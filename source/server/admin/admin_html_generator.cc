@@ -85,6 +85,25 @@ const char AdminHtmlStart[] = R"(
       document.getElementById("scope").value = scope;
       document.getElementById("stats").submit();
     }
+    function expandScope(scope) {
+      let url = 'stats?scope=' + scope + '&format=json';
+      url += '&type=' + document.getElementById('type').value;
+      if (document.getElementById('usedonly').checked) {
+        url += '&usedonly';
+      }
+      fetch(url).then(response => response.json())
+        .then(data => populateScope(scope, data));
+    }
+    function populateScope(scope, json) {
+      const pre = document.createElement('pre');
+      let lines = [];
+      for (let stat of json.stats) {
+        lines.push(stat.name + ": " + stat.value);
+      }
+      pre.textContent = lines.join('\n');
+      const label = document.getElementById('scope_' + scope);
+      label.parentNode.insertBefore(pre, label.nextSibling);
+    }
   </script>
 </head>
 <body>

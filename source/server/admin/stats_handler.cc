@@ -602,47 +602,55 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     server_.stats().forEachScope([](size_t) {}, add_scope);
   }
 
-  absl::string_view scope_name = params.scope_.has_value() ? params.scope_.value() : names[0];
-  Stats::StatNameManagedStorage scope_stat_name(scope_name, stats.symbolTable());
+  // If the scope is specified, then render all scopes that match it.
+  if (params.scope_.has_value()) {
+    Stats::StatNameManagedStorage scope_stat_name(params.scope_.value(), stats.symbolTable());
 
-  // Note that multiple scopes can exist with the same name, and also that
-  // scopes may be created/destroyed in other threads, whenever we are not
-  // holding the store's lock. So when we traverse the scopes, we'll both
-  // look for Scope objects matchiung our expected name, and we'll create
-  // a sorted list of sort names for use in populating next/previous buttons.
-  Context context(params, *render, response);
-  server_.stats().forEachScope([](size_t) {},
-                               [&scope_stat_name, &context](const Stats::Scope& scope) {
-    if (scope.prefix() == scope_stat_name.statName()) {
-      ENVOY_LOG_MISC(error, "Collecting {}", scope.constSymbolTable().toString(scope.prefix()));
-      context.collectScope(scope);
-    } else {
-      ENVOY_LOG_MISC(error, "Skipping {}", scope.constSymbolTable().toString(scope.prefix()));
+    // Note that multiple scopes can exist with the same name, and also that
+    // scopes may be created/destroyed in other threads, whenever we are not
+    // holding the store's lock. So when we traverse the scopes, we'll both
+    // look for Scope objects matchiung our expected name, and we'll create
+    // a sorted list of sort names for use in populating next/previous buttons.
+    Context context(params, *render, response);
+    server_.stats().forEachScope([](size_t) {},
+                                 [&scope_stat_name, &context](const Stats::Scope& scope) {
+      if (scope.prefix() == scope_stat_name.statName()) {
+        ENVOY_LOG_MISC(error, "Collecting {}", scope.constSymbolTable().toString(scope.prefix()));
+        context.collectScope(scope);
+      } else {
+        ENVOY_LOG_MISC(error, "Skipping {}", scope.constSymbolTable().toString(scope.prefix()));
+      }
+    });
+    context.emit();
+    render->render(response);
+  } else {
+    std::sort(names.begin(), names.end());
+    for (const std::string& name : names) {
+      response.add(absl::StrCat(
+          "    <a href='javascript:expandScope(\"", name, "\")' id='scope_", name, "'>", name,
+          "</a><br>\n"));
     }
-  });
-  context.emit();
 
-  // Determine the previous/next scopes for populating navigation buttons.
-  absl::string_view prev, next;
-  bool found = false;
-  std::sort(names.begin(), names.end());
-  for (uint32_t i = 0; i < names.size(); ++i) {
-    if (names[i] == scope_name) {
-      found = true;
-      if (i > 0) {
-        prev = names[i - 1];
-        ENVOY_LOG_MISC(error, "Found prev: {}", prev);
-      }
-      if (i < names.size() - 1) {
-        next = names[i + 1];
-        ENVOY_LOG_MISC(error, "Found next: {}", next);
+#if 0
+    // if the scope is unspecified, then render all the scopes.
+    for (uint32_t i = 0; i < names.size(); ++i) {
+      if (names[i] == scope_name) {
+        found = true;
+        if (i > 0) {
+          prev = names[i - 1];
+          ENVOY_LOG_MISC(error, "Found prev: {}", prev);
+        }
+        if (i < names.size() - 1) {
+          next = names[i + 1];
+          ENVOY_LOG_MISC(error, "Found next: {}", next);
+        }
       }
     }
+#endif
   }
 
-  render->render(response);
-
   if (params.format_ == Format::Html) {
+    /*
     if (!prev.empty()) {
       response.add(absl::StrCat("  <a href='javascript:setScope(\"", prev,
                                 "\")'>Previous</a>\n"));
@@ -650,7 +658,7 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     if (!next.empty()) {
       response.add(absl::StrCat("  <a href='javascript:setScope(\"", next, "\")'>Next</a>\n"));
     }
-
+    */
     response.add("</body>\n");
   }
 
