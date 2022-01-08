@@ -127,7 +127,6 @@ Http::Utility::QueryParams buildAutorizationQueryParams(
       absl::StrJoin(authScopesList(proto_config.auth_scopes()), " "), ":/=&? ");
   return query_params;
 }
-
 } // namespace
 
 FilterConfig::FilterConfig(
