@@ -115,8 +115,8 @@ struct CookieNames {
 };
 
 /**
- * This class encapsulates all data needed for the filter to operate so that we
- * don't pass around raw protobufs and other arbitrary data.
+ * This class encapsulates all data needed for the filter to operate so that we don't pass around
+ * raw protobufs and other arbitrary data.
  */
 class FilterConfig {
 public:
