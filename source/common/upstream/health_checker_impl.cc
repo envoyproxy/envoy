@@ -298,7 +298,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       host_->transportSocketFactory().implementsSecureTransport());
   StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource(),
                                          local_connection_info_provider_);
-  stream_info.onUpstreamHostSelected(host_);
+  stream_info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  stream_info.upstreamInfo()->setUpstreamHost(host_);
   parent_.request_headers_parser_->evaluateHeaders(*request_headers, stream_info);
   auto status = request_encoder->encodeHeaders(*request_headers, true);
   // Encoding will only fail if required request headers are missing.

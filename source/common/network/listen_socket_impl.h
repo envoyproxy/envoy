@@ -167,7 +167,8 @@ public:
 
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr) override {
     // internal listener socket does not support bind semantic.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    // TODO(lambdai) return an error.
+    PANIC("not implemented");
   }
 
   void close() override { ASSERT(io_handle_ == nullptr); }

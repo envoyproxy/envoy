@@ -176,7 +176,6 @@ envoy_cc_test(
         ":filter_manager_integration_proto_cc_proto",
         ":http_integration_lib",
         ":integration_lib",
-        "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/echo:config",
@@ -545,11 +544,9 @@ envoy_cc_test(
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
-        "//source/extensions/access_loggers/grpc:http_config",
         "//source/extensions/filters/http/buffer:config",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
-        "//test/integration/filters:stream_info_to_headers_filter_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -640,6 +637,7 @@ envoy_cc_test_library(
     deps = [
         ":http_integration_lib",
         "//test/common/upstream:utility_lib",
+        "//test/integration/filters:stream_info_to_headers_filter_lib",
     ],
 )
 
@@ -1414,7 +1412,6 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
-        "//source/extensions/access_loggers/grpc:http_config",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//source/extensions/filters/network/tcp_proxy:config",

@@ -42,6 +42,7 @@
 #include "source/common/router/reset_header_parser.h"
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
 #include "source/extensions/filters/http/common/utility.h"
@@ -367,7 +368,7 @@ RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& trac
     overall_sampling_ = tracing.overall_sampling();
   }
   for (const auto& tag : tracing.custom_tags()) {
-    custom_tags_.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
+    custom_tags_.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
   }
 }
 
@@ -1544,9 +1545,10 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     if (match.result_) {
       // The only possible action that can be used within the route matching context
       // is the RouteMatchAction, so this must be true.
-      ASSERT(match.result_->typeUrl() == RouteMatchAction::staticTypeUrl());
-      ASSERT(dynamic_cast<RouteMatchAction*>(match.result_.get()));
-      const RouteMatchAction& route_action = static_cast<const RouteMatchAction&>(*match.result_);
+      const auto result = match.result_();
+      ASSERT(result->typeUrl() == RouteMatchAction::staticTypeUrl());
+      ASSERT(dynamic_cast<RouteMatchAction*>(result.get()));
+      const RouteMatchAction& route_action = static_cast<const RouteMatchAction&>(*result);
 
       if (route_action.route()->matches(headers, stream_info, random_value)) {
         return route_action.route();

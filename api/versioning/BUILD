@@ -26,6 +26,7 @@ proto_library(
         "//envoy/config/cluster/v3:pkg",
         "//envoy/config/common/key_value/v3:pkg",
         "//envoy/config/common/matcher/v3:pkg",
+        "//envoy/config/common/mutation_rules/v3:pkg",
         "//envoy/config/core/v3:pkg",
         "//envoy/config/endpoint/v3:pkg",
         "//envoy/config/filter/thrift/router/v2alpha1:pkg",

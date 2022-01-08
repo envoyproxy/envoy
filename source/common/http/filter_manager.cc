@@ -285,10 +285,11 @@ void FilterMatchState::evaluateMatchTreeWithNewData(MatchDataUpdateFunc update_f
   match_tree_evaluated_ = match_result.match_state_ == Matcher::MatchState::MatchComplete;
 
   if (match_tree_evaluated_ && match_result.result_) {
-    if (SkipAction().typeUrl() == match_result.result_->typeUrl()) {
+    const auto result = match_result.result_();
+    if (SkipAction().typeUrl() == result->typeUrl()) {
       skip_filter_ = true;
     } else {
-      filter_->onMatchCallback(*match_result.result_);
+      filter_->onMatchCallback(*result);
     }
   }
 }
@@ -748,7 +749,7 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("fatal error adding decoded data");
   }
 }
 
@@ -1013,11 +1014,16 @@ void FilterManager::sendDirectLocalReply(
             state_.non_100_response_headers_encoded_ = true;
             filter_manager_callbacks_.encodeHeaders(*filter_manager_callbacks_.responseHeaders(),
                                                     end_stream);
-
+            if (state_.saw_downstream_reset_) {
+              return;
+            }
             maybeEndEncode(end_stream);
           },
           [&](Buffer::Instance& data, bool end_stream) -> void {
             filter_manager_callbacks_.encodeData(data, end_stream);
+            if (state_.saw_downstream_reset_) {
+              return;
+            }
             maybeEndEncode(end_stream);
           }},
       Utility::LocalReplyData{state_.is_grpc_request_, code, body, grpc_status, is_head_request});
@@ -1144,13 +1150,16 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     sendLocalReply(
         Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
         absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders,
-                     "{", status.message(), "}"));
+                     "{", StringUtil::replaceAllEmptySpace(status.message()), "}"));
     return;
   }
 
   const bool modified_end_stream = (end_stream && continue_data_entry == encoder_filters_.end());
   state_.non_100_response_headers_encoded_ = true;
   filter_manager_callbacks_.encodeHeaders(headers, modified_end_stream);
+  if (state_.saw_downstream_reset_) {
+    return;
+  }
   maybeEndEncode(modified_end_stream);
 
   if (!modified_end_stream) {
@@ -1221,7 +1230,7 @@ void FilterManager::addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::In
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("fatal error adding decoded data");
   }
 }
 
@@ -1290,6 +1299,9 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
 
   const bool modified_end_stream = end_stream && trailers_added_entry == encoder_filters_.end();
   filter_manager_callbacks_.encodeData(data, modified_end_stream);
+  if (state_.saw_downstream_reset_) {
+    return;
+  }
   maybeEndEncode(modified_end_stream);
 
   // If trailers were adding during encodeData we need to trigger decodeTrailers in order
@@ -1332,6 +1344,9 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
   }
 
   filter_manager_callbacks_.encodeTrailers(trailers);
+  if (state_.saw_downstream_reset_) {
+    return;
+  }
   maybeEndEncode(true);
 }
 

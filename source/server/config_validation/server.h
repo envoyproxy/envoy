@@ -82,11 +82,11 @@ public:
         Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
     return dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
   }
-  void drainListeners() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  DrainManager& drainManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void drainListeners() override {}
+  DrainManager& drainManager() override { PANIC("not implemented"); }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
-  void failHealthcheck(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  HotRestart& hotRestart() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void failHealthcheck(bool) override {}
+  HotRestart& hotRestart() override { PANIC("not implemented"); }
   Init::Manager& initManager() override { return init_manager_; }
   ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
@@ -94,13 +94,13 @@ public:
   Runtime::Loader& runtime() override { return Runtime::LoaderSingleton::get(); }
   void shutdown() override;
   bool isShutdown() override { return false; }
-  void shutdownAdmin() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void shutdownAdmin() override {}
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
-  bool healthCheckFailed() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  bool healthCheckFailed() override { return false; }
   const Options& options() override { return options_; }
-  time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  time_t startTimeFirstEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  time_t startTimeCurrentEpoch() override { PANIC("not implemented"); }
+  time_t startTimeFirstEpoch() override { PANIC("not implemented"); }
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
@@ -110,7 +110,7 @@ public:
   LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
-  void flushStats() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void flushStats() override {}
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }

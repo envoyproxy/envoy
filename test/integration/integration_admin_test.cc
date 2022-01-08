@@ -251,7 +251,7 @@ TEST_P(IntegrationAdminTest, Admin) {
               response->body());
     break;
   case Http::CodecType::HTTP3:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 
   EXPECT_EQ("200", request("admin", "GET", "/certs", response));

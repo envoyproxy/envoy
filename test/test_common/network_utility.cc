@@ -158,7 +158,7 @@ std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
   }
 
   // This seems to be needed on the coverage build for some reason.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("reached unexpected code");
 }
 
 std::pair<Address::InstanceConstSharedPtr, Network::SocketPtr>

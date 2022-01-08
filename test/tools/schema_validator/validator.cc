@@ -22,7 +22,7 @@ const std::string& Schema::toString(Type type) {
     return ROUTE;
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("reached unexpected code");
 }
 
 Options::Options(int argc, char** argv) {
@@ -69,7 +69,7 @@ void Validator::validate(const std::string& config_path, Schema::Type schema_typ
     break;
   }
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 }
 

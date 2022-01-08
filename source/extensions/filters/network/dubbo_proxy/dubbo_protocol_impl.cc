@@ -208,9 +208,9 @@ bool DubboProtocolImpl::encode(Buffer::Instance& buffer, const MessageMetadata& 
   case MessageType::Request:
   case MessageType::Oneway:
   case MessageType::Exception:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 }
 
