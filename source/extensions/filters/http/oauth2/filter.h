@@ -221,10 +221,9 @@ private:
 };
 
 /**
- * The filter is the primary entry point for the OAuth workflow. Its
- * responsibilities are to receive incoming requests and decide at what state of
- * the OAuth workflow they are in. Logic beyond that is broken into component
- * classes.
+ * The filter is the primary entry point for the OAuth workflow. Its responsibilities are to
+ * receive incoming requests and decide at what state of the OAuth workflow they are in. Logic
+ * beyond that is broken into component classes.
  */
 class OAuth2Filter : public Http::PassThroughDecoderFilter, public FilterCallbacks {
 public:
@@ -238,8 +237,8 @@ public:
   void onGetAccessTokenSuccess(const std::string& access_code, const std::string& id_token,
                                const std::string& refresh_token,
                                std::chrono::seconds expires_in) override;
-  // a catch-all function used for request failures. we don't retry, as a user
-  // can simply refresh the page in the case of a network blip.
+  // a catch-all function used for request failures. we don't retry, as a user can simply refresh
+  // the page in the case of a network blip.
   void sendUnauthorizedResponse() override;
 
   void finishFlow();
@@ -264,8 +263,8 @@ private:
   FilterConfigSharedPtr config_;
   TimeSource& time_source_;
 
-  // Determines whether or not the current request can skip the entire OAuth
-  // flow (HMAC is valid, connection is mTLS, etc.)
+  // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
+  // connection is mTLS, etc.)
   bool canSkipOAuth(Http::RequestHeaderMap& headers) const;
 
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
