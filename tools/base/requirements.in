@@ -1,13 +1,14 @@
 abstracts>=0.0.12
 aio.api.bazel
 aio.core>=0.2.0
-aio.run.runner>=0.2.1
+aio.run.runner>=0.2.2
 aio.run.checker>=0.2.1
 colorama
 coloredlogs
 coverage
 envoy.base.utils>=0.0.14
 envoy.code_format.python_check>=0.0.7
+envoy.dependency.check
 envoy.dependency.cve_scan>=0.0.4
 envoy.dependency.pip_check>=0.1.0
 envoy.distribution.release>=0.0.7
