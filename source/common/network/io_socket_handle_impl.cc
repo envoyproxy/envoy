@@ -608,17 +608,10 @@ absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
     if (socket_address->ip()->version() == interface_address.interface_addr_->ip()->version()) {
       // Compare address _without port_.
       // TODO: create common addressAsStringWithoutPort method to simplify code here.
-      absl::uint128 interface_address_value;
-      switch (interface_address.interface_addr_->ip()->version()) {
-      case Address::IpVersion::v4:
-        interface_address_value = interface_address.interface_addr_->ip()->ipv4()->address();
-        break;
-      case Address::IpVersion::v6:
-        interface_address_value = interface_address.interface_addr_->ip()->ipv6()->address();
-        break;
-      default:
-        NOT_REACHED_GCOVR_EXCL_LINE;
-      }
+      absl::uint128 interface_address_value =
+          interface_address.interface_addr_->ip()->version() == Address::IpVersion::v4
+              ? interface_address.interface_addr_->ip()->ipv4()->address()
+              : interface_address.interface_addr_->ip()->ipv6()->address();
 
       if (socket_address_value == interface_address_value) {
         selected_interface_name = interface_address.interface_name_;
