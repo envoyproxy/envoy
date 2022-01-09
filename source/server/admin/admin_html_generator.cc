@@ -36,6 +36,10 @@ const char AdminHtmlStart[] = R"(
 <head>
   <title>Envoy Admin</title>
   <link rel='shortcut icon' type='image/png' href='@FAVICON@'/>
+  <!--
+     <link rel='stylesheet' href='http://localhost:8081/admin.css' />
+     <script src="http://localhost:8081/admin.js"></script>
+  -->
   <style>
     .home-table {
       font-family: sans-serif;
@@ -79,43 +83,111 @@ const char AdminHtmlStart[] = R"(
       padding-left: 20px;
       text-align: right;
     }
+
+    #scopes-outline {
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif
+    }
+
+    .scope-children {
+      list-style-type: none;
+    }
+
+    /* Style the caret/arrow */
+    .caret {
+      cursor: pointer;
+      user-select: none; /* Prevent text selection */
+    }
+
+    /* Create the caret/arrow with a unicode, and style it */
+    .caret::before {
+      content: "\25B6";
+      color: black;
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    /* Rotate the caret/arrow icon when clicked on (using JavaScript) */
+    .caret-down::before {
+      transform: rotate(90deg);
+    }*/
   </style>
-<!--
-  <script src="http://localhost:8081/admin.js"></script>
--->
   <script>
     function setScope(scope) {
       document.getElementById("scope").value = scope;
       document.getElementById("stats").submit();
     }
 
-    function expandScope(scope) {
+    function expandScope(parent, scope) {
       let url = 'stats?scope=' + scope + '&format=json';
       url += '&type=' + document.getElementById('type').value;
       if (document.getElementById('usedonly').checked) {
         url += '&usedonly';
       }
       fetch(url).then(response => response.json())
-          .then(data => populateScope(scope, data));
+          .then(json => populateScope(parent, scope, json));
     }
 
-    function populateScope(scope, json) {
-      let prev = document.getElementById('scope_' + scope);
+    function addScope(parent, scope) {
+      const li_tag = document.createElement('li');
+      const span_tag = document.createElement('span');
+      span_tag.setAttribute('class', 'caret');
+      span_tag.textContent = scope;
+      const children_tag = document.createElement('ul');
+      children_tag.setAttribute('class', 'scope-children');
+      li_tag.appendChild(span_tag);
+      li_tag.appendChild(children_tag);
+      parent.appendChild(li_tag);
+
+      span_tag.addEventListener("click", () => {
+        span_tag.classList.toggle("caret-down");
+        if (children_tag.firstChild) {
+          while (children_tag.firstChild) {
+            children_tag.removeChild(children_tag.firstChild);
+          }
+        } else {
+          expandScope(children_tag, scope);
+        }
+      });
+    }
+
+    function populateScopes(json) {
+      const parent = document.getElementById('scopes-outline');
+      for (let scope of json.scopes) {
+        addScope(parent, scope);
+    /*
+        const a_tag = document.createElement('a');
+        a_tag.id = 'scope_' + scope;
+        a_tag.setAttribute("href", 'javascript:expandScope("' + scope + '")');
+        a_tag.textContent = scope;
+        document.body.appendChild(a_tag);
+        document.body.appendChild(document.createElement('br'));
+    */
+      }
+    }
+
+    function populateScope(parent, scope, json) {
+      //let prev = document.getElementById('scope_' + scope);
 
       for (let subscope of json.scopes) {
-        const br = document.createElement('br');
-        prev.parentNode.insertBefore(br, prev.nextSibling);
-        prev = br;
+    /*
+    const br = document.createElement('br');
+    prev.parentNode.insertBefore(br, prev.nextSibling);
+    prev = br;
+    */
 
+    addScope(parent, subscope);
+    /*
         const a_tag = document.createElement('a');
         a_tag.textContent = subscope;
         a_tag.id = 'scope_' + subscope;
         a_tag.setAttribute("href", 'javascript:expandScope("' + subscope + '")');
         prev.parentNode.insertBefore(a_tag, prev.nextSibling);
         prev = a_tag;
+    */
       }
 
-      let lines = [];
       for (let stat of json.stats) {
         if (stat.histograms && stat.histograms.computed_quantiles) {
           for (let histogram of stat.histograms.computed_quantiles) {
@@ -126,16 +198,21 @@ const char AdminHtmlStart[] = R"(
               }
             }
             const val_str = (val_strs.length == 0) ? 'no values' : ('[' + val_strs.join(',') + ']');
-            lines.push(histogram.name + ": " + val_str);
+            const li_tag = document.createElement('li');
+            li_tag.textContent = histogram.name + ": " + val_str;
+            parent.appendChild(li_tag);
           }
         } else {
-          lines.push(stat.name + ": " + stat.value);
+          const li_tag = document.createElement('li');
+          li_tag.textContent = stat.name + ": " + stat.value;
+          parent.appendChild(li_tag);
         }
       }
-
+    /*
       const pre = document.createElement('pre');
       pre.textContent = lines.join('\n');
       prev.parentNode.insertBefore(pre, prev.nextSibling);
+    */
     }
   </script>
 </head>

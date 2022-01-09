@@ -458,7 +458,7 @@ public:
         std::string::size_type dot = name.find('.');
         if (dot != std::string::npos) {
           name.resize(dot);
-          prefixes_.insert(name);
+          addScope(name);
         }
       }
       return true;
@@ -498,7 +498,14 @@ public:
   }
 
   void emitScopes() {
+    // Prune the scopes-list so that if both "a.b.c" and "a.b" are present, we drop "a.b.c".
     for (const std::string& scope : scopes_) {
+      size_t last_dot = scope.rfind('.');
+      if (last_dot != 0 && last_dot != std::string::npos &&
+          scopes_.find(scope.substr(0, last_dot)) != scopes_.end()) {
+        ENVOY_LOG_MISC(error, "skipping redundant sub-scope {}", scope);
+        continue;
+      }
       render_.addScope(scope);
     }
   }
@@ -600,7 +607,7 @@ public:
   Stats::StatSet<Stats::Gauge> gauges_;
   Stats::StatSet<Stats::TextReadout> text_readouts_;
   Stats::StatSet<Stats::Histogram> histograms_;
-  std::set<std::string> prefixes_;
+  //std::set<std::string> prefixes_;
   std::set<std::string> scopes_;
   //Stats::StatSet<Stats::CounterSharedPtr> counters_;
 };
@@ -658,52 +665,69 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
       // the user types, in which case we'll still be filtering based on stat name
       // prefix.
       if (scope_prefix_str == params_scope || scope_prefix_str.empty()) {
-        ENVOY_LOG_MISC(error, "Collecting {}", scope_prefix_str);
         context.collectScope(scope);
       } else if (absl::StartsWith(scope_prefix_str, params_scope) &&
                  scope_prefix_str[params_scope.size()] == '.') {
-        ENVOY_LOG_MISC(error, "Add sub-scope {}", scope_prefix_str);
         context.addScope(scope_prefix_str);
       }
     });
     context.emit();
     render->render(response);
+  } else if (params.format_ == Format::Html) {
+    // Delegate to JavaScript to fetch all top-level scopes and render as an outline.
+    std::string url = absl::StrCat("stats?format=json&type=", typeToString(params.type_));
+    if (params.used_only_) {
+      url += "&usedonly";
+    }
+#if 0
+    if (params.filter_.has_value()) {
+      absl::StrAppend(&url, "&filter=", params.filter_.value());
+    }
+#endif
+    response.add(absl::StrCat(
+        "<ul id='scopes-outline'></ul>\n"
+        "<script>\n"
+        "  fetch('", url, "')\n",
+        "    .then(response => response.json())\n",
+        "    .then(data => populateScopes(data));\n"
+        "</script>\n"));
   } else {
     // Get an ordered set of scope names, which are used for previous/next
     // navigation, and to choose a default scope name in case none was specified
     // in a query param.
-    {
-      //Stats::StatNameHashSet prefixes;
-      Stats::StatFn<const Stats::Scope> add_scope = [this, &context](const Stats::Scope& scope) {
-        //if (prefixes.insert(scope.prefix()).second) {
-        std::string prefix_str = server_.stats().symbolTable().toString(scope.prefix());
+    Stats::StatFn<const Stats::Scope> add_scope = [this, &context](const Stats::Scope& scope) {
+      //if (prefixes.insert(scope.prefix()).second) {
+      std::string prefix_str = server_.stats().symbolTable().toString(scope.prefix());
 
-        //#if 0
-        // Truncate at dot. We are abstracting the scope so we
-        std::string::size_type dot = prefix_str.find('.');
-        if (dot != std::string::npos) {
-          prefix_str.resize(dot);
-        }
-        //#endif
+      //#if 0
+      // Truncate at dot. We are abstracting the scope so we
+      std::string::size_type dot = prefix_str.find('.');
+      if (dot != std::string::npos) {
+        prefix_str.resize(dot);
+      }
+      //#endif
 
-        // If the scope name is blank, then we need to find all the prefixes in
-        // the scope by iterating over all the stats in it.
-        if (prefix_str.empty()) {
-          context.collectScopePrefixes(scope);
-        } else {
-          context.prefixes_.insert(prefix_str);
-        }
-        //}
-      };
-      server_.stats().forEachScope([](size_t) {}, add_scope);
-    }
+      // If the scope name is blank, then we need to find all the prefixes in
+      // the scope by iterating over all the stats in it.
+      if (prefix_str.empty()) {
+        context.collectScopePrefixes(scope);
+      } else {
+        //context.prefixes_.insert(prefix_str);
+        context.addScope(prefix_str);
+      }
+      //}
+    };
+    server_.stats().forEachScope([](size_t) {}, add_scope);
+    context.emit();
+    render->render(response);
+
+#if 0
     for (const std::string& name : context.prefixes_) {
       response.add(absl::StrCat(
           "    <a href='javascript:expandScope(\"", name, "\")' id='scope_", name, "'>", name,
           "</a><br>\n"));
     }
 
-#if 0
     // if the scope is unspecified, then render all the scopes.
     for (uint32_t i = 0; i < names.size(); ++i) {
       if (names[i] == scope_name) {
