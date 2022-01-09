@@ -80,40 +80,20 @@ private:
 
   struct Params {
     Http::Code parse(absl::string_view url, Buffer::Instance& response);
-    template <class StatType> bool shouldShowMetric(const StatType& metric) const {
-      if (used_only_ && !metric.used()) {
-        return false;
-      }
-      if (scope_.has_value() || filter_.has_value()) {
-        std::string name = metric.name();
-        if (filter_.has_value() && !std::regex_search(name, filter_.value())) {
-          return false;
-        }
-        if (scope_.has_value()) {
-          //ENVOY_LOG_MISC(error, "shouldShowMetric searching in {} for {}", name, scope_.value() + ".");
-          if (!absl::StartsWith(name, scope_.value() + ".")) {
-            return false;
-          }
-        }
-      }
-      return true;
-    }
+    bool shouldShowMetric(const Stats::Metric& metric) const;
 
     bool used_only_{false};
     bool prometheus_text_readouts_{false};
     bool pretty_{false};
     Format format_{Format::Text}; // If no `format=` param we use Text, but UI defaults to HTML.
     Type type_{Type::All};
-    Stats::PageDirection direction_{Stats::PageDirection::Forward};
-    std::string start_;
     Type start_type_{Type::TextReadouts};
     std::string filter_string_;
     absl::optional<std::regex> filter_;
-    absl::optional<std::string> scope_;
-    absl::optional<uint32_t> page_size_; // If no `pagesize=` param we use unlimited,
-                                         // but UI defaults to 25.
+    std::string scope_;
     Http::Utility::QueryParams query_;
   };
+
 
   friend class StatsHandlerTest;
 

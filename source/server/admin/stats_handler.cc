@@ -83,6 +83,24 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
   return Http::Code::OK;
 }
 
+bool StatsHandler::Params::shouldShowMetric(const Stats::Metric& metric) const {
+  if (used_only_ && !metric.used()) {
+    return false;
+  }
+  if (!scope_.empty() || filter_.has_value()) {
+    std::string name = metric.name();
+    if (filter_.has_value() && !std::regex_search(name, filter_.value())) {
+      return false;
+    }
+    if (!scope_.empty()) {
+      if (!absl::StartsWith(name, scope_ + ".")) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& response) {
   query_ = Http::Utility::parseAndDecodeQueryString(url);
   used_only_ = query_.find("usedonly") != query_.end();
@@ -93,19 +111,6 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
   }
   if (filter_.has_value()) {
     filter_string_ = query_.find("filter")->second;
-  }
-
-  Http::Utility::QueryParams::const_iterator pagesize_iter = query_.find("pagesize");
-  if (pagesize_iter != query_.end()) {
-    // We don't accept arbitrary page sizes as they might be dangerous.
-    uint32_t page_size = 0;
-    if (pagesize_iter->second == "unlimited") {
-      page_size_ = absl::nullopt;
-    } else if (!absl::SimpleAtoi(pagesize_iter->second, &page_size) || page_size > 1000) {
-      response.add("pagesize invalid -- must be <= 1000 or unlimited");
-      return Http::Code::BadRequest;
-    }
-    page_size_ = page_size;
   }
 
   auto parse_type = [](absl::string_view str, Type& type) {
@@ -147,54 +152,10 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
     }
   }
 
-  auto set_param = [this](const std::string& name, std::function<void(const std::string&)> setter) {
-    auto iter = query_.find(name);
-    if (iter != query_.end()) {
-      setter(iter->second);
-    }
-  };
-
-  set_param("scope", [this](const std::string& val) { scope_ = val; });
-
-#if 0
-  auto parse_start = [this, parse_type](absl::string_view val) -> bool {
-    std::vector<absl::string_view> split = absl::StrSplit(val, absl::MaxSplits(StartSeparator, 1));
-    if ((split.size() != 2) || !parse_type(split[0], start_type_)) {
-      return false;
-    }
-    start_ = std::string(split[1]);
-    return true;
-  };
-
-  // For clarity and brevity of command-line options, we parse &after=foo to
-  // mean display the first page of stats alphabetically after "foo", and
-  // &&before=bar to mean display the last page of stats alphabetically before
-  // "bar". It is not valid to specify both &before=... and after, though that
-  // could make sense in principle. It's just not that useful for paging, so
-  // it is not implemented. If nothing is specified, that implies "&after=",
-  // which gives you the first page.
-  Http::Utility::QueryParams::const_iterator after_iter = query_.find("after");
-  Http::Utility::QueryParams::const_iterator before_iter = query_.find("before");
-  if (before_iter != query_.end() && !before_iter->second.empty()) {
-    if (after_iter != query_.end() && !after_iter->second.empty()) {
-      response.add("Only one of &before= and &after= is allowed");
-      return Http::Code::BadRequest;
-    }
-    if (!parse_start(before_iter->second)) {
-      response.add("bad before= param");
-      return Http::Code::BadRequest;
-    }
-    direction_ = Stats::PageDirection::Backward;
-  } else {
-    direction_ = Stats::PageDirection::Forward;
-    if (after_iter != query_.end() && !after_iter->second.empty() &&
-        !parse_start(after_iter->second)) {
-      response.add("bad after= param");
-      return Http::Code::BadRequest;
-    }
+  auto scope_iter = query_.find("scope");
+  if (scope_iter != query_.end()) {
+    scope_ = scope_iter->second;
   }
-#endif
-
   return Http::Code::OK;
 }
 
@@ -445,8 +406,6 @@ public:
   }
 
   template<class StatType> void collectPrefixes(Type type, const Stats::Scope& scope) {
-    //ENVOY_LOG_MISC(error, "collect {}", typeToString(type));
-
     // Bail early if the  requested type does not match the current type.
     if (params_.type_ != Type::All && params_.type_ != type) {
       return;
@@ -510,106 +469,18 @@ public:
     }
   }
 
-#if 0
-  template <class StatType>
-      void emit(Type type /*, std::function<void(StatType& stat_type)> render_fn */,
-
-    //ENVOY_LOG_MISC(error, "emit {}", typeToString(type));
-
-    // Bail early if the  requested type does not match the current type.
-    if (params_.type_ != Type::All && params_.type_ != type) {
-      return;
-    }
-
-    std::vector<Stats::RefcountPtr<StatType>> stats;
-    scope_.iterate([this, &stats](Stats::RefcountPtr<StatType>& stat) {
-      if (params_.shouldShowMetric(stat)) {
-        stats.push_back(&stat);
-      }
-    });
-
-    if (stats.empty()) {
-      render_.noStats(type);
-    }
-
-    struct Cmp {
-      bool operator()(const Stats::RefcountPtr<StatType>& a,
-                      const Stats::RefcountPtr<StatType>& b) const {
-        return a->constSymbolTable().lessThan(a->statName(), b->statName());
-      }
-    };
-
-    std::sort(stats.begin(), stats.end());
-    for (const auto& stat : stats) {
-      //render_fn(*stat);
-      render_.generate(*stat);
-    }
-  }
-
-  void textReadouts() {
-    emit<Stats::TextReadout>(Type::TextReadouts);
-    // [this](Stats::TextReadout& text_readout) { render().textReadout(text_readout); });
-  }
-
-  void counters() {
-    emit<Stats::Counter>(Type::Counters);
-
-    /*
-    emit<Stats::Counter>(
-        Type::Counters, CountersLabel,
-        [this](Stats::Counter& counter) { render().counter(counter); },
-        [this](Stats::PageFn<Stats::Counter> render) -> bool {
-          return scope_.iterate<Stats::Counter>(render, start(Type::Counters), params_.direction_);
-        });
-    */
-  }
-
-  void gauges() {
-    emit<Stats::Gauge>(Type::Gauges);
-    /*emit<Stats::Gauge>(
-        Type::Gauges, GaugesLabel, [this](Stats::Gauge& gauge) { render().gauge(gauge); },
-        [this](Stats::PageFn<Stats::Gauge> render) -> bool {
-          return scope_.gaugePage(render, start(Type::Gauges), params_.direction_);
-          });*/
-  }
-
-  void histograms() {
-    emit<Stats::Histogram>(Type::Histograms);
-        /*
-        Type::Histograms, HistogramsLabel,
-        [this](Stats::Histogram& histogram) { render().histogram(histogram); },
-        [this](Stats::PageFn<Stats::Histogram> render) -> bool {
-          return stats_.histogramPage(render, start(Type::Histograms), params_.direction_);
-          });*/
-  }
-#endif
-
   void addScope(const std::string& scope) { scopes_.insert(scope); }
-
 
   Render& render() { return render_; }
 
-  absl::string_view start(Type type) const {
-    if (type == params_.start_type_) {
-      return params_.start_;
-    }
-    return absl::string_view();
-  }
-
-  int64_t num_{0};
   const Params& params_;
   Render& render_;
   Buffer::Instance& response_;
-  //Stats::Store& stats_;
-  std::string next_start_;
-  std::string prev_start_;
   Stats::StatSet<Stats::Counter> counters_;
   Stats::StatSet<Stats::Gauge> gauges_;
   Stats::StatSet<Stats::TextReadout> text_readouts_;
   Stats::StatSet<Stats::Histogram> histograms_;
-  //std::set<std::string> prefixes_;
   std::set<std::string> scopes_;
-  //Stats::StatSet<Stats::CounterSharedPtr> counters_;
 };
 
 Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
@@ -649,25 +520,24 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
   Context context(params, *render, response);
 
   // If the scope is specified, then render all scopes that match it.
-  if (params.scope_.has_value()) {
+  if (!params.scope_.empty()) {
     // Note that multiple scopes can exist with the same name, and also that
     // scopes may be created/destroyed in other threads, whenever we are not
     // holding the store's lock. So when we traverse the scopes, we'll both
     // look for Scope objects matchiung our expected name, and we'll create
     // a sorted list of sort names for use in populating next/previous buttons.
-    ASSERT(!params.scope_.value().empty());
-    std::string params_scope = params.scope_.value();
-    stats.forEachScope([](size_t) {}, [this, &params_scope, &context](const Stats::Scope& scope) {
+    ASSERT(!params.scope_.empty());
+    stats.forEachScope([](size_t) {}, [this, &params, &context](const Stats::Scope& scope) {
       std::string scope_prefix_str = server_.stats().symbolTable().toString(scope.prefix());
 
       // If the scope matches the prefix of what the user wants, append in the
       // stats from it. Note that scopes with a prefix of "" will match anything
       // the user types, in which case we'll still be filtering based on stat name
       // prefix.
-      if (scope_prefix_str == params_scope || scope_prefix_str.empty()) {
+      if (scope_prefix_str == params.scope_ || scope_prefix_str.empty()) {
         context.collectScope(scope);
-      } else if (absl::StartsWith(scope_prefix_str, params_scope) &&
-                 scope_prefix_str[params_scope.size()] == '.') {
+      } else if (absl::StartsWith(scope_prefix_str, params.scope_) &&
+                 scope_prefix_str[params.scope_.size()] == '.') {
         context.addScope(scope_prefix_str);
       }
     });
@@ -679,11 +549,9 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     if (params.used_only_) {
       url += "&usedonly";
     }
-#if 0
-    if (params.filter_.has_value()) {
-      absl::StrAppend(&url, "&filter=", params.filter_.value());
+    if (params.filter_string_.empty()) {
+      absl::StrAppend(&url, "&filter=", params.filter_string_);
     }
-#endif
     response.add(absl::StrCat(
         "<ul id='scopes-outline'></ul>\n"
         "<script>\n"
@@ -696,65 +564,28 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     // navigation, and to choose a default scope name in case none was specified
     // in a query param.
     Stats::StatFn<const Stats::Scope> add_scope = [this, &context](const Stats::Scope& scope) {
-      //if (prefixes.insert(scope.prefix()).second) {
       std::string prefix_str = server_.stats().symbolTable().toString(scope.prefix());
 
-      //#if 0
       // Truncate at dot. We are abstracting the scope so we
       std::string::size_type dot = prefix_str.find('.');
       if (dot != std::string::npos) {
         prefix_str.resize(dot);
       }
-      //#endif
 
       // If the scope name is blank, then we need to find all the prefixes in
       // the scope by iterating over all the stats in it.
       if (prefix_str.empty()) {
         context.collectScopePrefixes(scope);
       } else {
-        //context.prefixes_.insert(prefix_str);
         context.addScope(prefix_str);
       }
-      //}
     };
     server_.stats().forEachScope([](size_t) {}, add_scope);
     context.emit();
     render->render(response);
-
-#if 0
-    for (const std::string& name : context.prefixes_) {
-      response.add(absl::StrCat(
-          "    <a href='javascript:expandScope(\"", name, "\")' id='scope_", name, "'>", name,
-          "</a><br>\n"));
-    }
-
-    // if the scope is unspecified, then render all the scopes.
-    for (uint32_t i = 0; i < names.size(); ++i) {
-      if (names[i] == scope_name) {
-        found = true;
-        if (i > 0) {
-          prev = names[i - 1];
-          ENVOY_LOG_MISC(error, "Found prev: {}", prev);
-        }
-        if (i < names.size() - 1) {
-          next = names[i + 1];
-          ENVOY_LOG_MISC(error, "Found next: {}", next);
-        }
-      }
-    }
-#endif
   }
 
   if (params.format_ == Format::Html) {
-    /*
-    if (!prev.empty()) {
-      response.add(absl::StrCat("  <a href='javascript:setScope(\"", prev,
-                                "\")'>Previous</a>\n"));
-    }
-    if (!next.empty()) {
-      response.add(absl::StrCat("  <a href='javascript:setScope(\"", next, "\")'>Next</a>\n"));
-    }
-    */
     response.add("</body>\n");
   }
 
@@ -968,10 +799,6 @@ Admin::UrlHandler StatsHandler::statsHandler() {
             "format",
             "File format to use.",
             {"html", "text", "json", "prometheus"}},
-           {Admin::ParamDescriptor::Type::Enum,
-            "pagesize",
-            "Number of stats to show per page..",
-            {"25", "100", "1000", "unlimited"}},
            {Admin::ParamDescriptor::Type::Enum,
             "type",
             "Stat types to include.",
