@@ -242,6 +242,7 @@ public:
   virtual void generate(Stats::Gauge&) PURE;
   virtual void generate(Stats::TextReadout&) PURE;
   virtual void generate(Stats::Histogram&) PURE;
+  virtual void addScope(const std::string&) {}
   virtual void noStats(Type type) { UNREFERENCED_PARAMETER(type); }
   virtual void render(Buffer::Instance& response) PURE;
 };
@@ -313,7 +314,9 @@ public:
   void generate(Stats::Counter& counter) override {
     add(counter, ValueUtil::numberValue(counter.value()));
   }
-  void generate(Stats::Gauge& gauge) override { add(gauge, ValueUtil::numberValue(gauge.value())); }
+  void generate(Stats::Gauge& gauge) override {
+    add(gauge, ValueUtil::numberValue(gauge.value()));
+  }
   void generate(Stats::TextReadout& text_readout) override {
     add(text_readout, ValueUtil::stringValue(text_readout.value()));
   }
@@ -357,6 +360,10 @@ public:
     }
   }
 
+  void addScope(const std::string& prefix) override {
+    scope_array_.push_back(ValueUtil::stringValue(prefix));
+  }
+
   void render(Buffer::Instance& response) override {
     if (found_used_histogram_) {
       auto* histograms_obj_fields = histograms_obj_.mutable_fields();
@@ -369,6 +376,7 @@ public:
 
     auto* document_fields = document_.mutable_fields();
     (*document_fields)["stats"] = ValueUtil::listValue(stats_array_);
+    (*document_fields)["scopes"] = ValueUtil::listValue(scope_array_);
     response.add(MessageUtil::getJsonStringFromMessageOrDie(document_, params_.pretty_, true));
   }
 
@@ -384,6 +392,7 @@ private:
   const StatsHandler::Params& params_;
   ProtobufWkt::Struct document_;
   std::vector<ProtobufWkt::Value> stats_array_;
+  std::vector<ProtobufWkt::Value> scope_array_;
   ProtobufWkt::Struct histograms_obj_;
   ProtobufWkt::Struct histograms_obj_container_;
   std::vector<ProtobufWkt::Value> computed_quantile_array_;
@@ -399,12 +408,22 @@ public:
     collect<Stats::TextReadout>(Type::TextReadouts, scope, text_readouts_);
     collect<Stats::Counter>(Type::Counters, scope, counters_);
     collect<Stats::Gauge>(Type::Gauges, scope, gauges_);
+    collect<Stats::Histogram>(Type::Histograms, scope, histograms_);
+  }
+
+  void collectScopePrefixes(const Stats::Scope& scope) {
+    collectPrefixes<Stats::TextReadout>(Type::TextReadouts, scope);
+    collectPrefixes<Stats::Counter>(Type::Counters, scope);
+    collectPrefixes<Stats::Gauge>(Type::Gauges, scope);
+    collectPrefixes<Stats::Histogram>(Type::Histograms, scope);
   }
 
   void emit() {
     emit<Stats::TextReadout>(Type::TextReadouts, text_readouts_);
     emit<Stats::Counter>(Type::Counters, counters_);
     emit<Stats::Gauge>(Type::Gauges, gauges_);
+    emit<Stats::Histogram>(Type::Histograms, histograms_);
+    emitScopes();
   }
 
   template<class StatType> void collect(Type type, const Stats::Scope& scope,
@@ -419,6 +438,28 @@ public:
     Stats::IterateFn<StatType> fn = [this, &set](const Stats::RefcountPtr<StatType>& stat) -> bool {
       if (params_.shouldShowMetric(*stat)) {
         set.insert(stat.get());
+      }
+      return true;
+    };
+    scope.iterate(fn);
+  }
+
+  template<class StatType> void collectPrefixes(Type type, const Stats::Scope& scope) {
+    //ENVOY_LOG_MISC(error, "collect {}", typeToString(type));
+
+    // Bail early if the  requested type does not match the current type.
+    if (params_.type_ != Type::All && params_.type_ != type) {
+      return;
+    }
+
+    Stats::IterateFn<StatType> fn = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
+      if (params_.shouldShowMetric(*stat)) {
+        std::string name = stat->name();
+        std::string::size_type dot = name.find('.');
+        if (dot != std::string::npos) {
+          name.resize(dot);
+          prefixes_.insert(name);
+        }
       }
       return true;
     };
@@ -456,6 +497,11 @@ public:
     }
   }
 
+  void emitScopes() {
+    for (const std::string& scope : scopes_) {
+      render_.addScope(scope);
+    }
+  }
 
 #if 0
   template <class StatType>
@@ -531,6 +577,9 @@ public:
   }
 #endif
 
+  void addScope(const std::string& scope) { scopes_.insert(scope); }
+
+
   Render& render() { return render_; }
 
   absl::string_view start(Type type) const {
@@ -550,6 +599,9 @@ public:
   Stats::StatSet<Stats::Counter> counters_;
   Stats::StatSet<Stats::Gauge> gauges_;
   Stats::StatSet<Stats::TextReadout> text_readouts_;
+  Stats::StatSet<Stats::Histogram> histograms_;
+  std::set<std::string> prefixes_;
+  std::set<std::string> scopes_;
   //Stats::StatSet<Stats::CounterSharedPtr> counters_;
 };
 
@@ -587,45 +639,65 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     break;
   }
 
-  // Get an ordered set of scope names, which are used for previous/next
-  // navigation, and to choose a default scope name in case none was specified
-  // in a query param.
-  std::vector<std::string> names;
-  {
-    Stats::StatNameHashSet prefixes;
-    Stats::StatFn<const Stats::Scope> add_scope =
-        [&prefixes, &names, this](const Stats::Scope& scope) {
-      if (prefixes.insert(scope.prefix()).second) {
-        names.emplace_back(server_.stats().symbolTable().toString(scope.prefix()));
-      }
-    };
-    server_.stats().forEachScope([](size_t) {}, add_scope);
-  }
+  Context context(params, *render, response);
 
   // If the scope is specified, then render all scopes that match it.
   if (params.scope_.has_value()) {
-    Stats::StatNameManagedStorage scope_stat_name(params.scope_.value(), stats.symbolTable());
-
     // Note that multiple scopes can exist with the same name, and also that
     // scopes may be created/destroyed in other threads, whenever we are not
     // holding the store's lock. So when we traverse the scopes, we'll both
     // look for Scope objects matchiung our expected name, and we'll create
     // a sorted list of sort names for use in populating next/previous buttons.
-    Context context(params, *render, response);
-    server_.stats().forEachScope([](size_t) {},
-                                 [&scope_stat_name, &context](const Stats::Scope& scope) {
-      if (scope.prefix() == scope_stat_name.statName()) {
-        ENVOY_LOG_MISC(error, "Collecting {}", scope.constSymbolTable().toString(scope.prefix()));
+    ASSERT(!params.scope_.value().empty());
+    std::string params_scope = params.scope_.value();
+    stats.forEachScope([](size_t) {}, [this, &params_scope, &context](const Stats::Scope& scope) {
+      std::string scope_prefix_str = server_.stats().symbolTable().toString(scope.prefix());
+
+      // If the scope matches the prefix of what the user wants, append in the
+      // stats from it. Note that scopes with a prefix of "" will match anything
+      // the user types, in which case we'll still be filtering based on stat name
+      // prefix.
+      if (scope_prefix_str == params_scope || scope_prefix_str.empty()) {
+        ENVOY_LOG_MISC(error, "Collecting {}", scope_prefix_str);
         context.collectScope(scope);
-      } else {
-        ENVOY_LOG_MISC(error, "Skipping {}", scope.constSymbolTable().toString(scope.prefix()));
+      } else if (absl::StartsWith(scope_prefix_str, params_scope) &&
+                 scope_prefix_str[params_scope.size()] == '.') {
+        ENVOY_LOG_MISC(error, "Add sub-scope {}", scope_prefix_str);
+        context.addScope(scope_prefix_str);
       }
     });
     context.emit();
     render->render(response);
   } else {
-    std::sort(names.begin(), names.end());
-    for (const std::string& name : names) {
+    // Get an ordered set of scope names, which are used for previous/next
+    // navigation, and to choose a default scope name in case none was specified
+    // in a query param.
+    {
+      //Stats::StatNameHashSet prefixes;
+      Stats::StatFn<const Stats::Scope> add_scope = [this, &context](const Stats::Scope& scope) {
+        //if (prefixes.insert(scope.prefix()).second) {
+        std::string prefix_str = server_.stats().symbolTable().toString(scope.prefix());
+
+        //#if 0
+        // Truncate at dot. We are abstracting the scope so we
+        std::string::size_type dot = prefix_str.find('.');
+        if (dot != std::string::npos) {
+          prefix_str.resize(dot);
+        }
+        //#endif
+
+        // If the scope name is blank, then we need to find all the prefixes in
+        // the scope by iterating over all the stats in it.
+        if (prefix_str.empty()) {
+          context.collectScopePrefixes(scope);
+        } else {
+          context.prefixes_.insert(prefix_str);
+        }
+        //}
+      };
+      server_.stats().forEachScope([](size_t) {}, add_scope);
+    }
+    for (const std::string& name : context.prefixes_) {
       response.add(absl::StrCat(
           "    <a href='javascript:expandScope(\"", name, "\")' id='scope_", name, "'>", name,
           "</a><br>\n"));

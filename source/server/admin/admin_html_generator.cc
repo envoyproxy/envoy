@@ -80,11 +80,15 @@ const char AdminHtmlStart[] = R"(
       text-align: right;
     }
   </style>
+<!--
+  <script src="http://localhost:8081/admin.js"></script>
+-->
   <script>
     function setScope(scope) {
       document.getElementById("scope").value = scope;
       document.getElementById("stats").submit();
     }
+
     function expandScope(scope) {
       let url = 'stats?scope=' + scope + '&format=json';
       url += '&type=' + document.getElementById('type').value;
@@ -92,17 +96,46 @@ const char AdminHtmlStart[] = R"(
         url += '&usedonly';
       }
       fetch(url).then(response => response.json())
-        .then(data => populateScope(scope, data));
+          .then(data => populateScope(scope, data));
     }
+
     function populateScope(scope, json) {
-      const pre = document.createElement('pre');
+      let prev = document.getElementById('scope_' + scope);
+
+      for (let subscope of json.scopes) {
+        const br = document.createElement('br');
+        prev.parentNode.insertBefore(br, prev.nextSibling);
+        prev = br;
+
+        const a_tag = document.createElement('a');
+        a_tag.textContent = subscope;
+        a_tag.id = 'scope_' + subscope;
+        a_tag.setAttribute("href", 'javascript:expandScope("' + subscope + '")');
+        prev.parentNode.insertBefore(a_tag, prev.nextSibling);
+        prev = a_tag;
+      }
+
       let lines = [];
       for (let stat of json.stats) {
-        lines.push(stat.name + ": " + stat.value);
+        if (stat.histograms && stat.histograms.computed_quantiles) {
+          for (let histogram of stat.histograms.computed_quantiles) {
+            let val_strs = [];
+            for (let value of histogram.values) {
+              if (value.interval || value.cumulative) {
+                val_strs.push('(' + value.interval + ',' + value.cumulative + ')')
+              }
+            }
+            const val_str = (val_strs.length == 0) ? 'no values' : ('[' + val_strs.join(',') + ']');
+            lines.push(histogram.name + ": " + val_str);
+          }
+        } else {
+          lines.push(stat.name + ": " + stat.value);
+        }
       }
+
+      const pre = document.createElement('pre');
       pre.textContent = lines.join('\n');
-      const label = document.getElementById('scope_' + scope);
-      label.parentNode.insertBefore(pre, label.nextSibling);
+      prev.parentNode.insertBefore(pre, prev.nextSibling);
     }
   </script>
 </head>

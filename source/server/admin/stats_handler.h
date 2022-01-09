@@ -81,8 +81,22 @@ private:
   struct Params {
     Http::Code parse(absl::string_view url, Buffer::Instance& response);
     template <class StatType> bool shouldShowMetric(const StatType& metric) const {
-      return ((!used_only_ || metric.used()) &&
-              (!filter_.has_value() || std::regex_search(metric.name(), filter_.value())));
+      if (used_only_ && !metric.used()) {
+        return false;
+      }
+      if (scope_.has_value() || filter_.has_value()) {
+        std::string name = metric.name();
+        if (filter_.has_value() && !std::regex_search(name, filter_.value())) {
+          return false;
+        }
+        if (scope_.has_value()) {
+          //ENVOY_LOG_MISC(error, "shouldShowMetric searching in {} for {}", name, scope_.value() + ".");
+          if (!absl::StartsWith(name, scope_.value() + ".")) {
+            return false;
+          }
+        }
+      }
+      return true;
     }
 
     bool used_only_{false};
