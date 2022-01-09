@@ -1092,7 +1092,7 @@ TEST(BufferHelperTest, AddFragments) {
       buffer.addFragments({"aaaaa", "bbbbb", "ccccc", "ddddd"});
       str += "aaaaabbbbbcccccddddd";
     }
-    EXPECT_EQ(buffer.length(), 20 * 1024);
+    EXPECT_EQ(20 * 1024, buffer.length());
     EXPECT_EQ(str, buffer.toString());
 
     auto slice_vec = buffer.getRawSlices();

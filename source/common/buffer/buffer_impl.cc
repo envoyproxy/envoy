@@ -589,33 +589,39 @@ std::vector<Slice::SliceRepresentation> OwnedImpl::describeSlicesForTest() const
 }
 
 size_t OwnedImpl::addFragments(absl::Span<const absl::string_view> fragments) {
-  size_t total_size_to_write = 0;
+  size_t total_size_to_copy = 0;
 
   for (const auto& fragment : fragments) {
-    total_size_to_write += fragment.size();
+    total_size_to_copy += fragment.size();
   }
 
   if (slices_.empty()) {
-    slices_.emplace_back(Slice(total_size_to_write, account_));
+    slices_.emplace_back(Slice(total_size_to_copy, account_));
   }
 
   Slice& back = slices_.back();
-  if (back.reservableSize() >= total_size_to_write) {
-    uint8_t* mem = back.base_ + back.reservable_;
+  Slice::Reservation reservation = back.reserve(total_size_to_copy);
+  uint8_t* mem = static_cast<uint8_t*>(reservation.mem_);
+  if (reservation.len_ == total_size_to_copy) {
+    // Enough continuous memory for all fragments in the back slice then copy
+    // all fragments directly for performance improvement.
     for (const auto& fragment : fragments) {
       memcpy(mem, fragment.data(), fragment.size()); // NOLINT(safe-memcpy)
       mem += fragment.size();
     }
-    length_ += total_size_to_write;
-    back.reservable_ += total_size_to_write;
+    back.commit<false>(reservation);
+    length_ += total_size_to_copy;
   } else {
-    // Downgrade to using `addImpl` for no enough memory in the back slice.
+    // Downgrade to using `addImpl` for not enough memory in the back slice.
+    // TODO(wbpcode): Fill the remaining memory space in the back slice then
+    // allocate enough contiguous memory for the remaining unwritten fragments
+    // and copy them directly. This may result in better performance.
     for (const auto& fragment : fragments) {
       addImpl(fragment.data(), fragment.size());
     }
   }
 
-  return total_size_to_write;
+  return total_size_to_copy;
 }
 
 } // namespace Buffer

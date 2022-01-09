@@ -34,6 +34,7 @@ public:
   void add(const Instance& data) override;
   void prepend(absl::string_view data) override;
   void prepend(Instance& data) override;
+  size_t addFragments(absl::Span<const absl::string_view> fragments) override;
   void drain(uint64_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
@@ -42,12 +43,6 @@ public:
   void postProcess() override { checkLowWatermark(); }
   void appendSliceForTest(const void* data, uint64_t size) override;
   void appendSliceForTest(absl::string_view data) override;
-
-  size_t addFragments(absl::Span<const absl::string_view> fragments) override {
-    size_t total_size_to_write = OwnedImpl::addFragments(fragments);
-    checkHighAndOverflowWatermarks();
-    return total_size_to_write;
-  }
 
   void setWatermarks(uint32_t high_watermark) override;
   uint32_t highWatermark() const override { return high_watermark_; }

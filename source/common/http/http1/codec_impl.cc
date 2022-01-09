@@ -226,8 +226,6 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
     }
   }
 
-  // Watermark checks are skipped while encoding headers and this `CRLF` will trigger once watermark
-  // check for entire encoded header map.
   connection_.buffer().add(CRLF);
 
   if (end_stream) {
@@ -283,8 +281,6 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
     });
 
     connection_.buffer().add(CRLF);
-
-    flushOutput();
   }
 
   flushOutput();
