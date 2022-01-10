@@ -281,7 +281,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        .setTimeout(config_->timeout())
                        .setParentSpan(parent_span)
                        .setChildSpanName(config_->tracingName())
-                       .setSampled(absl::nullopt);
+                       .setSampled(absl::nullopt); // do not enforce a sampling decision and keep the parent's sampling.
 
     request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }
