@@ -17,8 +17,6 @@
 namespace Envoy {
 namespace Buffer {
 
-class OwnedImpl;
-
 /**
  * A Slice manages a contiguous block of bytes.
  * The block is arranged like this:
@@ -427,10 +425,9 @@ protected:
   /** Account associated with this slice. This may be null. When
    * coalescing with another slice, we do not transfer over their account. */
   BufferMemoryAccountSharedPtr account_;
-
-private:
-  friend OwnedImpl;
 };
+
+class OwnedImpl;
 
 class SliceDataImpl : public SliceData {
 public:

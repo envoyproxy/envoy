@@ -1097,7 +1097,7 @@ TEST(BufferHelperTest, AddFragments) {
 
     auto slice_vec = buffer.getRawSlices();
 
-    EXPECT_EQ(slice_vec.size(), 5);
+    EXPECT_EQ(5, slice_vec.size());
     for (size_t i = 0; i < 5; i++) {
       EXPECT_EQ(4096, slice_vec[i].len_);
     }

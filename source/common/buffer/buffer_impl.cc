@@ -612,7 +612,7 @@ size_t OwnedImpl::addFragments(absl::Span<const absl::string_view> fragments) {
     back.commit<false>(reservation);
     length_ += total_size_to_copy;
   } else {
-    // Downgrade to using `addImpl` for not enough memory in the back slice.
+    // Downgrade to using `addImpl` if not enough memory in the back slice.
     // TODO(wbpcode): Fill the remaining memory space in the back slice then
     // allocate enough contiguous memory for the remaining unwritten fragments
     // and copy them directly. This may result in better performance.
