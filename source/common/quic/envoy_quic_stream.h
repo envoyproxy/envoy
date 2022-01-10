@@ -153,6 +153,8 @@ protected:
     }
   }
 
+  StreamInfo::BytesMeterSharedPtr& mutableBytesMeter() { return bytes_meter_; }
+
   // True once end of stream is propagated to Envoy. Envoy doesn't expect to be
   // notified more than once about end of stream. So once this is true, no need
   // to set it in the callback to Envoy stream any more.

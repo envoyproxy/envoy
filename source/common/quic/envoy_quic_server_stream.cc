@@ -47,7 +47,8 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   // This is counting not serialized bytes in the send buffer.
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-  WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
+  size_t header_bytes_sent = WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
+  mutableBytesMeter()->addHeaderBytesSent(header_bytes_sent);
   if (local_end_stream_) {
     onLocalEndStream();
   }
@@ -168,7 +169,15 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   ConsumeHeaderList();
 }
 
+void EnvoyQuicServerStream::OnStreamDataConsumed(quic::QuicByteCount bytes_consumed) {
+  mutableBytesMeter()->addWireBytesSent(bytes_consumed);
+  QuicSpdyStream::OnStreamDataConsumed(bytes_consumed);
+}
+
 void EnvoyQuicServerStream::OnBodyAvailable() {
+  if (stream_bytes_read() > bytesMeter()->wireBytesReceived()) {
+    mutableBytesMeter()->addWireBytesReceived(stream_bytes_read() - bytesMeter()->wireBytesReceived());
+  }
   ASSERT(FinishedReadingHeaders());
   if (read_side_closed()) {
     return;
