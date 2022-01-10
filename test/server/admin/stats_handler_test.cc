@@ -96,11 +96,10 @@ TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
 }
 
 TEST_P(AdminStatsTest, HandlerStatsPlainText) {
-  InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   const std::string url = "/stats";
-  Buffer::OwnedImpl data;
+  Buffer::OwnedImpl data, used_data;
 
   Stats::Counter& c1 = store_->counterFromString("c1");
   Stats::Counter& c2 = store_->counterFromString("c2");
@@ -124,16 +123,21 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
 
   Http::Code code = handlerStats(url, data);
   EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_EQ("t: \"hello world\"\n"
-            "c1: 10\n"
-            "c2: 20\n"
-            "h1: P0(200.0,200.0) P25(202.5,202.5) P50(205.0,205.0) P75(207.5,207.5) "
-            "P90(209.0,209.0) P95(209.5,209.5) P99(209.9,209.9) P99.5(209.95,209.95) "
-            "P99.9(209.99,209.99) P100(210.0,210.0)\n"
-            "h2: P0(100.0,100.0) P25(102.5,102.5) P50(105.0,105.0) P75(107.5,107.5) "
-            "P90(109.0,109.0) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
-            "P99.9(109.99,109.99) P100(110.0,110.0)\n",
-            data.toString());
+  constexpr char expected[] =
+      "t: \"hello world\"\n"
+      "c1: 10\n"
+      "c2: 20\n"
+      "h1: P0(200.0,200.0) P25(202.5,202.5) P50(205.0,205.0) P75(207.5,207.5) "
+      "P90(209.0,209.0) P95(209.5,209.5) P99(209.9,209.9) P99.5(209.95,209.95) "
+      "P99.9(209.99,209.99) P100(210.0,210.0)\n"
+      "h2: P0(100.0,100.0) P25(102.5,102.5) P50(105.0,105.0) P75(107.5,107.5) "
+      "P90(109.0,109.0) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
+      "P99.9(109.99,109.99) P100(110.0,110.0)\n";
+  EXPECT_EQ(expected, data.toString());
+
+  code = handlerStats(url + "?usedonly", used_data);
+  EXPECT_EQ(Http::Code::OK, code);
+  EXPECT_EQ(expected, used_data.toString());
 
   shutdownThreading();
 }
