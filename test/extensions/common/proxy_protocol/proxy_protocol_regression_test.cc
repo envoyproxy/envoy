@@ -5,7 +5,6 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/listen_socket_impl.h"
-#include "source/common/singleton/manager_impl.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 #include "source/server/connection_handler_impl.h"

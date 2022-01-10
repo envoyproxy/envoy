@@ -34,7 +34,6 @@
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
-#include "source/common/singleton/manager_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 
 #if defined(ENVOY_ENABLE_QUIC)

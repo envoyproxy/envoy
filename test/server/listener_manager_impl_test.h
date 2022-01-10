@@ -309,9 +309,6 @@ protected:
   class DumbInternalListenerRegistry : public Singleton::Instance,
                                        public Network::InternalListenerRegistry {
   public:
-    ~DumbInternalListenerRegistry() {
-      ENVOY_LOG_MISC(debug, "lambdai: destroy DumbInternalListenerRegistry");
-    }
     MOCK_METHOD(Network::LocalInternalListenerRegistry*, getLocalRegistry, ());
   };
   std::shared_ptr<DumbInternalListenerRegistry> internal_registry_{

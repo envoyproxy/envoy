@@ -97,9 +97,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "thread_local_registry",
-    srcs = [
-        "thread_local_registry.cc",
-    ],
     hdrs = [
         "client_connection_factory.h",
         "thread_local_registry.h",
@@ -107,7 +104,6 @@ envoy_cc_library(
     deps = [
         "//envoy/network:client_connection_factory",
         "//envoy/network:listener_interface",
-        "//envoy/singleton:manager_interface",
         "//envoy/thread_local:thread_local_interface",
     ],
 )

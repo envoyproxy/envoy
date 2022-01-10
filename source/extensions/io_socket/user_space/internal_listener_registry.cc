@@ -18,7 +18,7 @@ void InternalListenerExtension::onServerInitialized() {
       server_context_.singletonManager().getTyped<TlsInternalListenerRegistry>(
           SINGLETON_MANAGER_REGISTERED_NAME(internal_listener_registry),
           [registry = tls_registry_]() { return registry; });
-  // save it in the singleton
+  // Save it in the singleton so the listener manager can obtain during a listener config update.
   ASSERT(internal_listener_registry == tls_registry_);
   ASSERT(internal_listener_registry->tls_slot_ == nullptr);
 
@@ -28,9 +28,7 @@ void InternalListenerExtension::onServerInitialized() {
   tls_registry_->tls_slot_->set([](Event::Dispatcher&) {
     return std::make_shared<Extensions::InternalListener::ThreadLocalRegistryImpl>();
   });
-  // This field is overwritten multiple times since onServerInitialized is called in each test case.
-  // ASSERT(Extensions::IoSocket::UserSpace::InternalClientConnectionFactory::registry_tls_slot_ ==
-  //        nullptr);
+
   Extensions::IoSocket::UserSpace::InternalClientConnectionFactory::registry_tls_slot_ =
       tls_registry_->tls_slot_.get();
 }

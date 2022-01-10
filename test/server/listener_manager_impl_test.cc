@@ -60,13 +60,9 @@ class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
 public:
   void SetUp() override {
     ListenerManagerImplTest::SetUp();
-    // place holder. The
-    ASSERT_NE(nullptr,
-              server_.singletonManager().getTyped<Network::InternalListenerRegistry>(
-                  "internal_listener_registry_singleton", [registry = internal_registry_]() {
-                    ENVOY_LOG_MISC(debug, "lambdai: create Dumb internal registry");
-                    return registry;
-                  }));
+    ASSERT_NE(nullptr, server_.singletonManager().getTyped<Network::InternalListenerRegistry>(
+                           "internal_listener_registry_singleton",
+                           [registry = internal_registry_]() { return registry; }));
   }
   /**
    * Create an IPv4 listener with a given name.

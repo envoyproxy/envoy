@@ -3,9 +3,7 @@
 #include <chrono>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/network/client_connection_factory.h"
 #include "envoy/network/filter.h"
-#include "envoy/singleton/manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/event/deferred_task.h"

@@ -79,7 +79,6 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
-        "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:stats_lib",
         "//source/server:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",

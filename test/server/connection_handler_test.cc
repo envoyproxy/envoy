@@ -7,7 +7,6 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
-#include "source/common/api/api_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/network/address_impl.h"
@@ -17,7 +16,6 @@
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/network/utility.h"
-#include "source/common/singleton/manager_impl.h"
 #include "source/server/active_raw_udp_listener_config.h"
 #include "source/server/connection_handler_impl.h"
 
@@ -115,7 +113,8 @@ public:
       Network::LocalInternalListenerRegistry* getLocalRegistry() override {
         return &local_registry_;
       }
-
+      // This registry does not depend on envoy thread local. Put it here because it should not be
+      // used in an integration test.
       class MockLocalInternalListenerRegistry : public Network::LocalInternalListenerRegistry {
       public:
         void setInternalListenerManager(
@@ -131,7 +130,6 @@ public:
         }
 
       private:
-        // A thread unsafe internal listener manager.
         Network::InternalListenerManager* manager_{nullptr};
       };
       MockLocalInternalListenerRegistry local_registry_;

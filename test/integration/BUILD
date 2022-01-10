@@ -724,7 +724,6 @@ envoy_cc_test_library(
         "//source/common/config:utility_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
-        "//source/common/singleton:manager_impl_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/network:connection_balancer_lib",

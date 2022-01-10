@@ -92,7 +92,6 @@ envoy_cc_library(
         "//envoy/network:listener_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/server:listener_manager_interface",
-        "//envoy/singleton:manager_interface",
         "//envoy/stats:timespan_interface",
         "//source/common/common:linked_object",
         "//source/common/common:non_copyable",

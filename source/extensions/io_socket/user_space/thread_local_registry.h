@@ -25,7 +25,6 @@ public:
   }
 
 private:
-  // A thread unsafe internal listener manager.
   Network::InternalListenerManager* manager_{nullptr};
 };
 } // namespace InternalListener

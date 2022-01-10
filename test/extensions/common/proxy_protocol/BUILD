@@ -28,7 +28,6 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:listener_lib",
-        "//source/common/singleton:manager_impl_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//source/extensions/filters/listener/proxy_protocol:proxy_protocol_lib",
         "//source/server:connection_handler_lib",
