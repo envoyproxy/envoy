@@ -4,6 +4,7 @@
 4. Fix build on Windows.
 5. Fix build on aarch64.
 6. Fix build with GCC.
+7. Respect envoy_linkstatic().
 
 diff --git a/BUILD.bazel b/BUILD.bazel
 index 5d607a5048..fb9862a02b 100644
@@ -88,10 +89,19 @@ index 5d607a5048..fb9862a02b 100644
  )
  
 diff --git a/bazel/defs.bzl b/bazel/defs.bzl
-index 14fff6f049..088d989b99 100644
+index 14fff6f049..61d2f77f09 100644
 --- a/bazel/defs.bzl
 +++ b/bazel/defs.bzl
-@@ -120,13 +120,17 @@ def _default_args():
+@@ -2,6 +2,8 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++load("@envoy//bazel:envoy_internal.bzl", "envoy_linkstatic")
++
+ FlagInfo = provider(fields = ["value"])
+ 
+ def _options_impl(ctx):
+@@ -120,13 +122,17 @@ def _default_args():
              ],
              "@v8//bazel/config:is_gcc": [
                  "-Wno-extra",
@@ -109,7 +119,34 @@ index 14fff6f049..088d989b99 100644
                  # Use GNU dialect, because GCC doesn't allow using
                  # ##__VA_ARGS__ when in standards-conforming mode.
                  "-std=gnu++17",
-@@ -367,8 +371,10 @@ def _v8_target_cpu_transition_impl(settings, attr):
+@@ -236,7 +242,7 @@ def v8_library(
+             copts = copts + default.copts,
+             linkopts = linkopts + default.linkopts,
+             alwayslink = 1,
+-            linkstatic = 1,
++            linkstatic = envoy_linkstatic(),
+             **kwargs
+         )
+         # Alias target used because of cc_library bug in bazel on windows
+@@ -254,7 +260,7 @@ def v8_library(
+             copts = copts + default.copts + ENABLE_I18N_SUPPORT_DEFINES,
+             linkopts = linkopts + default.linkopts,
+             alwayslink = 1,
+-            linkstatic = 1,
++            linkstatic = envoy_linkstatic(),
+             **kwargs
+         )
+         # Alias target used because of cc_library bug in bazel on windows
+@@ -273,7 +279,7 @@ def v8_library(
+             copts = copts + default.copts,
+             linkopts = linkopts + default.linkopts,
+             alwayslink = 1,
+-            linkstatic = 1,
++            linkstatic = envoy_linkstatic(),
+             **kwargs
+         )
+ 
+@@ -367,8 +373,10 @@ def _v8_target_cpu_transition_impl(settings, attr):
          "x86_64": "x64",
          "darwin": "x64",
          "darwin_x86_64": "x64",
