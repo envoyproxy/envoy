@@ -1,11 +1,11 @@
-1.21.0 (Pending)
-================
+1.21.0 (January 12, 2022)
+=========================
 
 Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
-* auto_config: :ref:`auto_config: <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>` now verifies that any transport sockets configured via :ref:`transport_socket_matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>` support ALPN. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.correctly_validate_alpn`` to false..
+* auto_config: :ref:`auto_config <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>` now verifies that any transport sockets configured via :ref:`transport_socket_matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>` support ALPN. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.correctly_validate_alpn`` to false.
 * xds: ``*`` became a reserved name for a wildcard resource that can be subscribed to and unsubscribed from at any time. This is a requirement for implementing the on-demand xDSes (like on-demand CDS) that can subscribe to specific resources next to their wildcard subscription. If such xDS is subscribed to both wildcard resource and to other specific resource, then in stream reconnection scenario, the xDS will not send an empty initial request, but a request containing ``*`` for wildcard subscription and the rest of the resources the xDS is subscribed to. If the xDS is only subscribed to wildcard resource, it will try to send a legacy wildcard request. This behavior implements the recent changes in :ref:`xDS protocol <xds_protocol>` and can be temporarily reverted by setting the ``envoy.restart_features.explicit_wildcard_resource`` runtime guard to false.
 
 Minor Behavior Changes
@@ -15,14 +15,13 @@ Minor Behavior Changes
 * bandwidth_limit: added :ref:`response trailers <envoy_v3_api_field_extensions.filters.http.bandwidth_limit.v3.BandwidthLimit.enable_response_trailers>` when request or response delay are enforced.
 * bandwidth_limit: added :ref:`bandwidth limit stats <config_http_filters_bandwidth_limit>` *request_enforced* and *response_enforced*.
 * dns: now respecting the returned DNS TTL for resolved hosts, rather than always relying on the hard-coded :ref:`dns_refresh_rate. <envoy_v3_api_field_config.cluster.v3.Cluster.dns_refresh_rate>` This behavior can be temporarily reverted by setting the runtime guard ``envoy.reloadable_features.use_dns_ttl`` to false.
-* http: directly response with http status code 1xx isn't valid usecase, so the status code 1xx was refused by the :ref:`direct_response <envoy_v3_api_field_config.route.v3.Route.direct_response>` field.
+* http: directly responding with only a 1xx http status code isn't valid, and is now refused as invalid :ref:`direct_response <envoy_v3_api_field_config.route.v3.Route.direct_response>` config.
 * http: envoy will now proxy 102 and 103 headers from upstream, though as with 100s only the first 1xx response headers will be sent. This behavioral change by can temporarily reverted by setting runtime guard ``envoy.reloadable_features.proxy_102_103`` to false.
 * http: usage of the experimental matching API is no longer guarded behind a feature flag, as the corresponding protobuf fields have been marked as WIP.
-* http: when envoy run out of ``max_requests_per_connection``, it will send an HTTP/2 "shutdown nofitication" (GOAWAY frame with max stream ID) and go to a default grace period of 5000 milliseconds (5 seconds) if ``drain_timeout`` is not specified. During this grace period, envoy will continue to accept new streams. After the grace period, a final GOAWAY is sent and envoy will start refusing new streams. However before bugfix, during the grace period, every time a new stream is received, old envoy will always send a "shutdown notification" and restart drain again which actually causes the grace period to be extended and is no longer equal to ``drain_timeout``.
+* http: when a downstream connection hits a configured ``max_requests_per_connection``, it will send an HTTP/2 "shutdown nofitication" (GOAWAY frame with max stream ID) and go to a default grace period of 5000 milliseconds (5 seconds) if :ref:`drain_timeout <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>` is not specified. During this grace period, envoy will continue to accept new streams. After the grace period, a final GOAWAY is sent and envoy will start refusing new streams. However before bugfix, during the grace period, every time a new stream is received, envoy would restart the drain which caused the grace period to be extended and so longer than the configured drain timeout.
 * json: switching from rapidjson to nlohmann/json. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.remove_legacy_json`` to false.
 * listener: destroy per network filter chain stats when a network filter chain is removed during the listener in place update.
-* quic: add back the support for IETF draft 29 which is guarded via ``envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_disable_version_draft_29``. It is off by default so Envoy only supports RFCv1 without flipping this runtime guard explicitly. Draft 29 is not recommended for use.
-* router: take elapsed time into account when setting the x-envoy-expected-rq-timeout-ms header for retries, and never send a value that's longer than the request timeout. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` to false.
+* router: take elapsed time into account when setting the 11x-envoy-expected-rq-timeout-ms header11 for retries, and never send a value that's longer than the request timeout. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` to false.
 * stream_info: response code details with empty space characters (' ', '\t', '\f', '\v', '\n', '\r') is not accepted by the ``setResponseCodeDetails()`` API.
 * upstream: fixed a bug where auto_config didn't work for wrapped TLS sockets (e.g. if proxy proto were configured for TLS).
 
@@ -92,7 +91,7 @@ New Features
 * matcher: added support for *xds.type.matcher.v3.IPMatcher* IP trie matching.
 * oauth filter: added :ref:`cookie_names <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_names>` to allow overriding (default) cookie names (``BearerToken``, ``OauthHMAC``, and ``OauthExpires``) set by the filter.
 * oauth filter: setting IdToken and RefreshToken cookies if they are provided by Identity provider along with AccessToken.
-* perf: added support for [Perfetto](https://perfetto.dev) performance tracing.
+* perf: added support for `Perfetto <https://perfetto.dev>`_ performance tracing.
 * router: added support for the :ref:`config_http_conn_man_headers_x-forwarded-host` header.
 * stats: added text_readouts query parameter to prometheus stats to return gauges made from text readouts.
 * tcp: added a :ref:`FilterState <envoy_v3_api_msg_type.v3.HashPolicy.FilterState>` :ref:`hash policy <envoy_v3_api_msg_type.v3.HashPolicy>`, used by :ref:`TCP proxy <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.hash_policy>` to allow hashing load balancer algorithms to hash on objects in filter state.
