@@ -5,8 +5,8 @@ HTTP3 overview
 
 .. warning::
 
-  HTTP/3 downstream support is now GA, but continued improvements are coming, tracked in
-  the `area-quic <https://github.com/envoyproxy/envoy/labels/area%2Fquic>`_ tag.
+  HTTP/3 downstream support is ready for production use, but continued improvements are coming,
+  tracked in the `area-quic <https://github.com/envoyproxy/envoy/labels/area%2Fquic>`_ tag.
 
   HTTP/3 upstream support is fine for locally controlled networks, but is not ready for
   general internet use, and is missing some key latency features. See details below.
@@ -18,7 +18,7 @@ HTTP3 downstream
 Downstream Envoy HTTP/3 support can be turned up via adding
 :ref:`quic_options <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>`,
 ensuring the downstream transport socket is a QuicDownstreamTransport, and setting the codec
-to HTTP/3.
+to HTTP/3. Please note that hot restart is not gracefully handled for HTTP/3 yet.
 
 See example :repo:`downstream HTTP/3 configuration </configs/envoyproxy_io_proxy_http3_downstream.yaml>` for example configuration.
 
