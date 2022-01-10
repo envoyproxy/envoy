@@ -10,17 +10,17 @@
 #include "source/common/stream_info/utility.h"
 
 namespace {
-  absl::optional<std::chrono::duration<double, std::milli>>
-  timeSince(absl::optional<Envoy::MonotonicTime> start_time) {
-    if (start_time.has_value()) {
+absl::optional<std::chrono::duration<double, std::milli>>
+timeSince(absl::optional<Envoy::MonotonicTime> start_time) {
+  if (start_time.has_value()) {
 
-      auto ext_authz_duration =
-          std::chrono::duration<double, std::milli>(start_time->time_since_epoch().count());
-      return ext_authz_duration;
-    }
-    return absl::nullopt;
+    auto ext_authz_duration =
+        std::chrono::duration<double, std::milli>(start_time->time_since_epoch().count());
+    return ext_authz_duration;
   }
+  return absl::nullopt;
 }
+} // namespace
 
 namespace Envoy {
 namespace Extensions {
