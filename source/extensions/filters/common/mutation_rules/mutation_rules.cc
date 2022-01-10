@@ -2,8 +2,11 @@
 
 #include "envoy/http/header_map.h"
 
+#include "source/common/common/macros.h"
+#include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/match.h"
 
 namespace Envoy {
@@ -11,6 +14,24 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace MutationRules {
+
+using Http::LowerCaseString;
+
+class ExtraRoutingHeaders {
+public:
+  ExtraRoutingHeaders() {
+    const auto& hdrs = Http::Headers::get();
+    headers_.insert(hdrs.HostLegacy);
+    headers_.insert(hdrs.Host);
+    headers_.insert(hdrs.Method);
+    headers_.insert(hdrs.Scheme);
+  }
+
+  bool containsHeader(const LowerCaseString& name) const { return headers_.contains(name); }
+
+private:
+  absl::flat_hash_set<Http::LowerCaseString> headers_;
+};
 
 Checker::Checker(const envoy::config::common::mutation_rules::v3::HeaderMutationRules& rules)
     : rules_(rules) {
@@ -20,23 +41,6 @@ Checker::Checker(const envoy::config::common::mutation_rules::v3::HeaderMutation
   if (rules.has_disallow_expression()) {
     disallow_expression_ = Regex::Utility::parseRegex(rules.disallow_expression());
   }
-}
-
-// Pre-populate "routing headers" that we'll use to match whether a header
-// should be rejected according to the "allow_routing" rule.
-absl::flat_hash_set<Http::LowerCaseString> Checker::createRoutingHeaders() {
-  absl::flat_hash_set<Http::LowerCaseString> routing_headers;
-  const auto& headers = Http::Headers::get();
-  routing_headers.insert(headers.HostLegacy);
-  routing_headers.insert(headers.Host);
-  routing_headers.insert(headers.Method);
-  routing_headers.insert(headers.Scheme);
-  return routing_headers;
-}
-
-const absl::flat_hash_set<Http::LowerCaseString>& Checker::getRoutingHeaders() {
-  static absl::flat_hash_set<Http::LowerCaseString> routing_headers = createRoutingHeaders();
-  return routing_headers;
 }
 
 CheckResult Checker::check(absl::string_view header_name) const {
@@ -64,9 +68,9 @@ bool Checker::isAllowed(absl::string_view header_name) const {
     return false;
   }
   if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules_, allow_all_routing, false) &&
-      getRoutingHeaders().contains(lower_name)) {
-    // Unless this is true, modifications to headers in the of the
-    // "routing_headers" map above must be rejected.
+      extraRoutingHeaders().containsHeader(lower_name)) {
+    // If false, check the pre-defined list of "extra routing headers"
+    // and fail if the header is in that list.
     return false;
   }
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules_, disallow_system, false) &&
@@ -76,10 +80,14 @@ bool Checker::isAllowed(absl::string_view header_name) const {
   }
   if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules_, allow_envoy, false) &&
       absl::StartsWith(lower_name, Http::Headers::get().prefix())) {
-    // If true, disallow changes to "x-envoy" headers (or the equivalent).
+    // If false, prevent changes to "x-envoy" headers (or the equivalent).
     return false;
   }
   return true;
+}
+
+const ExtraRoutingHeaders& Checker::extraRoutingHeaders() {
+  CONSTRUCT_ON_FIRST_USE(ExtraRoutingHeaders);
 }
 
 } // namespace MutationRules

@@ -5,9 +5,7 @@
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 
 #include "source/common/common/regex.h"
-#include "source/common/http/headers.h"
 
-#include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -17,6 +15,8 @@ namespace Common {
 namespace MutationRules {
 
 enum class CheckResult { OK, IGNORE, FAIL };
+
+class ExtraRoutingHeaders;
 
 // Checker can be used to test a proposed change to an HTTP header against
 // the mutation rules expressed in the *HeaderMutationRules* proto.
@@ -32,8 +32,7 @@ public:
 
 private:
   bool isAllowed(absl::string_view header_name) const;
-  static absl::flat_hash_set<Http::LowerCaseString> createRoutingHeaders();
-  static const absl::flat_hash_set<Http::LowerCaseString>& getRoutingHeaders();
+  static const ExtraRoutingHeaders& extraRoutingHeaders();
 
   envoy::config::common::mutation_rules::v3::HeaderMutationRules rules_;
   Regex::CompiledMatcherPtr allow_expression_;

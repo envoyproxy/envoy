@@ -15,6 +15,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/http:header_map_interface",
+        "//source/common/common:macros",
         "//source/common/common:regex_lib",
         "//source/common/http:headers_lib",
         "@com_google_absl//absl/container:flat_hash_set",
