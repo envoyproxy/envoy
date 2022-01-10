@@ -59,7 +59,7 @@ AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
     const AlternateProtocolsCacheImpl::Origin origin = {"https", entry.hostname(), entry.port()};
     std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocol = {
         {"h3", entry.hostname(), entry.port(),
-         dispatcher.timeSource().monotonicTime() + std::chrono::days(7)}};
+          dispatcher.timeSource().monotonicTime() + std::chrono::hours(168)}};
     OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> existing_protocols =
         new_cache->findAlternatives(origin);
     if (!existing_protocols.has_value()) {
