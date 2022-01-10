@@ -529,22 +529,43 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     // holding the store's lock. So when we traverse the scopes, we'll both
     // look for Scope objects matching our expected name, and we'll create
     // a sorted list of sort names for use in populating next/previous buttons.
-    stats.forEachScope([](size_t) {},
-                       [this, &params, &context](const Stats::Scope& scope) {
-                         std::string scope_prefix_str =
-                             server_.stats().symbolTable().toString(scope.prefix());
+    auto scope_fn = [this, &params, &context](const Stats::Scope& scope) {
+      std::string prefix_str =
+          server_.stats().symbolTable().toString(scope.prefix());
 
-                         // If the scope matches the prefix of what the user wants, append in the
-                         // stats from it. Note that scopes with a prefix of "" will match anything
-                         // the user types, in which case we'll still be filtering based on stat
-                         // name prefix.
-                         if (scope_prefix_str == params.scope_ || scope_prefix_str.empty()) {
-                           context.collectScope(scope);
-                         } else if (absl::StartsWith(scope_prefix_str, params.scope_) &&
-                                    scope_prefix_str[params.scope_.size()] == '.') {
-                           context.addScope(scope_prefix_str);
-                         }
-                       });
+      if (params.query_.find("show_json_scopes") != params.query_.end()) {
+        ENVOY_LOG_MISC(error, "show_json_jscopes: scope={} params={}", prefix_str, params.scope_);
+
+        // Truncate at dot after the prefix.
+        if (prefix_str.size() > params.scope_.size() + 1 &&
+            prefix_str[params.scope_.size() + 1] == '.') {
+          std::string::size_type dot = prefix_str.find('.', params.scope_.size() + 2);
+          if (dot != std::string::npos) {
+            prefix_str.resize(dot);
+          }
+        }
+
+        // If the scope name is blank, then we need to find all the prefixes in
+        // the scope by iterating over all the stats in it.
+        if (prefix_str.empty()) {
+          context.collectScopePrefixes(scope);
+        } else {
+          context.addScope(prefix_str);
+        }
+      } else if (prefix_str == params.scope_ || prefix_str.empty() || params.scope_.empty()) {
+        // If the scope matches the prefix of what the user wants, append in the
+        // stats from it. Note that scopes with a prefix of "" will match anything
+        // the user types, in which case we'll still be filtering based on stat
+        // name prefix.
+        context.collectScope(scope);
+      } else if (absl::StartsWith(prefix_str, params.scope_) &&
+                 prefix_str[params.scope_.size()] == '.') {
+        context.addScope(prefix_str);
+      } else {
+        ENVOY_LOG_MISC(error, "Dropping scope {}, param={}", prefix_str, params.scope_);
+      }
+    };
+    stats.forEachScope([](size_t) {}, scope_fn);
     context.emit();
     render->render(response);
   }

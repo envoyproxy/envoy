@@ -302,35 +302,6 @@ public:
     Thread::LockGuard lock(lock_);
     store_.forEachScope(f_size, f_scope);
   }
-
-  bool counterPage(PageFn<Counter> f_stat, absl::string_view start,
-                   PageDirection direction) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.counterPage(f_stat, start, direction);
-  }
-  bool gaugePage(PageFn<Gauge> f_stat, absl::string_view start,
-                 PageDirection direction) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.gaugePage(f_stat, start, direction);
-  }
-  bool textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start,
-                       PageDirection direction) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.textReadoutPage(f_stat, start, direction);
-  }
-  bool histogramPage(PageFn<Histogram> f_stat, absl::string_view start,
-                     PageDirection direction) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.histogramPage(f_stat, start, direction);
-  }
-  bool scopePage(PageFn<const Scope> /*f_scope*/, absl::string_view /*start*/,
-                 PageDirection) const override {
-    ASSERT(false);
-    return false;
-    /*Thread::LockGuard lock(lock_);
-      store_.scopePage(f_size, f_scope);*/
-  }
-
   void forEachSinkedCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachSinkedCounter(f_size, f_stat);

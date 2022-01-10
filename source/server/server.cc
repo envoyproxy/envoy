@@ -184,10 +184,9 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
         snapped_counters_.reserve(size);
         counters_.reserve(size);
       },
-      [this](Stats::Counter& counter) mutable -> bool {
+      [this](Stats::Counter& counter) mutable {
         snapped_counters_.push_back(Stats::CounterSharedPtr(&counter));
         counters_.push_back({counter.latch(), counter});
-        return true;
       });
 
   store.forEachSinkedGauge(
@@ -195,11 +194,10 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
         snapped_gauges_.reserve(size);
         gauges_.reserve(size);
       },
-      [this](Stats::Gauge& gauge) mutable -> bool {
+      [this](Stats::Gauge& gauge) mutable {
         ASSERT(gauge.importMode() != Stats::Gauge::ImportMode::Uninitialized);
         snapped_gauges_.push_back(Stats::GaugeSharedPtr(&gauge));
         gauges_.push_back(gauge);
-        return true;
       });
 
   snapped_histograms_ = store.histograms();
@@ -213,10 +211,9 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
         snapped_text_readouts_.reserve(size);
         text_readouts_.reserve(size);
       },
-      [this](Stats::TextReadout& text_readout) -> bool {
+      [this](Stats::TextReadout& text_readout) {
         snapped_text_readouts_.push_back(Stats::TextReadoutSharedPtr(&text_readout));
         text_readouts_.push_back(text_readout);
-        return true;
       });
 
   snapshot_time_ = time_source.systemTime();
