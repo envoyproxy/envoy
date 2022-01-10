@@ -106,8 +106,7 @@ public:
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
       Rds::RouteConfigProviderManager& route_config_provider_manager);
 
-  absl::optional<RouteConfigProvider*>& routeConfigProvider() { return route_config_provider_opt_; }
-  RouteConfigUpdateReceiver* routeConfigUpdate() { return config_update_info_; }
+  RouteConfigUpdateReceiver* routeConfigUpdateCast();
   void updateOnDemand(const std::string& aliases);
   void maybeCreateInitManager(const std::string& version_info,
                               std::unique_ptr<Init::ManagerImpl>& init_manager,
@@ -120,11 +119,6 @@ private:
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addUpdateCallback(std::function<void()> callback) {
     return update_callback_manager_.add(callback);
   }
-
-  absl::optional<RouteConfigProvider*> route_config_provider_opt_;
-  // The pointer is owned by the base class, here it is just stored as raw pointer to avoid
-  // downcasting.
-  RouteConfigUpdateReceiver* config_update_info_;
 
   VhdsSubscriptionPtr vhds_subscription_;
   Common::CallbackManager<> update_callback_manager_;
@@ -151,9 +145,7 @@ public:
   RdsRouteConfigProviderImpl(RdsRouteConfigSubscription* subscription,
                              Server::Configuration::ServerFactoryContext& factory_context);
 
-  ~RdsRouteConfigProviderImpl() override;
-
-  RdsRouteConfigSubscription& subscription() { return *subscription_; }
+  RdsRouteConfigSubscription& subscription();
 
   // Router::RouteConfigProvider
   Rds::ConfigConstSharedPtr config() override { return base_.config(); }
@@ -169,8 +161,6 @@ public:
 private:
   Rds::RdsRouteConfigProviderImpl base_;
 
-  // The pointer is owned by base_, here it is just stored as raw pointer to avoid downcasting.
-  RdsRouteConfigSubscription* subscription_;
   RouteConfigUpdateReceiver* config_update_info_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   std::list<UpdateOnDemandCallback> config_update_callbacks_;

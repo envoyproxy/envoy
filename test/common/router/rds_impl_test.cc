@@ -705,11 +705,7 @@ TEST_F(RdsImplTest, RdsRouteConfigProviderImplSubscriptionSetup) {
   EXPECT_CALL(init_watcher_, ready());
   RdsRouteConfigSubscription& subscription =
       dynamic_cast<RdsRouteConfigProviderImpl&>(*rds_).subscription();
-  Rds::RdsRouteConfigSubscription& base = subscription;
-  EXPECT_NE(static_cast<void*>(&subscription.routeConfigProvider()),
-            static_cast<void*>(&base.routeConfigProvider()));
   EXPECT_EQ(rds_.get(), subscription.routeConfigProvider().value());
-  EXPECT_EQ(rds_.get(), base.routeConfigProvider().value());
 }
 
 class RdsRouteConfigSubscriptionTest : public RdsTestBase {

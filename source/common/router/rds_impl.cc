@@ -78,20 +78,23 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
           RouteConfigUpdatePtr(config_update),
           std::unique_ptr<Envoy::Config::OpaqueResourceDecoder>(resource_decoder),
           rds.config_source(), rds.route_config_name(), manager_identifier, factory_context,
-          stat_prefix + "rds.", "RDS", route_config_provider_manager),
-      config_update_info_(config_update) {}
+          stat_prefix + "rds.", "RDS", route_config_provider_manager) {}
+
+RouteConfigUpdateReceiver* RdsRouteConfigSubscription::routeConfigUpdateCast() {
+  return static_cast<RouteConfigUpdateReceiver*>(config_update_info_.get());
+}
 
 void RdsRouteConfigSubscription::beforeProviderUpdate() {
-  if (config_update_info_->protobufConfigurationCast().has_vhds() &&
-      config_update_info_->vhdsConfigurationChanged()) {
+  if (routeConfigUpdateCast()->protobufConfigurationCast().has_vhds() &&
+      routeConfigUpdateCast()->vhdsConfigurationChanged()) {
     std::unique_ptr<Init::ManagerImpl> noop_init_manager;
     std::unique_ptr<Cleanup> resume_rds;
     ENVOY_LOG(debug,
               "rds: vhds configuration present/changed, (re)starting vhds: config_name={} hash={}",
-              route_config_name_, config_update_info_->configHash());
-    maybeCreateInitManager(config_update_info_->configVersion(), noop_init_manager, resume_rds);
+              route_config_name_, routeConfigUpdateCast()->configHash());
+    maybeCreateInitManager(routeConfigUpdateCast()->configVersion(), noop_init_manager, resume_rds);
     vhds_subscription_ = std::make_unique<VhdsSubscription>(
-        config_update_info_, factory_context_, stat_prefix_, route_config_provider_opt_);
+        routeConfigUpdateCast(), factory_context_, stat_prefix_, route_config_provider_opt_);
     vhds_subscription_->registerInitTargetWithInitManager(
         noop_init_manager == nullptr ? local_init_manager_ : *noop_init_manager);
   }
@@ -99,7 +102,7 @@ void RdsRouteConfigSubscription::beforeProviderUpdate() {
 
 void RdsRouteConfigSubscription::afterProviderUpdate() {
   // RDS update removed VHDS configuration
-  if (!config_update_info_->protobufConfigurationCast().has_vhds()) {
+  if (!routeConfigUpdateCast()->protobufConfigurationCast().has_vhds()) {
     vhds_subscription_.release();
   }
 
@@ -138,19 +141,16 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     RdsRouteConfigSubscription* subscription,
     Server::Configuration::ServerFactoryContext& factory_context)
     : base_(RdsRouteConfigSubscriptionSharedPtr(subscription), factory_context),
-      subscription_(subscription), config_update_info_(subscription->routeConfigUpdate()),
+      config_update_info_(subscription->routeConfigUpdateCast()),
       factory_context_(factory_context) {
   // The subscription referenced by the 'base_' and by 'this' is the same.
-  // But the subscription contains two references back to the provider.
-  // One is in Rds::RdsRouteConfigSubscription other in RdsRouteConfigSubscription part.
-  // The first is already initialized by the 'base_' so need to set back to 'this'.
+  // In it the provider is already set by the 'base_' so it points to that.
+  // Need to set again to point to 'this'.
   base_.subscription().routeConfigProvider().emplace(this);
-  subscription_->routeConfigProvider().emplace(this);
 }
 
-RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
-  ASSERT(subscription_->routeConfigProvider().has_value());
-  subscription_->routeConfigProvider().reset();
+RdsRouteConfigSubscription& RdsRouteConfigProviderImpl::subscription() {
+  return static_cast<RdsRouteConfigSubscription&>(base_.subscription());
 }
 
 void RdsRouteConfigProviderImpl::onConfigUpdate() {
@@ -209,7 +209,7 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
                                                 alias, &thread_local_dispatcher,
                                                 route_config_updated_cb]() -> void {
     if (maybe_still_alive.lock()) {
-      subscription_->updateOnDemand(alias);
+      subscription().updateOnDemand(alias);
       config_update_callbacks_.push_back({alias, thread_local_dispatcher, route_config_updated_cb});
     }
   });

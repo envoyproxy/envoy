@@ -86,7 +86,7 @@ vhds:
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
   const std::string context_ = "vhds_test";
-  absl::optional<Envoy::Router::RouteConfigProvider*> provider_;
+  absl::optional<Envoy::Rds::RouteConfigProvider*> provider_;
   Protobuf::util::MessageDifferencer messageDifferencer_;
   std::string default_vhds_config_;
   NiceMock<Envoy::Config::MockSubscriptionFactory> subscription_factory_;
