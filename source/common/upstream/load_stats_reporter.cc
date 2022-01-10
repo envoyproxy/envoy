@@ -80,7 +80,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         uint64_t rq_error = 0;
         uint64_t rq_active = 0;
         uint64_t rq_issued = 0;
-        LoadMetricStats::StatsMap load_metrics;
+        LoadMetricStats::StatMap load_metrics;
         for (const HostSharedPtr& host : hosts) {
           uint64_t host_rq_success = host->stats().rq_success_.latch();
           uint64_t host_rq_error = host->stats().rq_error_.latch();
@@ -91,7 +91,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
           rq_active += host_rq_active;
           rq_issued += host_rq_issued;
           if (host_rq_success + host_rq_error + host_rq_active != 0) {
-            const std::unique_ptr<LoadMetricStats::StatsMap> latched_stats =
+            const std::unique_ptr<LoadMetricStats::StatMap> latched_stats =
                 host->loadMetricStats().latch();
             if (latched_stats != nullptr) {
               for (const auto& metric : *latched_stats) {

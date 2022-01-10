@@ -230,6 +230,29 @@ HostSharedPtr makeTestHost(const std::string& hostname,
   return host;
 }
 
+void addStats(const HostSharedPtr& host, double a, double b = 0, double c = 0, double d = 0) {
+  host->stats().rq_success_.inc();
+  host->loadMetricStats().add("metric_a", a);
+  if (b != 0) {
+    host->loadMetricStats().add("metric_b", b);
+  }
+  if (c != 0) {
+    host->loadMetricStats().add("metric_c", c);
+  }
+  if (d != 0) {
+    host->loadMetricStats().add("metric_d", d);
+  }
+}
+
+void addStatExpectation(envoy::config::endpoint::v3::UpstreamLocalityStats* stats,
+                        const std::string& metric_name, int num_requests_with_metric,
+                        double total_metric_value) {
+  auto metric = stats->add_load_metric_stats();
+  metric->set_metric_name(metric_name);
+  metric->set_num_requests_finished_with_metric(num_requests_with_metric);
+  metric->set_total_metric_value(total_metric_value);
+}
+
 // Validate that per-locality metrics are aggregated across hosts and included in the load report.
 TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
@@ -248,22 +271,10 @@ TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
                 host2 = makeTestHost("host2", locality1);
   host_set_.hosts_per_locality_ = makeHostsPerLocality({{host0, host1}, {host2}});
 
-  host0->stats().rq_success_.inc();
-  host0->loadMetricStats().add("metric_a", 0.11111);
-  host0->loadMetricStats().add("metric_b", 1.0);
-
-  host0->stats().rq_success_.inc();
-  host0->loadMetricStats().add("metric_a", 0.33333);
-  host0->loadMetricStats().add("metric_c", 3.14159);
-
-  host1->stats().rq_success_.inc();
-  host1->loadMetricStats().add("metric_a", 0.44444);
-  host1->loadMetricStats().add("metric_b", 0.12345);
-
-  host2->stats().rq_success_.inc();
-  host2->loadMetricStats().add("metric_a", 10.01);
-  host2->loadMetricStats().add("metric_c", 20.02);
-  host2->loadMetricStats().add("metric_d", 30.03);
+  addStats(host0, 0.11111, 1.0);
+  addStats(host0, 0.33333, 0, 3.14159);
+  addStats(host1, 0.44444, 0.12345);
+  addStats(host2, 10.01, 0, 20.02, 30.03);
 
   cluster.info_->eds_service_name_ = "bar";
   MockClusterManager::ClusterInfoMaps cluster_info{{{"foo", cluster}}, {}};
@@ -281,34 +292,16 @@ TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
     auto expected_locality0_stats = expected_cluster_stats.add_upstream_locality_stats();
     expected_locality0_stats->mutable_locality()->set_region("mars");
     expected_locality0_stats->set_total_successful_requests(3);
-    auto locality0_metric_a = expected_locality0_stats->add_load_metric_stats();
-    locality0_metric_a->set_metric_name("metric_a");
-    locality0_metric_a->set_num_requests_finished_with_metric(3);
-    locality0_metric_a->set_total_metric_value(0.88888);
-    auto locality0_metric_b = expected_locality0_stats->add_load_metric_stats();
-    locality0_metric_b->set_metric_name("metric_b");
-    locality0_metric_b->set_num_requests_finished_with_metric(2);
-    locality0_metric_b->set_total_metric_value(1.12345);
-    auto locality0_metric_c = expected_locality0_stats->add_load_metric_stats();
-    locality0_metric_c->set_metric_name("metric_c");
-    locality0_metric_c->set_num_requests_finished_with_metric(1);
-    locality0_metric_c->set_total_metric_value(3.14159);
+    addStatExpectation(expected_locality0_stats, "metric_a", 3, 0.88888);
+    addStatExpectation(expected_locality0_stats, "metric_b", 2, 1.12345);
+    addStatExpectation(expected_locality0_stats, "metric_c", 1, 3.14159);
 
     auto expected_locality1_stats = expected_cluster_stats.add_upstream_locality_stats();
     expected_locality1_stats->mutable_locality()->set_region("jupiter");
     expected_locality1_stats->set_total_successful_requests(1);
-    auto locality1_metric_a = expected_locality1_stats->add_load_metric_stats();
-    locality1_metric_a->set_metric_name("metric_a");
-    locality1_metric_a->set_num_requests_finished_with_metric(1);
-    locality1_metric_a->set_total_metric_value(10.01);
-    auto locality1_metric_c = expected_locality1_stats->add_load_metric_stats();
-    locality1_metric_c->set_metric_name("metric_c");
-    locality1_metric_c->set_num_requests_finished_with_metric(1);
-    locality1_metric_c->set_total_metric_value(20.02);
-    auto locality1_metric_d = expected_locality1_stats->add_load_metric_stats();
-    locality1_metric_d->set_metric_name("metric_d");
-    locality1_metric_d->set_num_requests_finished_with_metric(1);
-    locality1_metric_d->set_total_metric_value(30.03);
+    addStatExpectation(expected_locality1_stats, "metric_a", 1, 10.01);
+    addStatExpectation(expected_locality1_stats, "metric_c", 1, 20.02);
+    addStatExpectation(expected_locality1_stats, "metric_d", 1, 30.03);
 
     expectSendMessage({expected_cluster_stats});
   }
@@ -334,14 +327,8 @@ TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
     auto expected_locality0_stats = expected_cluster_stats.add_upstream_locality_stats();
     expected_locality0_stats->mutable_locality()->set_region("mars");
     expected_locality0_stats->set_total_successful_requests(1);
-    auto locality0_metric_a = expected_locality0_stats->add_load_metric_stats();
-    locality0_metric_a->set_metric_name("metric_a");
-    locality0_metric_a->set_num_requests_finished_with_metric(1);
-    locality0_metric_a->set_total_metric_value(1.41421);
-    auto locality0_metric_e = expected_locality0_stats->add_load_metric_stats();
-    locality0_metric_e->set_metric_name("metric_e");
-    locality0_metric_e->set_num_requests_finished_with_metric(1);
-    locality0_metric_e->set_total_metric_value(2.71828);
+    addStatExpectation(expected_locality0_stats, "metric_a", 1, 1.41421);
+    addStatExpectation(expected_locality0_stats, "metric_e", 1, 2.71828);
 
     // No stats for locality 1 since there was no traffic to it.
     expectSendMessage({expected_cluster_stats});

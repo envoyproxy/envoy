@@ -74,38 +74,15 @@ public:
 
 /**
  * Implementation of LoadMetricStats.
- *
- * TODO(pianiststickman): this implementation puts a copy of the stat name into every host that
- * receives a copy of that metric. This can be improved by putting a single copy of the stat name
- * into a thread-local key->index map and using the index as the key to the stat map instead.
  */
 class LoadMetricStatsImpl : public LoadMetricStats {
 public:
-  LoadMetricStatsImpl() = default;
-
-  void add(const absl::string_view key, double value) override {
-    absl::MutexLock lock(&mu_);
-    if (map_ == nullptr) {
-      map_ = std::make_unique<StatsMap>();
-    }
-    Stat& stat = (*map_)[key];
-    ++stat.num_requests_with_metric;
-    stat.total_metric_value += value;
-  }
-
-  StatsMapPtr latch() override {
-    absl::MutexLock lock(&mu_);
-    StatsMapPtr latched = std::move(map_);
-    map_ = nullptr;
-    return latched;
-  }
+  void add(const absl::string_view key, double value) override;
+  StatMapPtr latch() override;
 
 private:
   absl::Mutex mu_;
-  StatsMapPtr map_ ABSL_GUARDED_BY(mu_) = nullptr;
-
-  LoadMetricStatsImpl(const LoadMetricStatsImpl&) = delete;
-  LoadMetricStatsImpl& operator=(const LoadMetricStatsImpl&) = delete;
+  StatMapPtr map_ ABSL_GUARDED_BY(mu_);
 };
 
 /**

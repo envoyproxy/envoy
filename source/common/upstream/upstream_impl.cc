@@ -218,6 +218,27 @@ HostVector filterHosts(const absl::node_hash_set<HostSharedPtr>& hosts,
 
 } // namespace
 
+// TODO(pianiststickman): this implementation takes a lock on the hot path and puts a copy of the
+// stat name into every host that receives a copy of that metric. This can be improved by putting
+// a single copy of the stat name into a thread-local key->index map so that the lock can be avoided
+// and using the index as the key to the stat map instead.
+void LoadMetricStatsImpl::add(const absl::string_view key, double value) {
+  absl::MutexLock lock(&mu_);
+  if (map_ == nullptr) {
+    map_ = std::make_unique<StatMap>();
+  }
+  Stat& stat = (*map_)[key];
+  ++stat.num_requests_with_metric;
+  stat.total_metric_value += value;
+}
+
+LoadMetricStats::StatMapPtr LoadMetricStatsImpl::latch() {
+  absl::MutexLock lock(&mu_);
+  StatMapPtr latched = std::move(map_);
+  map_ = nullptr;
+  return latched;
+}
+
 HostDescriptionImpl::HostDescriptionImpl(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,

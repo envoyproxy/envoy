@@ -59,7 +59,6 @@ struct HostStats {
  * Weakly-named load metrics to be reported as EndpointLoadMetricStats. Individual stats are
  * accumulated by calling add(), which combines stats with the same name. The aggregated stats are
  * retrieved by calling latch(), which also clears the current load metrics.
- *
  */
 class LoadMetricStats {
 public:
@@ -70,8 +69,8 @@ public:
     double total_metric_value = 0.0;
   };
 
-  using StatsMap = absl::flat_hash_map<std::string, Stat>;
-  using StatsMapPtr = std::unique_ptr<StatsMap>;
+  using StatMap = absl::flat_hash_map<std::string, Stat>;
+  using StatMapPtr = std::unique_ptr<StatMap>;
 
   // Adds the given stat to the map. If the stat already exists in the map, then the stat is
   // combined with the existing map entry by incrementing num_requests_with_metric and summing the
@@ -81,7 +80,7 @@ public:
   virtual void add(const absl::string_view key, double value) PURE;
 
   // Returns an owning pointer to the current load metrics and clears the map.
-  virtual StatsMapPtr latch() PURE;
+  virtual StatMapPtr latch() PURE;
 };
 
 class ClusterInfo;
