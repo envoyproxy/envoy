@@ -15,6 +15,7 @@ Minor Behavior Changes
 * bandwidth_limit: added :ref:`response trailers <envoy_v3_api_field_extensions.filters.http.bandwidth_limit.v3.BandwidthLimit.enable_response_trailers>` when request or response delay are enforced.
 * bandwidth_limit: added :ref:`bandwidth limit stats <config_http_filters_bandwidth_limit>` *request_enforced* and *response_enforced*.
 * dns: now respecting the returned DNS TTL for resolved hosts, rather than always relying on the hard-coded :ref:`dns_refresh_rate. <envoy_v3_api_field_config.cluster.v3.Cluster.dns_refresh_rate>` This behavior can be temporarily reverted by setting the runtime guard ``envoy.reloadable_features.use_dns_ttl`` to false.
+* ext_authz: the ext_authz span was always getting sampled, even if the parent span was not; now the ext_authz span follows the parent's sampling status.
 * http: directly response with http status code 1xx isn't valid usecase, so the status code 1xx was refused by the :ref:`direct_response <envoy_v3_api_field_config.route.v3.Route.direct_response>` field.
 * http: envoy will now proxy 102 and 103 headers from upstream, though as with 100s only the first 1xx response headers will be sent. This behavioral change by can temporarily reverted by setting runtime guard ``envoy.reloadable_features.proxy_102_103`` to false.
 * http: usage of the experimental matching API is no longer guarded behind a feature flag, as the corresponding protobuf fields have been marked as WIP.
@@ -25,7 +26,6 @@ Minor Behavior Changes
 * router: take elapsed time into account when setting the x-envoy-expected-rq-timeout-ms header for retries, and never send a value that's longer than the request timeout. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` to false.
 * stream_info: response code details with empty space characters (' ', '\t', '\f', '\v', '\n', '\r') is not accepted by the ``setResponseCodeDetails()`` API.
 * upstream: fixed a bug where auto_config didn't work for wrapped TLS sockets (e.g. if proxy proto were configured for TLS).
-* ext_authz: the ext_authz span was always getting sampled, even if the parent span was not; now the ext_authz span follows the parent's sampling status.
 
 Bug Fixes
 ---------
