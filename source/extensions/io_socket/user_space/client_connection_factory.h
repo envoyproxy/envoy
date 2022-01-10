@@ -28,7 +28,7 @@ public:
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
   // The slot is owned by the internal listener registry extension. Once that extension is
-  // intialized, this slot is available. The ClientConnectionFactory has two potential user cases.
+  // initialized, this slot is available. The ClientConnectionFactory has two potential user cases.
   // 1. The per worker thread connection handler populates the per worker listener registry.
   // 2. A envoy thread local cluster lookup the per thread internal listener by listener name.
   // Since the population and the lookup is supposed to be executed in the same worker thread,
