@@ -530,8 +530,7 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     // look for Scope objects matching our expected name, and we'll create
     // a sorted list of sort names for use in populating next/previous buttons.
     auto scope_fn = [this, &params, &context](const Stats::Scope& scope) {
-      std::string prefix_str =
-          server_.stats().symbolTable().toString(scope.prefix());
+      std::string prefix_str = server_.stats().symbolTable().toString(scope.prefix());
 
       if (params.query_.find("show_json_scopes") != params.query_.end()) {
         ENVOY_LOG_MISC(error, "show_json_jscopes: scope={} params={}", prefix_str, params.scope_);
@@ -695,26 +694,6 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
                  "--enable-mutex-tracing.");
   }
   return Http::Code::OK;
-}
-
-void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& counters_and_gauges,
-                               const std::map<std::string, std::string>& text_readouts,
-                               const std::vector<Stats::HistogramSharedPtr>& histograms,
-                               Buffer::Instance& response) {
-  // Display plain stats if format query param is not there.
-  for (const auto& text_readout : text_readouts) {
-    response.add(fmt::format("{}: \"{}\"\n", text_readout.first,
-                             Html::Utility::sanitize(text_readout.second)));
-  }
-  for (const auto& stat : counters_and_gauges) {
-    response.add(fmt::format("{}: {}\n", stat.first, stat.second));
-  }
-  for (const auto& histogram : histograms) {
-    Stats::ParentHistogram* phist = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
-    if (phist != nullptr) {
-      response.add(fmt::format("{}: {}\n", phist->name(), phist->quantileSummary()));
-    }
-  }
 }
 
 std::string StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& counters_and_gauges,

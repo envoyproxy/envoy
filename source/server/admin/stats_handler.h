@@ -82,7 +82,8 @@ private:
     bool used_only_{false};
     bool prometheus_text_readouts_{false};
     bool pretty_{false};
-    Format format_{Format::Text}; // If no `format=` param we use Text, but UI defaults to HTML.
+    Format format_{
+        Format::Text}; // If no `format=` param we use Text, but the `UI` defaults to HTML.
     Type type_{Type::All};
     Type start_type_{Type::TextReadouts};
     std::string filter_string_;
@@ -104,11 +105,6 @@ private:
                                  const std::map<std::string, std::string>& text_readouts,
                                  const std::vector<Stats::HistogramSharedPtr>& all_histograms,
                                  bool pretty_print);
-
-  static void statsAsText(const std::map<std::string, uint64_t>& all_stats,
-                          const std::map<std::string, std::string>& text_readouts,
-                          const std::vector<Stats::HistogramSharedPtr>& all_histograms,
-                          Buffer::Instance& response);
 
   static absl::string_view typeToString(Type type);
 };

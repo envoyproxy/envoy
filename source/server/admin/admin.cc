@@ -316,43 +316,6 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
 
   for (const UrlHandler& handler : handlers_) {
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
-#if 0
-      ParamValues values;
-      const Http::Utility::QueryParams params =
-          Http::Utility::parseAndDecodeQueryString(path_and_query);
-      for (const ParamDescriptor& desc : handler.params_) {
-        auto iter = params.find(desc.id_);
-        if (iter != params.end()) {
-          switch (desc.type_) {
-            case ParamDescriptor::Type::Boolean: {
-              if (iter->second == "false") {
-                values.boolean_map_[desc.id_] = false;
-              } else if (iter->second == "true" || iter->second.empty()) {
-                values.boolean_map_[desc.id_] = true;
-              } else {
-                response.add(fmt::format("Invalid value for query-param {}.", desc.id_));
-                return Http::Code::BadRequest;
-              }
-              break;
-            }
-            case ParamDescriptor::Type::Integer: {
-              int64_t val;
-              if (absl::SimpleAtoi(iter->second, &val)) {
-                values.integer_map_[desc.id_] = val;
-              } else {
-                response.add(fmt::format("Invalid value for query-param {}.", desc.id_));
-                return Http::Code::BadRequest;
-              }
-              break;
-            }
-            case ParamDescriptor::Type::String:
-              values.string_map_[desc.id_] = iter->second;
-              break;
-          }
-        }
-      }
-#endif
-
       found_handler = true;
       if (handler.mutates_server_state_) {
         const absl::string_view method = admin_stream.getRequestHeaders().getMethodValue();
