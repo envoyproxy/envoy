@@ -28,6 +28,7 @@ private:
   std::vector<unsigned int> ids_{};
   hs_database_t* database_{};
   hs_scratch_t* scratch_{};
+  std::mutex scratch_mutex_{};
 };
 
 } // namespace Hyperscan
