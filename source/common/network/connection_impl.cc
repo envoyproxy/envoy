@@ -679,8 +679,10 @@ void ConnectionImpl::onWriteReady() {
         return;
       }
     } else {
-      failure_reason_ = absl::StrCat("delayed connect error: ", error);
-      ENVOY_CONN_LOG(debug, "{}", *this, failure_reason_);
+      if (ConnectionImpl::transportFailureReason().empty()) {
+        failure_reason_ = absl::StrCat("delayed connect error: ", error);
+      }
+      ENVOY_CONN_LOG(debug, "{}", *this, transportFailureReason());
       closeSocket(ConnectionEvent::RemoteClose);
       return;
     }
