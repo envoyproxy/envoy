@@ -277,11 +277,12 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
     callbacks_ = nullptr;
   } else {
+    // Do not enforce a sampling decision on this span; instead keep the parent's sampling status.
     auto options = Http::AsyncClient::RequestOptions()
                        .setTimeout(config_->timeout())
                        .setParentSpan(parent_span)
                        .setChildSpanName(config_->tracingName())
-                       .setSampled(absl::nullopt); // do not enforce a sampling decision and keep the parent's sampling.
+                       .setSampled(absl::nullopt);
 
     request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }
