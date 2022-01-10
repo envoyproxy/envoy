@@ -31,3 +31,15 @@ envoy_cc_benchmark_binary(
         "@com_googlesource_code_re2//:re2",
     ],
 )
+
+envoy_cc_benchmark_binary(
+    name = "matcher_speed_test",
+    srcs = ["matcher_speed_test.cc"],
+    external_deps = ["benchmark"],
+    deps = [
+        "//contrib/hyperscan/matching/input_matchers/source:hyperscan_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:regex_lib",
+        "//source/common/common:utility_lib",
+    ],
+)

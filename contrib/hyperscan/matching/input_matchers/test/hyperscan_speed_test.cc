@@ -3,7 +3,6 @@
 
 #include "source/common/common/assert.h"
 
-#include "absl/strings/str_join.h"
 #include "benchmark/benchmark.h"
 #include "hs/hs.h"
 #include "re2/re2.h"
