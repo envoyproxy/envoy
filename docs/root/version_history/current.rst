@@ -25,6 +25,7 @@ Minor Behavior Changes
 * router: take elapsed time into account when setting the x-envoy-expected-rq-timeout-ms header for retries, and never send a value that's longer than the request timeout. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` to false.
 * stream_info: response code details with empty space characters (' ', '\t', '\f', '\v', '\n', '\r') is not accepted by the ``setResponseCodeDetails()`` API.
 * upstream: fixed a bug where auto_config didn't work for wrapped TLS sockets (e.g. if proxy proto were configured for TLS).
+* ext_authz: the ext_authz span was always getting sampled, even if the parent span was not; now the ext_authz span follows the parent's sampling status.
 
 Bug Fixes
 ---------
