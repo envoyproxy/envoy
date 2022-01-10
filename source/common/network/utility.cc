@@ -733,8 +733,8 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
               ? (packets_dropped - old_packets_dropped)
               : (packets_dropped + (std::numeric_limits<uint32_t>::max() - old_packets_dropped) +
                  1);
-      ENVOY_LOG_MISC(
-          debug,
+      ENVOY_LOG_EVERY_POW_2_MISC(
+          warn,
           "Kernel dropped {} datagram(s). Consider increasing receive buffer size and/or "
           "max datagram size.",
           delta);
