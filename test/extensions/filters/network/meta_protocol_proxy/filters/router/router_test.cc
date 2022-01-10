@@ -160,6 +160,13 @@ TEST_F(RouterFilterTest, UpstreamClusterNoHealthyUpstream) {
 
 TEST_F(RouterFilterTest, KickOffNormalUpstreamRequest) { kickOffNewUpstreamRequest(false); }
 
+TEST_F(RouterFilterTest, UpstreamStreamRequestWatermarkCheck) {
+  kickOffNewUpstreamRequest(false);
+  // Do nothing.
+  filter_->upstreamRequestsForTest().front()->onAboveWriteBufferHighWatermark();
+  filter_->upstreamRequestsForTest().front()->onBelowWriteBufferLowWatermark();
+}
+
 TEST_F(RouterFilterTest, UpstreamRequestResetBeforePoolCallback) {
   kickOffNewUpstreamRequest(false);
 
@@ -253,6 +260,28 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyButConnectionTerminationBeforeR
   upstream_request->onEvent(Network::ConnectionEvent::RemoteClose);
 
   EXPECT_EQ(upstream_request->conn_data_, nullptr);
+}
+
+TEST_F(RouterFilterTest, UpstreamRequestPoolReadyButStreamDestroyBeforeResponse) {
+  kickOffNewUpstreamRequest(true);
+
+  auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
+
+  NiceMock<Network::MockClientConnection> mock_conn;
+
+  EXPECT_CALL(mock_conn, write(_, _));
+
+  factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(mock_conn);
+
+  EXPECT_NE(upstream_request->conn_data_, nullptr);
+  EXPECT_EQ(upstream_request->conn_pool_handle_, nullptr);
+
+  EXPECT_CALL(mock_conn, close(Network::ConnectionCloseType::NoFlush)).Times(1);
+
+  filter_->onDestroy();
+  EXPECT_EQ(upstream_request->conn_data_, nullptr);
+  // Do nothing for the second call.
+  filter_->onDestroy();
 }
 
 TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponse) {

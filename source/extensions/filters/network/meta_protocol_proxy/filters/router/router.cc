@@ -168,7 +168,7 @@ void RouterFilter::onUpstreamRequestReset(UpstreamRequest& upstream_request,
 }
 
 void RouterFilter::cleanUpstreamRequests(bool filter_complete) {
-  // If filter_complete is true then the resetStream() of RouterFilter will not be called on the
+  // If filter_complete_ is true then the resetStream() of RouterFilter will not be called on the
   // onUpstreamRequestReset() of RouterFilter.
   filter_complete_ = filter_complete;
 

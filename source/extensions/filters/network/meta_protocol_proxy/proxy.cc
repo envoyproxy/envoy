@@ -42,7 +42,7 @@ std::vector<FilterFactoryCb> FilterConfig::filtersFactoryFromProto(
   for (const auto& filter : filters) {
     if (has_terminal_filter) {
       throw EnvoyException(fmt::format(
-          "Termial filter: {} must be the last meta protocol L7 filter", terminal_filter_name));
+          "Terminal filter: {} must be the last meta protocol L7 filter", terminal_filter_name));
     }
 
     auto& factory = Config::Utility::getAndCheckFactory<NamedFilterConfigFactory>(filter);
@@ -61,7 +61,7 @@ std::vector<FilterFactoryCb> FilterConfig::filtersFactoryFromProto(
   }
 
   if (!has_terminal_filter) {
-    throw EnvoyException("A termial L7 filter is necessary for meta protocol proxy");
+    throw EnvoyException("A terminal L7 filter is necessary for meta protocol proxy");
   }
   return factories;
 }

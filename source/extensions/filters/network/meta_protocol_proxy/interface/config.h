@@ -24,7 +24,7 @@ public:
    * @return ProtobufTypes::MessagePtr create empty route config proto message route specific
    * config.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyRouteConfigProto() { return nullptr; }
+  virtual ProtobufTypes::MessagePtr createEmptyRouteConfigProto() PURE;
 
   /**
    * @return RouteSpecificFilterConfigConstSharedPtr allow the filter to pre-process per route
@@ -33,16 +33,14 @@ public:
   virtual RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const Protobuf::Message&,
                                   Server::Configuration::ServerFactoryContext&,
-                                  ProtobufMessage::ValidationVisitor&) {
-    return nullptr;
-  }
+                                  ProtobufMessage::ValidationVisitor&) PURE;
 
   std::string category() const override { return "envoy.meta_protocol_proxy.filters"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
    */
-  virtual bool isTerminalFilter() { return false; }
+  virtual bool isTerminalFilter() PURE;
 };
 
 } // namespace MetaProtocolProxy

@@ -109,26 +109,26 @@ TEST(BasicFilterConfigTest, CreatingFilterFactories) {
   Registry::InjectFactory<NamedFilterConfigFactory> registration_0(mock_filter_config_0);
   Registry::InjectFactory<NamedFilterConfigFactory> registration_1(mock_filter_config_1);
 
+  // No terminal filter.
+  {
+    EXPECT_THROW_WITH_MESSAGE(
+        FilterConfig::filtersFactoryFromProto(filters_proto_config, "test", factory_context),
+        EnvoyException, "A terminal L7 filter is necessary for meta protocol proxy");
+  }
+
+  // Error terminal filter position.
   {
     ON_CALL(mock_filter_config_0, isTerminalFilter()).WillByDefault(Return(true));
 
     EXPECT_THROW_WITH_MESSAGE(
         FilterConfig::filtersFactoryFromProto(filters_proto_config, "test", factory_context),
         EnvoyException,
-        "Termial filter: mock_meta_protocol_filter_name_0 must be the last meta protocol L7 "
+        "Terminal filter: mock_meta_protocol_filter_name_0 must be the last meta protocol L7 "
         "filter");
   }
 
   {
     ON_CALL(mock_filter_config_0, isTerminalFilter()).WillByDefault(Return(false));
-
-    EXPECT_THROW_WITH_MESSAGE(
-        FilterConfig::filtersFactoryFromProto(filters_proto_config, "test", factory_context),
-        EnvoyException, "A termial L7 filter is necessary for meta protocol proxy");
-  }
-
-  {
-
     ON_CALL(mock_filter_config_1, isTerminalFilter()).WillByDefault(Return(true));
     auto factories =
         FilterConfig::filtersFactoryFromProto(filters_proto_config, "test", factory_context);
@@ -142,7 +142,23 @@ public:
     std::vector<FilterFactoryCb> factories;
 
     for (const auto& filter : mock_stream_filters_) {
-      factories.push_back([f = filter](FilterChainFactoryCallbacks& cb) { cb.addFilter(f); });
+      factories.push_back([f = filter](FilterChainFactoryCallbacks& cb) {
+        ASSERT(f->isDualFilter());
+        cb.addFilter(f);
+      });
+    }
+
+    for (const auto& filter : mock_decoder_filters_) {
+      factories.push_back([f = filter](FilterChainFactoryCallbacks& cb) {
+        ASSERT(!f->isDualFilter());
+        cb.addDecoderFilter(f);
+      });
+    }
+    for (const auto& filter : mock_encoder_filters_) {
+      factories.push_back([f = filter](FilterChainFactoryCallbacks& cb) {
+        ASSERT(!f->isDualFilter());
+        cb.addEncoderFilter(f);
+      });
     }
 
     auto codec_factory = std::make_unique<NiceMock<MockCodecFactory>>();
@@ -165,6 +181,9 @@ public:
   NiceMock<MockRouteMatcher>* route_matcher_;
 
   std::vector<std::shared_ptr<NiceMock<MockStreamFilter>>> mock_stream_filters_;
+  std::vector<std::shared_ptr<NiceMock<MockDecoderFilter>>> mock_decoder_filters_;
+  std::vector<std::shared_ptr<NiceMock<MockEncoderFilter>>> mock_encoder_filters_;
+
   std::shared_ptr<NiceMock<MockRouteEntry>> mock_route_entry_;
 };
 
@@ -440,6 +459,9 @@ TEST_F(FilterTest, ActiveStreamFiltersContinueDecoding) {
 
   mock_stream_filters_ = {mock_stream_filter_0, mock_stream_filter_1, mock_stream_filter_2};
 
+  auto mock_encoder_filter = std::make_shared<NiceMock<MockEncoderFilter>>();
+  mock_encoder_filters_ = {mock_encoder_filter, mock_encoder_filter, mock_encoder_filter};
+
   ON_CALL(*mock_stream_filter_1, onStreamDecoded(_))
       .WillByDefault(Return(FilterStatus::StopIteration));
 
@@ -453,7 +475,7 @@ TEST_F(FilterTest, ActiveStreamFiltersContinueDecoding) {
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
   EXPECT_EQ(3, active_stream->decoderFiltersForTest().size());
-  EXPECT_EQ(3, active_stream->encoderFiltersForTest().size());
+  EXPECT_EQ(6, active_stream->encoderFiltersForTest().size());
 
   // Decoding will be stopped when `onStreamDecoded` of `mock_stream_filter_1` is called.
   EXPECT_EQ(2, active_stream->nextDecoderFilterIndexForTest());
@@ -472,6 +494,9 @@ TEST_F(FilterTest, ActiveStreamFiltersContinueEncoding) {
 
   mock_stream_filters_ = {mock_stream_filter_0, mock_stream_filter_1, mock_stream_filter_2};
 
+  auto mock_decoder_filter = std::make_shared<NiceMock<MockDecoderFilter>>();
+  mock_decoder_filters_ = {mock_decoder_filter, mock_decoder_filter, mock_decoder_filter};
+
   ON_CALL(*mock_stream_filter_1, onStreamEncoded(_))
       .WillByDefault(Return(FilterStatus::StopIteration));
 
@@ -484,11 +509,11 @@ TEST_F(FilterTest, ActiveStreamFiltersContinueEncoding) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_EQ(3, active_stream->decoderFiltersForTest().size());
+  EXPECT_EQ(6, active_stream->decoderFiltersForTest().size());
   EXPECT_EQ(3, active_stream->encoderFiltersForTest().size());
 
   // All decoder filters are completed directly.
-  EXPECT_EQ(3, active_stream->nextDecoderFilterIndexForTest());
+  EXPECT_EQ(6, active_stream->nextDecoderFilterIndexForTest());
   EXPECT_EQ(0, active_stream->nextEncoderFilterIndexForTest());
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
@@ -496,7 +521,6 @@ TEST_F(FilterTest, ActiveStreamFiltersContinueEncoding) {
   active_stream->upstreamResponse(std::move(response));
 
   // Encoding will be stopped when `onStreamEncoded` of `mock_stream_filter_1` is called.
-  EXPECT_EQ(3, active_stream->nextDecoderFilterIndexForTest());
   EXPECT_EQ(2, active_stream->nextEncoderFilterIndexForTest());
 
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), true));

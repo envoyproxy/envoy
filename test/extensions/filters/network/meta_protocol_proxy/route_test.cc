@@ -78,6 +78,9 @@ TEST_F(RouteEntryImplTest, RouteMetadata) {
  */
 TEST_F(RouteEntryImplTest, RoutePerFilterConfig) {
   Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
+  ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault(Invoke([]() {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }));
   ON_CALL(filter_config_, createRouteSpecificFilterConfig(_, _, _))
       .WillByDefault(
           Invoke([this](const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
@@ -98,6 +101,54 @@ TEST_F(RouteEntryImplTest, RoutePerFilterConfig) {
 
   EXPECT_EQ(route_->perFilterConfig("envoy.filters.meta_protocol.mock_filter"),
             route_config_map_.at("envoy.filters.meta_protocol.mock_filter").get());
+};
+
+/**
+ * Test the case where there is no route level proto available for the filter.
+ */
+TEST_F(RouteEntryImplTest, NullRouteEmptyProto) {
+  Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
+
+  ON_CALL(filter_config_, createRouteSpecificFilterConfig(_, _, _))
+      .WillByDefault(
+          Invoke([this](const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
+                        ProtobufMessage::ValidationVisitor&) {
+            auto route_config = std::make_shared<RouteConfig>();
+            route_config_map_.emplace(filter_config_.name(), route_config);
+            return route_config;
+          }));
+
+  const std::string yaml_config = R"EOF(
+    cluster: cluster_0
+    per_filter_config:
+      envoy.filters.meta_protocol.mock_filter:
+        "@type": type.googleapis.com/google.protobuf.Struct
+        value: { "key_0": "value_0" }
+  )EOF";
+  initialize(yaml_config);
+
+  EXPECT_EQ(route_->perFilterConfig("envoy.filters.meta_protocol.mock_filter"), nullptr);
+};
+
+/**
+ * Test the case where there is no route level config available for the filter.
+ */
+TEST_F(RouteEntryImplTest, NullRouteSpecificConfig) {
+  Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
+  ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault(Invoke([]() {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }));
+
+  const std::string yaml_config = R"EOF(
+    cluster: cluster_0
+    per_filter_config:
+      envoy.filters.meta_protocol.mock_filter:
+        "@type": type.googleapis.com/google.protobuf.Struct
+        value: { "key_0": "value_0" }
+  )EOF";
+  initialize(yaml_config);
+
+  EXPECT_EQ(route_->perFilterConfig("envoy.filters.meta_protocol.mock_filter"), nullptr);
 };
 
 /**

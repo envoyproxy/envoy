@@ -18,7 +18,13 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::Struct>();
   }
-
+  ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override { return nullptr; }
+  RouteSpecificFilterConfigConstSharedPtr
+  createRouteSpecificFilterConfig(const Protobuf::Message&,
+                                  Server::Configuration::ServerFactoryContext&,
+                                  ProtobufMessage::ValidationVisitor&) override {
+    return nullptr;
+  }
   bool isTerminalFilter() override { return true; }
 
   std::string name() const override { return "envoy.filters.meta_protocol.router"; }

@@ -10,6 +10,26 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MetaProtocolProxy {
 
+class MockDecoderFilter : public DecoderFilter {
+public:
+  MockDecoderFilter();
+
+  MOCK_METHOD(void, onDestroy, ());
+
+  MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallback & callbacks));
+  MOCK_METHOD(FilterStatus, onStreamDecoded, (Request & request));
+};
+
+class MockEncoderFilter : public EncoderFilter {
+public:
+  MockEncoderFilter();
+
+  MOCK_METHOD(void, onDestroy, ());
+
+  MOCK_METHOD(void, setEncoderFilterCallbacks, (EncoderFilterCallback & callbacks));
+  MOCK_METHOD(FilterStatus, onStreamEncoded, (Response & response));
+};
+
 class MockStreamFilter : public StreamFilter {
 public:
   MockStreamFilter();
@@ -20,7 +40,7 @@ public:
   MOCK_METHOD(FilterStatus, onStreamEncoded, (Response & response));
 
   MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallback & callbacks));
-  MOCK_METHOD(FilterStatus, onStreamDecoded, (Request & response));
+  MOCK_METHOD(FilterStatus, onStreamDecoded, (Request & request));
 };
 
 class MockStreamFilterConfig : public NamedFilterConfigFactory {

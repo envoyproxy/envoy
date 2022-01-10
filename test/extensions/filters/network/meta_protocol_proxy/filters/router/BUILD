@@ -38,6 +38,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.meta_protocol_proxy"],
     deps = [
         "//source/extensions/filters/network/meta_protocol_proxy/filters/router:config",
+        "//test/extensions/filters/network/meta_protocol_proxy/mocks:filter_mocks",
         "//test/mocks/server:factory_context_mocks",
     ],
 )

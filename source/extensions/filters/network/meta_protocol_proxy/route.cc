@@ -19,14 +19,17 @@ namespace MetaProtocolProxy {
 
 RouteEntryImpl::RouteEntryImpl(const ProtoRouteAction& route_action,
                                Envoy::Server::Configuration::ServerFactoryContext& context)
-    : cluster_name_(route_action.cluster()),
-      metadata_(route_action.metadata()) {
+    : cluster_name_(route_action.cluster()), metadata_(route_action.metadata()) {
 
   for (const auto& proto_filter_config : route_action.per_filter_config()) {
     auto& factory = Config::Utility::getAndCheckFactoryByName<NamedFilterConfigFactory>(
         proto_filter_config.first);
 
     ProtobufTypes::MessagePtr message = factory.createEmptyRouteConfigProto();
+    if (message == nullptr) {
+      continue;
+    }
+
     Envoy::Config::Utility::translateOpaqueConfig(proto_filter_config.second,
                                                   context.messageValidationVisitor(), *message);
 
