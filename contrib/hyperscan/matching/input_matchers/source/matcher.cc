@@ -65,7 +65,7 @@ bool Matcher::match(absl::optional<absl::string_view> input) {
     return false;
   }
 
-  std::lock_guard<std::mutex> guard(scratch_mutex_);
+  absl::MutexLock lock(&scratch_mutex_);
   bool matched = false;
   const absl::string_view input_str = *input;
   hs_error_t err = hs_scan(

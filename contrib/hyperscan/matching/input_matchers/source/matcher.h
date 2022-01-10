@@ -2,6 +2,7 @@
 
 #include "envoy/matcher/matcher.h"
 
+#include "absl/synchronization/mutex.h"
 #include "contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha/hyperscan.pb.h"
 #include "hs/hs.h"
 
@@ -28,7 +29,7 @@ private:
   std::vector<unsigned int> ids_{};
   hs_database_t* database_{};
   hs_scratch_t* scratch_{};
-  std::mutex scratch_mutex_{};
+  absl::Mutex scratch_mutex_{};
 };
 
 } // namespace Hyperscan
