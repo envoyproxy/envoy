@@ -161,6 +161,11 @@ public:
    * Returns the bucket summary representation.
    */
   virtual const std::string bucketSummary() const PURE;
+
+  /**
+   * Returns the bucket summary representation with non-overlapping buckets.
+   */
+  virtual const std::string nonOverlappingBucketSummary() const PURE;
 };
 
 using ParentHistogramSharedPtr = RefcountPtr<ParentHistogram>;

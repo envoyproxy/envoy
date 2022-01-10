@@ -106,6 +106,7 @@ public:
   }
   const std::string quantileSummary() const override;
   const std::string bucketSummary() const override;
+  const std::string nonOverlappingBucketSummary() const override;
 
   // Stats::Metric
   SymbolTable& symbolTable() override;

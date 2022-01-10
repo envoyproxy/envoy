@@ -29,6 +29,7 @@ Removed Config or Runtime
 New Features
 ------------
 * http3: downstream HTTP/3 support is now GA! Upstream HTTP/3 also GA for specific deployments. See :ref:`here <arch_overview_http3>` for details.
+* stats: histogram_buckets query parameter added to plain text stats to change histogram output to show buckets.
 
 
 Deprecated

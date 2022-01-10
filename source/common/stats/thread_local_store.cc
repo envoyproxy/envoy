@@ -940,6 +940,29 @@ const std::string ParentHistogramImpl::bucketSummary() const {
   }
 }
 
+const std::string ParentHistogramImpl::nonOverlappingBucketSummary() const {
+  if (used()) {
+    std::vector<std::string> bucket_summary;
+    ConstSupportedBuckets& supported_buckets = interval_statistics_.supportedBuckets();
+    bucket_summary.reserve(supported_buckets.size());
+    uint64_t previous_computed_interval_bucket = 0;
+    uint64_t previous_computed_cumulative_bucket = 0;
+    for (size_t i = 0; i < supported_buckets.size(); ++i) {
+      uint64_t current_computed_interval_bucket = interval_statistics_.computedBuckets()[i];
+      uint64_t current_computed_cumulative_bucket = cumulative_statistics_.computedBuckets()[i];
+      bucket_summary.push_back(
+          fmt::format("B{:g}({},{})", supported_buckets[i],
+                      current_computed_interval_bucket - previous_computed_interval_bucket,
+                      current_computed_cumulative_bucket - previous_computed_cumulative_bucket));
+      previous_computed_interval_bucket = current_computed_interval_bucket;
+      previous_computed_cumulative_bucket = current_computed_cumulative_bucket;
+    }
+    return absl::StrJoin(bucket_summary, " ");
+  } else {
+    return std::string("No recorded values");
+  }
+}
+
 void ParentHistogramImpl::addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr) {
   Thread::LockGuard lock(merge_lock_);
   tls_histograms_.emplace_back(hist_ptr);

@@ -80,6 +80,7 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(url);
 
   const bool used_only = params.find("usedonly") != params.end();
+  const bool histogram_buckets = params.find("histogram_buckets") != params.end();
   absl::optional<std::regex> regex;
   if (!Utility::filterParam(params, response, regex)) {
     return Http::Code::BadRequest;
@@ -113,7 +114,8 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
 
   if (!format_value.has_value()) {
     // Display plain stats if format query param is not there.
-    statsAsText(all_stats, text_readouts, server_.stats().histograms(), used_only, regex, response);
+    statsAsText(all_stats, text_readouts, server_.stats().histograms(), used_only,
+                histogram_buckets, regex, response);
     return Http::Code::OK;
   }
 
@@ -174,7 +176,8 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
 void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
                                const std::map<std::string, std::string>& text_readouts,
                                const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                               bool used_only, const absl::optional<std::regex>& regex,
+                               bool used_only, bool histogram_buckets,
+                               const absl::optional<std::regex>& regex,
                                Buffer::Instance& response) {
   // Display plain stats if format query param is not there.
   for (const auto& text_readout : text_readouts) {
@@ -187,8 +190,16 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
   std::map<std::string, std::string> all_histograms;
   for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
     if (shouldShowMetric(*histogram, used_only, regex)) {
-      auto insert = all_histograms.emplace(histogram->name(), histogram->quantileSummary());
-      ASSERT(insert.second); // No duplicates expected.
+      bool success = false;
+      // Display summary of non-overlapping buckets if histogram_buckets query parameter is found.
+      if (histogram_buckets) {
+        success =
+            all_histograms.emplace(histogram->name(), histogram->nonOverlappingBucketSummary())
+                .second;
+      } else {
+        success = all_histograms.emplace(histogram->name(), histogram->quantileSummary()).second;
+      }
+      ASSERT(success); // No duplicates expected.
     }
   }
   for (const auto& histogram : all_histograms) {

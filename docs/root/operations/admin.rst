@@ -444,6 +444,13 @@ modify different aspects of the server:
   Full-string matching can be specified with begin- and end-line anchors. (i.e.
   ``/stats?filter=^server.concurrency$``)
 
+  .. http:get:: /stats?histogram_buckets
+
+  Changes histogram output to display buckets with upper bounds (e.g. B0.5, B1, B5, ...).
+  The output for each bucket will be in the form of (interval,cumulative) (e.g. B0.5(0,0)).
+  Buckets do not include values from other buckets with smaller upper bounds;
+  the previous bucket's upper bound acts as a lower bound. Compatible with ``usedonly`` and ``filter``.
+
 .. http:get:: /stats?format=json
 
   Outputs /stats in JSON format. This can be used for programmatic access of stats. Counters and Gauges
