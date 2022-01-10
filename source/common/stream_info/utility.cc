@@ -116,17 +116,6 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamRxByteRece
   return duration(timing.value().get().lastDownstreamRxByteReceived(), stream_info_);
 }
 
-absl::optional<std::chrono::duration<double, std::milli>>
-TimingUtility::recordExtAuthzDuration(absl::optional<MonotonicTime> start_time) {
-  if (start_time.has_value()) {
-
-    auto ext_authz_duration =
-        std::chrono::duration<double, std::milli>(start_time->time_since_epoch().count());
-    return ext_authz_duration;
-  }
-  return absl::nullopt;
-}
-
 const std::string&
 Utility::formatDownstreamAddressNoPort(const Network::Address::Instance& address) {
   if (address.type() == Network::Address::Type::Ip) {
