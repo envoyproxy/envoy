@@ -5,7 +5,7 @@ Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
-* build: added visibility rules for upstream. If these cause visibility related breakage, see notes in :ref:`BUILD <https://github.com/envoyproxy/envoy/blob/release/v1.16/BUILD>`.
+* build: added visibility rules for upstream. If these cause visibility related breakage, see notes in `BUILD <https://github.com/envoyproxy/envoy/blob/release/v1.16/BUILD>`_.
 * build: tcmalloc changes require Clang 9. This requirement change can be avoided by building with ``--define tcmalloc=gperftools`` to use the older tcmalloc code.
 * config: additional warnings have been added for the use of v2 APIs. These appear as log messages
   and are also captured in the :ref:`deprecated_feature_use <v1.16:runtime_stats>` counter after server
