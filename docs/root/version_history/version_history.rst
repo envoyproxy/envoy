@@ -7,6 +7,7 @@ Version history
   :titlesonly:
 
   current
+  v1.20.1
   v1.20.0
   v1.19.1
   v1.19.0

@@ -21,7 +21,7 @@ FixedHeapMonitor::FixedHeapMonitor(
   ASSERT(max_heap_ > 0);
 }
 
-void FixedHeapMonitor::updateResourceUsage(Server::ResourceMonitor::Callbacks& callbacks) {
+void FixedHeapMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
   const size_t physical = stats_->reservedHeapBytes();
   const size_t unmapped = stats_->unmappedHeapBytes();
   ASSERT(physical >= unmapped);

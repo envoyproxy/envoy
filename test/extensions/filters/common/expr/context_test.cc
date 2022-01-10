@@ -442,12 +442,11 @@ TEST(Context, ConnectionAttributes) {
   info.downstream_connection_info_provider_->setRemoteAddress(remote);
   info.downstream_connection_info_provider_->setRequestedServerName(sni_name);
   info.downstream_connection_info_provider_->setSslConnection(downstream_ssl_info);
-  EXPECT_CALL(info, upstreamSslConnection()).WillRepeatedly(Return(upstream_ssl_info));
-  EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(upstream_host));
-  EXPECT_CALL(info, upstreamLocalAddress()).WillRepeatedly(ReturnRef(upstream_local_address));
   const std::string upstream_transport_failure_reason = "ConnectionTermination";
-  EXPECT_CALL(info, upstreamTransportFailureReason())
-      .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
+  info.upstreamInfo()->setUpstreamSslConnection(upstream_ssl_info);
+  info.upstreamInfo()->setUpstreamHost(upstream_host);
+  info.upstreamInfo()->setUpstreamLocalAddress(upstream_local_address);
+  info.upstreamInfo()->setUpstreamTransportFailureReason(upstream_transport_failure_reason);
   EXPECT_CALL(info, connectionID()).WillRepeatedly(Return(123));
   info.downstream_connection_info_provider_->setConnectionID(123);
   const absl::optional<std::string> connection_termination_details = "unauthorized";

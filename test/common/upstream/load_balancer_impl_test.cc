@@ -89,11 +89,9 @@ public:
   using LoadBalancerBase::percentageDegradedLoad;
   using LoadBalancerBase::percentageLoad;
 
-  HostConstSharedPtr chooseHost(LoadBalancerContext*) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  HostConstSharedPtr chooseHost(LoadBalancerContext*) override { PANIC("not implemented"); }
 
-  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { PANIC("not implemented"); }
 };
 
 class LoadBalancerBaseTest : public LoadBalancerTestBase {
@@ -578,9 +576,7 @@ public:
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
     return choose_host_once_host_;
   }
-  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { PANIC("not implemented"); }
 
   HostConstSharedPtr choose_host_once_host_{std::make_shared<NiceMock<MockHost>>()};
 };

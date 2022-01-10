@@ -1,9 +1,11 @@
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/histogram.h"
+#include "envoy/stats/sink.h"
 
 #include "source/common/common/c_smart_ptr.h"
 #include "source/common/event/dispatcher_impl.h"
@@ -1564,6 +1566,7 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
             "B3.6e+06(1,1)",
             parent_histogram->bucketSummary());
 }
+
 class ThreadLocalRealThreadsTestBase : public Thread::RealThreadsTestHelper,
                                        public ThreadLocalStoreNoMocksTestBase {
 protected:
@@ -1801,7 +1804,7 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
                                      2 * NumThreads, ") ")));
 
   // Now clear everything, and synchronize the system by calling mergeHistograms().
-  // THere should be no more ParentHistograms or TlsHistograms.
+  // There should be no more ParentHistograms or TlsHistograms.
   scope2.reset();
   histograms.clear();
   mergeHistograms();

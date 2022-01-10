@@ -3,6 +3,11 @@ envoy.access_loggers.file:
   - envoy.access_loggers
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.access_loggers.extension_filters.cel:
+  categories:
+  - envoy.access_loggers.extension_filters
+  security_posture: unknown
+  status: alpha
 envoy.access_loggers.http_grpc:
   categories:
   - envoy.access_loggers
@@ -693,17 +698,17 @@ envoy.wasm.runtime.v8:
 envoy.wasm.runtime.wamr:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown  # "This may never change from unknown until the threat model at https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.wasm.runtime.wasmtime:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown  # "This may never change from unknown until the threat model at https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.wasm.runtime.wavm:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown  # "This may never change from unknown until the threat model at https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.watchdog.profile_action:
   categories:

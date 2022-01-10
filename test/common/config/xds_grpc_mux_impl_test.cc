@@ -967,7 +967,8 @@ TEST_F(NullGrpcMuxImplTest, PauseMultipleArgsImplemented) {
 }
 
 TEST_F(NullGrpcMuxImplTest, RequestOnDemandNotImplemented) {
-  EXPECT_DEATH(null_mux_->requestOnDemandUpdate("type_url", {"for_update"}), "not implemented");
+  EXPECT_ENVOY_BUG(null_mux_->requestOnDemandUpdate("type_url", {"for_update"}),
+                   "unexpected request for on demand update");
 }
 
 TEST_F(NullGrpcMuxImplTest, AddWatchRaisesException) {

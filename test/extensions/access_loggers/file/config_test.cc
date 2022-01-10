@@ -62,7 +62,7 @@ public:
     absl::Time abslStartTime =
         TestUtility::parseTime("Dec 18 01:50:34 2018 GMT", "%b %e %H:%M:%S %Y GMT");
     stream_info_.start_time_ = absl::ToChronoTime(abslStartTime);
-    EXPECT_CALL(stream_info_, upstreamHost()).WillRepeatedly(Return(nullptr));
+    stream_info_.upstreamInfo()->setUpstreamHost(nullptr);
     stream_info_.response_code_ = 200;
 
     EXPECT_CALL(*file, write(_)).WillOnce(Invoke([expected, is_json](absl::string_view got) {

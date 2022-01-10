@@ -60,7 +60,7 @@ public:
   getBalancedHandlerByAddress(const Network::Address::Instance&) override {
     // Internal listener doesn't support migrate connection to another worker.
     // TODO(lambdai): implement the function of handling off to another listener of the same worker.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 
   void pauseListening() override {

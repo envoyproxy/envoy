@@ -63,7 +63,7 @@ SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec
   UNREFERENCED_PARAMETER(vlen);
   UNREFERENCED_PARAMETER(flags);
   UNREFERENCED_PARAMETER(timeout);
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  return {false, EOPNOTSUPP};
 #endif
 }
 
@@ -325,7 +325,7 @@ SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVec
 // TODO: eliminate this branching by upstreaming an alternative Android implementation
 // e.g.: https://github.com/envoyproxy/envoy-mobile/blob/main/third_party/android/ifaddrs-android.h
 #if defined(__ANDROID_API__) && __ANDROID_API__ < 24
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 #else
   struct ifaddrs* ifaddr;
   struct ifaddrs* ifa;

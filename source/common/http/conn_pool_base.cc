@@ -127,7 +127,6 @@ void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
     }
     parent_.decrClusterStreamCapacity(delta);
     ENVOY_CONN_LOG(trace, "Decreasing stream capacity by {}", *codec_client_, delta);
-    negative_capacity_ += delta;
   }
   // As we don't increase stream limits when maxConcurrentStreams goes up, treat
   // a stream limit of 0 as a GOAWAY.

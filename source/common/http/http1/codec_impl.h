@@ -499,6 +499,7 @@ private:
 
   // ParserCallbacks.
   Status onUrl(const char* data, size_t length) override;
+  Status onStatus(const char*, size_t) override { return okStatus(); }
   // ConnectionImpl
   void onEncodeComplete() override;
   StreamInfo::BytesMeter& getBytesMeter() override {
@@ -592,7 +593,8 @@ private:
   bool cannotHaveBody();
 
   // ParserCallbacks.
-  Status onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  Status onUrl(const char*, size_t) override { return okStatus(); }
+  Status onStatus(const char* data, size_t length) override;
   // ConnectionImpl
   Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override {}

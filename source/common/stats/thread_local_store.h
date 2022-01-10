@@ -244,14 +244,9 @@ public:
   std::vector<TextReadoutSharedPtr> textReadouts() const override;
   std::vector<ParentHistogramSharedPtr> histograms() const override;
 
-  void forEachCounter(std::function<void(std::size_t)> f_size,
-                      std::function<void(Stats::Counter&)> f_stat) const override;
-
-  void forEachGauge(std::function<void(std::size_t)> f_size,
-                    std::function<void(Stats::Gauge&)> f_stat) const override;
-
-  void forEachTextReadout(std::function<void(std::size_t)> f_size,
-                          std::function<void(Stats::TextReadout&)> f_stat) const override;
+  void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
+  void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
+  void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
@@ -266,6 +261,12 @@ public:
   void mergeHistograms(PostMergeCb merge_cb) override;
 
   Histogram& tlsHistogram(ParentHistogramImpl& parent, uint64_t id);
+
+  void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
+  void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
+  void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
+
+  void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override;
 
   /**
    * @return a thread synchronizer object used for controlling thread behavior in tests.
@@ -500,6 +501,7 @@ private:
                                  StatNameHashSet* tls_rejected_stats);
   TlsCache& tlsCache() { return **tls_cache_; }
 
+  OptRef<SinkPredicates> sink_predicates_;
   Allocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   using TlsCacheSlot = ThreadLocal::TypedSlotPtr<TlsCache>;
