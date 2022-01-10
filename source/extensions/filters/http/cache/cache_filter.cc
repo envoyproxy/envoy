@@ -65,7 +65,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   LookupRequest lookup_request(headers, time_source_.systemTime(), vary_allow_list_);
   request_allows_inserts_ = !lookup_request.requestCacheControl().no_store_;
   is_head_request_ = headers.getMethodValue() == Http::Headers::get().MethodValues.Head;
-  lookup_ = cache_.makeLookupContext(std::move(lookup_request));
+  lookup_ = cache_.makeLookupContext(std::move(lookup_request), *decoder_callbacks_);
 
   ASSERT(lookup_);
   getHeaders(headers);
@@ -104,7 +104,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
   if (request_allows_inserts_ && !is_head_request_ &&
       CacheabilityUtils::isCacheableResponse(headers, vary_allow_list_)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
-    insert_ = cache_.makeInsertContext(std::move(lookup_));
+    insert_ = cache_.makeInsertContext(std::move(lookup_), *encoder_callbacks_);
     // Add metadata associated with the cached response. Right now this is only response_time;
     const ResponseMetadata metadata = {time_source_.systemTime()};
     insert_->insertHeaders(headers, metadata, end_stream);

@@ -105,7 +105,8 @@ private:
 };
 } // namespace
 
-LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request) {
+LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request,
+                                                    Http::StreamDecoderFilterCallbacks&) {
   return std::make_unique<SimpleLookupContext>(*this, std::move(request));
 }
 
@@ -271,7 +272,8 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
   }
 }
 
-InsertContextPtr SimpleHttpCache::makeInsertContext(LookupContextPtr&& lookup_context) {
+InsertContextPtr SimpleHttpCache::makeInsertContext(LookupContextPtr&& lookup_context,
+                                                    Http::StreamEncoderFilterCallbacks&) {
   ASSERT(lookup_context != nullptr);
   return std::make_unique<SimpleInsertContext>(*lookup_context, *this);
 }

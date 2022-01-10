@@ -336,12 +336,14 @@ class HttpCache {
 public:
   // Returns a LookupContextPtr to manage the state of a cache lookup. On a cache
   // miss, the returned LookupContext will be given to the insert call (if any).
-  virtual LookupContextPtr makeLookupContext(LookupRequest&& request) PURE;
+  virtual LookupContextPtr makeLookupContext(LookupRequest&& request,
+                                             Http::StreamDecoderFilterCallbacks& callbacks) PURE;
 
   // Returns an InsertContextPtr to manage the state of a cache insertion.
   // Responses with a chunked transfer-encoding must be dechunked before
   // insertion.
-  virtual InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context) PURE;
+  virtual InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context,
+                                             Http::StreamEncoderFilterCallbacks& callbacks) PURE;
 
   // Precondition: lookup_context represents a prior cache lookup that required
   // validation.
