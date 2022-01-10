@@ -481,7 +481,7 @@ public:
   virtual ~InternalListenerManager() = default;
 
   /**
-   * Return the internal listene binding the listener address.
+   * Return the internal listener binding the listener address.
    *
    * @param listen_address the internal address of the expected internal listener.
    */
@@ -492,12 +492,13 @@ public:
 using InternalListenerManagerOptRef =
     absl::optional<std::reference_wrapper<InternalListenerManager>>;
 
-// The thread local registry. 
+// The thread local registry.
 class LocalInternalListenerRegistry {
 public:
   virtual ~LocalInternalListenerRegistry() = default;
 
-  // Set the internal listener manager which maintains life of internal listeners. Called by connection handler.
+  // Set the internal listener manager which maintains life of internal listeners. Called by
+  // connection handler.
   virtual void setInternalListenerManager(InternalListenerManager& internal_listener_manager) PURE;
 
   // Get the internal listener manager to obtain a listener. Called by client connection factory.
