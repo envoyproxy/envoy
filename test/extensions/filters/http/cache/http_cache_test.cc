@@ -296,6 +296,12 @@ TEST_F(LookupRequestTest, PragmaNoFallback) {
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
 }
 
+TEST(HttpCacheTest, StableHashKey) {
+  Key key;
+  key.set_host("example.com");
+  ASSERT_EQ(stableHashKey(key), 9582653837550152292u);
+}
+
 } // namespace
 } // namespace Cache
 } // namespace HttpFilters
