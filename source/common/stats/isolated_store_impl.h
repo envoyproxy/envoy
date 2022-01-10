@@ -233,35 +233,6 @@ public:
     f_stat(scope);
   }
 
-#if 0
-  bool counterPage(PageFn<Counter> f_stat, absl::string_view start,
-                   PageDirection direction) const override {
-    return alloc_.counterPage(f_stat, start, direction);
-  }
-
-  bool gaugePage(PageFn<Gauge> f_stat, absl::string_view start,
-                 PageDirection direction) const override {
-    return alloc_.gaugePage(f_stat, start, direction);
-  }
-
-  bool textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start,
-                       PageDirection direction) const override {
-    return alloc_.textReadoutPage(f_stat, start, direction);
-  }
-
-  bool histogramPage(PageFn<Histogram>, absl::string_view, PageDirection) const override {
-    return false;
-  }
-
-  bool scopePage(PageFn<const Scope> f_stat, absl::string_view /*start*/,
-                 PageDirection) const override {
-    /** FIX THIS */
-    const Scope& scope = *this;
-    f_stat(scope);
-    return false;
-  }
-#endif
-
   Stats::StatName prefix() const override { return StatName(); }
 
   void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override {

@@ -40,9 +40,6 @@ public:
   Http::Code handlerStats(absl::string_view path_and_query,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                           AdminStream&);
-  Http::Code handlerStatsJson(absl::string_view path_and_query,
-                              Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                              AdminStream&);
   Http::Code handlerStatsPrometheus(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
@@ -93,7 +90,6 @@ private:
     std::string scope_;
     Http::Utility::QueryParams query_;
   };
-
 
   friend class StatsHandlerTest;
 

@@ -138,6 +138,7 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
   shutdownThreading();
 }
 
+#if 0
 TEST_P(AdminStatsTest, HandlerStatsPage) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -218,6 +219,7 @@ TEST_P(AdminStatsTest, HandlerStatsPage) {
 
   shutdownThreading();
 }
+#endif
 
 TEST_P(AdminStatsTest, HandlerStatsJson) {
   InSequence s;

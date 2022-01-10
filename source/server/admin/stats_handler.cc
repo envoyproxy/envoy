@@ -184,18 +184,6 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   return stats(params, server_.stats(), response_headers, response);
 }
 
-Http::Code StatsHandler::handlerStatsJson(absl::string_view url,
-                                          Http::ResponseHeaderMap& response_headers,
-                                          Buffer::Instance& response, AdminStream&) {
-  Params params;
-  Http::Code code = params.parse(url, response);
-  if (code != Http::Code::OK) {
-    return code;
-  }
-  params.format_ = Format::Json;
-  return stats(params, server_.stats(), response_headers, response);
-}
-
 class StatsHandler::Render {
 public:
   virtual ~Render() = default;
@@ -253,7 +241,7 @@ public:
   void render(Buffer::Instance& response) override {
     for (const auto& iter : groups_) {
       absl::string_view label = StatsHandler::typeToString(iter.first);
-      //ENVOY_LOG_MISC(error, "Rendering {}", label);
+      // ENVOY_LOG_MISC(error, "Rendering {}", label);
       const Group& group = iter.second;
       if (group.empty()) {
         response.add(absl::StrCat("<br/><i>No ", label, " found</i><br/>\n"));
@@ -266,6 +254,24 @@ public:
       }
     }
   }
+
+  static void renderAjaxRequestForScopes(Buffer::Instance& response, const Params& params) {
+    // Delegate to JavaScript to fetch all top-level scopes and render as an outline.
+    std::string url =
+        absl::StrCat("stats?format=json&show_json_scopes&type=", typeToString(params.type_));
+    if (params.used_only_) {
+      url += "&usedonly";
+    }
+    if (params.filter_string_.empty()) {
+      absl::StrAppend(&url, "&filter=", params.filter_string_);
+    }
+    response.add(absl::StrCat("<ul id='scopes-outline'></ul>\n"
+                              "<script>\n"
+                              "  fetch('",
+                              url, "')\n", "    .then(response => response.json())\n",
+                              "    .then(data => populateScopes(data));\n"
+                              "</script>\n"));
+  }
 };
 
 class StatsHandler::JsonRender : public StatsHandler::Render {
@@ -275,9 +281,7 @@ public:
   void generate(Stats::Counter& counter) override {
     add(counter, ValueUtil::numberValue(counter.value()));
   }
-  void generate(Stats::Gauge& gauge) override {
-    add(gauge, ValueUtil::numberValue(gauge.value()));
-  }
+  void generate(Stats::Gauge& gauge) override { add(gauge, ValueUtil::numberValue(gauge.value())); }
   void generate(Stats::TextReadout& text_readout) override {
     add(text_readout, ValueUtil::stringValue(text_readout.value()));
   }
@@ -337,7 +341,9 @@ public:
 
     auto* document_fields = document_.mutable_fields();
     (*document_fields)["stats"] = ValueUtil::listValue(stats_array_);
-    (*document_fields)["scopes"] = ValueUtil::listValue(scope_array_);
+    if (params_.query_.find("show_json_scopes") != params_.query_.end()) {
+      (*document_fields)["scopes"] = ValueUtil::listValue(scope_array_);
+    }
     response.add(MessageUtil::getJsonStringFromMessageOrDie(document_, params_.pretty_, true));
   }
 
@@ -387,10 +393,8 @@ public:
     emitScopes();
   }
 
-  template<class StatType> void collect(Type type, const Stats::Scope& scope,
-                                        Stats::StatSet<StatType>& set) {
-    //ENVOY_LOG_MISC(error, "collect {}", typeToString(type));
-
+  template <class StatType>
+  void collect(Type type, const Stats::Scope& scope, Stats::StatSet<StatType>& set) {
     // Bail early if the  requested type does not match the current type.
     if (params_.type_ != Type::All && params_.type_ != type) {
       return;
@@ -405,7 +409,7 @@ public:
     scope.iterate(fn);
   }
 
-  template<class StatType> void collectPrefixes(Type type, const Stats::Scope& scope) {
+  template <class StatType> void collectPrefixes(Type type, const Stats::Scope& scope) {
     // Bail early if the  requested type does not match the current type.
     if (params_.type_ != Type::All && params_.type_ != type) {
       return;
@@ -426,8 +430,6 @@ public:
   }
 
   template <class StatType> void emit(Type type, Stats::StatSet<StatType>& set) {
-    //ENVOY_LOG_MISC(error, "emit {}", typeToString(type));
-
     // Bail early if the  requested type does not match the current type.
     if (params_.type_ != Type::All && params_.type_ != type) {
       return;
@@ -497,10 +499,7 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     html.setSubmitOnChange(true);
     html.renderHead();
     html.renderUrlHandler(statsHandler(), params.query_);
-    //html.renderInput("before", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
-    //html.renderInput("after", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
     html.renderInput("scope", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
-    //html.renderInput("direction", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
     html.renderTail();
     response.add("<body>\n");
     break;
@@ -517,49 +516,39 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     break;
   }
 
-  Context context(params, *render, response);
+  // The default HTML view, with no scope query-param specified (or an empty string), we will
+  // just generate some HTML to initiate a JSON request to populate the scopes. This way the
+  // rendering for scopes and sub-scopes can be handled consistently in JavaScript.
+  if (params.scope_.empty() && params.format_ == Format::Html) {
+    StatsHandler::HtmlRender::renderAjaxRequestForScopes(response, params);
+  } else {
+    Context context(params, *render, response);
 
-  // If the scope is specified, then render all scopes that match it.
-  if (!params.scope_.empty()) {
     // Note that multiple scopes can exist with the same name, and also that
     // scopes may be created/destroyed in other threads, whenever we are not
     // holding the store's lock. So when we traverse the scopes, we'll both
-    // look for Scope objects matchiung our expected name, and we'll create
+    // look for Scope objects matching our expected name, and we'll create
     // a sorted list of sort names for use in populating next/previous buttons.
-    ASSERT(!params.scope_.empty());
-    stats.forEachScope([](size_t) {}, [this, &params, &context](const Stats::Scope& scope) {
-      std::string scope_prefix_str = server_.stats().symbolTable().toString(scope.prefix());
+    stats.forEachScope([](size_t) {},
+                       [this, &params, &context](const Stats::Scope& scope) {
+                         std::string scope_prefix_str =
+                             server_.stats().symbolTable().toString(scope.prefix());
 
-      // If the scope matches the prefix of what the user wants, append in the
-      // stats from it. Note that scopes with a prefix of "" will match anything
-      // the user types, in which case we'll still be filtering based on stat name
-      // prefix.
-      if (scope_prefix_str == params.scope_ || scope_prefix_str.empty()) {
-        context.collectScope(scope);
-      } else if (absl::StartsWith(scope_prefix_str, params.scope_) &&
-                 scope_prefix_str[params.scope_.size()] == '.') {
-        context.addScope(scope_prefix_str);
-      }
-    });
+                         // If the scope matches the prefix of what the user wants, append in the
+                         // stats from it. Note that scopes with a prefix of "" will match anything
+                         // the user types, in which case we'll still be filtering based on stat
+                         // name prefix.
+                         if (scope_prefix_str == params.scope_ || scope_prefix_str.empty()) {
+                           context.collectScope(scope);
+                         } else if (absl::StartsWith(scope_prefix_str, params.scope_) &&
+                                    scope_prefix_str[params.scope_.size()] == '.') {
+                           context.addScope(scope_prefix_str);
+                         }
+                       });
     context.emit();
     render->render(response);
-  } else if (params.format_ == Format::Html) {
-    // Delegate to JavaScript to fetch all top-level scopes and render as an outline.
-    std::string url = absl::StrCat("stats?format=json&type=", typeToString(params.type_));
-    if (params.used_only_) {
-      url += "&usedonly";
-    }
-    if (params.filter_string_.empty()) {
-      absl::StrAppend(&url, "&filter=", params.filter_string_);
-    }
-    response.add(absl::StrCat(
-        "<ul id='scopes-outline'></ul>\n"
-        "<script>\n"
-        "  fetch('", url, "')\n",
-        "    .then(response => response.json())\n",
-        "    .then(data => populateScopes(data));\n"
-        "</script>\n"));
-  } else {
+  }
+#if 0
     // Get an ordered set of scope names, which are used for previous/next
     // navigation, and to choose a default scope name in case none was specified
     // in a query param.
@@ -584,6 +573,7 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     context.emit();
     render->render(response);
   }
+#endif
 
   if (params.format_ == Format::Html) {
     response.add("</body>\n");

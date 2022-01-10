@@ -200,17 +200,5 @@ using SizeFn = std::function<void(std::size_t)>;
  */
 template <typename Stat> using StatFn = std::function<void(Stat&)>;
 
-/**
- * Callback invoked for each stat during iteration.
- *
- * @return false if the iteration should stop.
- */
-template <typename Stat> using PageFn = std::function<bool(Stat&)>;
-
-enum class PageDirection {
-  Forward,
-  Backward,
-};
-
 } // namespace Stats
 } // namespace Envoy

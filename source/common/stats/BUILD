@@ -21,7 +21,6 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/common:thread_synchronizer_lib",
         "//source/common/common:utility_lib",
-        "@com_google_absl//absl/container:btree",
     ],
 )
 

@@ -120,7 +120,7 @@ const char AdminHtmlStart[] = R"(
     }
 
     function expandScope(parent, scope) {
-      let url = 'stats?scope=' + scope + '&format=json';
+      let url = 'stats?scope=' + scope + '&show_json_scopes&format=json';
       url += '&type=' + document.getElementById('type').value;
       if (document.getElementById('usedonly').checked) {
         url += '&usedonly';
@@ -156,36 +156,12 @@ const char AdminHtmlStart[] = R"(
       const parent = document.getElementById('scopes-outline');
       for (let scope of json.scopes) {
         addScope(parent, scope);
-    /*
-        const a_tag = document.createElement('a');
-        a_tag.id = 'scope_' + scope;
-        a_tag.setAttribute("href", 'javascript:expandScope("' + scope + '")');
-        a_tag.textContent = scope;
-        document.body.appendChild(a_tag);
-        document.body.appendChild(document.createElement('br'));
-    */
       }
     }
 
     function populateScope(parent, scope, json) {
-      //let prev = document.getElementById('scope_' + scope);
-
-      for (let subscope of json.scopes) {
-    /*
-    const br = document.createElement('br');
-    prev.parentNode.insertBefore(br, prev.nextSibling);
-    prev = br;
-    */
-
-    addScope(parent, subscope);
-    /*
-        const a_tag = document.createElement('a');
-        a_tag.textContent = subscope;
-        a_tag.id = 'scope_' + subscope;
-        a_tag.setAttribute("href", 'javascript:expandScope("' + subscope + '")');
-        prev.parentNode.insertBefore(a_tag, prev.nextSibling);
-        prev = a_tag;
-    */
+      for (let sub_scope of json.scopes) {
+        addScope(parent, sub_scope);
       }
 
       for (let stat of json.stats) {
@@ -208,11 +184,6 @@ const char AdminHtmlStart[] = R"(
           parent.appendChild(li_tag);
         }
       }
-    /*
-      const pre = document.createElement('pre');
-      pre.textContent = lines.join('\n');
-      prev.parentNode.insertBefore(pre, prev.nextSibling);
-    */
     }
   </script>
 </head>
