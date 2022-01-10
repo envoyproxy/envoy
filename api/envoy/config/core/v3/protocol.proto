@@ -123,9 +123,10 @@ message UpstreamHttpProtocolOptions {
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 }
 
-// Allows pre-populating the cache with HTTP/3 alternate protocols entries.
+// Allows pre-populating the cache with HTTP/3 alternate protocols entries with a 7 day lifetime.
 // This will cause Envoy to attempt HTTP/3 to those upstreams, even if the upstreams have not
-// advertised HTTP/3 support.
+// advertised HTTP/3 support. These entries will be overwritten by alt-svc
+// response headers or cached values.
 // As with regular cached entries, if the origin response would result in clearing an existing
 // alternate protocol cache entry, pre-populated entries will also be cleared.
 // Adding a cache entry with hostname=foo.com port=123 is the equivalent of getting
@@ -165,6 +166,7 @@ message AlternateProtocolsCacheOptions {
   // :ref:`key value store <envoy_v3_api_msg_config.common.key_value.v3.KeyValueStoreConfig>` to flush
   // alternate protocols entries to disk.
   // This function is currently only supported if concurrency is 1
+  // Cached entries will take precedence over pre-populated entries below.
   TypedExtensionConfig key_value_store_config = 3;
 
   // Allows pre-populating the cache with entries, to reduce odds of using TCP for the
