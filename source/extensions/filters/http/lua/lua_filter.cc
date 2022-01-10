@@ -9,6 +9,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/config/datasource.h"
+#include "source/common/crypto/crypto_impl.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/message_impl.h"
 
@@ -190,8 +191,9 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
 }
 
 StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
-                                         Http::HeaderMap& headers, bool end_stream, Filter& filter,
-                                         FilterCallbacks& callbacks, TimeSource& time_source)
+                                         Http::RequestOrResponseHeaderMap& headers, bool end_stream,
+                                         Filter& filter, FilterCallbacks& callbacks,
+                                         TimeSource& time_source)
     : coroutine_(coroutine), headers_(headers), end_stream_(end_stream), filter_(filter),
       callbacks_(callbacks), yield_callback_([this]() {
         if (state_ == State::Running) {
@@ -223,7 +225,7 @@ Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool 
   if (state_ == State::WaitForBodyChunk) {
     ENVOY_LOG(trace, "resuming for next body chunk");
     Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> wrapper(
-        Filters::Common::Lua::BufferWrapper::create(coroutine_.luaState(), data), true);
+        Filters::Common::Lua::BufferWrapper::create(coroutine_.luaState(), headers_, data), true);
     state_ = State::Running;
     coroutine_.resume(1, yield_callback_);
   } else if (state_ == State::WaitForBody && end_stream_) {
@@ -457,9 +459,10 @@ int StreamHandleWrapper::luaBody(lua_State* state) {
           callbacks_.addData(body);
         }
 
-        body_wrapper_.reset(Filters::Common::Lua::BufferWrapper::create(
-                                state, const_cast<Buffer::Instance&>(*callbacks_.bufferedBody())),
-                            true);
+        body_wrapper_.reset(
+            Filters::Common::Lua::BufferWrapper::create(
+                state, headers_, const_cast<Buffer::Instance&>(*callbacks_.bufferedBody())),
+            true);
       }
       return 1;
     }
@@ -552,37 +555,37 @@ int StreamHandleWrapper::luaConnection(lua_State* state) {
 }
 
 int StreamHandleWrapper::luaLogTrace(lua_State* state) {
-  const char* message = luaL_checkstring(state, 2);
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   filter_.scriptLog(spdlog::level::trace, message);
   return 0;
 }
 
 int StreamHandleWrapper::luaLogDebug(lua_State* state) {
-  const char* message = luaL_checkstring(state, 2);
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   filter_.scriptLog(spdlog::level::debug, message);
   return 0;
 }
 
 int StreamHandleWrapper::luaLogInfo(lua_State* state) {
-  const char* message = luaL_checkstring(state, 2);
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   filter_.scriptLog(spdlog::level::info, message);
   return 0;
 }
 
 int StreamHandleWrapper::luaLogWarn(lua_State* state) {
-  const char* message = luaL_checkstring(state, 2);
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   filter_.scriptLog(spdlog::level::warn, message);
   return 0;
 }
 
 int StreamHandleWrapper::luaLogErr(lua_State* state) {
-  const char* message = luaL_checkstring(state, 2);
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   filter_.scriptLog(spdlog::level::err, message);
   return 0;
 }
 
 int StreamHandleWrapper::luaLogCritical(lua_State* state) {
-  const char* message = luaL_checkstring(state, 2);
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   filter_.scriptLog(spdlog::level::critical, message);
   return 0;
 }
@@ -649,9 +652,8 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
 }
 
 int StreamHandleWrapper::luaBase64Escape(lua_State* state) {
-  size_t input_size;
-  const char* input = luaL_checklstring(state, 2, &input_size);
-  auto output = absl::Base64Escape(absl::string_view(input, input_size));
+  absl::string_view input = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  auto output = absl::Base64Escape(input);
   lua_pushlstring(state, output.data(), output.length());
 
   return 1;
@@ -700,7 +702,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
 FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
     Server::Configuration::ServerFactoryContext& context)
-    : main_thread_dispatcher_(context.dispatcher()), disabled_(config.disabled()),
+    : main_thread_dispatcher_(context.mainThreadDispatcher()), disabled_(config.disabled()),
       name_(config.name()) {
   if (disabled_ || !name_.empty()) {
     return;
@@ -720,11 +722,10 @@ void Filter::onDestroy() {
   }
 }
 
-Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
-                                            Filters::Common::Lua::CoroutinePtr& coroutine,
-                                            FilterCallbacks& callbacks, int function_ref,
-                                            PerLuaCodeSetup* setup, Http::HeaderMap& headers,
-                                            bool end_stream) {
+Http::FilterHeadersStatus
+Filter::doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& coroutine,
+                  FilterCallbacks& callbacks, int function_ref, PerLuaCodeSetup* setup,
+                  Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
   if (function_ref == LUA_REFNIL) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -783,7 +784,7 @@ void Filter::scriptError(const Filters::Common::Lua::LuaException& e) {
   response_stream_wrapper_.reset();
 }
 
-void Filter::scriptLog(spdlog::level::level_enum level, const char* message) {
+void Filter::scriptLog(spdlog::level::level_enum level, absl::string_view message) {
   switch (level) {
   case spdlog::level::trace:
     ENVOY_LOG(trace, "script log: {}", message);
@@ -804,10 +805,10 @@ void Filter::scriptLog(spdlog::level::level_enum level, const char* message) {
     ENVOY_LOG(critical, "script log: {}", message);
     return;
   case spdlog::level::off:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unsupported");
     return;
   case spdlog::level::n_levels:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unsupported");
   }
 }
 

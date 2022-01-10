@@ -37,6 +37,8 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
   // Allow any number of (append|pop)TrackedObject calls for the dispatcher strict mock.
   EXPECT_CALL(callbacks_.dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
   EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_)).Times(AnyNumber());
+  callbacks_.dispatcher_.delete_immediately_ = true;
 }
 
 void RouterTestBase::expectResponseTimerCreate() {
@@ -49,6 +51,11 @@ void RouterTestBase::expectPerTryTimerCreate() {
   per_try_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
   EXPECT_CALL(*per_try_timeout_, enableTimer(_, _));
   EXPECT_CALL(*per_try_timeout_, disableTimer());
+}
+
+void RouterTestBase::expectPerTryIdleTimerCreate(std::chrono::milliseconds timeout) {
+  per_try_idle_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
+  EXPECT_CALL(*per_try_idle_timeout_, enableTimer(timeout, _));
 }
 
 void RouterTestBase::expectMaxStreamDurationTimerCreate(std::chrono::milliseconds duration_msec) {

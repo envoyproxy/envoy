@@ -4,21 +4,11 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/network/transport_socket.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
-#include "quiche/quic/core/quic_crypto_server_stream_base.h"
 #include "quiche/quic/core/crypto/quic_crypto_server_config.h"
-#include "quiche/quic/core/tls_server_handshaker.h"
-#include "quiche/quic/core/quic_session.h"
 #include "quiche/quic/core/quic_crypto_client_stream.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
+#include "quiche/quic/core/quic_crypto_server_stream_base.h"
+#include "quiche/quic/core/quic_session.h"
+#include "quiche/quic/core/tls_server_handshaker.h"
 
 namespace Envoy {
 namespace Quic {

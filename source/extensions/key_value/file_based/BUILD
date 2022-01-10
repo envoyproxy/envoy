@@ -19,7 +19,7 @@ envoy_cc_extension(
         "//envoy/filesystem:filesystem_interface",
         "//envoy/registry",
         "//source/common/common:key_value_store_lib",
-        "@envoy_api//envoy/extensions/common/key_value/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/common/key_value/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/key_value/file_based/v3:pkg_cc_proto",
     ],
 )

@@ -10,12 +10,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-using envoy::extensions::filters::http::ext_proc::v3alpha::ExtProcPerRoute;
-using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
+using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 
-using envoy::service::ext_proc::v3alpha::ImmediateResponse;
-using envoy::service::ext_proc::v3alpha::ProcessingRequest;
-using envoy::service::ext_proc::v3alpha::ProcessingResponse;
+using envoy::service::ext_proc::v3::ImmediateResponse;
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
 
 using Http::FilterDataStatus;
 using Http::FilterHeadersStatus;
@@ -25,7 +25,7 @@ using Http::RequestTrailerMap;
 using Http::ResponseHeaderMap;
 using Http::ResponseTrailerMap;
 
-static const std::string ErrorPrefix = "ext_proc error";
+static const std::string ErrorPrefix = "ext_proc_error";
 static const int DefaultImmediateStatus = 200;
 static const std::string FilterName = "envoy.filters.http.ext_proc";
 
@@ -55,7 +55,7 @@ Filter::StreamOpenState Filter::openStream() {
   ENVOY_BUG(!processing_complete_, "openStream should not have been called");
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
-    stream_ = client_->start(*this);
+    stream_ = client_->start(*this, decoder_callbacks_->streamInfo());
     stats_.streams_started_.inc();
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
@@ -65,16 +65,24 @@ Filter::StreamOpenState Filter::openStream() {
   return StreamOpenState::Ok;
 }
 
-void Filter::onDestroy() {
-  ENVOY_LOG(trace, "onDestroy");
-  // Make doubly-sure we no longer use the stream, as
-  // per the filter contract.
-  processing_complete_ = true;
+void Filter::closeStream() {
   if (stream_) {
+    ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
       stats_.streams_closed_.inc();
     }
+    stream_.reset();
+  } else {
+    ENVOY_LOG(debug, "Stream already closed");
   }
+}
+
+void Filter::onDestroy() {
+  ENVOY_LOG(debug, "onDestroy");
+  // Make doubly-sure we no longer use the stream, as
+  // per the filter contract.
+  processing_complete_ = true;
+  closeStream();
 }
 
 FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
@@ -478,7 +486,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   case ProcessingResponse::ResponseCase::kImmediateResponse:
     // We won't be sending anything more to the stream after we
     // receive this message.
+    ENVOY_LOG(debug, "Sending immediate response");
     processing_complete_ = true;
+    closeStream();
     cleanUpTimers();
     sendImmediateResponse(response->immediate_response());
     message_handled = true;
@@ -499,6 +509,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     // to protect us from a malformed server.
     ENVOY_LOG(warn, "Spurious response message {} received on gRPC stream",
               response->response_case());
+    closeStream();
     clearAsyncState();
     processing_complete_ = true;
   }
@@ -519,12 +530,13 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 
   } else {
     processing_complete_ = true;
+    closeStream();
     // Since the stream failed, there is no need to handle timeouts, so
     // make sure that they do not fire now.
     cleanUpTimers();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
-    errorResponse.set_details(absl::StrFormat("%s: gRPC error %i", ErrorPrefix, status));
+    errorResponse.set_details(absl::StrFormat("%s_gRPC_error_%i", ErrorPrefix, status));
     sendImmediateResponse(errorResponse);
   }
 }
@@ -535,6 +547,7 @@ void Filter::onGrpcClose() {
   stats_.streams_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
+  closeStream();
   clearAsyncState();
 }
 
@@ -547,17 +560,19 @@ void Filter::onMessageTimeout() {
     // and we can't wait any more. So, as we do for a spurious message, ignore
     // the external processor for the rest of the request.
     processing_complete_ = true;
+    closeStream();
     stats_.failure_mode_allowed_.inc();
     clearAsyncState();
 
   } else {
     // Return an error and stop processing the current stream.
     processing_complete_ = true;
+    closeStream();
     decoding_state_.setCallbackState(ProcessorState::CallbackState::Idle);
     encoding_state_.setCallbackState(ProcessorState::CallbackState::Idle);
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
-    errorResponse.set_details(absl::StrFormat("%s: per-message timeout exceeded", ErrorPrefix));
+    errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
     sendImmediateResponse(errorResponse);
   }
 }
@@ -594,8 +609,9 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
 
   sent_immediate_response_ = true;
   ENVOY_LOG(debug, "Sending local reply with status code {}", status_code);
+  const auto details = StringUtil::replaceAllEmptySpace(response.details());
   encoder_callbacks_->sendLocalReply(static_cast<Http::Code>(status_code), response.body(),
-                                     mutate_headers, grpc_status, response.details());
+                                     mutate_headers, grpc_status, details);
 }
 
 static ProcessingMode allDisabledMode() {

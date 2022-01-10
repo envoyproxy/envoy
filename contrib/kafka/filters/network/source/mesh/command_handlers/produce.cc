@@ -20,19 +20,18 @@ ProduceRequestHolder::ProduceRequestHolder(AbstractRequestListener& filter,
                                            const RecordExtractor& record_extractor,
                                            const std::shared_ptr<Request<ProduceRequest>> request)
     : BaseInFlightRequest{filter}, kafka_facade_{kafka_facade}, request_{request} {
-  outbound_records_ = record_extractor.extractRecords(request_->data_.topics_);
+  outbound_records_ = record_extractor.extractRecords(request_->data_.topic_data_);
   expected_responses_ = outbound_records_.size();
 }
 
 void ProduceRequestHolder::startProcessing() {
   // Main part of the proxy: for each outbound record we get the appropriate sink (effectively a
   // facade for upstream Kafka cluster), and send the record to it.
-  for (const auto& outbound_record : outbound_records_) {
+  for (const OutboundRecord& outbound_record : outbound_records_) {
     KafkaProducer& producer = kafka_facade_.getProducerForTopic(outbound_record.topic_);
     // We need to provide our object as first argument, as we will want to be notified when the
     // delivery finishes.
-    producer.send(shared_from_this(), outbound_record.topic_, outbound_record.partition_,
-                  outbound_record.key_, outbound_record.value_);
+    producer.send(shared_from_this(), outbound_record);
   }
   // Corner case handling:
   // If we ever receive produce request without records, we need to notify the filter we are ready,

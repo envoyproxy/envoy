@@ -50,21 +50,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "string_utils_lib",
-    srcs = ["string_utils.cc"],
-    hdrs = ["string_utils.h"],
-    external_deps = ["abseil_str_format"],
-    visibility = ["//visibility:private"],
-    deps = [
-        "//source/common/common:assert_lib",
-        "//source/common/common:base64_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "http2_platform_impl_lib",
     hdrs = [
-        "http2_logging_impl.h",
         "http2_macros_impl.h",
     ],
     external_deps = [
@@ -75,15 +62,7 @@ envoy_cc_library(
     deps = [
         ":quic_platform_logging_impl_lib",
         ":quiche_flags_impl_lib",
-        ":string_utils_lib",
     ],
-)
-
-envoy_cc_library(
-    name = "quic_platform_export_impl_lib",
-    hdrs = ["quic_export_impl.h"],
-    tags = ["nofips"],
-    visibility = ["//visibility:public"],
 )
 
 envoy_cc_library(
@@ -112,7 +91,6 @@ envoy_cc_library(
     ],
     hdrs = [
         "quic_client_stats_impl.h",
-        "quic_containers_impl.h",
         "quic_error_code_wrappers_impl.h",
         "quic_flags_impl.h",
         "quic_iovec_impl.h",
@@ -135,7 +113,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_flags_impl_lib",
-        ":string_utils_lib",
         "//envoy/api:io_error_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
@@ -156,7 +133,6 @@ envoy_cc_library(
     hdrs = [
         "quic_hostname_utils_impl.h",
         "quic_mutex_impl.h",
-        "quic_pcc_sender_impl.h",
     ],
     external_deps = [
         "quiche_quic_platform_base",
@@ -212,30 +188,5 @@ envoy_cc_library(
     deps = [
         ":quic_platform_logging_impl_lib",
         ":quiche_flags_impl_lib",
-        ":string_utils_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "spdy_platform_impl_lib",
-    hdrs = [
-        "spdy_bug_tracker_impl.h",
-        "spdy_logging_impl.h",
-        "spdy_test_utils_prod_impl.h",
-    ],
-    external_deps = [
-        "abseil_base",
-        "abseil_hash",
-        "abseil_inlined_vector",
-        "abseil_memory",
-        "abseil_str_format",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":quic_platform_logging_impl_lib",
-        ":quiche_flags_impl_lib",
-        ":string_utils_lib",
-        "//source/common/common:assert_lib",
-        "@com_github_google_quiche//:quiche_common_lib",
     ],
 )

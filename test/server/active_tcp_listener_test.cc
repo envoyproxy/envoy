@@ -10,7 +10,6 @@
 #include "source/common/network/utility.h"
 #include "source/server/active_tcp_listener.h"
 
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"

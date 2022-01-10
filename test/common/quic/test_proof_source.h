@@ -27,8 +27,9 @@ class TestProofSource : public EnvoyQuicProofSourceBase {
 public:
   quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>
   GetCertChain(const quic::QuicSocketAddress& /*server_address*/,
-               const quic::QuicSocketAddress& /*client_address*/,
-               const std::string& /*hostname*/) override {
+               const quic::QuicSocketAddress& /*client_address*/, const std::string& /*hostname*/,
+               bool* cert_matched_sni) override {
+    *cert_matched_sni = true;
     return cert_chain_;
   }
 

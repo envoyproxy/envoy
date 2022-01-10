@@ -27,7 +27,7 @@ std::string generateProfileFilePath(const std::string& directory, TimeSource& ti
 } // namespace
 
 ProfileAction::ProfileAction(
-    envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig& config,
+    envoy::extensions::watchdog::profile_action::v3::ProfileActionConfig& config,
     Server::Configuration::GuardDogActionFactoryContext& context)
     : path_(config.profile_path()),
       duration_(

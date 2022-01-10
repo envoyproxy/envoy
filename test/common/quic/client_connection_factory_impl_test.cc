@@ -17,13 +17,12 @@ using testing::Return;
 namespace Envoy {
 namespace Quic {
 
-class QuicNetworkConnectionTest : public Event::TestUsingSimulatedTime, public testing::Test {
+class QuicNetworkConnectionTest : public Event::TestUsingSimulatedTime,
+                                  public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   void initialize() {
-    test_address_ = Network::Utility::resolveUrl(absl::StrCat(
-        "tcp://",
-        Network::Test::getLoopbackAddressString(TestEnvironment::getIpVersionsForTest()[0]),
-        ":30"));
+    test_address_ = Network::Utility::resolveUrl(
+        absl::StrCat("tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":30"));
     Ssl::ClientContextSharedPtr context{new Ssl::MockClientContext()};
     EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _, _))
         .WillOnce(Return(context));
@@ -49,7 +48,7 @@ protected:
   QuicStatNames quic_stat_names_{store_.symbolTable()};
 };
 
-TEST_F(QuicNetworkConnectionTest, BufferLimits) {
+TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   initialize();
 
   quic::QuicConfig config;
@@ -68,5 +67,7 @@ TEST_F(QuicNetworkConnectionTest, BufferLimits) {
   client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
+INSTANTIATE_TEST_SUITE_P(IpVersions, QuicNetworkConnectionTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 } // namespace Quic
 } // namespace Envoy

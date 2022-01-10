@@ -4,6 +4,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/win32_socket_handle_impl.h"
 
 #include "test/common/buffer/utility.h"
 #include "test/mocks/api/mocks.h"
@@ -251,92 +252,6 @@ TEST_F(OwnedImplTest, PrependBuffer) {
   EXPECT_EQ(suffix.size() + prefix.size(), buffer.length());
   EXPECT_EQ(prefix + suffix, buffer.toString());
   EXPECT_EQ(0, prefixBuffer.length());
-}
-
-TEST_F(OwnedImplTest, Write) {
-  Api::MockOsSysCalls os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
-  Buffer::OwnedImpl buffer;
-  Network::IoSocketHandleImpl io_handle;
-  buffer.add("example");
-  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{7, 0}));
-  Api::IoCallUint64Result result = io_handle.write(buffer);
-  EXPECT_TRUE(result.ok());
-  EXPECT_EQ(7, result.return_value_);
-  EXPECT_EQ(0, buffer.length());
-
-  buffer.add("example");
-  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{6, 0}));
-  result = io_handle.write(buffer);
-  EXPECT_TRUE(result.ok());
-  EXPECT_EQ(6, result.return_value_);
-  EXPECT_EQ(1, buffer.length());
-
-  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
-  result = io_handle.write(buffer);
-  EXPECT_TRUE(result.ok());
-  EXPECT_EQ(0, result.return_value_);
-  EXPECT_EQ(1, buffer.length());
-
-  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
-  result = io_handle.write(buffer);
-  EXPECT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
-  EXPECT_EQ(0, result.return_value_);
-  EXPECT_EQ(1, buffer.length());
-
-  EXPECT_CALL(os_sys_calls, writev(_, _, _))
-      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
-  result = io_handle.write(buffer);
-  EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
-  EXPECT_EQ(0, result.return_value_);
-  EXPECT_EQ(1, buffer.length());
-
-  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{1, 0}));
-  result = io_handle.write(buffer);
-  EXPECT_TRUE(result.ok());
-  EXPECT_EQ(1, result.return_value_);
-  EXPECT_EQ(0, buffer.length());
-
-  EXPECT_CALL(os_sys_calls, writev(_, _, _)).Times(0);
-  result = io_handle.write(buffer);
-  EXPECT_EQ(0, result.return_value_);
-  EXPECT_EQ(0, buffer.length());
-}
-
-TEST_F(OwnedImplTest, Read) {
-  Api::MockOsSysCalls os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
-  Buffer::OwnedImpl buffer;
-  Network::IoSocketHandleImpl io_handle;
-  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
-  Api::IoCallUint64Result result = io_handle.read(buffer, 100);
-  EXPECT_TRUE(result.ok());
-  EXPECT_EQ(0, result.return_value_);
-  EXPECT_EQ(0, buffer.length());
-  EXPECT_THAT(buffer.describeSlicesForTest(), testing::IsEmpty());
-
-  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
-  result = io_handle.read(buffer, 100);
-  EXPECT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
-  EXPECT_EQ(0, result.return_value_);
-  EXPECT_EQ(0, buffer.length());
-  EXPECT_THAT(buffer.describeSlicesForTest(), testing::IsEmpty());
-
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
-  result = io_handle.read(buffer, 100);
-  EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
-  EXPECT_EQ(0, result.return_value_);
-  EXPECT_EQ(0, buffer.length());
-  EXPECT_THAT(buffer.describeSlicesForTest(), testing::IsEmpty());
-
-  EXPECT_CALL(os_sys_calls, readv(_, _, _)).Times(0);
-  result = io_handle.read(buffer, 0);
-  EXPECT_EQ(0, result.return_value_);
-  EXPECT_EQ(0, buffer.length());
-  EXPECT_THAT(buffer.describeSlicesForTest(), testing::IsEmpty());
 }
 
 TEST_F(OwnedImplTest, ExtractOwnedSlice) {
@@ -1136,68 +1051,6 @@ TEST_F(OwnedImplTest, PrependEmpty) {
   EXPECT_EQ(0, buf.length());
 }
 
-// Regression test for oss-fuzz issues
-// https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=14466, empty commit
-// following a reserve resulted in a corrupted libevent internal state.
-TEST_F(OwnedImplTest, ReserveZeroCommit) {
-  BufferFragmentImpl frag("", 0, nullptr);
-  Buffer::OwnedImpl buf;
-  buf.addBufferFragment(frag);
-  buf.prepend("bbbbb");
-  buf.add("");
-  expectSlices({{5, 0, 4096}, {0, 0, 0}}, buf);
-  { auto reservation = buf.reserveSingleSlice(1280); }
-  expectSlices({{5, 0, 4096}}, buf);
-  os_fd_t pipe_fds[2] = {0, 0};
-  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-#ifdef WIN32
-  ASSERT_EQ(os_sys_calls.socketpair(AF_INET, SOCK_STREAM, 0, pipe_fds).return_value_, 0);
-#else
-  ASSERT_EQ(pipe(pipe_fds), 0);
-#endif
-  Network::IoSocketHandleImpl io_handle(pipe_fds[0]);
-  ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[0], false).return_value_, 0);
-  ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[1], false).return_value_, 0);
-  const uint32_t max_length = 1953;
-  std::string data(max_length, 'e');
-  const ssize_t rc = os_sys_calls.write(pipe_fds[1], data.data(), max_length).return_value_;
-  ASSERT_GT(rc, 0);
-  const uint32_t previous_length = buf.length();
-  Api::IoCallUint64Result result = io_handle.read(buf, max_length);
-  ASSERT_EQ(result.return_value_, static_cast<uint64_t>(rc));
-  ASSERT_EQ(os_sys_calls.close(pipe_fds[1]).return_value_, 0);
-  ASSERT_EQ(previous_length, buf.search(data.data(), rc, previous_length, 0));
-  EXPECT_EQ("bbbbb", buf.toString().substr(0, 5));
-  expectSlices({{5, 0, 4096}, {1953, 14431, 16384}}, buf);
-}
-
-TEST_F(OwnedImplTest, ReadReserveAndCommit) {
-  BufferFragmentImpl frag("", 0, nullptr);
-  Buffer::OwnedImpl buf;
-  buf.add("bbbbb");
-
-  os_fd_t pipe_fds[2] = {0, 0};
-  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-#ifdef WIN32
-  ASSERT_EQ(os_sys_calls.socketpair(AF_INET, SOCK_STREAM, 0, pipe_fds).return_value_, 0);
-#else
-  ASSERT_EQ(pipe(pipe_fds), 0);
-#endif
-  Network::IoSocketHandleImpl io_handle(pipe_fds[0]);
-  ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[0], false).return_value_, 0);
-  ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[1], false).return_value_, 0);
-
-  const uint32_t read_length = 32768;
-  std::string data = "e";
-  const ssize_t rc = os_sys_calls.write(pipe_fds[1], data.data(), data.size()).return_value_;
-  ASSERT_GT(rc, 0);
-  Api::IoCallUint64Result result = io_handle.read(buf, read_length);
-  ASSERT_EQ(result.return_value_, static_cast<uint64_t>(rc));
-  ASSERT_EQ(os_sys_calls.close(pipe_fds[1]).return_value_, 0);
-  EXPECT_EQ("bbbbbe", buf.toString());
-  expectSlices({{6, 4090, 4096}}, buf);
-}
-
 TEST(OverflowDetectingUInt64, Arithmetic) {
   OverflowDetectingUInt64 length;
   length += 1;
@@ -1263,6 +1116,167 @@ TEST_F(OwnedImplTest, FrontSlice) {
   EXPECT_EQ(0, buffer.frontSlice().len_);
   buffer.add("a");
   EXPECT_EQ(1, buffer.frontSlice().len_);
+}
+
+template <class T> struct OwnedImplTypedTest : public OwnedImplTest {
+  using IoSocketHandleTestType = T;
+};
+
+using IoSocketHandleTypes =
+    testing::Types<Network::IoSocketHandleImpl, Network::Win32SocketHandleImpl>;
+
+TYPED_TEST_CASE(OwnedImplTypedTest, IoSocketHandleTypes);
+
+TYPED_TEST(OwnedImplTypedTest, Write) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  Buffer::OwnedImpl buffer;
+  using IoSocketHandleType = typename TestFixture::IoSocketHandleTestType;
+  IoSocketHandleType io_handle;
+  buffer.add("example");
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{7, 0}));
+  Api::IoCallUint64Result result = io_handle.write(buffer);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(7, result.return_value_);
+  EXPECT_EQ(0, buffer.length());
+
+  buffer.add("example");
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{6, 0}));
+  result = io_handle.write(buffer);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(6, result.return_value_);
+  EXPECT_EQ(1, buffer.length());
+
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
+  result = io_handle.write(buffer);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+  EXPECT_EQ(1, buffer.length());
+
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
+  result = io_handle.write(buffer);
+  EXPECT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+  EXPECT_EQ(0, result.return_value_);
+  EXPECT_EQ(1, buffer.length());
+
+  EXPECT_CALL(os_sys_calls, writev(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
+  result = io_handle.write(buffer);
+  EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
+  EXPECT_EQ(0, result.return_value_);
+  EXPECT_EQ(1, buffer.length());
+
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{1, 0}));
+  result = io_handle.write(buffer);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(1, result.return_value_);
+  EXPECT_EQ(0, buffer.length());
+
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).Times(0);
+  result = io_handle.write(buffer);
+  EXPECT_EQ(0, result.return_value_);
+  EXPECT_EQ(0, buffer.length());
+}
+
+TYPED_TEST(OwnedImplTypedTest, Read) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  Buffer::OwnedImpl buffer;
+  using IoSocketHandleType = typename TestFixture::IoSocketHandleTestType;
+  IoSocketHandleType io_handle;
+  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
+  Api::IoCallUint64Result result = io_handle.read(buffer, 100);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+  EXPECT_EQ(0, buffer.length());
+  EXPECT_THAT(buffer.describeSlicesForTest(), testing::IsEmpty());
+
+  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
+  result = io_handle.read(buffer, 100);
+  EXPECT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+  EXPECT_EQ(0, result.return_value_);
+  EXPECT_EQ(0, buffer.length());
+  EXPECT_THAT(buffer.describeSlicesForTest(), testing::IsEmpty());
+
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
+  result = io_handle.read(buffer, 100);
+  EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
+  EXPECT_EQ(0, result.return_value_);
+  EXPECT_EQ(0, buffer.length());
+  EXPECT_THAT(buffer.describeSlicesForTest(), testing::IsEmpty());
+
+  EXPECT_CALL(os_sys_calls, readv(_, _, _)).Times(0);
+  result = io_handle.read(buffer, 0);
+  EXPECT_EQ(0, result.return_value_);
+  EXPECT_EQ(0, buffer.length());
+  EXPECT_THAT(buffer.describeSlicesForTest(), testing::IsEmpty());
+}
+
+// Regression test for oss-fuzz issues
+// https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=14466, empty commit
+// following a reserve resulted in a corrupted libevent internal state.
+TYPED_TEST(OwnedImplTypedTest, ReserveZeroCommit) {
+  BufferFragmentImpl frag("", 0, nullptr);
+  Buffer::OwnedImpl buf;
+  buf.addBufferFragment(frag);
+  buf.prepend("bbbbb");
+  buf.add("");
+  OwnedImplTest::expectSlices({{5, 0, 4096}, {0, 0, 0}}, buf);
+  { auto reservation = buf.reserveSingleSlice(1280); }
+  OwnedImplTest::expectSlices({{5, 0, 4096}}, buf);
+  os_fd_t pipe_fds[2] = {0, 0};
+  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+#ifdef WIN32
+  ASSERT_EQ(os_sys_calls.socketpair(AF_INET, SOCK_STREAM, 0, pipe_fds).return_value_, 0);
+#else
+  ASSERT_EQ(pipe(pipe_fds), 0);
+#endif
+  using IoSocketHandleType = typename TestFixture::IoSocketHandleTestType;
+  IoSocketHandleType io_handle(pipe_fds[0]);
+  ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[0], false).return_value_, 0);
+  ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[1], false).return_value_, 0);
+  const uint32_t max_length = 1953;
+  std::string data(max_length, 'e');
+  const ssize_t rc = os_sys_calls.write(pipe_fds[1], data.data(), max_length).return_value_;
+  ASSERT_GT(rc, 0);
+  const uint32_t previous_length = buf.length();
+  Api::IoCallUint64Result result = io_handle.read(buf, max_length);
+  ASSERT_EQ(result.return_value_, static_cast<uint64_t>(rc));
+  ASSERT_EQ(os_sys_calls.close(pipe_fds[1]).return_value_, 0);
+  ASSERT_EQ(previous_length, buf.search(data.data(), rc, previous_length, 0));
+  EXPECT_EQ("bbbbb", buf.toString().substr(0, 5));
+  OwnedImplTest::expectSlices({{5, 0, 4096}, {1953, 14431, 16384}}, buf);
+}
+
+TYPED_TEST(OwnedImplTypedTest, ReadReserveAndCommit) {
+  BufferFragmentImpl frag("", 0, nullptr);
+  Buffer::OwnedImpl buf;
+  buf.add("bbbbb");
+
+  os_fd_t pipe_fds[2] = {0, 0};
+  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+#ifdef WIN32
+  ASSERT_EQ(os_sys_calls.socketpair(AF_INET, SOCK_STREAM, 0, pipe_fds).return_value_, 0);
+#else
+  ASSERT_EQ(pipe(pipe_fds), 0);
+#endif
+  using IoSocketHandleType = typename TestFixture::IoSocketHandleTestType;
+  IoSocketHandleType io_handle(pipe_fds[0]);
+  ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[0], false).return_value_, 0);
+  ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[1], false).return_value_, 0);
+
+  const uint32_t read_length = 32768;
+  std::string data = "e";
+  const ssize_t rc = os_sys_calls.write(pipe_fds[1], data.data(), data.size()).return_value_;
+  ASSERT_GT(rc, 0);
+  Api::IoCallUint64Result result = io_handle.read(buf, read_length);
+  ASSERT_EQ(result.return_value_, static_cast<uint64_t>(rc));
+  ASSERT_EQ(os_sys_calls.close(pipe_fds[1]).return_value_, 0);
+  EXPECT_EQ("bbbbbe", buf.toString());
+  OwnedImplTest::expectSlices({{6, 4090, 4096}}, buf);
 }
 
 } // namespace

@@ -1,9 +1,18 @@
 # Script for collecting PRs in need of review, and informing maintainers via
 # slack.
+#
+# By default this runs in "developer mode" which means that it collects PRs
+# associated with maintainers and API reviewers, and spits them out (badly
+# formatted) to the command line.
+#
+# .github/workflows/pr_notifier.yml runs the script with --cron_job
+# which instead sends the collected PRs to the various slack channels.
+#
 # NOTE: Slack IDs can be found in the user's full profile from within Slack.
 
 from __future__ import print_function
 
+import argparse
 import datetime
 import os
 import sys
@@ -30,6 +39,7 @@ MAINTAINERS = {
     'asraa': 'UKZKCFRTP',
     'davinci26': 'U013608CUDV',
     'rojkov': 'UH5EXLYQK',
+    'RyanTheOptimist': 'U01SW3JC8GP',
 }
 
 # First pass reviewers who are not maintainers should get
@@ -43,7 +53,6 @@ FIRST_PASS = {
     'KBaichoo': 'U016ZPU8KBK',
     'wbpcode': 'U017KF5C0Q6',
     'mathetake': 'UG9TD2FSB',
-    'RyanTheOptimist': 'U01SW3JC8GP',
 }
 
 # Only notify API reviewers who aren't maintainers.
@@ -67,6 +76,10 @@ def is_waiting(labels):
         if label.name == 'waiting' or label.name == 'waiting:any':
             return True
     return False
+
+
+def is_contrib(labels):
+    return any(label.name == "contrib" for label in labels)
 
 
 # Return true if the PR has an API tag, false otherwise.
@@ -174,7 +187,7 @@ def track_prs():
             pr_info.assignees, maintainers_and_prs, message, MAINTAINERS, FIRST_PASS)
 
         # If there was no maintainer, track it as unassigned.
-        if not has_maintainer_assignee:
+        if not has_maintainer_assignee and not is_contrib(labels):
             maintainers_and_prs['unassigned'] = maintainers_and_prs['unassigned'] + message
 
     # Return the dict of {maintainers : PR notifications},
@@ -218,7 +231,22 @@ def post_to_oncall(client, unassigned_prs, out_slo_prs):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--cron_job',
+        action="store_true",
+        help="true if this is run by the daily cron job, false if run manually by a developer")
+    args = parser.parse_args()
+
     maintainers_and_messages, shephards_and_messages, stalled_prs = track_prs()
+
+    if not args.cron_job:
+        print(maintainers_and_messages)
+        print("\n\n\n")
+        print(shephards_and_messages)
+        print("\n\n\n")
+        print(stalled_prs)
+        exit(0)
 
     SLACK_BOT_TOKEN = os.getenv('SLACK_BOT_TOKEN')
     if not SLACK_BOT_TOKEN:

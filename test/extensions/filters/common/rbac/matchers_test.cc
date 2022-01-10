@@ -45,7 +45,7 @@ TEST(AndMatcher, Permission_Set) {
   envoy::config::rbac::v3::Permission* perm = set.add_rules();
   perm->set_any(true);
 
-  checkMatcher(RBAC::AndMatcher(set), true);
+  checkMatcher(RBAC::AndMatcher(set, ProtobufMessage::getStrictValidationVisitor()), true);
 
   perm = set.add_rules();
   perm->set_destination_port(123);
@@ -57,12 +57,14 @@ TEST(AndMatcher, Permission_Set) {
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   info.downstream_connection_info_provider_->setLocalAddress(addr);
 
-  checkMatcher(RBAC::AndMatcher(set), true, conn, headers, info);
+  checkMatcher(RBAC::AndMatcher(set, ProtobufMessage::getStrictValidationVisitor()), true, conn,
+               headers, info);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 8080, false);
   info.downstream_connection_info_provider_->setLocalAddress(addr);
 
-  checkMatcher(RBAC::AndMatcher(set), false, conn, headers, info);
+  checkMatcher(RBAC::AndMatcher(set, ProtobufMessage::getStrictValidationVisitor()), false, conn,
+               headers, info);
 }
 
 TEST(AndMatcher, Principal_Set) {
@@ -104,18 +106,21 @@ TEST(OrMatcher, Permission_Set) {
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
   info.downstream_connection_info_provider_->setLocalAddress(addr);
 
-  checkMatcher(RBAC::OrMatcher(set), false, conn, headers, info);
+  checkMatcher(RBAC::OrMatcher(set, ProtobufMessage::getStrictValidationVisitor()), false, conn,
+               headers, info);
 
   perm = set.add_rules();
   perm->mutable_destination_port_range()->set_start(123);
   perm->mutable_destination_port_range()->set_end(456);
 
-  checkMatcher(RBAC::OrMatcher(set), false, conn, headers, info);
+  checkMatcher(RBAC::OrMatcher(set, ProtobufMessage::getStrictValidationVisitor()), false, conn,
+               headers, info);
 
   perm = set.add_rules();
   perm->set_any(true);
 
-  checkMatcher(RBAC::OrMatcher(set), true, conn, headers, info);
+  checkMatcher(RBAC::OrMatcher(set, ProtobufMessage::getStrictValidationVisitor()), true, conn,
+               headers, info);
 }
 
 TEST(OrMatcher, Principal_Set) {
@@ -144,7 +149,8 @@ TEST(NotMatcher, Permission) {
   envoy::config::rbac::v3::Permission perm;
   perm.set_any(true);
 
-  checkMatcher(RBAC::NotMatcher(perm), false, Envoy::Network::MockConnection());
+  checkMatcher(RBAC::NotMatcher(perm, ProtobufMessage::getStrictValidationVisitor()), false,
+               Envoy::Network::MockConnection());
 }
 
 TEST(NotMatcher, Principal) {
@@ -419,7 +425,7 @@ TEST(PolicyMatcher, PolicyMatcher) {
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("bar");
   Expr::BuilderPtr builder = Expr::createBuilder(nullptr);
 
-  RBAC::PolicyMatcher matcher(policy, builder.get());
+  RBAC::PolicyMatcher matcher(policy, builder.get(), ProtobufMessage::getStrictValidationVisitor());
 
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;

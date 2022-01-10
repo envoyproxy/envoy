@@ -65,7 +65,7 @@ public:
  * Generic integer deserializer (uses array of sizeof(T) bytes).
  * After all bytes are filled in, the value is converted from network byte-order and returned.
  */
-template <typename T> class IntDeserializer : public Deserializer<T> {
+template <typename T> class FixedSizeDeserializer : public Deserializer<T> {
 public:
   uint32_t feed(absl::string_view& data) override {
     const uint32_t available = std::min<uint32_t>(sizeof(buf_) - written_, data.size());
@@ -92,7 +92,7 @@ protected:
 /**
  * Integer deserializer for int8_t.
  */
-class Int8Deserializer : public IntDeserializer<int8_t> {
+class Int8Deserializer : public FixedSizeDeserializer<int8_t> {
 public:
   int8_t get() const override {
     int8_t result = buf_[0];
@@ -103,7 +103,7 @@ public:
 /**
  * Integer deserializer for int16_t.
  */
-class Int16Deserializer : public IntDeserializer<int16_t> {
+class Int16Deserializer : public FixedSizeDeserializer<int16_t> {
 public:
   int16_t get() const override {
     int16_t result;
@@ -113,9 +113,21 @@ public:
 };
 
 /**
+ * Integer deserializer for uint16_t.
+ */
+class UInt16Deserializer : public FixedSizeDeserializer<uint16_t> {
+public:
+  uint16_t get() const override {
+    uint16_t result;
+    safeMemcpyUnsafeSrc(&result, buf_);
+    return be16toh(result);
+  }
+};
+
+/**
  * Integer deserializer for int32_t.
  */
-class Int32Deserializer : public IntDeserializer<int32_t> {
+class Int32Deserializer : public FixedSizeDeserializer<int32_t> {
 public:
   int32_t get() const override {
     int32_t result;
@@ -127,7 +139,7 @@ public:
 /**
  * Integer deserializer for uint32_t.
  */
-class UInt32Deserializer : public IntDeserializer<uint32_t> {
+class UInt32Deserializer : public FixedSizeDeserializer<uint32_t> {
 public:
   uint32_t get() const override {
     uint32_t result;
@@ -139,7 +151,7 @@ public:
 /**
  * Integer deserializer for uint64_t.
  */
-class Int64Deserializer : public IntDeserializer<int64_t> {
+class Int64Deserializer : public FixedSizeDeserializer<int64_t> {
 public:
   int64_t get() const override {
     int64_t result;
@@ -149,11 +161,33 @@ public:
 };
 
 /**
+ * Deserializer for Kafka Float64 type.
+ * Reference: https://kafka.apache.org/28/protocol.html#protocol_types
+ * Represents a double-precision 64-bit format IEEE 754 value. The values are encoded using eight
+ * bytes in network byte order (big-endian).
+ */
+class Float64Deserializer : public FixedSizeDeserializer<double> {
+
+  static_assert(sizeof(double) == sizeof(uint64_t), "sizeof(double) != sizeof(uint64_t)");
+  static_assert(std::numeric_limits<double>::is_iec559, "non-IEC559 (IEEE 754) double");
+
+public:
+  double get() const override {
+    uint64_t in_network_order;
+    safeMemcpyUnsafeSrc(&in_network_order, buf_);
+    uint64_t in_host_order = be64toh(in_network_order);
+    double result;
+    safeMemcpy(&result, &in_host_order);
+    return result;
+  }
+};
+
+/**
  * Deserializer for boolean values.
  * Uses a single int8 deserializer, and checks whether the results equals 0.
  * When reading a boolean value, any non-zero value is considered true.
- * Impl note: could have been a subclass of IntDeserializer<int8_t> with a different get function,
- * but it makes it harder to understand.
+ * Impl note: could have been a subclass of FixedSizeDeserializer<int8_t> with a different get
+ * function, but it makes it harder to understand.
  */
 class BooleanDeserializer : public Deserializer<bool> {
 public:
@@ -175,9 +209,10 @@ private:
  * https://cwiki.apache.org/confluence/display/KAFKA/KIP-482%3A+The+Kafka+Protocol+should+Support+Optional+Tagged+Fields#KIP-482:TheKafkaProtocolshouldSupportOptionalTaggedFields-UnsignedVarints
  *
  * Impl note:
- * This implementation is equivalent to the one present in Kafka 2.4.0, what means that for 5-byte
+ * This implementation is equivalent to the one present in Kafka, what means that for 5-byte
  * inputs, the data at bits 5-7 in 5th byte are *ignored* (as long as 8th bit is unset).
- * Reference: org.apache.kafka.common.utils.ByteUtils.readUnsignedVarint
+ * Reference:
+ * https://github.com/apache/kafka/blob/2.8.1/clients/src/main/java/org/apache/kafka/common/utils/ByteUtils.java#L142
  */
 class VarUInt32Deserializer : public Deserializer<uint32_t> {
 public:
@@ -227,12 +262,13 @@ private:
 
 /**
  * Deserializer for Kafka 'varint' type.
- * Encoding documentation: https://kafka.apache.org/24/protocol.html#protocol_types
+ * Encoding documentation: https://kafka.apache.org/28/protocol.html#protocol_types
  *
  * Impl note:
- * This implementation is equivalent to the one present in Kafka 2.4.0, what means that for 5-byte
+ * This implementation is equivalent to the one present in Kafka, what means that for 5-byte
  * inputs, the data at bits 5-7 in 5th byte are *ignored* (as long as 8th bit is unset).
- * Reference: org.apache.kafka.common.utils.ByteUtils.readVarint
+ * Reference:
+ * https://github.com/apache/kafka/blob/2.8.1/clients/src/main/java/org/apache/kafka/common/utils/ByteUtils.java#L189
  */
 class VarInt32Deserializer : public Deserializer<int32_t> {
 public:
@@ -253,12 +289,13 @@ private:
 
 /**
  * Deserializer for Kafka 'varlong' type.
- * Encoding documentation: https://kafka.apache.org/24/protocol.html#protocol_types
+ * Encoding documentation: https://kafka.apache.org/28/protocol.html#protocol_types
  *
  * Impl note:
- * This implementation is equivalent to the one present in Kafka 2.4.0, what means that for 10-byte
+ * This implementation is equivalent to the one present in Kafka, what means that for 10-byte
  * inputs, the data at bits 3-7 in 10th byte are *ignored* (as long as 8th bit is unset).
- * Reference: org.apache.kafka.common.utils.ByteUtils.readVarlong
+ * Reference:
+ * https://github.com/apache/kafka/blob/2.8.1/clients/src/main/java/org/apache/kafka/common/utils/ByteUtils.java#L242
  */
 class VarInt64Deserializer : public Deserializer<int64_t> {
 public:
@@ -510,6 +547,36 @@ private:
   Int32Deserializer length_buf_;
   bool length_consumed_{false};
   int32_t required_;
+
+  std::vector<unsigned char> data_buf_;
+  bool ready_{false};
+};
+
+/**
+ * Deserializer of nullable compact bytes value.
+ * First reads length (UNSIGNED_VARINT32) and then allocates the buffer of given length.
+ * If length was 0, buffer allocation is omitted and deserializer is immediately ready (returning
+ * null value).
+ *
+ * From Kafka documentation:
+ * First the length N+1 is given as an UNSIGNED_VARINT. Then N bytes follow.
+ * A null object is represented with a length of 0.
+ */
+class NullableCompactBytesDeserializer : public Deserializer<NullableBytes> {
+public:
+  /**
+   * Can throw EnvoyException if given bytes length is not valid.
+   */
+  uint32_t feed(absl::string_view& data) override;
+
+  bool ready() const override { return ready_; }
+
+  NullableBytes get() const override;
+
+private:
+  VarUInt32Deserializer length_buf_;
+  bool length_consumed_{false};
+  uint32_t required_;
 
   std::vector<unsigned char> data_buf_;
   bool ready_{false};
@@ -852,6 +919,31 @@ private:
 };
 
 /**
+ * Kafka UUID is basically two longs, so we are going to keep model them the same way.
+ * Reference:
+ * https://github.com/apache/kafka/blob/2.8.1/clients/src/main/java/org/apache/kafka/common/Uuid.java#L38
+ */
+class UuidDeserializer : public Deserializer<Uuid> {
+public:
+  uint32_t feed(absl::string_view& data) override {
+    uint32_t consumed = 0;
+    consumed += high_bytes_deserializer_.feed(data);
+    consumed += low_bytes_deserializer_.feed(data);
+    return consumed;
+  }
+
+  bool ready() const override { return low_bytes_deserializer_.ready(); }
+
+  Uuid get() const override {
+    return {high_bytes_deserializer_.get(), low_bytes_deserializer_.get()};
+  }
+
+private:
+  Int64Deserializer high_bytes_deserializer_;
+  Int64Deserializer low_bytes_deserializer_;
+};
+
+/**
  * Encodes provided argument in Kafka format.
  * In case of primitive types, this is done explicitly as per specification.
  * In case of composite types, this is done by calling 'encode' on provided argument.
@@ -961,9 +1053,11 @@ template <typename T> inline uint32_t EncodingContext::computeSize(const T& arg)
 COMPUTE_SIZE_OF_NUMERIC_TYPE(bool)
 COMPUTE_SIZE_OF_NUMERIC_TYPE(int8_t)
 COMPUTE_SIZE_OF_NUMERIC_TYPE(int16_t)
+COMPUTE_SIZE_OF_NUMERIC_TYPE(uint16_t)
 COMPUTE_SIZE_OF_NUMERIC_TYPE(int32_t)
 COMPUTE_SIZE_OF_NUMERIC_TYPE(uint32_t)
 COMPUTE_SIZE_OF_NUMERIC_TYPE(int64_t)
+COMPUTE_SIZE_OF_NUMERIC_TYPE(double)
 
 /**
  * Template overload for string.
@@ -1017,6 +1111,13 @@ inline uint32_t EncodingContext::computeSize(const std::vector<T>& arg) const {
 template <typename T>
 inline uint32_t EncodingContext::computeSize(const NullableArray<T>& arg) const {
   return arg ? computeSize(*arg) : sizeof(int32_t);
+}
+
+/**
+ * Template overload for Uuid.
+ */
+template <> inline uint32_t EncodingContext::computeSize(const Uuid&) const {
+  return 2 * sizeof(uint64_t);
 }
 
 /**
@@ -1080,6 +1181,14 @@ template <> inline uint32_t EncodingContext::computeCompactSize(const Bytes& arg
 }
 
 /**
+ * Template overload for nullable compact byte array.
+ * Kafka NullableCompactBytes' size is var-len encoding of N+1 + N bytes.
+ */
+template <> inline uint32_t EncodingContext::computeCompactSize(const NullableBytes& arg) const {
+  return arg ? computeCompactSize(*arg) : 1;
+}
+
+/**
  * Template overload for CompactArray of T.
  * The size of array is compact size of header and all of its elements.
  */
@@ -1131,9 +1240,23 @@ template <> inline uint32_t EncodingContext::encode(const int8_t& arg, Buffer::I
   }
 
 ENCODE_NUMERIC_TYPE(int16_t, htobe16);
+ENCODE_NUMERIC_TYPE(uint16_t, htobe16);
 ENCODE_NUMERIC_TYPE(int32_t, htobe32);
 ENCODE_NUMERIC_TYPE(uint32_t, htobe32);
 ENCODE_NUMERIC_TYPE(int64_t, htobe64);
+
+/**
+ * Template overload for double.
+ * Encodes 8 bytes.
+ */
+template <> inline uint32_t EncodingContext::encode(const double& arg, Buffer::Instance& dst) {
+  double tmp = arg;
+  uint64_t in_host_order;
+  safeMemcpy(&in_host_order, &tmp);
+  const uint64_t in_network_order = htobe64(in_host_order);
+  dst.add(&in_network_order, sizeof(uint64_t));
+  return sizeof(uint64_t);
+}
 
 /**
  * Template overload for bool.
@@ -1228,6 +1351,16 @@ uint32_t EncodingContext::encode(const NullableArray<T>& arg, Buffer::Instance& 
 }
 
 /**
+ * Template overload for Uuid.
+ */
+template <> inline uint32_t EncodingContext::encode(const Uuid& arg, Buffer::Instance& dst) {
+  uint32_t result = 0;
+  result += encode(arg.msb_, dst);
+  result += encode(arg.lsb_, dst);
+  return result;
+}
+
+/**
  * For non-primitive types, call `encodeCompact` on them, to delegate the serialization to the
  * entity itself.
  */
@@ -1307,6 +1440,20 @@ inline uint32_t EncodingContext::encodeCompact(const Bytes& arg, Buffer::Instanc
   const uint32_t header_length = encodeCompact(data_length + 1, dst);
   dst.add(arg.data(), data_length);
   return header_length + data_length;
+}
+
+/**
+ * Template overload for NullableBytes.
+ * Encode byte array as VAR_UINT + N bytes.
+ */
+template <>
+inline uint32_t EncodingContext::encodeCompact(const NullableBytes& arg, Buffer::Instance& dst) {
+  if (arg.has_value()) {
+    return encodeCompact(*arg, dst);
+  } else {
+    const uint32_t len = 0;
+    return encodeCompact(len, dst);
+  }
 }
 
 /**

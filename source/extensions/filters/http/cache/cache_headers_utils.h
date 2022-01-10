@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/common/time.h"
-#include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
+#include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "source/common/common/matchers.h"

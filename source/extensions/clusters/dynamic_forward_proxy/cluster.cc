@@ -1,12 +1,17 @@
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 
+#include <algorithm>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
+#include "source/common/http/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "source/extensions/filters/network/common/utility.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,10 +27,12 @@ Cluster::Cluster(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                                       added_via_api, factory_context.dispatcher().timeSource()),
+                                       added_via_api,
+                                       factory_context.mainThreadDispatcher().timeSource()),
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
-      update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info) {}
+      update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info),
+      allow_coalesced_connections_(config.allow_coalesced_connections()) {}
 
 void Cluster::startPreInit() {
   // If we are attaching to a pre-populated cache we need to initialize our hosts.
@@ -77,7 +84,8 @@ void Cluster::addOrUpdateHost(
       ASSERT(host_map_it->second.shared_host_info_->address() !=
              host_map_it->second.logical_host_->address());
       ENVOY_LOG(debug, "updating dfproxy cluster host address '{}'", host);
-      host_map_it->second.logical_host_->setNewAddress(host_info->address(), dummy_lb_endpoint_);
+      host_map_it->second.logical_host_->setNewAddresses(
+          host_info->address(), host_info->addressList(), dummy_lb_endpoint_);
       return;
     }
 
@@ -87,8 +95,8 @@ void Cluster::addOrUpdateHost(
                         .try_emplace(host, host_info,
                                      std::make_shared<Upstream::LogicalHost>(
                                          info(), std::string{host}, host_info->address(),
-                                         dummy_locality_lb_endpoint_, dummy_lb_endpoint_, nullptr,
-                                         time_source_))
+                                         host_info->addressList(), dummy_locality_lb_endpoint_,
+                                         dummy_lb_endpoint_, nullptr, time_source_))
                         .first->second.logical_host_;
   }
 
@@ -169,6 +177,72 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   }
 }
 
+absl::optional<Upstream::SelectedPoolAndConnection>
+Cluster::LoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                                                const Upstream::Host& host,
+                                                std::vector<uint8_t>& hash_key) {
+  const std::string& hostname = host.hostname();
+  if (hostname.empty()) {
+    return absl::nullopt;
+  }
+
+  LookupKey key = {hash_key, *host.address()};
+  auto it = connection_info_map_.find(key);
+  if (it == connection_info_map_.end()) {
+    return absl::nullopt;
+  }
+
+  for (auto& info : it->second) {
+    Envoy::Ssl::ConnectionInfoConstSharedPtr ssl = info.connection_->ssl();
+    ASSERT(ssl);
+    for (const std::string& san : ssl->dnsSansPeerCertificate()) {
+      if (Extensions::TransportSockets::Tls::Utility::dnsNameMatch(hostname, san)) {
+        return Upstream::SelectedPoolAndConnection{*info.pool_, *info.connection_};
+      }
+    }
+  }
+
+  return absl::nullopt;
+}
+
+OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+Cluster::LoadBalancer::lifetimeCallbacks() {
+  if (!cluster_.allowCoalescedConnections()) {
+    return {};
+  }
+  return makeOptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>(*this);
+}
+
+void Cluster::LoadBalancer::onConnectionOpen(Envoy::Http::ConnectionPool::Instance& pool,
+                                             std::vector<uint8_t>& hash_key,
+                                             const Network::Connection& connection) {
+  // Only coalesce connections that are over TLS.
+  if (!connection.ssl()) {
+    return;
+  }
+  const std::string alpn = connection.nextProtocol();
+  if (alpn != Http::Utility::AlpnNames::get().Http2 &&
+      alpn != Http::Utility::AlpnNames::get().Http3) {
+    // Only coalesce connections for HTTP/2 and HTTP/3.
+    return;
+  }
+  const LookupKey key = {hash_key, *connection.connectionInfoProvider().remoteAddress()};
+  ConnectionInfo info = {&pool, &connection};
+  connection_info_map_[key].push_back(info);
+}
+
+void Cluster::LoadBalancer::onConnectionDraining(Envoy::Http::ConnectionPool::Instance& pool,
+                                                 std::vector<uint8_t>& hash_key,
+                                                 const Network::Connection& connection) {
+  const LookupKey key = {hash_key, *connection.connectionInfoProvider().remoteAddress()};
+  connection_info_map_[key].erase(
+      std::remove_if(connection_info_map_[key].begin(), connection_info_map_[key].end(),
+                     [&pool, &connection](const ConnectionInfo& info) {
+                       return (info.pool_ == &pool && info.connection_ == &connection);
+                     }),
+      connection_info_map_[key].end());
+}
+
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 ClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
@@ -177,8 +251,7 @@ ClusterFactory::createClusterWithConfig(
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context.singletonManager(), context.dispatcher(), context.tls(), context.api(),
-      context.runtime(), context.stats(), context.messageValidationVisitor());
+      context);
   envoy::config::cluster::v3::Cluster cluster_config = cluster;
   if (!cluster_config.has_upstream_http_protocol_options()) {
     // This sets defaults which will only apply if using old style http config.

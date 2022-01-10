@@ -46,7 +46,7 @@ using OverloadActionNames = ConstSingleton<OverloadActionNameValues>;
  */
 class OverloadActionStatsNameValues {
 public:
-  // Count of ther number of streams the reset streams action has reset
+  // Count of the number of streams the reset streams action has reset
   const std::string ResetStreamsCount = "envoy.overload_actions.reset_high_memory_stream.count";
 };
 

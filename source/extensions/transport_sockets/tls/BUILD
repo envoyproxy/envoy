@@ -27,11 +27,25 @@ envoy_cc_extension(
 )
 
 envoy_cc_library(
+    name = "connection_info_impl_base_lib",
+    srcs = ["connection_info_impl_base.cc"],
+    hdrs = ["connection_info_impl_base.h"],
+    external_deps = ["ssl"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":context_lib",
+        ":utility_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "ssl_handshaker_lib",
     srcs = ["ssl_handshaker.cc"],
     hdrs = ["ssl_handshaker.h"],
-    external_deps = ["ssl"],
     deps = [
+        ":connection_info_impl_base_lib",
         ":context_lib",
         ":utility_lib",
         "//envoy/network:connection_interface",

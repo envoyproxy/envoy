@@ -72,8 +72,10 @@ An exception to the above policy exists for:
 or message has not been included in an Envoy release.
 * API versions tagged `vNalpha`. Within an alpha major version, arbitrary breaking changes are allowed.
 * Any field, message or enum with a `[#not-implemented-hide:..` comment.
-* Any proto with a `(udpa.annotations.file_status).work_in_progress` option annotation.
-* Any proto marked as [#alpha:].
+* Any proto with a `(udpa.annotations.file_status).work_in_progress`,
+  `(xds.annotations.v3.file_status).work_in_progress`
+  `(xds.annotations.v3.message_status).work_in_progress`, or
+  `(xds.annotations.v3.field_status).work_in_progress` option annotation.
 
 Note that changes to default values for wrapped types, e.g. `google.protobuf.UInt32Value` are not
 governed by the above policy. Any management server requiring stability across Envoy API or

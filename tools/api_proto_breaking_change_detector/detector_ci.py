@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
-from detector import BufWrapper
+from tools.api_proto_breaking_change_detector.detector import BufWrapper
 
-API_DIR = Path("api").resolve()
-GIT_PATH = Path.cwd().joinpath(".git")
+import envoy_repo
+
+API_DIR = Path(envoy_repo.PATH).joinpath("api")
+GIT_PATH = Path(envoy_repo.PATH).joinpath(".git")
 CONFIG_FILE_LOC = Path(API_DIR, "buf.yaml")
 
 
@@ -39,6 +42,7 @@ if __name__ == '__main__':
     parser.add_argument(
         'git_ref', type=str, help='git reference to check against for breaking changes')
     args = parser.parse_args()
-
-    exit_status = detect_breaking_changes_git(args.buf_path, args.git_ref)
+    buf_path = os.path.abspath(args.buf_path)
+    os.chdir(envoy_repo.PATH)
+    exit_status = detect_breaking_changes_git(buf_path, args.git_ref)
     sys.exit(exit_status)

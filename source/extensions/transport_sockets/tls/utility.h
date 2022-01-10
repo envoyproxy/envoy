@@ -21,6 +21,14 @@ Envoy::Ssl::CertificateDetailsPtr certificateDetails(X509* cert, const std::stri
                                                      TimeSource& time_source);
 
 /**
+ * Determines whether the given name matches 'pattern' which may optionally begin with a wildcard.
+ * @param dns_name the DNS name to match
+ * @param pattern the pattern to match against (*.example.com)
+ * @return true if the san matches pattern
+ */
+bool dnsNameMatch(absl::string_view dns_name, absl::string_view pattern);
+
+/**
  * Retrieves the serial number of a certificate.
  * @param cert the certificate
  * @return std::string the serial number field of the certificate. Returns "" if
@@ -100,6 +108,14 @@ absl::optional<std::string> getLastCryptoError();
  * @return string message corresponding error code.
  */
 absl::string_view getErrorDescription(int err);
+
+/**
+ * Extracts the X509 certificate validation error information.
+ *
+ * @param ctx the store context
+ * @return the error details
+ */
+std::string getX509VerificationErrorInfo(X509_STORE_CTX* ctx);
 
 } // namespace Utility
 } // namespace Tls

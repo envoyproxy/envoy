@@ -11,7 +11,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 /**
- * See docs/configuration/http_filters/grpc_http1_bridge_filter.rst
+ * See
+ * https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/grpc_http1_bridge_filter
  */
 class Http1BridgeFilter : public Http::StreamFilter {
 public:
@@ -34,7 +35,7 @@ public:
   }
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
+  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,

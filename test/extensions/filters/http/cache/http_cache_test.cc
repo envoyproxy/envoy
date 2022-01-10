@@ -30,9 +30,9 @@ struct LookupRequestTestCase {
 
 using Seconds = std::chrono::seconds;
 
-envoy::extensions::filters::http::cache::v3alpha::CacheConfig getConfig() {
+envoy::extensions::filters::http::cache::v3::CacheConfig getConfig() {
   // Allows 'accept' to be varied in the tests.
-  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
+  envoy::extensions::filters::http::cache::v3::CacheConfig config;
   const auto& add_accept = config.mutable_allowed_vary_headers()->Add();
   add_accept->set_exact("accept");
   return config;
@@ -393,6 +393,20 @@ TEST_P(LookupRequestTest, ResultWithBodyAndTrailersMatchesExpectation) {
   EXPECT_EQ(lookup_response.content_length_, content_length);
   EXPECT_TRUE(lookup_response.response_ranges_.empty());
   EXPECT_TRUE(lookup_response.has_trailers_);
+}
+
+TEST_F(LookupRequestTest, HttpScheme) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/"}, {":method", "GET"}, {":scheme", "http"}, {":authority", "example.com"}};
+  const LookupRequest lookup_request(request_headers, currentTime(), vary_allow_list_);
+  EXPECT_EQ(lookup_request.key().scheme(), Key::HTTP);
+}
+
+TEST_F(LookupRequestTest, HttpsScheme) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/"}, {":method", "GET"}, {":scheme", "https"}, {":authority", "example.com"}};
+  const LookupRequest lookup_request(request_headers, currentTime(), vary_allow_list_);
+  EXPECT_EQ(lookup_request.key().scheme(), Key::HTTPS);
 }
 
 TEST(RawByteRangeTest, IsSuffix) {

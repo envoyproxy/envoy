@@ -26,25 +26,25 @@ const char ExampleIpTaggingConfig[] = R"EOF(
 
 // envoy.filters.http.ip_tagging from v3 TypedStruct config.
 TEST_P(VersionIntegrationTest, IpTaggingV3StaticTypedStructConfig) {
-  config_helper_.addFilter(absl::StrCat(R"EOF(
+  config_helper_.prependFilter(absl::StrCat(R"EOF(
 name: ip_tagging
 typed_config:
-  "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+  "@type": type.googleapis.com/xds.type.v3.TypedStruct
   type_url: type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
   value:
   )EOF",
-                                        ExampleIpTaggingConfig));
+                                            ExampleIpTaggingConfig));
   initialize();
 }
 
 // envoy.filters.http.ip_tagging from v3 typed Any config.
 TEST_P(VersionIntegrationTest, IpTaggingV3StaticTypedConfig) {
-  config_helper_.addFilter(absl::StrCat(R"EOF(
+  config_helper_.prependFilter(absl::StrCat(R"EOF(
   name: ip_tagging
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
   )EOF",
-                                        ExampleIpTaggingConfig));
+                                            ExampleIpTaggingConfig));
   initialize();
 }
 

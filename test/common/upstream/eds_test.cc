@@ -355,9 +355,8 @@ TEST_F(EdsTest, EdsClusterFromFileIsPrimaryCluster) {
   EXPECT_TRUE(initialized_);
 }
 
-namespace {
-
-void endpointWeightChangeCausesRebuildTest(EdsTest& test, bool expect_rebuild) {
+// Verify that host weight changes cause a full rebuild.
+TEST_F(EdsTest, EndpointWeightChangeCausesRebuild) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   auto* endpoints = cluster_load_assignment.add_endpoints();
@@ -366,43 +365,26 @@ void endpointWeightChangeCausesRebuildTest(EdsTest& test, bool expect_rebuild) {
   endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
   endpoint->mutable_load_balancing_weight()->set_value(30);
 
-  test.initialize();
-  test.doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_TRUE(test.initialized_);
-  EXPECT_EQ(0UL, test.stats_.counter("cluster.name.update_no_rebuild").value());
-  EXPECT_EQ(30UL,
-            test.stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate)
-                .value());
-  auto& hosts = test.cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized_);
+  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(
+      30UL,
+      stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate).value());
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 1);
   EXPECT_EQ(hosts[0]->weight(), 30);
 
   endpoint->mutable_load_balancing_weight()->set_value(31);
-  test.doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_EQ(expect_rebuild ? 0UL : 1UL,
-            test.stats_.counter("cluster.name.update_no_rebuild").value());
-  EXPECT_EQ(31UL,
-            test.stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate)
-                .value());
-  auto& new_hosts = test.cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(
+      31UL,
+      stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate).value());
+  auto& new_hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(new_hosts.size(), 1);
   EXPECT_EQ(new_hosts[0]->weight(), 31);
-}
-
-} // namespace
-
-// Verify that host weight changes cause a full rebuild.
-TEST_F(EdsTest, EndpointWeightChangeCausesRebuild) {
-  endpointWeightChangeCausesRebuildTest(*this, true);
-}
-
-// Verify that host weight changes do not cause a full rebuild when the feature flag is disabled.
-TEST_F(EdsTest, EndpointWeightChangeCausesRebuildDisabled) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.upstream_host_weight_change_causes_rebuild", "false"}});
-
-  endpointWeightChangeCausesRebuildTest(*this, false);
 }
 
 // Validate that onConfigUpdate() updates the endpoint metadata.
@@ -2306,6 +2288,29 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentLeaseExpired) {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 0);
   }
+}
+
+// Validate that onConfigUpdate() with a config that contains both LEDS config
+// source and explicit list of endpoints is rejected.
+TEST_F(EdsTest, OnConfigUpdateLedsAndEndpoints) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  // Add an endpoint.
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  auto* endpoint = endpoints->add_lb_endpoints();
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("1.2.3.4");
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
+  // Configure an LEDS data source.
+  auto* leds_conf = endpoints->mutable_leds_cluster_locality_config();
+  leds_conf->set_leds_collection_name("xdstp://foo/leds/collection");
+  initialize();
+
+  const auto decoded_resources =
+      TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
+  EXPECT_THROW_WITH_MESSAGE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""),
+                            EnvoyException,
+                            "A ClusterLoadAssignment for cluster fare cannot include both LEDS "
+                            "(resource: xdstp://foo/leds/collection) and a list of endpoints.");
 }
 
 } // namespace

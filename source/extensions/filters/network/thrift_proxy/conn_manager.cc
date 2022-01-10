@@ -210,44 +210,19 @@ bool ConnectionManager::ResponseDecoder::onData(Buffer::Instance& data) {
   return complete_;
 }
 
+FilterStatus ConnectionManager::ResponseDecoder::passthroughData(Buffer::Instance& data) {
+  passthrough_ = true;
+  return ProtocolConverter::passthroughData(data);
+}
+
 FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
   metadata_->setSequenceId(parent_.original_sequence_id_);
 
-  first_reply_field_ =
-      (metadata->hasMessageType() && metadata->messageType() == MessageType::Reply);
+  if (metadata->hasReplyType()) {
+    success_ = metadata->replyType() == ReplyType::Success;
+  }
   return ProtocolConverter::messageBegin(metadata);
-}
-
-FilterStatus ConnectionManager::ResponseDecoder::fieldBegin(absl::string_view name,
-                                                            FieldType& field_type,
-                                                            int16_t& field_id) {
-  if (first_reply_field_) {
-    // Reply messages contain a struct where field 0 is the call result and fields 1+ are
-    // exceptions, if defined. At most one field may be set. Therefore, the very first field we
-    // encounter in a reply is either field 0 (success) or not (IDL exception returned).
-    // If first fieldType is FieldType::Stop then it is a void success and handled in messageEnd()
-    // because decoder state machine does not call decoder event callback fieldBegin on
-    // FieldType::Stop.
-    success_ = (field_id == 0);
-    first_reply_field_ = false;
-  }
-
-  return ProtocolConverter::fieldBegin(name, field_type, field_id);
-}
-
-FilterStatus ConnectionManager::ResponseDecoder::messageEnd() {
-  if (first_reply_field_) {
-    // When the response is thrift void type there is never a fieldBegin call on a success
-    // because the response struct has no fields and so the first field type is FieldType::Stop.
-    // The decoder state machine handles FieldType::Stop by going immediately to structEnd,
-    // skipping fieldBegin callback. Therefore if we are still waiting for the first reply field
-    // at end of message then it is a void success.
-    success_ = true;
-    first_reply_field_ = false;
-  }
-
-  return ProtocolConverter::messageEnd();
 }
 
 FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
@@ -275,14 +250,19 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   cm.read_callbacks_->connection().write(buffer, false);
 
   cm.stats_.response_.inc();
+  if (passthrough_) {
+    cm.stats_.response_passthrough_.inc();
+  }
 
   switch (metadata_->messageType()) {
   case MessageType::Reply:
     cm.stats_.response_reply_.inc();
-    if (success_.value_or(false)) {
-      cm.stats_.response_success_.inc();
-    } else {
-      cm.stats_.response_error_.inc();
+    if (success_) {
+      if (success_.value()) {
+        cm.stats_.response_success_.inc();
+      } else {
+        cm.stats_.response_error_.inc();
+      }
     }
 
     break;
@@ -419,6 +399,10 @@ void ConnectionManager::ActiveRpc::finalizeRequest() {
     parent_.stats_.downstream_cx_max_requests_.inc();
   }
 
+  if (passthrough_) {
+    parent_.stats_.request_passthrough_.inc();
+  }
+
   bool destroy_rpc = false;
   switch (original_msg_type_) {
   case MessageType::Call:
@@ -458,6 +442,7 @@ bool ConnectionManager::ActiveRpc::passthroughSupported() const {
 }
 
 FilterStatus ConnectionManager::ActiveRpc::passthroughData(Buffer::Instance& data) {
+  passthrough_ = true;
   filter_context_ = &data;
   filter_action_ = [this](DecoderEventHandler* filter) -> FilterStatus {
     Buffer::Instance* data = absl::any_cast<Buffer::Instance*>(filter_context_);

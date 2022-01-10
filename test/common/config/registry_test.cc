@@ -91,18 +91,10 @@ public:
 REGISTER_FACTORY(TestWithDeprecatedPublishedFactory,
                  PublishedFactory){"testing.published.deprecated_name"};
 
+// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST(RegistryTest, DEPRECATED_FEATURE_TEST(WithDeprecatedFactoryPublished)) {
-  EXPECT_EQ("testing.published.instead_name",
-            Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(
-                "testing.published.deprecated_name")
-                ->name());
-  EXPECT_LOG_CONTAINS("warn",
-                      fmt::format("Using deprecated extension name '{}' for '{}'.",
-                                  "testing.published.deprecated_name",
-                                  "testing.published.instead_name"),
-                      Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(
-                          "testing.published.deprecated_name")
-                          ->name());
+  EXPECT_EQ(nullptr, Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(
+                         "testing.published.deprecated_name"));
 }
 
 class NoNamePublishedFactory : public PublishedFactory {
@@ -161,17 +153,9 @@ REGISTER_FACTORY(TestVersionedWithDeprecatedNamesFactory,
 
 // Test registration of versioned factory that also uses deprecated names
 TEST(RegistryTest, DEPRECATED_FEATURE_TEST(VersionedWithDeprecatedNamesFactory)) {
-  EXPECT_EQ("testing.published.versioned.instead_name",
-            Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(
-                "testing.published.versioned.deprecated_name")
-                ->name());
-  EXPECT_LOG_CONTAINS("warn",
-                      fmt::format("Using deprecated extension name '{}' for '{}'.",
-                                  "testing.published.versioned.deprecated_name",
-                                  "testing.published.versioned.instead_name"),
-                      Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(
-                          "testing.published.versioned.deprecated_name")
-                          ->name());
+  EXPECT_EQ(nullptr, Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(
+                         "testing.published.versioned.deprecated_name"));
+
   const auto& factories = Envoy::Registry::FactoryCategoryRegistry::registeredFactories();
   auto version = factories.find("testing.published")
                      ->second->getFactoryVersion("testing.published.versioned.instead_name");

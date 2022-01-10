@@ -27,15 +27,10 @@ public:
             std::make_unique<std::map<std::string, envoy::config::route::v3::VirtualHost>>()),
         vhds_configuration_changed_(true), optional_http_filters_(optional_http_filters) {}
 
-  void initializeRdsVhosts(const envoy::config::route::v3::RouteConfiguration& route_configuration);
   bool removeVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
                     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
   bool updateVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
                     const VirtualHostRefVector& added_vhosts);
-  void rebuildRouteConfig(
-      const std::map<std::string, envoy::config::route::v3::VirtualHost>& rds_vhosts,
-      const std::map<std::string, envoy::config::route::v3::VirtualHost>& vhds_vhosts,
-      envoy::config::route::v3::RouteConfiguration& route_config);
   bool onDemandFetchFailed(const envoy::service::discovery::v3::Resource& resource) const;
   void onUpdateCommon(const std::string& version_info);
 

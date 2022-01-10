@@ -40,6 +40,18 @@ public:
   choosePriority(uint64_t hash, const HealthyLoad& healthy_per_priority_load,
                  const DegradedLoad& degraded_per_priority_load);
 
+  // Pool selection not implemented.
+  absl::optional<Upstream::SelectedPoolAndConnection>
+  selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                           const Upstream::Host& /*host*/,
+                           std::vector<uint8_t>& /*hash_key*/) override {
+    return absl::nullopt;
+  }
+  // Lifetime tracking not implemented.
+  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+    return {};
+  }
+
 protected:
   /**
    * For the given host_set @return if we should be in a panic mode or not. For example, if the
@@ -387,12 +399,15 @@ private:
  * This base class also supports unweighted selection which derived classes can use to customize
  * behavior. Derived classes can also override how host weight is determined when in weighted mode.
  */
-class EdfLoadBalancerBase : public ZoneAwareLoadBalancerBase {
+class EdfLoadBalancerBase : public ZoneAwareLoadBalancerBase,
+                            Logger::Loggable<Logger::Id::upstream> {
 public:
-  EdfLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                      ClusterStats& stats, Runtime::Loader& runtime,
-                      Random::RandomGenerator& random,
-                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
+  EdfLoadBalancerBase(
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
+      Runtime::Loader& runtime, Random::RandomGenerator& random,
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+      const absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig> slow_start_cofig,
+      TimeSource& time_source);
 
   // Upstream::ZoneAwareLoadBalancerBase
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
@@ -410,6 +425,11 @@ protected:
 
   virtual void refresh(uint32_t priority);
 
+  bool isSlowStartEnabled();
+  bool noHostsAreInSlowStart();
+
+  virtual void recalculateHostsInSlowStart(const HostVector& hosts_added);
+
   // Seed to allow us to desynchronize load balancers across a fleet. If we don't
   // do this, multiple Envoys that receive an update at the same time (or even
   // multiple load balancers on the same host) will send requests to
@@ -417,7 +437,11 @@ protected:
   // overload.
   const uint64_t seed_;
 
+  double applyAggressionFactor(double time_factor);
+  double applySlowStartFactor(double host_weight, const Host& host);
+
 private:
+  friend class EdfLoadBalancerBasePeer;
   virtual void refreshHostSource(const HostsSource& source) PURE;
   virtual double hostWeight(const Host& host) PURE;
   virtual HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
@@ -428,6 +452,15 @@ private:
   // Scheduler for each valid HostsSource.
   absl::node_hash_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
   Common::CallbackHandlePtr priority_update_cb_;
+  Common::CallbackHandlePtr member_update_cb_;
+
+protected:
+  // Slow start related config
+  const std::chrono::milliseconds slow_start_window_;
+  double aggression_{1.0};
+  const absl::optional<Runtime::Double> aggression_runtime_;
+  TimeSource& time_source_;
+  MonotonicTime latest_host_added_time_;
 };
 
 /**
@@ -436,12 +469,20 @@ private:
  */
 class RoundRobinLoadBalancer : public EdfLoadBalancerBase {
 public:
-  RoundRobinLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                         ClusterStats& stats, Runtime::Loader& runtime,
-                         Random::RandomGenerator& random,
-                         const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                            common_config) {
+  RoundRobinLoadBalancer(
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
+      Runtime::Loader& runtime, Random::RandomGenerator& random,
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+      const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
+          round_robin_config,
+      TimeSource& time_source)
+      : EdfLoadBalancerBase(
+            priority_set, local_priority_set, stats, runtime, random, common_config,
+            (round_robin_config.has_value() && round_robin_config.value().has_slow_start_config())
+                ? absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig>(
+                      round_robin_config.value().slow_start_config())
+                : absl::nullopt,
+            time_source) {
     initialize();
   }
 
@@ -455,7 +496,13 @@ private:
     // index.
     peekahead_index_ = 0;
   }
-  double hostWeight(const Host& host) override { return host.weight(); }
+  double hostWeight(const Host& host) override {
+    if (!noHostsAreInSlowStart()) {
+      return applySlowStartFactor(host.weight(), host);
+    }
+    return host.weight();
+  }
+
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                         const HostsSource& source) override {
     auto i = rr_indexes_.find(source);
@@ -498,37 +545,45 @@ private:
  *    The benefit of the Maglev table is at the expense of resolution, memory usage is capped.
  *    Additionally, the Maglev table can be shared amongst all threads.
  */
-class LeastRequestLoadBalancer : public EdfLoadBalancerBase,
-                                 Logger::Loggable<Logger::Id::upstream> {
+class LeastRequestLoadBalancer : public EdfLoadBalancerBase {
 public:
   LeastRequestLoadBalancer(
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
       Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
-          least_request_config)
-      : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                            common_config),
+          least_request_config,
+      TimeSource& time_source)
+      : EdfLoadBalancerBase(
+            priority_set, local_priority_set, stats, runtime, random, common_config,
+            (least_request_config.has_value() &&
+             least_request_config.value().has_slow_start_config())
+                ? absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig>(
+                      least_request_config.value().slow_start_config())
+                : absl::nullopt,
+            time_source),
         choice_count_(
             least_request_config.has_value()
                 ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.value(), choice_count, 2)
                 : 2),
         active_request_bias_runtime_(
             least_request_config.has_value() && least_request_config->has_active_request_bias()
-                ? std::make_unique<Runtime::Double>(least_request_config->active_request_bias(),
-                                                    runtime)
-                : nullptr) {
+                ? absl::optional<Runtime::Double>(
+                      {least_request_config->active_request_bias(), runtime})
+                : absl::nullopt) {
     initialize();
   }
 
 protected:
   void refresh(uint32_t priority) override {
-    active_request_bias_ =
-        active_request_bias_runtime_ != nullptr ? active_request_bias_runtime_->value() : 1.0;
+    active_request_bias_ = active_request_bias_runtime_ != absl::nullopt
+                               ? active_request_bias_runtime_.value().value()
+                               : 1.0;
 
     if (active_request_bias_ < 0.0) {
-      ENVOY_LOG(warn, "upstream: invalid active request bias supplied (runtime key {}), using 1.0",
-                active_request_bias_runtime_->runtimeKey());
+      ENVOY_LOG_MISC(warn,
+                     "upstream: invalid active request bias supplied (runtime key {}), using 1.0",
+                     active_request_bias_runtime_->runtimeKey());
       active_request_bias_ = 1.0;
     }
 
@@ -555,16 +610,21 @@ private:
     //
     // It might be possible to do better by picking two hosts off of the schedule, and selecting the
     // one with fewer active requests at the time of selection.
-    if (active_request_bias_ == 0.0) {
-      return host.weight();
-    }
+
+    double host_weight = static_cast<double>(host.weight());
 
     if (active_request_bias_ == 1.0) {
-      return static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
+      host_weight = static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
+    } else if (active_request_bias_ != 0.0) {
+      host_weight = static_cast<double>(host.weight()) /
+                    std::pow(host.stats().rq_active_.value() + 1, active_request_bias_);
     }
 
-    return static_cast<double>(host.weight()) /
-           std::pow(host.stats().rq_active_.value() + 1, active_request_bias_);
+    if (!noHostsAreInSlowStart()) {
+      return applySlowStartFactor(host_weight, host);
+    } else {
+      return host_weight;
+    }
   }
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
@@ -578,13 +638,14 @@ private:
   // whenever a `HostSet` is updated.
   double active_request_bias_{};
 
-  const std::unique_ptr<Runtime::Double> active_request_bias_runtime_;
+  const absl::optional<Runtime::Double> active_request_bias_runtime_;
 };
 
 /**
  * Random load balancer that picks a random host out of all hosts.
  */
-class RandomLoadBalancer : public ZoneAwareLoadBalancerBase {
+class RandomLoadBalancer : public ZoneAwareLoadBalancerBase,
+                           Logger::Loggable<Logger::Id::upstream> {
 public:
   RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                      ClusterStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,

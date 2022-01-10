@@ -17,7 +17,7 @@ involved and how Envoy plays a role, read the CNCF
 
 * [Official documentation](https://www.envoyproxy.io/)
 * [FAQ](https://www.envoyproxy.io/docs/envoy/latest/faq/overview)
-* [Unofficial Chinese documentation](https://www.servicemesher.com/envoy/)
+* [Unofficial Chinese documentation](https://cloudnative.to/envoy/)
 * Watch [a video overview of Envoy](https://www.youtube.com/watch?v=RVZX4CwKhGE)
 ([transcript](https://www.microservices.com/talks/lyfts-envoy-monolith-service-mesh-matt-klein/))
 to find out more about the origin story and design philosophy of Envoy

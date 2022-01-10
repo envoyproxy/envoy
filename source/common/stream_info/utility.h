@@ -83,6 +83,22 @@ private:
   static absl::flat_hash_map<std::string, ResponseFlag> getFlagMap();
 };
 
+class TimingUtility {
+public:
+  TimingUtility(const StreamInfo& info) : stream_info_(info) {}
+
+  absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent();
+  absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent();
+  absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived();
+  absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived();
+  absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent();
+  absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent();
+  absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived();
+
+private:
+  const StreamInfo& stream_info_;
+};
+
 /**
  * Utility class for StreamInfo.
  */

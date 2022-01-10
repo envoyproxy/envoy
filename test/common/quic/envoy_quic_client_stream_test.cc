@@ -55,8 +55,8 @@ public:
                       std::unique_ptr<EnvoyQuicClientConnection>(quic_connection_), *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2,
                       crypto_stream_factory_),
-        stream_id_(4u), stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
-                                                      POOL_GAUGE_PREFIX(scope_, "http3."))}),
+        stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
+                                      POOL_GAUGE_PREFIX(scope_, "http3."))}),
         quic_stream_(new EnvoyQuicClientStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL,
                                                stats_, http3_options_)),
         request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}},
@@ -89,7 +89,7 @@ public:
 
     setQuicConfigWithDefaultValues(quic_session_.config());
     quic_session_.OnConfigNegotiated();
-    quic_connection_->setUpConnectionSocket(delegate_);
+    quic_connection_->setUpConnectionSocket(*quic_connection_->connectionSocket(), delegate_);
     spdy_response_headers_[":status"] = "200";
 
     spdy_trailers_["key1"] = "value1";
@@ -136,7 +136,7 @@ protected:
   EnvoyQuicClientConnection* quic_connection_;
   TestQuicCryptoClientStreamFactory crypto_stream_factory_;
   MockEnvoyQuicClientSession quic_session_;
-  quic::QuicStreamId stream_id_;
+  quic::QuicStreamId stream_id_{4u};
   Stats::IsolatedStoreImpl scope_;
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
@@ -194,11 +194,11 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
   quic_stream_->OnStreamFrame(frame);
 }
 
-TEST_F(EnvoyQuicClientStreamTest, PostRequestAnd100Continue) {
+TEST_F(EnvoyQuicClientStreamTest, PostRequestAnd1xx) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
 
-  EXPECT_CALL(stream_decoder_, decode100ContinueHeaders_(_))
+  EXPECT_CALL(stream_decoder_, decode1xxHeaders_(_))
       .WillOnce(Invoke([this](const Http::ResponseHeaderMapPtr& headers) {
         EXPECT_EQ("100", headers->getStatusValue());
         EXPECT_EQ("0", headers->get(Http::LowerCaseString("i"))[0]->value().getStringView());
@@ -206,14 +206,14 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAnd100Continue) {
       }));
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& headers, bool) {
-        EXPECT_EQ("103", headers->getStatusValue());
+        EXPECT_EQ("199", headers->getStatusValue());
         EXPECT_EQ("1", headers->get(Http::LowerCaseString("i"))[0]->value().getStringView());
       }));
   size_t offset = 0;
   size_t i = 0;
   // Receive several 10x headers, only the first 100 Continue header should be
   // delivered.
-  for (const std::string& status : {"100", "103", "100"}) {
+  for (const std::string& status : {"100", "199", "100"}) {
     spdy::SpdyHeaderBlock continue_header;
     continue_header[":status"] = status;
     continue_header["i"] = absl::StrCat("", i++);

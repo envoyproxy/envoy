@@ -2,8 +2,8 @@
 
 #include "contrib/rocketmq_proxy/filters/network/source/config.h"
 #include "contrib/rocketmq_proxy/filters/network/source/conn_manager.h"
+#include "contrib/rocketmq_proxy/filters/network/source/constant.h"
 #include "contrib/rocketmq_proxy/filters/network/source/router/router.h"
-#include "contrib/rocketmq_proxy/filters/network/source/well_known_names.h"
 #include "contrib/rocketmq_proxy/filters/network/test/mocks.h"
 #include "contrib/rocketmq_proxy/filters/network/test/utility.h"
 #include "gtest/gtest.h"
@@ -25,7 +25,7 @@ public:
         cluster_info_(std::make_shared<Upstream::MockClusterInfo>()) {
     context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     conn_manager_ =
-        std::make_unique<ConnectionManager>(config_, context_.dispatcher().timeSource());
+        std::make_unique<ConnectionManager>(config_, context_.mainThreadDispatcher().timeSource());
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 

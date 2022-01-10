@@ -107,14 +107,20 @@ public:
       return Http::HeaderUtility::HeaderValidationResult::REJECT;
     }
     if (header_name == "content-length") {
-      return Http::HeaderUtility::validateContentLength(
-          header_value, override_stream_error_on_invalid_http_message,
-          close_connection_upon_invalid_header_);
+      size_t content_length = 0;
+      Http::HeaderUtility::HeaderValidationResult result =
+          Http::HeaderUtility::validateContentLength(
+              header_value, override_stream_error_on_invalid_http_message,
+              close_connection_upon_invalid_header_, content_length);
+      content_length_ = content_length;
+      return result;
     }
     return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
   }
 
   absl::string_view responseDetails() override { return details_; }
+
+  const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
 protected:
   virtual void switchStreamBlockState() PURE;
@@ -122,6 +128,26 @@ protected:
   // Needed for ENVOY_STREAM_LOG.
   virtual uint32_t streamId() PURE;
   virtual Network::Connection* connection() PURE;
+  // Either reset the stream or close the connection according to
+  // should_close_connection and configured http3 options.
+  virtual void
+  onStreamError(absl::optional<bool> should_close_connection,
+                quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD) PURE;
+
+  // TODO(danzh) remove this once QUICHE enforces content-length consistency.
+  void updateReceivedContentBytes(size_t payload_length, bool end_stream) {
+    received_content_bytes_ += payload_length;
+    if (!content_length_.has_value()) {
+      return;
+    }
+    if (received_content_bytes_ > content_length_.value() ||
+        (end_stream && received_content_bytes_ != content_length_.value() &&
+         !(got_304_response_ && received_content_bytes_ == 0) && !(sent_head_request_))) {
+      details_ = Http3ResponseCodeDetailValues::inconsistent_content_length;
+      // Reset instead of closing the connection to align with nghttp2.
+      onStreamError(false);
+    }
+  }
 
   // True once end of stream is propagated to Envoy. Envoy doesn't expect to be
   // notified more than once about end of stream. So once this is true, no need
@@ -141,6 +167,8 @@ protected:
   // TODO(kbaichoo): bind the account to the QUIC buffers to enable tracking of
   // memory allocated within QUIC buffers.
   Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_ = nullptr;
+  bool got_304_response_{false};
+  bool sent_head_request_{false};
 
 private:
   // Keeps track of bytes buffered in the stream send buffer in QUICHE and reacts
@@ -157,6 +185,10 @@ private:
   // state change in its own call stack. And Envoy upstream doesn't like quic stream to be unblocked
   // in its callstack either because the stream will push data right away.
   Event::SchedulableCallbackPtr async_stream_blockage_change_;
+
+  StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
+  absl::optional<size_t> content_length_;
+  size_t received_content_bytes_{0};
 };
 
 } // namespace Quic

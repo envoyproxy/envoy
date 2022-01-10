@@ -70,6 +70,7 @@ public:
   }
   MOCK_METHOD(void, drainConnections, (const std::string& cluster));
   MOCK_METHOD(void, drainConnections, ());
+  MOCK_METHOD(void, checkActiveStaticCluster, (const std::string& cluster));
 
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   envoy::config::core::v3::BindConfig bind_config_;

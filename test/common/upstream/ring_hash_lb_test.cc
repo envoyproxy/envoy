@@ -96,6 +96,24 @@ INSTANTIATE_TEST_SUITE_P(RingHashPrimaryOrFailover, RingHashFailoverTest, ::test
 TEST_P(RingHashLoadBalancerTest, NoHost) {
   init();
   EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
+
+  EXPECT_EQ(nullptr, lb_->factory()->create()->peekAnotherHost(nullptr));
+  EXPECT_FALSE(lb_->factory()->create()->lifetimeCallbacks().has_value());
+  std::vector<uint8_t> hash_key;
+  auto mock_host = std::make_shared<NiceMock<MockHost>>();
+  EXPECT_FALSE(lb_->factory()
+                   ->create()
+                   ->selectExistingConnection(nullptr, *mock_host, hash_key)
+                   .has_value());
+}
+
+TEST_P(RingHashLoadBalancerTest, BaseMethods) {
+  init();
+  EXPECT_EQ(nullptr, lb_->peekAnotherHost(nullptr));
+  EXPECT_FALSE(lb_->lifetimeCallbacks().has_value());
+  std::vector<uint8_t> hash_key;
+  auto mock_host = std::make_shared<NiceMock<MockHost>>();
+  EXPECT_FALSE(lb_->selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
 };
 
 TEST_P(RingHashLoadBalancerTest, SelectOverrideHost) {
@@ -118,6 +136,19 @@ TEST_P(RingHashLoadBalancerTest, SelectOverrideHost) {
   host_set_.runCallbacks({}, {});
 
   EXPECT_EQ(mock_host, lb_->factory()->create()->chooseHost(&context));
+}
+
+// Test for thread aware load balancer destructed before load balancer factory. After CDS removes a
+// cluster, the operation does not immediately reach the worker thread. There may be cases where the
+// thread aware load balancer is destructed, but the load balancer factory is still used in the
+// worker thread.
+TEST_P(RingHashLoadBalancerTest, LbDestructedBeforeFactory) {
+  init();
+
+  auto factory = lb_->factory();
+  lb_.reset();
+
+  EXPECT_NE(nullptr, factory->create());
 }
 
 // Given minimum_ring_size > maximum_ring_size, expect an exception.

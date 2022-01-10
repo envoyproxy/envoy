@@ -29,9 +29,13 @@ public:
   // BackOffStrategy methods
   uint64_t nextBackOffMs() override;
   void reset() override;
+  void reset(uint64_t base_interval) override {
+    base_interval_ = base_interval;
+    reset();
+  }
 
 private:
-  const uint64_t base_interval_;
+  uint64_t base_interval_;
   const uint64_t max_interval_{};
   uint64_t next_interval_;
   Random::RandomGenerator& random_;
@@ -53,9 +57,10 @@ public:
   // BackOffStrategy methods
   uint64_t nextBackOffMs() override;
   void reset() override {}
+  void reset(uint64_t min_interval) override { min_interval_ = min_interval; }
 
 private:
-  const uint64_t min_interval_;
+  uint64_t min_interval_;
   Random::RandomGenerator& random_;
 };
 
@@ -74,9 +79,10 @@ public:
   // BackOffStrategy methods.
   uint64_t nextBackOffMs() override;
   void reset() override {}
+  void reset(uint64_t interval_ms) override { interval_ms_ = interval_ms; }
 
 private:
-  const uint64_t interval_ms_;
+  uint64_t interval_ms_;
 };
 
 } // namespace Envoy

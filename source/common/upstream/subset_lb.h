@@ -30,15 +30,29 @@ public:
       const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
           lb_ring_hash_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>& lb_maglev_config,
+      const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>&
+          round_robin_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
           least_request_config,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+      TimeSource& time_source);
   ~SubsetLoadBalancer() override;
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
   // TODO(alyssawilk) implement for non-metadata match.
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
+  // Pool selection not implemented.
+  absl::optional<Upstream::SelectedPoolAndConnection>
+  selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                           const Upstream::Host& /*host*/,
+                           std::vector<uint8_t>& /*hash_key*/) override {
+    return absl::nullopt;
+  }
+  // Lifetime tracking not implemented.
+  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+    return {};
+  }
 
 private:
   using HostPredicate = std::function<bool(const Host&)>;
@@ -239,6 +253,7 @@ private:
   const LoadBalancerType lb_type_;
   const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
+  const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config_;
   const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
       least_request_config_;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
@@ -279,6 +294,8 @@ private:
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;
   const bool list_as_any_;
+
+  TimeSource& time_source_;
 
   friend class SubsetLoadBalancerDescribeMetadataTester;
 };

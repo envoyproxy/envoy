@@ -169,6 +169,7 @@ envoy_cc_library(
         "alternate_protocols_cache_impl.h",
         "alternate_protocols_cache_manager_impl.h",
     ],
+    external_deps = ["quiche_quic_platform"],
     deps = [
         "//envoy/common:time_interface",
         "//envoy/event:dispatcher_interface",
@@ -176,7 +177,11 @@ envoy_cc_library(
         "//envoy/singleton:manager_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:resource_manager_interface",
+        "//source/common/common:key_value_store_lib",
         "//source/common/common:logger_lib",
+        "//source/common/config:utility_lib",
+        "@com_github_google_quiche//:spdy_core_alt_svc_wire_format_lib",
+        "@envoy_api//envoy/config/common/key_value/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -291,6 +296,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
         "//source/common/common:linked_object",
+        "//source/common/common:perf_tracing_lib",
         "//source/common/common:regex_lib",
         "//source/common/common:scope_tracker",
         "//source/common/common:utility_lib",
@@ -341,6 +347,7 @@ envoy_cc_library(
     hdrs = ["hash_policy.h"],
     deps = [
         ":utility_lib",
+        "//envoy/common:hashable_interface",
         "//envoy/http:hash_policy_interface",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
@@ -454,6 +461,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
@@ -490,19 +498,11 @@ envoy_cc_library(
         "abseil_optional",
     ],
     deps = [
-        ":legacy_path_canonicalizer",
         "//envoy/http:header_map_interface",
         "//source/common/common:logger_lib",
         "//source/common/runtime:runtime_features_lib",
         "@com_googlesource_googleurl//url:envoy_url",
     ],
-)
-
-envoy_cc_library(
-    name = "legacy_path_canonicalizer",
-    srcs = ["legacy_path_canonicalizer.cc"],
-    hdrs = ["legacy_path_canonicalizer.h"],
-    deps = ["//source/common/chromium_url"],
 )
 
 envoy_cc_library(

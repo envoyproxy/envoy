@@ -39,6 +39,11 @@ public:
   size_t size() const;
 
   /**
+   * @return true if the pools across all priorities are empty.
+   */
+  bool empty() const;
+
+  /**
    * Destroys all mapped pools.
    */
   void clear();

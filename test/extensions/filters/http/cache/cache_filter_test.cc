@@ -118,7 +118,7 @@ protected:
   void waitBeforeSecondRequest() { time_source_.advanceTimeWait(delay_); }
 
   SimpleHttpCache simple_cache_;
-  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config_;
+  envoy::extensions::filters::http::cache::v3::CacheConfig config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Event::SimulatedTimeSystem time_source_;
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};

@@ -143,6 +143,8 @@ Note in the example that the minimum idle time is specified as an absolute durat
 would be computed based on the maximum (specified elsewhere). So if ``idle_timeout`` is
 again 600 seconds, then the minimum timer value would be :math:`10\% \cdot 600s = 60s`.
 
+.. _config_overload_manager_limiting_connections:
+
 Limiting Active Connections
 ---------------------------
 
@@ -155,6 +157,13 @@ If the value is unspecified, there is no global limit on the number of active do
 and Envoy will emit a warning indicating this at startup. To disable the warning without setting a
 limit on the number of active downstream connections, the runtime value may be set to a very large
 limit (~2e9).
+Listeners can opt out of this global connection limit by setting
+:ref:`Listener.ignore_global_conn_limit <envoy_v3_api_field_config.listener.v3.Listener.ignore_global_conn_limit>`
+to true. Similarly, you can opt out the admin listener by setting
+:ref:`Admin.ignore_global_conn_limit <envoy_v3_api_field_config.bootstrap.v3.Admin.ignore_global_conn_limit>`.
+You may want to opt out a listener to be able to probe Envoy or collect stats while it is otherwise at its
+connection limit. Note that connections to listeners that opt out are still tracked and count towards the
+global limit.
 
 If it is desired to only limit the number of downstream connections for a particular listener,
 per-listener limits can be set via the :ref:`listener configuration <config_listeners>`.
@@ -199,9 +208,9 @@ threshold for tracking and a single overload action entry that resets streams:
   ...
 
 We will only track streams using >=
-:math:`2^minimum_account_to_track_power_of_two` worth of allocated memory in
+:math:`2^{minimum\_account\_to\_track\_power\_of\_two}` worth of allocated memory in
 buffers. In this case, by setting the `minimum_account_to_track_power_of_two`
-to `20` we will track streams using >= 1MiB since :math:`2^20` is 1MiB. Streams
+to `20` we will track streams using >= 1MiB since :math:`2^{20}` is 1MiB. Streams
 using >= 1MiB will be classified into 8 power of two sized buckets. Currently,
 the number of buckets is hardcoded to 8.  For this example, the buckets are as
 follows:
@@ -240,7 +249,7 @@ of streams that end up getting reset and to prevent the worker thread from
 locking up and triggering the Watchdog system.
 
 Given that there are only 8 buckets, we partition the space with a gradation of
-:math:`gradation = (saturation_threshold - scaling_threshold)/8`. Hence at 85%
+:math:`gradation = (saturation\_threshold - scaling\_threshold)/8`. Hence at 85%
 heap usage we reset streams in the last bucket e.g. those using `>= 128MiB`. At
 :math:`85% + 1 * gradation` heap usage we reset streams in the last two buckets
 e.g. those using `>= 64MiB`, prioritizing the streams in the last bucket since

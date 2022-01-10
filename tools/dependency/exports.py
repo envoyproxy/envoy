@@ -17,7 +17,7 @@ def load_module(name, path):
 # this is the relative path in a bazel build
 # to call this module outside of a bazel build set the `API_PATH` first,
 # for example, if running from the envoy repo root: `export API_PATH=api/`
-api_path = os.getenv("API_PATH", "external/envoy_api_canonical")
+api_path = os.getenv("API_PATH", "external/envoy_api")
 
 # Modules
 envoy_repository_locations = load_module(

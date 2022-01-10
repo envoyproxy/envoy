@@ -23,6 +23,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/grpc/async_client_manager_impl.h"
 #include "source/common/http/async_client_impl.h"
@@ -182,11 +183,12 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      Config::ScopedResume maybe_resume_eds;
+      Config::ScopedResume maybe_resume_eds_leds;
       if (cm_.adsMux()) {
-        const auto type_url =
+        const auto eds_type_url =
             Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-        maybe_resume_eds = cm_.adsMux()->pause(type_url);
+        const auto leds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
+        maybe_resume_eds_leds = cm_.adsMux()->pause({eds_type_url, leds_type_url});
       }
       initializeSecondaryClusters();
     }
@@ -338,28 +340,56 @@ ClusterManagerImpl::ClusterManagerImpl(
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
-      ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
-          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                         dyn_resources.ads_config(), stats, false)
-              ->createUncachedRawAsyncClient(),
-          main_thread_dispatcher,
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
-          random_, stats_,
-          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+        ads_mux_ = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->createUncachedRawAsyncClient(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                "envoy.service.discovery.v3.AggregatedDiscoveryService."
+                "DeltaAggregatedResources"),
+            random_, stats_,
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
+            dyn_resources.ads_config().set_node_on_first_message_only());
+      } else {
+        ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->createUncachedRawAsyncClient(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
+            random_, stats_,
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
+      }
     } else {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
-      ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
-          local_info,
-          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                         dyn_resources.ads_config(), stats, false)
-              ->createUncachedRawAsyncClient(),
-          main_thread_dispatcher,
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_,
-          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
-          bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+        ads_mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->createUncachedRawAsyncClient(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                "envoy.service.discovery.v3.AggregatedDiscoveryService."
+                "StreamAggregatedResources"),
+            random_, stats_,
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
+            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+      } else {
+        ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
+            local_info,
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->createUncachedRawAsyncClient(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+            random_, stats_,
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
+            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+      }
     }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
@@ -971,6 +1001,16 @@ void ClusterManagerImpl::drainConnections() {
   });
 }
 
+void ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {
+  const auto& it = active_clusters_.find(cluster);
+  if (it == active_clusters_.end()) {
+    throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster));
+  }
+  if (it->second->added_via_api_) {
+    throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster));
+  }
+}
+
 void ClusterManagerImpl::postThreadLocalRemoveHosts(const Cluster& cluster,
                                                     const HostVector& hosts_removed) {
   tls_.runOnAllThreads([name = cluster.info()->name(),
@@ -1200,7 +1240,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
   pools->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   container.do_not_delete_ = false;
 
-  if (container.pools_->size() == 0) {
+  if (container.pools_->empty()) {
     host_http_conn_pool_map_.erase(old_host);
   }
 }
@@ -1329,14 +1369,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
         cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
         cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
         cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
-        cluster->lbLeastRequestConfig(), cluster->lbConfig());
+        cluster->lbRoundRobinConfig(), cluster->lbLeastRequestConfig(), cluster->lbConfig(),
+        parent_.thread_local_dispatcher_.timeSource());
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
       ASSERT(lb_factory_ == nullptr);
       lb_ = std::make_unique<LeastRequestLoadBalancer>(
           priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
-          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig());
+          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig(),
+          parent.thread_local_dispatcher_.timeSource());
       break;
     }
     case LoadBalancerType::Random: {
@@ -1348,9 +1390,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     }
     case LoadBalancerType::RoundRobin: {
       ASSERT(lb_factory_ == nullptr);
-      lb_ = std::make_unique<RoundRobinLoadBalancer>(priority_set_, parent_.local_priority_set_,
-                                                     cluster->stats(), parent.parent_.runtime_,
-                                                     parent.parent_.random_, cluster->lbConfig());
+      lb_ = std::make_unique<RoundRobinLoadBalancer>(
+          priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
+          parent.parent_.random_, cluster->lbConfig(), cluster->lbRoundRobinConfig(),
+          parent.thread_local_dispatcher_.timeSource());
       break;
     }
     case LoadBalancerType::ClusterProvided:
@@ -1393,7 +1436,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainAllConnPoolsWorker(
           Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
       container->do_not_delete_ = false;
 
-      if (container->pools_->size() == 0) {
+      if (container->pools_->empty()) {
         host_http_conn_pool_map_.erase(host);
       }
     }
@@ -1539,7 +1582,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
     // Guard deletion of the container with `do_not_delete_` to avoid deletion while
     // iterating through the container in `container->pools_->startDrain()`. See
     // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
-    if (!container->do_not_delete_ && container->pools_->size() == 0) {
+    if (!container->do_not_delete_ && container->pools_->empty()) {
       ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
       host_http_conn_pool_map_.erase(
           host); // NOTE: `container` is erased after this point in the lambda.
@@ -1633,8 +1676,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   return ClusterManagerPtr{new ClusterManagerImpl(
-      bootstrap, *this, stats_, tls_, runtime_, local_info_, log_manager_, main_thread_dispatcher_,
-      admin_, validation_context_, api_, http_context_, grpc_context_, router_context_)};
+      bootstrap, *this, stats_, tls_, context_.runtime(), context_.localInfo(), log_manager_,
+      context_.mainThreadDispatcher(), context_.admin(), validation_context_, context_.api(),
+      http_context_, grpc_context_, router_context_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
@@ -1645,21 +1689,20 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     TimeSource& source, ClusterConnectivityState& state) {
-  if (protocols.size() == 3 && runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
+  if (protocols.size() == 3 &&
+      context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
     ASSERT(contains(protocols,
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
-    Http::AlternateProtocolsCacheSharedPtr alternate_protocols_cache;
-    if (alternate_protocol_options.has_value()) {
-      alternate_protocols_cache =
-          alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value());
-    }
+    ASSERT(alternate_protocol_options.has_value());
 #ifdef ENVOY_ENABLE_QUIC
-    // TODO(RyanTheOptimist): Plumb an actual alternate protocols cache.
+    Http::AlternateProtocolsCacheSharedPtr alternate_protocols_cache =
+        alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value(),
+                                                     dispatcher);
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     return std::make_unique<Http::ConnectivityGrid>(
-        dispatcher, api_.randomGenerator(), host, priority, options, transport_socket_options,
-        state, source, alternate_protocols_cache, std::chrono::milliseconds(300), coptions,
-        quic_stat_names_, stats_);
+        dispatcher, context_.api().randomGenerator(), host, priority, options,
+        transport_socket_options, state, source, alternate_protocols_cache,
+        std::chrono::milliseconds(300), coptions, quic_stat_names_, stats_);
 #else
     // Should be blocked by configuration checking at an earlier point.
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -1667,20 +1710,20 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   }
   if (protocols.size() >= 2) {
     ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
-    return std::make_unique<Http::HttpConnPoolImplMixed>(dispatcher, api_.randomGenerator(), host,
-                                                         priority, options,
-                                                         transport_socket_options, state);
+    return std::make_unique<Http::HttpConnPoolImplMixed>(
+        dispatcher, context_.api().randomGenerator(), host, priority, options,
+        transport_socket_options, state);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
-      runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
-    return Http::Http2::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
-                                         options, transport_socket_options, state);
+      context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
+    return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
+                                         priority, options, transport_socket_options, state);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
-      runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
+      context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
 #ifdef ENVOY_ENABLE_QUIC
-    return Http::Http3::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
-                                         options, transport_socket_options, state, source,
+    return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
+                                         priority, options, transport_socket_options, state, source,
                                          quic_stat_names_, stats_);
 #else
     UNREFERENCED_PARAMETER(source);
@@ -1689,8 +1732,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #endif
   }
   ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
-  return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority, options,
-                                       transport_socket_options, state);
+  return Http::Http1::allocateConnPool(dispatcher, context_.api().randomGenerator(), host, priority,
+                                       options, transport_socket_options, state);
 }
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
@@ -1712,12 +1755,12 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   return ClusterFactoryImplBase::create(
-      cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_,
-      main_thread_dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-      outlier_event_logger, added_via_api,
+      cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, context_.runtime(),
+      context_.mainThreadDispatcher(), log_manager_, context_.localInfo(), admin_,
+      singleton_manager_, outlier_event_logger, added_via_api,
       added_via_api ? validation_context_.dynamicValidationVisitor()
                     : validation_context_.staticValidationVisitor(),
-      api_, options_);
+      context_.api(), context_.options());
 }
 
 CdsApiPtr

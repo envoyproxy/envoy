@@ -14,6 +14,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -97,11 +98,11 @@ public:
 };
 
 namespace {
-class ConnectivityGridTestBase : public Event::TestUsingSimulatedTime, public testing::Test {
+class ConnectivityGridTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  ConnectivityGridTestBase(bool use_alternate_protocols)
+  ConnectivityGridTest()
       : options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
-        alternate_protocols_(maybeCreateAlternateProtocolsCacheImpl(use_alternate_protocols)),
+        alternate_protocols_(std::make_shared<AlternateProtocolsCacheImpl>(simTime(), nullptr, 10)),
         quic_stat_names_(store_.symbolTable()),
         grid_(dispatcher_, random_,
               Upstream::makeTestHost(cluster_, "hostname", "tcp://127.0.0.1:9000", simTime()),
@@ -119,12 +120,12 @@ public:
     if (!use_alternate_protocols) {
       return nullptr;
     }
-    return std::make_shared<AlternateProtocolsCacheImpl>(simTime());
+    return std::make_shared<AlternateProtocolsCacheImpl>(simTime(), nullptr, 10);
   }
 
   void addHttp3AlternateProtocol() {
     AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
-    const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
+    std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
         {"h3", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
     alternate_protocols_->setAlternatives(origin, protocols);
   }
@@ -149,25 +150,12 @@ public:
   NiceMock<MockRequestEncoder> encoder_;
 };
 
-// Tests of the Grid in which no alternate protocols cache is configured.
-class ConnectivityGridTest : public ConnectivityGridTestBase {
-public:
-  ConnectivityGridTest() : ConnectivityGridTestBase(false) {}
-};
-
-// Tests of the Grid in which an alternate protocols cache is configured.
-class ConnectivityGridWithAlternateProtocolsCacheImplTest : public ConnectivityGridTestBase {
-public:
-  ConnectivityGridWithAlternateProtocolsCacheImplTest() : ConnectivityGridTestBase(true) {}
-};
-
 // Test the first pool successfully connecting.
 TEST_F(ConnectivityGridTest, Success) {
+  addHttp3AlternateProtocol();
   EXPECT_EQ(grid_.first(), nullptr);
 
-  EXPECT_LOG_CONTAINS("trace",
-                      "No alternate protocols cache. Attempting HTTP/3 to host 'hostname'.",
-                      EXPECT_NE(grid_.newStream(decoder_, callbacks_), nullptr));
+  EXPECT_NE(grid_.newStream(decoder_, callbacks_), nullptr);
   EXPECT_NE(grid_.first(), nullptr);
   EXPECT_EQ(grid_.second(), nullptr);
 
@@ -180,6 +168,7 @@ TEST_F(ConnectivityGridTest, Success) {
 
 // Test the first pool successfully connecting under the stack of newStream.
 TEST_F(ConnectivityGridTest, ImmediateSuccess) {
+  addHttp3AlternateProtocol();
   grid_.immediate_success_ = true;
 
   EXPECT_CALL(callbacks_.pool_ready_, ready());
@@ -190,6 +179,7 @@ TEST_F(ConnectivityGridTest, ImmediateSuccess) {
 
 // Test the first pool failing and the second connecting.
 TEST_F(ConnectivityGridTest, FailureThenSuccessSerial) {
+  addHttp3AlternateProtocol();
   EXPECT_EQ(grid_.first(), nullptr);
 
   EXPECT_LOG_CONTAINS("trace", "first pool attempting to create a new stream to host 'hostname'",
@@ -219,6 +209,7 @@ TEST_F(ConnectivityGridTest, FailureThenSuccessSerial) {
 
 // Test both connections happening in parallel and the second connecting.
 TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnects) {
+  addHttp3AlternateProtocol();
   EXPECT_EQ(grid_.first(), nullptr);
 
   // This timer will be returned and armed as the grid creates the wrapper's failover timer.
@@ -249,6 +240,7 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnects) {
 
 // Test both connections happening in parallel and the first connecting.
 TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelFirstConnects) {
+  addHttp3AlternateProtocol();
   EXPECT_EQ(grid_.first(), nullptr);
 
   // This timer will be returned and armed as the grid creates the wrapper's failover timer.
@@ -278,6 +270,7 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelFirstConnects) {
 // Test both connections happening in parallel and the second connecting before
 // the first eventually fails.
 TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnectsFirstFail) {
+  addHttp3AlternateProtocol();
   EXPECT_EQ(grid_.first(), nullptr);
 
   // This timer will be returned and armed as the grid creates the wrapper's failover timer.
@@ -309,6 +302,7 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnectsFirstFail) 
 // Test that after the first pool fails, subsequent connections will
 // successfully fail over to the second pool (the iterators work as intended)
 TEST_F(ConnectivityGridTest, FailureThenSuccessForMultipleConnectionsSerial) {
+  addHttp3AlternateProtocol();
   NiceMock<ConnPoolCallbacks> callbacks2;
   NiceMock<MockResponseDecoder> decoder2;
   // Kick off two new streams.
@@ -334,6 +328,7 @@ TEST_F(ConnectivityGridTest, FailureThenSuccessForMultipleConnectionsSerial) {
 
 // Test double failure under the stack of newStream.
 TEST_F(ConnectivityGridTest, ImmediateDoubleFailure) {
+  addHttp3AlternateProtocol();
   grid_.immediate_failure_ = true;
   EXPECT_CALL(callbacks_.pool_failure_, ready());
   EXPECT_EQ(grid_.newStream(decoder_, callbacks_), nullptr);
@@ -342,6 +337,7 @@ TEST_F(ConnectivityGridTest, ImmediateDoubleFailure) {
 
 // Test both connections happening in parallel and both failing.
 TEST_F(ConnectivityGridTest, TimeoutDoubleFailureParallel) {
+  addHttp3AlternateProtocol();
   EXPECT_EQ(grid_.first(), nullptr);
 
   // This timer will be returned and armed as the grid creates the wrapper's failover timer.
@@ -370,6 +366,7 @@ TEST_F(ConnectivityGridTest, TimeoutDoubleFailureParallel) {
 
 // Test cancellation
 TEST_F(ConnectivityGridTest, TestCancel) {
+  addHttp3AlternateProtocol();
   EXPECT_EQ(grid_.first(), nullptr);
 
   auto cancel = grid_.newStream(decoder_, callbacks_);
@@ -382,6 +379,7 @@ TEST_F(ConnectivityGridTest, TestCancel) {
 
 // Make sure drains get sent to all active pools.
 TEST_F(ConnectivityGridTest, Drain) {
+  addHttp3AlternateProtocol();
   grid_.drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 
   // Synthetically create a pool.
@@ -404,6 +402,7 @@ TEST_F(ConnectivityGridTest, Drain) {
 
 // Make sure drain callbacks work as expected.
 TEST_F(ConnectivityGridTest, DrainCallbacks) {
+  addHttp3AlternateProtocol();
   // Synthetically create both pools.
   grid_.createNextPool();
   grid_.createNextPool();
@@ -452,6 +451,7 @@ TEST_F(ConnectivityGridTest, DrainCallbacks) {
 
 // Make sure idle callbacks work as expected.
 TEST_F(ConnectivityGridTest, IdleCallbacks) {
+  addHttp3AlternateProtocol();
   // Synthetically create both pools.
   grid_.createNextPool();
   grid_.createNextPool();
@@ -484,6 +484,7 @@ TEST_F(ConnectivityGridTest, IdleCallbacks) {
 
 // Ensure drain callbacks aren't called during grid teardown.
 TEST_F(ConnectivityGridTest, NoDrainOnTeardown) {
+  addHttp3AlternateProtocol();
   grid_.createNextPool();
 
   bool drain_received = false;
@@ -499,7 +500,7 @@ TEST_F(ConnectivityGridTest, NoDrainOnTeardown) {
 }
 
 // Test that when HTTP/3 is broken then the HTTP/3 pool is skipped.
-TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessAfterBroken) {
+TEST_F(ConnectivityGridTest, SuccessAfterBroken) {
   addHttp3AlternateProtocol();
   grid_.markHttp3Broken();
   EXPECT_EQ(grid_.first(), nullptr);
@@ -517,7 +518,7 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessAfterBroken) 
 }
 
 // Test the HTTP/3 pool successfully connecting when HTTP/3 is available.
-TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, Success) {
+TEST_F(ConnectivityGridTest, SuccessWithAltSvc) {
   addHttp3AlternateProtocol();
   EXPECT_EQ(grid_.first(), nullptr);
 
@@ -533,7 +534,7 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, Success) {
 }
 
 // Test that when HTTP/3 is not available then the HTTP/3 pool is skipped.
-TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3) {
+TEST_F(ConnectivityGridTest, SuccessWithoutHttp3) {
   EXPECT_EQ(grid_.first(), nullptr);
 
   EXPECT_LOG_CONTAINS("trace",
@@ -549,9 +550,9 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3)
 }
 
 // Test that when HTTP/3 is not available then the HTTP/3 pool is skipped.
-TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithExpiredHttp3) {
+TEST_F(ConnectivityGridTest, SuccessWithExpiredHttp3) {
   AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
-  const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
+  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
       {"h3-29", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
   alternate_protocols_->setAlternatives(origin, protocols);
   simTime().setMonotonicTime(simTime().monotonicTime() + Seconds(10));
@@ -572,9 +573,9 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithExpiredHt
 
 // Test that when the alternate protocol specifies a different host, then the HTTP/3 pool is
 // skipped.
-TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3NoMatchingHostname) {
+TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingHostname) {
   AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
-  const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
+  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
       {"h3-29", "otherhostname", origin.port_, simTime().monotonicTime() + Seconds(5)}};
   alternate_protocols_->setAlternatives(origin, protocols);
 
@@ -593,9 +594,9 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3N
 
 // Test that when the alternate protocol specifies a different port, then the HTTP/3 pool is
 // skipped.
-TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3NoMatchingPort) {
+TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingPort) {
   AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
-  const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
+  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
       {"h3-29", "", origin.port_ + 1, simTime().monotonicTime() + Seconds(5)}};
   alternate_protocols_->setAlternatives(origin, protocols);
 
@@ -613,9 +614,9 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3N
 }
 
 // Test that when the alternate protocol specifies an invalid ALPN, then the HTTP/3 pool is skipped.
-TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3NoMatchingAlpn) {
+TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingAlpn) {
   AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
-  const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
+  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
       {"http/2", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
   alternate_protocols_->setAlternatives(origin, protocols);
 
@@ -680,6 +681,74 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   auto optional_it3 = ConnectivityGridForTest::forceCreateNextPool(grid);
   ASSERT_FALSE(optional_it3.has_value());
 }
+
+TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
+  EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
+
+  testing::InSequence s;
+  dispatcher_.allow_null_callback_ = true;
+  // Set the cluster up to have a quic transport socket.
+  Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
+  EXPECT_CALL(factory_context.context_manager_, createSslClientContext(_, _, _))
+      .WillOnce(Return(ssl_context));
+  auto factory =
+      std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context);
+  factory->initialize();
+  ASSERT_FALSE(factory->usesProxyProtocolOptions());
+  auto& matcher =
+      static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
+  EXPECT_CALL(matcher, resolve(_))
+      .WillRepeatedly(
+          Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
+
+  ConnectivityGrid grid(dispatcher_, random_,
+                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+                        Upstream::ResourcePriority::Default, socket_options_,
+                        transport_socket_options_, state_, simTime(), alternate_protocols_,
+                        std::chrono::milliseconds(300), options_, quic_stat_names_, store_);
+
+  // Create the HTTP/3 pool.
+  auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
+  ASSERT_TRUE(optional_it1.has_value());
+  EXPECT_EQ("HTTP/3", (**optional_it1)->protocolDescription());
+
+  const bool supports_getifaddrs = Api::OsSysCallsSingleton::get().supportsGetifaddrs();
+  Api::InterfaceAddressVector interfaces{};
+  if (supports_getifaddrs) {
+    ASSERT_EQ(0, Api::OsSysCallsSingleton::get().getifaddrs(interfaces).return_value_);
+  }
+
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(supports_getifaddrs));
+  if (supports_getifaddrs) {
+    EXPECT_CALL(os_sys_calls, getifaddrs(_))
+        .WillOnce(
+            Invoke([&](Api::InterfaceAddressVector& interface_vector) -> Api::SysCallIntResult {
+              interface_vector.insert(interface_vector.begin(), interfaces.begin(),
+                                      interfaces.end());
+              return {0, 0};
+            }));
+  }
+  EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillOnce(Return(Api::SysCallSocketResult{1, 0}));
+#if defined(__APPLE__) || defined(WIN32)
+  EXPECT_CALL(os_sys_calls, setsocketblocking(1, false))
+      .WillOnce(Return(Api::SysCallIntResult{1, 0}));
+#endif
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _))
+      .Times(testing::AtLeast(0u))
+      .WillRepeatedly(Return(0));
+  EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{1, 0}));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 101}));
+
+  EXPECT_CALL(os_sys_calls, close(1)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  ConnectionPool::Cancellable* cancel = (**optional_it1)->newStream(decoder_, callbacks_);
+  EXPECT_EQ(nullptr, cancel);
+}
+
 #endif
 
 } // namespace

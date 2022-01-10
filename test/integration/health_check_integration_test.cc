@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/type/v3/range.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/http/http2/http2_frame.h"
@@ -170,7 +171,8 @@ public:
 
   // Adds a HTTP active health check specifier to the given cluster, and waits for the first health
   // check probe to be received.
-  void initHttpHealthCheck(uint32_t cluster_idx) {
+  void initHttpHealthCheck(uint32_t cluster_idx, int unhealthy_threshold = 1,
+                           std::unique_ptr<envoy::type::v3::Int64Range> retriable_range = nullptr) {
     const envoy::type::v3::CodecClientType codec_client_type =
         (Http::CodecType::HTTP1 == upstream_protocol_) ? envoy::type::v3::CodecClientType::HTTP1
                                                        : envoy::type::v3::CodecClientType::HTTP2;
@@ -179,6 +181,12 @@ public:
     auto* health_check = addHealthCheck(cluster_data.cluster_);
     health_check->mutable_http_health_check()->set_path("/healthcheck");
     health_check->mutable_http_health_check()->set_codec_client_type(codec_client_type);
+    health_check->mutable_unhealthy_threshold()->set_value(unhealthy_threshold);
+    if (retriable_range != nullptr) {
+      auto* range = health_check->mutable_http_health_check()->add_retriable_statuses();
+      range->set_start(retriable_range->start());
+      range->set_end(retriable_range->end());
+    }
 
     // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
@@ -244,6 +252,117 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyHttp) {
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+// Tests that a retriable status response does not mark endpoint unhealthy until threshold is
+// reached
+TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
+  const uint32_t cluster_idx = 0;
+  initialize();
+  auto retriable_range = std::make_unique<envoy::type::v3::Int64Range>();
+  retriable_range->set_start(400);
+  retriable_range->set_end(401);
+  initHttpHealthCheck(cluster_idx, 2, std::move(retriable_range));
+
+  // Responds with healthy status.
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  clusters_[cluster_idx].host_stream_->encodeData(0, true);
+
+  // Wait for health check
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 1);
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.success", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 1);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
+
+  // Wait until the next attempt is made.
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 2);
+
+  // Respond with retriable status
+  ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
+      *dispatcher_, clusters_[cluster_idx].host_stream_));
+  ASSERT_TRUE(clusters_[cluster_idx].host_stream_->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getPathValue(), "/healthcheck");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getMethodValue(), "GET");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getHostValue(),
+            clusters_[cluster_idx].name_);
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "400"}}, false);
+  clusters_[cluster_idx].host_stream_->encodeData(0, true);
+
+  // Wait for second health check
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.failure", 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
+
+  // Wait until the next attempt is made.
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 3);
+
+  // Respond with retriable status a second time, matching unhealthy threshold
+  ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
+      *dispatcher_, clusters_[cluster_idx].host_stream_));
+  ASSERT_TRUE(clusters_[cluster_idx].host_stream_->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getPathValue(), "/healthcheck");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getMethodValue(), "GET");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getHostValue(),
+            clusters_[cluster_idx].name_);
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "400"}}, false);
+  clusters_[cluster_idx].host_stream_->encodeData(0, true);
+
+  // Wait for third health check
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.failure", 2);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 0);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
+
+  // Wait until the next attempt is made.
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 4);
+
+  // Respond with healthy status again.
+  ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
+      *dispatcher_, clusters_[cluster_idx].host_stream_));
+  ASSERT_TRUE(clusters_[cluster_idx].host_stream_->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getPathValue(), "/healthcheck");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getMethodValue(), "GET");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getHostValue(),
+            clusters_[cluster_idx].name_);
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  clusters_[cluster_idx].host_stream_->encodeData(0, true);
+
+  // Wait for fourth health check
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.success", 2);
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 1);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
+}
+
+// Tests that expected statuses takes precedence over retriable statuses
+TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointExpectedAndRetriablePrecedence) {
+  const uint32_t cluster_idx = 0;
+  initialize();
+  auto retriable_range = std::make_unique<envoy::type::v3::Int64Range>();
+  retriable_range->set_start(200);
+  retriable_range->set_end(201);
+  initHttpHealthCheck(cluster_idx, 2, std::move(retriable_range));
+
+  // Responds with healthy status.
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  clusters_[cluster_idx].host_stream_->encodeData(0, true);
+
+  // Wait for health check
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 1);
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.success", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 1);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
 }
 
 // Verify that immediate health check fail causes cluster exclusion.

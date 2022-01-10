@@ -14,6 +14,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.thrift_proxy.v3";
 option java_outer_classname = "ThriftProxyProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/thrift_proxy/v3;thrift_proxyv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Thrift Proxy]
@@ -85,8 +86,8 @@ message ThriftProxy {
   repeated ThriftFilter thrift_filters = 5;
 
   // If set to true, Envoy will try to skip decode data after metadata in the Thrift message.
-  // This mode will only work if the upstream and downstream protocols are the same and the transport
-  // is the same, the transport type is framed and the protocol is not Twitter. Otherwise Envoy will
+  // This mode will only work if the upstream and downstream protocols are the same and the transports
+  // are Framed or Header, and the protocol is not Twitter. Otherwise Envoy will
   // fallback to decode the data.
   bool payload_passthrough = 6;
 

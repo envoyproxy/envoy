@@ -25,10 +25,9 @@ private:
 
 public:
   /**
-   * How many request/response types are supported.
-   * Proper values are 0..apiKeys() - 1.
+   * What are the supported request / response types.
    */
-  static int16_t apiKeys();
+  static std::vector<int16_t> apiKeys();
 
   /**
    * How many request types are supported for given api key.

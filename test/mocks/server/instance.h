@@ -87,6 +87,7 @@ public:
   MOCK_METHOD(Configuration::ServerFactoryContext&, serverFactoryContext, ());
   MOCK_METHOD(Configuration::TransportSocketFactoryContext&, transportSocketFactoryContext, ());
   MOCK_METHOD(bool, enableReusePortDefault, ());
+  MOCK_METHOD(void, setSinkPredicates, (std::unique_ptr<Envoy::Stats::SinkPredicates> &&));
 
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
@@ -141,6 +142,7 @@ public:
   MOCK_METHOD(const std::list<Stats::SinkPtr>&, sinks, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, flushInterval, (), (const));
   MOCK_METHOD(bool, flushOnAdmin, (), (const));
+  MOCK_METHOD(const Stats::SinkPredicates*, sinkPredicates, (), (const));
 };
 
 class MockServerFactoryContext : public virtual ServerFactoryContext {
@@ -149,12 +151,13 @@ public:
   ~MockServerFactoryContext() override;
 
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, ());
   MOCK_METHOD(const Server::Options&, options, ());
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
   MOCK_METHOD(Stats::Scope&, scope, ());
+  MOCK_METHOD(Stats::Scope&, serverScope, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(Server::Admin&, admin, ());

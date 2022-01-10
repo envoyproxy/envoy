@@ -4,8 +4,6 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/router/router.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/load_balancer.h"
 
@@ -59,21 +57,8 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
   // ProtocolConverter
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override {
     metadata_ = metadata;
-    first_reply_field_ =
-        (metadata->hasMessageType() && metadata->messageType() == MessageType::Reply);
-    return FilterStatus::Continue;
-  }
-  FilterStatus messageEnd() override {
-    if (first_reply_field_) {
-      success_ = true;
-      first_reply_field_ = false;
-    }
-    return FilterStatus::Continue;
-  }
-  FilterStatus fieldBegin(absl::string_view, FieldType&, int16_t& field_id) override {
-    if (first_reply_field_) {
-      success_ = (field_id == 0);
-      first_reply_field_ = false;
+    if (metadata_->hasReplyType()) {
+      success_ = metadata_->replyType() == ReplyType::Success;
     }
     return FilterStatus::Continue;
   }
@@ -97,7 +82,6 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
   MessageMetadataSharedPtr metadata_;
   absl::optional<bool> success_;
   bool complete_ : 1;
-  bool first_reply_field_ : 1;
 };
 using NullResponseDecoderPtr = std::unique_ptr<NullResponseDecoder>;
 
@@ -156,9 +140,6 @@ public:
   void continueDecoding() override { flushPendingCallbacks(); }
   void resetDownstreamConnection() override {}
   void sendLocalReply(const ThriftProxy::DirectResponse&, bool) override {}
-  void recordResponseDuration(uint64_t value, Stats::Histogram::Unit unit) override {
-    recordClusterResponseDuration(*cluster_, value, unit);
-  }
 
   // RequestOwner::ProtocolConverter
   FilterStatus transportBegin(MessageMetadataSharedPtr) override { return FilterStatus::Continue; }
@@ -230,12 +211,6 @@ private:
   bool deferred_deleting_{};
 };
 
-#define ALL_SHADOW_WRITER_STATS(COUNTER, GAUGE, HISTOGRAM) COUNTER(shadow_request_submit_failure)
-
-struct ShadowWriterStats {
-  ALL_SHADOW_WRITER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
-};
-
 class ActiveRouters : public ThreadLocal::ThreadLocalObject {
 public:
   ActiveRouters(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
@@ -260,12 +235,9 @@ private:
 
 class ShadowWriterImpl : public ShadowWriter, Logger::Loggable<Logger::Id::thrift> {
 public:
-  ShadowWriterImpl(Upstream::ClusterManager& cm, const std::string& stat_prefix,
-                   Stats::Scope& scope, Event::Dispatcher& dispatcher,
-                   ThreadLocal::SlotAllocator& tls)
-      : cm_(cm), stat_prefix_(stat_prefix), scope_(scope), dispatcher_(dispatcher),
-        stats_(generateStats(stat_prefix, scope)), tls_(tls.allocateSlot()) {
-
+  ShadowWriterImpl(Upstream::ClusterManager& cm, const RouterStats& stats,
+                   Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls)
+      : cm_(cm), stats_(stats), dispatcher_(dispatcher), tls_(tls.allocateSlot()) {
     tls_->set([](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
       return std::make_shared<ActiveRouters>(dispatcher);
     });
@@ -274,11 +246,10 @@ public:
   ~ShadowWriterImpl() override = default;
 
   void remove(ShadowRouterImpl& router) { tls_->getTyped<ActiveRouters>().remove(router); }
+  const RouterStats& stats() { return stats_; }
 
   // Router::ShadowWriter
   Upstream::ClusterManager& clusterManager() override { return cm_; }
-  const std::string& statPrefix() const override { return stat_prefix_; }
-  Stats::Scope& scope() override { return scope_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   absl::optional<std::reference_wrapper<ShadowRouterHandle>>
   submit(const std::string& cluster_name, MessageMetadataSharedPtr metadata,
@@ -287,17 +258,9 @@ public:
 private:
   friend class ShadowRouterImpl;
 
-  ShadowWriterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    return ShadowWriterStats{ALL_SHADOW_WRITER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
-                                                     POOL_GAUGE_PREFIX(scope, prefix),
-                                                     POOL_HISTOGRAM_PREFIX(scope, prefix))};
-  }
-
   Upstream::ClusterManager& cm_;
-  const std::string stat_prefix_;
-  Stats::Scope& scope_;
+  const RouterStats& stats_;
   Event::Dispatcher& dispatcher_;
-  ShadowWriterStats stats_;
   ThreadLocal::SlotPtr tls_;
 };
 

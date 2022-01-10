@@ -154,10 +154,13 @@ routes:
 )EOF";
 
 class VhdsInitializationTest : public HttpIntegrationTest,
-                               public Grpc::GrpcClientIntegrationParamTest {
+                               public Grpc::UnifiedOrLegacyMuxIntegrationParamTest {
 public:
   VhdsInitializationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), config()) {
     use_lds_ = false;
+    if (isUnified()) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+    }
   }
 
   void TearDown() override { cleanUpXdsConnection(); }
@@ -211,7 +214,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsInitializationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         UNIFIED_LEGACY_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // tests a scenario when:
 //  - RouteConfiguration without VHDS is received
@@ -250,10 +253,13 @@ TEST_P(VhdsInitializationTest, InitializeVhdsAfterRdsHasBeenInitialized) {
 }
 
 class VhdsIntegrationTest : public HttpIntegrationTest,
-                            public Grpc::GrpcClientIntegrationParamTest {
+                            public Grpc::UnifiedOrLegacyMuxIntegrationParamTest {
 public:
   VhdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), config()) {
     use_lds_ = false;
+    if (isUnified()) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+    }
   }
 
   void TearDown() override { cleanUpXdsConnection(); }
@@ -397,7 +403,8 @@ public:
   bool use_rds_with_vhosts{false};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsIntegrationTest,
+                         UNIFIED_LEGACY_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(VhdsIntegrationTest, RdsUpdateWithoutVHDSChangesDoesNotRestartVHDS) {
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "host");

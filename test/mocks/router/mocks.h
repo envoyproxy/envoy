@@ -104,10 +104,15 @@ public:
 
   // Router::RetryPolicy
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
+  std::chrono::milliseconds perTryIdleTimeout() const override { return per_try_idle_timeout_; }
   uint32_t numRetries() const override { return num_retries_; }
   uint32_t retryOn() const override { return retry_on_; }
   MOCK_METHOD(std::vector<Upstream::RetryHostPredicateSharedPtr>, retryHostPredicates, (), (const));
   MOCK_METHOD(Upstream::RetryPrioritySharedPtr, retryPriority, (), (const));
+  absl::Span<const Upstream::RetryOptionsPredicateConstSharedPtr>
+  retryOptionsPredicates() const override {
+    return retry_options_predicates_;
+  }
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
   const std::vector<uint32_t>& retriableStatusCodes() const override {
     return retriable_status_codes_;
@@ -127,6 +132,7 @@ public:
   }
 
   std::chrono::milliseconds per_try_timeout_{0};
+  std::chrono::milliseconds per_try_idle_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
   uint32_t host_selection_max_attempts_;
@@ -137,6 +143,7 @@ public:
   absl::optional<std::chrono::milliseconds> max_interval_{};
   std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
   std::chrono::milliseconds reset_max_interval_{300000};
+  std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
 };
 
 class MockInternalRedirectPolicy : public InternalRedirectPolicy {
@@ -256,9 +263,11 @@ public:
 class TestVirtualCluster : public VirtualCluster {
 public:
   // Router::VirtualCluster
+  const absl::optional<std::string>& name() const override { return name_; }
   Stats::StatName statName() const override { return stat_name_.statName(); }
   VirtualClusterStats& stats() const override { return stats_; }
 
+  const absl::optional<std::string> name_ = "fake_virtual_cluster";
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::StatNameManagedStorage stat_name_{"fake_virtual_cluster", *symbol_table_};
   Stats::IsolatedStoreImpl stats_store_;
@@ -383,6 +392,7 @@ public:
   MOCK_METHOD(const VirtualCluster*, virtualCluster, (const Http::HeaderMap& headers), (const));
   MOCK_METHOD(const VirtualHost&, virtualHost, (), (const));
   MOCK_METHOD(bool, autoHostRewrite, (), (const));
+  MOCK_METHOD(bool, appendXfh, (), (const));
   MOCK_METHOD((const std::multimap<std::string, std::string>&), opaqueConfig, (), (const));
   MOCK_METHOD(bool, includeVirtualHostRateLimits, (), (const));
   MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
@@ -499,7 +509,6 @@ public:
   MOCK_METHOD(absl::optional<ConfigInfo>, configInfo, (), (const));
   MOCK_METHOD(SystemTime, lastUpdated, (), (const));
   MOCK_METHOD(void, onConfigUpdate, ());
-  MOCK_METHOD(void, validateConfig, (const envoy::config::route::v3::RouteConfiguration&), (const));
   MOCK_METHOD(void, requestVirtualHostsUpdate,
               (const std::string&, Event::Dispatcher&,
                std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb));
@@ -566,7 +575,7 @@ public:
 
   MOCK_METHOD(void, decodeData, (Buffer::Instance&, bool));
   MOCK_METHOD(void, decodeMetadata, (Http::MetadataMapPtr &&));
-  MOCK_METHOD(void, decode100ContinueHeaders, (Http::ResponseHeaderMapPtr &&));
+  MOCK_METHOD(void, decode1xxHeaders, (Http::ResponseHeaderMapPtr &&));
   MOCK_METHOD(void, decodeHeaders, (Http::ResponseHeaderMapPtr&&, bool));
   MOCK_METHOD(void, decodeTrailers, (Http::ResponseTrailerMapPtr &&));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));

@@ -1,11 +1,12 @@
-#include "test/integration/multiplexed_integration_test.h"
-
 #include <algorithm>
+#include <memory>
 #include <string>
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
 #endif
+
+#include "absl/synchronization/mutex.h"
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -16,6 +17,7 @@
 #include "source/common/http/header_map_impl.h"
 
 #include "test/integration/filters/stop_and_continue_filter_config.pb.h"
+#include "test/integration/http_protocol_integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -29,36 +31,40 @@ using ::testing::MatchesRegex;
 
 namespace Envoy {
 
-// TODO(#2557) fix all the failures.
 #define EXCLUDE_DOWNSTREAM_HTTP3                                                                   \
   if (downstreamProtocol() == Http::CodecType::HTTP3) {                                            \
     return;                                                                                        \
   }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, Http2IntegrationTest,
+class MultiplexedIntegrationTest : public HttpProtocolIntegrationTest {
+public:
+  void simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes);
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, MultiplexedIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP2, Http::CodecType::HTTP3},
                              {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
+TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false, false);
 }
 
-TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyNoBuffer) {
+TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithGiantBodyNoBuffer) {
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false, nullptr,
                                        TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
-TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBody) {
+TEST_P(MultiplexedIntegrationTest, FlowControlOnAndGiantBody) {
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false, nullptr,
                                        TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
-TEST_P(Http2IntegrationTest, LargeFlowControlOnAndGiantBody) {
+TEST_P(MultiplexedIntegrationTest, LargeFlowControlOnAndGiantBody) {
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(128 * 1024,
                                  128 * 1024); // Set buffer limits upstream and downstream.
@@ -66,24 +72,24 @@ TEST_P(Http2IntegrationTest, LargeFlowControlOnAndGiantBody) {
                                        TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
-TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyAndContentLengthNoBuffer) {
+TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithBodyAndContentLengthNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false, true);
 }
 
-TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyAndContentLengthNoBuffer) {
+TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithGiantBodyAndContentLengthNoBuffer) {
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true, nullptr,
                                        TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
-TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBodyWithContentLength) {
+TEST_P(MultiplexedIntegrationTest, FlowControlOnAndGiantBodyWithContentLength) {
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true, nullptr,
                                        TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
-TEST_P(Http2IntegrationTest, LargeFlowControlOnAndGiantBodyWithContentLength) {
+TEST_P(MultiplexedIntegrationTest, LargeFlowControlOnAndGiantBodyWithContentLength) {
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(128 * 1024,
                                  128 * 1024); // Set buffer limits upstream and downstream.
@@ -91,42 +97,44 @@ TEST_P(Http2IntegrationTest, LargeFlowControlOnAndGiantBodyWithContentLength) {
                                        TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
-TEST_P(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
+TEST_P(MultiplexedIntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
   testRouterHeaderOnlyRequestAndResponse();
 }
 
-TEST_P(Http2IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
+TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, true);
 }
 
-TEST_P(Http2IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
+TEST_P(MultiplexedIntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
   testRouterUpstreamDisconnectBeforeRequestComplete();
 }
 
-TEST_P(Http2IntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
+TEST_P(MultiplexedIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
   testRouterUpstreamDisconnectBeforeResponseComplete();
 }
 
-TEST_P(Http2IntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
+TEST_P(MultiplexedIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
   testRouterDownstreamDisconnectBeforeRequestComplete();
 }
 
-TEST_P(Http2IntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
+TEST_P(MultiplexedIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
   testRouterDownstreamDisconnectBeforeResponseComplete();
 }
 
-TEST_P(Http2IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
+TEST_P(MultiplexedIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
-TEST_P(Http2IntegrationTest, Retry) { testRetry(); }
+TEST_P(MultiplexedIntegrationTest, Retry) { testRetry(); }
 
-TEST_P(Http2IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }
+TEST_P(MultiplexedIntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }
 
-TEST_P(Http2IntegrationTest, LargeRequestTrailersRejected) { testLargeRequestTrailers(66, 60); }
+TEST_P(MultiplexedIntegrationTest, LargeRequestTrailersRejected) {
+  testLargeRequestTrailers(66, 60);
+}
 
 // Verify downstream codec stream flush timeout.
-TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
+TEST_P(MultiplexedIntegrationTest, CodecStreamIdleTimeout) {
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -162,9 +170,8 @@ TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
   ASSERT_TRUE(response->waitForReset());
 }
 
-TEST_P(Http2IntegrationTest, Http2DownstreamKeepalive) {
-  // TODO(#16751) Need to support keepalive.
-  EXCLUDE_DOWNSTREAM_HTTP3;
+TEST_P(MultiplexedIntegrationTest, Http2DownstreamKeepalive) {
+  EXCLUDE_DOWNSTREAM_HTTP3; // Http3 keepalive doesn't timeout and close connection.
   constexpr uint64_t interval_ms = 1;
   constexpr uint64_t timeout_ms = 250;
   config_helper_.addConfigModifier(
@@ -197,6 +204,41 @@ name: response-metadata-filter
 typed_config:
   "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
+
+class Http2MetadataIntegrationTest : public HttpProtocolIntegrationTest {
+public:
+  void SetUp() override {
+    HttpProtocolIntegrationTest::SetUp();
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()
+              ->mutable_http2_protocol_options()
+              ->set_allow_metadata(true);
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+        });
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+  }
+
+  void testRequestMetadataWithStopAllFilter();
+
+  void verifyHeadersOnlyTest();
+
+  void runHeaderOnlyTest(bool send_request_body, size_t body_size);
+
+protected:
+  // Utility function to prepend filters. Note that the filters
+  // are added in reverse order.
+  void prependFilters(std::vector<std::string> filters) {
+    for (const auto& filter : filters) {
+      config_helper_.prependFilter(filter);
+    }
+  }
+};
 
 // Verifies metadata can be sent at different locations of the responses.
 TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
@@ -370,6 +412,8 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadata) {
   EXPECT_EQ(response->metadataMap().size(), multiple_vecs.size());
 }
 
+// Disabled temporarily see #19040
+#if 0
 TEST_P(Http2MetadataIntegrationTest, ProxyInvalidMetadata) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -398,6 +442,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyInvalidMetadata) {
   EXPECT_EQ(0, response->metadataMapsDecodedCount());
   EXPECT_EQ(response->metadataMap().size(), 0);
 }
+#endif
 
 void verifyExpectedMetadata(Http::MetadataMap metadata_map, std::set<std::string> keys) {
   for (const auto& key : keys) {
@@ -408,7 +453,7 @@ void verifyExpectedMetadata(Http::MetadataMap metadata_map, std::set<std::string
 }
 
 TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
-  addFilters({response_metadata_filter});
+  prependFilters({response_metadata_filter});
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
@@ -464,8 +509,8 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
                                          10);
 
   waitForNextUpstreamRequest();
-  upstream_request_->encode100ContinueHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
-  response->waitForContinueHeaders();
+  upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  response->waitFor1xxHeaders();
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(100, true);
 
@@ -652,7 +697,7 @@ typed_config:
 )EOF";
 
 TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
-  addFilters({request_metadata_filter});
+  prependFilters({request_metadata_filter});
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
@@ -799,7 +844,7 @@ void Http2MetadataIntegrationTest::verifyHeadersOnlyTest() {
 }
 
 TEST_P(Http2MetadataIntegrationTest, HeadersOnlyRequestWithRequestMetadata) {
-  addFilters({request_metadata_filter});
+  prependFilters({request_metadata_filter});
   // Send a headers only request.
   runHeaderOnlyTest(false, 0);
   verifyHeadersOnlyTest();
@@ -842,17 +887,17 @@ typed_config:
 )EOF";
 
 TEST_P(Http2MetadataIntegrationTest, RequestMetadataWithStopAllFilterBeforeMetadataFilter) {
-  addFilters({request_metadata_filter, metadata_stop_all_filter});
+  prependFilters({request_metadata_filter, metadata_stop_all_filter});
   testRequestMetadataWithStopAllFilter();
 }
 
 TEST_P(Http2MetadataIntegrationTest, RequestMetadataWithStopAllFilterAfterMetadataFilter) {
-  addFilters({metadata_stop_all_filter, request_metadata_filter});
+  prependFilters({metadata_stop_all_filter, request_metadata_filter});
   testRequestMetadataWithStopAllFilter();
 }
 
 TEST_P(Http2MetadataIntegrationTest, TestAddEncodedMetadata) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
 )EOF");
 
@@ -889,7 +934,7 @@ name: encode-headers-return-stop-all-filter
   EXPECT_EQ(count * size + added_decoded_data_size * 2, response->body().size());
 }
 
-TEST_P(Http2IntegrationTest, GrpcRouterNotFound) {
+TEST_P(MultiplexedIntegrationTest, GrpcRouterNotFound) {
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
   initialize();
 
@@ -902,12 +947,11 @@ TEST_P(Http2IntegrationTest, GrpcRouterNotFound) {
   EXPECT_EQ("12", response->headers().getGrpcStatusValue());
 }
 
-TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
+TEST_P(MultiplexedIntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
 // Verify the case where there is an HTTP/2 codec/protocol error with an active stream.
-TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
-  // TODO(#16757) Needs HTTP/3 "bad frame" equivalent.
-  EXCLUDE_DOWNSTREAM_HTTP3;
+TEST_P(MultiplexedIntegrationTest, CodecErrorAfterStreamStart) {
+  EXCLUDE_DOWNSTREAM_HTTP3; // The HTTP/3 client has no "bad frame" equivalent.
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -923,7 +967,7 @@ TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
   ASSERT_TRUE(response->waitForEndStream());
 }
 
-TEST_P(Http2IntegrationTest, Http2BadMagic) {
+TEST_P(MultiplexedIntegrationTest, Http2BadMagic) {
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
     // The "magic" payload is an HTTP/2 specific thing.
     return;
@@ -939,8 +983,8 @@ TEST_P(Http2IntegrationTest, Http2BadMagic) {
   EXPECT_EQ("", response);
 }
 
-TEST_P(Http2IntegrationTest, BadFrame) {
-  EXCLUDE_DOWNSTREAM_HTTP3; // Needs HTTP/3 "bad frame" equivalent.
+TEST_P(MultiplexedIntegrationTest, BadFrame) {
+  EXCLUDE_DOWNSTREAM_HTTP3; // The HTTP/3 client has no "bad frame" equivalent.
 
   initialize();
   std::string response;
@@ -955,9 +999,8 @@ TEST_P(Http2IntegrationTest, BadFrame) {
 
 // Send client headers, a GoAway and then a body and ensure the full request and
 // response are received.
-TEST_P(Http2IntegrationTest, GoAway) {
-  EXCLUDE_DOWNSTREAM_HTTP3; // QuicHttpClientConnectionImpl::goAway NOT_REACHED_GCOVR_EXCL_LINE
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
+TEST_P(MultiplexedIntegrationTest, GoAway) {
+  autonomous_upstream_ = true;
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -974,14 +1017,14 @@ TEST_P(Http2IntegrationTest, GoAway) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048, false, false); }
+TEST_P(MultiplexedIntegrationTest, Trailers) { testTrailers(1024, 2048, false, false); }
 
-TEST_P(Http2IntegrationTest, TrailersGiantBody) {
+TEST_P(MultiplexedIntegrationTest, TrailersGiantBody) {
   testTrailers(1024 * 1024, 1024 * 1024, false, false);
 }
 
 // Ensure if new timeouts are set, legacy timeouts do not apply.
-TEST_P(Http2IntegrationTest, DEPRECATED_FEATURE_TEST(GrpcRequestTimeoutMixedLegacy)) {
+TEST_P(MultiplexedIntegrationTest, DEPRECATED_FEATURE_TEST(GrpcRequestTimeoutMixedLegacy)) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1014,7 +1057,7 @@ TEST_P(Http2IntegrationTest, DEPRECATED_FEATURE_TEST(GrpcRequestTimeoutMixedLega
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream\n"));
 }
 
-TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
+TEST_P(MultiplexedIntegrationTest, GrpcRequestTimeout) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1047,7 +1090,7 @@ TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
 }
 
 // Interleave two requests and responses and make sure that idle timeout is handled correctly.
-TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
+TEST_P(MultiplexedIntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   FakeHttpConnectionPtr fake_upstream_connection1;
   FakeHttpConnectionPtr fake_upstream_connection2;
   Http::RequestEncoder* encoder1;
@@ -1136,7 +1179,7 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
 }
 
 // Test request mirroring / shadowing with an HTTP/2 downstream and a request with a body.
-TEST_P(Http2IntegrationTest, RequestMirrorWithBody) {
+TEST_P(MultiplexedIntegrationTest, RequestMirrorWithBody) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1184,7 +1227,8 @@ TEST_P(Http2IntegrationTest, RequestMirrorWithBody) {
 }
 
 // Interleave two requests and responses and make sure the HTTP2 stack handles this correctly.
-void Http2IntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes) {
+void MultiplexedIntegrationTest::simultaneousRequest(int32_t request1_bytes,
+                                                     int32_t request2_bytes) {
   FakeHttpConnectionPtr fake_upstream_connection1;
   FakeHttpConnectionPtr fake_upstream_connection2;
   Http::RequestEncoder* encoder1;
@@ -1253,15 +1297,15 @@ void Http2IntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t r
   codec_client_->close();
 }
 
-TEST_P(Http2IntegrationTest, SimultaneousRequest) { simultaneousRequest(1024, 512); }
+TEST_P(MultiplexedIntegrationTest, SimultaneousRequest) { simultaneousRequest(1024, 512); }
 
-TEST_P(Http2IntegrationTest, SimultaneousRequestWithBufferLimits) {
+TEST_P(MultiplexedIntegrationTest, SimultaneousRequestWithBufferLimits) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   simultaneousRequest(1024 * 32, 1024 * 16);
 }
 
 // Test downstream connection delayed close processing.
-TEST_P(Http2IntegrationTest, DelayedCloseAfterBadFrame) {
+TEST_P(MultiplexedIntegrationTest, DelayedCloseAfterBadFrame) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Needs HTTP/3 "bad frame" equivalent.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1291,7 +1335,7 @@ TEST_P(Http2IntegrationTest, DelayedCloseAfterBadFrame) {
 }
 
 // Test disablement of delayed close processing on downstream connections.
-TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
+TEST_P(MultiplexedIntegrationTest, DelayedCloseDisabled) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Needs HTTP/3 "bad frame" equivalent.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1318,8 +1362,8 @@ TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
             0);
 }
 
-TEST_P(Http2IntegrationTest, PauseAndResume) {
-  config_helper_.addFilter(R"EOF(
+TEST_P(MultiplexedIntegrationTest, PauseAndResume) {
+  config_helper_.prependFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
     "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
@@ -1348,8 +1392,8 @@ TEST_P(Http2IntegrationTest, PauseAndResume) {
   ASSERT_TRUE(response->complete());
 }
 
-TEST_P(Http2IntegrationTest, PauseAndResumeHeadersOnly) {
-  config_helper_.addFilter(R"EOF(
+TEST_P(MultiplexedIntegrationTest, PauseAndResumeHeadersOnly) {
+  config_helper_.prependFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
     "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
@@ -1371,7 +1415,7 @@ TEST_P(Http2IntegrationTest, PauseAndResumeHeadersOnly) {
 // Verify the case when we have large pending data with empty trailers. It should not introduce
 // stack-overflow (on ASan build). This is a regression test for
 // https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=24714.
-TEST_P(Http2IntegrationTest, EmptyTrailers) {
+TEST_P(MultiplexedIntegrationTest, EmptyTrailers) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1389,7 +1433,22 @@ TEST_P(Http2IntegrationTest, EmptyTrailers) {
   ASSERT_TRUE(response->complete());
 }
 
-Http2RingHashIntegrationTest::Http2RingHashIntegrationTest() {
+class MultiplexedRingHashIntegrationTest : public HttpProtocolIntegrationTest {
+public:
+  MultiplexedRingHashIntegrationTest();
+
+  ~MultiplexedRingHashIntegrationTest() override;
+
+  void createUpstreams() override;
+
+  void sendMultipleRequests(int request_bytes, Http::TestRequestHeaderMapImpl headers,
+                            std::function<void(IntegrationStreamDecoder&)> cb);
+
+  std::vector<FakeHttpConnectionPtr> fake_upstream_connections_;
+  int num_upstreams_ = 5;
+};
+
+MultiplexedRingHashIntegrationTest::MultiplexedRingHashIntegrationTest() {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
     cluster->clear_load_assignment();
@@ -1408,7 +1467,7 @@ Http2RingHashIntegrationTest::Http2RingHashIntegrationTest() {
   });
 }
 
-Http2RingHashIntegrationTest::~Http2RingHashIntegrationTest() {
+MultiplexedRingHashIntegrationTest::~MultiplexedRingHashIntegrationTest() {
   if (codec_client_) {
     codec_client_->close();
     codec_client_ = nullptr;
@@ -1421,15 +1480,16 @@ Http2RingHashIntegrationTest::~Http2RingHashIntegrationTest() {
   }
 }
 
-void Http2RingHashIntegrationTest::createUpstreams() {
+void MultiplexedRingHashIntegrationTest::createUpstreams() {
   for (int i = 0; i < num_upstreams_; i++) {
     addFakeUpstream(Http::CodecType::HTTP1);
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, Http2RingHashIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, MultiplexedRingHashIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP1})),
+                             {Http::CodecType::HTTP2, Http::CodecType::HTTP3},
+                             {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2MetadataIntegrationTest,
@@ -1437,7 +1497,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, Http2MetadataIntegrationTest,
                              {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-void Http2RingHashIntegrationTest::sendMultipleRequests(
+void MultiplexedRingHashIntegrationTest::sendMultipleRequests(
     int request_bytes, Http::TestRequestHeaderMapImpl headers,
     std::function<void(IntegrationStreamDecoder&)> cb) {
   TestRandomGenerator rand;
@@ -1484,7 +1544,7 @@ void Http2RingHashIntegrationTest::sendMultipleRequests(
   }
 }
 
-TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieNoTtl) {
+TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingNoCookieNoTtl) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1518,7 +1578,7 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieNoTtl) {
   EXPECT_EQ(served_by.size(), num_upstreams_);
 }
 
-TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithNonzeroTtlSet) {
+TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingNoCookieWithNonzeroTtlSet) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1549,7 +1609,7 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithNonzeroTtlSet) {
   EXPECT_EQ(set_cookies.size(), 1);
 }
 
-TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithZeroTtlSet) {
+TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingNoCookieWithZeroTtlSet) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1580,7 +1640,7 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithZeroTtlSet) {
   EXPECT_EQ(set_cookies.size(), 1);
 }
 
-TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieNoTtl) {
+TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingWithCookieNoTtl) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1612,7 +1672,7 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieNoTtl) {
   EXPECT_EQ(served_by.size(), 1);
 }
 
-TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
+TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1723,16 +1783,14 @@ TEST_P(Http2FrameIntegrationTest, DownstreamSendingEmptyMetadata) {
   // This test uses an Http2Frame and not the encoder's encodeMetadata method,
   // because encodeMetadata fails when an empty metadata map is sent.
   beginSession();
-  FakeHttpConnectionPtr fake_upstream_connection;
-  FakeStreamPtr fake_upstream_request;
 
   const uint32_t client_stream_idx = 1;
   // Send request.
   const Http2Frame request =
       Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url");
   sendFrame(request);
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection));
-  ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, fake_upstream_request));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send metadata frame with empty metadata map.
   const Http::MetadataMap empty_metadata_map;
@@ -1746,9 +1804,9 @@ TEST_P(Http2FrameIntegrationTest, DownstreamSendingEmptyMetadata) {
   sendFrame(empty_data_frame);
 
   // Upstream sends a reply.
-  ASSERT_TRUE(fake_upstream_request->waitForEndStream(*dispatcher_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   const Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  fake_upstream_request->encodeHeaders(response_headers, true);
+  upstream_request_->encodeHeaders(response_headers, true);
 
   // Make sure that a response from upstream is received by the client, and
   // close the connection.
@@ -1757,7 +1815,10 @@ TEST_P(Http2FrameIntegrationTest, DownstreamSendingEmptyMetadata) {
   EXPECT_EQ(Http2Frame::ResponseStatus::Ok, response.responseStatus());
   EXPECT_EQ(1, test_server_->counter("http2.metadata_empty_frames")->value());
 
-  // Cleanup.
+  // Cleanup. Closing upstream connection first to avoid a race between the
+  // client FIN and the connection closure (see comment in
+  // HttpIntegrationTest::cleanupUpstreamAndDownstream).
+  cleanupUpstreamAndDownstream();
   tcp_client_->close();
 }
 
@@ -1828,8 +1889,8 @@ typed_config:
   "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
-TEST_P(Http2IntegrationTest, OnLocalReply) {
-  config_helper_.addFilter(on_local_reply_filter);
+TEST_P(MultiplexedIntegrationTest, OnLocalReply) {
+  config_helper_.prependFilter(on_local_reply_filter);
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1862,7 +1923,8 @@ TEST_P(Http2IntegrationTest, OnLocalReply) {
   }
 }
 
-TEST_P(Http2IntegrationTest, InvalidTrailers) {
+TEST_P(MultiplexedIntegrationTest, InvalidTrailers) {
+  autonomous_allow_incomplete_streams_ = true;
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   autonomous_upstream_ = true;
   initialize();
@@ -1880,6 +1942,37 @@ TEST_P(Http2IntegrationTest, InvalidTrailers) {
   ASSERT_TRUE(response->waitForReset());
   // http2.invalid.header.field or http3.invalid_header_field
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
+}
+
+TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"content-length", "1025"}});
+
+  auto response = std::move(encoder_decoder.second);
+  request_encoder_ = &encoder_decoder.first;
+  codec_client_->sendData(*request_encoder_, 1024, false);
+  codec_client_->sendTrailers(*request_encoder_,
+                              Http::TestRequestTrailerMapImpl{{"trailer", "value"}});
+
+  // Inconsistency in content-length header and the actually body length should be treated as a
+  // stream error.
+  ASSERT_TRUE(response->waitForReset());
+  // http3.inconsistent_content_length.
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("inconsistent_content_length"));
+  } else {
+    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+    // http2.violation.of.messaging.rule
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("violation"));
+  }
 }
 
 } // namespace Envoy

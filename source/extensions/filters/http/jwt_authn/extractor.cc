@@ -119,7 +119,6 @@ public:
 
   void removeJwt(Http::HeaderMap&) const override {
     // TODO(theshubhamp): remove JWT from cookies.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 };
 

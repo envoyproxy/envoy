@@ -58,7 +58,7 @@ public:
   }
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
+  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
 

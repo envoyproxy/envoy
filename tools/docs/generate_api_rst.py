@@ -31,11 +31,11 @@ def main():
         # the contents of `proto_srcs` are the result of a bazel genquery,
         # containing bazel target rules, eg:
         #
-        #   @envoy_api_canonical//envoy/watchdog/v3alpha:abort_action.proto
+        #   @envoy_api//envoy/watchdog/v3:abort_action.proto
         #
         # this transforms them to a list with a "canonical" form of:
         #
-        #   envoy/watchdog/v3alpha/abort_action.proto.rst
+        #   envoy/watchdog/v3/abort_action.proto.rst
         #
         envoy_api_protos = [
             f"{src.split('//')[1].replace(':', '/')}.rst" for src in f.read().split("\n") if src
@@ -46,6 +46,10 @@ def main():
         if canonical is None:
             canonical = include_package(envoy_api_protos, rst_file_path, "contrib/envoy/")
         if canonical is None:
+            continue
+
+        # Skip copying empty files.
+        if os.path.getsize(rst_file_path) == 0:
             continue
 
         target = os.path.join("rst-out/api-v3", canonical)

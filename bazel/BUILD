@@ -1,8 +1,10 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
+load("//bazel:utils.bzl", "json_data")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
 
@@ -369,6 +371,11 @@ config_setting(
 )
 
 config_setting(
+    name = "enable_perf_tracing",
+    values = {"define": "perf_tracing=enabled"},
+)
+
+config_setting(
     name = "force_libcpp",
     values = {"define": "force_libcpp=enabled"},
 )
@@ -585,4 +592,14 @@ selects.config_setting_group(
 alias(
     name = "remote_jdk11",
     actual = "@bazel_tools//tools/jdk:remote_jdk11",
+)
+
+alias(
+    name = "windows",
+    actual = "@bazel_tools//src/conditions:windows",
+)
+
+json_data(
+    name = "repository_locations",
+    data = REPOSITORY_LOCATIONS_SPEC,
 )

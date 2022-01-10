@@ -141,8 +141,7 @@ public:
     }
     populateBuffer(buffer_content_size);
     Http::TestResponseHeaderMapImpl continue_headers;
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-              filter_->encode100ContinueHeaders(continue_headers));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(continue_headers));
     Http::MetadataMap metadata_map{{"metadata", "metadata"}};
     EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
@@ -258,28 +257,6 @@ TEST_F(CompressorFilterTest, CompressRequestAndResponseNoContentLength) {
   doRequestCompression({{":method", "post"}, {"accept-encoding", "deflate, test"}}, false);
   Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
   doResponseCompression(headers, false);
-}
-
-TEST_F(CompressorFilterTest, CompressRequestAndResponseNoContentLengthRuntimeDisabled) {
-  setUpFilter(R"EOF(
-{
-  "request_direction_config": {},
-  "response_direction_config": {},
-  "compressor_library": {
-    "name": "test",
-    "typed_config": {
-      "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
-    }
-  }
-}
-)EOF");
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.enable_compression_without_content_length_header", "false"}});
-  response_stats_prefix_ = "response.";
-  doRequestNoCompression({{":method", "get"}, {"accept-encoding", "deflate, test"}});
-  Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
-  doResponseNoCompression(headers);
 }
 
 TEST_F(CompressorFilterTest, CompressRequestWithTrailers) {

@@ -19,7 +19,8 @@ class FilterCallbacks {
 public:
   virtual ~FilterCallbacks() = default;
 
-  virtual void onGetAccessTokenSuccess(const std::string& access_token,
+  virtual void onGetAccessTokenSuccess(const std::string& access_token, const std::string& id_token,
+                                       const std::string& refresh_token,
                                        std::chrono::seconds expires_in) PURE;
 
   virtual void sendUnauthorizedResponse() PURE;

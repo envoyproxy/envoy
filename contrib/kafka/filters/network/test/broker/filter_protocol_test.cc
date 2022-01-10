@@ -143,7 +143,7 @@ TEST_F(KafkaBrokerFilterProtocolTest, ShouldProcessMessages) {
   ASSERT_EQ(result2, Network::FilterStatus::Continue);
 
   // Also, assert that every message type has been processed properly.
-  for (int16_t i = 0; i < MessageUtilities::apiKeys(); ++i) {
+  for (const int16_t i : MessageUtilities::apiKeys()) {
     // We should have received one request per api version.
     const Stats::Counter& request_counter = scope_.counter(MessageUtilities::requestMetric(i));
     ASSERT_EQ(request_counter.value(), MessageUtilities::requestApiVersions(i));

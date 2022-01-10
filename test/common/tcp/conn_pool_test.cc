@@ -61,10 +61,11 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
     pool_ready_.ready();
   }
 
-  void onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override {
     reason_ = reason;
     host_ = host;
+    failure_reason_string_ = std::string(failure_reason);
     pool_failure_.ready();
   }
 
@@ -73,6 +74,7 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
   ReadyWatcher pool_ready_;
   ConnectionPool::ConnectionDataPtr conn_data_{};
   absl::optional<ConnectionPool::PoolFailureReason> reason_;
+  std::string failure_reason_string_;
   Upstream::HostDescriptionConstSharedPtr host_;
   Ssl::ConnectionInfoConstSharedPtr ssl_;
 };
@@ -321,6 +323,7 @@ public:
 
   void prepareConn() {
     connection_ = new StrictMock<Network::MockClientConnection>();
+    EXPECT_CALL(*connection_, transportFailureReason()).Times(AtLeast(0));
     EXPECT_CALL(*connection_, setBufferLimits(0));
     EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(false));
     EXPECT_CALL(*connection_, addConnectionCallbacks(_));
@@ -650,10 +653,13 @@ TEST_P(TcpConnPoolImplTest, RemoteConnectFailure) {
   EXPECT_CALL(*conn_pool_->test_conns_[0].connect_timer_, disableTimer());
 
   EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
+  EXPECT_CALL(*conn_pool_->test_conns_[0].connection_, transportFailureReason())
+      .WillOnce(Return("foo"));
   conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 
   EXPECT_EQ(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, callbacks.reason_);
+  EXPECT_EQ("foo", callbacks.failure_reason_string_);
 
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_fail_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_failure_eject_.value());

@@ -17,27 +17,29 @@ namespace TcpGrpc {
 TcpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(GrpcCommon::GrpcAccessLoggerSharedPtr logger)
     : logger_(std::move(logger)) {}
 
-TcpGrpcAccessLog::TcpGrpcAccessLog(
-    AccessLog::FilterPtr&& filter,
-    envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig config,
-    ThreadLocal::SlotAllocator& tls, GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-    Stats::Scope& scope)
-    : Common::ImplBase(std::move(filter)), scope_(scope), config_(std::move(config)),
+TcpGrpcAccessLog::TcpGrpcAccessLog(AccessLog::FilterPtr&& filter,
+                                   const TcpGrpcAccessLogConfig config,
+                                   ThreadLocal::SlotAllocator& tls,
+                                   GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache)
+    : Common::ImplBase(std::move(filter)),
+      config_(std::make_shared<const TcpGrpcAccessLogConfig>(std::move(config))),
       tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)) {
-  Config::Utility::checkTransportVersion(config_.common_config());
-  tls_slot_->set([this](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalLogger>(access_logger_cache_->getOrCreateLogger(
-        config_.common_config(), Common::GrpcAccessLoggerType::TCP, scope_));
-  });
+  Config::Utility::checkTransportVersion(config_->common_config());
+  tls_slot_->set(
+      [config = config_, access_logger_cache = access_logger_cache_](Event::Dispatcher&) {
+        return std::make_shared<ThreadLocalLogger>(access_logger_cache->getOrCreateLogger(
+            config->common_config(), Common::GrpcAccessLoggerType::TCP));
+      });
 }
 
-void TcpGrpcAccessLog::emitLog(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                               const Http::ResponseTrailerMap&,
+void TcpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_header,
+                               const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
                                const StreamInfo::StreamInfo& stream_info) {
   // Common log properties.
   envoy::data::accesslog::v3::TCPAccessLogEntry log_entry;
   GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),
-                                                        stream_info, config_.common_config());
+                                                        request_header, stream_info,
+                                                        config_->common_config());
 
   envoy::data::accesslog::v3::ConnectionProperties& connection_properties =
       *log_entry.mutable_connection_properties();

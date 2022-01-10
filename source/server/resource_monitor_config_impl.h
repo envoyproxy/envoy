@@ -14,7 +14,7 @@ public:
       : dispatcher_(dispatcher), options_(options), api_(api),
         validation_visitor_(validation_visitor) {}
 
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
 
   const Server::Options& options() override { return options_; }
 

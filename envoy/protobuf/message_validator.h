@@ -56,6 +56,12 @@ public:
    * throw an exception.
    */
   virtual void onDeprecatedField(absl::string_view description, bool soft_deprecation) PURE;
+
+  /**
+   * Called when a message or field is marked as work in progress or a message is contained in a
+   * proto file marked as work in progress.
+   */
+  virtual void onWorkInProgress(absl::string_view description) PURE;
 };
 
 class ValidationContext {

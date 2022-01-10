@@ -21,6 +21,6 @@ envoy_cc_library(
     deps = [
         "//envoy/grpc:status",
         "//source/common/common:enum_to_int",
-        "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/admission_control/v3:pkg_cc_proto",
     ],
 )

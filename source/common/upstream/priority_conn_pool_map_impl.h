@@ -41,6 +41,16 @@ size_t PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::size() const {
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
+bool PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::empty() const {
+  for (const auto& pool_map : conn_pool_maps_) {
+    if (!pool_map->empty()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+template <typename KEY_TYPE, typename POOL_TYPE>
 void PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::clear() {
   for (auto& pool_map : conn_pool_maps_) {
     pool_map->clear();

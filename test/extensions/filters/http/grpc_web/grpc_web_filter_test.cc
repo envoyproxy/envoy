@@ -14,7 +14,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/global.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -419,25 +418,6 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithTrailers) {
   EXPECT_EQ("hellohello", response_headers.get_(Http::Headers::get().GrpcMessage));
 }
 
-TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextSkipTransformation) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling", "false"}});
-
-  Http::TestRequestHeaderMapImpl request_headers{
-      {"content-type", Http::Headers::get().ContentTypeValues.GrpcWebText},
-      {"accept", Http::Headers::get().ContentTypeValues.GrpcWebText},
-      {":path", "/"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "400"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
-  Buffer::OwnedImpl data("hello");
-  // Since the client expects grpc-web-text and the upstream response does not contain gRPC frames,
-  // the iteration is paused.
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.encodeData(data, false));
-}
-
 TEST_P(GrpcWebFilterTest, StatsNoCluster) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", request_content_type()},
@@ -455,8 +435,7 @@ TEST_P(GrpcWebFilterTest, StatsNormalResponse) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_.encode100ContinueHeaders(continue_headers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));

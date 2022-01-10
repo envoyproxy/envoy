@@ -28,11 +28,7 @@ from google.protobuf import text_format
 
 from envoy.annotations import deprecation_pb2
 from udpa.annotations import migrate_pb2, status_pb2
-
-PROTO_PACKAGES = (
-    "google.api.annotations", "validate.validate", "envoy.annotations.resource",
-    "udpa.annotations.migrate", "udpa.annotations.security", "udpa.annotations.status",
-    "udpa.annotations.versioning", "udpa.annotations.sensitive")
+from xds.annotations.v3 import status_pb2 as xds_status_pb2
 
 NEXT_FREE_FIELD_MIN = 5
 
@@ -82,8 +78,9 @@ def clang_format(contents):
     Returns:
         clang-formatted string
     """
+    clang_format_path = os.getenv("CLANG_FORMAT", "clang-format-11")
     return subprocess.run(
-        ['clang-format',
+        [clang_format_path,
          '--style=%s' % CLANG_FORMAT_STYLE, '--assume-filename=.proto'],
         input=contents.encode('utf-8'),
         stdout=subprocess.PIPE).stdout
@@ -217,6 +214,17 @@ def format_header_from_file(
     options.java_multiple_files = True
     options.java_package = 'io.envoyproxy.' + file_proto.package
 
+    # Workaround packages in generated go code conflicting by transforming:
+    # foo/bar/v2 to use barv2 as the package in the generated code
+    golang_package_name = ""
+    if file_proto.package.split(".")[-1] in ("v2", "v3"):
+        name = "".join(file_proto.package.split(".")[-2:])
+        golang_package_name = ";" + name
+    options.go_package = "".join([
+        "github.com/envoyproxy/go-control-plane/",
+        file_proto.package.replace(".", "/"), golang_package_name
+    ])
+
     # This is a workaround for C#/Ruby namespace conflicts between packages and
     # objects, see https://github.com/envoyproxy/envoy/pull/3854.
     # TODO(htuch): remove once v3 fixes this naming issue in
@@ -232,6 +240,10 @@ def format_header_from_file(
     if file_proto.options.HasExtension(migrate_pb2.file_migrate):
         options.Extensions[migrate_pb2.file_migrate].CopyFrom(
             file_proto.options.Extensions[migrate_pb2.file_migrate])
+
+    if file_proto.options.HasExtension(xds_status_pb2.file_status):
+        options.Extensions[xds_status_pb2.file_status].CopyFrom(
+            file_proto.options.Extensions[xds_status_pb2.file_status])
 
     if file_proto.options.HasExtension(
             status_pb2.file_status) and file_proto.package.endswith('alpha'):
@@ -717,7 +729,7 @@ class ProtoFormatVisitor(visitor.Visitor):
 if __name__ == '__main__':
     proto_desc_path = sys.argv[1]
 
-    utils.load_protos(PROTO_PACKAGES)
+    utils.load_protos()
 
     file_proto = descriptor_pb2.FileDescriptorProto()
     input_text = pathlib.Path(proto_desc_path).read_text()

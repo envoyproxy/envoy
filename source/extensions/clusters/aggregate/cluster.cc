@@ -19,7 +19,7 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
                  Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                  Stats::ScopePtr&& stats_scope, bool added_via_api)
     : Upstream::ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
-                                added_via_api, factory_context.dispatcher().timeSource()),
+                                added_via_api, factory_context.mainThreadDispatcher().timeSource()),
       cluster_manager_(cluster_manager), runtime_(runtime), random_(random),
       clusters_(std::make_shared<ClusterSet>(config.clusters().begin(), config.clusters().end())) {}
 
@@ -178,6 +178,32 @@ AggregateClusterLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context)
     return load_balancer_->chooseHost(context);
   }
   return nullptr;
+}
+
+Upstream::HostConstSharedPtr
+AggregateClusterLoadBalancer::peekAnotherHost(Upstream::LoadBalancerContext* context) {
+  if (load_balancer_) {
+    return load_balancer_->peekAnotherHost(context);
+  }
+  return nullptr;
+}
+
+absl::optional<Upstream::SelectedPoolAndConnection>
+AggregateClusterLoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext* context,
+                                                       const Upstream::Host& host,
+                                                       std::vector<uint8_t>& hash_key) {
+  if (load_balancer_) {
+    return load_balancer_->selectExistingConnection(context, host, hash_key);
+  }
+  return absl::nullopt;
+}
+
+OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+AggregateClusterLoadBalancer::lifetimeCallbacks() {
+  if (load_balancer_) {
+    return load_balancer_->lifetimeCallbacks();
+  }
+  return {};
 }
 
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>

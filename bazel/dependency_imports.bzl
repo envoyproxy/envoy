@@ -1,6 +1,5 @@
-load("@rules_foreign_cc//:workspace_definitions.bzl", "rules_foreign_cc_dependencies")
+load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
-load("@envoy_build_tools//toolchains:rbe_toolchains_config.bzl", "rbe_toolchains_config")
 load("@bazel_toolchains//rules/exec_properties:exec_properties.bzl", "create_rbe_exec_properties_dict", "custom_exec_properties")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
@@ -9,15 +8,16 @@ load("@upb//bazel:workspace_deps.bzl", "upb_deps")
 load("@rules_rust//rust:repositories.bzl", "rust_repositories")
 load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
+load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies", "rules_cc_toolchains")
 
 # go version for rules_go
-GO_VERSION = "1.15.5"
+GO_VERSION = "1.17.5"
 
 def envoy_dependency_imports(go_version = GO_VERSION):
-    rules_foreign_cc_dependencies()
+    # TODO: allow building of tools for easier onboarding
+    rules_foreign_cc_dependencies(register_default_tools = False, register_built_tools = False)
     go_rules_dependencies()
     go_register_toolchains(go_version)
-    rbe_toolchains_config()
     gazelle_dependencies()
     apple_rules_dependencies()
     rust_repositories()
@@ -28,6 +28,8 @@ def envoy_dependency_imports(go_version = GO_VERSION):
         oss_fuzz = True,
         honggfuzz = False,
     )
+    rules_cc_dependencies()
+    rules_cc_toolchains()
 
     custom_exec_properties(
         name = "envoy_large_machine_exec_property",

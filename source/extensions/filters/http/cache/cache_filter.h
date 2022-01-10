@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
+#include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
@@ -24,7 +24,7 @@ class CacheFilter : public Http::PassThroughFilter,
                     public Logger::Loggable<Logger::Id::cache_filter>,
                     public std::enable_shared_from_this<CacheFilter> {
 public:
-  CacheFilter(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config,
+  CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
               const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
               HttpCache& http_cache);
   // Http::StreamFilterBase

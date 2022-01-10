@@ -30,6 +30,13 @@ public:
 
   virtual std::unique_ptr<RdKafka::Producer> createProducer(RdKafka::Conf* conf,
                                                             std::string& errstr) const PURE;
+
+  // Returned type is a raw pointer, as librdkafka does the deletion on successful produce call.
+  virtual RdKafka::Headers* convertHeaders(
+      const std::vector<std::pair<absl::string_view, absl::string_view>>& headers) const PURE;
+
+  // In case of produce failures, we need to dispose of headers manually.
+  virtual void deleteHeaders(RdKafka::Headers* librdkafka_headers) const PURE;
 };
 
 using RawKafkaProducerConfig = std::map<std::string, std::string>;
@@ -60,9 +67,7 @@ public:
   void markFinished() override;
 
   // KafkaProducer
-  void send(const ProduceFinishCbSharedPtr origin, const std::string& topic,
-            const int32_t partition, const absl::string_view key,
-            const absl::string_view value) override;
+  void send(const ProduceFinishCbSharedPtr origin, const OutboundRecord& record) override;
 
   // This method gets executed by monitoring thread.
   // Does not finish until this object gets 'markFinished' invoked or gets destroyed.
@@ -93,6 +98,9 @@ private:
 
   // Monitoring thread that's responsible for continuously polling for new Kafka producer events.
   Thread::ThreadPtr poller_thread_;
+
+  // Abstracts out pure Kafka operations.
+  const LibRdKafkaUtils& utils_;
 };
 
 using RichKafkaProducerPtr = std::unique_ptr<RichKafkaProducer>;

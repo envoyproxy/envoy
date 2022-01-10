@@ -18,6 +18,7 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:socket_lib",
+        "//source/common/stats:custom_stat_namespaces_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
@@ -47,6 +48,7 @@ envoy_cc_library(
     }),
     deps = [
         "//envoy/api:os_sys_calls_interface",
+        "//source/common/network:address_lib",
         "//source/common/singleton:threadsafe_singleton",
     ],
 )

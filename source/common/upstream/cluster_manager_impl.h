@@ -36,6 +36,7 @@
 #include "source/common/upstream/load_stats_reporter.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/server/factory_context_base_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -54,14 +55,14 @@ public:
       Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
       AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager,
       const Server::Options& options, Quic::QuicStatNames& quic_stat_names)
-      : main_thread_dispatcher_(main_thread_dispatcher), validation_context_(validation_context),
-        api_(api), http_context_(http_context), grpc_context_(grpc_context),
-        router_context_(router_context), admin_(admin), runtime_(runtime), stats_(stats), tls_(tls),
-        dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
+      : context_(options, main_thread_dispatcher, api, local_info, admin, runtime,
+                 singleton_manager, validation_context.staticValidationVisitor(), stats, tls),
+        validation_context_(validation_context), http_context_(http_context),
+        grpc_context_(grpc_context), router_context_(router_context), admin_(admin), stats_(stats),
+        tls_(tls), dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
         local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
-        singleton_manager_(singleton_manager), options_(options), quic_stat_names_(quic_stat_names),
-        alternate_protocols_cache_manager_factory_(singleton_manager,
-                                                   main_thread_dispatcher.timeSource(), tls_),
+        singleton_manager_(singleton_manager), quic_stat_names_(quic_stat_names),
+        alternate_protocols_cache_manager_factory_(singleton_manager, tls_, {context_}),
         alternate_protocols_cache_manager_(alternate_protocols_cache_manager_factory_.get()) {}
 
   // Upstream::ClusterManagerFactory
@@ -88,16 +89,15 @@ public:
                       const xds::core::v3::ResourceLocator* cds_resources_locator,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
+  Singleton::Manager& singletonManager() override { return singleton_manager_; }
 
 protected:
-  Event::Dispatcher& main_thread_dispatcher_;
+  Server::FactoryContextBaseImpl context_;
   ProtobufMessage::ValidationContext& validation_context_;
-  Api::Api& api_;
   Http::Context& http_context_;
   Grpc::Context& grpc_context_;
   Router::Context& router_context_;
   Server::Admin& admin_;
-  Runtime::Loader& runtime_;
   Stats::Store& stats_;
   ThreadLocal::Instance& tls_;
   Network::DnsResolverSharedPtr dns_resolver_;
@@ -106,7 +106,6 @@ protected:
   Secret::SecretManager& secret_manager_;
   AccessLog::AccessLogManager& log_manager_;
   Singleton::Manager& singleton_manager_;
-  const Server::Options& options_;
   Quic::QuicStatNames& quic_stat_names_;
   Http::AlternateProtocolsCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
   Http::AlternateProtocolsCacheManagerSharedPtr alternate_protocols_cache_manager_;
@@ -318,6 +317,8 @@ public:
   void drainConnections(const std::string& cluster) override;
 
   void drainConnections() override;
+
+  void checkActiveStaticCluster(const std::string& cluster) override;
 
 protected:
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);

@@ -1,18 +1,8 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "source/common/quic/envoy_quic_stream.h"
 
 #include "quiche/quic/core/http/quic_spdy_server_stream_base.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/common/quic/envoy_quic_stream.h"
 
 namespace Envoy {
 namespace Quic {
@@ -31,7 +21,7 @@ public:
   void setRequestDecoder(Http::RequestDecoder& decoder) { request_decoder_ = &decoder; }
 
   // Http::StreamEncoder
-  void encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) override;
+  void encode1xxHeaders(const Http::ResponseHeaderMap& headers) override;
   void encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(const Http::ResponseTrailerMap& trailers) override;
@@ -48,9 +38,9 @@ public:
 
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
-  bool OnStopSending(quic::QuicRstStreamErrorCode error) override;
+  bool OnStopSending(quic::QuicResetStreamError error) override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
-  void Reset(quic::QuicRstStreamErrorCode error) override;
+  void ResetWithError(quic::QuicResetStreamError error) override;
   void OnClose() override;
   void OnCanWrite() override;
   // quic::QuicSpdyServerStreamBase
@@ -80,16 +70,15 @@ protected:
   void onPendingFlushTimer() override;
   bool hasPendingData() override;
 
+  void
+  onStreamError(absl::optional<bool> should_close_connection,
+                quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD) override;
+
 private:
   QuicFilterManagerConnectionImpl* filterManagerConnection();
 
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
-
-  // Either reset the stream or close the connection according to
-  // should_close_connection and configured http3 options.
-  void onStreamError(absl::optional<bool> should_close_connection,
-                     quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD);
 
   Http::RequestDecoder* request_decoder_{nullptr};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction

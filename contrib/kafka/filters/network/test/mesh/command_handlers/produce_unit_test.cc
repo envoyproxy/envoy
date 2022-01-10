@@ -38,9 +38,7 @@ public:
 
 class MockKafkaProducer : public KafkaProducer {
 public:
-  MOCK_METHOD(void, send,
-              (const ProduceFinishCbSharedPtr, const std::string&, const int32_t,
-               const absl::string_view, const absl::string_view));
+  MOCK_METHOD(void, send, (const ProduceFinishCbSharedPtr, const OutboundRecord&), ());
   MOCK_METHOD(void, markFinished, (), ());
 };
 
@@ -83,8 +81,8 @@ TEST_F(ProduceUnitTest, ShouldHandleProduceRequestWithNoRecords) {
 // The response should contain the values returned by Kafka broker.
 TEST_F(ProduceUnitTest, ShouldSendRecordsInNormalFlow) {
   // given
-  const OutboundRecord r1 = {"t1", 13, "aaa", "bbb"};
-  const OutboundRecord r2 = {"t2", 42, "ccc", "ddd"};
+  const OutboundRecord r1 = {"t1", 13, "aaa", "bbb", {}};
+  const OutboundRecord r2 = {"t2", 42, "ccc", "ddd", {}};
   const std::vector<OutboundRecord> records = {r1, r2};
   EXPECT_CALL(extractor_, extractRecords(_)).WillOnce(Return(records));
 
@@ -96,9 +94,9 @@ TEST_F(ProduceUnitTest, ShouldSendRecordsInNormalFlow) {
 
   // when, then - invoking should use producers to send records.
   MockKafkaProducer producer1;
-  EXPECT_CALL(producer1, send(_, r1.topic_, r1.partition_, _, _));
+  EXPECT_CALL(producer1, send(_, _));
   MockKafkaProducer producer2;
-  EXPECT_CALL(producer2, send(_, r2.topic_, r2.partition_, _, _));
+  EXPECT_CALL(producer2, send(_, _));
   EXPECT_CALL(upstream_kafka_facade_, getProducerForTopic(r1.topic_))
       .WillOnce(ReturnRef(producer1));
   EXPECT_CALL(upstream_kafka_facade_, getProducerForTopic(r2.topic_))
@@ -128,10 +126,10 @@ TEST_F(ProduceUnitTest, ShouldSendRecordsInNormalFlow) {
   ASSERT_TRUE(response);
   const std::vector<TopicProduceResponse> responses = response->data_.responses_;
   EXPECT_EQ(responses.size(), 2);
-  EXPECT_EQ(responses[0].partitions_[0].error_code_, dm1.error_code_);
-  EXPECT_EQ(responses[0].partitions_[0].base_offset_, dm1.offset_);
-  EXPECT_EQ(responses[1].partitions_[0].error_code_, dm2.error_code_);
-  EXPECT_EQ(responses[1].partitions_[0].base_offset_, dm2.offset_);
+  EXPECT_EQ(responses[0].partition_responses_[0].error_code_, dm1.error_code_);
+  EXPECT_EQ(responses[0].partition_responses_[0].base_offset_, dm1.offset_);
+  EXPECT_EQ(responses[1].partition_responses_[0].error_code_, dm2.error_code_);
+  EXPECT_EQ(responses[1].partition_responses_[0].base_offset_, dm2.offset_);
 }
 
 // Typical flow without errors.
@@ -141,8 +139,8 @@ TEST_F(ProduceUnitTest, ShouldSendRecordsInNormalFlow) {
 // is going to be saved on a bigger offset.
 TEST_F(ProduceUnitTest, ShouldMergeOutboundRecordResponses) {
   // given
-  const OutboundRecord r1 = {"t1", 13, "aaa", "bbb"};
-  const OutboundRecord r2 = {r1.topic_, r1.partition_, "ccc", "ddd"};
+  const OutboundRecord r1 = {"t1", 13, "aaa", "bbb", {}};
+  const OutboundRecord r2 = {r1.topic_, r1.partition_, "ccc", "ddd", {}};
   const std::vector<OutboundRecord> records = {r1, r2};
   EXPECT_CALL(extractor_, extractRecords(_)).WillOnce(Return(records));
 
@@ -154,7 +152,7 @@ TEST_F(ProduceUnitTest, ShouldMergeOutboundRecordResponses) {
 
   // when, then - invoking should use producers to send records.
   MockKafkaProducer producer;
-  EXPECT_CALL(producer, send(_, r1.topic_, r1.partition_, _, _)).Times(2);
+  EXPECT_CALL(producer, send(_, _)).Times(2);
   EXPECT_CALL(upstream_kafka_facade_, getProducerForTopic(r1.topic_))
       .WillRepeatedly(ReturnRef(producer));
   testee->startProcessing();
@@ -182,9 +180,9 @@ TEST_F(ProduceUnitTest, ShouldMergeOutboundRecordResponses) {
   ASSERT_TRUE(response);
   const std::vector<TopicProduceResponse> responses = response->data_.responses_;
   EXPECT_EQ(responses.size(), 1);
-  EXPECT_EQ(responses[0].partitions_.size(), 1);
-  EXPECT_EQ(responses[0].partitions_[0].error_code_, 0);
-  EXPECT_EQ(responses[0].partitions_[0].base_offset_, 1313);
+  EXPECT_EQ(responses[0].partition_responses_.size(), 1);
+  EXPECT_EQ(responses[0].partition_responses_[0].error_code_, 0);
+  EXPECT_EQ(responses[0].partition_responses_[0].base_offset_, 1313);
 }
 
 // Flow with errors.
@@ -195,8 +193,8 @@ TEST_F(ProduceUnitTest, ShouldMergeOutboundRecordResponses) {
 // proxy (this is going to be amended when we manage to send whole record batch).
 TEST_F(ProduceUnitTest, ShouldHandleDeliveryErrors) {
   // given
-  const OutboundRecord r1 = {"t1", 13, "aaa", "bbb"};
-  const OutboundRecord r2 = {r1.topic_, r1.partition_, "ccc", "ddd"};
+  const OutboundRecord r1 = {"t1", 13, "aaa", "bbb", {}};
+  const OutboundRecord r2 = {r1.topic_, r1.partition_, "ccc", "ddd", {}};
   const std::vector<OutboundRecord> records = {r1, r2};
   EXPECT_CALL(extractor_, extractRecords(_)).WillOnce(Return(records));
 
@@ -208,7 +206,7 @@ TEST_F(ProduceUnitTest, ShouldHandleDeliveryErrors) {
 
   // when, then - invoking should use producers to send records.
   MockKafkaProducer producer;
-  EXPECT_CALL(producer, send(_, r1.topic_, r1.partition_, _, _)).Times(2);
+  EXPECT_CALL(producer, send(_, _)).Times(2);
   EXPECT_CALL(upstream_kafka_facade_, getProducerForTopic(r1.topic_))
       .WillRepeatedly(ReturnRef(producer));
   testee->startProcessing();
@@ -237,7 +235,7 @@ TEST_F(ProduceUnitTest, ShouldHandleDeliveryErrors) {
   ASSERT_TRUE(response);
   const std::vector<TopicProduceResponse> responses = response->data_.responses_;
   EXPECT_EQ(responses.size(), 1);
-  EXPECT_EQ(responses[0].partitions_[0].error_code_, dm1.error_code_);
+  EXPECT_EQ(responses[0].partition_responses_[0].error_code_, dm1.error_code_);
 }
 
 // As with current version of Kafka library we have no capability of linking producer's notification
@@ -246,7 +244,7 @@ TEST_F(ProduceUnitTest, ShouldHandleDeliveryErrors) {
 // did not originate in this request, so it should be ignored.
 TEST_F(ProduceUnitTest, ShouldIgnoreMementoFromAnotherRequest) {
   // given
-  const OutboundRecord r1 = {"t1", 13, "aaa", "bbb"};
+  const OutboundRecord r1 = {"t1", 13, "aaa", "bbb", {}};
   const std::vector<OutboundRecord> records = {r1};
   EXPECT_CALL(extractor_, extractRecords(_)).WillOnce(Return(records));
 

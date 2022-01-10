@@ -51,6 +51,7 @@ public:
   struct TimeoutData {
     std::chrono::milliseconds global_timeout_{0};
     std::chrono::milliseconds per_try_timeout_{0};
+    std::chrono::milliseconds per_try_idle_timeout_{0};
   };
 
   struct HedgingParams {
@@ -147,6 +148,21 @@ public:
                                   bool respect_expected_rq_timeout);
 
   /**
+   * Set the x-envoy-expected-request-timeout-ms and grpc-timeout headers if needed.
+   * @param elapsed_time time elapsed since completion of the downstream request
+   * @param timeout final TimeoutData to use for the request
+   * @param request_headers the request headers to modify
+   * @param insert_envoy_expected_request_timeout_ms insert
+   *        x-envoy-expected-request-timeout-ms?
+   * @param grpc_request tells if the request is a gRPC request.
+   * @param per_try_timeout_headging_enabled is request hedging enabled?
+   */
+  static void setTimeoutHeaders(uint64_t elapsed_time, const FilterUtility::TimeoutData& timeout,
+                                const RouteEntry& route, Http::RequestHeaderMap& request_headers,
+                                bool insert_envoy_expected_request_timeout_ms, bool grpc_request,
+                                bool per_try_timeout_hedging_enabled);
+
+  /**
    * Try to parse a header entry that may have a timeout field
    *
    * @param header_timeout_entry header entry which may contain a timeout value.
@@ -187,8 +203,8 @@ public:
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
-      : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime), random_(random),
-        stats_(router_context.statNames(), scope, stat_prefix),
+      : router_context_(router_context), scope_(scope), local_info_(local_info), cm_(cm),
+        runtime_(runtime), random_(random), stats_(router_context_.statNames(), scope, stat_prefix),
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
@@ -223,6 +239,7 @@ public:
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
   TimeSource& timeSource() { return time_source_; }
 
+  Router::Context& router_context_;
   Stats::Scope& scope_;
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cm_;
@@ -257,8 +274,8 @@ class RouterFilterInterface {
 public:
   virtual ~RouterFilterInterface() = default;
 
-  virtual void onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
-                                            UpstreamRequest& upstream_request) PURE;
+  virtual void onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
+                                    UpstreamRequest& upstream_request) PURE;
   virtual void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
                                  UpstreamRequest& upstream_request, bool end_stream) PURE;
   virtual void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
@@ -271,6 +288,7 @@ public:
                                UpstreamRequest& upstream_request) PURE;
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
   virtual void onPerTryTimeout(UpstreamRequest& upstream_request) PURE;
+  virtual void onPerTryIdleTimeout(UpstreamRequest& upstream_request) PURE;
   virtual void onStreamMaxDurationReached(UpstreamRequest& upstream_request) PURE;
 
   virtual Http::StreamDecoderFilterCallbacks* callbacks() PURE;
@@ -299,9 +317,9 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public RouterFilterInterface {
 public:
   Filter(FilterConfig& config)
-      : config_(config), final_upstream_request_(nullptr),
-        downstream_100_continue_headers_encoded_(false), downstream_response_started_(false),
-        downstream_end_stream_(false), is_retry_(false), request_buffer_overflowed_(false) {}
+      : config_(config), final_upstream_request_(nullptr), downstream_1xx_headers_encoded_(false),
+        downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
+        request_buffer_overflowed_(false) {}
 
   ~Filter() override;
 
@@ -432,8 +450,8 @@ public:
   }
 
   // RouterFilterInterface
-  void onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
-                                    UpstreamRequest& upstream_request) override;
+  void onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
+                            UpstreamRequest& upstream_request) override;
   void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
                          UpstreamRequest& upstream_request, bool end_stream) override;
   void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
@@ -445,6 +463,7 @@ public:
                        UpstreamRequest& upstream_request) override;
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override;
   void onPerTryTimeout(UpstreamRequest& upstream_request) override;
+  void onPerTryIdleTimeout(UpstreamRequest& upstream_request) override;
   void onStreamMaxDurationReached(UpstreamRequest& upstream_request) override;
   Http::StreamDecoderFilterCallbacks* callbacks() override { return callbacks_; }
   Upstream::ClusterInfoConstSharedPtr cluster() override { return cluster_; }
@@ -469,8 +488,8 @@ public:
 private:
   friend class UpstreamRequest;
 
-  RetryStatePtr retry_state_;
-
+  void onPerTryTimeoutCommon(UpstreamRequest& upstream_request, Stats::Counter& error_counter,
+                             const std::string& response_code_details);
   Stats::StatName upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
   void chargeUpstreamCode(uint64_t response_status_code,
                           const Http::ResponseHeaderMap& response_headers,
@@ -521,6 +540,7 @@ private:
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
                               absl::optional<uint64_t> code);
   void doRetry();
+  void runRetryOptionsPredicates(UpstreamRequest& retriable_request);
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus> grpc_status,
@@ -528,6 +548,7 @@ private:
                                    uint64_t grpc_to_http_status);
   Http::Context& httpContext() { return config_.http_context_; }
 
+  RetryStatePtr retry_state_;
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_;
@@ -557,7 +578,7 @@ private:
   // list of cookies to add to upstream headers
   std::vector<std::string> downstream_set_cookies_;
 
-  bool downstream_100_continue_headers_encoded_ : 1;
+  bool downstream_1xx_headers_encoded_ : 1;
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;

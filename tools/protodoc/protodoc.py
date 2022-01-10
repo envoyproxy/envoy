@@ -21,22 +21,24 @@ from jinja2 import Template
 # just remove it from the sys.path.
 sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
 
+from envoy.base import utils
+
 from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
-from tools.base import utils
 from tools.config_validation import validate_fragment
 
 from tools.protodoc import manifest_pb2
 from udpa.annotations import security_pb2
-from udpa.annotations import status_pb2
+from udpa.annotations import status_pb2 as udpa_status_pb2
 from validate import validate_pb2
+from xds.annotations.v3 import status_pb2 as xds_status_pb2
 
 # Namespace prefix for Envoy core APIs.
 ENVOY_API_NAMESPACE_PREFIX = '.envoy.api.v2.'
 
 # Last documented v2 api version
-ENVOY_LAST_V2_VERSION = "1.17.2"
+ENVOY_LAST_V2_VERSION = "1.17"
 
 # Namespace prefix for Envoy top-level APIs.
 ENVOY_PREFIX = '.envoy.'
@@ -124,6 +126,13 @@ EXTENSION_STATUS_VALUES = {
         'This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.',
 }
 
+WIP_WARNING = (
+    '.. warning::\n   This API feature is currently work-in-progress. API features marked as '
+    'work-in-progress are not considered stable, are not covered by the :ref:`threat model '
+    '<arch_overview_threat_model>`, are not supported by the security team, and are subject to '
+    'breaking changes. Do not use this feature without understanding each of the previous '
+    'points.\n\n')
+
 r = runfiles.Create()
 
 EXTENSION_DB = utils.from_yaml(r.Rlocation("envoy/source/extensions/extensions_metadata.yaml"))
@@ -176,22 +185,19 @@ def github_url(text, type_context):
     return f":repo:`{text} <api/{type_context.source_code_info.name}#L{type_context.location.span[0]}>`"
 
 
-def format_comment_with_annotations(comment, type_name=''):
+def format_comment_with_annotations(comment, show_wip_warning=False):
     """Format a comment string with additional RST for annotations.
 
     Args:
         comment: comment string.
-        type_name: optional, 'message' or 'enum' may be specified for additional
-           message/enum specific annotations.
+        show_wip_warning: whether to show the work in progress warning.
 
     Returns:
         A string with additional RST from annotations.
     """
-    alpha_warning = ''
-    if annotations.ALPHA_ANNOTATION in comment.annotations:
-        experimental_warning = (
-            '.. warning::\n   This API is alpha and is not covered by the :ref:`threat model <arch_overview_threat_model>`.\n\n'
-        )
+    wip_warning = ''
+    if show_wip_warning:
+        wip_warning = WIP_WARNING
 
     formatted_extension = ''
     if annotations.EXTENSION_ANNOTATION in comment.annotations:
@@ -202,7 +208,7 @@ def format_comment_with_annotations(comment, type_name=''):
         for category in comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION].split(","):
             formatted_extension_category += format_extension_category(category)
     comment = annotations.without_annotations(strip_leading_space(comment.raw) + '\n')
-    return alpha_warning + comment + formatted_extension + formatted_extension_category
+    return comment + wip_warning + formatted_extension + formatted_extension_category
 
 
 def map_lines(f, s):
@@ -558,7 +564,10 @@ def format_field_as_definition_list_item(
                 or (rule.HasField('repeated') and rule.repeated.min_items > 0)):
             field_annotations = ['*REQUIRED*']
     leading_comment = type_context.leading_comment
-    formatted_leading_comment = format_comment_with_annotations(leading_comment)
+    formatted_leading_comment = format_comment_with_annotations(
+        leading_comment,
+        field.options.HasExtension(xds_status_pb2.field_status)
+        and field.options.Extensions[xds_status_pb2.field_status].work_in_progress)
     if hide_not_implemented(leading_comment):
         return ''
 
@@ -710,7 +719,7 @@ class RstFormatVisitor(visitor.Visitor):
         header = format_header('-', 'Enum %s' % normal_enum_type)
         proto_link = github_url(f"[{normal_enum_type} proto]", type_context) + '\n\n'
         leading_comment = type_context.leading_comment
-        formatted_leading_comment = format_comment_with_annotations(leading_comment, 'enum')
+        formatted_leading_comment = format_comment_with_annotations(leading_comment)
         if hide_not_implemented(leading_comment):
             return ''
         return anchor + header + proto_link + formatted_leading_comment + format_enum_as_definition_list(
@@ -725,7 +734,10 @@ class RstFormatVisitor(visitor.Visitor):
         header = format_header('-', normal_msg_type)
         proto_link = github_url(f"[{normal_msg_type} proto]", type_context) + '\n\n'
         leading_comment = type_context.leading_comment
-        formatted_leading_comment = format_comment_with_annotations(leading_comment, 'message')
+        formatted_leading_comment = format_comment_with_annotations(
+            leading_comment,
+            msg_proto.options.HasExtension(xds_status_pb2.message_status)
+            and msg_proto.options.Extensions[xds_status_pb2.message_status].work_in_progress)
         if hide_not_implemented(leading_comment):
             return ''
 
@@ -735,6 +747,11 @@ class RstFormatVisitor(visitor.Visitor):
                 self.protodoc_manifest) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
 
     def visit_file(self, file_proto, type_context, services, msgs, enums):
+        # If there is a file-level 'not-implemented-hide' annotation then return empty string.
+        if (annotations.NOT_IMPLEMENTED_HIDE_ANNOTATION
+                in type_context.source_code_info.file_level_annotations):
+            return ''
+
         has_messages = True
         if all(len(msg) == 0 for msg in msgs) and all(len(enum) == 0 for enum in enums):
             has_messages = False
@@ -760,17 +777,21 @@ class RstFormatVisitor(visitor.Visitor):
         # Also extract file level titles if any.
         header, comment = format_header_from_file(
             '=', type_context.source_code_info, file_proto.name, v2_link)
+
         # If there are no messages, we don't include in the doc tree (no support for
         # service rendering yet). We allow these files to be missing from the
         # toctrees.
         if not has_messages:
             header = ':orphan:\n\n' + header
         warnings = ''
-        if file_proto.options.HasExtension(status_pb2.file_status):
-            if file_proto.options.Extensions[status_pb2.file_status].work_in_progress:
-                warnings += (
-                    '.. warning::\n   This API is work-in-progress and is '
-                    'subject to breaking changes.\n\n')
+        added_wip_warning = False
+        if file_proto.options.HasExtension(udpa_status_pb2.file_status):
+            if file_proto.options.Extensions[udpa_status_pb2.file_status].work_in_progress:
+                added_wip_warning = True
+                warnings += WIP_WARNING
+        if not added_wip_warning and file_proto.options.HasExtension(xds_status_pb2.file_status):
+            if file_proto.options.Extensions[xds_status_pb2.file_status].work_in_progress:
+                warnings += WIP_WARNING
         # debug_proto = format_proto_as_block_comment(file_proto)
         return header + warnings + comment + '\n'.join(msgs) + '\n'.join(enums)  # + debug_proto
 

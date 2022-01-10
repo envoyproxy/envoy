@@ -56,7 +56,7 @@ public:
     auto config = plugin_->wasmConfig();
     config.allowedCapabilities() = allowed_capabilities_;
     config.environmentVariables() = envs_;
-    wasm_ = std::make_shared<Extensions::Common::Wasm::Wasm>(config, vm_key_, scope_,
+    wasm_ = std::make_shared<Extensions::Common::Wasm::Wasm>(config, vm_key_, scope_, *api_,
                                                              cluster_manager, *dispatcher_);
     EXPECT_NE(wasm_, nullptr);
     wasm_->setCreateContextForTesting(
@@ -285,8 +285,10 @@ TEST_P(WasmNullTest, Stats) {
   EXPECT_CALL(*context, log_(spdlog::level::err, Eq("get histogram = Unsupported")));
 
   EXPECT_TRUE(wasm_->configure(context, plugin_));
-  EXPECT_EQ(scope_->counterFromString("test_counter").value(), 5);
-  EXPECT_EQ(scope_->gaugeFromString("test_gauge", Stats::Gauge::ImportMode::Accumulate).value(), 2);
+  EXPECT_EQ(scope_->counterFromString("wasmcustom.test_counter").value(), 5);
+  EXPECT_EQ(scope_->gaugeFromString("wasmcustom.test_gauge", Stats::Gauge::ImportMode::Accumulate)
+                .value(),
+            2);
 }
 
 TEST_P(WasmNullTest, StatsHigherLevel) {
@@ -312,11 +314,12 @@ TEST_P(WasmNullTest, StatsHigherLevel) {
 
   wasm_->setTimerPeriod(1, std::chrono::milliseconds(10));
   wasm_->tickHandler(1);
-  EXPECT_EQ(scope_->counterFromString("counter_tag.test_tag.test_counter").value(), 5);
-  EXPECT_EQ(
-      scope_->gaugeFromString("gauge_int_tag.9.test_gauge", Stats::Gauge::ImportMode::Accumulate)
-          .value(),
-      2);
+  EXPECT_EQ(scope_->counterFromString("wasmcustom.counter_tag.test_tag.test_counter").value(), 5);
+  EXPECT_EQ(scope_
+                ->gaugeFromString("wasmcustom.gauge_int_tag.9.test_gauge",
+                                  Stats::Gauge::ImportMode::Accumulate)
+                .value(),
+            2);
 }
 
 TEST_P(WasmNullTest, StatsHighLevel) {
@@ -346,13 +349,16 @@ TEST_P(WasmNullTest, StatsHighLevel) {
   // EXPECT_CALL(*context, log_(spdlog::level::err, Eq("stack_h = 3")));
   context->onLog();
   EXPECT_EQ(
-      scope_->counterFromString("string_tag.test_tag.int_tag.7.bool_tag.true.test_counter").value(),
+      scope_
+          ->counterFromString("wasmcustom.string_tag.test_tag.int_tag.7.bool_tag.true.test_counter")
+          .value(),
       5);
-  EXPECT_EQ(scope_
-                ->gaugeFromString("string_tag1.test_tag1.string_tag2.test_tag2.test_gauge",
-                                  Stats::Gauge::ImportMode::Accumulate)
-                .value(),
-            2);
+  EXPECT_EQ(
+      scope_
+          ->gaugeFromString("wasmcustom.string_tag1.test_tag1.string_tag2.test_tag2.test_gauge",
+                            Stats::Gauge::ImportMode::Accumulate)
+          .value(),
+      2);
 }
 
 } // namespace Wasm

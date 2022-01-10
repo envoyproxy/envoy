@@ -50,8 +50,7 @@ pool will drain the affected connection. Once a connection reaches its :ref:`max
 stream limit <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.max_concurrent_streams>`, it
 will be marked as busy until a stream is available. New connections are established anytime there is
 a pending request without a connection that can be dispatched to (up to circuit breaker limits for
-connections). HTTP/3 upstream support is currently only usable in situations where HTTP/3 is guaranteed
-to work, but automatic failover to TCP is coming soon!.
+connections).
 
 Automatic protocol selection
 ----------------------------
@@ -69,10 +68,21 @@ then 300ms later, if a QUIC connection is not established, will also attempt to 
 Whichever handshake succeeds will be used for the initial
 stream, but if both TCP and QUIC connections are established, QUIC will eventually be preferred.
 
-Upcoming versions of HTTP/3 support will include only selecting HTTP/3 if the upstream advertises support
-either via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`_,
-`HTTPS DNS RR <https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04>`_, or "QUIC hints" which
-will be manually configured. This path is alpha and rapidly undergoing improvements with the goal of having
+If an alternate protocol cache is configured via
+:ref:`alternate_protocols_cache_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig.alternate_protocols_cache_options>`
+then HTTP/3 connections will only be attempted to servers which
+advertise HTTP/3 support either via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`, (eventually
+the `HTTPS DNS resource record<https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04>` or "QUIC hints"
+which will be manually configured).
+If no such advertisement exists, then HTTP/2 or HTTP/1 will be used instead.
+
+If no alternate protocol cache is configured, then HTTP/3 connections will be attempted to
+all servers, even those which do not advertise HTTP/3.
+
+Further, HTTP/3 runs over QUIC (which uses UDP) and not over TCP (which HTTP/1 and HTTP/2 use).
+It is not uncommon for network devices to block UDP traffic, and hence block HTTP/3. This
+means that upstream HTTP/3 connection attempts might be blocked by the network and will fall
+back to using HTTP/2 or HTTP/1.  This path is alpha and rapidly undergoing improvements with the goal of having
 the default behavior result in optimal latency for internet environments, so please be patient and follow along with Envoy release notes
 to stay aprised of the latest and greatest changes.
 

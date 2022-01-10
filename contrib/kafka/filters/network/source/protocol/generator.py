@@ -15,7 +15,7 @@ def generate_main_code(type, main_header_file, resolver_cc_file, metrics_header_
   - resolver_cc_file - contains request api key & version mapping to deserializer (from header file)
   - metrics_header_file - contains metrics with names corresponding to messages
   """
-    processor = StatefulProcessor()
+    processor = StatefulProcessor(type)
     # Parse provided input files.
     messages = processor.parse_messages(input_files)
 
@@ -66,7 +66,7 @@ def generate_test_code(
   - codec_test_cc_file - tests involving codec and Request/ResponseParserResolver,
   - utilities_cc_file - utilities for creating sample messages.
   """
-    processor = StatefulProcessor()
+    processor = StatefulProcessor(type)
     # Parse provided input files.
     messages = processor.parse_messages(input_files)
 
@@ -97,7 +97,8 @@ class StatefulProcessor:
   AlterConfigsResource, what would cause a compile-time error if we were to handle it trivially).
   """
 
-    def __init__(self):
+    def __init__(self, type):
+        self.type = type
         # Complex types that have been encountered during processing.
         self.known_types = set()
         # Name of parent message type that's being processed right now.
@@ -107,8 +108,8 @@ class StatefulProcessor:
 
     def parse_messages(self, input_files):
         """
-    Parse request/response structures from provided input files.
-    """
+        Parse request/response structures from provided input files.
+        """
         import re
         import json
 
@@ -123,9 +124,13 @@ class StatefulProcessor:
                     without_comments = re.sub(r'\s*//.*\n', '\n', raw_contents)
                     without_empty_newlines = re.sub(
                         r'^\s*$', '', without_comments, flags=re.MULTILINE)
-                    message_spec = json.loads(without_empty_newlines)
-                    message = self.parse_top_level_element(message_spec)
-                    messages.append(message)
+                    # Windows support: see PR 10542 for details.
+                    amended = re.sub(r'-2147483648', 'INT32_MIN', without_empty_newlines)
+                    message_spec = json.loads(amended)
+                    api_key = message_spec['apiKey']
+                    if api_key <= 51 or api_key in [56, 57, 60, 61]:
+                        message = self.parse_top_level_element(message_spec)
+                        messages.append(message)
             except Exception as e:
                 print('could not process %s' % input_file)
                 raise
@@ -195,7 +200,9 @@ class StatefulProcessor:
                 child = self.parse_field(child_field, versions[-1])
                 if child is not None:
                     fields.append(child)
-
+            # Some structures share the same name, use request/response as prefix.
+            if type_name in ['EntityData', 'EntryData', 'PartitionData', 'TopicData']:
+                type_name = self.type.capitalize() + type_name
             # Some of the types repeat multiple times (e.g. AlterableConfig).
             # In such a case, every second or later occurrence of the same name is going to be prefixed
             # with parent type, e.g. we have AlterableConfig (for AlterConfigsRequest) and then
@@ -379,7 +386,7 @@ class FieldSpec:
             return str(self.type.default_value())
 
     def example_value_for_test(self, version):
-        if self.is_nullable():
+        if self.is_nullable_in_version(version):
             return 'absl::make_optional<%s>(%s)' % (
                 self.type.name, self.type.example_value_for_test(version))
         else:
@@ -470,7 +477,10 @@ class Primitive(TypeSpecification):
   Represents a Kafka primitive value.
   """
 
-    USABLE_PRIMITIVE_TYPE_NAMES = ['bool', 'int8', 'int16', 'int32', 'int64', 'string', 'bytes']
+    USABLE_PRIMITIVE_TYPE_NAMES = [
+        'bool', 'int8', 'int16', 'int32', 'int64', 'uint16', 'float64', 'string', 'bytes',
+        'records', 'uuid'
+    ]
 
     KAFKA_TYPE_TO_ENVOY_TYPE = {
         'string': 'std::string',
@@ -479,7 +489,11 @@ class Primitive(TypeSpecification):
         'int16': 'int16_t',
         'int32': 'int32_t',
         'int64': 'int64_t',
+        'uint16': 'uint16_t',
+        'float64': 'double',
         'bytes': 'Bytes',
+        'records': 'Bytes',
+        'uuid': 'Uuid',
         'tagged_fields': 'TaggedFields',
     }
 
@@ -490,13 +504,18 @@ class Primitive(TypeSpecification):
         'int16': 'Int16Deserializer',
         'int32': 'Int32Deserializer',
         'int64': 'Int64Deserializer',
+        'uint16': 'UInt16Deserializer',
+        'float64': 'Float64Deserializer',
         'bytes': 'BytesDeserializer',
+        'records': 'BytesDeserializer',
+        'uuid': 'UuidDeserializer',
         'tagged_fields': 'TaggedFieldsDeserializer',
     }
 
     KAFKA_TYPE_TO_COMPACT_DESERIALIZER = {
         'string': 'CompactStringDeserializer',
-        'bytes': 'CompactBytesDeserializer'
+        'bytes': 'CompactBytesDeserializer',
+        'records': 'CompactBytesDeserializer'
     }
 
     # See https://github.com/apache/kafka/tree/trunk/clients/src/main/resources/common/message#deserializing-messages
@@ -508,6 +527,7 @@ class Primitive(TypeSpecification):
         'int32': '0',
         'int64': '0',
         'bytes': '{}',
+        'uuid': 'Uuid{0, 0}',
         'tagged_fields': 'TaggedFields({})',
     }
 
@@ -525,8 +545,14 @@ class Primitive(TypeSpecification):
             'static_cast<int32_t>(32)',
         'int64':
             'static_cast<int64_t>(64)',
+        'float64':
+            'static_cast<double>(13.125)',
         'bytes':
             'Bytes({0, 1, 2, 3})',
+        'records':
+            'Bytes({0, 1, 2, 3})',
+        'uuid':
+            'Uuid{13, 42}',
         'tagged_fields':
             'TaggedFields{std::vector<TaggedField>{{10, Bytes({1, 2, 3})}, {20, Bytes({4, 5, 6})}}}',
     }
@@ -561,7 +587,7 @@ class Primitive(TypeSpecification):
             return Primitive.compute(self.original_name, Primitive.KAFKA_TYPE_TO_DEFAULT_VALUE)
 
     def has_flexible_handling(self):
-        return self.original_name in ['string', 'bytes', 'tagged_fields']
+        return self.original_name in ['string', 'bytes', 'records', 'tagged_fields']
 
     def example_value_for_test(self, version):
         return Primitive.compute(self.original_name, Primitive.KAFKA_TYPE_TO_EXAMPLE_VALUE_FOR_TEST)

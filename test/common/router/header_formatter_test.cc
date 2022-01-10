@@ -106,7 +106,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemoteAddressVariabl
   testFormatting("UPSTREAM_REMOTE_ADDRESS", "10.0.0.1:443");
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  stream_info.host_.reset();
+  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
   testFormatting(stream_info, "UPSTREAM_REMOTE_ADDRESS", "");
 }
 
@@ -139,6 +139,28 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
   ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
   testFormatting(stream_info, "PROTOCOL", "HTTP/1.1");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithRequestedServerNameVariable) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  // Validate for empty Request Server Name
+  testFormatting(stream_info, "REQUESTED_SERVER_NAME", "");
+
+  // Validate for a valid Request Server Name
+  const std::string requested_server_name = "foo.bar";
+  stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
+  testFormatting(stream_info, "REQUESTED_SERVER_NAME", requested_server_name);
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithVirtualClusterNameVariable) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  // Validate for empty VC
+  testFormatting(stream_info, "VIRTUAL_CLUSTER_NAME", "");
+
+  // Validate for a valid VC
+  const std::string virtual_cluster_name = "authN";
+  stream_info.setVirtualClusterName(virtual_cluster_name);
+  testFormatting(stream_info, "VIRTUAL_CLUSTER_NAME", virtual_cluster_name);
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerUriSanVariableSingleSan) {
@@ -581,7 +603,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   EXPECT_EQ(nested_struct.fields().at("list_key").kind_case(), ProtobufWkt::Value::kListValue);
   EXPECT_EQ(nested_struct.fields().at("struct_key").kind_case(), ProtobufWkt::Value::kStructValue);
 
-  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
+  stream_info.upstreamInfo()->setUpstreamHost(host);
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
   // Top-level value.
@@ -655,9 +677,20 @@ TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMissingHost) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host;
-  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
+  stream_info.upstreamInfo()->setUpstreamHost(host);
 
   testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithInvalidUpstreamMetadata) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host;
+  stream_info.upstreamInfo()->setUpstreamHost(host);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      testFormatting(stream_info, "UPSTREAM_METADATA(1)", ""), EnvoyException,
+      "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+      "...]), actual format UPSTREAM_METADATA1");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithRequestMetadata) {
@@ -733,11 +766,13 @@ TEST_F(StreamInfoHeaderFormatterTest, UnknownVariable) { testInvalidFormat("INVA
 
 TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
   // Invalid JSON.
-  EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA(abcd)", false), EnvoyException,
-      "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
-      "...]), actual format UPSTREAM_METADATA(abcd), because JSON supplied is not valid. "
-      "Error(offset 0, line 1): Invalid value.\n");
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA(abcd)", false),
+                            EnvoyException,
+                            "Invalid header configuration. Expected format "
+                            "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+                            "UPSTREAM_METADATA(abcd), because JSON supplied is not valid. "
+                            "Error(line 1, column 1, token a): syntax error while parsing value - "
+                            "invalid literal; last read: 'a'\n");
 
   // No parameters.
   EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA", false), EnvoyException,
@@ -747,9 +782,10 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 
   EXPECT_THROW_WITH_MESSAGE(
       StreamInfoHeaderFormatter("UPSTREAM_METADATA()", false), EnvoyException,
-      "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
-      "...]), actual format UPSTREAM_METADATA(), because JSON supplied is not valid. Error(offset "
-      "0, line 1): The document is empty.\n");
+      "Invalid header configuration. Expected format "
+      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format UPSTREAM_METADATA(), "
+      "because JSON supplied is not valid. Error(line 1, column 1, token ): syntax error while "
+      "parsing value - unexpected end of input; expected '[', '{', or a literal\n");
 
   // One parameter.
   EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"ns\"])", false),
@@ -787,9 +823,10 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
   // Invalid string elements.
   EXPECT_THROW_WITH_MESSAGE(
       StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", \"\\unothex\"])", false), EnvoyException,
-      "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
-      "...]), actual format UPSTREAM_METADATA([\"a\", \"\\unothex\"]), because JSON supplied is "
-      "not valid. Error(offset 7, line 1): Incorrect hex digit after \\u escape in string.\n");
+      "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", "
+      "\"k\", ...]), actual format UPSTREAM_METADATA([\"a\", \"\\unothex\"]), because JSON "
+      "supplied is not valid. Error(line 1, column 10, token \"\\un): syntax error while parsing "
+      "value - invalid string: '\\u' must be followed by 4 hex digits; last read: '\"\\un'\n");
 
   // Non-array parameters.
   EXPECT_THROW_WITH_MESSAGE(
@@ -831,6 +868,8 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
       {R"EOF(%UPSTREAM_METADATA(["\"quoted\"", "\"key\""])%)EOF", {"value"}, {}},
       {"%UPSTREAM_REMOTE_ADDRESS%", {"10.0.0.1:443"}, {}},
+      {"%REQUESTED_SERVER_NAME%", {"foo.bar"}, {}},
+      {"%VIRTUAL_CLUSTER_NAME%", {"authN"}, {}},
       {"%PER_REQUEST_STATE(testing)%", {"test_value"}, {}},
       {"%REQ(x-request-id)%", {"123"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
@@ -868,14 +907,17 @@ TEST(HeaderParserTest, TestParseInternal) {
       // Parsing errors in variable expressions that take a JSON-array parameter.
       {"%UPSTREAM_METADATA(no array)%",
        {},
-       {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
-        "...]), actual format UPSTREAM_METADATA(no array), because JSON supplied is not valid. "
-        "Error(offset 1, line 1): Invalid value.\n"}},
+       {"Invalid header configuration. Expected format "
+        "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+        "UPSTREAM_METADATA(no array), because JSON supplied is not valid. Error(line 1, "
+        "column 2, token no): syntax error while parsing value - invalid literal; last read: "
+        "'no'\n"}},
       {"%UPSTREAM_METADATA( no array)%",
        {},
-       {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
-        "...]), actual format UPSTREAM_METADATA( no array), because JSON supplied is not valid. "
-        "Error(offset 2, line 1): Invalid value.\n"}},
+       {"Invalid header configuration. Expected format "
+        "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format UPSTREAM_METADATA( "
+        "no array), because JSON supplied is not valid. Error(line 1, column 3, token  no): "
+        "syntax error while parsing value - invalid literal; last read: ' no'\n"}},
       {"%UPSTREAM_METADATA([\"unterminated array\")%",
        {},
        {"Invalid header configuration. Expecting ',', ']', or whitespace after "
@@ -925,12 +967,16 @@ TEST(HeaderParserTest, TestParseInternal) {
   };
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  const std::string requested_server_name = "foo.bar";
+  stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
+  const std::string virtual_cluster_name = "authN";
+  stream_info.setVirtualClusterName(virtual_cluster_name);
   absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
-  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
+  stream_info.upstreamInfo()->setUpstreamHost(host);
 
   Http::TestRequestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::LowerCaseString(std::string("x-request-id")), 123);
@@ -1106,7 +1152,7 @@ request_headers_to_add:
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
-  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
+  stream_info.upstreamInfo()->setUpstreamHost(host);
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
   req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_FALSE(header_map.has("x-key"));
@@ -1181,7 +1227,7 @@ request_headers_to_remove: ["x-nope"]
 
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
-  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
+  stream_info.upstreamInfo()->setUpstreamHost(host);
 
   // Metadata with percent signs in the key.
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(

@@ -313,6 +313,36 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
   }
 }
 
+TEST_F(HdsTest, TestHdsCluster) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  message = std::make_unique<envoy::service::health::v3::HealthCheckSpecifier>();
+  message->mutable_interval()->set_seconds(1);
+
+  auto* health_check = message->add_cluster_health_checks();
+  health_check->set_cluster_name("test_cluster");
+  auto* address = health_check->add_locality_endpoints()->add_endpoints()->mutable_address();
+  address->mutable_socket_address()->set_address("127.0.0.2");
+  address->mutable_socket_address()->set_port_value(1234);
+
+  // Process message
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
+
+  EXPECT_EQ(hds_delegate_->hdsClusters()[0]->initializePhase(),
+            Upstream::Cluster::InitializePhase::Primary);
+
+  // HdsCluster uses health_checkers_ instead.
+  EXPECT_TRUE(hds_delegate_->hdsClusters()[0]->healthChecker() == nullptr);
+
+  // outlier detector is always null for HdsCluster.
+  EXPECT_TRUE(hds_delegate_->hdsClusters()[0]->outlierDetector() == nullptr);
+  const auto* hds_cluster = hds_delegate_->hdsClusters()[0].get();
+  EXPECT_TRUE(hds_cluster->outlierDetector() == nullptr);
+}
+
 // Test if processMessage processes health checks from a HealthCheckSpecifier
 // message correctly
 TEST_F(HdsTest, TestProcessMessageHealthChecks) {

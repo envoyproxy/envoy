@@ -387,6 +387,14 @@ void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& 
   headers.appendVia(via, ", ");
 }
 
+void Utility::updateAuthority(RequestHeaderMap& headers, absl::string_view hostname,
+                              const bool append_xfh) {
+  if (append_xfh && !headers.getHostValue().empty()) {
+    headers.appendForwardedHost(headers.getHostValue(), ",");
+  }
+  headers.setHost(hostname);
+}
+
 std::string Utility::createSslRedirectPath(const RequestHeaderMap& headers) {
   ASSERT(headers.Host());
   ASSERT(headers.Path());
@@ -461,6 +469,18 @@ std::string Utility::stripQueryString(const HeaderString& path) {
   size_t query_offset = path_str.find('?');
   return std::string(path_str.data(),
                      query_offset != path_str.npos ? query_offset : path_str.size());
+}
+
+std::string Utility::replaceQueryString(const HeaderString& path,
+                                        const Utility::QueryParams& params) {
+  std::string new_path{Http::Utility::stripQueryString(path)};
+
+  if (!params.empty()) {
+    const auto new_query_string = Http::Utility::queryParamsToString(params);
+    absl::StrAppend(&new_path, new_query_string);
+  }
+
+  return new_path;
 }
 
 std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
@@ -802,7 +822,7 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
     return Headers::get().ProtocolStrings.Http3String;
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return EMPTY_STRING;
 }
 
 absl::string_view Utility::getScheme(const RequestHeaderMap& headers) {
@@ -912,7 +932,7 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "overload manager reset";
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return "";
 }
 
 void Utility::transformUpgradeRequestFromH1toH2(RequestHeaderMap& headers) {
@@ -1064,6 +1084,46 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   }
 
   return {is_ip_address, host_to_resolve, port};
+}
+
+envoy::config::route::v3::RetryPolicy
+Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy,
+                                       const std::string& retry_on) {
+  envoy::config::route::v3::RetryPolicy route_retry_policy;
+  constexpr uint64_t default_base_interval_ms = 1000;
+  constexpr uint64_t default_max_interval_ms = 10 * default_base_interval_ms;
+
+  uint64_t base_interval_ms = default_base_interval_ms;
+  uint64_t max_interval_ms = default_max_interval_ms;
+
+  if (retry_policy.has_retry_back_off()) {
+    const auto& core_back_off = retry_policy.retry_back_off();
+
+    base_interval_ms = PROTOBUF_GET_MS_REQUIRED(core_back_off, base_interval);
+    max_interval_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
+
+    if (max_interval_ms < base_interval_ms) {
+      throw EnvoyException("max_interval must be greater than or equal to the base_interval");
+    }
+  }
+
+  route_retry_policy.mutable_num_retries()->set_value(
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1));
+
+  auto* route_mutable_back_off = route_retry_policy.mutable_retry_back_off();
+
+  route_mutable_back_off->mutable_base_interval()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(base_interval_ms));
+  route_mutable_back_off->mutable_max_interval()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(max_interval_ms));
+
+  // set all the other fields with appropriate values.
+  route_retry_policy.set_retry_on(retry_on);
+  route_retry_policy.mutable_per_try_timeout()->CopyFrom(
+      route_retry_policy.retry_back_off().max_interval());
+
+  return route_retry_policy;
 }
 
 } // namespace Http

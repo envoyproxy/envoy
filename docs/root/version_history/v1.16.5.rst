@@ -25,7 +25,7 @@ Bug Fixes
 
 Removed Config or Runtime
 -------------------------
-*Normally occurs at the end of the* :ref:`deprecation period <v1.16.5:deprecated>`
+*Normally occurs at the end of the* :ref:`deprecation period <v1.16:deprecated>`
 
 New Features
 ------------

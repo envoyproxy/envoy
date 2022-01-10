@@ -27,6 +27,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/perf_tracing.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/codes.h"
@@ -260,6 +261,13 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
   read_callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(streams_));
 
+  // The response_encoder should never be dangling (unless we're destroying a
+  // stream we are recreating) as the codec level stream will either outlive the
+  // ActiveStream, or be alive in deferred deletion queue at this point.
+  if (stream.response_encoder_) {
+    stream.response_encoder_->getStream().removeCallbacks(stream);
+  }
+
   if (connection_idle_timer_ && streams_.empty()) {
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }
@@ -267,6 +275,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
 RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encoder,
                                                  bool is_internally_created) {
+  TRACE_EVENT("core", "ConnectionManagerImpl::newStream");
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
   }
@@ -289,7 +298,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
       new_stream->state_.saw_connection_close_ = true;
       // Prevent erroneous debug log of closing due to incoming connection close header.
       drain_state_ = DrainState::Closing;
-    } else {
+    } else if (drain_state_ == DrainState::NotDraining) {
       startDrainSequence();
     }
     ENVOY_CONN_LOG(debug, "max requests per connection reached", read_callbacks_->connection());
@@ -300,6 +309,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
   new_stream->response_encoder_->getStream().setFlushTimeout(new_stream->idle_timeout_ms_);
+  new_stream->streamInfo().setDownstreamBytesMeter(response_encoder.getStream().bytesMeter());
   // If the network connection is backed up, the stream should be made aware of it on creation.
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
@@ -317,7 +327,7 @@ void ConnectionManagerImpl::handleCodecError(absl::string_view error) {
   // GOAWAY.
   doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay,
                     StreamInfo::ResponseFlag::DownstreamProtocolError,
-                    absl::StrCat("codec error:", error));
+                    absl::StrCat("codec_error:", StringUtil::replaceAllEmptySpace(error)));
 }
 
 void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
@@ -704,10 +714,6 @@ void ConnectionManagerImpl::ActiveStream::completeRequest() {
     filter_manager_.streamInfo().setResponseFlag(
         StreamInfo::ResponseFlag::DownstreamConnectionTermination);
   }
-  // TODO(danzh) bring HTTP/3 to parity here.
-  if (connection_manager_.codec_->protocol() != Protocol::Http3) {
-    ASSERT(filter_manager_.streamInfo().responseCodeDetails().has_value());
-  }
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
   if (filter_manager_.streamInfo().healthCheck()) {
     connection_manager_.config_.tracingStats().health_check_.inc();
@@ -888,7 +894,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     // Note in the case Envoy is handling 100-Continue complexity, it skips the filter chain
     // and sends the 100-Continue directly to the encoder.
     chargeStats(continueHeader());
-    response_encoder_->encode100ContinueHeaders(continueHeader());
+    response_encoder_->encode1xxHeaders(continueHeader());
     // Remove the Expect header so it won't be handled again upstream.
     request_headers_->removeExpect();
   }
@@ -1335,8 +1341,7 @@ void ConnectionManagerImpl::ActiveStream::onLocalReply(Code code) {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
-    ResponseHeaderMap& response_headers) {
+void ConnectionManagerImpl::ActiveStream::encode1xxHeaders(ResponseHeaderMap& response_headers) {
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
   ConnectionManagerUtility::mutateResponseHeaders(
@@ -1349,7 +1354,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
   ENVOY_STREAM_LOG(debug, "encoding 100 continue headers via codec:\n{}", *this, response_headers);
 
   // Now actually encode via the codec.
-  response_encoder_->encode100ContinueHeaders(response_headers);
+  response_encoder_->encode1xxHeaders(response_headers);
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& headers,
@@ -1467,7 +1472,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
                    headers);
 
   // Now actually encode via the codec.
-  filter_manager_.streamInfo().onFirstDownstreamTxByteSent();
+  filter_manager_.streamInfo().downstreamTiming().onFirstDownstreamTxByteSent(
+      connection_manager_.time_source_);
   response_encoder_->encodeHeaders(headers, end_stream);
 }
 
@@ -1533,6 +1539,10 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
     filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::OverloadManager);
     filter_manager_.streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().Overload);
+  }
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.handle_stream_reset_during_hcm_encoding")) {
+    filter_manager_.onDownstreamReset();
   }
 
   connection_manager_.doDeferredStreamDestroy(*this);

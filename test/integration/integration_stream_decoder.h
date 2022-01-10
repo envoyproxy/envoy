@@ -29,13 +29,13 @@ public:
   bool complete() { return saw_end_stream_; }
   bool reset() { return saw_reset_; }
   Http::StreamResetReason resetReason() { return reset_reason_; }
-  const Http::ResponseHeaderMap* continueHeaders() { return continue_headers_.get(); }
+  const Http::ResponseHeaderMap* informationalHeaders() { return continue_headers_.get(); }
   const Http::ResponseHeaderMap& headers() { return *headers_; }
   const Http::ResponseTrailerMapPtr& trailers() { return trailers_; }
   const Http::MetadataMap& metadataMap() { return *metadata_map_; }
   uint64_t keyCount(std::string key) { return duplicated_metadata_key_count_[key]; }
   uint32_t metadataMapsDecodedCount() const { return metadata_maps_decoded_count_; }
-  void waitForContinueHeaders();
+  void waitFor1xxHeaders();
   void waitForHeaders();
   // This function waits until body_ has at least size bytes in it (it might have more). clearBody()
   // can be used if the previous body data is not relevant and the test wants to wait for a specific
@@ -52,7 +52,7 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
   // Http::ResponseDecoder
-  void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
+  void decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) override;
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
   void dumpState(std::ostream& os, int indent_level) const override {

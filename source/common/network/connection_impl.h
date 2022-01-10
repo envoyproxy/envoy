@@ -149,6 +149,10 @@ protected:
   void onWriteBufferLowWatermark();
   void onWriteBufferHighWatermark();
 
+  // This is called when the underlying socket is connected, not when the
+  // connected event is raised.
+  virtual void onConnected() {}
+
   TransportSocketPtr transport_socket_;
   ConnectionSocketPtr socket_;
   StreamInfo::StreamInfo& stream_info_;
@@ -254,6 +258,8 @@ public:
   void connect() override;
 
 private:
+  void onConnected() override;
+
   StreamInfo::StreamInfoImpl stream_info_;
 };
 

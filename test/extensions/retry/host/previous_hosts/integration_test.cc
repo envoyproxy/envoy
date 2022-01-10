@@ -17,7 +17,7 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP2, Network::Address::IpVersion::v4) {}
 
   void initialize() override {
-    setDeterministic();
+    setDeterministicValue();
 
     // Add the retry configuration to a new virtual host.
     const auto vhost_config = R"EOF(

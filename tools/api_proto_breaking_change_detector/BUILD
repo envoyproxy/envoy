@@ -1,4 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+load("@base_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 
@@ -9,14 +10,28 @@ py_binary(
     ],
     data = [
         "@com_github_bufbuild_buf//:buf",
-        "@envoy_api_canonical//:proto_breaking_change_detector_buf_config",
+        "@envoy_api//:proto_breaking_change_detector_buf_config",
     ],
     main = "detector.py",
     tags = ["manual"],
     deps = [
         ":buf_utils",
         ":detector_errors",
-        "//tools:run_command",
+    ],
+)
+
+py_binary(
+    name = "detector_ci",
+    srcs = [
+        "detector_ci.py",
+    ],
+    args = ["$(location @com_github_bufbuild_buf//:buf)"],
+    data = [
+        "@com_github_bufbuild_buf//:buf",
+    ],
+    deps = [
+        ":detector",
+        "@envoy_repo",
     ],
 )
 
@@ -27,7 +42,7 @@ py_library(
     ],
     deps = [
         ":detector_errors",
-        "//tools/base:utils",
+        requirement("envoy.base.utils"),
     ],
 )
 
@@ -50,7 +65,6 @@ py_test(
     tags = ["manual"],
     deps = [
         ":detector",
-        "//tools:run_command",
         "@rules_python//python/runfiles",
     ],
 )

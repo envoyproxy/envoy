@@ -17,7 +17,7 @@ Network::Address::InstanceConstSharedPtr OriginalDstFilter::getOriginalDst(Netwo
 }
 
 Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbacks& cb) {
-  ENVOY_LOG(debug, "original_dst: New connection accepted");
+  ENVOY_LOG(debug, "original_dst: new connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
 
   if (socket.addressType() == Network::Address::Type::Ip) {

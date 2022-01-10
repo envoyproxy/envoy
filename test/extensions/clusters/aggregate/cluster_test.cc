@@ -182,6 +182,13 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
     EXPECT_CALL(random_, random()).WillOnce(Return(i));
     EXPECT_TRUE(lb_->peekAnotherHost(nullptr) == nullptr);
     Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
+        lb_->lifetimeCallbacks();
+    EXPECT_FALSE(lifetime_callbacks.has_value());
+    std::vector<uint8_t> hash_key = {1, 2, 3};
+    absl::optional<Upstream::SelectedPoolAndConnection> selection =
+        lb_->selectExistingConnection(nullptr, *host, hash_key);
+    EXPECT_FALSE(selection.has_value());
     EXPECT_EQ(host.get(), target.get());
   }
 

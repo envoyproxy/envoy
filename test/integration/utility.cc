@@ -76,7 +76,7 @@ void BufferingStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream)
 }
 
 void BufferingStreamDecoder::decodeTrailers(Http::ResponseTrailerMapPtr&&) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 void BufferingStreamDecoder::onComplete() {

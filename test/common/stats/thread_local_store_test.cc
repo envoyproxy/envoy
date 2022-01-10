@@ -1,9 +1,11 @@
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/histogram.h"
+#include "envoy/stats/sink.h"
 
 #include "source/common/common/c_smart_ptr.h"
 #include "source/common/event/dispatcher_impl.h"
@@ -20,11 +22,10 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/real_threads_test_helper.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_split.h"
-#include "absl/synchronization/blocking_counter.h"
-#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -1566,74 +1567,36 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
             parent_histogram->bucketSummary());
 }
 
-class ThreadLocalRealThreadsTestBase : public ThreadLocalStoreNoMocksTestBase {
+class ThreadLocalRealThreadsTestBase : public Thread::RealThreadsTestHelper,
+                                       public ThreadLocalStoreNoMocksTestBase {
 protected:
   static constexpr uint32_t NumScopes = 1000;
   static constexpr uint32_t NumIters = 35;
 
-  // Helper class to block on a number of multi-threaded operations occurring.
-  class BlockingBarrier {
-  public:
-    explicit BlockingBarrier(uint32_t count) : blocking_counter_(count) {}
-    ~BlockingBarrier() { blocking_counter_.Wait(); }
-
-    /**
-     * Returns a function that first executes 'f', and then decrements the count
-     * toward unblocking the scope. This is intended to be used as a post() callback.
-     *
-     * @param f the function to run prior to decrementing the count.
-     */
-    std::function<void()> run(std::function<void()> f) {
-      return [this, f]() {
-        f();
-        decrementCount();
-      };
-    }
-
-    /**
-     * @return a function that, when run, decrements the count, intended for passing to post().
-     */
-    std::function<void()> decrementCountFn() {
-      return [this] { decrementCount(); };
-    }
-
-    void decrementCount() { blocking_counter_.DecrementCount(); }
-
-  private:
-    absl::BlockingCounter blocking_counter_;
-  };
-
+public:
   ThreadLocalRealThreadsTestBase(uint32_t num_threads)
-      : num_threads_(num_threads), api_(Api::createApiForTest()),
-        thread_factory_(api_->threadFactory()), pool_(store_->symbolTable()) {
-    // This is the same order as InstanceImpl::initialize in source/server/server.cc.
-    thread_dispatchers_.resize(num_threads_);
-    {
-      BlockingBarrier blocking_barrier(num_threads_ + 1);
-      main_thread_ = thread_factory_.createThread(
-          [this, &blocking_barrier]() { mainThreadFn(blocking_barrier); });
-      for (uint32_t i = 0; i < num_threads_; ++i) {
-        threads_.emplace_back(thread_factory_.createThread(
-            [this, i, &blocking_barrier]() { workerThreadFn(i, blocking_barrier); }));
-      }
-    }
-
-    {
-      BlockingBarrier blocking_barrier(1);
-      main_dispatcher_->post(blocking_barrier.run([this]() {
-        tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
-        tls_->registerThread(*main_dispatcher_, true);
-        for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
-          // Worker threads must be registered from the main thread, per assert in registerThread().
-          tls_->registerThread(*dispatcher, false);
-        }
-        store_->initializeThreading(*main_dispatcher_, *tls_);
-      }));
-    }
+      : RealThreadsTestHelper(num_threads), pool_(store_->symbolTable()) {
+    runOnMainBlocking([this]() { store_->initializeThreading(*main_dispatcher_, *tls_); });
   }
 
   ~ThreadLocalRealThreadsTestBase() override {
+    // TODO(chaoqin-li1123): clean this up when we figure out how to free the threading resources in
+    // RealThreadsTestHelper.
     shutdownThreading();
+    exitThreads();
+  }
+
+  void shutdownThreading() {
+    runOnMainBlocking([this]() {
+      if (!tls_->isShutdown()) {
+        tls_->shutdownGlobalThreading();
+      }
+      store_->shutdownThreading();
+      tls_->shutdownThread();
+    });
+  }
+
+  void exitThreads() {
     for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
       dispatcher->post([&dispatcher]() { dispatcher->exit(); });
     }
@@ -1650,52 +1613,6 @@ protected:
     main_thread_->join();
   }
 
-  void shutdownThreading() {
-    BlockingBarrier blocking_barrier(1);
-    main_dispatcher_->post(blocking_barrier.run([this]() {
-      if (!tls_->isShutdown()) {
-        tls_->shutdownGlobalThreading();
-      }
-      store_->shutdownThreading();
-      tls_->shutdownThread();
-    }));
-  }
-
-  void workerThreadFn(uint32_t thread_index, BlockingBarrier& blocking_barrier) {
-    thread_dispatchers_[thread_index] =
-        api_->allocateDispatcher(absl::StrCat("test_worker_", thread_index));
-    blocking_barrier.decrementCount();
-    thread_dispatchers_[thread_index]->run(Event::Dispatcher::RunType::RunUntilExit);
-  }
-
-  void mainThreadFn(BlockingBarrier& blocking_barrier) {
-    main_dispatcher_ = api_->allocateDispatcher("test_main_thread");
-    blocking_barrier.decrementCount();
-    main_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-  }
-
-  void mainDispatchBlock() {
-    // To ensure all stats are freed we have to wait for a few posts() to clear.
-    // First, wait for the main-dispatcher to initiate the cross-thread TLS cleanup.
-    BlockingBarrier blocking_barrier(1);
-    main_dispatcher_->post(blocking_barrier.run([]() {}));
-  }
-
-  void tlsBlock() {
-    BlockingBarrier blocking_barrier(num_threads_);
-    for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
-      thread_dispatcher->post(blocking_barrier.run([]() {}));
-    }
-  }
-
-  const uint32_t num_threads_;
-  Api::ApiPtr api_;
-  Event::DispatcherPtr main_dispatcher_;
-  std::vector<Event::DispatcherPtr> thread_dispatchers_;
-  Thread::ThreadFactory& thread_factory_;
-  ThreadLocal::InstanceImplPtr tls_;
-  Thread::ThreadPtr main_thread_;
-  std::vector<Thread::ThreadPtr> threads_;
   StatNamePool pool_;
 };
 
@@ -1717,11 +1634,8 @@ protected:
   }
 
   void createScopesIncCountersAndCleanupAllThreads() {
-    BlockingBarrier blocking_barrier(NumThreads);
-    for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
-      thread_dispatcher->post(
-          blocking_barrier.run([this]() { createScopesIncCountersAndCleanup(); }));
-    }
+
+    runOnAllWorkersBlocking([this]() { createScopesIncCountersAndCleanup(); });
   }
 
   std::chrono::seconds elapsedTime() {
@@ -1795,7 +1709,7 @@ protected:
 
   void mergeHistograms() {
     BlockingBarrier blocking_barrier(1);
-    main_dispatcher_->post([this, &blocking_barrier]() {
+    runOnMainBlocking([this, &blocking_barrier]() {
       store_->mergeHistograms(blocking_barrier.decrementCountFn());
     });
   }
@@ -1804,7 +1718,7 @@ protected:
     uint32_t num;
     {
       BlockingBarrier blocking_barrier(1);
-      main_dispatcher_->post([this, &num, &blocking_barrier]() {
+      runOnMainBlocking([this, &num, &blocking_barrier]() {
         ThreadLocalStoreTestingPeer::numTlsHistograms(*store_,
                                                       [&num, &blocking_barrier](uint32_t num_hist) {
                                                         num = num_hist;
@@ -1817,10 +1731,7 @@ protected:
 
   // Executes a function on every worker thread dispatcher.
   void foreachThread(const std::function<void()>& fn) {
-    BlockingBarrier blocking_barrier(NumThreads);
-    for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
-      thread_dispatcher->post(blocking_barrier.run(fn));
-    }
+    runOnAllWorkersBlocking([&fn]() { fn(); });
   }
 };
 
@@ -1893,7 +1804,7 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
                                      2 * NumThreads, ") ")));
 
   // Now clear everything, and synchronize the system by calling mergeHistograms().
-  // THere should be no more ParentHistograms or TlsHistograms.
+  // There should be no more ParentHistograms or TlsHistograms.
   scope2.reset();
   histograms.clear();
   mergeHistograms();

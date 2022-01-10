@@ -27,7 +27,8 @@ struct Result {
 class RoleBasedAccessControlFilterConfig {
 public:
   RoleBasedAccessControlFilterConfig(
-      const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope);
+      const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope,
+      ProtobufMessage::ValidationVisitor& validation_visitor);
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }
   std::string shadowEffectivePolicyIdField() const {

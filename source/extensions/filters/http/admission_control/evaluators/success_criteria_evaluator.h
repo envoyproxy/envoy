@@ -2,8 +2,8 @@
 
 #include <vector>
 
-#include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
-#include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
+#include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.h"
+#include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.validate.h"
 
 #include "source/extensions/filters/http/admission_control/evaluators/response_evaluator.h"
 
@@ -14,8 +14,8 @@ namespace AdmissionControl {
 
 class SuccessCriteriaEvaluator : public ResponseEvaluator {
 public:
-  using SuccessCriteria = envoy::extensions::filters::http::admission_control::v3alpha::
-      AdmissionControl::SuccessCriteria;
+  using SuccessCriteria =
+      envoy::extensions::filters::http::admission_control::v3::AdmissionControl::SuccessCriteria;
   SuccessCriteriaEvaluator(const SuccessCriteria& evaluation_criteria);
   // ResponseEvaluator
   bool isHttpSuccess(uint64_t code) const override;

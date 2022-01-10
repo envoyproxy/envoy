@@ -163,6 +163,10 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
       std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1"));
   std::string expected_sha_1("digest");
   EXPECT_CALL(*ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_1));
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError));
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
+              setResponseCodeDetails("auth_digest_no_match"));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);

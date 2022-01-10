@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # L7 HTTP filter that bridges HTTP/1.1 unary "gRPC" to compliant HTTP/2 gRPC.
-# Public docs: docs/root/configuration/http_filters/grpc_http1_bridge_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/grpc_http1_bridge_filter
 
 envoy_extension_package()
 
@@ -33,12 +33,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # Legacy test use. TODO(#9953) clean up.
-    extra_visibility = [
-        "//source/exe:__pkg__",
-        "//test/integration:__subpackages__",
-        "//test/server:__subpackages__",
-    ],
     deps = [
         "//envoy/registry",
         "//envoy/server:filter_config_interface",

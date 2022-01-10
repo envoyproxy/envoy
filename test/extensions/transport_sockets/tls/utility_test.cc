@@ -1,6 +1,7 @@
 #include <string>
 #include <vector>
 
+#include "source/common/common/c_smart_ptr.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
@@ -20,6 +21,23 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 namespace {
+
+using X509StoreContextPtr = CSmartPtr<X509_STORE_CTX, X509_STORE_CTX_free>;
+using X509StorePtr = CSmartPtr<X509_STORE, X509_STORE_free>;
+
+TEST(UtilityTest, TestDnsNameMatching) {
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "lyft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("a.lyft.com", "*.lyft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("a.LYFT.com", "*.lyft.COM"));
+  EXPECT_FALSE(Utility::dnsNameMatch("a.b.lyft.com", "*.lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("foo.test.com", "*.lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "*.lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("alyft.com", "*.lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("alyft.com", "*lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "*lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("", "*lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", ""));
+}
 
 TEST(UtilityTest, TestGetSubjectAlternateNamesWithDNS) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
@@ -162,6 +180,18 @@ TEST(UtilityTest, SslErrorDescriptionTest) {
 
   EXPECT_ENVOY_BUG(EXPECT_EQ(Utility::getErrorDescription(-1), "UNKNOWN_ERROR"),
                    "Unknown BoringSSL error had occurred");
+}
+
+TEST(UtilityTest, TestGetX509ErrorInfo) {
+  auto cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
+  X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
+  X509StorePtr ssl_ctx = X509_STORE_new();
+  EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
+  X509_STORE_CTX_set_error(store_ctx.get(), X509_V_ERR_UNSPECIFIED);
+  EXPECT_EQ(Utility::getX509VerificationErrorInfo(store_ctx.get()),
+            "X509_verify_cert: certificate verification error at depth 0: unknown certificate "
+            "verification error");
 }
 
 } // namespace

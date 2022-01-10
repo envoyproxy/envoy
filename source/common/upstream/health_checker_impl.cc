@@ -69,7 +69,7 @@ public:
   }
   Upstream::Cluster& cluster() override { return cluster_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
   HealthCheckEventLoggerPtr eventLogger() override { return std::move(event_logger_); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     return validation_visitor_;
@@ -138,6 +138,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
                                           config.http_health_check().request_headers_to_remove())),
       http_status_checker_(config.http_health_check().expected_statuses(),
+                           config.http_health_check().retriable_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),
       codec_client_type_(codecClientType(config.http_health_check().codec_client_type())),
       random_generator_(random) {
@@ -148,37 +149,63 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
 
 HttpHealthCheckerImpl::HttpStatusChecker::HttpStatusChecker(
     const Protobuf::RepeatedPtrField<envoy::type::v3::Int64Range>& expected_statuses,
+    const Protobuf::RepeatedPtrField<envoy::type::v3::Int64Range>& retriable_statuses,
     uint64_t default_expected_status) {
   for (const auto& status_range : expected_statuses) {
-    const auto start = status_range.start();
-    const auto end = status_range.end();
+    const auto start = static_cast<uint64_t>(status_range.start());
+    const auto end = static_cast<uint64_t>(status_range.end());
 
-    if (start >= end) {
-      throw EnvoyException(fmt::format(
-          "Invalid http status range: expecting start < end, but found start={} and end={}", start,
-          end));
-    }
+    validateRange(start, end, "expected");
 
-    if (start < 100) {
-      throw EnvoyException(fmt::format(
-          "Invalid http status range: expecting start >= 100, but found start={}", start));
-    }
-
-    if (end > 600) {
-      throw EnvoyException(
-          fmt::format("Invalid http status range: expecting end <= 600, but found end={}", end));
-    }
-
-    ranges_.emplace_back(std::make_pair(static_cast<uint64_t>(start), static_cast<uint64_t>(end)));
+    expected_ranges_.emplace_back(std::make_pair(start, end));
   }
 
-  if (ranges_.empty()) {
-    ranges_.emplace_back(std::make_pair(default_expected_status, default_expected_status + 1));
+  if (expected_ranges_.empty()) {
+    expected_ranges_.emplace_back(
+        std::make_pair(default_expected_status, default_expected_status + 1));
+  }
+
+  for (const auto& status_range : retriable_statuses) {
+    const auto start = static_cast<uint64_t>(status_range.start());
+    const auto end = static_cast<uint64_t>(status_range.end());
+
+    validateRange(start, end, "retriable");
+
+    retriable_ranges_.emplace_back(std::make_pair(start, end));
   }
 }
 
-bool HttpHealthCheckerImpl::HttpStatusChecker::inRange(uint64_t http_status) const {
-  for (const auto& range : ranges_) {
+void HttpHealthCheckerImpl::HttpStatusChecker::validateRange(uint64_t start, uint64_t end,
+                                                             absl::string_view range_type) {
+  if (start >= end) {
+    throw EnvoyException(fmt::format("Invalid http {} status range: expecting start < "
+                                     "end, but found start={} and end={}",
+                                     range_type, start, end));
+  }
+
+  if (start < 100) {
+    throw EnvoyException(
+        fmt::format("Invalid http {} status range: expecting start >= 100, but found start={}",
+                    range_type, start));
+  }
+
+  if (end > 600) {
+    throw EnvoyException(fmt::format(
+        "Invalid http {} status range: expecting end <= 600, but found end={}", range_type, end));
+  }
+}
+
+bool HttpHealthCheckerImpl::HttpStatusChecker::inRetriableRanges(uint64_t http_status) const {
+  return inRanges(http_status, retriable_ranges_);
+}
+
+bool HttpHealthCheckerImpl::HttpStatusChecker::inExpectedRanges(uint64_t http_status) const {
+  return inRanges(http_status, expected_ranges_);
+}
+
+bool HttpHealthCheckerImpl::HttpStatusChecker::inRanges(
+    uint64_t http_status, const std::vector<std::pair<uint64_t, uint64_t>>& ranges) {
+  for (const auto& range : ranges) {
     if (http_status >= range.first && http_status < range.second) {
       return true;
     }
@@ -271,7 +298,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       host_->transportSocketFactory().implementsSecureTransport());
   StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource(),
                                          local_connection_info_provider_);
-  stream_info.onUpstreamHostSelected(host_);
+  stream_info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  stream_info.upstreamInfo()->setUpstreamHost(host_);
   parent_.request_headers_parser_->evaluateHeaders(*request_headers, stream_info);
   auto status = request_encoder->encodeHeaders(*request_headers, true);
   // Encoding will only fail if required request headers are missing.
@@ -331,7 +359,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   ENVOY_CONN_LOG(debug, "hc response={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
-  if (!parent_.http_status_checker_.inRange(response_code)) {
+  if (!parent_.http_status_checker_.inExpectedRanges(response_code)) {
     // If the HTTP response code would indicate failure AND the immediate health check
     // failure header is set, exclude the host from LB.
     // TODO(mattklein123): We could consider doing this check for any HTTP response code, but this
@@ -341,7 +369,12 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
     if (response_headers_->EnvoyImmediateHealthCheckFail() != nullptr) {
       host_->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
     }
-    return HealthCheckResult::Failed;
+
+    if (parent_.http_status_checker_.inRetriableRanges(response_code)) {
+      return HealthCheckResult::Retriable;
+    } else {
+      return HealthCheckResult::Failed;
+    }
   }
 
   const auto degraded = response_headers_->EnvoyDegraded() != nullptr;
@@ -374,7 +407,10 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     handleSuccess(true);
     break;
   case HealthCheckResult::Failed:
-    handleFailure(envoy::data::core::v3::ACTIVE);
+    handleFailure(envoy::data::core::v3::ACTIVE, /*retriable=*/false);
+    break;
+  case HealthCheckResult::Retriable:
+    handleFailure(envoy::data::core::v3::ACTIVE, /*retriable=*/true);
     break;
   }
 

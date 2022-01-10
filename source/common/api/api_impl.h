@@ -10,6 +10,8 @@
 #include "envoy/network/socket.h"
 #include "envoy/thread/thread.h"
 
+#include "source/common/stats/custom_stat_namespaces_impl.h"
+
 namespace Envoy {
 namespace Api {
 
@@ -36,6 +38,7 @@ public:
   TimeSource& timeSource() override { return time_system_; }
   Stats::Scope& rootScope() override { return store_; }
   Random::RandomGenerator& randomGenerator() override { return random_generator_; }
+  Stats::CustomStatNamespaces& customStatNamespaces() override { return custom_stat_namespaces_; }
   const envoy::config::bootstrap::v3::Bootstrap& bootstrap() const override { return bootstrap_; }
   ProcessContextOptRef processContext() override { return process_context_; }
 
@@ -46,6 +49,7 @@ private:
   Filesystem::Instance& file_system_;
   Random::RandomGenerator& random_generator_;
   const envoy::config::bootstrap::v3::Bootstrap& bootstrap_;
+  Stats::CustomStatNamespacesImpl custom_stat_namespaces_;
   ProcessContextOptRef process_context_;
   const Buffer::WatermarkFactorySharedPtr watermark_factory_;
 };

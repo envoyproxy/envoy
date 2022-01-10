@@ -1,6 +1,6 @@
 #include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
-#include "envoy/extensions/cache/simple_http_cache/v3alpha/config.pb.h"
+#include "envoy/extensions/cache/simple_http_cache/v3/config.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -117,6 +117,24 @@ LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request) {
   return std::make_unique<SimpleLookupContext>(*this, std::move(request));
 }
 
+const absl::flat_hash_set<Http::LowerCaseString> SimpleHttpCache::headersNotToUpdate() {
+  CONSTRUCT_ON_FIRST_USE(
+      absl::flat_hash_set<Http::LowerCaseString>,
+      // Content range should not be changed upon validation
+      Http::Headers::get().ContentRange,
+
+      // Headers that describe the body content should never be updated.
+      Http::Headers::get().ContentLength,
+
+      // It does not make sense for this level of the code to be updating the ETag, when
+      // presumably the cached_response_headers reflect this specific ETag.
+      Http::CustomHeaders::get().Etag,
+
+      // We don't update the cached response on a Vary; we just delete it
+      // entirely. So don't bother copying over the Vary header.
+      Http::CustomHeaders::get().Vary);
+}
+
 void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
                                     const Http::ResponseHeaderMap& response_headers,
                                     const ResponseMetadata& metadata) {
@@ -135,19 +153,34 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
     return;
   }
 
-  // https://www.rfc-editor.org/rfc/pdfrfc/rfc7234.txt.pdf
-  // 4.3.4 Freshening Stored Responses upon Validation
-  // use other header fields provided in the 304 (Not Modified)
-  // response to replace all instances of the corresponding header
-  // fields in the stored response.
-  //
   // Assumptions:
   // 1. The internet is fast, i.e. we get the result as soon as the server sends it.
-  // Race conditions would not be possible because we are always processing up-to-date data.
+  //    Race conditions would not be possible because we are always processing up-to-date data.
   // 2. No key collision for etag. Therefore, if etag matches it's the same resource.
   // 3. Backend is correct. etag is being used as a unique identifier to the resource
-  // TODO(tangsaidi) merge the header map instead of replacing it according to rfc7234
-  entry.response_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers);
+
+  // use other header fields provided in the new response to replace all instances
+  // of the corresponding header fields in the stored response
+
+  // `updatedHeaderFields` makes sure each field is only removed when we update the header
+  // field for the first time to handle the case where incoming headers have repeated values
+  absl::flat_hash_set<Http::LowerCaseString> updatedHeaderFields;
+  response_headers.iterate(
+      [&entry, &updatedHeaderFields](
+          const Http::HeaderEntry& incoming_response_header) -> Http::HeaderMap::Iterate {
+        Http::LowerCaseString lower_case_key{incoming_response_header.key().getStringView()};
+        absl::string_view incoming_value{incoming_response_header.value().getStringView()};
+        if (headersNotToUpdate().contains(lower_case_key)) {
+          return Http::HeaderMap::Iterate::Continue;
+        }
+        if (!updatedHeaderFields.contains(lower_case_key)) {
+          entry.response_headers_->setCopy(lower_case_key, incoming_value);
+          updatedHeaderFields.insert(lower_case_key);
+        } else {
+          entry.response_headers_->addCopy(lower_case_key, incoming_value);
+        }
+        return Http::HeaderMap::Iterate::Continue;
+      });
   entry.metadata_ = metadata;
 }
 
@@ -277,11 +310,11 @@ public:
   // From TypedFactory
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::cache::simple_http_cache::v3alpha::SimpleHttpCacheConfig>();
+        envoy::extensions::cache::simple_http_cache::v3::SimpleHttpCacheConfig>();
   }
   // From HttpCacheFactory
-  HttpCache&
-  getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig&) override {
+  HttpCache& getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&,
+                      Server::Configuration::FactoryContext&) override {
     return cache_;
   }
 

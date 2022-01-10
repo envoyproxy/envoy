@@ -23,7 +23,6 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
           grid_.dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })),
       current_(pool_it) {}
 
-// TODO(#15649) add trace logging.
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemptCallbacks(
     WrapperCallbacks& parent, PoolIterator it)
     : parent_(parent), pool_it_(it), cancellable_(nullptr) {}
@@ -54,7 +53,6 @@ void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolFailu
 void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
     ConnectionAttemptCallbacks* attempt, ConnectionPool::PoolFailureReason reason,
     absl::string_view transport_failure_reason, Upstream::HostDescriptionConstSharedPtr host) {
-  ASSERT(host == grid_.host_);
   ENVOY_LOG(trace, "{} pool failed to create connection to host '{}'.",
             describePool(attempt->pool()), host->hostname());
   if (grid_.isPoolHttp3(attempt->pool())) {
@@ -107,7 +105,6 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
     ConnectionAttemptCallbacks* attempt, RequestEncoder& encoder,
     Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
     absl::optional<Http::Protocol> protocol) {
-  ASSERT(host == grid_.host_);
   ENVOY_LOG(trace, "{} pool successfully connected to host '{}'.", describePool(attempt->pool()),
             host->hostname());
   if (!grid_.isPoolHttp3(attempt->pool())) {
@@ -204,6 +201,7 @@ ConnectivityGrid::ConnectivityGrid(
   // HTTP/3.
   // TODO(#15649) support v6/v4, WiFi/cellular.
   ASSERT(connectivity_options.protocols_.size() == 3);
+  ASSERT(alternate_protocols);
 }
 
 ConnectivityGrid::~ConnectivityGrid() {
@@ -363,11 +361,6 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
   if (http3_status_tracker_.isHttp3Broken()) {
     ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", host_->hostname());
     return false;
-  }
-  if (!alternate_protocols_) {
-    ENVOY_LOG(trace, "No alternate protocols cache. Attempting HTTP/3 to host '{}'.",
-              host_->hostname());
-    return true;
   }
   if (host_->address()->type() != Network::Address::Type::Ip) {
     ENVOY_LOG(error, "Address is not an IP address");

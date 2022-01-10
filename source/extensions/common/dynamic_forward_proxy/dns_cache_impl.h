@@ -5,6 +5,7 @@
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/dns.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/cleanup.h"
@@ -45,16 +46,14 @@ class DnsCacheImplTest;
 
 class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy> {
 public:
-  DnsCacheImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
-               Random::RandomGenerator& random, Filesystem::Instance& file_system,
-               Runtime::Loader& loader, Stats::Scope& root_scope,
-               ProtobufMessage::ValidationVisitor& validation_visitor,
+  DnsCacheImpl(Server::Configuration::FactoryContextBase& context,
                const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
   ~DnsCacheImpl() override;
   static DnsCacheStats generateDnsCacheStats(Stats::Scope& scope);
   static Network::DnsResolverSharedPtr selectDnsResolver(
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
-      Event::Dispatcher& main_thread_dispatcher);
+      Event::Dispatcher& main_thread_dispatcher,
+      Server::Configuration::FactoryContextBase& context);
 
   // DnsCache
   LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
@@ -63,6 +62,7 @@ public:
   void iterateHostMap(IterateHostMapCb cb) override;
   absl::optional<const DnsHostInfoSharedPtr> getHost(absl::string_view host_name) override;
   Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() override;
+  void forceRefreshHosts() override;
 
 private:
   struct LoadDnsCacheEntryHandleImpl
@@ -100,7 +100,8 @@ private:
   class DnsHostInfoImpl : public DnsHostInfo {
   public:
     DnsHostInfoImpl(TimeSource& time_source, absl::string_view resolved_host, bool is_ip_address)
-        : time_source_(time_source), resolved_host_(resolved_host), is_ip_address_(is_ip_address) {
+        : time_source_(time_source), resolved_host_(resolved_host), is_ip_address_(is_ip_address),
+          stale_at_time_(time_source.monotonicTime()) {
       touch();
     }
 
@@ -109,15 +110,32 @@ private:
       absl::ReaderMutexLock lock{&resolve_lock_};
       return address_;
     }
+
+    std::vector<Network::Address::InstanceConstSharedPtr> addressList() const override {
+      std::vector<Network::Address::InstanceConstSharedPtr> ret;
+      absl::ReaderMutexLock lock{&resolve_lock_};
+      ret = address_list_;
+      return ret;
+    }
+
     const std::string& resolvedHost() const override { return resolved_host_; }
     bool isIpAddress() const override { return is_ip_address_; }
     void touch() final { last_used_time_ = time_source_.monotonicTime().time_since_epoch(); }
+    void updateStale(MonotonicTime resolution_time, std::chrono::seconds ttl) {
+      stale_at_time_ = resolution_time + ttl;
+    }
+    bool isStale() {
+      return time_source_.monotonicTime() > static_cast<MonotonicTime>(stale_at_time_);
+    }
 
-    void setAddress(Network::Address::InstanceConstSharedPtr address) {
+    void setAddresses(Network::Address::InstanceConstSharedPtr address,
+                      std::vector<Network::Address::InstanceConstSharedPtr>&& list) {
       absl::WriterMutexLock lock{&resolve_lock_};
       first_resolve_complete_ = true;
       address_ = address;
+      address_list_ = std::move(list);
     }
+
     std::chrono::steady_clock::duration lastUsedTime() const { return last_used_time_.load(); }
 
     bool firstResolveComplete() const {
@@ -137,10 +155,13 @@ private:
     const bool is_ip_address_;
     mutable absl::Mutex resolve_lock_;
     Network::Address::InstanceConstSharedPtr address_ ABSL_GUARDED_BY(resolve_lock_);
+    std::vector<Network::Address::InstanceConstSharedPtr>
+        address_list_ ABSL_GUARDED_BY(resolve_lock_);
 
     // Using std::chrono::steady_clock::duration is required for compilation within an atomic vs.
     // using MonotonicTime.
     std::atomic<std::chrono::steady_clock::duration> last_used_time_;
+    std::atomic<MonotonicTime> stale_at_time_;
     bool first_resolve_complete_ ABSL_GUARDED_BY(resolve_lock_){false};
   };
 
@@ -156,6 +177,7 @@ private:
     const Event::TimerPtr refresh_timer_;
     const Event::TimerPtr timeout_timer_;
     const DnsHostInfoImplSharedPtr host_info_;
+    const BackOffStrategyPtr failure_backoff_strategy_;
     Network::ActiveDnsQuery* active_query_{};
   };
 
@@ -176,8 +198,10 @@ private:
 
   void startResolve(const std::string& host, PrimaryHostInfo& host_info)
       ABSL_LOCKS_EXCLUDED(primary_hosts_lock_);
+
   void finishResolve(const std::string& host, Network::DnsResolver::ResolutionStatus status,
-                     std::list<Network::DnsResponse>&& response, bool from_cache = false);
+                     std::list<Network::DnsResponse>&& response,
+                     absl::optional<MonotonicTime> resolution_time = {});
   void runAddUpdateCallbacks(const std::string& host, const DnsHostInfoSharedPtr& host_info);
   void runRemoveCallbacks(const std::string& host);
   void notifyThreads(const std::string& host, const DnsHostInfoImplSharedPtr& resolved_info);
@@ -186,12 +210,19 @@ private:
   PrimaryHostInfo& getPrimaryHost(const std::string& host);
 
   void addCacheEntry(const std::string& host,
-                     const Network::Address::InstanceConstSharedPtr& address);
+                     const Network::Address::InstanceConstSharedPtr& address,
+                     const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
+                     const std::chrono::seconds ttl);
   void removeCacheEntry(const std::string& host);
   void loadCacheEntries(
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
+  PrimaryHostInfo* createHost(const std::string& host, uint16_t default_port);
+  absl::optional<Network::DnsResponse> parseValue(absl::string_view value,
+                                                  absl::optional<MonotonicTime>& resolution_time);
 
   Event::Dispatcher& main_thread_dispatcher_;
+  const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config_;
+  Random::RandomGenerator& random_generator_;
   const Network::DnsLookupFamily dns_lookup_family_;
   const Network::DnsResolverSharedPtr resolver_;
   ThreadLocal::TypedSlot<ThreadLocalHostInfo> tls_slot_;
@@ -205,7 +236,6 @@ private:
   DnsCacheResourceManagerImpl resource_manager_;
   const std::chrono::milliseconds refresh_interval_;
   const std::chrono::milliseconds timeout_interval_;
-  const BackOffStrategyPtr failure_backoff_strategy_;
   Filesystem::Instance& file_system_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const std::chrono::milliseconds host_ttl_;

@@ -2,7 +2,6 @@
 
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/extension_config_provider.h"
-#include "envoy/http/filter.h"
 #include "envoy/init/manager.h"
 #include "envoy/server/filter_config.h"
 
@@ -11,19 +10,20 @@
 namespace Envoy {
 namespace Filter {
 
-using FilterConfigProvider =
-    Envoy::Config::ExtensionConfigProvider<Server::Configuration::NamedHttpFilterConfigFactory,
-                                           Envoy::Http::FilterFactoryCb>;
-using FilterConfigProviderPtr = std::unique_ptr<FilterConfigProvider>;
-using DynamicFilterConfigProvider = Envoy::Config::DynamicExtensionConfigProvider<
-    Server::Configuration::NamedHttpFilterConfigFactory, Envoy::Http::FilterFactoryCb>;
-using DynamicFilterConfigProviderPtr = std::unique_ptr<DynamicFilterConfigProvider>;
+template <class FactoryCb>
+using FilterConfigProvider = Envoy::Config::ExtensionConfigProvider<FactoryCb>;
+template <class FactoryCb>
+using FilterConfigProviderPtr = std::unique_ptr<FilterConfigProvider<FactoryCb>>;
+template <class FactoryCb>
+using DynamicFilterConfigProvider = Envoy::Config::DynamicExtensionConfigProvider<FactoryCb>;
+template <class FactoryCb>
+using DynamicFilterConfigProviderPtr = std::unique_ptr<DynamicFilterConfigProvider<FactoryCb>>;
 
 /**
  * The FilterConfigProviderManager exposes the ability to get an FilterConfigProvider
  * for both static and dynamic filter config providers.
  */
-class FilterConfigProviderManager {
+template <class FactoryCb> class FilterConfigProviderManager {
 public:
   virtual ~FilterConfigProviderManager() = default;
 
@@ -38,7 +38,7 @@ public:
    * configured chain
    * @param filter_chain_type is the filter chain type
    */
-  virtual DynamicFilterConfigProviderPtr createDynamicFilterConfigProvider(
+  virtual DynamicFilterConfigProviderPtr<FactoryCb> createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
       const std::string& stat_prefix, bool last_filter_in_filter_chain,
@@ -49,8 +49,8 @@ public:
    * @param config is a fully resolved filter instantiation factory.
    * @param filter_config_name is the name of the filter configuration resource.
    */
-  virtual FilterConfigProviderPtr
-  createStaticFilterConfigProvider(const Envoy::Http::FilterFactoryCb& config,
+  virtual FilterConfigProviderPtr<FactoryCb>
+  createStaticFilterConfigProvider(const FactoryCb& config,
                                    const std::string& filter_config_name) PURE;
 };
 

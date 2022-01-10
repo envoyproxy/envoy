@@ -15,8 +15,8 @@ Http::FilterFactoryCb RoleBasedAccessControlFilterConfigFactory::createFilterFac
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
-  auto config = std::make_shared<RoleBasedAccessControlFilterConfig>(proto_config, stats_prefix,
-                                                                     context.scope());
+  auto config = std::make_shared<RoleBasedAccessControlFilterConfig>(
+      proto_config, stats_prefix, context.scope(), context.messageValidationVisitor());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<RoleBasedAccessControlFilter>(config));
@@ -26,8 +26,9 @@ Http::FilterFactoryCb RoleBasedAccessControlFilterConfigFactory::createFilterFac
 Router::RouteSpecificFilterConfigConstSharedPtr
 RoleBasedAccessControlFilterConfigFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& proto_config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<const RoleBasedAccessControlRouteSpecificFilterConfig>(proto_config);
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor& validator) {
+  return std::make_shared<const RoleBasedAccessControlRouteSpecificFilterConfig>(proto_config,
+                                                                                 validator);
 }
 
 /**

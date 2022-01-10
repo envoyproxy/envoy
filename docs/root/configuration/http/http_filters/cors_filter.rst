@@ -8,7 +8,7 @@ For the meaning of the headers please refer to the pages below.
 
 * https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS
 * https://www.w3.org/TR/cors/
-* :ref:`v2 API reference <envoy_v3_api_msg_config.route.v3.CorsPolicy>`
+* :ref:`v3 API reference <envoy_v3_api_msg_config.route.v3.CorsPolicy>`
 * This filter should be configured with the name *envoy.filters.http.cors*.
 
 .. _cors-runtime:

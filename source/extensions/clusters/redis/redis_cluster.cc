@@ -25,7 +25,8 @@ RedisCluster::RedisCluster(
     Stats::ScopePtr&& stats_scope, bool added_via_api,
     ClusterSlotUpdateCallBackSharedPtr lb_factory)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                                       added_via_api, factory_context.dispatcher().timeSource()),
+                                       added_via_api,
+                                       factory_context.mainThreadDispatcher().timeSource()),
       cluster_manager_(cluster_manager),
       cluster_refresh_rate_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(redis_cluster, cluster_refresh_rate, 5000))),
@@ -37,7 +38,7 @@ RedisCluster::RedisCluster(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(redis_cluster, redirect_refresh_threshold, 5)),
       failure_refresh_threshold_(redis_cluster.failure_refresh_threshold()),
       host_degraded_refresh_threshold_(redis_cluster.host_degraded_refresh_threshold()),
-      dispatcher_(factory_context.dispatcher()), dns_resolver_(std::move(dns_resolver)),
+      dispatcher_(factory_context.mainThreadDispatcher()), dns_resolver_(std::move(dns_resolver)),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromCluster(cluster)),
       load_assignment_(cluster.load_assignment()), local_info_(factory_context.localInfo()),
       random_(api.randomGenerator()), redis_discovery_session_(*this, redis_client_factory),
@@ -48,7 +49,7 @@ RedisCluster::RedisCluster(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(info(), api)),
       cluster_name_(cluster.name()),
       refresh_manager_(Common::Redis::getClusterRefreshManager(
-          factory_context.singletonManager(), factory_context.dispatcher(),
+          factory_context.singletonManager(), factory_context.mainThreadDispatcher(),
           factory_context.clusterManager(), factory_context.api().timeSource())),
       registration_handle_(refresh_manager_->registerCluster(
           cluster_name_, redirect_refresh_interval_, redirect_refresh_threshold_,
@@ -274,8 +275,10 @@ void RedisCluster::RedisDiscoverySession::registerDiscoveryAddress(
   // Since the address from DNS does not have port, we need to make a new address that has
   // port in it.
   for (const Network::DnsResponse& res : response) {
-    ASSERT(res.address_ != nullptr);
-    discovery_address_list_.push_back(Network::Utility::getAddressWithPort(*(res.address_), port));
+    const auto& addrinfo = res.addrInfo();
+    ASSERT(addrinfo.address_ != nullptr);
+    discovery_address_list_.push_back(
+        Network::Utility::getAddressWithPort(*(addrinfo.address_), port));
   }
 }
 

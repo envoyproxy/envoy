@@ -37,51 +37,8 @@ const std::string& PerConnectionCluster::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
 }
 
-Config::RouteImpl::RouteImpl(
-    const Config& parent,
-    const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute&
-        config)
-    : parent_(parent) {
-  cluster_name_ = config.cluster();
-
-  source_ips_ = Network::Address::IpList(config.source_ip_list());
-  destination_ips_ = Network::Address::IpList(config.destination_ip_list());
-
-  if (!config.source_ports().empty()) {
-    Network::Utility::parsePortRangeList(config.source_ports(), source_port_ranges_);
-  }
-
-  if (!config.destination_ports().empty()) {
-    Network::Utility::parsePortRangeList(config.destination_ports(), destination_port_ranges_);
-  }
-}
-
-bool Config::RouteImpl::matches(Network::Connection& connection) const {
-  if (!source_port_ranges_.empty() &&
-      !Network::Utility::portInRangeList(*connection.connectionInfoProvider().remoteAddress(),
-                                         source_port_ranges_)) {
-    return false;
-  }
-
-  if (!source_ips_.empty() &&
-      !source_ips_.contains(*connection.connectionInfoProvider().remoteAddress())) {
-    return false;
-  }
-
-  if (!destination_port_ranges_.empty() &&
-      !Network::Utility::portInRangeList(*connection.connectionInfoProvider().localAddress(),
-                                         destination_port_ranges_)) {
-    return false;
-  }
-
-  if (!destination_ips_.empty() &&
-      !destination_ips_.contains(*connection.connectionInfoProvider().localAddress())) {
-    return false;
-  }
-
-  // if we made it past all checks, the route matches
-  return true;
-}
+Config::SimpleRouteImpl::SimpleRouteImpl(const Config& parent, absl::string_view cluster_name)
+    : parent_(parent), cluster_name_(cluster_name) {}
 
 Config::WeightedClusterEntry::WeightedClusterEntry(
     const Config& parent, const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::
@@ -131,7 +88,6 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
       upstream_drain_manager_slot_(context.threadLocal().allocateSlot()),
       shared_config_(std::make_shared<SharedConfig>(config, context)),
       random_generator_(context.api().randomGenerator()) {
-
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
     ThreadLocal::ThreadLocalObjectSharedPtr drain_manager =
         std::make_shared<UpstreamDrainManager>();
@@ -139,10 +95,7 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
   });
 
   if (!config.cluster().empty()) {
-    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute
-        default_route;
-    default_route.set_cluster(config.cluster());
-    routes_.emplace_back(std::make_shared<const RouteImpl>(*this, default_route));
+    default_route_ = std::make_shared<const SimpleRouteImpl>(*this, config.cluster());
   }
 
   if (config.has_metadata_match()) {
@@ -156,9 +109,8 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
     }
   }
 
-  // Weighted clusters will be enabled only if both the default cluster and
-  // deprecated v1 routes are absent.
-  if (routes_.empty() && config.has_weighted_clusters()) {
+  // Weighted clusters will be enabled only if the default cluster is absent.
+  if (default_route_ == nullptr && config.has_weighted_clusters()) {
     total_cluster_weight_ = 0;
     for (const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::WeightedCluster::
              ClusterWeight& cluster_desc : config.weighted_clusters().clusters()) {
@@ -186,16 +138,11 @@ RouteConstSharedPtr Config::getRegularRouteFromEntries(Network::Connection& conn
         connection.streamInfo().filterState()->getDataReadOnly<PerConnectionCluster>(
             PerConnectionCluster::key());
 
-    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute
-        per_connection_route;
-    per_connection_route.set_cluster(per_connection_cluster.value());
-    return std::make_shared<const RouteImpl>(*this, per_connection_route);
+    return std::make_shared<const SimpleRouteImpl>(*this, per_connection_cluster.value());
   }
 
-  for (const RouteConstSharedPtr& route : routes_) {
-    if (route->matches(connection)) {
-      return route;
-    }
+  if (default_route_ != nullptr) {
+    return default_route_;
   }
 
   // no match, no more routes to try
@@ -248,7 +195,7 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   // in onData(). This will get re-enabled when the upstream connection is
   // established.
   read_callbacks_->connection().readDisable(true);
-
+  getStreamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   config_->stats().downstream_cx_total_.inc();
   if (set_connection_stats) {
     read_callbacks_->connection().setConnectionStats(
@@ -491,24 +438,19 @@ void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
                                   Upstream::HostDescriptionConstSharedPtr host) {
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
-  getStreamInfo().onUpstreamHostSelected(host);
+  getStreamInfo().upstreamInfo()->setUpstreamHost(host);
 
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
     break;
-
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
     upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
     break;
-
   case ConnectionPool::PoolFailureReason::Timeout:
     onConnectTimeout();
     break;
-
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -520,13 +462,14 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
   upstream_ = std::move(upstream);
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
-  getStreamInfo().onUpstreamHostSelected(host);
-  getStreamInfo().setUpstreamLocalAddress(local_address);
-  getStreamInfo().setUpstreamSslConnection(ssl_info);
+  StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
+  upstream_info.setUpstreamHost(host);
+  upstream_info.setUpstreamLocalAddress(local_address);
+  upstream_info.setUpstreamSslConnection(ssl_info);
   onUpstreamConnection();
   read_callbacks_->continueReading();
   if (info) {
-    read_callbacks_->connection().streamInfo().setUpstreamFilterState(info->filterState());
+    upstream_info.setUpstreamFilterState(info->filterState());
   }
 }
 
@@ -583,6 +526,8 @@ Network::FilterStatus Filter::onNewConnection() {
 }
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
+  ENVOY_CONN_LOG(trace, "on downstream event {}, has upstream = {}", read_callbacks_->connection(),
+                 static_cast<int>(event), upstream_ == nullptr);
   if (upstream_) {
     Tcp::ConnectionPool::ConnectionDataPtr conn_data(upstream_->onDownstreamEvent(event));
     if (conn_data != nullptr &&
@@ -751,6 +696,7 @@ Drainer::Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedP
                  const Upstream::HostDescriptionConstSharedPtr& upstream_host)
     : parent_(parent), callbacks_(callbacks), upstream_conn_data_(std::move(conn_data)),
       timer_(std::move(idle_timer)), upstream_host_(upstream_host), config_(config) {
+  ENVOY_CONN_LOG(trace, "draining the upstream connection", upstream_conn_data_->connection());
   config_->stats().upstream_flush_total_.inc();
   config_->stats().upstream_flush_active_.inc();
 }

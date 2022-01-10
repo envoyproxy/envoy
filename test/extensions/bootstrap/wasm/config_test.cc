@@ -84,6 +84,9 @@ TEST_P(WasmFactoryTest, CreateWasmFromWasm) {
   initializeWithConfig(config_);
 
   EXPECT_NE(extension_, nullptr);
+
+  // Check if the custom stat namespace is registered during the initialization.
+  EXPECT_TRUE(api_->customStatNamespaces().registered("wasmcustom"));
 }
 
 TEST_P(WasmFactoryTest, CreateWasmFromWasmPerThread) {

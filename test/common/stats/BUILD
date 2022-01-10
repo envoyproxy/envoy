@@ -23,6 +23,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "custom_stat_namespaces_impl_test",
+    srcs = ["custom_stat_namespaces_impl_test.cc"],
+    deps = [
+        "//source/common/stats:custom_stat_namespaces_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "isolated_store_impl_test",
     srcs = ["isolated_store_impl_test.cc"],
     deps = [
@@ -265,6 +273,7 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:real_threads_test_helper_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",

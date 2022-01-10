@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Local Bandwidthlimit HTTP L7 filter
-# Public docs: docs/root/configuration/http_filters/bandwidth_limit_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/bandwidth_limit_filter
 
 envoy_extension_package()
 
@@ -28,7 +28,7 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:timespan_lib",
         "//source/extensions/filters/http/common:stream_rate_limiter_lib",
-        "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3:pkg_cc_proto",
     ],
 )
 
@@ -41,6 +41,6 @@ envoy_cc_extension(
         "//envoy/http:filter_interface",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3:pkg_cc_proto",
     ],
 )

@@ -10,6 +10,7 @@
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/process_context.h"
+#include "envoy/stats/custom_stat_namespaces.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
 
@@ -89,6 +90,11 @@ public:
    * @return the bootstrap Envoy started with.
    */
   virtual const envoy::config::bootstrap::v3::Bootstrap& bootstrap() const PURE;
+
+  /**
+   * @return a reference to the Stats::CustomStatNamespaces.
+   */
+  virtual Stats::CustomStatNamespaces& customStatNamespaces() PURE;
 };
 
 using ApiPtr = std::unique_ptr<Api>;

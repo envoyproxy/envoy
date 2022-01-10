@@ -113,7 +113,7 @@ analysis with tools such as `Wireshark <https://www.wireshark.org/>`_ with the
 
 .. code-block:: bash
 
-  bazel run @envoy_api_canonical//tools:tap2pcap /some/tap/path_0.pb path_0.pcap
+  bazel run @envoy_api//tools:tap2pcap /some/tap/path_0.pb path_0.pcap
   tshark -r path_0.pcap -d "tcp.port==10000,http2" -P
     1   0.000000    127.0.0.1 → 127.0.0.1    HTTP2 157 Magic, SETTINGS, WINDOW_UPDATE, HEADERS
     2   0.013713    127.0.0.1 → 127.0.0.1    HTTP2 91 SETTINGS, SETTINGS, WINDOW_UPDATE

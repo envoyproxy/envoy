@@ -9,7 +9,7 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
-* http: disable the integration between :ref:`ExtensionWithMatcher <v1.18.4:envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
+* http: disable the integration between :ref:`ExtensionWithMatcher <v1.18:envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
   and HTTP filters by default to reflects its experimental status. This feature can be enabled by seting
   `envoy.reloadable_features.experimental_matching_api` to true.
 * http: reject requests with #fragment in the URI path. The fragment is not allowed to be part of request
@@ -31,7 +31,7 @@ Bug Fixes
 
 Removed Config or Runtime
 -------------------------
-*Normally occurs at the end of the* :ref:`deprecation period <v1.18.4:deprecated>`
+*Normally occurs at the end of the* :ref:`deprecation period <v1.18:deprecated>`
 
 New Features
 ------------

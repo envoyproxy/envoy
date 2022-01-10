@@ -26,7 +26,7 @@
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "udpa/type/v1/typed_struct.pb.h"
+#include "xds/type/v3/typed_struct.pb.h"
 
 using testing::NiceMock;
 using testing::Return;
@@ -402,7 +402,7 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
       "http": {
         "name": "invalid",
         "typed_config": {
-          "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+          "@type": "type.googleapis.com/xds.type.v3.TypedStruct",
           "type_url": "type.googleapis.com/envoy.config.trace.v2.BlackHoleConfig",
           "value": {
             "collector_cluster": "cluster_0",
@@ -583,7 +583,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
-  udpa::type::v1::TypedStruct typed_struct;
+  xds::type::v3::TypedStruct typed_struct;
   auto untyped_struct = typed_struct.mutable_value();
   (*untyped_struct->mutable_fields())["foo"].set_string_value("bar");
   sink.mutable_typed_config()->PackFrom(typed_struct);

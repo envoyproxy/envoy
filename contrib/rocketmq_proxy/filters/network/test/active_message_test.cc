@@ -6,8 +6,8 @@
 #include "contrib/rocketmq_proxy/filters/network/source/active_message.h"
 #include "contrib/rocketmq_proxy/filters/network/source/config.h"
 #include "contrib/rocketmq_proxy/filters/network/source/conn_manager.h"
+#include "contrib/rocketmq_proxy/filters/network/source/constant.h"
 #include "contrib/rocketmq_proxy/filters/network/source/protocol.h"
-#include "contrib/rocketmq_proxy/filters/network/source/well_known_names.h"
 #include "contrib/rocketmq_proxy/filters/network/test/utility.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -24,7 +24,7 @@ public:
   ActiveMessageTest()
       : stats_(RocketmqFilterStats::generateStats("test.", store_)),
         config_(rocketmq_proxy_config_, factory_context_),
-        connection_manager_(config_, factory_context_.dispatcher().timeSource()) {
+        connection_manager_(config_, factory_context_.mainThreadDispatcher().timeSource()) {
     connection_manager_.initializeReadFilterCallbacks(filter_callbacks_);
   }
 

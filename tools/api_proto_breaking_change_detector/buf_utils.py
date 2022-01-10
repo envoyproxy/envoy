@@ -1,9 +1,10 @@
+import subprocess
 from pathlib import Path
 from typing import List, Union, Tuple
 
-from detector_errors import ChangeDetectorError, ChangeDetectorInitializeError
-from tools.base.utils import cd_and_return
-from tools.run_command import run_command
+from tools.api_proto_breaking_change_detector.detector_errors import (
+    ChangeDetectorError, ChangeDetectorInitializeError)
+from envoy.base.utils import cd_and_return
 
 
 def _generate_buf_args(target_path, config_file_loc, additional_args):
@@ -52,7 +53,10 @@ def pull_buf_deps(
     with _cd_into_config_parent(config_file_loc):
         buf_args = _generate_buf_args(target_path, config_file_loc, additional_args)
 
-        update_code, _, update_err = run_command(f'{buf_path} mod update')
+        response = subprocess.run([buf_path, "mod", "update"],
+                                  encoding="utf-8",
+                                  capture_output=True)
+        update_code, update_err = response.returncode, response.stderr.split("\n")
         # for some reason buf prints out the "downloading..." lines on stderr
         if update_code != 0:
             raise ChangeDetectorInitializeError(
@@ -63,7 +67,7 @@ def pull_buf_deps(
                 "buf mod update did not generate a buf.lock file (silent error... incorrect config?)"
             )
 
-        run_command(' '.join([f'{buf_path} build', *buf_args]))
+        subprocess.run([buf_path, "build"] + buf_args, capture_output=True)
 
 
 def check_breaking(
@@ -87,7 +91,7 @@ def check_breaking(
         additional_args {List[str]} -- additional arguments passed into the buf binary invocations
 
     Returns:
-        Tuple[int, List[str], List[str]] -- tuple of (exit status code, stdout, stderr) as provided by run_command. Note stdout/stderr are provided as string lists
+        Tuple[int, List[str], List[str]] -- tuple of (exit status code, stdout, stderr). Note stdout/stderr are provided as string lists
     """
     with _cd_into_config_parent(config_file_loc):
         if not Path(git_path).exists():
@@ -100,6 +104,8 @@ def check_breaking(
         if subdir:
             initial_state_input += f',subdir={subdir}'
 
-        final_code, final_out, final_err = run_command(
-            ' '.join([buf_path, f"breaking --against {initial_state_input}", *buf_args]))
-        return final_code, final_out, final_err
+        response = subprocess.run([buf_path, "breaking", "--against", initial_state_input]
+                                  + buf_args,
+                                  encoding="utf-8",
+                                  capture_output=True)
+        return response.returncode, response.stdout.split("\n"), response.stderr.split("\n")

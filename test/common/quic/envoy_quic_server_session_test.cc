@@ -64,6 +64,8 @@ public:
     // behavior.
     return false;
   }
+
+  using EnvoyQuicServerSession::GetCryptoStream;
 };
 
 class ProofSourceDetailsSetter {
@@ -151,10 +153,8 @@ public:
   EnvoyQuicServerSessionTest()
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_({[]() {
-          SetQuicReloadableFlag(quic_decline_server_push_stream, true);
-          return quic::CurrentSupportedHttp3Versions()[0];
-        }()}),
+        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
+        quic_version_({[]() { return quic::CurrentSupportedHttp3Versions()[0]; }()}),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()),
         quic_connection_(new MockEnvoyQuicServerConnection(
             connection_helper_, alarm_factory_, writer_, quic_version_, *listener_config_.socket_)),
@@ -166,8 +166,7 @@ public:
                             &compressed_certs_cache_, *dispatcher_,
                             /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5,
                             quic_stat_names_, listener_config_.listenerScope(),
-                            crypto_stream_factory_,
-                            makeOptRefFromPtr<const Network::TransportSocketFactory>(nullptr)),
+                            crypto_stream_factory_),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {
@@ -293,6 +292,8 @@ TEST_F(EnvoyQuicServerSessionTest, NewStreamBeforeInitializingFilter) {
 TEST_F(EnvoyQuicServerSessionTest, NewStream) {
   installReadFilter();
 
+  EXPECT_EQ(envoy_quic_session_.GetCryptoStream()->GetSsl(),
+            static_cast<const QuicSslConnectionInfo&>(*envoy_quic_session_.ssl()).ssl());
   Http::MockRequestDecoder request_decoder;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
       .WillOnce(testing::ReturnRef(request_decoder));

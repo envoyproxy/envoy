@@ -86,11 +86,12 @@ TEST(RouterFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
   cb(filter_callback);
 }
 
-// Test that the deprecated extension name still functions.
+// Test that the deprecated extension name is disabled by default.
+// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST(RouterFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
   const std::string deprecated_name = "envoy.router";
 
-  ASSERT_NE(
+  ASSERT_EQ(
       nullptr,
       Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
           deprecated_name));

@@ -614,7 +614,7 @@ public:
   void encode(ProtobufWkt::Struct& root);
 
   void add(absl::string_view consumer_id) {
-    consumer_id_list_.emplace_back(std::string(consumer_id.data(), consumer_id.length()));
+    consumer_id_list_.emplace_back(consumer_id.data(), consumer_id.length());
   }
 
 private:
@@ -657,8 +657,7 @@ public:
 struct AckMessageDirective {
 
   AckMessageDirective(absl::string_view broker_name, int32_t broker_id, MonotonicTime create_time)
-      : broker_name_(broker_name.data(), broker_name.length()), broker_id_(broker_id),
-        creation_time_(create_time) {}
+      : broker_name_(broker_name), broker_id_(broker_id), creation_time_(create_time) {}
 
   std::string broker_name_;
   int32_t broker_id_;

@@ -52,7 +52,8 @@ public:
       config.set_enforcement_type(envoy::extensions::filters::network::rbac::v3::RBAC::CONTINUOUS);
     }
 
-    return std::make_shared<RoleBasedAccessControlFilterConfig>(config, store_);
+    return std::make_shared<RoleBasedAccessControlFilterConfig>(
+        config, store_, ProtobufMessage::getStrictValidationVisitor());
   }
 
   RoleBasedAccessControlNetworkFilterTest() : config_(setupConfig()) {

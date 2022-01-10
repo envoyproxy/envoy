@@ -15,7 +15,7 @@ public:
       : dispatcher_(dispatcher), factory_(factory), pressure_(0.0) {}
   // Server::ResourceMonitor
   ~FakeResourceMonitor() override;
-  void updateResourceUsage(Callbacks& callbacks) override;
+  void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
 
   void setResourcePressure(double pressure) {
     dispatcher_.post([this, pressure] { pressure_ = pressure; });

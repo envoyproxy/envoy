@@ -46,9 +46,6 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
   // The header_prefix is a write-once then read-only singleton that persists across tests. We clear
   // this field so that fuzz tests don't fail over multiple iterations.
   output.clear_header_prefix();
-  if (output.has_hidden_envoy_deprecated_runtime()) {
-    output.mutable_hidden_envoy_deprecated_runtime()->set_symlink_root(test_env.temporaryPath(""));
-  }
   for (auto& listener : *output.mutable_static_resources()->mutable_listeners()) {
     if (listener.has_address()) {
       makePortHermetic(test_env, *listener.mutable_address());

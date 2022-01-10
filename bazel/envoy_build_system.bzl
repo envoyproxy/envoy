@@ -1,6 +1,6 @@
 # The main Envoy bazel file. Load this file for all Envoy-specific build macros
 # and rules that you'd like to use in your BUILD files.
-load("@rules_foreign_cc//tools/build_defs:cmake.bzl", "cmake_external")
+load("@rules_foreign_cc//foreign_cc:cmake.bzl", "cmake")
 load(":envoy_binary.bzl", _envoy_cc_binary = "envoy_cc_binary")
 load(":envoy_internal.bzl", "envoy_external_dep_path")
 load(
@@ -44,6 +44,7 @@ load(
 )
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
+    "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_PACKAGE_VISIBILITY",
 )
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
@@ -65,7 +66,7 @@ def envoy_extension_package(enabled_default = True, default_visibility = EXTENSI
     )
 
 def envoy_contrib_package():
-    envoy_extension_package(default_visibility = ["//:contrib_library"])
+    envoy_extension_package(default_visibility = CONTRIB_EXTENSION_PACKAGE_VISIBILITY)
 
 # A genrule variant that can output a directory. This is useful when doing things like
 # generating a fuzz corpus mechanically.
@@ -91,15 +92,12 @@ envoy_directory_genrule = rule(
 
 # External CMake C++ library targets should be specified with this function. This defaults
 # to building the dependencies with ninja
-def envoy_cmake_external(
+def envoy_cmake(
         name,
         cache_entries = {},
         debug_cache_entries = {},
-        cmake_options = ["-GNinja"],
-        make_commands = ["ninja -v", "ninja -v install"],
         lib_source = "",
         postfix_script = "",
-        static_libraries = [],
         copy_pdb = False,
         pdb_name = "",
         cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles",
@@ -127,22 +125,23 @@ def envoy_cmake_external(
     else:
         pf = postfix_script
 
-    cmake_external(
+    cmake(
         name = name,
         cache_entries = select({
             "@envoy//bazel:dbg_build": cache_entries_debug,
             "//conditions:default": cache_entries,
         }),
-        cmake_options = cmake_options,
+        generate_args = ["-GNinja"],
+        targets = ["", "install"],
+        # TODO: Remove install target and make this work
+        install = False,
         # TODO(lizan): Make this always true
         generate_crosstool_file = select({
             "@envoy//bazel:windows_x86_64": True,
             "//conditions:default": generate_crosstool_file,
         }),
         lib_source = lib_source,
-        make_commands = make_commands,
         postfix_script = pf,
-        static_libraries = static_libraries,
         **kwargs
     )
 

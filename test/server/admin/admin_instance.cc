@@ -9,7 +9,7 @@ namespace Server {
 AdminInstanceTest::AdminInstanceTest()
     : address_out_path_(TestEnvironment::temporaryPath("admin.address")),
       cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
-      admin_(cpu_profile_path_, server_), request_headers_{{":path", "/"}},
+      admin_(cpu_profile_path_, server_, false), request_headers_{{":path", "/"}},
       admin_filter_(admin_.createCallbackFunction()) {
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};

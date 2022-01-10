@@ -62,7 +62,7 @@ public:
       envoy::config::listener::v3::Filter ratelimit_filter;
       ratelimit_filter.set_name("envoy.filters.http.ratelimit");
       ratelimit_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ratelimit_filter));
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ratelimit_filter));
     });
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -344,7 +344,7 @@ TEST_P(RatelimitIntegrationTest, Timeout) {
     EXPECT_EQ(1, test_server_->counter("grpc.ratelimit.streams_total")->value());
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 
   // Rate limiter fails open

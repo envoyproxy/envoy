@@ -17,6 +17,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/codec_impl.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
 #endif
 
 #include "source/server/connection_handler_impl.h"
@@ -72,7 +73,7 @@ void FakeStream::postToConnectionThread(std::function<void()> cb) {
   parent_.postToConnectionThread(cb);
 }
 
-void FakeStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
+void FakeStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
   std::shared_ptr<Http::ResponseHeaderMap> headers_copy(
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
   postToConnectionThread([this, headers_copy]() -> void {
@@ -83,7 +84,7 @@ void FakeStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers
         return;
       }
     }
-    encoder_.encode100ContinueHeaders(*headers_copy);
+    encoder_.encode1xxHeaders(*headers_copy);
   });
 }
 
@@ -307,17 +308,17 @@ public:
   Http::Http1::ParserStatus onMessageCompleteBase() override {
     auto rc = ServerConnectionImpl::onMessageCompleteBase();
 
-    if (activeRequest().has_value() && activeRequest().value().request_decoder_) {
+    if (activeRequest() && activeRequest()->request_decoder_) {
       // Undo the read disable from the base class - we have many tests which
       // waitForDisconnect after a full request has been read which will not
       // receive the disconnect if reading is disabled.
-      activeRequest().value().response_encoder_.readDisable(false);
+      activeRequest()->response_encoder_.readDisable(false);
     }
     return rc;
   }
   ~TestHttp1ServerConnectionImpl() override {
-    if (activeRequest().has_value()) {
-      activeRequest().value().response_encoder_.clearReadDisableCallsForTests();
+    if (activeRequest()) {
+      activeRequest()->response_encoder_.clearReadDisableCallsForTests();
     }
   }
 };
@@ -394,6 +395,21 @@ void FakeHttpConnection::encodeGoAway() {
   ASSERT(type_ >= Http::CodecType::HTTP2);
 
   postToConnectionThread([this]() { codec_->goAway(); });
+}
+
+void FakeHttpConnection::updateConcurrentStreams(uint64_t max_streams) {
+  ASSERT(type_ >= Http::CodecType::HTTP3);
+
+#ifdef ENVOY_ENABLE_QUIC
+  postToConnectionThread([this, max_streams]() {
+    auto codec = dynamic_cast<Quic::QuicHttpServerConnectionImpl*>(codec_.get());
+    quic::test::QuicSessionPeer::SetMaxOpenIncomingBidirectionalStreams(&codec->quicServerSession(),
+                                                                        max_streams);
+    codec->quicServerSession().SendMaxStreams(1, false);
+  });
+#else
+  UNREFERENCED_PARAMETER(max_streams);
+#endif
 }
 
 void FakeHttpConnection::encodeProtocolError() {
@@ -510,7 +526,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, const FakeUpstreamConfig& config)
     : http_type_(config.upstream_protocol_), http2_options_(config.http2_options_),
-      http3_options_(config.http3_options_),
+      http3_options_(config.http3_options_), quic_options_(config.quic_options_),
       socket_(Network::SocketSharedPtr(listen_socket.release())),
       socket_factory_(std::make_unique<FakeListenSocketFactory>(socket_)),
       api_(Api::createApiForTest(stats_store_)), time_system_(config.time_system_),
@@ -729,9 +745,11 @@ testing::AssertionResult FakeUpstream::waitForUdpDatagram(Network::UdpRecvData& 
   return AssertionSuccess();
 }
 
-void FakeUpstream::onRecvDatagram(Network::UdpRecvData& data) {
+Network::FilterStatus FakeUpstream::onRecvDatagram(Network::UdpRecvData& data) {
   absl::MutexLock lock(&lock_);
   received_datagrams_.emplace_back(std::move(data));
+
+  return Network::FilterStatus::StopIteration;
 }
 
 AssertionResult FakeUpstream::runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb,

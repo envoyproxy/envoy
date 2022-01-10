@@ -423,8 +423,9 @@ TEST_P(HeaderMapImplTest, AllInlineHeaders) {
     INLINE_REQ_RESP_STRING_HEADERS(TEST_INLINE_STRING_HEADER_FUNCS)
   }
   {
-      // No request trailer O(1) headers.
-  } {
+    // No request trailer O(1) headers.
+  }
+  {
     auto header_map = ResponseHeaderMapImpl::create();
     INLINE_RESP_STRING_HEADERS(TEST_INLINE_STRING_HEADER_FUNCS)
     INLINE_REQ_RESP_STRING_HEADERS(TEST_INLINE_STRING_HEADER_FUNCS)
@@ -750,10 +751,6 @@ TEST_P(HeaderMapImplTest, DoubleCookieAdd) {
 }
 
 TEST_P(HeaderMapImplTest, AppendCookieHeadersWithSemicolon) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.header_map_correctly_coalesce_cookies")) {
-    return;
-  }
   TestRequestHeaderMapImpl headers;
   const std::string foo("foo=1");
   const std::string bar("bar=2");
