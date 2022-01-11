@@ -126,8 +126,7 @@ uint64_t OwnedImpl::copyOutToSlices(uint64_t size, Buffer::RawSlice* dest_slices
   uint64_t num_src_slices_read = 0;
   uint64_t dest_slice_off = 0;
   uint64_t src_slice_off = 0;
-  for (; num_dest_slices_read < num_slice && num_bytes_read < total_length_to_read &&
-         num_src_slices_read < slices_.size();) {
+  for (; num_dest_slices_read < num_slice && num_bytes_read < total_length_to_read;) {
     auto& src_slice = slices_[num_src_slices_read];
     auto& dest_slice = dest_slices[num_dest_slices_read];
     auto length_to_copy = std::min(
