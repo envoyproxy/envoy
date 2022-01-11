@@ -25,6 +25,8 @@ BBR
 BSON
 BPF
 Repick
+UI
+ajax
 btree
 CAS
 CB

@@ -43,9 +43,6 @@ public:
   Http::Code handlerStatsPrometheus(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsScopes(absl::string_view path_and_query,
-                                Http::ResponseHeaderMap& response_headers,
-                                Buffer::Instance& response, AdminStream&);
   Http::Code handlerContention(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);

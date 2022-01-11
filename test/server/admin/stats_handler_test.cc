@@ -292,7 +292,6 @@ TEST_P(AdminStatsTest, HandlerStatsScoped) {
        {"name":"scope4.c5", "value":5}],
     "scopes": []})");
   shutdownThreading();
-
 }
 
 TEST_P(AdminStatsTest, HandlerStatsJson) {
