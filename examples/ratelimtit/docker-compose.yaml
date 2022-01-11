@@ -1,0 +1,14 @@
+version: "3.7"
+services:
+  envoy-stat:
+    build:
+      context: .
+      dockerfile: Dockerfile-ratelimit
+    ports:
+    - "9901:9901"
+    - "9902:9902"
+    - "10000:10000"
+  service:
+    build:
+      context: .
+      dockerfile: Dockerfile-service
