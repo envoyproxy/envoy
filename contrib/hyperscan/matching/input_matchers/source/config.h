@@ -7,7 +7,10 @@
 
 #include "contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha/hyperscan.pb.h"
 #include "contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha/hyperscan.pb.validate.h"
+
+#ifndef HYPERSCAN_DISABLED
 #include "contrib/hyperscan/matching/input_matchers/source/matcher.h"
+#endif
 
 namespace Envoy {
 namespace Extensions {
@@ -21,13 +24,7 @@ public:
 
   Envoy::Matcher::InputMatcherFactoryCb createInputMatcherFactoryCb(
       const Protobuf::Message& config,
-      Server::Configuration::ServerFactoryContext& factory_context) override {
-    const auto& hyperscan_config = MessageUtil::downcastAndValidate<
-        const envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan&>(
-        config, factory_context.messageValidationVisitor());
-
-    return [hyperscan_config]() { return std::make_unique<Matcher>(hyperscan_config); };
-  }
+      Server::Configuration::ServerFactoryContext& factory_context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
         envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan>();
