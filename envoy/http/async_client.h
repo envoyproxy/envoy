@@ -294,7 +294,7 @@ public:
       child_span_name_ = child_span_name;
       return *this;
     }
-    RequestOptions& setSampled(bool sampled) {
+    RequestOptions& setSampled(absl::optional<bool> sampled) {
       sampled_ = sampled;
       return *this;
     }
@@ -313,7 +313,7 @@ public:
     // Only used if parent_span_ is set.
     std::string child_span_name_{""};
     // Sampling decision for the tracing span. The span is sampled by default.
-    bool sampled_{true};
+    absl::optional<bool> sampled_{true};
   };
 
   /**

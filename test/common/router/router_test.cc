@@ -4781,7 +4781,7 @@ TEST_F(RouterTest, Shadow) {
         EXPECT_NE(request->body().length(), 0);
         EXPECT_NE(nullptr, request->trailers());
         EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
-        EXPECT_TRUE(options.sampled_);
+        EXPECT_TRUE(options.sampled_.value());
       }));
   EXPECT_CALL(*shadow_writer_, shadow_("fizz", _, _))
       .WillOnce(Invoke([](const std::string&, Http::RequestMessagePtr& request,
@@ -4789,7 +4789,7 @@ TEST_F(RouterTest, Shadow) {
         EXPECT_NE(request->body().length(), 0);
         EXPECT_NE(nullptr, request->trailers());
         EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
-        EXPECT_FALSE(options.sampled_);
+        EXPECT_FALSE(options.sampled_.value());
       }));
   router_.decodeTrailers(trailers);
   EXPECT_EQ(1U,
