@@ -52,7 +52,7 @@ void GrpcClientImpl::createTrafficRoutingAssistant(
   }
 
   const auto& service_method = *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-      "contrib.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Create");
+      "envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Create");
   request_ =
       async_client_->send(service_method, request, *this, parent_span,
                           Http::AsyncClient::RequestOptions().setTimeout(timeout_).setParentContext(
@@ -70,7 +70,7 @@ void GrpcClientImpl::updateTrafficRoutingAssistant(
   }
 
   const auto& service_method = *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-      "contrib.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Update");
+      "envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Update");
   request_ =
       async_client_->send(service_method, request, *this, parent_span,
                           Http::AsyncClient::RequestOptions().setTimeout(timeout_).setParentContext(
@@ -87,7 +87,7 @@ void GrpcClientImpl::retrieveTrafficRoutingAssistant(const std::string& type,
   request.mutable_retrieve_request()->set_key(key);
 
   const auto& service_method = *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-      "contrib.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Retrieve");
+      "envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Retrieve");
   request_ =
       async_client_->send(service_method, request, *this, parent_span,
                           Http::AsyncClient::RequestOptions().setTimeout(timeout_).setParentContext(
@@ -103,7 +103,7 @@ void GrpcClientImpl::deleteTrafficRoutingAssistant(const std::string& type, cons
   request.mutable_delete_request()->set_key(key);
 
   const auto& service_method = *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-      "contrib.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Delete");
+      "envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Delete");
   request_ =
       async_client_->send(service_method, request, *this, parent_span,
                           Http::AsyncClient::RequestOptions().setTimeout(timeout_).setParentContext(
@@ -120,7 +120,7 @@ void GrpcClientImpl::subscribeTrafficRoutingAssistant(const std::string& type,
   request.mutable_subscribe_request();
 
   const auto& service_method = *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-      "contrib.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Subscribe");
+      "envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Subscribe");
   stream_ = async_client_->start(service_method, *this,
                                  Http::AsyncClient::StreamOptions().setParentContext(
                                      Http::AsyncClient::ParentContext{&stream_info}));

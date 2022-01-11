@@ -110,10 +110,9 @@ public:
           Operation(OperationType::Delete, raw_offset + pos,
                     DeleteOperationValue(
                         header.substr(pos, header.find_first_of(";>", pos + 1) - pos).size())));
-      // auto xsuri = header.find("sip:pcsf-cfed");
-      auto xsuri = header.find("x-suri=sip:");
-      if (xsuri != absl::string_view::npos) {
-        setOperation(Operation(OperationType::Delete, raw_offset + xsuri + strlen("x-suri="),
+      pos = header.find("x-suri=sip:");
+      if (pos != absl::string_view::npos) {
+        setOperation(Operation(OperationType::Delete, raw_offset + pos + strlen("x-suri="),
                                DeleteOperationValue(4)));
       }
     }

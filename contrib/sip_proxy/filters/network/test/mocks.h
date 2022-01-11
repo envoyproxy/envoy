@@ -114,8 +114,6 @@ public:
   MOCK_METHOD(std::shared_ptr<SipProxy::TrafficRoutingAssistantHandler>, traHandler, ());
   MOCK_METHOD(void, onReset, ());
   MOCK_METHOD(void, continueHanding, ());
-  // MOCK_METHOD(MessageMetadataSharedPtr, responseMetadata, ());
-  // MOCK_METHOD(bool, responseSuccess, ());
 
   uint64_t stream_id_{1};
   std::string transaction_id_{"test"};

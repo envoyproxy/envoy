@@ -106,7 +106,7 @@ private:
 };
 
 /**
- * Builds the Tra client.
+ * Builds the Traffic Routing Assistant client.
  */
 ClientPtr traClient(Server::Configuration::FactoryContext& context,
                     const envoy::config::core::v3::GrpcService& grpc_service,

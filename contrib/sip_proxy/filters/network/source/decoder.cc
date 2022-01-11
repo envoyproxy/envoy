@@ -670,7 +670,7 @@ void Decoder::getParamFromHeader(absl::string_view header, MessageMetadataShared
   std::size_t pos = 0;
   std::string pattern = "(.*)=(.*?)>*";
 
-  // If have both topline and top route, only keep one
+  // If have both top line and top route, only keep one
   metadata->resetParam();
 
   // Has "SIP/2.0" in top line
