@@ -26,6 +26,7 @@ common --experimental_allow_tags_propagation
 # Enable position independent code (this is the default on macOS and Windows)
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
 build:linux --copt=-fPIC
+build:linux --copt=-Wno-deprecated-declarations
 build:linux --cxxopt=-std=c++17
 build:linux --conlyopt=-fexceptions
 build:linux --fission=dbg,opt
@@ -41,7 +42,6 @@ build --action_env=CC
 build --action_env=CXX
 build --action_env=LLVM_CONFIG
 build --action_env=PATH
-build --copt=-Wno-deprecated-declarations
 
 # Common flags for sanitizers
 build:sanitizer --define tcmalloc=disabled
