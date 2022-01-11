@@ -26,7 +26,7 @@ void Filter::callCheck() {
                                                                config_->destinationLabels());
   // haitao: test this
   const std::string server_name(read_callbacks_->connection().requestedServerName());
-  if (!sni.empty()) {
+  if (!server_name.empty()) {
     auto attrs = check_request_.mutable_attributes();
     (*attrs->mutable_destination()->mutable_service()) = server_name
   }
