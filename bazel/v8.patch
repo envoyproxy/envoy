@@ -1,8 +1,9 @@
 # 1. Use already imported python dependencies.
 # 2. Fix the include path for //external:zlib.
+# 3. Remove -fPIC.
 
 diff --git a/BUILD.bazel b/BUILD.bazel
-index 4c6c8740db..a7bb0b4d34 100644
+index d03ca08c52..329d4141cd 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
 @@ -4,7 +4,7 @@
@@ -14,6 +15,18 @@ index 4c6c8740db..a7bb0b4d34 100644
  load(
      "@v8//:bazel/defs.bzl",
      "v8_binary",
+diff --git a/bazel/defs.bzl b/bazel/defs.bzl
+index 0e9559a65f..582c76bca1 100644
+--- a/bazel/defs.bzl
++++ b/bazel/defs.bzl
+@@ -99,7 +99,6 @@ def _default_args():
+         }),
+         copts = select({
+             "@v8//bazel/config:is_posix": [
+-                "-fPIC",
+                 "-fno-strict-aliasing",
+                 "-Werror",
+                 "-Wextra",
 diff --git a/src/snapshot/snapshot-utils.cc b/src/snapshot/snapshot-utils.cc
 index 6db6698d7e..b56d31085f 100644
 --- a/src/snapshot/snapshot-utils.cc
