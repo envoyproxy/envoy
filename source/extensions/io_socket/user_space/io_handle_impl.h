@@ -185,6 +185,17 @@ public:
     p.second->setPeerHandle(p.first.get());
     return p;
   }
+  static std::pair<IoHandleImplPtr, IoHandleImplPtr>
+  createBufferLimitedIoHandlePair(uint32_t buffer_size) {
+    auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(), new IoHandleImpl()};
+    // This buffer watermark setting emulates the OS socket buffer parameter
+    // `/proc/sys/net/ipv4/tcp_{r,w}mem`.
+    p.first->setWatermarks(buffer_size);
+    p.second->setWatermarks(buffer_size);
+    p.first->setPeerHandle(p.second.get());
+    p.second->setPeerHandle(p.first.get());
+    return p;
+  }
 };
 } // namespace UserSpace
 } // namespace IoSocket

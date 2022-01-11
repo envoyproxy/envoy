@@ -29,7 +29,10 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
   }
 
   auto [io_handle_client, io_handle_server] =
-      Extensions::IoSocket::UserSpace::IoHandleFactory::createIoHandlePair();
+      // 1MB is the default connection buffer size.
+      // TODO(lambdai): export as configuration.
+      Extensions::IoSocket::UserSpace::IoHandleFactory::createBufferLimitedIoHandlePair(1024 *
+                                                                                        1024);
 
   auto client_conn = std::make_unique<Network::ClientConnectionImpl>(
       dispatcher,
