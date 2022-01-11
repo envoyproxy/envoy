@@ -79,7 +79,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/wasm_runtime/wavm:0.0" # Not enabled in coverage build
 "source/extensions/watchdog:83.3" # Death tests within extensions
 "source/extensions/watchdog/profile_action:83.3"
-"source/server:93.5" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
+"source/server:93.3" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
 "source/server/admin:95.3"
 "source/server/config_validation:74.8"
 )

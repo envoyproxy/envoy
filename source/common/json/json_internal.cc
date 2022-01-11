@@ -109,7 +109,7 @@ private:
       return "String";
     }
 
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    return "";
   }
 
   struct Value {
@@ -205,8 +205,8 @@ public:
     // Colon will always exist in the parse error.
     auto end = error.find(": ");
     if (end == std::string::npos) {
-      ENVOY_BUG(false, "Error string not present. Check nlohmann/json "
-                       "documentation in case error string changed.");
+      IS_ENVOY_BUG("Error string not present. Check nlohmann/json "
+                   "documentation in case error string changed.");
     } else {
       // Extract portion after ": " to get error string.
       error_ = std::string(error.substr(end + 2));
