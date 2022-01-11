@@ -381,8 +381,6 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
     }
     break;
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -619,8 +617,8 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
       layers.emplace_back(std::make_unique<const ProtoLayer>(layer.name(), subscription->proto_));
       break;
     }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::LAYER_SPECIFIER_NOT_SET:
+      PANIC_DUE_TO_PROTO_UNSET;
     }
   }
   stats_.num_layers_.set(layers.size());

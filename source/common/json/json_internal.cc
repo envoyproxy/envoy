@@ -109,7 +109,7 @@ private:
       return "String";
     }
 
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    return "";
   }
 
   struct Value {
@@ -224,8 +224,8 @@ public:
       error_position_ = absl::StrCat("position: ", at);
       error_ = std::string(error.substr(prefix_end + 1));
     } else {
-      ENVOY_BUG(false, "Error string not present. Check nlohmann/json "
-                       "documentation in case error string changed.");
+      IS_ENVOY_BUG(false, "Error string not present. Check nlohmann/json "
+                          "documentation in case error string changed.");
     }
     return false;
   }

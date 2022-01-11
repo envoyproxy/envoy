@@ -45,7 +45,7 @@ public:
   void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override {
     // TODO(danzh): implement to support proxy. This interface is only called from
     // TCP proxy code.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("unexpected call to addBytesSentCallback");
   }
   void enableHalfClose(bool enabled) override;
   bool isHalfCloseEnabled() override;

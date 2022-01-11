@@ -74,7 +74,8 @@ TEST(ResolverTest, InternalListenerNameFromProtoAddress) {
 TEST(ResolverTest, UninitializedInternalAddressFromProtoAddress) {
   envoy::config::core::v3::Address internal_address;
   internal_address.mutable_envoy_internal_address();
-  EXPECT_DEATH(resolveProtoAddress(internal_address), "panic");
+  EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(internal_address), EnvoyException,
+                            "Failed to resolve address:envoy_internal_address {\n}\n");
 }
 
 // Validate correct handling of ipv4_compat field.
