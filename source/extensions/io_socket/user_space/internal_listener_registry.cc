@@ -12,12 +12,22 @@ namespace InternalListener {
 
 SINGLETON_MANAGER_REGISTRATION(internal_listener_registry);
 
+InternalListenerExtension::InternalListenerExtension(
+    Server::Configuration::ServerFactoryContext& server_context)
+    : server_context_(server_context),
+      tls_registry_(std::make_shared<TlsInternalListenerRegistry>()) {
+  // Initialize this singleton before the listener manager potentially load a static internal
+  // listener.
+  server_context_.singletonManager().getTyped<TlsInternalListenerRegistry>(
+      SINGLETON_MANAGER_REGISTERED_NAME(internal_listener_registry),
+      [registry = tls_registry_]() { return registry; });
+}
+
 void InternalListenerExtension::onServerInitialized() {
-  ENVOY_LOG_MISC(debug, "lambdai: InternalListenerExtension::onServerInitialized");
   std::shared_ptr<TlsInternalListenerRegistry> internal_listener_registry =
       server_context_.singletonManager().getTyped<TlsInternalListenerRegistry>(
-          SINGLETON_MANAGER_REGISTERED_NAME(internal_listener_registry),
-          [registry = tls_registry_]() { return registry; });
+          SINGLETON_MANAGER_REGISTERED_NAME(internal_listener_registry));
+
   // Save it in the singleton so the listener manager can obtain during a listener config update.
   ASSERT(internal_listener_registry == tls_registry_);
   ASSERT(internal_listener_registry->tls_slot_ == nullptr);

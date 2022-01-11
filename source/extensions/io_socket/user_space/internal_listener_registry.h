@@ -28,9 +28,8 @@ public:
 };
 class InternalListenerExtension : public Server::BootstrapExtension {
 public:
-  explicit InternalListenerExtension(Server::Configuration::ServerFactoryContext& server_context)
-      : server_context_(server_context),
-        tls_registry_(std::make_shared<TlsInternalListenerRegistry>()) {}
+  explicit InternalListenerExtension(Server::Configuration::ServerFactoryContext& server_context);
+
   ~InternalListenerExtension() override = default;
 
   // Server::Configuration::BootstrapExtension
