@@ -80,8 +80,12 @@ Matcher::DataInputGetResult TransportProtocolInput::get(const MatchingData& data
 }
 
 Matcher::DataInputGetResult ApplicationProtocolInput::get(const MatchingData& data) const {
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-          absl::StrJoin(data.socket().requestedApplicationProtocols(), ",")};
+  const auto& protocols = data.socket().requestedApplicationProtocols();
+  if (!protocols.empty()) {
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            absl::StrCat("'", absl::StrJoin(protocols, "','"), "'")};
+  }
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
 REGISTER_FACTORY(DestinationIPInputFactory, Matcher::DataInputFactory<MatchingData>);

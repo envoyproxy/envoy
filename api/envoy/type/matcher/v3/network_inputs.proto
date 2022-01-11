@@ -60,7 +60,11 @@ message ServerNameInput {
 message TransportProtocolInput {
 }
 
-// List of comma-separated requested application protocols, when detected by one of the listener filters.
+// List of quoted and comma-separated requested application protocols, when detected by one of the listener filters.
+// Examples:
+//
+// * ``'h2','http/1.1'``
+// * ``'h2c'```
 //
 // Suggested values in the list include:
 //
