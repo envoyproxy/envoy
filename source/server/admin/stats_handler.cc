@@ -234,6 +234,24 @@ protected:
 
 class StatsHandler::HtmlRender : public StatsHandler::TextRender {
 public:
+  HtmlRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response, StatsHandler& stats_handler,
+             const Params& params)
+      : response_(response) {
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
+    AdminHtmlGenerator html(response);
+    html.setVisibleSubmit(false);
+    html.setSubmitOnChange(true);
+    html.renderHead();
+    html.renderUrlHandler(stats_handler.statsHandler(), params.query_);
+    html.renderInput("scope", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
+    html.renderTail();
+    response.add("<body>\n");
+  }
+
+  ~HtmlRender()  {
+    response_.add("</body>\n");
+  }
+
   void noStats(Type type) override {
     groups_[type]; // Make an empty group for this type.
   }
@@ -271,6 +289,9 @@ public:
                               "    .then(data => populateScopes(data));\n"
                               "</script>\n"));
   }
+
+ private:
+  Buffer::Instance& response_;
 };
 
 class StatsHandler::JsonRender : public StatsHandler::Render {
@@ -466,26 +487,16 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
   std::unique_ptr<Render> render;
 
   switch (params.format_) {
-  case Format::Html: {
-    render = std::make_unique<HtmlRender>();
-    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
-    AdminHtmlGenerator html(response);
-    html.setVisibleSubmit(false);
-    html.setSubmitOnChange(true);
-    html.renderHead();
-    html.renderUrlHandler(statsHandler(), params.query_);
-    html.renderInput("scope", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
-    html.renderTail();
-    response.add("<body>\n");
+  case Format::Html:
+    render = std::make_unique<HtmlRender>(response_headers, response, *this, params);
     break;
-  }
   case Format::Json:
     render = std::make_unique<JsonRender>(params);
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
     break;
   case Format::Prometheus:
     ASSERT(false);
-    // fall through
+    ABSL_FALLTHROUGH_INTENDED;
   case Format::Text:
     render = std::make_unique<TextRender>();
     break;
