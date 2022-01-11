@@ -137,7 +137,7 @@ public:
     class InternalListenerConfigImpl : public Network::InternalListenerConfig {
     public:
       InternalListenerConfigImpl(MockInternalListenerRegistery& registry) : registry_(registry) {}
-      Network::InternalListenerRegistry& internalListenerRegistry() { return registry_; }
+      Network::InternalListenerRegistry& internalListenerRegistry() override { return registry_; }
       MockInternalListenerRegistery& registry_;
     };
 
