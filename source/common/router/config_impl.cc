@@ -927,7 +927,8 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   }
 
   if (!absl::StartsWith(final_path, "/")) {
-    final_path = absl::StrCat("/", final_path);
+    final_path_value = absl::StrCat("/", final_path);
+    final_path = final_path_value;
   }
 
   if (!path_redirect_has_query_ && strip_query_) {
