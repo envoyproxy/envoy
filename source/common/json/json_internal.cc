@@ -224,8 +224,8 @@ public:
       error_position_ = absl::StrCat("position: ", at);
       error_ = std::string(error.substr(prefix_end + 1));
     } else {
-      IS_ENVOY_BUG(false, "Error string not present. Check nlohmann/json "
-                          "documentation in case error string changed.");
+      IS_ENVOY_BUG("Error string not present. Check nlohmann/json "
+                   "documentation in case error string changed.");
     }
     return false;
   }
