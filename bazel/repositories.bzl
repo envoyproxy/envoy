@@ -528,10 +528,6 @@ def _io_hyperscan():
         name = "io_hyperscan",
         build_file_content = BUILD_ALL_CONTENT,
     )
-    native.bind(
-        name = "hyperscan",
-        actual = "@envoy//bazel/foreign_cc:hyperscan",
-    )
 
 def _io_opentracing_cpp():
     external_http_archive(

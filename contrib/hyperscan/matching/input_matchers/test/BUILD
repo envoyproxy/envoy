@@ -21,11 +21,9 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "hyperscan_speed_test",
     srcs = ["hyperscan_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-        "hyperscan",
-    ],
+    external_deps = ["benchmark"],
     deps = [
+        "//contrib/hyperscan/matching/input_matchers/source:hyperscan",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "@com_googlesource_code_re2//:re2",
