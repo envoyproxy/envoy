@@ -396,7 +396,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
     reset_reason = Http::StreamResetReason::Overflow;
     break;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
-    FALLTHRU;
+    [[fallthrough]];
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     reset_reason = Http::StreamResetReason::ConnectionFailure;
     break;
