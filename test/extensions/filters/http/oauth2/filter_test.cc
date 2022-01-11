@@ -279,6 +279,21 @@ TEST_F(OAuth2Test, InvalidCluster) {
                             "specify which cluster to direct OAuth requests to.");
 }
 
+// Verifies that we fail constructing the filter if the authorization endpoint isn't a valid URL.
+TEST_F(OAuth2Test, InvalidAuthorizationEndpoint) {
+  // Create a filter config with an invalid authorization_endpoint URL.
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  p.set_authorization_endpoint("INVALID_URL");
+  auto secret_reader = std::make_shared<MockSecretReader>();
+
+  EXPECT_THROW_WITH_MESSAGE(
+      std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader, scope_,
+                                     "test."),
+      EnvoyException, "OAuth2 filter: invalid authorization endpoint URL 'INVALID_URL' in config.");
+}
+
 // Verifies that the OAuth config is created with a default value for auth_scopes field when it is
 // not set in proto/yaml.
 TEST_F(OAuth2Test, DefaultAuthScope) {
