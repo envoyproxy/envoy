@@ -900,7 +900,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessIntervalJitterPercent) {
   }
 }
 
-TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious100Continue) {
+TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious1xx) {
   setupNoServiceValidationHC();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
@@ -921,8 +921,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious100Continue) {
 
   std::unique_ptr<Http::TestResponseHeaderMapImpl> continue_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "100"}});
-  test_sessions_[0]->stream_response_callbacks_->decode100ContinueHeaders(
-      std::move(continue_headers));
+  test_sessions_[0]->stream_response_callbacks_->decode1xxHeaders(std::move(continue_headers));
 
   respond(0, "200", false, false, true);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());

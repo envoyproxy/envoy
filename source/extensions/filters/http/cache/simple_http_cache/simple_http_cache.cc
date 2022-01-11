@@ -31,8 +31,8 @@ public:
   }
 
   void getTrailers(LookupTrailersCallback&&) override {
+    ENVOY_BUG(false, "trailers not supported");
     // TODO(toddmgreer): Support trailers.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   const LookupRequest& request() const { return request_; }
@@ -78,7 +78,7 @@ public:
   }
 
   void insertTrailers(const Http::ResponseTrailerMap&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // TODO(toddmgreer): support trailers
+    ENVOY_BUG(false, "trailers not supported");
   }
 
   void onDestroy() override {}
@@ -294,7 +294,8 @@ public:
         envoy::extensions::cache::simple_http_cache::v3::SimpleHttpCacheConfig>();
   }
   // From HttpCacheFactory
-  HttpCache& getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&) override {
+  HttpCache& getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&,
+                      Server::Configuration::FactoryContext&) override {
     return cache_;
   }
 

@@ -24,13 +24,23 @@ namespace Envoy {
 namespace Network {
 namespace {
 
-TEST(ConnectionSocketImplTest, LowerCaseRequestedServerName) {
+class ConnectionSocketImplTest : public testing::TestWithParam<Address::IpVersion> {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionSocketImplTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(ConnectionSocketImplTest, LowerCaseRequestedServerName) {
   absl::string_view serverName("www.EXAMPLE.com");
   absl::string_view expectedServerName("www.example.com");
   auto loopback_addr = Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4);
-  auto conn_socket_ = ConnectionSocketImpl(Socket::Type::Stream, loopback_addr, loopback_addr);
+  auto conn_socket_ = ConnectionSocketImpl(Socket::Type::Stream, loopback_addr, loopback_addr, {});
   conn_socket_.setRequestedServerName(serverName);
   EXPECT_EQ(expectedServerName, conn_socket_.requestedServerName());
+}
+
+TEST_P(ConnectionSocketImplTest, IpVersion) {
+  ClientSocketImpl socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr);
+  EXPECT_EQ(socket.ipVersion(), GetParam());
 }
 
 template <Network::Socket::Type Type>
@@ -119,7 +129,7 @@ protected:
       auto socket_result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
       EXPECT_TRUE(SOCKET_VALID(socket_result.return_value_));
       Network::IoHandlePtr io_handle =
-          std::make_unique<IoSocketHandleImpl>(socket_result.return_value_);
+          std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(socket_result.return_value_);
       auto socket3 = createListenSocketPtr(std::move(io_handle), addr, nullptr);
       EXPECT_EQ(socket3->connectionInfoProvider().localAddress()->asString(), addr->asString());
 
@@ -173,7 +183,7 @@ TEST_P(ListenSocketImplTestTcp, BindSpecificPort) { testBindSpecificPort(); }
 class TestListenSocket : public ListenSocketImpl {
 public:
   TestListenSocket(Address::InstanceConstSharedPtr address)
-      : ListenSocketImpl(std::make_unique<Network::IoSocketHandleImpl>(), address) {}
+      : ListenSocketImpl(std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(), address) {}
 
   TestListenSocket(Address::IpVersion ip_version)
       : ListenSocketImpl(/*io_handle=*/nullptr, ip_version == Address::IpVersion::v4
@@ -221,8 +231,8 @@ TEST_P(ListenSocketImplTestTcp, SupportedIpFamilyVirtualSocketIsCreatedWithNoBsd
   StackedScopedInjectableLoader<SocketInterface> new_interface(std::move(mock_interface));
 
   {
-    EXPECT_CALL(*mock_interface_ptr, socket(_, _)).Times(0);
-    EXPECT_CALL(*mock_interface_ptr, socket(_, _, _, _)).Times(0);
+    EXPECT_CALL(*mock_interface_ptr, socket(_, _, _)).Times(0);
+    EXPECT_CALL(*mock_interface_ptr, socket(_, _, _, _, _)).Times(0);
     TcpListenSocket virtual_listener_socket(any_address, nullptr,
                                             /*bind_to_port*/ false);
   }
@@ -236,8 +246,8 @@ TEST_P(ListenSocketImplTestTcp, DeathAtUnSupportedIpFamilyListenSocket) {
                                                               : Utility::getIpv4AnyAddress();
   StackedScopedInjectableLoader<SocketInterface> new_interface(std::move(mock_interface));
   {
-    EXPECT_CALL(*mock_interface_ptr, socket(_, _)).Times(0);
-    EXPECT_CALL(*mock_interface_ptr, socket(_, _, _, _)).Times(0);
+    EXPECT_CALL(*mock_interface_ptr, socket(_, _, _)).Times(0);
+    EXPECT_CALL(*mock_interface_ptr, socket(_, _, _, _, _)).Times(0);
     EXPECT_DEATH(
         {
           TcpListenSocket virtual_listener_socket(the_other_address, nullptr,

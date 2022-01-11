@@ -22,7 +22,7 @@ public:
       : credentials_provider_(new NiceMock<MockCredentialsProvider>()),
         message_(new Http::RequestMessageImpl()),
         signer_("service", "region", CredentialsProviderSharedPtr{credentials_provider_},
-                time_system_),
+                time_system_, Extensions::Common::Aws::AwsSigV4HeaderExclusionVector{}),
         credentials_("akid", "secret"), token_credentials_("akid", "secret", "token") {
     // 20180102T030405Z
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
@@ -48,7 +48,7 @@ public:
     headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
 
     SignerImpl signer(service_name, "region", CredentialsProviderSharedPtr{credentials_provider},
-                      time_system_);
+                      time_system_, Extensions::Common::Aws::AwsSigV4HeaderExclusionVector{});
     if (use_unsigned_payload) {
       signer.signUnsignedPayload(headers);
     } else {

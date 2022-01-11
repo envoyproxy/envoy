@@ -93,6 +93,7 @@ TEST_F(OptionsImplTest, All) {
       "--disable-hot-restart --cpuset-threads --allow-unknown-static-fields "
       "--reject-unknown-dynamic-fields --base-id 5 "
       "--use-dynamic-base-id --base-id-path /foo/baz "
+      "--stats-tag foo:bar --stats-tag baz:bar "
       "--socket-path /foo/envoy_domain_socket --socket-mode 644");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
@@ -120,6 +121,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ("/foo/baz", options->baseIdPath());
   EXPECT_EQ("/foo/envoy_domain_socket", options->socketPath());
   EXPECT_EQ(0644, options->socketMode());
+  EXPECT_EQ(2U, options->statsTags().size());
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
@@ -181,6 +183,7 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setRejectUnknownFieldsDynamic(true);
   options->setSocketPath("/foo/envoy_domain_socket");
   options->setSocketMode(0644);
+  options->setStatsTags({{"foo", "bar"}});
 
   EXPECT_EQ(109876, options->baseId());
   EXPECT_EQ(true, options->useDynamicBaseId());
@@ -244,6 +247,8 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(options->cpusetThreadsEnabled(), command_line_options->cpuset_threads());
   EXPECT_EQ(options->socketPath(), command_line_options->socket_path());
   EXPECT_EQ(options->socketMode(), command_line_options->socket_mode());
+  EXPECT_EQ(1U, command_line_options->stats_tag().size());
+  EXPECT_EQ("foo:bar", command_line_options->stats_tag(0));
 }
 
 TEST_F(OptionsImplTest, DefaultParams) {
@@ -257,6 +262,7 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_EQ(spdlog::level::warn, options->logLevel());
   EXPECT_EQ("@envoy_domain_socket", options->socketPath());
   EXPECT_EQ(0, options->socketMode());
+  EXPECT_EQ(0U, options->statsTags().size());
   EXPECT_FALSE(options->hotRestartDisabled());
   EXPECT_FALSE(options->cpusetThreadsEnabled());
 
@@ -275,6 +281,7 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_FALSE(command_line_options->cpuset_threads());
   EXPECT_FALSE(command_line_options->allow_unknown_static_fields());
   EXPECT_FALSE(command_line_options->reject_unknown_dynamic_fields());
+  EXPECT_EQ(0, options->statsTags().size());
 }
 
 // Validates that the server_info proto is in sync with the options.
@@ -390,6 +397,38 @@ TEST_F(OptionsImplTest, WarnIsValidLogLevel) {
 TEST_F(OptionsImplTest, AllowedLogLevels) {
   EXPECT_EQ("[trace][debug][info][warning|warn][error][critical][off]",
             OptionsImpl::allowedLogLevels());
+}
+
+TEST_F(OptionsImplTest, InvalidStatsTags) {
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --stats-tag foo"), MalformedArgvException,
+                          "error: misformatted stats-tag 'foo'");
+}
+
+TEST_F(OptionsImplTest, InvalidCharsInStatsTags) {
+  EXPECT_THROW_WITH_REGEX(
+      createOptionsImpl("envoy --stats-tag foo:b.ar"), MalformedArgvException,
+      "error: misformatted stats-tag 'foo:b.ar' contains invalid char in 'b.ar'");
+  EXPECT_THROW_WITH_REGEX(
+      createOptionsImpl("envoy --stats-tag foo:b.a.r"), MalformedArgvException,
+      "error: misformatted stats-tag 'foo:b.a.r' contains invalid char in 'b.a.r'");
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --stats-tag f_o:bar"), MalformedArgvException,
+                          "error: misformatted stats-tag 'f_o:bar' contains invalid char in 'f_o'");
+}
+
+TEST_F(OptionsImplTest, ValidStatsTagsCharacters) {
+  Stats::TagVector test_tags{
+      Stats::Tag{"foo", "bar"},
+      Stats::Tag{"foo", "b:ar"},
+      Stats::Tag{"foo", "b_-ar"},
+  };
+
+  for (const auto& tag : test_tags) {
+    std::unique_ptr<OptionsImpl> options =
+        createOptionsImpl(fmt::format("envoy --stats-tag {}:{}", tag.name_, tag.value_));
+    EXPECT_EQ(options->statsTags().size(), 1);
+    EXPECT_EQ(options->statsTags()[0].name_, tag.name_);
+    EXPECT_EQ(options->statsTags()[0].value_, tag.value_);
+  }
 }
 
 // Test that the test constructor comes up with the same default values as the main constructor.

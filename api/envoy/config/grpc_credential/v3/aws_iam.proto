@@ -9,6 +9,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.grpc_credential.v3";
 option java_outer_classname = "AwsIamProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/grpc_credential/v3;grpc_credentialv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Grpc Credentials AWS IAM]

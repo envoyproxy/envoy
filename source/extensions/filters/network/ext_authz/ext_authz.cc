@@ -94,6 +94,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
        !config_->failureModeAllow())) {
     config_->stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    filter_callbacks_->connection().streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::UnauthorizedExternalService);
+    filter_callbacks_->connection().streamInfo().setResponseCodeDetails(
+        response->status == Filters::Common::ExtAuthz::CheckStatus::Denied
+            ? Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied
+            : Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
   } else {
     // Let the filter chain continue.
     filter_return_ = FilterReturn::Continue;

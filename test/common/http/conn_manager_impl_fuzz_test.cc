@@ -473,7 +473,7 @@ public:
         auto headers = std::make_unique<TestResponseHeaderMapImpl>(
             Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.continue_headers()));
         headers->setReferenceKey(Headers::get().Status, "100");
-        decoder_filter_->callbacks_->encode100ContinueHeaders(std::move(headers));
+        decoder_filter_->callbacks_->encode1xxHeaders(std::move(headers));
         // We don't allow multiple 100-continue headers in HCM, UpstreamRequest is responsible
         // for coalescing.
         state = StreamState::PendingNonInformationalHeaders;

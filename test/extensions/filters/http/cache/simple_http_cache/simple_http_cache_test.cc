@@ -6,6 +6,7 @@
 #include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
 #include "test/extensions/filters/http/cache/common.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -275,8 +276,10 @@ TEST(Registration, GetFactory) {
       "envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig");
   ASSERT_NE(factory, nullptr);
   envoy::extensions::filters::http::cache::v3::CacheConfig config;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   config.mutable_typed_config()->PackFrom(*factory->createEmptyConfigProto());
-  EXPECT_EQ(factory->getCache(config).cacheInfo().name_, "envoy.extensions.http.cache.simple");
+  EXPECT_EQ(factory->getCache(config, factory_context).cacheInfo().name_,
+            "envoy.extensions.http.cache.simple");
 }
 
 TEST_F(SimpleHttpCacheTest, VaryResponses) {
@@ -343,17 +346,25 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersAndMetadata) {
   const std::string time_value_1 = formatter_.fromTime(time_source_.systemTime());
   Http::TestResponseHeaderMapImpl response_headers{{"date", time_value_1},
                                                    {"cache-control", "public,max-age=3600"}};
+  Http::TestResponseHeaderMapImpl response_headers_with_age(response_headers);
+  response_headers_with_age.setReferenceKey(Http::LowerCaseString("age"), "0");
+
   insert(request_path_1, response_headers, "body");
-  EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers));
+  EXPECT_TRUE(
+      expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_with_age));
 
   // Update the date field in the headers
   time_source_.advanceTimeWait(Seconds(3601));
   const SystemTime time_2 = time_source_.systemTime();
   const std::string time_value_2 = formatter_.fromTime(time_2);
-  response_headers = Http::TestResponseHeaderMapImpl{{"date", time_value_2},
-                                                     {"cache-control", "public,max-age=3600"}};
-  updateHeaders(request_path_1, response_headers, {time_2});
-  EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers));
+  Http::TestResponseHeaderMapImpl response_headers_2 = Http::TestResponseHeaderMapImpl{
+      {"date", time_value_2}, {"cache-control", "public,max-age=3600"}};
+  Http::TestResponseHeaderMapImpl response_headers_with_age_2(response_headers_2);
+  response_headers_with_age_2.setReferenceKey(Http::LowerCaseString("age"), "0");
+
+  updateHeaders(request_path_1, response_headers_2, {time_2});
+  EXPECT_TRUE(
+      expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_with_age_2));
 }
 
 TEST_F(SimpleHttpCacheTest, UpdateHeadersForMissingKey) {
@@ -373,6 +384,8 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersDisabledForVaryHeaders) {
                                                      {"accept", "image/*"},
                                                      {"vary", "accept"}};
   insert(request_path_1, response_headers_1, "body");
+  // An age header is inserted by `makeLookUpResult`
+  response_headers_1.setReferenceKey(Http::LowerCaseString("age"), "0");
   EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_1));
 
   // Update the date field in the headers
@@ -384,7 +397,8 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersDisabledForVaryHeaders) {
                                                      {"accept", "image/*"},
                                                      {"vary", "accept"}};
   updateHeaders(request_path_1, response_headers_2, {time_2});
-
+  response_headers_1.setReferenceKey(Http::LowerCaseString("age"), "3600");
+  // the age is still 0 because an entry is considered fresh after validation
   EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_1));
 }
 
@@ -394,6 +408,8 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipEtagHeader) {
   Http::TestResponseHeaderMapImpl response_headers_1{
       {"date", time_value_1}, {"cache-control", "public,max-age=3600"}, {"etag", "0000-0000"}};
   insert(request_path_1, response_headers_1, "body");
+  // An age header is inserted by `makeLookUpResult`
+  response_headers_1.setReferenceKey(Http::LowerCaseString("age"), "0");
   EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_1));
 
   // Update the date field in the headers
@@ -407,7 +423,7 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipEtagHeader) {
       {"date", time_value_2}, {"cache-control", "public,max-age=3600"}, {"etag", "0000-0000"}};
 
   updateHeaders(request_path_1, response_headers_2, {time_2});
-
+  response_headers_3.setReferenceKey(Http::LowerCaseString("age"), "0");
   EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_3));
 }
 
@@ -425,6 +441,9 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipSpecificHeaders) {
       {"etag", "1111-1111"},
       {"link", "<https://example.com>; rel=\"preconnect\""}};
   insert(request_path_1, origin_response_headers, "body");
+
+  // An age header is inserted by `makeLookUpResult`
+  origin_response_headers.setReferenceKey(Http::LowerCaseString("age"), "0");
   EXPECT_TRUE(
       expectLookupSuccessWithHeaders(lookup(request_path_1).get(), origin_response_headers));
   time_source_.advanceTimeWait(Seconds(100));
@@ -454,7 +473,6 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipSpecificHeaders) {
       {"link", "<https://changed.com>; rel=\"preconnect\""}};
 
   updateHeaders(request_path_1, incoming_response_headers, {time_2});
-
   EXPECT_TRUE(
       expectLookupSuccessWithHeaders(lookup(request_path_1).get(), expected_response_headers));
 }
@@ -471,6 +489,9 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersWithMultivalue) {
       {"link", "<https://www.example.com>; rel=\"preconnect\""},
       {"link", "<https://example.com>; rel=\"preconnect\""}};
   insert(request_path_1, response_headers_1, "body");
+
+  // An age header is inserted by `makeLookUpResult`
+  response_headers_1.setReferenceKey(Http::LowerCaseString("age"), "0");
   EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_1));
 
   Http::TestResponseHeaderMapImpl response_headers_2{
@@ -481,6 +502,7 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersWithMultivalue) {
 
   updateHeaders(request_path_1, response_headers_2, {time_1});
 
+  response_headers_2.setReferenceKey(Http::LowerCaseString("age"), "0");
   EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_2));
 }
 

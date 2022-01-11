@@ -15,7 +15,6 @@ envoy_cc_library(
     deps = [
         ":socket_interface_lib",
         "//envoy/network:address_interface",
-        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:safe_memcpy_lib",
         "//source/common/common:statusor_lib",
@@ -64,6 +63,7 @@ envoy_cc_library(
     hdrs = ["connection_impl_base.h"],
     deps = [
         ":filter_manager_lib",
+        ":listen_socket_lib",
         "//envoy/common:scope_tracker_interface",
         "//envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
@@ -109,46 +109,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "apple_dns_lib",
-    srcs = select({
-        "//bazel:apple": ["apple_dns_impl.cc"],
-        "//conditions:default": [],
-    }),
-    hdrs = select({
-        "//bazel:apple": ["apple_dns_impl.h"],
-        "//conditions:default": [],
-    }),
-    deps = [
-        ":address_lib",
-        ":utility_lib",
-        "//envoy/event:dispatcher_interface",
-        "//envoy/event:file_event_interface",
-        "//envoy/event:timer_interface",
-        "//envoy/network:dns_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:backoff_lib",
-        "//source/common/common:linked_object",
-        "//source/common/singleton:threadsafe_singleton",
-    ],
-)
-
-envoy_cc_library(
-    name = "dns_lib",
-    srcs = ["dns_impl.cc"],
-    hdrs = ["dns_impl.h"],
-    external_deps = ["ares"],
-    deps = [
-        ":address_lib",
-        ":utility_lib",
-        "//envoy/event:dispatcher_interface",
-        "//envoy/event:file_event_interface",
-        "//envoy/network:dns_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:linked_object",
-    ],
-)
-
-envoy_cc_library(
     name = "filter_lib",
     hdrs = ["filter_impl.h"],
     deps = [
@@ -173,6 +133,8 @@ envoy_cc_library(
     srcs = ["hash_policy.cc"],
     hdrs = ["hash_policy.h"],
     deps = [
+        "//envoy/common:hashable_interface",
+        "//envoy/network:connection_interface",
         "//envoy/network:hash_policy_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
@@ -222,10 +184,12 @@ envoy_cc_library(
     srcs = [
         "io_socket_handle_impl.cc",
         "socket_interface_impl.cc",
+        "win32_socket_handle_impl.cc",
     ],
     hdrs = [
         "io_socket_handle_impl.h",
         "socket_interface_impl.h",
+        "win32_socket_handle_impl.h",
     ],
     deps = [
         ":address_lib",

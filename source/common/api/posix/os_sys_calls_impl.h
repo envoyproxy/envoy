@@ -26,6 +26,7 @@ public:
   bool supportsUdpGro() const override;
   bool supportsUdpGso() const override;
   bool supportsIpTransparent() const override;
+  bool supportsMptcp() const override;
   SysCallIntResult close(os_fd_t fd) override;
   SysCallIntResult ftruncate(int fd, off_t length) override;
   SysCallPtrResult mmap(void* addr, size_t length, int prot, int flags, int fd,
@@ -49,6 +50,8 @@ public:
   SysCallSocketResult duplicate(os_fd_t oldfd) override;
   SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen) override;
   SysCallBoolResult socketTcpInfo(os_fd_t sockfd, EnvoyTcpInfo* tcp_info) override;
+  bool supportsGetifaddrs() const override;
+  SysCallIntResult getifaddrs(InterfaceAddressVector& interfaces) override;
 };
 
 using OsSysCallsSingleton = ThreadSafeSingleton<OsSysCallsImpl>;

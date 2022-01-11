@@ -253,22 +253,11 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
   std::string body;
+  MockTimeSystem time_system;
+  auto& upstream_timing = stream_info.upstream_info_->upstreamTiming();
 
   {
     StreamInfoFormatter request_duration_format("REQUEST_DURATION");
-    absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(5000000);
-    EXPECT_CALL(stream_info, lastDownstreamRxByteReceived()).WillRepeatedly(Return(dur));
-    EXPECT_EQ("5", request_duration_format.format(request_headers, response_headers,
-                                                  response_trailers, stream_info, body));
-    EXPECT_THAT(request_duration_format.formatValue(request_headers, response_headers,
-                                                    response_trailers, stream_info, body),
-                ProtoEq(ValueUtil::numberValue(5.0)));
-  }
-
-  {
-    StreamInfoFormatter request_duration_format("REQUEST_DURATION");
-    absl::optional<std::chrono::nanoseconds> dur;
-    EXPECT_CALL(stream_info, lastDownstreamRxByteReceived()).WillRepeatedly(Return(dur));
     EXPECT_EQ(absl::nullopt, request_duration_format.format(request_headers, response_headers,
                                                             response_trailers, stream_info, body));
     EXPECT_THAT(request_duration_format.formatValue(request_headers, response_headers,
@@ -277,20 +266,19 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfoFormatter request_tx_duration_format("REQUEST_TX_DURATION");
-    absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
-    EXPECT_CALL(stream_info, lastUpstreamTxByteSent()).WillRepeatedly(Return(dur));
-    EXPECT_EQ("15", request_tx_duration_format.format(request_headers, response_headers,
-                                                      response_trailers, stream_info, body));
-    EXPECT_THAT(request_tx_duration_format.formatValue(request_headers, response_headers,
-                                                       response_trailers, stream_info, body),
-                ProtoEq(ValueUtil::numberValue(15.0)));
+    StreamInfoFormatter request_duration_format("REQUEST_DURATION");
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+    stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
+    EXPECT_EQ("5", request_duration_format.format(request_headers, response_headers,
+                                                  response_trailers, stream_info, body));
+    EXPECT_THAT(request_duration_format.formatValue(request_headers, response_headers,
+                                                    response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(5.0)));
   }
 
   {
     StreamInfoFormatter request_tx_duration_format("REQUEST_TX_DURATION");
-    absl::optional<std::chrono::nanoseconds> dur;
-    EXPECT_CALL(stream_info, lastUpstreamTxByteSent()).WillRepeatedly(Return(dur));
     EXPECT_EQ(absl::nullopt,
               request_tx_duration_format.format(request_headers, response_headers,
                                                 response_trailers, stream_info, body));
@@ -300,20 +288,19 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfoFormatter response_duration_format("RESPONSE_DURATION");
-    absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(10000000);
-    EXPECT_CALL(stream_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur));
-    EXPECT_EQ("10", response_duration_format.format(request_headers, response_headers,
-                                                    response_trailers, stream_info, body));
-    EXPECT_THAT(response_duration_format.formatValue(request_headers, response_headers,
-                                                     response_trailers, stream_info, body),
-                ProtoEq(ValueUtil::numberValue(10.0)));
+    StreamInfoFormatter request_tx_duration_format("REQUEST_TX_DURATION");
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(15000000))));
+    upstream_timing.onLastUpstreamTxByteSent(time_system);
+    EXPECT_EQ("15", request_tx_duration_format.format(request_headers, response_headers,
+                                                      response_trailers, stream_info, body));
+    EXPECT_THAT(request_tx_duration_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(15.0)));
   }
 
   {
     StreamInfoFormatter response_duration_format("RESPONSE_DURATION");
-    absl::optional<std::chrono::nanoseconds> dur;
-    EXPECT_CALL(stream_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur));
     EXPECT_EQ(absl::nullopt, response_duration_format.format(request_headers, response_headers,
                                                              response_trailers, stream_info, body));
     EXPECT_THAT(response_duration_format.formatValue(request_headers, response_headers,
@@ -322,27 +309,19 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfoFormatter ttlb_duration_format("RESPONSE_TX_DURATION");
-
-    absl::optional<std::chrono::nanoseconds> dur_upstream = std::chrono::nanoseconds(10000000);
-    EXPECT_CALL(stream_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur_upstream));
-    absl::optional<std::chrono::nanoseconds> dur_downstream = std::chrono::nanoseconds(25000000);
-    EXPECT_CALL(stream_info, lastDownstreamTxByteSent()).WillRepeatedly(Return(dur_downstream));
-
-    EXPECT_EQ("15", ttlb_duration_format.format(request_headers, response_headers,
-                                                response_trailers, stream_info, body));
-    EXPECT_THAT(ttlb_duration_format.formatValue(request_headers, response_headers,
-                                                 response_trailers, stream_info, body),
-                ProtoEq(ValueUtil::numberValue(15.0)));
+    StreamInfoFormatter response_duration_format("RESPONSE_DURATION");
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(10000000))));
+    upstream_timing.onFirstUpstreamRxByteReceived(time_system);
+    EXPECT_EQ("10", response_duration_format.format(request_headers, response_headers,
+                                                    response_trailers, stream_info, body));
+    EXPECT_THAT(response_duration_format.formatValue(request_headers, response_headers,
+                                                     response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(10.0)));
   }
 
   {
     StreamInfoFormatter ttlb_duration_format("RESPONSE_TX_DURATION");
-
-    absl::optional<std::chrono::nanoseconds> dur_upstream;
-    EXPECT_CALL(stream_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur_upstream));
-    absl::optional<std::chrono::nanoseconds> dur_downstream;
-    EXPECT_CALL(stream_info, lastDownstreamTxByteSent()).WillRepeatedly(Return(dur_downstream));
 
     EXPECT_EQ(absl::nullopt, ttlb_duration_format.format(request_headers, response_headers,
                                                          response_trailers, stream_info, body));
@@ -352,12 +331,62 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter ttlb_duration_format("RESPONSE_TX_DURATION");
+
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(25000000))));
+    stream_info.downstream_timing_.onLastDownstreamTxByteSent(time_system);
+
+    EXPECT_EQ("15", ttlb_duration_format.format(request_headers, response_headers,
+                                                response_trailers, stream_info, body));
+    EXPECT_THAT(ttlb_duration_format.formatValue(request_headers, response_headers,
+                                                 response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(15.0)));
+  }
+
+  {
     StreamInfoFormatter bytes_received_format("BYTES_RECEIVED");
     EXPECT_CALL(stream_info, bytesReceived()).WillRepeatedly(Return(1));
     EXPECT_EQ("1", bytes_received_format.format(request_headers, response_headers,
                                                 response_trailers, stream_info, body));
     EXPECT_THAT(bytes_received_format.formatValue(request_headers, response_headers,
                                                   response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(1.0)));
+  }
+
+  {
+    StreamInfoFormatter attempt_count_format("UPSTREAM_REQUEST_ATTEMPT_COUNT");
+    absl::optional<uint32_t> attempt_count{3};
+    EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(attempt_count));
+    EXPECT_EQ("3", attempt_count_format.format(request_headers, response_headers, response_trailers,
+                                               stream_info, body));
+    EXPECT_THAT(attempt_count_format.formatValue(request_headers, response_headers,
+                                                 response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(3.0)));
+  }
+
+  {
+    StreamInfoFormatter attempt_count_format("UPSTREAM_REQUEST_ATTEMPT_COUNT");
+    absl::optional<uint32_t> attempt_count;
+    EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(attempt_count));
+    EXPECT_EQ("0", attempt_count_format.format(request_headers, response_headers, response_trailers,
+                                               stream_info, body));
+    EXPECT_THAT(attempt_count_format.formatValue(request_headers, response_headers,
+                                                 response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(0.0)));
+  }
+
+  {
+    StreamInfo::BytesMeterSharedPtr upstream_bytes_meter{
+        std::make_shared<StreamInfo::BytesMeter>()};
+    upstream_bytes_meter->addWireBytesReceived(1);
+    StreamInfoFormatter wire_bytes_received_format("UPSTREAM_WIRE_BYTES_RECEIVED");
+    EXPECT_CALL(stream_info, getUpstreamBytesMeter())
+        .WillRepeatedly(ReturnRef(upstream_bytes_meter));
+    EXPECT_EQ("1", wire_bytes_received_format.format(request_headers, response_headers,
+                                                     response_trailers, stream_info, body));
+    EXPECT_THAT(wire_bytes_received_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
                 ProtoEq(ValueUtil::numberValue(1.0)));
   }
 
@@ -451,6 +480,20 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfo::BytesMeterSharedPtr upstream_bytes_meter{
+        std::make_shared<StreamInfo::BytesMeter>()};
+    upstream_bytes_meter->addWireBytesSent(1);
+    StreamInfoFormatter wire_bytes_sent_format("UPSTREAM_WIRE_BYTES_SENT");
+    EXPECT_CALL(stream_info, getUpstreamBytesMeter())
+        .WillRepeatedly(ReturnRef(upstream_bytes_meter));
+    EXPECT_EQ("1", wire_bytes_sent_format.format(request_headers, response_headers,
+                                                 response_trailers, stream_info, body));
+    EXPECT_THAT(wire_bytes_sent_format.formatValue(request_headers, response_headers,
+                                                   response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(1.0)));
+  }
+
+  {
     StreamInfoFormatter duration_format("DURATION");
     absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
     EXPECT_CALL(stream_info, requestComplete()).WillRepeatedly(Return(dur));
@@ -486,8 +529,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     const std::string observable_cluster_name = "observability_name";
     auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
-    // Make sure that cluster info is obtained without calling upstreamHost.
-    EXPECT_CALL(stream_info, upstreamHost()).Times(0);
     EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
     EXPECT_CALL(*cluster_info_mock, observabilityName())
         .WillRepeatedly(ReturnRef(observable_cluster_name));
@@ -506,8 +547,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     const std::string upstream_cluster_name = "cluster_name";
     auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
-    // Make sure that cluster info is obtained without calling upstreamHost.
-    EXPECT_CALL(stream_info, upstreamHost()).Times(0);
     EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
     EXPECT_CALL(*cluster_info_mock, name()).WillRepeatedly(ReturnRef(upstream_cluster_name));
     EXPECT_EQ("cluster_name", upstream_format.format(request_headers, response_headers,
@@ -520,8 +559,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = nullptr;
-    // Make sure that cluster info is obtained without calling upstreamHost.
-    EXPECT_CALL(stream_info, upstreamHost()).Times(0);
     EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
                                                     response_trailers, stream_info, body));
@@ -532,7 +569,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter upstream_format("UPSTREAM_HOST");
-    EXPECT_CALL(stream_info, upstreamHost()).WillRepeatedly(Return(nullptr));
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
                                                     response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -692,8 +729,57 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                             stream_info, body),
                 ProtoEq(ValueUtil::nullValue()));
   }
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_TRANSPORT_FAILURE_REASON");
+    std::string upstream_transport_failure_reason = "SSL error";
+    stream_info.upstreamInfo()->setUpstreamTransportFailureReason(
+        upstream_transport_failure_reason);
+    EXPECT_EQ("SSL error", upstream_format.format(request_headers, response_headers,
+                                                  response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("SSL error")));
+  }
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_TRANSPORT_FAILURE_REASON");
+    std::string upstream_transport_failure_reason;
+    stream_info.upstreamInfo()->setUpstreamTransportFailureReason(
+        upstream_transport_failure_reason);
+    EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
+                                                    response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+}
+
+TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
+  EXPECT_THROW(StreamInfoFormatter formatter("unknown_field"), EnvoyException);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  std::string body;
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("VIRTUAL_CLUSTER_NAME");
+    std::string virtual_cluster_name = "authN";
+    stream_info.setVirtualClusterName(virtual_cluster_name);
+    EXPECT_EQ("authN", upstream_format.format(request_headers, response_headers, response_trailers,
+                                              stream_info, body));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("VIRTUAL_CLUSTER_NAME");
+    EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
+                                                    response_trailers, stream_info, body));
+  }
+
+  {
+    // Use a local stream info for these tests as as setSslConnection can only be called once.
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_URI_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san"};
@@ -707,6 +793,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_URI_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san1", "san2"};
@@ -716,6 +803,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                                   response_trailers, stream_info, body));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_URI_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, uriSanPeerCertificate())
@@ -728,6 +816,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_URI_SAN");
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
@@ -737,6 +826,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_URI_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san"};
@@ -749,6 +839,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::stringValue("san")));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_URI_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san1", "san2"};
@@ -758,6 +849,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                                   response_trailers, stream_info, body));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_URI_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, uriSanLocalCertificate())
@@ -770,6 +862,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_URI_SAN");
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
@@ -779,6 +872,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_SUBJECT");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::string subject_local = "subject";
@@ -792,6 +886,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::stringValue("subject")));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_SUBJECT");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, subjectLocalCertificate())
@@ -804,6 +899,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_SUBJECT");
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
@@ -813,6 +909,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::string subject_peer = "subject";
@@ -825,6 +922,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::stringValue("subject")));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillRepeatedly(ReturnRef(EMPTY_STRING));
@@ -836,6 +934,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
@@ -845,6 +944,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_SESSION_ID");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::string session_id = "deadbeef";
@@ -857,6 +957,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::stringValue("deadbeef")));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_SESSION_ID");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, sessionId()).WillRepeatedly(ReturnRef(EMPTY_STRING));
@@ -868,6 +969,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_SESSION_ID");
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
@@ -877,6 +979,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_CIPHER");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, ciphersuiteString())
@@ -887,6 +990,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                      stream_info, body));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_CIPHER");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, ciphersuiteString()).WillRepeatedly(Return(""));
@@ -898,6 +1002,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_CIPHER");
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
@@ -907,6 +1012,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_VERSION");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     std::string tlsVersion = "TLSv1.2";
@@ -919,6 +1025,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::stringValue("TLSv1.2")));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_VERSION");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, tlsVersion()).WillRepeatedly(ReturnRef(EMPTY_STRING));
@@ -930,6 +1037,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_VERSION");
@@ -940,6 +1048,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_FINGERPRINT_256");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     std::string expected_sha = "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f";
@@ -953,6 +1062,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::stringValue(expected_sha)));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_FINGERPRINT_256");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     std::string expected_sha;
@@ -966,6 +1076,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_FINGERPRINT_256");
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
@@ -975,6 +1086,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_FINGERPRINT_1");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     std::string expected_sha = "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f";
@@ -988,6 +1100,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::stringValue(expected_sha)));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_FINGERPRINT_1");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     std::string expected_sha;
@@ -1001,6 +1114,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_FINGERPRINT_1");
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
@@ -1010,6 +1124,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SERIAL");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::string serial_number = "b8b5ecc898f2124a";
@@ -1023,6 +1138,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::stringValue("b8b5ecc898f2124a")));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SERIAL");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, serialNumberPeerCertificate())
@@ -1035,6 +1151,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SERIAL");
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
@@ -1044,6 +1161,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::string issuer_peer =
@@ -1055,6 +1173,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                      stream_info, body));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, issuerPeerCertificate()).WillRepeatedly(ReturnRef(EMPTY_STRING));
@@ -1066,6 +1185,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER");
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
@@ -1075,6 +1195,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::string subject_peer =
@@ -1086,6 +1207,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                      stream_info, body));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillRepeatedly(ReturnRef(EMPTY_STRING));
@@ -1097,6 +1219,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
@@ -1106,6 +1229,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     std::string expected_cert = "<some cert>";
@@ -1119,6 +1243,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::stringValue(expected_cert)));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     std::string expected_cert = "";
@@ -1132,30 +1257,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT");
-    EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
-                                                    response_trailers, stream_info, body));
-    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body),
-                ProtoEq(ValueUtil::nullValue()));
-  }
-  {
-    StreamInfoFormatter upstream_format("UPSTREAM_TRANSPORT_FAILURE_REASON");
-    std::string upstream_transport_failure_reason = "SSL error";
-    EXPECT_CALL(stream_info, upstreamTransportFailureReason())
-        .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
-    EXPECT_EQ("SSL error", upstream_format.format(request_headers, response_headers,
-                                                  response_trailers, stream_info, body));
-    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body),
-                ProtoEq(ValueUtil::stringValue("SSL error")));
-  }
-  {
-    StreamInfoFormatter upstream_format("UPSTREAM_TRANSPORT_FAILURE_REASON");
-    std::string upstream_transport_failure_reason;
-    EXPECT_CALL(stream_info, upstreamTransportFailureReason())
-        .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
                                                     response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -1609,7 +1713,6 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
 }
 
 TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1617,6 +1720,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
 
   // No downstreamSslConnection
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     DownstreamPeerCertVStartFormatter cert_start_formart("DOWNSTREAM_PEER_CERT_V_START(%Y/%m/%d)");
     EXPECT_EQ(absl::nullopt, cert_start_formart.format(request_headers, response_headers,
@@ -1627,6 +1731,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
   }
   // No validFromPeerCertificate
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     DownstreamPeerCertVStartFormatter cert_start_formart("DOWNSTREAM_PEER_CERT_V_START(%Y/%m/%d)");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(absl::nullopt));
@@ -1639,6 +1744,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
   }
   // Default format string
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     DownstreamPeerCertVStartFormatter cert_start_format("DOWNSTREAM_PEER_CERT_V_START");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
@@ -1651,6 +1757,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
   }
   // Custom format string
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     DownstreamPeerCertVStartFormatter cert_start_format(
         "DOWNSTREAM_PEER_CERT_V_START(%b %e %H:%M:%S %Y %Z)");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
@@ -1665,7 +1772,6 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
 }
 
 TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1673,6 +1779,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
 
   // No downstreamSslConnection
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     DownstreamPeerCertVEndFormatter cert_end_format("DOWNSTREAM_PEER_CERT_V_END(%Y/%m/%d)");
     EXPECT_EQ(absl::nullopt, cert_end_format.format(request_headers, response_headers,
@@ -1683,6 +1790,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
   }
   // No expirationPeerCertificate
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     DownstreamPeerCertVEndFormatter cert_end_format("DOWNSTREAM_PEER_CERT_V_END(%Y/%m/%d)");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, expirationPeerCertificate())
@@ -1696,6 +1804,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
   }
   // Default format string
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     DownstreamPeerCertVEndFormatter cert_end_format("DOWNSTREAM_PEER_CERT_V_END");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
@@ -1708,6 +1817,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
   }
   // Custom format string
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     DownstreamPeerCertVEndFormatter cert_end_format(
         "DOWNSTREAM_PEER_CERT_V_END(%b %e %H:%M:%S %Y %Z)");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
@@ -2535,10 +2645,12 @@ TEST(SubstitutionFormatterTest, StructFormatterTypedTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   std::string body;
-  EXPECT_CALL(Const(stream_info), lastDownstreamRxByteReceived())
-      .WillRepeatedly(Return(std::chrono::nanoseconds(5000000)));
+  MockTimeSystem time_system;
+  EXPECT_CALL(time_system, monotonicTime)
+      .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+  stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
 
   ProtobufWkt::Value list;
   list.mutable_list_value()->add_values()->set_bool_value(true);
@@ -2574,7 +2686,7 @@ TEST(SubstitutionFormatterTest, StructFormatterTypedTest) {
 }
 
 TEST(SubstitutionFormatterTest, JsonFormatterTest) {
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
@@ -2584,8 +2696,10 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
   populateMetadataTestData(metadata);
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
-  EXPECT_CALL(Const(stream_info), lastDownstreamRxByteReceived())
-      .WillRepeatedly(Return(std::chrono::nanoseconds(5000000)));
+  MockTimeSystem time_system;
+  EXPECT_CALL(time_system, monotonicTime)
+      .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+  stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
 
   ProtobufWkt::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
@@ -2611,13 +2725,13 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
 }
 
 TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
   Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
   std::string body;
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     const std::string format = "{{%PROTOCOL%}}   %RESP(not exist)%++%RESP(test)% "
                                "%REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)%"
                                "\t@%TRAILER(THIRD)%@\t%TRAILER(TEST?TEST-2)%[]";
@@ -2632,6 +2746,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     const std::string format = "{}*JUST PLAIN string]";
     FormatterImpl formatter(format, false);
 
@@ -2640,6 +2755,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     const std::string format = "%REQ(first):3%|%REQ(first):1%|%RESP(first?second):2%|%REQ(first):"
                                "10%|%TRAILER(second?third):3%";
 
@@ -2650,6 +2766,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     envoy::config::core::v3::Metadata metadata;
     populateMetadataTestData(metadata);
     EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
@@ -2664,6 +2781,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
     stream_info.filter_state_->setData("testing",
                                        std::make_unique<Router::StringAccessorImpl>("test_value"),
@@ -2683,6 +2801,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     // Various START_TIME formats
     const std::string format = "%START_TIME(%Y/%m/%d)%|%START_TIME(%s)%|%START_TIME(bad_format)%|"
                                "%START_TIME%|%START_TIME(%f.%1f.%2f.%3f)%";
@@ -2699,6 +2818,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     // Various DOWNSTREAM_PEER_CERT_V_START formats (similar to START_TIME)
     const std::string format =
         "%DOWNSTREAM_PEER_CERT_V_START(%Y/%m/"
@@ -2719,6 +2839,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     // Various DOWNSTREAM_PEER_CERT_V_END formats (similar to START_TIME)
     const std::string format =
         "%DOWNSTREAM_PEER_CERT_V_END(%Y/%m/"
@@ -2739,6 +2860,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     // This tests the beginning of time.
     const std::string format = "%START_TIME(%Y/%m/%d)%|%START_TIME(%s)%|%START_TIME(bad_format)%|"
                                "%START_TIME%|%START_TIME(%f.%1f.%2f.%3f)%";
@@ -2754,6 +2876,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     // This tests multiple START_TIMEs.
     const std::string format =
         "%START_TIME(%s.%3f)%|%START_TIME(%s.%4f)%|%START_TIME(%s.%5f)%|%START_TIME(%s.%6f)%";
@@ -2766,6 +2889,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     const std::string format =
         "%START_TIME(segment1:%s.%3f|segment2:%s.%4f|seg3:%s.%6f|%s-%3f-asdf-%9f|.%7f:segm5:%Y)%";
     const SystemTime start_time(std::chrono::microseconds(1522796769123456));
@@ -2778,6 +2902,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     // This tests START_TIME specifier that has shorter segments when formatted, i.e.
     // absl::FormatTime("%%%%"") equals "%%", %1f will have 1 as its size.
     const std::string format = "%START_TIME(%%%%|%%%%%f|%s%%%%%3f|%1f%%%%%s)%";
@@ -2796,6 +2921,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   // https://github.com/google/cctz/issues/180
 #if !defined(WIN32) && !defined(__APPLE__)
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     const std::string format = "%START_TIME(%E4n)%";
     const SystemTime start_time(std::chrono::microseconds(1522796769123456));
     EXPECT_CALL(stream_info, startTime()).WillOnce(Return(start_time));

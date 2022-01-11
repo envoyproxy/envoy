@@ -1,6 +1,9 @@
-#include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/listener/v3/udp_listener_config.pb.h"
-#include "envoy/network/exception.h"
+#include <chrono>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
@@ -67,7 +70,8 @@ public:
         std::shared_ptr<AccessLog::MockInstance> access_log,
         std::shared_ptr<NiceMock<Network::MockFilterChainManager>> filter_chain_manager = nullptr,
         uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE,
-        Network::ConnectionBalancerSharedPtr connection_balancer = nullptr)
+        Network::ConnectionBalancerSharedPtr connection_balancer = nullptr,
+        bool ignore_global_conn_limit = false)
         : parent_(parent), socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()),
           tag_(tag), bind_to_port_(bind_to_port), tcp_backlog_size_(tcp_backlog_size),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
@@ -77,7 +81,7 @@ public:
                                    ? std::make_shared<Network::NopConnectionBalancerImpl>()
                                    : connection_balancer),
           access_logs_({access_log}), inline_filter_chain_manager_(filter_chain_manager),
-          init_manager_(nullptr) {
+          init_manager_(nullptr), ignore_global_conn_limit_(ignore_global_conn_limit) {
       envoy::config::listener::v3::UdpListenerConfig udp_config;
       udp_listener_config_ = std::make_unique<UdpListenerConfigImpl>(udp_config);
       udp_listener_config_->listener_factory_ =
@@ -104,6 +108,8 @@ public:
       Network::UdpListenerWorkerRouterPtr listener_worker_router_;
     };
 
+    struct InternalListenerConfigImpl : public Network::InternalListenerConfig {};
+
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override {
       return inline_filter_chain_manager_ == nullptr ? parent_.manager_
@@ -126,6 +132,13 @@ public:
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return *udp_listener_config_; }
+    Network::InternalListenerConfigOptRef internalListenerConfig() override {
+      if (internal_listener_config_ == nullptr) {
+        return Network::InternalListenerConfigOptRef();
+      } else {
+        return *internal_listener_config_;
+      }
+    }
     envoy::config::core::v3::TrafficDirection direction() const override { return direction_; }
     void setDirection(envoy::config::core::v3::TrafficDirection direction) {
       direction_ = direction;
@@ -137,6 +150,7 @@ public:
     ResourceLimit& openConnections() override { return open_connections_; }
     uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
     Init::Manager& initManager() override { return *init_manager_; }
+    bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
     void setMaxConnections(const uint32_t num_connections) {
       open_connections_.setMax(num_connections);
     }
@@ -153,11 +167,13 @@ public:
     const std::chrono::milliseconds listener_filters_timeout_;
     const bool continue_on_listener_filters_timeout_;
     std::unique_ptr<UdpListenerConfigImpl> udp_listener_config_;
+    std::unique_ptr<InternalListenerConfigImpl> internal_listener_config_;
     Network::ConnectionBalancerSharedPtr connection_balancer_;
     BasicResourceLimitImpl open_connections_;
     const std::vector<AccessLog::InstanceSharedPtr> access_logs_;
     std::shared_ptr<NiceMock<Network::MockFilterChainManager>> inline_filter_chain_manager_;
     std::unique_ptr<Init::Manager> init_manager_;
+    const bool ignore_global_conn_limit_;
     envoy::config::core::v3::TrafficDirection direction_;
     Network::UdpListenerCallbacks* udp_listener_callbacks_{};
   };
@@ -172,8 +188,8 @@ public:
       parent_.deleted_before_listener_ = !parent_.udp_listener_deleted_;
     }
 
-    MOCK_METHOD(void, onData, (Network::UdpRecvData&), (override));
-    MOCK_METHOD(void, onReceiveError, (Api::IoError::IoErrorCode), (override));
+    MOCK_METHOD(Network::FilterStatus, onData, (Network::UdpRecvData&), (override));
+    MOCK_METHOD(Network::FilterStatus, onReceiveError, (Api::IoError::IoErrorCode), (override));
 
   private:
     ConnectionHandlerTest& parent_;
@@ -211,11 +227,12 @@ public:
       bool continue_on_listener_filters_timeout = false,
       std::shared_ptr<NiceMock<Network::MockFilterChainManager>> overridden_filter_chain_manager =
           nullptr,
-      uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE) {
+      uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE, bool ignore_global_conn_limit = false) {
     listeners_.emplace_back(std::make_unique<TestListener>(
         *this, tag, bind_to_port, hand_off_restored_destination_connections, name, socket_type,
         listener_filters_timeout, continue_on_listener_filters_timeout, access_log_,
-        overridden_filter_chain_manager, tcp_backlog_size, connection_balancer));
+        overridden_filter_chain_manager, tcp_backlog_size, connection_balancer,
+        ignore_global_conn_limit));
 
     if (listener == nullptr) {
       // Expecting listener config in place update.
@@ -226,9 +243,9 @@ public:
     EXPECT_CALL(listeners_.back()->socket_factory_, getListenSocket(_))
         .WillOnce(Return(listeners_.back()->socket_));
     if (socket_type == Network::Socket::Type::Stream) {
-      EXPECT_CALL(dispatcher_, createListener_(_, _, _))
+      EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
           .WillOnce(Invoke([listener, listener_callbacks](Network::SocketSharedPtr&&,
-                                                          Network::TcpListenerCallbacks& cb,
+                                                          Network::TcpListenerCallbacks& cb, bool,
                                                           bool) -> Network::Listener* {
             if (listener_callbacks != nullptr) {
               *listener_callbacks = &cb;
@@ -253,6 +270,22 @@ public:
           .WillOnce(SaveArgAddress(balanced_connection_handler));
     }
 
+    return listeners_.back().get();
+  }
+
+  TestListener* addInternalListener(
+      uint64_t tag, const std::string& name,
+      std::chrono::milliseconds listener_filters_timeout = std::chrono::milliseconds(15000),
+      bool continue_on_listener_filters_timeout = false,
+      std::shared_ptr<NiceMock<Network::MockFilterChainManager>> overridden_filter_chain_manager =
+          nullptr) {
+    listeners_.emplace_back(std::make_unique<TestListener>(
+        *this, tag, /*bind_to_port*/ false, /*hand_off_restored_destination_connections*/ false,
+        name, Network::Socket::Type::Stream, listener_filters_timeout,
+        continue_on_listener_filters_timeout, access_log_, overridden_filter_chain_manager,
+        ENVOY_TCP_BACKLOG_SIZE, nullptr));
+    listeners_.back()->internal_listener_config_ =
+        std::make_unique<TestListener::InternalListenerConfigImpl>();
     return listeners_.back().get();
   }
 
@@ -300,7 +333,7 @@ public:
       new Network::Address::Ipv4Instance("127.0.0.1", 10001)};
   NiceMock<Event::MockDispatcher> dispatcher_{"test"};
   std::list<TestListenerPtr> listeners_;
-  Network::ConnectionHandlerPtr handler_;
+  std::unique_ptr<ConnectionHandlerImpl> handler_;
   NiceMock<Network::MockFilterChainManager> manager_;
   NiceMock<Network::MockFilterChainFactory> factory_;
   const std::shared_ptr<Network::MockFilterChain> filter_chain_;
@@ -1546,6 +1579,68 @@ TEST_F(ConnectionHandlerTest, ShutdownUdpListener) {
       << "The read_filter_ should be deleted before the udp_listener_ is deleted.";
 }
 
+TEST_F(ConnectionHandlerTest, DisableInternalListener) {
+  InSequence s;
+  Network::Address::InstanceConstSharedPtr local_address{
+      new Network::Address::EnvoyInternalInstance("server_internal_address")};
+
+  TestListener* internal_listener =
+      addInternalListener(1, "test_internal_listener", std::chrono::milliseconds(), false, nullptr);
+  EXPECT_CALL(internal_listener->socket_factory_, localAddress())
+      .WillOnce(ReturnRef(local_address));
+  handler_->addListener(absl::nullopt, *internal_listener);
+  auto internal_listener_cb = handler_->findByAddress(local_address);
+  ASSERT_TRUE(internal_listener_cb.has_value());
+
+  handler_->disableListeners();
+  auto internal_listener_cb_disabled = handler_->findByAddress(local_address);
+  ASSERT_TRUE(internal_listener_cb_disabled.has_value());
+  ASSERT_EQ(&internal_listener_cb_disabled.value().get(), &internal_listener_cb.value().get());
+
+  handler_->enableListeners();
+  auto internal_listener_cb_enabled = handler_->findByAddress(local_address);
+  ASSERT_TRUE(internal_listener_cb_enabled.has_value());
+  ASSERT_EQ(&internal_listener_cb_enabled.value().get(), &internal_listener_cb.value().get());
+}
+
+TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdate) {
+  InSequence s;
+  uint64_t old_listener_tag = 1;
+  uint64_t new_listener_tag = 2;
+  Network::Address::InstanceConstSharedPtr local_address{
+      new Network::Address::EnvoyInternalInstance("server_internal_address")};
+
+  TestListener* internal_listener = addInternalListener(
+      old_listener_tag, "test_internal_listener", std::chrono::milliseconds(), false, nullptr);
+  EXPECT_CALL(internal_listener->socket_factory_, localAddress())
+      .WillOnce(ReturnRef(local_address));
+  handler_->addListener(absl::nullopt, *internal_listener);
+
+  ASSERT_NE(internal_listener, nullptr);
+
+  auto overridden_filter_chain_manager =
+      std::make_shared<NiceMock<Network::MockFilterChainManager>>();
+  TestListener* new_test_listener =
+      addInternalListener(new_listener_tag, "test_internal_listener", std::chrono::milliseconds(),
+                          false, overridden_filter_chain_manager);
+
+  handler_->addListener(old_listener_tag, *new_test_listener);
+
+  Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
+
+  auto internal_listener_cb = handler_->findByAddress(local_address);
+
+  EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
+  EXPECT_CALL(*overridden_filter_chain_manager, findFilterChain(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*access_log_, log(_, _, _, _));
+  internal_listener_cb.value().get().onAccept(Network::ConnectionSocketPtr{connection});
+  EXPECT_EQ(0UL, handler_->numConnections());
+
+  testing::MockFunction<void()> completion;
+  handler_->removeFilterChains(old_listener_tag, {}, completion.AsStdFunction());
+  EXPECT_CALL(completion, Call());
+  dispatcher_.clearDeferredDeleteList();
+}
 } // namespace
 } // namespace Server
 } // namespace Envoy

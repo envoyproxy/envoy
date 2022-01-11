@@ -49,8 +49,8 @@ An example configuration of the filter may look like the following:
             "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
             memory_level: 3
             window_bits: 10
-            compression_level: best_compression
-            compression_strategy: default_strategy
+            compression_level: BEST_COMPRESSION
+            compression_strategy: DEFAULT_STRATEGY
 
 By *default* request compression is disabled, but when enabled it will be *skipped* if:
 
@@ -134,8 +134,8 @@ multiple compressor filters enabled only for requests or responses. For instance
             "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
             memory_level: 3
             window_bits: 10
-            compression_level: best_compression
-            compression_strategy: default_strategy
+            compression_level: BEST_COMPRESSION
+            compression_strategy: DEFAULT_STRATEGY
     # This filter is only enabled for requests.
     - name: envoy.filters.http.compressor
       typed_config:
@@ -156,8 +156,8 @@ multiple compressor filters enabled only for requests or responses. For instance
             "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
             memory_level: 9
             window_bits: 15
-            compression_level: best_speed
-            compression_strategy: default_strategy
+            compression_level: BEST_SPEED
+            compression_strategy: DEFAULT_STRATEGY
 
 .. _compressor-statistics:
 

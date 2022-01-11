@@ -70,6 +70,49 @@ public:
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   }
 
+  void queryParameterTest(const std::string& original_path, const std::string& expected_path,
+                          const Http::Utility::QueryParamsVector& add_me,
+                          const std::vector<std::string>& remove_me) {
+    InSequence s;
+
+    // Set up all the typical headers plus a path with a query string that we'll remove later.
+    request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+    request_headers_.addCopy(Http::Headers::get().Method, "GET");
+    request_headers_.addCopy(Http::Headers::get().Path, original_path);
+    request_headers_.addCopy(Http::Headers::get().Scheme, "https");
+
+    prepareCheck();
+
+    Filters::Common::ExtAuthz::Response response{};
+    response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+    response.query_parameters_to_set = add_me;
+    response.query_parameters_to_remove = remove_me;
+
+    auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
+
+    EXPECT_CALL(*client_, check(_, _, _, _))
+        .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                             const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                             const StreamInfo::StreamInfo&) -> void {
+          callbacks.onComplete(std::move(response_ptr));
+        }));
+    EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+    EXPECT_EQ(request_headers_.getPathValue(), expected_path);
+
+    Buffer::OwnedImpl response_data{};
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    Http::TestResponseTrailerMapImpl response_trailers{};
+    Http::MetadataMap response_metadata{};
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, false));
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
+    EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(response_metadata));
+  }
+
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   FilterConfigSharedPtr config_;
@@ -1789,6 +1832,54 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   EXPECT_EQ(response_headers.get_("should-be-overridden"), "finally-set-by-auth-server");
 }
 
+TEST_P(HttpFilterTestParam, ImmediateOkResponseWithUnmodifiedQueryParameters) {
+  const std::string original_path{"/users?leave-me=alone"};
+  const std::string expected_path{"/users?leave-me=alone"};
+  const Http::Utility::QueryParamsVector add_me{};
+  const std::vector<std::string> remove_me{"remove-me"};
+  queryParameterTest(original_path, expected_path, add_me, remove_me);
+}
+
+TEST_P(HttpFilterTestParam, ImmediateOkResponseWithAddedQueryParameters) {
+  const std::string original_path{"/users"};
+  const std::string expected_path{"/users?add-me=123"};
+  const Http::Utility::QueryParamsVector add_me{{"add-me", "123"}};
+  const std::vector<std::string> remove_me{};
+  queryParameterTest(original_path, expected_path, add_me, remove_me);
+}
+
+TEST_P(HttpFilterTestParam, ImmediateOkResponseWithAddedAndRemovedQueryParameters) {
+  const std::string original_path{"/users?remove-me=123"};
+  const std::string expected_path{"/users?add-me=456"};
+  const Http::Utility::QueryParamsVector add_me{{"add-me", "456"}};
+  const std::vector<std::string> remove_me{{"remove-me"}};
+  queryParameterTest(original_path, expected_path, add_me, remove_me);
+}
+
+TEST_P(HttpFilterTestParam, ImmediateOkResponseWithRemovedQueryParameters) {
+  const std::string original_path{"/users?remove-me=definitely"};
+  const std::string expected_path{"/users"};
+  const Http::Utility::QueryParamsVector add_me{};
+  const std::vector<std::string> remove_me{{"remove-me"}};
+  queryParameterTest(original_path, expected_path, add_me, remove_me);
+}
+
+TEST_P(HttpFilterTestParam, ImmediateOkResponseWithOverwrittenQueryParameters) {
+  const std::string original_path{"/users?overwrite-me=original"};
+  const std::string expected_path{"/users?overwrite-me=new"};
+  const Http::Utility::QueryParamsVector add_me{{"overwrite-me", "new"}};
+  const std::vector<std::string> remove_me{};
+  queryParameterTest(original_path, expected_path, add_me, remove_me);
+}
+
+TEST_P(HttpFilterTestParam, ImmediateOkResponseWithManyModifiedQueryParameters) {
+  const std::string original_path{"/users?remove-me=1&overwrite-me=2&leave-me=3"};
+  const std::string expected_path{"/users?add-me=9&leave-me=3&overwrite-me=new"};
+  const Http::Utility::QueryParamsVector add_me{{"add-me", "9"}, {"overwrite-me", "new"}};
+  const std::vector<std::string> remove_me{{"remove-me"}};
+  queryParameterTest(original_path, expected_path, add_me, remove_me);
+}
+
 // Test that an synchronous denied response from the authorization service, on the call stack,
 // results in request not continuing.
 TEST_P(HttpFilterTestParam, ImmediateDeniedResponse) {
@@ -1825,14 +1916,15 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith401) {
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
@@ -1857,14 +1949,15 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith403) {
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;

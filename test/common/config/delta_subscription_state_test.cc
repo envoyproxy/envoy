@@ -19,6 +19,7 @@
 
 using testing::IsSubstring;
 using testing::NiceMock;
+using testing::Pair;
 using testing::Throw;
 using testing::UnorderedElementsAre;
 using testing::UnorderedElementsAreArray;
@@ -29,27 +30,41 @@ namespace {
 
 const char TypeUrl[] = "type.googleapis.com/envoy.config.cluster.v3.Cluster";
 enum class LegacyOrUnified { Legacy, Unified };
+const auto WildcardStr = std::string(Wildcard);
+
+Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>
+populateRepeatedResource(std::vector<std::pair<std::string, std::string>> items) {
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add_to;
+  for (const auto& item : items) {
+    auto* resource = add_to.Add();
+    resource->set_name(item.first);
+    resource->set_version(item.second);
+  }
+  return add_to;
+}
+
+Protobuf::RepeatedPtrField<std::string> populateRepeatedString(std::vector<std::string> items) {
+  Protobuf::RepeatedPtrField<std::string> add_to;
+  for (const auto& item : items) {
+    auto* str = add_to.Add();
+    *str = item;
+  }
+  return add_to;
+}
 
 class DeltaSubscriptionStateTestBase : public testing::TestWithParam<LegacyOrUnified> {
 protected:
-  DeltaSubscriptionStateTestBase(
-      const std::string& type_url, const bool wildcard, LegacyOrUnified legacy_or_unified,
-      const absl::flat_hash_set<std::string> initial_resources = {"name1", "name2", "name3"})
+  DeltaSubscriptionStateTestBase(const std::string& type_url, LegacyOrUnified legacy_or_unified)
       : should_use_unified_(legacy_or_unified == LegacyOrUnified::Unified) {
     ttl_timer_ = new Event::MockTimer(&dispatcher_);
 
     if (should_use_unified_) {
-      state_ = std::make_unique<Envoy::Config::XdsMux::DeltaSubscriptionState>(
-          type_url, callbacks_, dispatcher_, wildcard);
+      state_ = std::make_unique<Envoy::Config::XdsMux::DeltaSubscriptionState>(type_url, callbacks_,
+                                                                               dispatcher_);
     } else {
-      state_ = std::make_unique<Envoy::Config::DeltaSubscriptionState>(
-          type_url, callbacks_, local_info_, dispatcher_, wildcard);
+      state_ = std::make_unique<Envoy::Config::DeltaSubscriptionState>(type_url, callbacks_,
+                                                                       local_info_, dispatcher_);
     }
-    updateSubscriptionInterest(initial_resources, {});
-    auto cur_request = getNextRequestAckless();
-    EXPECT_THAT(cur_request->resource_names_subscribe(),
-                // UnorderedElementsAre("name1", "name2", "name3"));
-                UnorderedElementsAreArray(initial_resources.cbegin(), initial_resources.cend()));
   }
 
   void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
@@ -112,6 +127,16 @@ protected:
     return handleResponse(message);
   }
 
+  UpdateAck
+  deliverSimpleDiscoveryResponse(std::vector<std::pair<std::string, std::string>> added_resources,
+                                 std::vector<std::string> removed_resources,
+                                 const std::string& version_info) {
+    EXPECT_CALL(*ttl_timer_, disableTimer());
+    auto add = populateRepeatedResource(added_resources);
+    auto remove = populateRepeatedString(removed_resources);
+    return deliverDiscoveryResponse(add, remove, version_info);
+  }
+
   void markStreamFresh() {
     if (should_use_unified_) {
       absl::get<1>(state_)->markStreamFresh();
@@ -138,30 +163,335 @@ protected:
   bool should_use_unified_;
 };
 
-Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>
-populateRepeatedResource(std::vector<std::pair<std::string, std::string>> items) {
-  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add_to;
-  for (const auto& item : items) {
-    auto* resource = add_to.Add();
-    resource->set_name(item.first);
-    resource->set_version(item.second);
-  }
-  return add_to;
+class DeltaSubscriptionStateTestBlank : public DeltaSubscriptionStateTestBase {
+public:
+  DeltaSubscriptionStateTestBlank() : DeltaSubscriptionStateTestBase(TypeUrl, GetParam()) {}
+};
+
+INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionStateTestBlank, DeltaSubscriptionStateTestBlank,
+                         testing::ValuesIn({LegacyOrUnified::Legacy, LegacyOrUnified::Unified}));
+
+// Checks if subscriptionUpdatePending returns correct value depending on scenario.
+TEST_P(DeltaSubscriptionStateTestBlank, SubscriptionPendingTest) {
+  // We should send a request, because nothing has been sent out yet. Note that this means
+  // subscribing to the wildcard resource.
+  EXPECT_TRUE(subscriptionUpdatePending());
+  getNextRequestAckless();
+
+  // We should not be sending any requests if nothing yet changed since last time we sent a
+  // request. Or if out subscription interest was not modified.
+  EXPECT_FALSE(subscriptionUpdatePending());
+  updateSubscriptionInterest({}, {});
+  EXPECT_FALSE(subscriptionUpdatePending());
+
+  // We should send a request, because our interest changed (we are interested in foo now).
+  updateSubscriptionInterest({"foo"}, {});
+  EXPECT_TRUE(subscriptionUpdatePending());
+  getNextRequestAckless();
+
+  // We should send a request after a new stream is established if we are interested in some
+  // resource.
+  EXPECT_FALSE(subscriptionUpdatePending());
+  markStreamFresh();
+  EXPECT_TRUE(subscriptionUpdatePending());
+  getNextRequestAckless();
+
+  // We should send a request, because our interest changed (we are not interested in foo and in
+  // wildcard resource any more).
+  EXPECT_FALSE(subscriptionUpdatePending());
+  updateSubscriptionInterest({}, {WildcardStr, "foo"});
+  EXPECT_TRUE(subscriptionUpdatePending());
+  getNextRequestAckless();
+
+  // We should not be sending anything after stream reestablishing, because we are not interested in
+  // anything.
+  markStreamFresh();
+  EXPECT_FALSE(subscriptionUpdatePending());
 }
 
-class DeltaSubscriptionStateTest : public DeltaSubscriptionStateTestBase {
+// Check if requested resources are dropped from the cache immediately after losing interest in them
+// in case we don't have a wildcard subscription. In such case there's no ambiguity whether a
+// dropped resource could come from the wildcard subscription.
+//
+// Dropping from the cache can be seen through the initial_resource_versions field in the initial
+// request.
+TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionNonWildcardFromRequestedToDropped) {
+  updateSubscriptionInterest({"foo", "bar"}, {});
+  auto req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("foo", "bar"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_TRUE(req->initial_resource_versions().empty());
+
+  deliverSimpleDiscoveryResponse({{"foo", "1"}, {"bar", "1"}}, {}, "d1");
+  markStreamFresh();
+  req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("foo", "bar"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_THAT(req->initial_resource_versions(),
+              UnorderedElementsAre(Pair("foo", "1"), Pair("bar", "1")));
+
+  updateSubscriptionInterest({}, {"foo"});
+  req = getNextRequestAckless();
+  EXPECT_TRUE(req->resource_names_subscribe().empty());
+  EXPECT_THAT(req->resource_names_unsubscribe(), UnorderedElementsAre("foo"));
+  deliverSimpleDiscoveryResponse({}, {"foo"}, "d2");
+
+  markStreamFresh();
+  req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("bar"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_THAT(req->initial_resource_versions(), UnorderedElementsAre(Pair("bar", "1")));
+}
+
+// Check if we keep foo resource in cache even if we lost interest in it. It could be a part of the
+// wildcard subscription.
+TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromRequestedToAmbiguous) {
+  // subscribe to foo and make sure we have it.
+  updateSubscriptionInterest({WildcardStr, "foo", "bar"}, {});
+  auto req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "foo", "bar"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_TRUE(req->initial_resource_versions().empty());
+  deliverSimpleDiscoveryResponse({{"foo", "1"}, {"bar", "1"}, {"wild1", "1"}}, {}, "d1");
+
+  // ensure that foo is a part of resource versions
+  markStreamFresh();
+  req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "foo", "bar"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_THAT(req->initial_resource_versions(),
+              UnorderedElementsAre(Pair("foo", "1"), Pair("bar", "1"), Pair("wild1", "1")));
+
+  // unsubscribe from foo just before the stream breaks, make sure we still send the foo initial
+  // version
+  updateSubscriptionInterest({}, {"foo"});
+  req = getNextRequestAckless();
+  EXPECT_TRUE(req->resource_names_subscribe().empty());
+  EXPECT_THAT(req->resource_names_unsubscribe(), UnorderedElementsAre("foo"));
+  // didn't receive a reply
+  markStreamFresh();
+  req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "bar"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_THAT(req->initial_resource_versions(),
+              UnorderedElementsAre(Pair("foo", "1"), Pair("bar", "1"), Pair("wild1", "1")));
+}
+
+// Check that foo and bar do not appear in initial versions after we lost interest. Foo won't
+// appear, because we got a reply from server confirming dropping the resource. Bar won't appear
+// because we never got a reply from server with a version of it.
+TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromRequestedToDropped) {
+  // subscribe to foo and bar and make sure we have it.
+  updateSubscriptionInterest({WildcardStr, "foo", "bar", "baz"}, {});
+  auto req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(),
+              UnorderedElementsAre(WildcardStr, "foo", "bar", "baz"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_TRUE(req->initial_resource_versions().empty());
+  deliverSimpleDiscoveryResponse({{"foo", "1"}, {"baz", "1"}, {"wild1", "1"}}, {}, "d1");
+
+  // ensure that foo is a part of resource versions, bar won't be, because we don't have its version
+  markStreamFresh();
+  req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(),
+              UnorderedElementsAre(WildcardStr, "foo", "bar", "baz"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_THAT(req->initial_resource_versions(),
+              UnorderedElementsAre(Pair("foo", "1"), Pair("baz", "1"), Pair("wild1", "1")));
+
+  // unsubscribe from foo and bar, and receive an confirmation about dropping foo. Now neither will
+  // appear in initial versions in the initial request after breaking the stream.
+  updateSubscriptionInterest({}, {"foo", "bar"});
+  req = getNextRequestAckless();
+  EXPECT_TRUE(req->resource_names_subscribe().empty());
+  EXPECT_THAT(req->resource_names_unsubscribe(), UnorderedElementsAre("foo", "bar"));
+  deliverSimpleDiscoveryResponse({}, {"foo"}, "d2");
+  markStreamFresh();
+  req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "baz"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_THAT(req->initial_resource_versions(),
+              UnorderedElementsAre(Pair("baz", "1"), Pair("wild1", "1")));
+}
+
+// Check that we move the resource from wildcard subscription to requested without losing version
+// information about it.
+TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromWildcardToRequested) {
+  updateSubscriptionInterest({}, {});
+  auto req = getNextRequestAckless();
+  EXPECT_TRUE(req->resource_names_subscribe().empty());
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_TRUE(req->initial_resource_versions().empty());
+  deliverSimpleDiscoveryResponse({{"foo", "1"}, {"wild1", "1"}}, {}, "d1");
+
+  updateSubscriptionInterest({"foo"}, {});
+  markStreamFresh();
+  req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "foo"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_THAT(req->initial_resource_versions(),
+              UnorderedElementsAre(Pair("foo", "1"), Pair("wild1", "1")));
+}
+
+// Check that we move the ambiguous resource to requested without losing version information about
+// it.
+TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromAmbiguousToRequested) {
+  updateSubscriptionInterest({WildcardStr, "foo"}, {});
+  auto req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "foo"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_TRUE(req->initial_resource_versions().empty());
+  deliverSimpleDiscoveryResponse({{"foo", "1"}, {"wild1", "1"}}, {}, "d1");
+
+  // make foo ambiguous and request it again
+  updateSubscriptionInterest({}, {"foo"});
+  updateSubscriptionInterest({"foo"}, {});
+  markStreamFresh();
+  req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "foo"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_THAT(req->initial_resource_versions(),
+              UnorderedElementsAre(Pair("foo", "1"), Pair("wild1", "1")));
+}
+
+// Check if we correctly decide to send a legacy wildcard initial request.
+TEST_P(DeltaSubscriptionStateTestBlank, LegacyWildcardInitialRequests) {
+  updateSubscriptionInterest({}, {});
+  auto req = getNextRequestAckless();
+  EXPECT_TRUE(req->resource_names_subscribe().empty());
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  deliverSimpleDiscoveryResponse({{"wild1", "1"}}, {}, "d1");
+
+  // unsubscribing from unknown resource should keep the legacy
+  // wildcard mode
+  updateSubscriptionInterest({}, {"unknown"});
+  markStreamFresh();
+  req = getNextRequestAckless();
+  EXPECT_TRUE(req->resource_names_subscribe().empty());
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+
+  updateSubscriptionInterest({"foo"}, {});
+  req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("foo"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  deliverSimpleDiscoveryResponse({{"foo", "1"}}, {}, "d1");
+  updateSubscriptionInterest({}, {"foo"});
+  req = getNextRequestAckless();
+  EXPECT_TRUE(req->resource_names_subscribe().empty());
+  EXPECT_THAT(req->resource_names_unsubscribe(), UnorderedElementsAre("foo"));
+  deliverSimpleDiscoveryResponse({}, {"foo"}, "d1");
+
+  markStreamFresh();
+  req = getNextRequestAckless();
+  EXPECT_TRUE(req->resource_names_subscribe().empty());
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+}
+
+// Check that ambiguous resources may also receive a heartbeat message.
+TEST_P(DeltaSubscriptionStateTestBlank, AmbiguousResourceTTL) {
+  Event::SimulatedTimeSystem time_system;
+  time_system.setSystemTime(std::chrono::milliseconds(0));
+
+  auto create_resource_with_ttl = [](absl::string_view name, absl::string_view version,
+                                     absl::optional<std::chrono::seconds> ttl_s,
+                                     bool include_resource) {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
+    auto* resource = added_resources.Add();
+    resource->set_name(std::string(name));
+    resource->set_version(std::string(version));
+
+    if (include_resource) {
+      resource->mutable_resource();
+    }
+
+    if (ttl_s) {
+      ProtobufWkt::Duration ttl;
+      ttl.set_seconds(ttl_s->count());
+      resource->mutable_ttl()->CopyFrom(ttl);
+    }
+
+    return added_resources;
+  };
+
+  updateSubscriptionInterest({WildcardStr, "foo"}, {});
+  auto req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "foo"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  {
+    EXPECT_CALL(*ttl_timer_, enabled());
+    EXPECT_CALL(*ttl_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+    deliverDiscoveryResponse(create_resource_with_ttl("foo", "1", std::chrono::seconds(1), true),
+                             {}, "debug1", "nonce1");
+  }
+
+  // make foo ambiguous
+  updateSubscriptionInterest({}, {"foo"});
+  req = getNextRequestAckless();
+  EXPECT_TRUE(req->resource_names_subscribe().empty());
+  EXPECT_THAT(req->resource_names_unsubscribe(), UnorderedElementsAre("foo"));
+  {
+    // Refresh the TTL with a heartbeat. The resource should not be passed to the update callbacks.
+    EXPECT_CALL(*ttl_timer_, enabled());
+    deliverDiscoveryResponse(create_resource_with_ttl("foo", "1", std::chrono::seconds(1), false),
+                             {}, "debug1", "nonce1", true, 0);
+  }
+
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _));
+  EXPECT_CALL(*ttl_timer_, disableTimer());
+  time_system.setSystemTime(std::chrono::seconds(2));
+
+  // Invoke the TTL.
+  ttl_timer_->invokeCallback();
+}
+
+// Checks that we ignore resources that we haven't asked for.
+TEST_P(DeltaSubscriptionStateTestBlank, IgnoreSuperfluousResources) {
+  updateSubscriptionInterest({"foo", "bar"}, {});
+  auto req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("foo", "bar"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_TRUE(req->initial_resource_versions().empty());
+  deliverSimpleDiscoveryResponse({{"foo", "1"}, {"bar", "1"}, {"did-not-want", "1"}, {"spam", "1"}},
+                                 {}, "d1");
+
+  // Force a reconnection and resending of the "initial" message. If the initial_resource_versions
+  // in the message contains resources like did-not-want or spam, we haven't ignored that as we
+  // should.
+  markStreamFresh();
+  req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("foo", "bar"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_THAT(req->initial_resource_versions(),
+              UnorderedElementsAre(Pair("foo", "1"), Pair("bar", "1")));
+}
+
+class DeltaSubscriptionStateTestWithResources : public DeltaSubscriptionStateTestBase {
+protected:
+  DeltaSubscriptionStateTestWithResources(
+      const std::string& type_url, LegacyOrUnified legacy_or_unified,
+      const absl::flat_hash_set<std::string> initial_resources = {"name1", "name2", "name3"})
+      : DeltaSubscriptionStateTestBase(type_url, legacy_or_unified) {
+    updateSubscriptionInterest(initial_resources, {});
+    auto cur_request = getNextRequestAckless();
+    EXPECT_THAT(cur_request->resource_names_subscribe(),
+                // UnorderedElementsAre("name1", "name2", "name3"));
+                UnorderedElementsAreArray(initial_resources.cbegin(), initial_resources.cend()));
+  }
+};
+
+class DeltaSubscriptionStateTest : public DeltaSubscriptionStateTestWithResources {
 public:
-  DeltaSubscriptionStateTest() : DeltaSubscriptionStateTestBase(TypeUrl, false, GetParam()) {}
+  DeltaSubscriptionStateTest() : DeltaSubscriptionStateTestWithResources(TypeUrl, GetParam()) {}
 };
 
 INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionStateTest, DeltaSubscriptionStateTest,
                          testing::ValuesIn({LegacyOrUnified::Legacy, LegacyOrUnified::Unified}));
 
 // Delta subscription state of a wildcard subscription request.
-class WildcardDeltaSubscriptionStateTest : public DeltaSubscriptionStateTestBase {
+class WildcardDeltaSubscriptionStateTest : public DeltaSubscriptionStateTestWithResources {
 public:
   WildcardDeltaSubscriptionStateTest()
-      : DeltaSubscriptionStateTestBase(TypeUrl, true, GetParam(), {}) {}
+      : DeltaSubscriptionStateTestWithResources(TypeUrl, GetParam(), {}) {}
 };
 
 INSTANTIATE_TEST_SUITE_P(WildcardDeltaSubscriptionStateTest, WildcardDeltaSubscriptionStateTest,
@@ -444,46 +774,236 @@ TEST_P(DeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect) {
   EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
 }
 
-// For wildcard subscription, upon a reconnection, the server is supposed to assume a
-// blank slate for the Envoy's state (hence the need for initial_resource_versions), and
-// the resource_names_subscribe and resource_names_unsubscribe must be empty (as is expected
-// of every wildcard first message). This is true even if in between the last request of the
-// last stream and the first request of the new stream, Envoy gained or lost interest in a
-// resource. The subscription & unsubscription implicitly takes effect by simply requesting a
-// wildcard subscription in the newly reconnected stream.
-TEST_P(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect) {
+// Check that switching into wildcard subscription after initial
+// request switches us into the explicit wildcard mode.
+TEST_P(DeltaSubscriptionStateTest, SwitchIntoWildcardMode) {
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
+      populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
+  // We call deliverDiscoveryResponse twice in this test.
+  EXPECT_CALL(*ttl_timer_, disableTimer()).Times(2);
+  deliverDiscoveryResponse(add1_2, {}, "debugversion1");
+
+  // switch into wildcard mode
+  updateSubscriptionInterest({"name4", WildcardStr}, {"name1"});
+  markStreamFresh(); // simulate a stream reconnection
+  auto cur_request = getNextRequestAckless();
+  // Regarding the resource_names_subscribe field:
+  // name1: do not include: we lost interest.
+  // name2: yes do include: we are explicitly interested (from test's base constructor)
+  // name3: yes do include: we are explicitly interested (from test's base constructor)
+  // name4: yes do include: we are explicitly interested
+  // *: explicit wildcard subscription
+  EXPECT_THAT(cur_request->resource_names_subscribe(),
+              UnorderedElementsAre("name2", "name3", "name4", Wildcard));
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add4_5 =
+      populateRepeatedResource({{"name4", "version4A"}, {"name5", "version5A"}});
+  deliverDiscoveryResponse(add4_5, {}, "debugversion1");
+
+  markStreamFresh(); // simulate a stream reconnection
+  cur_request = getNextRequestAckless();
+  // Regarding the resource_names_subscribe field:
+  // name1: do not include: we lost interest.
+  // name2: yes do include: we are explicitly interested (from test's base constructor)
+  // name3: yes do include: we are explicitly interested (from test's base constructor)
+  // name4: yes do include: we are explicitly interested
+  // name5: do not include: we are implicitly interested, so this resource should not appear on the
+  // initial request
+  // *: explicit wildcard subscription
+  EXPECT_THAT(cur_request->resource_names_subscribe(),
+              UnorderedElementsAre("name2", "name3", "name4", Wildcard));
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+}
+
+// For wildcard subscription, upon a reconnection, the server is supposed to assume a blank slate
+// for the Envoy's state (hence the need for initial_resource_versions), and the
+// resource_names_subscribe and resource_names_unsubscribe must be empty if we haven't gained any
+// new explicit interest in a resource. In such case, the client should send an empty request.
+TEST_P(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnectImplicit) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
       populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
   EXPECT_CALL(*ttl_timer_, disableTimer());
   deliverDiscoveryResponse(add1_2, {}, "debugversion1");
 
-  updateSubscriptionInterest({"name3"}, {"name1"});
   markStreamFresh(); // simulate a stream reconnection
   auto cur_request = getNextRequestAckless();
   // Regarding the resource_names_subscribe field:
   // name1: do not include: we lost interest.
-  // name2: do not include: we are interested, but for wildcard it shouldn't be provided.
-  // name4: do not include: although we are newly interested, an initial wildcard request
-  //        must be with no resources.
+  // name2: do not include: we are implicitly interested, but for wildcard it shouldn't be provided.
+  EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+}
+
+// For wildcard subscription, upon a reconnection, the server is supposed to assume a blank slate
+// for the Envoy's state (hence the need for initial_resource_versions). The
+// resource_names_unsubscribe must be empty (as is expected of every wildcard first message). The
+// resource_names_subscribe should contain all the resources we are explicitly interested in and a
+// special resource denoting a wildcard subscription.
+TEST_P(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnectExplicit) {
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
+      populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
+  EXPECT_CALL(*ttl_timer_, disableTimer());
+  deliverDiscoveryResponse(add1_2, {}, "debugversion1");
+
+  updateSubscriptionInterest({"name3"}, {});
+  markStreamFresh(); // simulate a stream reconnection
+  auto cur_request = getNextRequestAckless();
+  // Regarding the resource_names_subscribe field:
+  // name1: do not include: see below
+  // name2: do not include: we are implicitly interested, but for wildcard it shouldn't be provided.
+  // name3: yes do include: we are explicitly interested.
+  EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre(Wildcard, "name3"));
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+}
+
+// Check the contents of the requests after cancelling the wildcard
+// subscription and then reconnection. The second request should look
+// like a non-wildcard request, so mention all the known resources in
+// the initial request.
+TEST_P(WildcardDeltaSubscriptionStateTest, CancellingImplicitWildcardSubscription) {
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
+      populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
+  EXPECT_CALL(*ttl_timer_, disableTimer());
+  deliverDiscoveryResponse(add1_2, {}, "debugversion1");
+
+  updateSubscriptionInterest({"name3"}, {WildcardStr});
+  auto cur_request = getNextRequestAckless();
+  EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name3"));
+  EXPECT_THAT(cur_request->resource_names_unsubscribe(), UnorderedElementsAre(Wildcard));
+  markStreamFresh(); // simulate a stream reconnection
+  // Regarding the resource_names_subscribe field:
+  // name1: do not include, see below
+  // name2: do not include: it came from wildcard subscription we lost interest in, so we are not
+  //        interested in name2 too
+  // name3: yes do include: we are interested
+  cur_request = getNextRequestAckless();
+  EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name3"));
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+}
+
+// Check the contents of the requests after cancelling the wildcard
+// subscription and then reconnection. The second request should look
+// like a non-wildcard request, so mention all the known resources in
+// the initial request.
+TEST_P(WildcardDeltaSubscriptionStateTest, CancellingExplicitWildcardSubscription) {
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
+      populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
+  EXPECT_CALL(*ttl_timer_, disableTimer());
+  deliverDiscoveryResponse(add1_2, {}, "debugversion1");
+  // switch to explicit wildcard subscription
+  updateSubscriptionInterest({"name3"}, {});
+  auto cur_request = getNextRequestAckless();
+  EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name3"));
+
+  // cancel wildcard subscription
+  updateSubscriptionInterest({"name4"}, {WildcardStr});
+  cur_request = getNextRequestAckless();
+  EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name4"));
+  EXPECT_THAT(cur_request->resource_names_unsubscribe(), UnorderedElementsAre(Wildcard));
+  markStreamFresh(); // simulate a stream reconnection
+  // Regarding the resource_names_subscribe field:
+  // name1: do not include: see name2
+  // name2: do not include: it came as a part of wildcard subscription we cancelled, so we are not
+  // interested in this resource name3: yes do include: we are interested, and it's not wildcard.
+  // name4: yes do include: we are interested, and it's not wildcard.
+  cur_request = getNextRequestAckless();
+  EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name3", "name4"));
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+}
+
+// Check that resource changes from being interested in implicitly to explicitly when we update the
+// subscription interest. Such resources will show up in the initial wildcard requests
+// too. Receiving the update on such resource will not change their interest mode.
+TEST_P(WildcardDeltaSubscriptionStateTest, ExplicitInterestOverridesImplicit) {
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2_a =
+      populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
+  EXPECT_CALL(*ttl_timer_, disableTimer()).Times(2);
+  deliverDiscoveryResponse(add1_2_a, {}, "debugversion1");
+
+  // verify that neither name1 nor name2 appears in the initial request (they are of implicit
+  // interest and initial wildcard request should not contain those).
+  markStreamFresh(); // simulate a stream reconnection
+  auto cur_request = getNextRequestAckless();
+  EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+
+  // express the interest in name1 explicitly and verify that the follow-up request will contain it
+  // (this also switches the wildcard mode to explicit, but we won't see * in resource names,
+  // because we already are in wildcard mode).
+  updateSubscriptionInterest({"name1"}, {});
+  cur_request = getNextRequestAckless();
+  EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name1"));
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+
+  // verify that name1 and * appear in the initial request (name1 is of explicit interest and we are
+  // in explicit wildcard mode).
+  markStreamFresh(); // simulate a stream reconnection
+  cur_request = getNextRequestAckless();
+  EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name1", Wildcard));
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+
+  // verify that getting an update on name1 will keep name1 in the explicit interest mode
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2_b =
+      populateRepeatedResource({{"name1", "version1B"}, {"name2", "version2B"}});
+  deliverDiscoveryResponse(add1_2_b, {}, "debugversion1");
+  markStreamFresh(); // simulate a stream reconnection
+  cur_request = getNextRequestAckless();
+  EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name1", Wildcard));
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+}
+
+// Check that resource changes from being interested in implicitly to explicitly when we update the
+// subscription interest. Such resources will show up in the initial wildcard requests
+// too. Receiving the update on such resource will not change their interest mode.
+TEST_P(WildcardDeltaSubscriptionStateTest, ResetToLegacyWildcardBehaviorOnStreamReset) {
+  // verify that we will send the legacy wildcard subscription request
+  // after stream reset
+  updateSubscriptionInterest({"resource"}, {});
+  auto cur_request = getNextRequestAckless();
+  EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("resource"));
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+  updateSubscriptionInterest({}, {"resource"});
+  cur_request = getNextRequestAckless();
+  EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
+  EXPECT_THAT(cur_request->resource_names_unsubscribe(), UnorderedElementsAre("resource"));
+  markStreamFresh(); // simulate a stream reconnection
+  cur_request = getNextRequestAckless();
+  EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+
+  // verify that we will send the legacy wildcard subscription request
+  // after stream reset and confirming our subscription interest
+  updateSubscriptionInterest({"resource"}, {});
+  cur_request = getNextRequestAckless();
+  EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("resource"));
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+  updateSubscriptionInterest({}, {"resource"});
+  cur_request = getNextRequestAckless();
+  EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
+  EXPECT_THAT(cur_request->resource_names_unsubscribe(), UnorderedElementsAre("resource"));
+  markStreamFresh(); // simulate a stream reconnection
+  updateSubscriptionInterest({}, {});
+  cur_request = getNextRequestAckless();
   EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
   EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
 }
 
 // All resources from the server should be tracked.
 TEST_P(WildcardDeltaSubscriptionStateTest, AllResourcesFromServerAreTrackedInWildcardXDS) {
-  { // Add "name4", "name5", "name6" and remove "name1", "name2", "name3".
-    updateSubscriptionInterest({"name4", "name5", "name6"}, {"name1", "name2", "name3"});
+  { // Add "name4", "name5", "name6"
+    updateSubscriptionInterest({"name4", "name5", "name6"}, {});
     auto cur_request = getNextRequestAckless();
     EXPECT_THAT(cur_request->resource_names_subscribe(),
                 UnorderedElementsAre("name4", "name5", "name6"));
-    EXPECT_THAT(cur_request->resource_names_unsubscribe(),
-                UnorderedElementsAre("name1", "name2", "name3"));
+    EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
   }
   {
-    // On Reconnection, only "name4", "name5", "name6" are sent.
+    // On Reconnection, only "name4", "name5", "name6" and wildcard resource are sent.
     markStreamFresh();
     auto cur_request = getNextRequestAckless();
-    EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
+    EXPECT_THAT(cur_request->resource_names_subscribe(),
+                UnorderedElementsAre(WildcardStr, "name4", "name5", "name6"));
     EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
     EXPECT_TRUE(cur_request->initial_resource_versions().empty());
   }
@@ -503,7 +1023,8 @@ TEST_P(WildcardDeltaSubscriptionStateTest, AllResourcesFromServerAreTrackedInWil
   { // Simulate a stream reconnection, just to see the current resource_state_.
     markStreamFresh();
     auto cur_request = getNextRequestAckless();
-    EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
+    EXPECT_THAT(cur_request->resource_names_subscribe(),
+                UnorderedElementsAre(WildcardStr, "name4", "name5", "name6"));
     EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
     ASSERT_EQ(cur_request->initial_resource_versions().size(), 4);
     EXPECT_EQ(cur_request->initial_resource_versions().at("name1"), "version1A");
@@ -682,10 +1203,10 @@ TEST_P(DeltaSubscriptionStateTest, TypeUrlMismatch) {
   handleResponse(message);
 }
 
-class VhdsDeltaSubscriptionStateTest : public DeltaSubscriptionStateTestBase {
+class VhdsDeltaSubscriptionStateTest : public DeltaSubscriptionStateTestWithResources {
 public:
   VhdsDeltaSubscriptionStateTest()
-      : DeltaSubscriptionStateTestBase("envoy.config.route.v3.VirtualHost", false, GetParam()) {}
+      : DeltaSubscriptionStateTestWithResources("envoy.config.route.v3.VirtualHost", GetParam()) {}
 };
 
 INSTANTIATE_TEST_SUITE_P(VhdsDeltaSubscriptionStateTest, VhdsDeltaSubscriptionStateTest,

@@ -35,7 +35,7 @@ const std::string toString(envoy::type::matcher::v3::StringMatcher::MatchPattern
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::MATCH_PATTERN_NOT_SET:
     return "match_pattern_not_set";
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("reached unexpected code");
 }
 
 const std::string toString(const envoy::config::route::v3::HeaderMatcher& header) {
@@ -67,7 +67,7 @@ const std::string toString(const envoy::config::route::v3::HeaderMatcher& header
     return "string_match." + ::toString(header.string_match().match_pattern_case());
     break;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("reached unexpected code");
 }
 
 const std::string toString(const Envoy::Http::HeaderMap::GetResult& entry) {

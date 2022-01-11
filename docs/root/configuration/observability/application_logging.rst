@@ -14,7 +14,7 @@ Stackdriver Logging with GKE
 `Google Kubernetes Engine <https://cloud.google.com/kubernetes-engine/>`_. Envoy should be configured
 with the following :ref:`command line options <operations_cli>`:
 
-* ``--log-format '%L%m%d %T.%e %t envoy] [%t][%n]%v'``: Logs are formatted in `glog <https://github.com/google/glog>`_
+* ``--log-format '%L%m%d %T.%e %t envoy/%@] [%t][%n]%v'``: Logs are formatted in `glog <https://github.com/google/glog>`_
   format, allowing Stackdriver to parse the log severity and timestamp.
 * ``--log-format-escaped``: Each string that is logged will be printed in a single line.
   C-style escape sequences (such as ``\n``) will be escaped and prevent a single string

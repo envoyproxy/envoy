@@ -190,6 +190,18 @@ const std::string& ConnectionInfoImplBase::tlsVersion() const {
   return cached_tls_version_;
 }
 
+const std::string& ConnectionInfoImplBase::alpn() const {
+  if (alpn_.empty()) {
+    const unsigned char* proto;
+    unsigned int proto_len;
+    SSL_get0_alpn_selected(ssl(), &proto, &proto_len);
+    if (proto != nullptr) {
+      alpn_ = std::string(reinterpret_cast<const char*>(proto), proto_len);
+    }
+  }
+  return alpn_;
+}
+
 const std::string& ConnectionInfoImplBase::serialNumberPeerCertificate() const {
   if (!cached_serial_number_peer_certificate_.empty()) {
     return cached_serial_number_peer_certificate_;

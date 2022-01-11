@@ -301,6 +301,9 @@ public:
     std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
     config_helper_.addListenerFilter(tls_inspector_config);
     config_helper_.addSslConfig();
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) { hcm.mutable_stat_prefix()->assign("hcm0"); });
     config_helper_.addConfigModifier([this, add_default_filter_chain](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       if (!use_default_balancer_) {
@@ -335,6 +338,7 @@ public:
           ->mutable_routes(0)
           ->mutable_route()
           ->set_cluster("cluster_1");
+      hcm_config.mutable_stat_prefix()->assign("hcm1");
       config_blob->PackFrom(hcm_config);
       bootstrap.mutable_static_resources()->mutable_clusters()->Add()->MergeFrom(
           *bootstrap.mutable_static_resources()->mutable_clusters(0));
@@ -381,7 +385,7 @@ public:
     }
   }
 
-  void expectConnenctionServed(std::string alpn = "alpn0") {
+  void expectConnectionServed(std::string alpn = "alpn0") {
     auto codec_client_after_config_update = createHttpCodec(alpn);
     expectResponseHeaderConnectionClose(*codec_client_after_config_update, false);
     codec_client_after_config_update->close();
@@ -395,7 +399,7 @@ public:
 };
 
 // Verify that http response on filter chain 1 and default filter chain have "Connection: close"
-// header when these 2 filter chains are  deleted during the listener update.
+// header when these 2 filter chains are deleted during the listener update.
 TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
   inplaceInitialize(/*add_default_filter_chain=*/true);
 
@@ -403,12 +407,6 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
   auto codec_client_0 = createHttpCodec("alpn0");
   auto codec_client_default = createHttpCodec("alpndefault");
 
-  Cleanup cleanup([c1 = codec_client_1.get(), c0 = codec_client_0.get(),
-                   c_default = codec_client_default.get()]() {
-    c1->close();
-    c0->close();
-    c_default->close();
-  });
   ConfigHelper new_config_helper(
       version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
@@ -422,12 +420,20 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
 
+  test_server_->waitForGaugeGe("http.hcm0.downstream_cx_active", 1);
+  test_server_->waitForGaugeGe("http.hcm1.downstream_cx_active", 1);
+
   expectResponseHeaderConnectionClose(*codec_client_1, true);
   expectResponseHeaderConnectionClose(*codec_client_default, true);
 
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 0);
   expectResponseHeaderConnectionClose(*codec_client_0, false);
-  expectConnenctionServed();
+  expectConnectionServed();
+
+  codec_client_1->close();
+  test_server_->waitForGaugeDestroyed("http.hcm1.downstream_cx_active");
+  codec_client_0->close();
+  codec_client_default->close();
 }
 
 // Verify that http clients of filter chain 0 survives if new listener config adds new filter
@@ -438,15 +444,19 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
 
   auto codec_client_0 = createHttpCodec("alpn0");
   Cleanup cleanup0([c0 = codec_client_0.get()]() { c0->close(); });
+  test_server_->waitForGaugeGe("http.hcm0.downstream_cx_active", 1);
+
   ConfigHelper new_config_helper(
       version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
                                           -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->mutable_filter_chains()->Add()->MergeFrom(*listener->mutable_filter_chains(1));
+    // Note that HCM2 copies the stats prefix from HCM0
+    listener->mutable_filter_chains()->Add()->MergeFrom(*listener->mutable_filter_chains(0));
     *listener->mutable_filter_chains(2)
          ->mutable_filter_chain_match()
          ->mutable_application_protocols(0) = "alpn2";
+
     auto default_filter_chain =
         bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_default_filter_chain();
     default_filter_chain->MergeFrom(*listener->mutable_filter_chains(1));
@@ -458,6 +468,9 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
   auto codec_client_2 = createHttpCodec("alpn2");
   auto codec_client_default = createHttpCodec("alpndefault");
 
+  // 1 connection from filter chain 0 and 1 connection from filter chain 2.
+  test_server_->waitForGaugeGe("http.hcm0.downstream_cx_active", 2);
+
   Cleanup cleanup2([c2 = codec_client_2.get(), c_default = codec_client_default.get()]() {
     c2->close();
     c_default->close();
@@ -465,7 +478,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
   expectResponseHeaderConnectionClose(*codec_client_2, false);
   expectResponseHeaderConnectionClose(*codec_client_default, false);
   expectResponseHeaderConnectionClose(*codec_client_0, false);
-  expectConnenctionServed();
+  expectConnectionServed();
 }
 
 // Verify that http clients of default filter chain is drained and recreated if the default filter
@@ -493,7 +506,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigUpdatingDefaultFilterCha
   Cleanup cleanup2([c_default_v3 = codec_client_default_v3.get()]() { c_default_v3->close(); });
   expectResponseHeaderConnectionClose(*codec_client_default, true);
   expectResponseHeaderConnectionClose(*codec_client_default_v3, false);
-  expectConnenctionServed();
+  expectConnectionServed();
 }
 
 // Verify that balancer is inherited. Test only default balancer because ExactConnectionBalancer
@@ -515,7 +528,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, OverlappingFilterChainServesNewConne
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
   expectResponseHeaderConnectionClose(*codec_client_0, false);
-  expectConnenctionServed();
+  expectConnectionServed();
 }
 
 // Verify default filter chain update is filter chain only update.
@@ -595,84 +608,6 @@ TEST_P(LdsIntegrationTest, NewListenerWithBadPostListenSocketOption) {
       });
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
-}
-
-// Verify the grpc cached logger is available after the initial logger filter is destroyed.
-// Regression test for https://github.com/envoyproxy/envoy/issues/18066
-TEST_P(LdsIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
-  autonomous_upstream_ = true;
-  // The grpc access logger connection never closes. It's ok to see an incomplete logging stream.
-  autonomous_allow_incomplete_streams_ = true;
-
-  const std::string grpc_logger_string = R"EOF(
-    name: grpc_accesslog
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
-      common_config:
-        log_name: bar
-        transport_api_version: V3
-        grpc_service:
-          envoy_grpc:
-            cluster_name: cluster_0
-  )EOF";
-
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->set_stat_prefix("listener_0");
-  });
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) { TestUtility::loadFromYaml(grpc_logger_string, *hcm.add_access_log()); });
-  initialize();
-  // Given we're using LDS in this test, initialize() will not complete until
-  // the initial LDS file has loaded.
-  EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
-
-  // HTTP 1.1 is allowed and the connection is kept open until the listener update.
-  std::string response;
-  auto connection =
-      createConnectionDriver(lookupPort("http"), "GET / HTTP/1.1\r\nHost: host\r\n\r\n",
-                             [&response, &dispatcher = *dispatcher_](
-                                 Network::ClientConnection&, const Buffer::Instance& data) -> void {
-                               response.append(data.toString());
-                               if (response.find("\r\n\r\n") != std::string::npos) {
-                                 dispatcher.exit();
-                               }
-                             });
-  connection->run();
-  EXPECT_TRUE(response.find("HTTP/1.1 200") == 0);
-
-  test_server_->waitForCounterEq("access_logs.grpc_access_log.logs_written", 1);
-
-  // Create a new config with HTTP/1.0 proxying. The goal is to trigger a listener update.
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
-  new_config_helper.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) {
-        hcm.mutable_http_protocol_options()->set_accept_http_10(true);
-        hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
-      });
-
-  // Create an LDS response with the new config, and reload config.
-  new_config_helper.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
-  test_server_->waitForCounterEq("listener_manager.lds.update_success", 2);
-
-  // Wait until the http 1.1 connection is destroyed due to the listener update. It indicates the
-  // listener starts draining.
-  test_server_->waitForGaugeEq("listener.listener_0.downstream_cx_active", 0);
-  // Wait until all the draining filter chain is gone. It indicates the old listener and filter
-  // chains are destroyed.
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
-
-  // Verify that the new listener config is applied.
-  std::string response2;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response2, true);
-  EXPECT_THAT(response2, HasSubstr("HTTP/1.0 200 OK\r\n"));
-
-  // Verify that the grpc access logger is available after the listener update.
-  test_server_->waitForCounterEq("access_logs.grpc_access_log.logs_written", 2);
 }
 
 // Sample test making sure our config framework informs on listener failure.

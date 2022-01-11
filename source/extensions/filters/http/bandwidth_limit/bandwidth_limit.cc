@@ -16,6 +16,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BandwidthLimitFilter {
 
+namespace {
+const Http::LowerCaseString DefaultRequestDelayTrailer =
+    Http::LowerCaseString("bandwidth-request-delay-ms");
+const Http::LowerCaseString DefaultResponseDelayTrailer =
+    Http::LowerCaseString("bandwidth-response-delay-ms");
+const std::chrono::milliseconds ZeroMilliseconds = std::chrono::milliseconds(0);
+} // namespace
+
 FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
                            Runtime::Loader& runtime, TimeSource& time_source, bool per_route)
     : runtime_(runtime), time_source_(time_source), enable_mode_(config.enable_mode()),
@@ -23,7 +31,18 @@ FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
       fill_interval_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
           config, fill_interval, StreamRateLimiter::DefaultFillInterval.count()))),
       enabled_(config.runtime_enabled(), runtime),
-      stats_(generateStats(config.stat_prefix(), scope)) {
+      stats_(generateStats(config.stat_prefix(), scope)),
+      request_delay_trailer_(
+          config.response_trailer_prefix().empty()
+              ? DefaultRequestDelayTrailer
+              : Http::LowerCaseString(absl::StrCat(config.response_trailer_prefix(), "-",
+                                                   DefaultRequestDelayTrailer.get()))),
+      response_delay_trailer_(
+          config.response_trailer_prefix().empty()
+              ? DefaultResponseDelayTrailer
+              : Http::LowerCaseString(absl::StrCat(config.response_trailer_prefix(), "-",
+                                                   DefaultResponseDelayTrailer.get()))),
+      enable_response_trailers_(config.enable_response_trailers()) {
   if (per_route && !config.has_limit_kbps()) {
     throw EnvoyException("bandwidthlimitfilter: limit must be set for per route filter config");
   }
@@ -64,7 +83,12 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
           updateStatsOnDecodeFinish();
           decoder_callbacks_->continueDecoding();
         },
-        [config](uint64_t len) { config.stats().request_allowed_size_.set(len); },
+        [&config](uint64_t len, bool limit_enforced) {
+          config.stats().request_allowed_size_.set(len);
+          if (limit_enforced) {
+            config.stats().request_enforced_.inc();
+          }
+        },
         const_cast<FilterConfig*>(&config)->timeSource(), decoder_callbacks_->dispatcher(),
         decoder_callbacks_->scope(), config.tokenBucket(), config.fillInterval());
   }
@@ -123,7 +147,12 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
           updateStatsOnEncodeFinish();
           encoder_callbacks_->continueEncoding();
         },
-        [config](uint64_t len) { config.stats().response_allowed_size_.set(len); },
+        [&config](uint64_t len, bool limit_enforced) {
+          config.stats().response_allowed_size_.set(len);
+          if (limit_enforced) {
+            config.stats().response_enforced_.inc();
+          }
+        },
         const_cast<FilterConfig*>(&config)->timeSource(), encoder_callbacks_->dispatcher(),
         encoder_callbacks_->scope(), config.tokenBucket(), config.fillInterval());
   }
@@ -135,6 +164,14 @@ Http::FilterDataStatus BandwidthLimiter::encodeData(Buffer::Instance& data, bool
   if (response_limiter_ != nullptr) {
     const auto& config = getConfig();
 
+    // Adds encoded trailers. May only be called in encodeData when end_stream is set to true.
+    // If upstream has trailers, addEncodedTrailers won't be called
+    bool trailer_added = false;
+    if (end_stream && config.enableResponseTrailers()) {
+      trailers_ = &encoder_callbacks_->addEncodedTrailers();
+      trailer_added = true;
+    }
+
     if (!response_latency_) {
       response_latency_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
           config.stats().response_transfer_duration_,
@@ -143,15 +180,18 @@ Http::FilterDataStatus BandwidthLimiter::encodeData(Buffer::Instance& data, bool
     }
     config.stats().response_incoming_size_.set(data.length());
 
-    response_limiter_->writeData(data, end_stream);
+    response_limiter_->writeData(data, end_stream, trailer_added);
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
   ENVOY_LOG(debug, "BandwidthLimiter <encode data>: response_limiter not set");
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus BandwidthLimiter::encodeTrailers(Http::ResponseTrailerMap&) {
+Http::FilterTrailersStatus
+BandwidthLimiter::encodeTrailers(Http::ResponseTrailerMap& response_trailers) {
   if (response_limiter_ != nullptr) {
+    trailers_ = &response_trailers;
+
     if (response_limiter_->onTrailers()) {
       return Http::FilterTrailersStatus::StopIteration;
     } else {
@@ -164,6 +204,7 @@ Http::FilterTrailersStatus BandwidthLimiter::encodeTrailers(Http::ResponseTraile
 
 void BandwidthLimiter::updateStatsOnDecodeFinish() {
   if (request_latency_) {
+    request_duration_ = request_latency_.get()->elapsed();
     request_latency_->complete();
     request_latency_.reset();
     getConfig().stats().request_pending_.dec();
@@ -172,9 +213,22 @@ void BandwidthLimiter::updateStatsOnDecodeFinish() {
 
 void BandwidthLimiter::updateStatsOnEncodeFinish() {
   if (response_latency_) {
+    const auto& config = getConfig();
+
+    if (config.enableResponseTrailers() && trailers_ != nullptr) {
+      auto response_duration = response_latency_.get()->elapsed();
+      if (request_duration_ > ZeroMilliseconds) {
+        trailers_->setCopy(config.requestDelayTrailer(), std::to_string(request_duration_.count()));
+      }
+      if (response_duration > ZeroMilliseconds) {
+        trailers_->setCopy(config.responseDelayTrailer(),
+                           std::to_string(response_duration.count()));
+      }
+    }
+
     response_latency_->complete();
     response_latency_.reset();
-    getConfig().stats().response_pending_.dec();
+    config.stats().response_pending_.dec();
   }
 }
 

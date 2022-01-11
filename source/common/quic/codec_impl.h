@@ -53,6 +53,8 @@ public:
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override;
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override;
 
+  EnvoyQuicServerSession& quicServerSession() { return quic_server_session_; }
+
 private:
   EnvoyQuicServerSession& quic_server_session_;
 };

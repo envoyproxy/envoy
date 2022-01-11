@@ -5,9 +5,11 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/filter.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/event/deferred_task.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/server/active_internal_listener.h"
 #include "source/server/active_tcp_listener.h"
 
 namespace Envoy {
@@ -38,7 +40,20 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   }
 
   ActiveListenerDetails details;
-  if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
+  if (config.internalListenerConfig().has_value()) {
+    if (overridden_listener.has_value()) {
+      for (auto& listener : listeners_) {
+        if (listener.second.listener_->listenerTag() == overridden_listener) {
+          listener.second.internalListener()->get().updateListenerConfig(config);
+          return;
+        }
+      }
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+    auto internal_listener = std::make_unique<ActiveInternalListener>(*this, dispatcher(), config);
+    details.typed_listener_ = *internal_listener;
+    details.listener_ = std::move(internal_listener);
+  } else if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
     if (!support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
         if (listener.second.listener_->listenerTag() == overridden_listener) {
@@ -144,6 +159,25 @@ void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction)
   }
 }
 
+Network::InternalListenerOptRef
+ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstSharedPtr& address) {
+  ASSERT(address->type() == Network::Address::Type::EnvoyInternal);
+  auto listener_it =
+      std::find_if(listeners_.begin(), listeners_.end(),
+                   [&address](std::pair<Network::Address::InstanceConstSharedPtr,
+                                        ConnectionHandlerImpl::ActiveListenerDetails>& p) {
+                     return p.second.internalListener().has_value() &&
+                            p.second.listener_->listener() != nullptr &&
+                            p.first->type() == Network::Address::Type::EnvoyInternal &&
+                            *(p.first) == *address;
+                   });
+
+  if (listener_it != listeners_.end()) {
+    return Network::InternalListenerOptRef(listener_it->second.internalListener().value().get());
+  }
+  return OptRef<Network::InternalListener>();
+}
+
 ConnectionHandlerImpl::ActiveTcpListenerOptRef
 ConnectionHandlerImpl::ActiveListenerDetails::tcpListener() {
   auto* val = absl::get_if<std::reference_wrapper<ActiveTcpListener>>(&typed_listener_);
@@ -153,6 +187,12 @@ ConnectionHandlerImpl::ActiveListenerDetails::tcpListener() {
 ConnectionHandlerImpl::UdpListenerCallbacksOptRef
 ConnectionHandlerImpl::ActiveListenerDetails::udpListener() {
   auto* val = absl::get_if<std::reference_wrapper<Network::UdpListenerCallbacks>>(&typed_listener_);
+  return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
+}
+
+ConnectionHandlerImpl::ActiveInternalListenerOptRef
+ConnectionHandlerImpl::ActiveListenerDetails::internalListener() {
+  auto* val = absl::get_if<std::reference_wrapper<ActiveInternalListener>>(&typed_listener_);
   return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
 }
 

@@ -120,4 +120,5 @@ All http3 details are rooted at *http3.*
     http3.too_many_trailers, Either incoming request or response trailers contained too many entries.
     http3.remote_refuse, The peer refused the stream.
     http3.remote_reset, The peer reset the stream.
+    http3.inconsistent_content_length, The payload size is different from what was indicated by the content-length header.
 

@@ -66,15 +66,12 @@ public:
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
-  Network::DnsResolverSharedPtr createDnsResolver(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-      const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) override;
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::TcpListenerCallbacks& cb,
-                                      bool bind_to_port) override;
+                                      Network::TcpListenerCallbacks& cb, bool bind_to_port,
+                                      bool ignore_global_conn_limit) override;
   Network::UdpListenerPtr
   createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
                     const envoy::config::core::v3::UdpSocketConfig& config) override;

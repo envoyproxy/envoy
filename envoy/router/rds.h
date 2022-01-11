@@ -51,12 +51,6 @@ public:
   virtual void onConfigUpdate() PURE;
 
   /**
-   * Validate if the route configuration can be applied to the context of the route config provider.
-   */
-  virtual void
-  validateConfig(const envoy::config::route::v3::RouteConfiguration& config) const PURE;
-
-  /**
    * Callback used to request an update to the route configuration from the management server.
    * @param for_domain supplies the domain name that virtual hosts must match on
    * @param thread_local_dispatcher thread-local dispatcher

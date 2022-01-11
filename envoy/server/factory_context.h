@@ -8,6 +8,7 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/context.h"
@@ -229,6 +230,12 @@ public:
    * listener.
    */
   virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
+
+  /**
+   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
+   * for this listener.
+   */
+  virtual const Envoy::Config::TypedMetadata& listenerTypedMetadata() const PURE;
 
   /**
    * @return OverloadManager& the overload manager for the server.

@@ -9,6 +9,7 @@
 #include "source/common/grpc/context_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stream_info/utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -254,13 +255,16 @@ public:
   }
 
   void maybeChargeUpstreamStat() {
-    if (config_->enable_upstream_stats_ &&
-        decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().has_value() &&
-        decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().has_value()) {
+    if (!config_->enable_upstream_stats_) {
+      return;
+    }
+    StreamInfo::TimingUtility timing(decoder_callbacks_->streamInfo());
+    if (config_->enable_upstream_stats_ && timing.lastUpstreamTxByteSent().has_value() &&
+        timing.lastUpstreamRxByteReceived().has_value()) {
       std::chrono::milliseconds chrono_duration =
           std::chrono::duration_cast<std::chrono::milliseconds>(
-              decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().value() -
-              decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().value());
+              timing.lastUpstreamRxByteReceived().value() -
+              timing.lastUpstreamTxByteSent().value());
       config_->context_.chargeUpstreamStat(*cluster_, request_names_, chrono_duration);
     }
   }

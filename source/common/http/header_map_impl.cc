@@ -49,8 +49,8 @@ bool validatedLowerCaseString(absl::string_view str) {
   return lower_case_str == str;
 }
 
-absl::string_view delimiterByHeader(const LowerCaseString& key, bool correctly_coalesce_cookies) {
-  if (correctly_coalesce_cookies && key == Http::Headers::get().Cookie) {
+absl::string_view delimiterByHeader(const LowerCaseString& key) {
+  if (key == Http::Headers::get().Cookie) {
     return DelimiterForInlineCookies;
   }
   return DelimiterForInlineHeaders;
@@ -378,8 +378,7 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
     if (*lookup.value().entry_ == nullptr) {
       maybeCreateInline(lookup.value().entry_, *lookup.value().key_, std::move(value));
     } else {
-      const auto delimiter =
-          delimiterByHeader(*lookup.value().key_, header_map_correctly_coalesce_cookies_);
+      const auto delimiter = delimiterByHeader(*lookup.value().key_);
       const uint64_t added_size =
           appendToHeader((*lookup.value().entry_)->value(), value.getStringView(), delimiter);
       addSize(added_size);
@@ -446,7 +445,7 @@ void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view val
   // TODO(#9221): converge on and document a policy for coalescing multiple headers.
   auto entry = getExisting(key);
   if (!entry.empty()) {
-    const auto delimiter = delimiterByHeader(key, header_map_correctly_coalesce_cookies_);
+    const auto delimiter = delimiterByHeader(key);
     const uint64_t added_size = appendToHeader(entry[0]->value(), value, delimiter);
     addSize(added_size);
   } else {

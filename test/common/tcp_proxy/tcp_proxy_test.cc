@@ -935,8 +935,9 @@ TEST_F(TcpProxyTest, AccessLogUpstreamSSLConnection) {
   EXPECT_CALL(*upstream_connections_.at(0), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
 
   raiseEventUpstreamConnected(0);
-  ASSERT_NE(nullptr, filter_->getStreamInfo().upstreamSslConnection());
-  EXPECT_EQ(session_id, filter_->getStreamInfo().upstreamSslConnection()->sessionId());
+  ASSERT_NE(nullptr, filter_->getStreamInfo().upstreamInfo()->upstreamSslConnection());
+  EXPECT_EQ(session_id,
+            filter_->getStreamInfo().upstreamInfo()->upstreamSslConnection()->sessionId());
 }
 
 // Tests that upstream flush works properly with no idle timeout configured.
@@ -1081,7 +1082,8 @@ TEST_F(TcpProxyTest, ShareFilterState) {
   raiseEventUpstreamConnected(0);
   EXPECT_EQ("filter_state_cluster",
             filter_callbacks_.connection_.streamInfo()
-                .upstreamFilterState()
+                .upstreamInfo()
+                ->upstreamFilterState()
                 ->getDataReadOnly<PerConnectionCluster>("envoy.tcp_proxy.cluster")
                 .value());
 }
@@ -1093,9 +1095,10 @@ TEST_F(TcpProxyTest, AccessDownstreamAndUpstreamProperties) {
   raiseEventUpstreamConnected(0);
   EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamAddressProvider().sslConnection(),
             filter_callbacks_.connection().ssl());
-  EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamLocalAddress(),
-            upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().localAddress());
-  EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamSslConnection(),
+  EXPECT_EQ(
+      filter_callbacks_.connection().streamInfo().upstreamInfo()->upstreamLocalAddress().get(),
+      upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().localAddress().get());
+  EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamInfo()->upstreamSslConnection(),
             upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().sslConnection());
 }
 } // namespace

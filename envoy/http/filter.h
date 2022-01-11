@@ -448,22 +448,25 @@ public:
   virtual MetadataMapVector& addDecodedMetadata() PURE;
 
   /**
-   * Called with 100-Continue headers to be encoded.
+   * Called with 1xx headers to be encoded.
+   *
+   * Currently supported codes for this function include 100.
    *
    * This is not folded into encodeHeaders because most Envoy users and filters will not be proxying
-   * 100-continue and with it split out, can ignore the complexity of multiple encodeHeaders calls.
+   * 1xx headers and with it split out, can ignore the complexity of multiple encodeHeaders calls.
    *
-   * This must not be invoked more than once per request.
+   * This is currently only called once per request but implementations should
+   * handle multiple calls as multiple 1xx headers are legal.
    *
    * @param headers supplies the headers to be encoded.
    */
-  virtual void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) PURE;
+  virtual void encode1xxHeaders(ResponseHeaderMapPtr&& headers) PURE;
 
   /**
-   * Returns the 100-Continue headers provided to encode100ContinueHeaders. Returns absl::nullopt if
+   * Returns the headers provided to encode1xxHeaders. Returns absl::nullopt if
    * no headers have been provided yet.
    */
-  virtual ResponseHeaderMapOptRef continueHeaders() const PURE;
+  virtual ResponseHeaderMapOptRef informationalHeaders() const PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
@@ -903,19 +906,19 @@ public:
 class StreamEncoderFilter : public StreamFilterBase {
 public:
   /**
-   * Called with 100-continue headers.
+   * Called with supported 1xx headers.
    *
    * This is not folded into encodeHeaders because most Envoy users and filters
-   * will not be proxying 100-continue and with it split out, can ignore the
+   * will not be proxying 1xxs and with it split out, can ignore the
    * complexity of multiple encodeHeaders calls.
    *
    * This will only be invoked once per request.
    *
-   * @param headers supplies the 100-continue response headers to be encoded.
+   * @param headers supplies the 1xx response headers to be encoded.
    * @return FilterHeadersStatus determines how filter chain iteration proceeds.
    *
    */
-  virtual FilterHeadersStatus encode100ContinueHeaders(ResponseHeaderMap& headers) PURE;
+  virtual FilterHeadersStatus encode1xxHeaders(ResponseHeaderMap& headers) PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.

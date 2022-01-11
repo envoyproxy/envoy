@@ -362,8 +362,6 @@ public:
   ~MockShadowWriter() override;
 
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, (), ());
-  MOCK_METHOD(std::string&, statPrefix, (), (const));
-  MOCK_METHOD(Stats::Scope&, scope, (), ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, (), ());
   MOCK_METHOD(absl::optional<std::reference_wrapper<ShadowRouterHandle>>, submit,
               (const std::string&, MessageMetadataSharedPtr, TransportType, ProtocolType), ());

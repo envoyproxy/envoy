@@ -1,3 +1,4 @@
+#include "source/common/common/hex.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
@@ -8,7 +9,9 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
+#include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
+#include "openssl/md5.h"
 #include "openssl/ssl.h"
 
 using testing::_;
@@ -17,6 +20,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -30,7 +34,8 @@ namespace {
 class TlsInspectorTest : public testing::TestWithParam<std::tuple<uint16_t, uint16_t>> {
 public:
   TlsInspectorTest()
-      : cfg_(std::make_shared<Config>(store_)),
+      : cfg_(std::make_shared<Config>(
+            store_, envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector())),
         io_handle_(std::make_unique<Network::IoSocketHandleImpl>(42)) {}
   ~TlsInspectorTest() override { io_handle_->close(); }
 
@@ -46,15 +51,17 @@ public:
         .WillOnce(
             Invoke([](os_fd_t fd, void* buffer, size_t length, int flag) -> Api::SysCallSizeResult {
               ENVOY_LOG_MISC(error, "In mock syscall recv {} {} {} {}", fd, buffer, length, flag);
-              return Api::SysCallSizeResult{static_cast<ssize_t>(0), 0};
+              return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
             }));
-    EXPECT_CALL(dispatcher_,
-                createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
-                                 Event::FileReadyType::Read | Event::FileReadyType::Closed))
+    EXPECT_CALL(dispatcher_, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                              Event::FileReadyType::Read))
         .WillOnce(
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
     filter_->onAccept(cb_);
   }
+
+  void testJA3(const std::string& fingerprint, bool expect_server_name = true,
+               const std::string& hash = {});
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
@@ -78,15 +85,19 @@ INSTANTIATE_TEST_SUITE_P(TlsProtocolVersions, TlsInspectorTest,
 
 // Test that an exception is thrown for an invalid value for max_client_hello_size
 TEST_P(TlsInspectorTest, MaxClientHelloSize) {
-  EXPECT_THROW_WITH_MESSAGE(Config(store_, Config::TLS_MAX_CLIENT_HELLO + 1), EnvoyException,
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  EXPECT_THROW_WITH_MESSAGE(Config(store_, proto_config, Config::TLS_MAX_CLIENT_HELLO + 1),
+                            EnvoyException,
                             "max_client_hello_size of 65537 is greater than maximum of 65536.");
 }
 
 // Test that the filter detects Closed events and terminates.
 TEST_P(TlsInspectorTest, ConnectionClosed) {
   init();
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Return(Api::SysCallSizeResult{0, 0}));
   EXPECT_CALL(cb_, continueFilterChain(false));
-  file_event_callback_(Event::FileReadyType::Closed);
+  file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().connection_closed_.value());
 }
 
@@ -212,8 +223,9 @@ TEST_P(TlsInspectorTest, NoExtensions) {
 // Test that the filter fails if the ClientHello is larger than the
 // maximum allowed size.
 TEST_P(TlsInspectorTest, ClientHelloTooBig) {
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
   const size_t max_size = 50;
-  cfg_ = std::make_shared<Config>(store_, static_cast<uint32_t>(max_size));
+  cfg_ = std::make_shared<Config>(store_, proto_config, static_cast<uint32_t>(max_size));
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
       std::get<0>(GetParam()), std::get<1>(GetParam()), "example.com", "");
   ASSERT(client_hello.size() > max_size);
@@ -228,6 +240,117 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   EXPECT_CALL(cb_, continueFilterChain(false));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().client_hello_too_large_.value());
+}
+
+// Test that the filter sets the `JA3` hash
+TEST_P(TlsInspectorTest, ConnectionFingerprint) {
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.mutable_enable_ja3_fingerprinting()->set_value(true);
+  cfg_ = std::make_shared<Config>(store_, proto_config);
+  std::vector<uint8_t> client_hello =
+      Tls::Test::generateClientHello(std::get<0>(GetParam()), std::get<1>(GetParam()), "", "");
+  init();
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Invoke(
+          [&client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= client_hello.size());
+            memcpy(buffer, client_hello.data(), client_hello.size());
+            return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
+          }));
+  EXPECT_CALL(socket_, setJA3Hash(_));
+  EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(cb_, continueFilterChain(true));
+  file_event_callback_(Event::FileReadyType::Read);
+}
+
+void TlsInspectorTest::testJA3(const std::string& fingerprint, bool expect_server_name,
+                               const std::string& hash) {
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.mutable_enable_ja3_fingerprinting()->set_value(true);
+  cfg_ = std::make_shared<Config>(store_, proto_config);
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHelloFromJA3Fingerprint(fingerprint);
+  init();
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Invoke(
+          [&client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= client_hello.size());
+            memcpy(buffer, client_hello.data(), client_hello.size());
+            return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
+          }));
+  if (hash.empty()) {
+    uint8_t buf[MD5_DIGEST_LENGTH];
+    MD5(reinterpret_cast<const uint8_t*>(fingerprint.data()), fingerprint.size(), buf);
+    EXPECT_CALL(socket_, setJA3Hash(absl::string_view(Envoy::Hex::encode(buf, MD5_DIGEST_LENGTH))));
+  } else {
+    EXPECT_CALL(socket_, setJA3Hash(absl::string_view(hash)));
+  }
+  if (expect_server_name) {
+    EXPECT_CALL(socket_, setRequestedServerName(absl::string_view("www.envoyproxy.io")));
+  }
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(cb_, continueFilterChain(true));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  file_event_callback_(Event::FileReadyType::Read);
+}
+
+// Test that the filter sets the correct `JA3` hash.
+// Fingerprint created with User-Agent "curl/7.64.1" and a request to ja3er.com/json.
+TEST_P(TlsInspectorTest, ConnectionJA3Hash) {
+  testJA3("771,49200-49196-49192-49188-49172-49162-159-107-57-52393-52392-52394-65413-196-136-"
+          "129-157-61-53-192-132-49199-49195-49191-49187-49171-49161-158-103-51-190-69-156-60-"
+          "47-186-65-49169-49159-5-4-49170-49160-22-10-255,0-11-10-13-16,29-23-24,0");
+}
+
+// Test that the filter sets the correct `JA3` hash with GREASE values in ClientHello message.
+// Fingerprint created with User-Agent "curl/7.64.1" and a request to ja3er.com/json.
+TEST_P(TlsInspectorTest, ConnectionJA3HashGREASE) {
+  const std::string version("771");
+  const std::string ciphers(
+      "49200-49196-49192-49188-49172-49162-159-107-57-52393-52392-52394-65413-196-136-"
+      "129-157-61-53-192-132-49199-49195-49191-49187-49171-49161-158-103-51-190-69-156-60-"
+      "47-186-65-49169-49159-5-4-49170-49160-22-10-255");
+  const std::string extensions_ec_formats("0-11-10-13-16,29-23-24,0");
+  std::string fingerprint;
+  absl::StrAppend(&fingerprint, version, ",", ciphers, ",", extensions_ec_formats);
+
+  std::string grease;
+  for (uint32_t i = 0x0a0a; i < 0xfafa; i += 0x1010) {
+    if (i != 0x0a0a) {
+      absl::StrAppend(&grease, "-");
+    }
+    absl::StrAppendFormat(&grease, "%d", i);
+  }
+  std::string fingerprint_with_grease;
+  absl::StrAppend(&fingerprint_with_grease, version, ",", grease, "-", ciphers, ",", grease, "-",
+                  extensions_ec_formats);
+
+  uint8_t buf[MD5_DIGEST_LENGTH];
+  MD5(reinterpret_cast<const uint8_t*>(fingerprint.data()), fingerprint.size(), buf);
+  std::string hash = Envoy::Hex::encode(buf, MD5_DIGEST_LENGTH);
+
+  testJA3(fingerprint_with_grease, true, hash);
+}
+
+// Test that the filter sets the correct `JA3` hash with no elliptic curves or elliptic curve point
+// formats in ClientHello message. Fingerprint is from ja3er.com/getAllHashesJson.
+TEST_P(TlsInspectorTest, ConnectionJA3HashNoEllipticCurvesOrPointFormats) {
+  testJA3("771,157-49313-49309-156-49312-49308-61-60-53-47-255,0-35-16-22-23-13,,");
+}
+
+// Test that the filter sets the correct `JA3` hash with TLS1.0 and no extensions in ClientHello
+// message. Fingerprint is from ja3er.com/getAllHashesJson.
+TEST_P(TlsInspectorTest, ConnectionJA3HashTls10NoExtensions) {
+  testJA3("769,49162-49157-49161-49156-49159-49154-49160-49155-49172-49167-49171-49166-49169-49164-"
+          "49170-49165-57-51-53-47-5-4-10,,,",
+          false);
+}
+
+// Test that the filter sets the correct `JA3` hash with TLS1.1.
+// Fingerprint is from ja3er.com/getAllHashesJson.
+TEST_P(TlsInspectorTest, ConnectionJA3HashTls11) {
+  testJA3("770,49162-49172-49161-49171-57-56-51-50-53-47-255,0-11-10-16-22-23,5,0-1-2");
 }
 
 // Test that the filter fails on non-SSL data

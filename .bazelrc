@@ -20,6 +20,9 @@ build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --enable_platform_specific_config
 
+# Allow tags to influence execution requirements
+common --experimental_allow_tags_propagation
+
 # Enable position independent code (this is the default on macOS and Windows)
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
 build:linux --copt=-fPIC
@@ -47,6 +50,7 @@ build:sanitizer --test_tag_filters=-no_san
 
 # Common flags for Clang
 build:clang --action_env=BAZEL_COMPILER=clang
+build:clang --action_env=CC=clang --action_env=CXX=clang++
 build:clang --linkopt=-fuse-ld=lld
 
 # Flags for Clang + PCH
@@ -74,16 +78,19 @@ build:asan --copt -O1
 build:asan --copt -fno-optimize-sibling-calls
 
 # Clang ASAN/UBSAN
+build:clang-asan --config=clang
 build:clang-asan --config=asan
 build:clang-asan --linkopt -fuse-ld=lld
 build:clang-asan --linkopt --rtlib=compiler-rt
 build:clang-asan --linkopt --unwindlib=libgcc
 
-# macOS ASAN/UBSAN
+# macOS
 build:macos --cxxopt=-std=c++17
 build:macos --action_env=PATH=/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin:/opt/local/bin
 build:macos --host_action_env=PATH=/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin:/opt/local/bin
+build:macos --define tcmalloc=disabled
 
+# macOS ASAN/UBSAN
 build:macos-asan --config=asan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
 build:macos-asan --copt -Wno-macro-redefined
@@ -158,7 +165,7 @@ build:coverage --strategy=CoverageReport=sandboxed,local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
-build:coverage --instrumentation_filter="//source(?!/common/chromium_url|/common/quic/platform)[/:],//include[/:]"
+build:coverage --instrumentation_filter="//source(?!/common/quic/platform)[/:],//include[/:]"
 build:test-coverage --test_arg="-l trace"
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
@@ -189,7 +196,7 @@ build:rbe-toolchain-asan --linkopt -fuse-ld=lld
 build:rbe-toolchain-asan --action_env=ENVOY_UBSAN_VPTR=1
 build:rbe-toolchain-asan --copt=-fsanitize=vptr,function
 build:rbe-toolchain-asan --linkopt=-fsanitize=vptr,function
-build:rbe-toolchain-asan --linkopt=-L/opt/llvm/lib/clang/11.0.1/lib/linux
+build:rbe-toolchain-asan --linkopt=-L/opt/llvm/lib/clang/12.0.1/lib/linux
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone-x86_64.a
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx-x86_64.a
 
@@ -316,7 +323,7 @@ build:plain-fuzzer --copt=-fsanitize=fuzzer-no-link
 build:plain-fuzzer --linkopt=-fsanitize=fuzzer-no-link
 
 build:asan-fuzzer --config=plain-fuzzer
-build:asan-fuzzer --config=asan
+build:asan-fuzzer --config=clang-asan
 build:asan-fuzzer --copt=-fno-omit-frame-pointer
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1

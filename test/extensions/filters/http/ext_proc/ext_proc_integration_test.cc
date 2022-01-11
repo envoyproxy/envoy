@@ -447,11 +447,9 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
       [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
 
   processRequestHeadersMessage(true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
-    Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
-                                                            {":method", "GET"},
-                                                            {"host", "host"},
-                                                            {":path", "/"},
-                                                            {"x-remove-this", "yes"}};
+    Http::TestRequestHeaderMapImpl expected_request_headers{
+        {":scheme", "http"}, {":method", "GET"},       {"host", "host"},
+        {":path", "/"},      {"x-remove-this", "yes"}, {"x-forwarded-proto", "http"}};
     EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
     auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();

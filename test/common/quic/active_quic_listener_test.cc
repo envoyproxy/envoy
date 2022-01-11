@@ -200,8 +200,9 @@ protected:
   }
 
   void sendCHLO(quic::QuicConnectionId connection_id) {
-    client_sockets_.push_back(std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram,
-                                                                    local_address_, nullptr));
+    client_sockets_.push_back(
+        std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, local_address_,
+                                              nullptr, Network::SocketCreationOptions{}));
     Buffer::OwnedImpl payload =
         generateChloPacketToSend(quic_version_, quic_config_, connection_id);
     Buffer::RawSliceVector slice = payload.getRawSlices();
@@ -217,7 +218,7 @@ protected:
     // no packet is received when the event loop is running.
     // TODO(ggreenway): make tests more reliable, and handle packet loss during the tests, possibly
     // by retransmitting on a timer.
-    ::usleep(1000);
+    ::usleep(1000); // NO_CHECK_FORMAT(real_time)
 #endif
   }
 
@@ -263,6 +264,8 @@ protected:
     quic_protocol_options:
       initial_connection_window_size: {}
       initial_stream_window_size: {}
+    idle_timeout: {}s
+    crypto_handshake_timeout: {}s
     enabled:
       default_value: true
       runtime_key: quic.enabled
@@ -276,7 +279,8 @@ protected:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.quic.proof_source.v3.ProofSourceConfig
 )EOF",
-                       connection_window_size_, stream_window_size_);
+                       connection_window_size_, stream_window_size_, idle_timeout_,
+                       handshake_timeout_);
   }
 
   Network::Address::IpVersion version_;
@@ -319,6 +323,8 @@ protected:
   quic::ParsedQuicVersion quic_version_;
   uint32_t connection_window_size_{1024u};
   uint32_t stream_window_size_{1024u};
+  float idle_timeout_{5};
+  float handshake_timeout_{30};
   QuicStatNames quic_stat_names_;
 };
 
@@ -350,6 +356,49 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   EXPECT_EQ(stream_window_size_, const_cast<quic::QuicSession*>(session)
                                      ->config()
                                      ->GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
+  EXPECT_EQ(
+      idle_timeout_ * 1000,
+      const_cast<quic::QuicSession*>(session)->config()->IdleNetworkTimeout().ToMilliseconds());
+  EXPECT_EQ(handshake_timeout_ * 1000, const_cast<quic::QuicSession*>(session)
+                                           ->config()
+                                           ->max_time_before_crypto_handshake()
+                                           .ToMilliseconds());
+  readFromClientSockets();
+}
+
+TEST_P(ActiveQuicListenerTest, NormalizeTimeouts) {
+  idle_timeout_ = 0.0005;      // 0.5ms
+  handshake_timeout_ = 0.0009; // 0.9ms
+
+  initialize();
+  quic::QuicBufferedPacketStore* const buffered_packets =
+      quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
+  maybeConfigureMocks(/* connection_count = */ 1);
+  quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
+  sendCHLO(connection_id);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(buffered_packets->HasChlosBuffered());
+  EXPECT_NE(0u, quic_dispatcher_->NumSessions());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
+    EXPECT_EQ(50 * quic_dispatcher_->NumSessions(),
+              quic_listener_->numPacketsExpectedPerEventLoop());
+  }
+  const quic::QuicSession* session =
+      quic::test::QuicDispatcherPeer::FindSession(quic_dispatcher_, connection_id);
+  ASSERT(session != nullptr);
+  // 1024 is too small for QUICHE, should be adjusted to the minimum supported by QUICHE.
+  EXPECT_EQ(quic::kMinimumFlowControlSendWindow, const_cast<quic::QuicSession*>(session)
+                                                     ->config()
+                                                     ->GetInitialSessionFlowControlWindowToSend());
+  EXPECT_EQ(stream_window_size_, const_cast<quic::QuicSession*>(session)
+                                     ->config()
+                                     ->GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
+  EXPECT_EQ(
+      1u, const_cast<quic::QuicSession*>(session)->config()->IdleNetworkTimeout().ToMilliseconds());
+  EXPECT_EQ(5000u, const_cast<quic::QuicSession*>(session)
+                       ->config()
+                       ->max_time_before_crypto_handshake()
+                       .ToMilliseconds());
   readFromClientSockets();
 }
 

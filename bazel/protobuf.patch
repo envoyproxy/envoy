@@ -1,32 +1,24 @@
-# https://github.com/protocolbuffers/protobuf/pull/6720
-diff --git a/third_party/BUILD b/third_party/BUILD
-new file mode 100644
-index 0000000000..b66101a39a
---- /dev/null
-+++ b/third_party/BUILD
-@@ -0,0 +1,1 @@
-+exports_files(["six.BUILD", "zlib.BUILD"])
 diff --git a/BUILD b/BUILD
-index 7de87f884..3f0fd5362 100644
+index 1690d4219..8a7f1bf14 100644
 --- a/BUILD
 +++ b/BUILD
 @@ -19,7 +19,7 @@ exports_files(["LICENSE"])
  # ZLIB configuration
  ################################################################################
-
+ 
 -ZLIB_DEPS = ["@zlib//:zlib"]
 +ZLIB_DEPS = ["//external:zlib"]
-
+ 
  ################################################################################
  # Protobuf Runtime Library
 diff --git a/python/google/protobuf/__init__.py b/python/google/protobuf/__init__.py
-index cb4740412..91fe69ce5 100644
+index 52101b6fe..60f06aba2 100644
 --- a/python/google/protobuf/__init__.py
 +++ b/python/google/protobuf/__init__.py
 @@ -31,3 +31,9 @@
  # Copyright 2007 Google Inc. All Rights Reserved.
-
- __version__ = '3.18.0'
+ 
+ __version__ = '3.19.1'
 +
 +if __name__ != '__main__':
 +  try:

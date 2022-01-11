@@ -38,23 +38,25 @@ public:
   void releaseResourcesBase();
 
   // Network::ConnectionCallbacks
-  void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
   // Called if the connection does not complete within the cluster's connectTimeout()
   void onConnectTimeout();
 
+  // Called if the maximum connection duration is reached.
+  void onConnectionDurationTimeout();
+
   // Returns the concurrent stream limit, accounting for if the total stream limit
   // is less than the concurrent stream limit.
-  uint32_t effectiveConcurrentStreamLimit() const {
+  virtual uint32_t effectiveConcurrentStreamLimit() const {
     return std::min(remaining_streams_, concurrent_stream_limit_);
   }
 
   // Returns the application protocol, or absl::nullopt for TCP.
   virtual absl::optional<Http::Protocol> protocol() const PURE;
 
-  int64_t currentUnusedCapacity() const {
+  virtual int64_t currentUnusedCapacity() const {
     int64_t remaining_concurrent_streams =
         static_cast<int64_t>(concurrent_stream_limit_) - numActiveStreams();
 
@@ -100,12 +102,18 @@ public:
   virtual void drain();
 
   ConnPoolImplBase& parent_;
+  // The count of remaining streams allowed for this connection.
+  // This will start out as the total number of streams per connection if capped
+  // by configuration, or it will be set to std::numeric_limits<uint32_t>::max() to be
+  // (functionally) unlimited.
+  // TODO: this could be moved to an optional to make it actually unlimited.
   uint32_t remaining_streams_;
   uint32_t concurrent_stream_limit_;
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
   Stats::TimespanPtr conn_connect_ms_;
   Stats::TimespanPtr conn_length_;
   Event::TimerPtr connect_timer_;
+  Event::TimerPtr connection_duration_timer_;
   bool resources_released_{false};
   bool timed_out_{false};
 
@@ -145,6 +153,10 @@ public:
   virtual ~ConnPoolImplBase();
 
   void deleteIsPendingImpl();
+  // By default, the connection pool will track connected and connecting stream
+  // capacity as streams are created and destroyed. QUIC does custom stream
+  // accounting so will override this to false.
+  virtual bool trackStreamCapacity() { return true; }
 
   // A helper function to get the specific context type from the base class context.
   template <class T> T& typedContext(AttachContext& context) {
@@ -231,6 +243,9 @@ public:
   void decrClusterStreamCapacity(uint32_t delta) {
     state_.decrConnectingAndConnectedStreamCapacity(delta);
   }
+  void incrClusterStreamCapacity(uint32_t delta) {
+    state_.incrConnectingAndConnectedStreamCapacity(delta);
+  }
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "ConnPoolImplBase " << this << DUMP_MEMBER(ready_clients_.size())
@@ -252,6 +267,14 @@ public:
     connecting_stream_capacity_ -= delta;
   }
 
+  void incrConnectingAndConnectedStreamCapacity(uint32_t delta) {
+    state_.incrConnectingAndConnectedStreamCapacity(delta);
+    connecting_stream_capacity_ += delta;
+  }
+
+  // Called when an upstream is ready to serve pending streams.
+  void onUpstreamReady();
+
 protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
 
@@ -262,7 +285,6 @@ protected:
     NoConnectionRateLimited,
     CreatedButRateLimited,
   };
-
   // Creates up to 3 connections, based on the preconnect ratio.
   // Returns the ConnectionResult of the last attempt.
   ConnectionResult tryCreateNewConnections();
@@ -292,11 +314,6 @@ protected:
 
   bool hasActiveStreams() const { return num_active_streams_ > 0; }
 
-  void incrConnectingAndConnectedStreamCapacity(uint32_t delta) {
-    state_.incrConnectingAndConnectedStreamCapacity(delta);
-    connecting_stream_capacity_ += delta;
-  }
-
   Upstream::ClusterConnectivityState& state_;
 
   const Upstream::HostConstSharedPtr host_;
@@ -305,6 +322,10 @@ protected:
   Event::Dispatcher& dispatcher_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
+
+  // True if the max requests circuit breakers apply.
+  // This will be false for the TCP pool, true otherwise.
+  virtual bool enforceMaxRequests() const { return true; }
 
   std::list<Instance::IdleCb> idle_callbacks_;
 
@@ -339,7 +360,6 @@ private:
   // True iff this object is in the deferred delete list.
   bool deferred_deleting_{false};
 
-  void onUpstreamReady();
   Event::SchedulableCallbackPtr upstream_ready_cb_;
 };
 

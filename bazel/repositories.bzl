@@ -115,10 +115,6 @@ def _python_deps():
         name = "com_github_twitter_common_finagle_thrift",
         build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
     )
-    external_http_archive(
-        name = "six",
-        build_file = "@com_google_protobuf//third_party:six.BUILD",
-    )
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
@@ -224,6 +220,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("proxy_wasm_rust_sdk")
     external_http_archive("com_googlesource_code_re2")
     _com_google_cel_cpp()
+    _com_github_google_perfetto()
     external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
@@ -234,6 +231,7 @@ def envoy_dependencies(skip_targets = []):
     )
     external_http_archive("rules_cc")
     external_http_archive("rules_pkg")
+    _com_github_fdio_vpp_vcl()
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
@@ -470,6 +468,19 @@ cc_library(
         patch_args = ["-p1"],
         # Patches ASAN violation of initialization fiasco
         patches = ["@envoy//bazel:antlr.patch"],
+    )
+
+def _com_github_google_perfetto():
+    external_http_archive(
+        name = "com_github_google_perfetto",
+        build_file_content = """
+package(default_visibility = ["//visibility:public"])
+cc_library(
+    name = "perfetto",
+    srcs = ["perfetto.cc"],
+    hdrs = ["perfetto.h"],
+)
+""",
     )
 
 def _com_github_nghttp2_nghttp2():
@@ -818,6 +829,10 @@ def _com_github_google_quiche():
         actual = "@com_github_google_quiche//:quiche_common_platform",
     )
     native.bind(
+        name = "quiche_http2_adapter",
+        actual = "@com_github_google_quiche//:http2_adapter",
+    )
+    native.bind(
         name = "quiche_http2_platform",
         actual = "@com_github_google_quiche//:http2_platform",
     )
@@ -1056,6 +1071,9 @@ def _rules_fuzzing():
         repo_mapping = {
             "@fuzzing_py_deps": "@fuzzing_pip3",
         },
+        # TODO(asraa): Try this fix for OSS-Fuzz build failure on tar command.
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_fuzzing.patch"],
     )
 
 def _kafka_deps():
@@ -1101,6 +1119,13 @@ filegroup(
     external_http_archive(
         name = "kafka_python_client",
         build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _com_github_fdio_vpp_vcl():
+    external_http_archive(
+        name = "com_github_fdio_vpp_vcl",
+        build_file_content = BUILD_ALL_CONTENT,
+        patches = ["@envoy//bazel/foreign_cc:vpp_vcl.patch"],
     )
 
 def _foreign_cc_dependencies():

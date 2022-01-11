@@ -133,9 +133,9 @@ public:
     Responded
   };
 
-  StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine, Http::HeaderMap& headers,
-                      bool end_stream, Filter& filter, FilterCallbacks& callbacks,
-                      TimeSource& time_source);
+  StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
+                      Http::RequestOrResponseHeaderMap& headers, bool end_stream, Filter& filter,
+                      FilterCallbacks& callbacks, TimeSource& time_source);
 
   Http::FilterHeadersStatus start(int function_ref);
   Http::FilterDataStatus onData(Buffer::Instance& data, bool end_stream);
@@ -309,7 +309,7 @@ private:
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
   Filters::Common::Lua::Coroutine& coroutine_;
-  Http::HeaderMap& headers_;
+  Http::RequestOrResponseHeaderMap& headers_;
   bool end_stream_;
   bool headers_continued_{};
   bool buffered_body_{};
@@ -465,7 +465,7 @@ public:
   }
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
+  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
@@ -538,8 +538,8 @@ private:
   Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle,
                                       Filters::Common::Lua::CoroutinePtr& coroutine,
                                       FilterCallbacks& callbacks, int function_ref,
-                                      PerLuaCodeSetup* setup, Http::HeaderMap& headers,
-                                      bool end_stream);
+                                      PerLuaCodeSetup* setup,
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream);
   Http::FilterDataStatus doData(StreamHandleRef& handle, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
 

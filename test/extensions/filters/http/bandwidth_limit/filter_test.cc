@@ -11,6 +11,7 @@ using testing::_;
 using testing::AnyNumber;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -57,6 +58,7 @@ public:
   Http::TestResponseTrailerMapImpl response_trailers_;
   Buffer::OwnedImpl data_;
   Event::SimulatedTimeSystem time_system_;
+  Http::TestResponseTrailerMapImpl trailers_;
 };
 
 TEST_F(FilterTest, Disabled) {
@@ -68,6 +70,7 @@ TEST_F(FilterTest, Disabled) {
   enable_mode: DISABLED
   limit_kbps: 10
   fill_interval: 1s
+  enable_response_trailers: true
   )";
   setup(fmt::format(config_yaml, "1"));
 
@@ -75,11 +78,14 @@ TEST_F(FilterTest, Disabled) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.request_enabled"));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.request_enforced"));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.response_enabled"));
+  EXPECT_EQ(false, response_trailers_.has("bandwidth-request-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("bandwidth-response-delay-ms"));
 }
 
 TEST_F(FilterTest, LimitOnDecode) {
@@ -90,6 +96,8 @@ TEST_F(FilterTest, LimitOnDecode) {
     runtime_key: foo_key
   enable_mode: REQUEST
   limit_kbps: 1
+  enable_response_trailers: true
+  response_trailer_prefix: test
   )";
   setup(fmt::format(config_yaml, "1"));
 
@@ -111,6 +119,7 @@ TEST_F(FilterTest, LimitOnDecode) {
   EXPECT_CALL(decoder_filter_callbacks_,
               injectDecodedDataToFilterChain(BufferStringEqual("hello"), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(0, findCounter("test.http_bandwidth_limit.request_enforced"));
   EXPECT_EQ(5, findGauge("test.http_bandwidth_limit.request_allowed_size"));
 
   // Advance time by 1s which should refill all tokens.
@@ -129,6 +138,7 @@ TEST_F(FilterTest, LimitOnDecode) {
   EXPECT_CALL(decoder_filter_callbacks_,
               injectDecodedDataToFilterChain(BufferStringEqual(std::string(1024, 'a')), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(1, findCounter("test.http_bandwidth_limit.request_enforced"));
   EXPECT_EQ(1024, findGauge("test.http_bandwidth_limit.request_allowed_size"));
   EXPECT_EQ(1126, findGauge("test.http_bandwidth_limit.request_incoming_size"));
 
@@ -138,6 +148,7 @@ TEST_F(FilterTest, LimitOnDecode) {
   EXPECT_CALL(decoder_filter_callbacks_,
               injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(2, findCounter("test.http_bandwidth_limit.request_enforced"));
   EXPECT_EQ(51, findGauge("test.http_bandwidth_limit.request_allowed_size"));
   EXPECT_EQ(1126, findGauge("test.http_bandwidth_limit.request_incoming_size"));
 
@@ -153,6 +164,7 @@ TEST_F(FilterTest, LimitOnDecode) {
   EXPECT_CALL(decoder_filter_callbacks_,
               injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(3, findCounter("test.http_bandwidth_limit.request_enforced"));
   EXPECT_EQ(51, findGauge("test.http_bandwidth_limit.request_allowed_size"));
 
   // Fire timer, also advance time. No timer enable because there is nothing
@@ -161,6 +173,7 @@ TEST_F(FilterTest, LimitOnDecode) {
   EXPECT_CALL(decoder_filter_callbacks_,
               injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'b')), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(3, findCounter("test.http_bandwidth_limit.request_enforced"));
   EXPECT_EQ(51, findGauge("test.http_bandwidth_limit.request_allowed_size"));
 
   // Advance time by 1s for a full refill.
@@ -175,8 +188,11 @@ TEST_F(FilterTest, LimitOnDecode) {
   EXPECT_CALL(decoder_filter_callbacks_,
               injectDecodedDataToFilterChain(BufferStringEqual(std::string(1024, 'c')), true));
   token_timer->invokeCallback();
+  EXPECT_EQ(3, findCounter("test.http_bandwidth_limit.request_enforced"));
   EXPECT_EQ(1024, findGauge("test.http_bandwidth_limit.request_allowed_size"));
   EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.request_pending"));
+  EXPECT_EQ(false, response_trailers_.has("test-bandwidth-request-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("test-bandwidth-response-delay-ms"));
 
   filter_->onDestroy();
 }
@@ -189,18 +205,20 @@ TEST_F(FilterTest, LimitOnEncode) {
     runtime_key: foo_key
   enable_mode: RESPONSE
   limit_kbps: 1
+  enable_response_trailers: true
+  response_trailer_prefix: test
   )";
   setup(fmt::format(config_yaml, "1"));
 
   ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  ON_CALL(encoder_filter_callbacks_, addEncodedTrailers()).WillByDefault(ReturnRef(trailers_));
   Event::MockTimer* token_timer =
       new NiceMock<Event::MockTimer>(&encoder_filter_callbacks_.dispatcher_);
 
   EXPECT_EQ(1UL, config_->limit());
   EXPECT_EQ(50UL, config_->fillInterval().count());
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
@@ -215,6 +233,7 @@ TEST_F(FilterTest, LimitOnEncode) {
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual("hello"), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(0, findCounter("test.http_bandwidth_limit.response_enforced"));
   EXPECT_EQ(5, findGauge("test.http_bandwidth_limit.response_allowed_size"));
 
   // Advance time by 1s which should refill all tokens.
@@ -233,6 +252,7 @@ TEST_F(FilterTest, LimitOnEncode) {
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'a')), false));
   token_timer->invokeCallback();
   EXPECT_EQ(1, findGauge("test.http_bandwidth_limit.response_pending"));
+  EXPECT_EQ(1, findCounter("test.http_bandwidth_limit.response_enforced"));
   EXPECT_EQ(1126, findGauge("test.http_bandwidth_limit.response_incoming_size"));
   EXPECT_EQ(1024, findGauge("test.http_bandwidth_limit.response_allowed_size"));
 
@@ -242,6 +262,7 @@ TEST_F(FilterTest, LimitOnEncode) {
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(2, findCounter("test.http_bandwidth_limit.response_enforced"));
   EXPECT_EQ(51, findGauge("test.http_bandwidth_limit.response_allowed_size"));
 
   // Get new data with current data buffered, not end_stream.
@@ -254,6 +275,7 @@ TEST_F(FilterTest, LimitOnEncode) {
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(3, findCounter("test.http_bandwidth_limit.response_enforced"));
   EXPECT_EQ(51, findGauge("test.http_bandwidth_limit.response_allowed_size"));
 
   // Fire timer, also advance time. No time enable because there is nothing
@@ -262,6 +284,7 @@ TEST_F(FilterTest, LimitOnEncode) {
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'b')), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(3, findCounter("test.http_bandwidth_limit.response_enforced"));
   EXPECT_EQ(51, findGauge("test.http_bandwidth_limit.response_allowed_size"));
 
   // Advance time by 1s for a full refill.
@@ -274,10 +297,14 @@ TEST_F(FilterTest, LimitOnEncode) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data4, true));
   EXPECT_EQ(1024, findGauge("test.http_bandwidth_limit.response_incoming_size"));
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'c')), true));
+              injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'c')), false));
   token_timer->invokeCallback();
   EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.response_pending"));
+  EXPECT_EQ(3, findCounter("test.http_bandwidth_limit.response_enforced"));
   EXPECT_EQ(1024, findGauge("test.http_bandwidth_limit.response_allowed_size"));
+
+  EXPECT_EQ(false, response_trailers_.has("test-bandwidth-request-delay-ms"));
+  EXPECT_EQ("2150", trailers_.get_("test-bandwidth-response-delay-ms"));
 
   filter_->onDestroy();
 }
@@ -290,11 +317,14 @@ TEST_F(FilterTest, LimitOnDecodeAndEncode) {
     runtime_key: foo_key
   enable_mode: REQUEST_AND_RESPONSE
   limit_kbps: 1
+  enable_response_trailers: true
+  response_trailer_prefix: test
   )";
   setup(fmt::format(config_yaml, "1"));
 
   ON_CALL(decoder_filter_callbacks_, decoderBufferLimit()).WillByDefault(Return(1050));
   ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  ON_CALL(encoder_filter_callbacks_, addEncodedTrailers()).WillByDefault(ReturnRef(trailers_));
   Event::MockTimer* request_timer =
       new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
   Event::MockTimer* response_timer =
@@ -303,8 +333,7 @@ TEST_F(FilterTest, LimitOnDecodeAndEncode) {
   EXPECT_EQ(1UL, config_->limit());
   EXPECT_EQ(50UL, config_->fillInterval().count());
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
@@ -403,9 +432,13 @@ TEST_F(FilterTest, LimitOnDecodeAndEncode) {
   EXPECT_CALL(decoder_filter_callbacks_,
               injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'd')), true));
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual(std::string(960, 'e')), true));
-  response_timer->invokeCallback();
+              injectEncodedDataToFilterChain(BufferStringEqual(std::string(960, 'e')), false));
+  EXPECT_CALL(encoder_filter_callbacks_, continueEncoding());
+
   request_timer->invokeCallback();
+  response_timer->invokeCallback();
+  EXPECT_EQ("2200", trailers_.get_("test-bandwidth-request-delay-ms"));
+  EXPECT_EQ("2200", trailers_.get_("test-bandwidth-response-delay-ms"));
 
   filter_->onDestroy();
 }
@@ -418,6 +451,7 @@ TEST_F(FilterTest, WithTrailers) {
     runtime_key: foo_key
   enable_mode: REQUEST_AND_RESPONSE
   limit_kbps: 1
+  response_trailer_prefix: test
   )";
   setup(fmt::format(config_yaml, "1"));
 
@@ -431,8 +465,7 @@ TEST_F(FilterTest, WithTrailers) {
   EXPECT_EQ(1UL, config_->limit());
   EXPECT_EQ(50UL, config_->fillInterval().count());
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
@@ -479,6 +512,8 @@ TEST_F(FilterTest, WithTrailers) {
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(5, 'e')), false));
   response_timer->invokeCallback();
   EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.response_pending"));
+  EXPECT_EQ(false, response_trailers_.has("test-bandwidth-request-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("test-bandwidth-response-delay-ms"));
 }
 
 TEST_F(FilterTest, WithTrailersNoEndStream) {
@@ -489,6 +524,7 @@ TEST_F(FilterTest, WithTrailersNoEndStream) {
     runtime_key: foo_key
   enable_mode: REQUEST_AND_RESPONSE
   limit_kbps: 1
+  enable_response_trailers: true
   )";
   setup(fmt::format(config_yaml, "1"));
 
@@ -502,8 +538,7 @@ TEST_F(FilterTest, WithTrailersNoEndStream) {
   EXPECT_EQ(1UL, config_->limit());
   EXPECT_EQ(50UL, config_->fillInterval().count());
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
@@ -550,6 +585,9 @@ TEST_F(FilterTest, WithTrailersNoEndStream) {
   EXPECT_EQ(1, findGauge("test.http_bandwidth_limit.response_pending"));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.response_pending"));
+
+  EXPECT_EQ("50", response_trailers_.get_("bandwidth-request-delay-ms"));
+  EXPECT_EQ("150", response_trailers_.get_("bandwidth-response-delay-ms"));
 }
 
 } // namespace BandwidthLimitFilter

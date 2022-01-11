@@ -14,6 +14,7 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/http/codes.h"
 
@@ -80,7 +81,8 @@ public:
     }
 
     ServerSslOptions&
-    setSanMatchers(std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers) {
+    setSanMatchers(std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
+                       san_matchers) {
       san_matchers_ = san_matchers;
       return *this;
     }
@@ -94,7 +96,8 @@ public:
     bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
     bool expect_client_ecdsa_cert_{false};
-    std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers_{};
+    std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
+        san_matchers_{};
   };
 
   // Set up basic config, using the specified IpVersion for all connections: listeners, upstream,
@@ -119,7 +122,7 @@ public:
   static std::string baseUdpListenerConfig(std::string listen_address = "0.0.0.0");
 
   // A string for a tls inspector listener filter which can be used with addListenerFilter()
-  static std::string tlsInspectorFilter();
+  static std::string tlsInspectorFilter(bool enable_ja3_fingerprinting = false);
 
   // A basic configuration for L4 proxying.
   static std::string tcpProxyConfig();
@@ -312,6 +315,9 @@ public:
 
   // Add this key value pair to the static runtime.
   void addRuntimeOverride(const std::string& key, const std::string& value);
+
+  // Add typed_filter_metadata to the first listener.
+  void addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value);
 
   // Add filter_metadata to a cluster with the given name
   void addClusterFilterMetadata(absl::string_view metadata_yaml,

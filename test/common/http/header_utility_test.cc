@@ -916,20 +916,26 @@ TEST(ValidateHeaders, Connect) {
 
 TEST(ValidateHeaders, ContentLength) {
   bool should_close_connection;
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::ACCEPT,
-            HeaderUtility::validateContentLength("1,1", true, should_close_connection));
+  size_t content_length{0};
+  EXPECT_EQ(
+      HeaderUtility::HeaderValidationResult::ACCEPT,
+      HeaderUtility::validateContentLength("1,1", true, should_close_connection, content_length));
+  EXPECT_FALSE(should_close_connection);
+  EXPECT_EQ(1, content_length);
+
+  EXPECT_EQ(
+      HeaderUtility::HeaderValidationResult::REJECT,
+      HeaderUtility::validateContentLength("1,2", true, should_close_connection, content_length));
   EXPECT_FALSE(should_close_connection);
 
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
-            HeaderUtility::validateContentLength("1,2", true, should_close_connection));
-  EXPECT_FALSE(should_close_connection);
-
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
-            HeaderUtility::validateContentLength("1,2", false, should_close_connection));
+  EXPECT_EQ(
+      HeaderUtility::HeaderValidationResult::REJECT,
+      HeaderUtility::validateContentLength("1,2", false, should_close_connection, content_length));
   EXPECT_TRUE(should_close_connection);
 
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
-            HeaderUtility::validateContentLength("-1", false, should_close_connection));
+  EXPECT_EQ(
+      HeaderUtility::HeaderValidationResult::REJECT,
+      HeaderUtility::validateContentLength("-1", false, should_close_connection, content_length));
   EXPECT_TRUE(should_close_connection);
 }
 

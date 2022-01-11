@@ -1,6 +1,7 @@
 # This configuration takes incoming data on port 10000 and encapsulates it in a CONNECT
 # request which is sent upstream port 10001.
-# It can be used to test TCP tunneling as described in docs/root/intro/arch_overview/http/upgrades.rst
+# It can be used to test TCP tunneling as described in
+# https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/upgrades
 # and running `curl -x 127.0.0.1:10000 https://www.google.com`
 
 admin:
@@ -26,6 +27,10 @@ static_resources:
           cluster: "cluster_0"
           tunneling_config:
             hostname: host.com:443
+            headers_to_add:
+            - header:
+                key: original_dst_port
+                value: "%DOWNSTREAM_LOCAL_PORT%"
   clusters:
   - name: cluster_0
     connect_timeout: 5s

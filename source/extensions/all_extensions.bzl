@@ -7,6 +7,8 @@ _required_extensions = {
     "envoy.http.original_ip_detection.xff": "//source/extensions/http/original_ip_detection/xff:config",
     "envoy.request_id.uuid": "//source/extensions/request_id/uuid:config",
     "envoy.transport_sockets.tls": "//source/extensions/transport_sockets/tls:config",
+    "envoy.network.dns_resolver.cares": "//source/extensions/network/dns_resolver/cares:config",
+    "envoy.network.dns_resolver.apple": "//source/extensions/network/dns_resolver/apple:config",
 }
 
 # Return the extension cc_library target after select
@@ -29,6 +31,8 @@ _core_extensions = [
     "envoy.filters.network.http_connection_manager",
     "envoy.stat_sinks.statsd",
     "envoy.transport_sockets.raw_buffer",
+    "envoy.network.dns_resolver.cares",
+    "envoy.network.dns_resolver.apple",
 ]
 
 # Return all core extensions to be compiled into Envoy.

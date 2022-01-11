@@ -12,15 +12,29 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace DynamicForwardProxy {
+namespace {
 
+void latchTime(Http::StreamDecoderFilterCallbacks* decoder_callbacks, absl::string_view key) {
+  StreamInfo::DownstreamTiming& downstream_timing =
+      decoder_callbacks->streamInfo().downstreamTiming();
+  downstream_timing.setValue(key, decoder_callbacks->dispatcher().timeSource().monotonicTime());
+}
+
+} // namespace
 struct ResponseStringValues {
   const std::string DnsCacheOverflow = "DNS cache overflow";
   const std::string PendingRequestOverflow = "Dynamic forward proxy pending request overflow";
 };
 
+struct RcDetailsValues {
+  const std::string DnsCacheOverflow = "dns_cache_overflow";
+  const std::string PendingRequestOverflow = "dynamic_forward_proxy_pending_request_overflow";
+};
+
 using CustomClusterType = envoy::config::cluster::v3::Cluster::CustomClusterType;
 
 using ResponseStrings = ConstSingleton<ResponseStringValues>;
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 
@@ -77,7 +91,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     ENVOY_STREAM_LOG(debug, "pending request overflow", *this->decoder_callbacks_);
     this->decoder_callbacks_->sendLocalReply(
         Http::Code::ServiceUnavailable, ResponseStrings::get().PendingRequestOverflow, nullptr,
-        absl::nullopt, ResponseStrings::get().PendingRequestOverflow);
+        absl::nullopt, RcDetails::get().PendingRequestOverflow);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -110,6 +124,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     }
   }
 
+  latchTime(decoder_callbacks_, DNS_START);
   // See the comments in dns_cache.h for how loadDnsCacheEntry() handles hosts with embedded ports.
   // TODO(mattklein123): Because the filter and cluster have independent configuration, it is
   //                     not obvious to the user if something is misconfigured. We should see if
@@ -132,6 +147,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
       addHostAddressToFilterState(host.value()->address());
     }
 
+    latchTime(decoder_callbacks_, DNS_END);
     return Http::FilterHeadersStatus::Continue;
   }
   case LoadDnsCacheEntryStatus::Loading:
@@ -143,7 +159,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     ENVOY_STREAM_LOG(debug, "DNS cache overflow", *decoder_callbacks_);
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
                                        ResponseStrings::get().DnsCacheOverflow, nullptr,
-                                       absl::nullopt, ResponseStrings::get().DnsCacheOverflow);
+                                       absl::nullopt, RcDetails::get().DnsCacheOverflow);
     return Http::FilterHeadersStatus::StopIteration;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -183,6 +199,7 @@ void ProxyFilter::onLoadDnsCacheComplete(
     const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   ENVOY_STREAM_LOG(debug, "load DNS cache complete, continuing after adding resolved host: {}",
                    *decoder_callbacks_, host_info->resolvedHost());
+  latchTime(decoder_callbacks_, DNS_END);
   ASSERT(circuit_breaker_ != nullptr);
   circuit_breaker_.reset();
 

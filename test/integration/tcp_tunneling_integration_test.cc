@@ -488,39 +488,83 @@ public:
         });
     HttpProtocolIntegrationTest::SetUp();
   }
+
+  void setUpConnection(FakeHttpConnectionPtr& fake_upstream_connection) {
+    // Start a connection, and verify the upgrade headers are received upstream.
+    tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+    if (!fake_upstream_connection) {
+      ASSERT_TRUE(
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection));
+    }
+    ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+    // Send upgrade headers downstream, fully establishing the connection.
+    upstream_request_->encodeHeaders(default_response_headers_, false);
+  }
+
+  void sendBidiData(FakeHttpConnectionPtr& fake_upstream_connection, bool send_goaway = false) {
+    // Send some data from downstream to upstream, and make sure it goes through.
+    ASSERT_TRUE(tcp_client_->write("hello", false));
+    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+    if (send_goaway) {
+      fake_upstream_connection->encodeGoAway();
+    }
+    // Send data from upstream to downstream.
+    upstream_request_->encodeData(12, false);
+    ASSERT_TRUE(tcp_client_->waitForData(12));
+  }
+
+  void closeConnection(FakeHttpConnectionPtr& fake_upstream_connection) {
+    // Now send more data and close the TCP client. This should be treated as half close, so the
+    // data should go through.
+    ASSERT_TRUE(tcp_client_->write("hello", false));
+    tcp_client_->close();
+    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+    if (upstreamProtocol() == Http::CodecType::HTTP1) {
+      ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+    } else {
+      ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+      // If the upstream now sends 'end stream' the connection is fully closed.
+      upstream_request_->encodeData(0, true);
+    }
+  }
+
+  IntegrationTcpClientPtr tcp_client_;
 };
 
 TEST_P(TcpTunnelingIntegrationTest, Basic) {
   initialize();
 
-  // Start a connection, and verify the upgrade headers are received upstream.
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  setUpConnection(fake_upstream_connection_);
+  sendBidiData(fake_upstream_connection_);
+  closeConnection(fake_upstream_connection_);
+}
 
-  // Send upgrade headers downstream, fully establishing the connection.
-  upstream_request_->encodeHeaders(default_response_headers_, false);
+TEST_P(TcpTunnelingIntegrationTest, SendDataUpstreamAfterUpstreamClose) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    // HTTP/1.1 can't frame with FIN bits.
+    return;
+  }
+  initialize();
 
-  // Send some data from downstream to upstream, and make sure it goes through.
-  ASSERT_TRUE(tcp_client->write("hello", false));
+  setUpConnection(fake_upstream_connection_);
+  sendBidiData(fake_upstream_connection_);
+  // Close upstream.
+  upstream_request_->encodeData(2, true);
+  tcp_client_->waitForHalfClose();
+
+  // Now send data upstream.
+  ASSERT_TRUE(tcp_client_->write("hello", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
 
-  // Send data from upstream to downstream.
-  upstream_request_->encodeData(12, false);
-  ASSERT_TRUE(tcp_client->waitForData(12));
-
-  // Now send more data and close the TCP client. This should be treated as half close, so the data
-  // should go through.
-  ASSERT_TRUE(tcp_client->write("hello", false));
-  tcp_client->close();
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+  // Finally close and clean up.
+  tcp_client_->close();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-    // If the upstream now sends 'end stream' the connection is fully closed.
-    upstream_request_->encodeData(0, true);
   }
 }
 
@@ -548,7 +592,7 @@ TEST_P(TcpTunnelingIntegrationTest, BasicUsePost) {
   initialize();
 
   // Start a connection, and verify the upgrade headers are received upstream.
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
@@ -557,33 +601,88 @@ TEST_P(TcpTunnelingIntegrationTest, BasicUsePost) {
   // Send upgrade headers downstream, fully establishing the connection.
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
-  // Send some data from downstream to upstream, and make sure it goes through.
-  ASSERT_TRUE(tcp_client->write("hello", false));
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+  sendBidiData(fake_upstream_connection_);
+  closeConnection(fake_upstream_connection_);
+}
 
-  // Send data from upstream to downstream.
-  upstream_request_->encodeData(12, false);
-  ASSERT_TRUE(tcp_client->waitForData(12));
+TEST_P(TcpTunnelingIntegrationTest, BasicHeaderEvaluationTunnelingConfig) {
+  // Set the "downstream-local-ip" header in the CONNECT request.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("host.com:80");
+    auto new_header = proxy_config.mutable_tunneling_config()->mutable_headers_to_add()->Add();
+    new_header->mutable_header()->set_key("downstream-local-ip");
+    new_header->mutable_header()->set_value("%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%");
 
-  // Now send more data and close the TCP client. This should be treated as half close, so the data
-  // should go through.
-  ASSERT_TRUE(tcp_client->write("hello", false));
-  tcp_client->close();
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      filter->mutable_typed_config()->PackFrom(proxy_config);
+      break;
+    }
+  });
+
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
+
+  // Verify that the connect request has a "downstream-local-ip" header and its value is the
+  // loopback address.
+  EXPECT_EQ(
+      upstream_request_->headers().get(Envoy::Http::LowerCaseString("downstream-local-ip")).size(),
+      1);
+  EXPECT_EQ(upstream_request_->headers()
+                .get(Envoy::Http::LowerCaseString("downstream-local-ip"))[0]
+                ->value()
+                .getStringView(),
+            Network::Test::getLoopbackAddressString(version_));
+
+  // Send upgrade headers downstream, fully establishing the connection.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  sendBidiData(fake_upstream_connection_);
+  closeConnection(fake_upstream_connection_);
+}
+
+TEST_P(TcpTunnelingIntegrationTest, Goaway) {
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  } else {
-    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-    // If the upstream now sends 'end stream' the connection is fully closed.
-    upstream_request_->encodeData(0, true);
+    return;
   }
+  initialize();
+
+  // Send bidirectional data, including a goaway.
+  // This should result in the first connection being torn down.
+  setUpConnection(fake_upstream_connection_);
+  sendBidiData(fake_upstream_connection_, true);
+  closeConnection(fake_upstream_connection_);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+
+  // Make sure a subsequent connection can be established successfully.
+  FakeHttpConnectionPtr fake_upstream_connection;
+  setUpConnection(fake_upstream_connection);
+  sendBidiData(fake_upstream_connection);
+  closeConnection(fake_upstream_connection_);
+
+  // Make sure the last stream is finished before doing test teardown.
+  fake_upstream_connection->encodeGoAway();
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 2);
 }
 
 TEST_P(TcpTunnelingIntegrationTest, InvalidResponseHeaders) {
   initialize();
 
   // Start a connection, and verify the upgrade headers are received upstream.
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
@@ -600,23 +699,15 @@ TEST_P(TcpTunnelingIntegrationTest, InvalidResponseHeaders) {
 
   // The connection should be fully closed, but the client has no way of knowing
   // that. Ensure the FIN is read and clean up state.
-  tcp_client->waitForHalfClose();
-  tcp_client->close();
+  tcp_client_->waitForHalfClose();
+  tcp_client_->close();
 }
 
 TEST_P(TcpTunnelingIntegrationTest, CloseUpstreamFirst) {
   initialize();
 
-  // Establish a connection.
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-
-  // Send data in both directions.
-  ASSERT_TRUE(tcp_client->write("hello", false));
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+  setUpConnection(fake_upstream_connection_);
+  sendBidiData(fake_upstream_connection_);
 
   // Send data from upstream to downstream with an end stream and make sure the data is received
   // before the connection is half-closed.
@@ -624,19 +715,19 @@ TEST_P(TcpTunnelingIntegrationTest, CloseUpstreamFirst) {
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->close());
   }
-  ASSERT_TRUE(tcp_client->waitForData(12));
-  tcp_client->waitForHalfClose();
+  ASSERT_TRUE(tcp_client_->waitForData(12));
+  tcp_client_->waitForHalfClose();
 
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-    tcp_client->close();
+    tcp_client_->close();
   } else {
     // Attempt to send data upstream.
     // should go through.
-    ASSERT_TRUE(tcp_client->write("hello", false));
+    ASSERT_TRUE(tcp_client_->write("hello", false));
     ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
 
-    ASSERT_TRUE(tcp_client->write("hello", true));
+    ASSERT_TRUE(tcp_client_->write("hello", true));
     ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   }
@@ -649,16 +740,11 @@ TEST_P(TcpTunnelingIntegrationTest, ResetStreamTest) {
   enableHalfClose(false);
   initialize();
 
-  // Establish a connection.
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  upstream_request_->encodeHeaders(default_response_headers_, false);
+  setUpConnection(fake_upstream_connection_);
 
   // Reset the stream.
   upstream_request_->encodeResetStream();
-  tcp_client->waitForDisconnect();
+  tcp_client_->waitForDisconnect();
 }
 
 TEST_P(TcpTunnelingIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
@@ -681,20 +767,16 @@ TEST_P(TcpTunnelingIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
 
   initialize();
 
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  upstream_request_->encodeHeaders(default_response_headers_, false);
+  setUpConnection(fake_upstream_connection_);
 
   std::string data(1024 * 16, 'a');
-  ASSERT_TRUE(tcp_client->write(data));
+  ASSERT_TRUE(tcp_client_->write(data));
   upstream_request_->encodeData(data, false);
 
-  tcp_client->waitForDisconnect();
+  tcp_client_->waitForDisconnect();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-    tcp_client->close();
+    tcp_client_->close();
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
@@ -707,36 +789,32 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyDownstreamFlush) {
   config_helper_.setBufferLimits(size / 4, size / 4);
   initialize();
 
-  std::string data(size, 'a');
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  upstream_request_->encodeHeaders(default_response_headers_, false);
+  setUpConnection(fake_upstream_connection_);
 
-  tcp_client->readDisable(true);
+  tcp_client_->readDisable(true);
+  std::string data(size, 'a');
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    ASSERT_TRUE(tcp_client->write("hello", false));
+    ASSERT_TRUE(tcp_client_->write("hello", false));
     ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
 
     upstream_request_->encodeData(data, true);
     ASSERT_TRUE(fake_upstream_connection_->close());
   } else {
-    ASSERT_TRUE(tcp_client->write("", true));
+    ASSERT_TRUE(tcp_client_->write("", true));
 
     // This ensures that readDisable(true) has been run on its thread
-    // before tcp_client starts writing.
+    // before tcp_client_ starts writing.
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
     upstream_request_->encodeData(data, true);
   }
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
-  tcp_client->readDisable(false);
-  tcp_client->waitForData(data);
-  tcp_client->waitForHalfClose();
+  tcp_client_->readDisable(false);
+  tcp_client_->waitForData(data);
+  tcp_client_->waitForHalfClose();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    tcp_client->close();
+    tcp_client_->close();
   }
 }
 
@@ -754,22 +832,19 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyUpstreamFlush) {
   config_helper_.setBufferLimits(size, size);
   initialize();
 
-  std::string data(size, 'a');
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  upstream_request_->encodeHeaders(default_response_headers_, false);
+  setUpConnection(fake_upstream_connection_);
+
   upstream_request_->readDisable(true);
   upstream_request_->encodeData("hello", false);
 
   // This ensures that fake_upstream_connection->readDisable has been run on its thread
-  // before tcp_client starts writing.
-  ASSERT_TRUE(tcp_client->waitForData(5));
+  // before tcp_client_ starts writing.
+  ASSERT_TRUE(tcp_client_->waitForData(5));
 
-  ASSERT_TRUE(tcp_client->write(data, true));
+  std::string data(size, 'a');
+  ASSERT_TRUE(tcp_client_->write(data, true));
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    tcp_client->close();
+    tcp_client_->close();
 
     upstream_request_->readDisable(false);
     ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, size));
@@ -782,7 +857,7 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyUpstreamFlush) {
     ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, size));
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
     upstream_request_->encodeData("world", true);
-    tcp_client->waitForHalfClose();
+    tcp_client_->waitForHalfClose();
   }
 }
 
@@ -793,42 +868,37 @@ TEST_P(TcpTunnelingIntegrationTest, ConnectionReuse) {
   }
   initialize();
 
-  // Establish a connection.
-  IntegrationTcpClientPtr tcp_client1 = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  upstream_request_->encodeHeaders(default_response_headers_, false);
+  setUpConnection(fake_upstream_connection_);
 
   // Send data in both directions.
-  ASSERT_TRUE(tcp_client1->write("hello1", false));
+  ASSERT_TRUE(tcp_client_->write("hello1", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hello1"));
 
   // Send data from upstream to downstream with an end stream and make sure the data is received
   // before the connection is half-closed.
   upstream_request_->encodeData("world1", true);
-  tcp_client1->waitForData("world1");
-  tcp_client1->waitForHalfClose();
-  tcp_client1->close();
+  tcp_client_->waitForData("world1");
+  tcp_client_->waitForHalfClose();
+  tcp_client_->close();
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Establish a new connection.
-  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("tcp_proxy"));
+  IntegrationTcpClientPtr tcp_client_2 = makeTcpConnection(lookupPort("tcp_proxy"));
 
   // The new CONNECT stream is established in the existing h2 connection.
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
-  ASSERT_TRUE(tcp_client2->write("hello2", false));
+  ASSERT_TRUE(tcp_client_2->write("hello2", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hello2"));
 
   // Send data from upstream to downstream with an end stream and make sure the data is received
   // before the connection is half-closed.
   upstream_request_->encodeData("world2", true);
-  tcp_client2->waitForData("world2");
-  tcp_client2->waitForHalfClose();
-  tcp_client2->close();
+  tcp_client_2->waitForData("world2");
+  tcp_client_2->waitForHalfClose();
+  tcp_client_2->close();
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 }
 
@@ -839,36 +909,31 @@ TEST_P(TcpTunnelingIntegrationTest, H1NoConnectionReuse) {
   }
   initialize();
 
-  // Establish a connection.
-  IntegrationTcpClientPtr tcp_client1 = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  upstream_request_->encodeHeaders(default_response_headers_, false);
+  setUpConnection(fake_upstream_connection_);
 
   // Send data in both directions.
-  ASSERT_TRUE(tcp_client1->write("hello1", false));
+  ASSERT_TRUE(tcp_client_->write("hello1", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hello1"));
 
   // Send data from upstream to downstream and close the connection
   // from downstream.
   upstream_request_->encodeData("world1", false);
-  tcp_client1->waitForData("world1");
-  tcp_client1->close();
+  tcp_client_->waitForData("world1");
+  tcp_client_->close();
 
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
   // Establish a new connection.
-  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("tcp_proxy"));
+  IntegrationTcpClientPtr tcp_client_2 = makeTcpConnection(lookupPort("tcp_proxy"));
   // A new connection is established
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
-  ASSERT_TRUE(tcp_client2->write("hello1", false));
+  ASSERT_TRUE(tcp_client_2->write("hello1", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hello1"));
-  tcp_client2->close();
+  tcp_client_2->close();
 
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
@@ -881,41 +946,41 @@ TEST_P(TcpTunnelingIntegrationTest, H1UpstreamCloseNoConnectionReuse) {
   initialize();
 
   // Establish a connection.
-  IntegrationTcpClientPtr tcp_client1 = makeTcpConnection(lookupPort("tcp_proxy"));
+  IntegrationTcpClientPtr tcp_client_1 = makeTcpConnection(lookupPort("tcp_proxy"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
   // Send data in both directions.
-  ASSERT_TRUE(tcp_client1->write("hello1", false));
+  ASSERT_TRUE(tcp_client_1->write("hello1", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hello1"));
 
   // Send data from upstream to downstream and close the connection
   // from the upstream.
   upstream_request_->encodeData("world1", false);
-  tcp_client1->waitForData("world1");
+  tcp_client_1->waitForData("world1");
   ASSERT_TRUE(fake_upstream_connection_->close());
 
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  tcp_client1->waitForHalfClose();
-  tcp_client1->close();
+  tcp_client_1->waitForHalfClose();
+  tcp_client_1->close();
 
   // Establish a new connection.
-  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("tcp_proxy"));
+  IntegrationTcpClientPtr tcp_client_2 = makeTcpConnection(lookupPort("tcp_proxy"));
   // A new connection is established
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
-  ASSERT_TRUE(tcp_client2->write("hello2", false));
+  ASSERT_TRUE(tcp_client_2->write("hello2", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hello2"));
   ASSERT_TRUE(fake_upstream_connection_->close());
 
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  tcp_client2->waitForHalfClose();
-  tcp_client2->close();
+  tcp_client_2->waitForHalfClose();
+  tcp_client_2->close();
 }
 
 TEST_P(TcpTunnelingIntegrationTest, 2xxStatusCodeValidHttp1) {
@@ -925,7 +990,7 @@ TEST_P(TcpTunnelingIntegrationTest, 2xxStatusCodeValidHttp1) {
   initialize();
 
   // Start a connection, and verify the upgrade headers are received upstream.
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
@@ -935,16 +1000,10 @@ TEST_P(TcpTunnelingIntegrationTest, 2xxStatusCodeValidHttp1) {
   default_response_headers_.setStatus(enumToInt(Http::Code::Accepted));
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
-  // Send some data from downstream to upstream, and make sure it goes through.
-  ASSERT_TRUE(tcp_client->write("hello", false));
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
-
-  // Send data from upstream to downstream.
-  upstream_request_->encodeData(12, false);
-  ASSERT_TRUE(tcp_client->waitForData(12));
+  sendBidiData(fake_upstream_connection_);
 
   // Close the downstream connection and wait for upstream disconnect
-  tcp_client->close();
+  tcp_client_->close();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
@@ -955,7 +1014,7 @@ TEST_P(TcpTunnelingIntegrationTest, ContentLengthHeaderIgnoredHttp1) {
   initialize();
 
   // Start a connection, and verify the upgrade headers are received upstream.
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
@@ -968,11 +1027,11 @@ TEST_P(TcpTunnelingIntegrationTest, ContentLengthHeaderIgnoredHttp1) {
 
   // Send data from upstream to downstream.
   upstream_request_->encodeData(12, false);
-  ASSERT_TRUE(tcp_client->waitForData(12));
+  ASSERT_TRUE(tcp_client_->waitForData(12));
 
   // Now send some data and close the TCP client.
-  ASSERT_TRUE(tcp_client->write("hello", false));
-  tcp_client->close();
+  ASSERT_TRUE(tcp_client_->write("hello", false));
+  tcp_client_->close();
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
@@ -984,7 +1043,7 @@ TEST_P(TcpTunnelingIntegrationTest, TransferEncodingHeaderIgnoredHttp1) {
   initialize();
 
   // Start a connection, and verify the upgrade headers are received upstream.
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
   // Using raw connection to be able to set Transfer-encoding header.
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
@@ -998,24 +1057,24 @@ TEST_P(TcpTunnelingIntegrationTest, TransferEncodingHeaderIgnoredHttp1) {
       fake_upstream_connection->write("HTTP/1.1 200 OK\r\nTransfer-encoding: chunked\r\n\r\n"));
 
   // Now send some data and close the TCP client.
-  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_TRUE(tcp_client_->write("hello"));
   ASSERT_TRUE(
       fake_upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("hello")));
 
   // Close connections.
   ASSERT_TRUE(fake_upstream_connection->close());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  tcp_client->close();
+  tcp_client_->close();
 }
 
 TEST_P(TcpTunnelingIntegrationTest, DeferTransmitDataUntilSuccessConnectResponseIsReceived) {
   initialize();
 
   // Start a connection, and verify the upgrade headers are received upstream.
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
 
   // Send some data straight away.
-  ASSERT_TRUE(tcp_client->write("hello", false));
+  ASSERT_TRUE(tcp_client_->write("hello", false));
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -1028,7 +1087,7 @@ TEST_P(TcpTunnelingIntegrationTest, DeferTransmitDataUntilSuccessConnectResponse
 
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
 
-  tcp_client->close();
+  tcp_client_->close();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
@@ -1042,10 +1101,10 @@ TEST_P(TcpTunnelingIntegrationTest, NoDataTransmittedIfConnectFailureResponseIsR
   initialize();
 
   // Start a connection, and verify the upgrade headers are received upstream.
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
 
   // Send some data straight away.
-  ASSERT_TRUE(tcp_client->write("hello", false));
+  ASSERT_TRUE(tcp_client_->write("hello", false));
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -1057,7 +1116,7 @@ TEST_P(TcpTunnelingIntegrationTest, NoDataTransmittedIfConnectFailureResponseIsR
   // Wait a bit, no data should go through.
   ASSERT_FALSE(upstream_request_->waitForData(*dispatcher_, 1, std::chrono::milliseconds(100)));
 
-  tcp_client->close();
+  tcp_client_->close();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
@@ -1069,15 +1128,15 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamDisconnectBeforeResponseReceived) {
   initialize();
 
   // Start a connection, and verify the upgrade headers are received upstream.
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
   ASSERT_TRUE(fake_upstream_connection_->close());
-  tcp_client->waitForHalfClose();
-  tcp_client->close();
+  tcp_client_->waitForHalfClose();
+  tcp_client_->close();
 }
 
 INSTANTIATE_TEST_SUITE_P(IpAndHttpVersions, TcpTunnelingIntegrationTest,

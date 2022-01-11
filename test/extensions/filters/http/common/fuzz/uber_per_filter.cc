@@ -7,6 +7,7 @@
 
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 #include "test/proto/bookstore.pb.h"
+#include "test/test_common/registry.h"
 
 // This file contains any filter-specific setup and input clean-up needed in the generic filter fuzz
 // target.
@@ -125,7 +126,9 @@ void UberFilterFuzzer::perFilterSetup() {
   encoder_callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
 
   // Prepare expectations for dynamic forward proxy.
-  ON_CALL(factory_context_.dispatcher_, createDnsResolver(_, _))
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
+  ON_CALL(dns_resolver_factory, createDnsResolver(_, _, _))
       .WillByDefault(testing::Return(resolver_));
 
   // Prepare expectations for TAP config.

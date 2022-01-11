@@ -18,6 +18,7 @@ public:
   LogicalHost(
       const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
       const Network::Address::InstanceConstSharedPtr& address,
+      const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
       const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
       const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
       const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
@@ -28,20 +29,27 @@ public:
                  lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
                  lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
                  lb_endpoint.health_status(), time_source),
-        override_transport_socket_options_(override_transport_socket_options) {}
+        override_transport_socket_options_(override_transport_socket_options) {
+    setAddressList(address_list);
+  }
 
   // Set the new address. Updates are typically rare so a R/W lock is used for address updates.
   // Note that the health check address update requires no lock to be held since it is only
   // used on the main thread, but we do so anyway since it shouldn't be perf critical and will
   // future proof the code.
-  void setNewAddress(const Network::Address::InstanceConstSharedPtr& address,
-                     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
+  void setNewAddresses(const Network::Address::InstanceConstSharedPtr& address,
+                       const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
+                       const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
     const auto& port_value = lb_endpoint.endpoint().health_check_config().port_value();
     auto health_check_address =
         port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);
 
     absl::WriterMutexLock lock(&address_lock_);
     setAddress(address);
+    setAddressList(address_list);
+    // TODO: the health checker only gets the first address in the list and
+    // will not walk the full happy eyeballs list. We should eventually fix
+    // this.
     setHealthCheckAddress(health_check_address);
   }
 
@@ -78,9 +86,9 @@ public:
 
   // Upstream:HostDescription
   bool canary() const override { return logical_host_->canary(); }
-  void canary(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void canary(bool) override {}
   MetadataConstSharedPtr metadata() const override { return logical_host_->metadata(); }
-  void metadata(MetadataConstSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void metadata(MetadataConstSharedPtr) override {}
 
   Network::TransportSocketFactory& transportSocketFactory() const override {
     return logical_host_->transportSocketFactory();
@@ -107,13 +115,12 @@ public:
     return logical_host_->localityZoneStatName();
   }
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
-    // Should never be called since real hosts are used only for forwarding and not health
-    // checking.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    // Should never be called since real hosts are used only for forwarding.
+    return nullptr;
   }
   MonotonicTime creationTime() const override { return logical_host_->creationTime(); }
   uint32_t priority() const override { return logical_host_->priority(); }
-  void priority(uint32_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void priority(uint32_t) override {}
 
 private:
   const Network::Address::InstanceConstSharedPtr address_;

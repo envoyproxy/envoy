@@ -108,7 +108,7 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   callbacks_ = &callbacks;
 }
 
-Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderMap&) {
+Http::FilterHeadersStatus Filter::encode1xxHeaders(Http::ResponseHeaderMap&) {
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -200,13 +200,13 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   if (status == Filters::Common::RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
     callbacks_->sendLocalReply(
         Http::Code::TooManyRequests, response_body,
         [this](Http::HeaderMap& headers) {
           populateResponseHeaders(headers, /*from_local_reply=*/true);
         },
         config_->rateLimitedGrpcStatus(), RcDetails::get().RateLimited);
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
   } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {
     if (config_->failureModeAllow()) {
       cluster_->statsScope().counterFromStatName(stat_names.failure_mode_allowed_).inc();
@@ -216,9 +216,9 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
       }
     } else {
       state_ = State::Responded;
+      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
       callbacks_->sendLocalReply(Http::Code::InternalServerError, response_body, nullptr,
                                  absl::nullopt, RcDetails::get().RateLimitError);
-      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
     }
   } else if (!initiating_call_) {
     appendRequestHeaders(req_headers_to_add);

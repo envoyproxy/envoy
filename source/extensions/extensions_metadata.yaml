@@ -3,6 +3,11 @@ envoy.access_loggers.file:
   - envoy.access_loggers
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.access_loggers.extension_filters.cel:
+  categories:
+  - envoy.access_loggers.extension_filters
+  security_posture: unknown
+  status: alpha
 envoy.access_loggers.http_grpc:
   categories:
   - envoy.access_loggers
@@ -393,6 +398,11 @@ envoy.filters.network.zookeeper_proxy:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.filters.thrift.header_to_metadata:
+  categories:
+  - envoy.thrift_proxy.filters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.filters.thrift.ratelimit:
   categories:
   - envoy.thrift_proxy.filters
@@ -633,6 +643,12 @@ envoy.transport_sockets.tap:
   - envoy.transport_sockets.upstream
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.transport_sockets.tcp_stats:
+  categories:
+  - envoy.transport_sockets.downstream
+  - envoy.transport_sockets.upstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
 envoy.transport_sockets.tls:
   categories:
   - envoy.transport_sockets.downstream
@@ -682,17 +698,17 @@ envoy.wasm.runtime.v8:
 envoy.wasm.runtime.wamr:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown  # "This may never change from unknown until the threat model at https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.wasm.runtime.wasmtime:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown  # "This may never change from unknown until the threat model at https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.wasm.runtime.wavm:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown  # "This may never change from unknown until the threat model at https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.watchdog.profile_action:
   categories:
@@ -704,6 +720,16 @@ envoy.key_value.file_based:
   - envoy.common.key_value
   security_posture: data_plane_agnostic
   status: alpha
+envoy.network.dns_resolver.cares:
+  categories:
+  - envoy.network.dns_resolver
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+envoy.network.dns_resolver.apple:
+  categories:
+  - envoy.network.dns_resolver
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.rbac.matchers.upstream_ip_port:
   categories:
   - envoy.rbac.matchers

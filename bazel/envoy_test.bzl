@@ -258,10 +258,11 @@ def envoy_benchmark_test(
         benchmark_binary,
         data = [],
         tags = [],
+        repository = "",
         **kargs):
     native.sh_test(
         name = name,
-        srcs = ["//bazel:test_for_benchmark_wrapper.sh"],
+        srcs = [repository + "//bazel:test_for_benchmark_wrapper.sh"],
         data = [":" + benchmark_binary] + data,
         args = ["%s/%s" % (native.package_name(), benchmark_binary)],
         tags = tags + ["nocoverage"],

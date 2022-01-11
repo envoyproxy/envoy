@@ -35,7 +35,8 @@ static void errorCallbackTest(Address::IpVersion version) {
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version));
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::ListenerPtr listener = dispatcher->createListener(socket, listener_callbacks, true);
+  Network::ListenerPtr listener =
+      dispatcher->createListener(socket, listener_callbacks, true, false);
 
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -66,8 +67,10 @@ TEST_P(ListenerImplDeathTest, ErrorCallback) {
 class TestTcpListenerImpl : public TcpListenerImpl {
 public:
   TestTcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random_generator,
-                      SocketSharedPtr socket, TcpListenerCallbacks& cb, bool bind_to_port)
-      : TcpListenerImpl(dispatcher, random_generator, std::move(socket), cb, bind_to_port) {}
+                      SocketSharedPtr socket, TcpListenerCallbacks& cb, bool bind_to_port,
+                      bool ignore_global_conn_limit)
+      : TcpListenerImpl(dispatcher, random_generator, std::move(socket), cb, bind_to_port,
+                        ignore_global_conn_limit) {}
 
   MOCK_METHOD(Address::InstanceConstSharedPtr, getLocalAddress, (os_fd_t fd));
 };
@@ -85,10 +88,10 @@ TEST_P(TcpListenerImplTest, UseActualDst) {
   Random::MockRandomGenerator random_generator;
   // Do not redirect since use_original_dst is false.
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket,
-                                        listener_callbacks1, true);
+                                        listener_callbacks1, true, false);
   Network::MockTcpListenerCallbacks listener_callbacks2;
   Network::TestTcpListenerImpl listenerDst(dispatcherImpl(), random_generator, socketDst,
-                                           listener_callbacks2, false);
+                                           listener_callbacks2, false, false);
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -122,7 +125,8 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::ListenerPtr listener = dispatcher_->createListener(socket, listener_callbacks, true);
+  Network::ListenerPtr listener =
+      dispatcher_->createListener(socket, listener_callbacks, true, false);
 
   std::vector<Network::ClientConnectionPtr> client_connections;
   std::vector<Network::ConnectionPtr> server_connections;
@@ -181,6 +185,54 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
       {{"overload.global_downstream_max_connections", ""}});
 }
 
+TEST_P(TcpListenerImplTest, GlobalConnectionLimitListenerOptOut) {
+  // Required to manipulate runtime values when there is no test server.
+  TestScopedRuntime scoped_runtime;
+
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"overload.global_downstream_max_connections", "1"}});
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(version_));
+  Network::MockTcpListenerCallbacks listener_callbacks;
+  Network::ListenerPtr listener =
+      dispatcher_->createListener(socket, listener_callbacks, true, true);
+
+  std::vector<Network::ClientConnectionPtr> client_connections;
+  std::vector<Network::ConnectionPtr> server_connections;
+  StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr);
+  EXPECT_CALL(listener_callbacks, onAccept_(_))
+      .WillRepeatedly(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+        server_connections.emplace_back(dispatcher_->createServerConnection(
+            std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info));
+        dispatcher_->exit();
+      }));
+
+  auto initiate_connections = [&](const int count) {
+    for (int i = 0; i < count; ++i) {
+      client_connections.emplace_back(
+          dispatcher_->createClientConnection(socket->connectionInfoProvider().localAddress(),
+                                              Network::Address::InstanceConstSharedPtr(),
+                                              Network::Test::createRawBufferSocket(), nullptr));
+      client_connections.back()->connect();
+    }
+  };
+
+  initiate_connections(2);
+  EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::GlobalCxLimit))
+      .Times(0);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  for (const auto& conn : client_connections) {
+    conn->close(ConnectionCloseType::NoFlush);
+  }
+  for (const auto& conn : server_connections) {
+    conn->close(ConnectionCloseType::NoFlush);
+  }
+
+  // We expect any server-side connections that get created to populate 'server_connections'.
+  EXPECT_EQ(2, server_connections.size());
+}
+
 TEST_P(TcpListenerImplTest, WildcardListenerUseActualDst) {
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -188,7 +240,7 @@ TEST_P(TcpListenerImplTest, WildcardListenerUseActualDst) {
   Random::MockRandomGenerator random_generator;
   // Do not redirect since use_original_dst is false.
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket,
-                                        listener_callbacks, true);
+                                        listener_callbacks, true, false);
 
   auto local_dst_address = Network::Utility::getAddressWithPort(
       *Network::Test::getCanonicalLoopbackAddress(version_),
@@ -232,7 +284,7 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
 
   // Do not redirect since use_original_dst is false.
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket,
-                                        listener_callbacks, true);
+                                        listener_callbacks, true, false);
 
   auto listener_address = Network::Utility::getAddressWithPort(
       *Network::Test::getCanonicalLoopbackAddress(version_),
@@ -271,8 +323,8 @@ TEST_P(TcpListenerImplTest, DisableAndEnableListener) {
   MockTcpListenerCallbacks listener_callbacks;
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
-  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
-                               true);
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks, true,
+                               false);
 
   // When listener is disabled, the timer should fire before any connection is accepted.
   listener.disable();
@@ -312,8 +364,8 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionZero) {
   MockTcpListenerCallbacks listener_callbacks;
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
-  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
-                               true);
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks, true,
+                               false);
 
   listener.setRejectFraction(UnitFloat(0));
 
@@ -343,8 +395,8 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
   MockTcpListenerCallbacks listener_callbacks;
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
-  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
-                               true);
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks, true,
+                               false);
 
   listener.setRejectFraction(UnitFloat(0.5f));
 
@@ -406,8 +458,8 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionAll) {
   MockTcpListenerCallbacks listener_callbacks;
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
-  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
-                               true);
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks, true,
+                               false);
 
   listener.setRejectFraction(UnitFloat(1));
 

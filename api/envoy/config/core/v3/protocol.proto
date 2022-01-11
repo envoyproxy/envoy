@@ -18,6 +18,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "ProtocolProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/core/v3;corev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Protocol options]
@@ -28,11 +29,38 @@ message TcpProtocolOptions {
       "envoy.api.v2.core.TcpProtocolOptions";
 }
 
+// Config for keepalive probes in a QUIC connection.
+// Note that QUIC keep-alive probing packets work differently from HTTP/2 keep-alive PINGs in a sense that the probing packet
+// itself doesn't timeout waiting for a probing response. Quic has a shorter idle timeout than TCP, so it doesn't rely on such probing to discover dead connections. If the peer fails to respond, the connection will idle timeout eventually. Thus, they are configured differently from :ref:`connection_keepalive <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive>`.
+message QuicKeepAliveSettings {
+  // The max interval for a connection to send keep-alive probing packets (with PING or PATH_RESPONSE). The value should be smaller than :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` to prevent idle timeout while not less than 1s to avoid throttling the connection or flooding the peer with probes.
+  //
+  // If :ref:`initial_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.initial_interval>` is absent or zero, a client connection will use this value to start probing.
+  //
+  // If zero, disable keepalive probing.
+  // If absent, use the QUICHE default interval to probe.
+  google.protobuf.Duration max_interval = 1 [(validate.rules).duration = {
+    lte {}
+    gte {seconds: 1}
+  }];
+
+  // The interval to send the first few keep-alive probing packets to prevent connection from hitting the idle timeout. Subsequent probes will be sent, each one with an interval exponentially longer than previous one, till it reaches :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>`. And the probes afterwards will always use :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>`.
+  //
+  // The value should be smaller than :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` to prevent idle timeout and smaller than max_interval to take effect.
+  //
+  // If absent or zero, disable keepalive probing for a server connection. For a client connection, if :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>`  is also zero, do not keepalive, otherwise use max_interval or QUICHE default to probe all the time.
+  google.protobuf.Duration initial_interval = 2 [(validate.rules).duration = {
+    lte {}
+    gte {seconds: 1}
+  }];
+}
+
 // QUIC protocol options which apply to both downstream and upstream connections.
+// [#next-free-field: 6]
 message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
-  google.protobuf.UInt32Value max_concurrent_streams = 1;
+  google.protobuf.UInt32Value max_concurrent_streams = 1 [(validate.rules).uint32 = {gte: 1}];
 
   // `Initial stream-level flow-control receive window
   // <https://tools.ietf.org/html/draft-ietf-quic-transport-34#section-4.1>`_ size. Valid values range from
@@ -55,6 +83,17 @@ message QuicProtocolOptions {
   // window size now, so it's also the minimum.
   google.protobuf.UInt32Value initial_connection_window_size = 3
       [(validate.rules).uint32 = {lte: 25165824 gte: 1}];
+
+  // The number of timeouts that can occur before port migration is triggered for QUIC clients.
+  // This defaults to 1. If set to 0, port migration will not occur on path degrading.
+  // Timeout here refers to QUIC internal path degrading timeout mechanism, such as PTO.
+  // This has no effect on server sessions.
+  google.protobuf.UInt32Value num_timeouts_to_trigger_port_migration = 4
+      [(validate.rules).uint32 = {lte: 5 gte: 0}];
+
+  // Probes the peer at the configured interval to solicit traffic, i.e. ACK or PATH_RESPONSE, from the peer to push back connection idle timeout.
+  // If absent, use the default keepalive behavior of which a client connection sends PINGs every 15s, and a server connection doesn't do anything.
+  QuicKeepAliveSettings connection_keepalive = 5;
 }
 
 message UpstreamHttpProtocolOptions {
@@ -131,7 +170,7 @@ message HttpProtocolOptions {
     // is incremented for each rejected request.
     REJECT_REQUEST = 1;
 
-    // Drop the header with name containing underscores. The header is dropped before the filter chain is
+    // Drop the client header with name containing underscores. The header is dropped before the filter chain is
     // invoked and as such filters will not see dropped headers. The
     // "httpN.dropped_headers_with_underscores" is incremented for each dropped header.
     DROP_HEADER = 2;
@@ -157,11 +196,10 @@ message HttpProtocolOptions {
 
   // The maximum duration of a connection. The duration is defined as a period since a connection
   // was established. If not set, there is no max duration. When max_connection_duration is reached
-  // and if there are no active streams, the connection will be closed. If there are any active streams,
-  // the drain sequence will kick-in, and the connection will be force-closed after the drain period.
-  // See :ref:`drain_timeout
+  // and if there are no active streams, the connection will be closed. If the connection is a
+  // downstream connection and there are any active streams, the drain sequence will kick-in,
+  // and the connection will be force-closed after the drain period. See :ref:`drain_timeout
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`.
-  // Note: This feature is not yet implemented for the upstream connections.
   google.protobuf.Duration max_connection_duration = 3;
 
   // The maximum number of headers. If unconfigured, the default
@@ -176,6 +214,8 @@ message HttpProtocolOptions {
   // Action to take when a client request with a header name containing underscore characters is received.
   // If this setting is not specified, the value defaults to ALLOW.
   // Note: upstream responses are not affected by this setting.
+  // Note: this only affects client headers. It does not affect headers added
+  // by Envoy filters and does not have any impact if added to cluster config.
   HeadersWithUnderscoresAction headers_with_underscores_action = 5;
 
   // Optional maximum requests for both upstream and downstream connections.
@@ -252,7 +292,7 @@ message Http1ProtocolOptions {
   // Allows Envoy to process requests/responses with both `Content-Length` and `Transfer-Encoding`
   // headers set. By default such messages are rejected, but if option is enabled - Envoy will
   // remove Content-Length header and process message.
-  // See `RFC7230, sec. 3.3.3 <https://tools.ietf.org/html/rfc7230#section-3.3.3>` for details.
+  // See `RFC7230, sec. 3.3.3 <https://tools.ietf.org/html/rfc7230#section-3.3.3>`_ for details.
   //
   // .. attention::
   //   Enabling this option might lead to request smuggling vulnerability, especially if traffic
@@ -290,6 +330,8 @@ message KeepaliveSettings {
   // If this is zero, this type of PING will not be sent.
   // If an interval ping is outstanding, a second ping will not be sent as the
   // interval ping will determine if the connection is dead.
+  //
+  // The same feature for HTTP/3 is given by inheritance from QUICHE which uses :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` and the current PTO of the connection to decide whether to probe before sending a new request.
   google.protobuf.Duration connection_idle_interval = 4
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
@@ -369,8 +411,6 @@ message Http2ProtocolOptions {
   // be written into the socket). Exceeding this limit triggers flood mitigation and connection is
   // terminated. The ``http2.outbound_flood`` stat tracks the number of terminated connections due
   // to flood mitigation. The default limit is 10000.
-  // NOTE: flood and abuse mitigation for upstream connections is presently enabled by the
-  // `envoy.reloadable_features.upstream_http2_flood_checks` flag.
   google.protobuf.UInt32Value max_outbound_frames = 7 [(validate.rules).uint32 = {gte: 1}];
 
   // Limit the number of pending outbound downstream frames of types PING, SETTINGS and RST_STREAM,
@@ -378,8 +418,6 @@ message Http2ProtocolOptions {
   // this limit triggers flood mitigation and connection is terminated. The
   // ``http2.outbound_control_flood`` stat tracks the number of terminated connections due to flood
   // mitigation. The default limit is 1000.
-  // NOTE: flood and abuse mitigation for upstream connections is presently enabled by the
-  // `envoy.reloadable_features.upstream_http2_flood_checks` flag.
   google.protobuf.UInt32Value max_outbound_control_frames = 8 [(validate.rules).uint32 = {gte: 1}];
 
   // Limit the number of consecutive inbound frames of types HEADERS, CONTINUATION and DATA with an
@@ -388,8 +426,6 @@ message Http2ProtocolOptions {
   // stat tracks the number of connections terminated due to flood mitigation.
   // Setting this to 0 will terminate connection upon receiving first frame with an empty payload
   // and no end stream flag. The default limit is 1.
-  // NOTE: flood and abuse mitigation for upstream connections is presently enabled by the
-  // `envoy.reloadable_features.upstream_http2_flood_checks` flag.
   google.protobuf.UInt32Value max_consecutive_inbound_frames_with_empty_payload = 9;
 
   // Limit the number of inbound PRIORITY frames allowed per each opened stream. If the number
@@ -403,8 +439,6 @@ message Http2ProtocolOptions {
   // `opened_streams` is incremented when Envoy send the HEADERS frame for a new stream. The
   // ``http2.inbound_priority_frames_flood`` stat tracks
   // the number of connections terminated due to flood mitigation. The default limit is 100.
-  // NOTE: flood and abuse mitigation for upstream connections is presently enabled by the
-  // `envoy.reloadable_features.upstream_http2_flood_checks` flag.
   google.protobuf.UInt32Value max_inbound_priority_frames_per_stream = 10;
 
   // Limit the number of inbound WINDOW_UPDATE frames allowed per DATA frame sent. If the number
@@ -421,8 +455,6 @@ message Http2ProtocolOptions {
   // flood mitigation. The default max_inbound_window_update_frames_per_data_frame_sent value is 10.
   // Setting this to 1 should be enough to support HTTP/2 implementations with basic flow control,
   // but more complex implementations that try to estimate available bandwidth require at least 2.
-  // NOTE: flood and abuse mitigation for upstream connections is presently enabled by the
-  // `envoy.reloadable_features.upstream_http2_flood_checks` flag.
   google.protobuf.UInt32Value max_inbound_window_update_frames_per_data_frame_sent = 11
       [(validate.rules).uint32 = {gte: 1}];
 

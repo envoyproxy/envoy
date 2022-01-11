@@ -20,7 +20,7 @@ public:
   const xds::core::v3::ContextParams& nodeContext() const override { return node_context_; }
   const xds::core::v3::ContextParams&
   dynamicContext(absl::string_view resource_type_url) const override {
-    ASSERT(Thread::MainThread::isMainOrTestThread());
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
     auto it = dynamic_context_.find(resource_type_url);
     if (it != dynamic_context_.end()) {
       return it->second;
@@ -29,7 +29,7 @@ public:
   };
   void setDynamicContextParam(absl::string_view resource_type_url, absl::string_view key,
                               absl::string_view value) override {
-    ASSERT(Thread::MainThread::isMainOrTestThread());
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
     (*dynamic_context_[resource_type_url]
           .mutable_params())[toStdStringView(key)] = // NOLINT(std::string_view)
         toStdStringView(value);                      // NOLINT(std::string_view)
@@ -37,14 +37,14 @@ public:
   }
   void unsetDynamicContextParam(absl::string_view resource_type_url,
                                 absl::string_view key) override {
-    ASSERT(Thread::MainThread::isMainOrTestThread());
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
     dynamic_context_[resource_type_url].mutable_params()->erase(
         toStdStringView(key)); // NOLINT(std::string_view)
     update_cb_helper_.runCallbacks(resource_type_url);
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addDynamicContextUpdateCallback(UpdateNotificationCb callback) const override {
-    ASSERT(Thread::MainThread::isMainOrTestThread());
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
     return update_cb_helper_.add(callback);
   };
 

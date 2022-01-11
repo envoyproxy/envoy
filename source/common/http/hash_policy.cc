@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/common/hashable.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 
 #include "source/common/common/matchers.h"

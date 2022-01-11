@@ -490,7 +490,7 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
         } else {
           return ReadOrParseState::Error;
         }
-      } else {
+      } else if (nread != 0) {
         const auto result = io_handle.recv(buf_ + buf_off_, nread, 0);
         nread = result.return_value_;
         if (!result.ok()) {

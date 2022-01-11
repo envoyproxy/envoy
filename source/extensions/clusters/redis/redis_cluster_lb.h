@@ -188,6 +188,17 @@ private:
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
+    // Pool selection not implemented.
+    absl::optional<Upstream::SelectedPoolAndConnection>
+    selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                             const Upstream::Host& /*host*/,
+                             std::vector<uint8_t>& /*hash_key*/) override {
+      return absl::nullopt;
+    }
+    // Lifetime tracking not implemented.
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+      return {};
+    }
 
   private:
     const SlotArraySharedPtr slot_array_;

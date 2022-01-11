@@ -71,6 +71,26 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
   return certificate_details;
 }
 
+bool Utility::dnsNameMatch(absl::string_view dns_name, absl::string_view pattern) {
+  const std::string lower_case_dns_name = absl::AsciiStrToLower(dns_name);
+  const std::string lower_case_pattern = absl::AsciiStrToLower(pattern);
+  if (lower_case_dns_name == lower_case_pattern) {
+    return true;
+  }
+
+  size_t pattern_len = lower_case_pattern.length();
+  if (pattern_len > 1 && lower_case_pattern[0] == '*' && lower_case_pattern[1] == '.') {
+    if (lower_case_dns_name.length() > pattern_len - 1) {
+      const size_t off = lower_case_dns_name.length() - pattern_len + 1;
+      return lower_case_dns_name.substr(0, off).find('.') == std::string::npos &&
+             lower_case_dns_name.substr(off, pattern_len - 1) ==
+                 lower_case_pattern.substr(1, pattern_len - 1);
+    }
+  }
+
+  return false;
+}
+
 namespace {
 
 enum class CertName { Issuer, Subject };

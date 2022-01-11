@@ -95,6 +95,7 @@ public:
   const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override;
   const VirtualHost& virtualHost() const override;
   bool autoHostRewrite() const override;
+  bool appendXfh() const override;
   const MetadataMatchCriteria* metadataMatchCriteria() const override;
   const std::multimap<std::string, std::string>& opaqueConfig() const override;
   bool includeVirtualHostRateLimits() const override;
