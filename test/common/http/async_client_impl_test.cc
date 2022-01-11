@@ -305,9 +305,9 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpanKeepParentSampling) {
   message_->body().add("test body");
   Buffer::Instance& data = message_->body();
 
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseDecoder& decoder,
-                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks, bool,
+                           bool) -> ConnectionPool::Cancellable* {
         callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
                               stream_info_, {});
         response_decoder_ = &decoder;
