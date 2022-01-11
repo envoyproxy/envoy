@@ -3,14 +3,8 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/server/factory_context.h"
 
-#include "source/common/protobuf/utility.h"
-
 #include "contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha/hyperscan.pb.h"
 #include "contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha/hyperscan.pb.validate.h"
-
-#ifndef HYPERSCAN_DISABLED
-#include "contrib/hyperscan/matching/input_matchers/source/matcher.h"
-#endif
 
 namespace Envoy {
 namespace Extensions {

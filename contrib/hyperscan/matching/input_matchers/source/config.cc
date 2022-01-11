@@ -2,6 +2,12 @@
 
 #include "envoy/registry/registry.h"
 
+#include "source/common/protobuf/utility.h"
+
+#ifndef HYPERSCAN_DISABLED
+#include "contrib/hyperscan/matching/input_matchers/source/matcher.h"
+#endif
+
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
@@ -11,7 +17,7 @@ namespace Hyperscan {
 Envoy::Matcher::InputMatcherFactoryCb
 Config::createInputMatcherFactoryCb(const Protobuf::Message& config,
                                     Server::Configuration::ServerFactoryContext& factory_context) {
-  const auto& hyperscan_config = MessageUtil::downcastAndValidate<
+  const auto hyperscan_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan&>(
       config, factory_context.messageValidationVisitor());
 
