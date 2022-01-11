@@ -18,3 +18,9 @@ def load_repository_locations_spec(repository_locations_spec):
                 mutable_location["strip_prefix"] = _format_version(location["strip_prefix"], location["version"])
             mutable_location["urls"] = [_format_version(url, location["version"]) for url in location["urls"]]
     return locations
+
+def merge_dicts(*dicts):
+    result = {}
+    for d in dicts:
+        result.update(d)
+    return result
