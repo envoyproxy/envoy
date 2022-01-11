@@ -83,9 +83,27 @@ envoy_cc_library(
     ],
 )
 
+genrule(
+    name = "generate_admin_html",
+    srcs = [
+        "admin_head_start.html",
+        "admin.css",
+        "admin.js",
+    ],
+    outs = ["admin_html_gen.h"],
+    cmd = "./$(location :generate_admin_html.sh) \
+        $(location admin_head_start.html) $(location admin.css) \
+        $(location admin.js)> $@",
+    tools = [":generate_admin_html.sh"],
+    visibility = ["//visibility:private"],
+)
+
 envoy_cc_library(
     name = "admin_html_generator_lib",
-    srcs = ["admin_html_generator.cc"],
+    srcs = [
+        "admin_html_generator.cc",
+        ":generate_admin_html",
+    ],
     hdrs = ["admin_html_generator.h"],
     deps = [
         "//envoy/server:admin_interface",

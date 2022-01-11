@@ -15,7 +15,8 @@ public:
   AdminHtmlGenerator(Buffer::Instance& response) : response_(response) {}
 
   void renderHead();
-  void renderTail();
+  void renderTableBegin();
+  void renderTableEnd();
   void renderUrlHandler(const Admin::UrlHandler& handler,
                         OptRef<const Http::Utility::QueryParams> query);
   void renderInput(absl::string_view id, absl::string_view path, Admin::ParamDescriptor::Type type,

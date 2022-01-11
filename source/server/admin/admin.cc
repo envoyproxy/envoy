@@ -363,15 +363,19 @@ Http::Code AdminImpl::handlerHelp(absl::string_view, Http::ResponseHeaderMap&,
 Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance& response, AdminStream&) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
-  AdminHtmlGenerator gen(response);
-  gen.renderHead();
+  AdminHtmlGenerator html(response);
+  html.renderHead();
+  html.renderTableBegin();
 
   // Prefix order is used during searching, but for printing do them in alpha order.
   OptRef<const Http::Utility::QueryParams> no_query_params;
   for (const UrlHandler* handler : sortedHandlers()) {
-    gen.renderUrlHandler(*handler, no_query_params);
+    html.renderUrlHandler(*handler, no_query_params);
   }
-  gen.renderTail();
+
+  html.renderTableEnd();
+
+  // gen.renderTail();
   return Http::Code::OK;
 }
 

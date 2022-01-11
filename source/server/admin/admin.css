@@ -1,0 +1,71 @@
+.home-table {
+  font-family: sans-serif;
+  font-size: medium;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.home-data {
+  text-align: left;
+  padding: 4px;
+}
+
+.home-form {
+  margin-bottom: 0;
+}
+
+.button-as-link {
+  background: none!important;
+  border: none;
+  padding: 0!important;
+  font-family: sans-serif;
+  font-size: medium;
+  color: #069;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.gray {
+  background-color: #dddddd;
+}
+
+.vert-space {
+  height: 4px;
+}
+
+.option {
+  padding-bottom: 4px;
+  padding-top: 4px;
+  padding-right: 4px;
+  padding-left: 20px;
+  text-align: right;
+}
+
+#scopes-outline {
+  margin: 0;
+  padding: 0;
+  font-family: sans-serif
+}
+
+.scope-children {
+  list-style-type: none;
+}
+
+/* Style the caret/arrow */
+.caret {
+  cursor: pointer;
+  user-select: none; /* Prevent text selection */
+}
+
+/* Create the caret/arrow with a unicode, and style it */
+.caret::before {
+  content: "\25B6";
+  color: black;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+/* Rotate the caret/arrow icon when clicked on (using JavaScript) */
+.caret-down::before {
+  transform: rotate(90deg);
+}*/
