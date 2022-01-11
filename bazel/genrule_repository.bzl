@@ -15,10 +15,8 @@ def _genrule_repository(ctx):
 
     genrule_cmd = ctx.read(ctx.attr.genrule_cmd_file)
     ctx.file("WORKSPACE", "workspace(name=%r)" % (ctx.name,))
-
-    if ctx.attr.build_file:
-        ctx.delete("BUILD.bazel")
-        ctx.symlink(ctx.attr.build_file, "BUILD.bazel")
+    ctx.delete("BUILD.bazel")
+    ctx.symlink(ctx.attr.build_file, "BUILD.bazel")
 
     # Inject the genrule_cmd content into a .bzl file that can be loaded
     # from the repository BUILD file. We force the user to look up the
@@ -46,6 +44,7 @@ genrule_repository = repository_rule(
             allow_single_file = [".genrule_cmd"],
         ),
         "build_file": attr.label(
+            mandatory = True,
             allow_single_file = [".BUILD"],
         ),
     },
