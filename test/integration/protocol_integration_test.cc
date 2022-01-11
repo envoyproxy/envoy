@@ -2720,6 +2720,24 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   }
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, ExtendedConnectIsBlocked) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "CONNECT"},
+                                                                 {":protocol", "bytestream"},
+                                                                 {":path", "/"},
+                                                                 {":authority", "host.com:80"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
 // Make sure that with override_stream_error_on_invalid_http_message true, CONNECT
 // results in stream teardown not connection teardown.
 TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
