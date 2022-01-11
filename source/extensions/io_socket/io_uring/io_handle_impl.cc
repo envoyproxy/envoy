@@ -39,13 +39,13 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
 Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
   auto req = new Request{absl::nullopt, RequestType::Close};
-  Io::IoUringResult res = io_uring_factory_.getOrCreateUring().prepareClose(fd_, req);
+  Io::IoUringResult res = io_uring_factory_.getOrCreate().prepareClose(fd_, req);
   if (res == Io::IoUringResult::Failed) {
     // Fall back to posix system call.
     ::close(fd_);
   }
   if (isLeader()) {
-    io_uring_factory_.getOrCreateUring().unregisterEventfd();
+    io_uring_factory_.getOrCreate().unregisterEventfd();
     file_event_adapter_.reset();
   }
   SET_SOCKET_INVALID(fd_);
@@ -117,7 +117,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer)
   }
 
   auto req = new Request{*this, RequestType::Write, iovecs, std::move(slices)};
-  auto& uring = io_uring_factory_.getOrCreateUring();
+  auto& uring = io_uring_factory_.getOrCreate();
   auto res = uring.prepareWritev(fd_, iovecs, nr_vecs, 0, req);
   if (res == Io::IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
@@ -175,7 +175,7 @@ Network::IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, sock
 
 Api::SysCallIntResult
 IoUringSocketHandleImpl::connect(Network::Address::InstanceConstSharedPtr address) {
-  auto& uring = io_uring_factory_.getOrCreateUring();
+  auto& uring = io_uring_factory_.getOrCreate();
   auto req = new Request{*this, RequestType::Connect};
   auto res = uring.prepareConnect(fd_, address, req);
   if (res == Io::IoUringResult::Failed) {
@@ -263,12 +263,12 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
   if (isLeader()) {
     file_event_adapter_->initialize(dispatcher, cb, trigger, events);
     file_event_adapter_->addAcceptRequest();
-    io_uring_factory_.getOrCreateUring().submit();
+    io_uring_factory_.getOrCreate().submit();
     return;
   }
 
   // Check if this is going to become a leading client socket.
-  if (!io_uring_factory_.getOrCreateUring().isEventfdRegistered()) {
+  if (!io_uring_factory_.getOrCreate().isEventfdRegistered()) {
     file_event_adapter_ =
         std::make_unique<FileEventAdapter>(read_buffer_size_, io_uring_factory_, fd_);
     file_event_adapter_->initialize(dispatcher, cb, trigger, events);
@@ -309,7 +309,7 @@ void IoUringSocketHandleImpl::addReadRequest() {
   read_buf_ = std::unique_ptr<uint8_t[]>(new uint8_t[read_buffer_size_]);
   iov_.iov_base = read_buf_.get();
   iov_.iov_len = read_buffer_size_;
-  auto& uring = io_uring_factory_.getOrCreateUring();
+  auto& uring = io_uring_factory_.getOrCreate();
   auto req = new Request{*this, RequestType::Read};
   auto res = uring.prepareReadv(fd_, &iov_, 1, 0, req);
   if (res == Io::IoUringResult::Failed) {
@@ -435,7 +435,7 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
 }
 
 void IoUringSocketHandleImpl::FileEventAdapter::onFileEvent() {
-  Io::IoUring& uring = io_uring_factory_.getOrCreateUring();
+  Io::IoUring& uring = io_uring_factory_.getOrCreate();
   uring.forEveryCompletion([this](void* user_data, int32_t result) {
     auto req = static_cast<Request*>(user_data);
     onRequestCompletion(*req, result);
@@ -452,7 +452,7 @@ void IoUringSocketHandleImpl::FileEventAdapter::initialize(Event::Dispatcher& di
                                  "file descriptor. This is not allowed.");
 
   cb_ = std::move(cb);
-  Io::IoUring& uring = io_uring_factory_.getOrCreateUring();
+  Io::IoUring& uring = io_uring_factory_.getOrCreate();
   const os_fd_t event_fd = uring.registerEventfd();
   file_event_ = dispatcher.createFileEvent(
       event_fd, [this](uint32_t) { onFileEvent(); }, trigger, events);
@@ -460,7 +460,7 @@ void IoUringSocketHandleImpl::FileEventAdapter::initialize(Event::Dispatcher& di
 
 void IoUringSocketHandleImpl::FileEventAdapter::addAcceptRequest() {
   is_accept_added_ = true;
-  auto& uring = io_uring_factory_.getOrCreateUring();
+  auto& uring = io_uring_factory_.getOrCreate();
   auto req = new Request{absl::nullopt, RequestType::Accept};
   auto res = uring.prepareAccept(fd_, &remote_addr_, &remote_addr_len_, req);
   if (res == Io::IoUringResult::Failed) {
