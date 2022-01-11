@@ -81,6 +81,22 @@ def envoy_entry_point(
         script = None,
         data = None,
         args = None):
+    """This macro provides the convenience of using an `entry_point` while
+    also being able to create a rule with associated `args` and `data`, as is
+    possible with the normal `py_binary` rule.
+
+    We may wish to remove this macro should https://github.com/bazelbuild/rules_python/issues/600
+    be resolved.
+
+    The `script` and `pkg` args are passed directly to the `entry_point`.
+
+    By default, the pip `entry_point` from `@base_pip3` is used. You can provide
+    a custom `entry_point` if eg you want to provide an `entry_point` with dev
+    requirements, or from some other requirements set.
+
+    A `py_binary` is dynamically created to wrap the `entry_point` with provided
+    `args` and `data`.
+    """
     script = script or pkg
     entry_point_name = "%s_entry_point" % name
     native.alias(
