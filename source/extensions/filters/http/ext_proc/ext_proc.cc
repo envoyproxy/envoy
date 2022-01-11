@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
+#include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
+
 #include "source/common/http/utility.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
@@ -10,13 +12,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+using envoy::config::common::mutation_rules::v3::HeaderMutationRules;
 using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
 using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
+using envoy::type::v3::StatusCode;
 
 using envoy::service::ext_proc::v3::ImmediateResponse;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
+using Filters::Common::MutationRules::Checker;
 using Http::FilterDataStatus;
 using Http::FilterHeadersStatus;
 using Http::FilterTrailersStatus;
@@ -28,6 +33,24 @@ using Http::ResponseTrailerMap;
 static const std::string ErrorPrefix = "ext_proc_error";
 static const int DefaultImmediateStatus = 200;
 static const std::string FilterName = "envoy.filters.http.ext_proc";
+
+// Set up a class that contains a MutationChecker that can check for valid
+// values of headers on an "ImmediateResponse" message but allow common
+// actions on that header.
+class ImmediateMutationChecker {
+public:
+  ImmediateMutationChecker() {
+    HeaderMutationRules rules;
+    rules.mutable_allow_all_routing()->set_value(true);
+    rules.mutable_allow_envoy()->set_value(true);
+    rule_checker_ = std::make_unique<Checker>(rules);
+  }
+
+  const Checker& checker() const { return *rule_checker_; }
+
+private:
+  std::unique_ptr<Checker> rule_checker_;
+};
 
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()) {
@@ -452,7 +475,6 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   }
 
   auto response = std::move(r);
-  bool message_handled = false;
 
   // Update processing mode now because filter callbacks check it
   // and the various "handle" methods below may result in callbacks
@@ -464,24 +486,25 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   }
 
   ENVOY_LOG(debug, "Received {} response", responseCaseToString(response->response_case()));
+  absl::Status processing_status;
   switch (response->response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
-    message_handled = decoding_state_.handleHeadersResponse(response->request_headers());
+    processing_status = decoding_state_.handleHeadersResponse(response->request_headers());
     break;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
-    message_handled = encoding_state_.handleHeadersResponse(response->response_headers());
+    processing_status = encoding_state_.handleHeadersResponse(response->response_headers());
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
-    message_handled = decoding_state_.handleBodyResponse(response->request_body());
+    processing_status = decoding_state_.handleBodyResponse(response->request_body());
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
-    message_handled = encoding_state_.handleBodyResponse(response->response_body());
+    processing_status = encoding_state_.handleBodyResponse(response->response_body());
     break;
   case ProcessingResponse::ResponseCase::kRequestTrailers:
-    message_handled = decoding_state_.handleTrailersResponse(response->request_trailers());
+    processing_status = decoding_state_.handleTrailersResponse(response->request_trailers());
     break;
   case ProcessingResponse::ResponseCase::kResponseTrailers:
-    message_handled = encoding_state_.handleTrailersResponse(response->response_trailers());
+    processing_status = encoding_state_.handleTrailersResponse(response->response_trailers());
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
     // We won't be sending anything more to the stream after we
@@ -491,17 +514,27 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     closeStream();
     cleanUpTimers();
     sendImmediateResponse(response->immediate_response());
-    message_handled = true;
+    processing_status = absl::OkStatus();
     break;
   default:
     // Any other message is considered spurious
     ENVOY_LOG(debug, "Received unknown stream message {} -- ignoring and marking spurious",
               response->response_case());
+    processing_status = absl::FailedPreconditionError("unhandled message");
     break;
   }
 
-  if (message_handled) {
+  if (processing_status.ok()) {
     stats_.stream_msgs_received_.inc();
+  } else if (absl::IsInvalidArgument(processing_status)) {
+    ENVOY_LOG(debug, "Sending immediate response: {}", processing_status.message());
+    processing_complete_ = true;
+    closeStream();
+    cleanUpTimers();
+    ImmediateResponse invalid_mutation_response;
+    invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
+    invalid_mutation_response.set_details(std::string(processing_status.message()));
+    sendImmediateResponse(invalid_mutation_response);
   } else {
     stats_.spurious_msgs_received_.inc();
     // When a message is received out of order, ignore it and also
@@ -535,7 +568,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
     // make sure that they do not fire now.
     cleanUpTimers();
     ImmediateResponse errorResponse;
-    errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
+    errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_gRPC_error_%i", ErrorPrefix, status));
     sendImmediateResponse(errorResponse);
   }
@@ -571,7 +604,7 @@ void Filter::onMessageTimeout() {
     decoding_state_.setCallbackState(ProcessorState::CallbackState::Idle);
     encoding_state_.setCallbackState(ProcessorState::CallbackState::Idle);
     ImmediateResponse errorResponse;
-    errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
+    errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
     sendImmediateResponse(errorResponse);
   }
@@ -591,6 +624,10 @@ void Filter::cleanUpTimers() {
   encoding_state_.cleanUpTimer();
 }
 
+static const ImmediateMutationChecker& immediateResponseChecker() {
+  CONSTRUCT_ON_FIRST_USE(ImmediateMutationChecker);
+}
+
 void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   auto status_code = response.has_status() ? response.status().code() : DefaultImmediateStatus;
   if (!MutationUtils::isValidHttpStatus(status_code)) {
@@ -601,9 +638,12 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
       response.has_grpc_status()
           ? absl::optional<Grpc::Status::GrpcStatus>(response.grpc_status().status())
           : absl::nullopt;
-  const auto mutate_headers = [&response](Http::ResponseHeaderMap& headers) {
+  const auto mutate_headers = [this, &response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
-      MutationUtils::applyHeaderMutations(response.headers(), headers, false);
+      const auto mut_status = MutationUtils::applyHeaderMutations(
+          response.headers(), headers, false, immediateResponseChecker().checker(),
+          stats_.rejected_header_mutations_);
+      ENVOY_BUG(mut_status.ok(), "Immediate response mutations should not fail");
     }
   };
 
