@@ -1273,9 +1273,8 @@ uint64_t HeadersByteSizeFormatter::extractHeadersByteSize(
     return response_headers.byteSize();
   case HeaderType::ResponseTrailers:
     return response_trailers.byteSize();
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 absl::optional<std::string>
