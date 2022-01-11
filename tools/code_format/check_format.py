@@ -1172,8 +1172,10 @@ if __name__ == "__main__":
     def owned_directories(error_messages):
         owned = []
         maintainers = [
-            '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@asraa',
-            '@yanavlasov', '@junr03', '@dio', '@jmarantz', '@antoniovicente', '@ggreenway'
+            '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp',
+            '@yanavlasov', '@junr03', '@dio', '@jmarantz', '@antoniovicente', '@ggreenway',
+            '@phlax', '@wrowe', '@davinci26', '@rojkov', '@RyanTheOptimist', '@adisuissa',
+            '@KBaichoo',
         ]
 
         try:
