@@ -24,6 +24,12 @@ void Filter::callCheck() {
   Filters::Common::ExtAuthz::CheckRequestUtils::createTcpCheck(filter_callbacks_, check_request_,
                                                                config_->includePeerCertificate(),
                                                                config_->destinationLabels());
+  // haitao: test this
+  const std::string server_name(read_callbacks_->connection().requestedServerName());
+  if (!sni.empty()) {
+    auto attrs = check_request_.mutable_attributes();
+    (*attrs->mutable_destination()->mutable_service()) = server_name
+  }
 
   status_ = Status::Calling;
   config_->stats().active_.inc();
