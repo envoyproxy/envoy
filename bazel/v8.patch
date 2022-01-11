@@ -1,149 +1,19 @@
-1. Generate inspector files using @rules_python.
-2. Set v8_enable_handle_zapping=False to regain performance.
-3. Replace @zlib with //external:zlib and fix the include path.
-4. Fix build on Windows.
-5. Fix build on aarch64.
-6. Fix build with GCC.
+# 1. Use already imported python dependencies.
+# 2. Fix the include path for //external:zlib.
 
 diff --git a/BUILD.bazel b/BUILD.bazel
-index 5d607a5048..fb9862a02b 100644
+index 4c6c8740db..a7bb0b4d34 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
-@@ -3,6 +3,8 @@
- # found in the LICENSE file.
+@@ -4,7 +4,7 @@
  
  load("@bazel_skylib//lib:selects.bzl", "selects")
-+load("@rules_python//python:defs.bzl", "py_binary")
+ load("@rules_python//python:defs.bzl", "py_binary")
+-load("@v8_python_deps//:requirements.bzl", "requirement")
 +load("@configs_pip3//:requirements.bzl", "requirement")
  load(
      "@v8//:bazel/defs.bzl",
      "v8_binary",
-@@ -3069,9 +3071,39 @@ v8_torque(
-     noicu_srcs = [":noicu/torque_files"],
- )
- 
-+py_binary(
-+    name = "code_generator",
-+    srcs = [
-+        "third_party/inspector_protocol/code_generator.py",
-+        "third_party/inspector_protocol/pdl.py",
-+    ],
-+    data = [
-+        "third_party/inspector_protocol/lib/Forward_h.template",
-+        "third_party/inspector_protocol/lib/Object_cpp.template",
-+        "third_party/inspector_protocol/lib/Object_h.template",
-+        "third_party/inspector_protocol/lib/Protocol_cpp.template",
-+        "third_party/inspector_protocol/lib/ValueConversions_cpp.template",
-+        "third_party/inspector_protocol/lib/ValueConversions_h.template",
-+        "third_party/inspector_protocol/lib/Values_cpp.template",
-+        "third_party/inspector_protocol/lib/Values_h.template",
-+        "third_party/inspector_protocol/lib/base_string_adapter_cc.template",
-+        "third_party/inspector_protocol/lib/base_string_adapter_h.template",
-+        "third_party/inspector_protocol/templates/Exported_h.template",
-+        "third_party/inspector_protocol/templates/Imported_h.template",
-+        "third_party/inspector_protocol/templates/TypeBuilder_cpp.template",
-+        "third_party/inspector_protocol/templates/TypeBuilder_h.template",
-+    ],
-+    deps = [
-+        requirement("jinja2"),
-+    ],
-+)
-+
- genrule(
-     name = "generated_inspector_files",
--    srcs = ["include/js_protocol.pdl"],
-+    srcs = [
-+        "include/js_protocol.pdl",
-+        "src/inspector/inspector_protocol_config.json",
-+    ],
-     outs = [
-         "include/inspector/Debugger.h",
-         "include/inspector/Runtime.h",
-@@ -3092,10 +3124,15 @@ genrule(
-         "src/inspector/protocol/Schema.cpp",
-         "src/inspector/protocol/Schema.h",
-     ],
--    cmd = "bazel/generate-inspector-files.sh $(@D)",
--    cmd_bat = "bazel\\generate-inspector-files.cmd $(@D)",
--    local = 1,
-+    cmd = "$(location :code_generator) --jinja_dir . \
-+           --inspector_protocol_dir third_party/inspector_protocol \
-+           --config $(location :src/inspector/inspector_protocol_config.json) \
-+           --config_value protocol.path=$(location :include/js_protocol.pdl) \
-+           --output_base $(@D)/src/inspector",
-     message = "Generating inspector files",
-+    tools = [
-+        ":code_generator",
-+    ],
- )
- 
- filegroup(
-@@ -3241,7 +3278,7 @@ v8_library(
-     ],
-     deps = [
-         ":v8_libbase",
--        "@zlib",
-+        "//external:zlib",
-     ],
- )
- 
-diff --git a/bazel/defs.bzl b/bazel/defs.bzl
-index 14fff6f049..088d989b99 100644
---- a/bazel/defs.bzl
-+++ b/bazel/defs.bzl
-@@ -120,13 +120,17 @@ def _default_args():
-             ],
-             "@v8//bazel/config:is_gcc": [
-                 "-Wno-extra",
-+                "-Wno-array-bounds",
-+                "-Wno-class-memaccess",
-                 "-Wno-comments",
-                 "-Wno-deprecated-declarations",
-                 "-Wno-implicit-fallthrough",
-+                "-Wno-int-in-bool-context",
-                 "-Wno-maybe-uninitialized",
-                 "-Wno-mismatched-new-delete",
-                 "-Wno-redundant-move",
-                 "-Wno-return-type",
-+                "-Wno-stringop-overflow",
-                 # Use GNU dialect, because GCC doesn't allow using
-                 # ##__VA_ARGS__ when in standards-conforming mode.
-                 "-std=gnu++17",
-@@ -367,8 +371,10 @@ def _v8_target_cpu_transition_impl(settings, attr):
-         "x86_64": "x64",
-         "darwin": "x64",
-         "darwin_x86_64": "x64",
-+        "x64_windows": "x64",
-         "x86": "ia32",
-         "ppc": "ppc64",
-+        "aarch64": "arm64",
-         "arm64-v8a": "arm64",
-         "arm": "arm64",
-         "armeabi-v7a": "arm32",
-diff --git a/src/inspector/BUILD.gn b/src/inspector/BUILD.gn
-index 495354da45..1473f30df0 100644
---- a/src/inspector/BUILD.gn
-+++ b/src/inspector/BUILD.gn
-@@ -47,6 +47,8 @@ inspector_protocol_generate("protocol_generated_sources") {
- 
-   inspector_protocol_dir = _inspector_protocol
-   out_dir = target_gen_dir
-+  _protocol_path=rebase_path(v8_inspector_js_protocol, root_build_dir)
-+  config_values = [ "protocol.path=$_protocol_path" ]
-   config_file = v8_path_prefix + "/src/inspector/inspector_protocol_config.json"
-   inputs = [
-     v8_inspector_js_protocol,
-diff --git a/src/inspector/inspector_protocol_config.json b/src/inspector/inspector_protocol_config.json
-index bd4f9c534c..ba96b34574 100644
---- a/src/inspector/inspector_protocol_config.json
-+++ b/src/inspector/inspector_protocol_config.json
-@@ -1,6 +1,5 @@
- {
-     "protocol": {
--        "path": "../../include/js_protocol.pdl",
-         "package": "src/inspector/protocol",
-         "output": "protocol",
-         "namespace": ["v8_inspector", "protocol"],
 diff --git a/src/snapshot/snapshot-utils.cc b/src/snapshot/snapshot-utils.cc
 index 6db6698d7e..b56d31085f 100644
 --- a/src/snapshot/snapshot-utils.cc

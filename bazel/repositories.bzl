@@ -205,6 +205,8 @@ def envoy_dependencies(skip_targets = []):
     _com_github_curl()
     _com_github_envoyproxy_sqlparser()
     _v8()
+    _com_googlesource_chromium_base_trace_event_common()
+    _com_googlesource_chromium_zlib() 
     _com_github_google_quiche()
     _com_googlesource_googleurl()
     _com_lightstep_tracer_cpp()
@@ -815,6 +817,26 @@ def _v8():
     native.bind(
         name = "wee8",
         actual = "@v8//:wee8",
+    )
+
+def _com_googlesource_chromium_base_trace_event_common():
+    external_http_archive(
+        name = "com_googlesource_chromium_base_trace_event_common",
+        build_file = "@v8//:bazel/BUILD.trace_event_common",
+    )
+    native.bind(
+        name = "base_trace_event_common",
+        actual = "@com_googlesource_chromium_base_trace_event_common//:trace_event_common",
+    )
+
+def _com_googlesource_chromium_zlib():
+    external_http_archive(
+        name = "com_googlesource_chromium_zlib",
+        build_file = "@v8//:bazel/BUILD.zlib",
+    )
+    native.bind(
+        name = "zlib_compression_utils",
+        actual = "@com_googlesource_chromium_zlib//:zlib_compression_utils",
     )
 
 def _com_github_google_quiche():

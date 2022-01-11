@@ -827,16 +827,43 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "V8",
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
-        version = "9.9.62",
-        # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
-        # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "bca06342b955e8acdfa200266b4b956bd54a5bee9bf7be9d0a16802dc3a47521",
-        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.tar.gz"],
-        strip_prefix = "wee8",
+        # NOTE: Update together with com_googlesource_chromium_base_trace_event_common and com_googlesource_chromium_zlib.
+        version = "9.9.80",
+        # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
+        sha256 = "5d3d2678cfb27bcadadebcdace3ffe8aaff354e290204ad821fb3f71a92fa8c9",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/v8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2021-12-10",
+        release_date = "2022-01-11",
         cpe = "cpe:2.3:a:google:v8:*",
+    ),
+    com_googlesource_chromium_base_trace_event_common = dict(
+        project_name = "Chromium's trace event headers",
+        project_desc = "Chromium's trace event headers",
+        project_url = "https://chromium.googlesource.com/chromium/src/base/trace_event/common/",
+        # NOTE: Update together with v8 and com_googlesource_chromium_zlib.
+        version = "7f36dbc19d31e2aad895c60261ca8f726442bfbb",
+        # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
+        sha256 = "4e9f31f393ea87bf3987f9a5e3b1d8314ad45f00e5a79c61cdcc1ef1eed2f05b",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/chromium-base_trace_event_common-{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.wasm.runtime.v8"],
+        release_date = "2021-10-27",
+        cpe = "N/A",
+    ),
+    com_googlesource_chromium_zlib = dict(
+        project_name = "Chromium's zlib",
+        project_desc = "Chromium’s fork of zlib with compression utils",
+        project_url = "https://chromium.googlesource.com/chromium/src/third_party/zlib/",
+        # NOTE: Update together with v8 and com_googlesource_chromium_base_trace_event_common.
+        version = "efd9399ae01364926be2a38946127fdf463480db",
+        # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
+        sha256 = "bbe9b4b8f7e06060933d56931da9cb71a16bba937d6457e2a711baef6e536a1e",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/chromium-zlib-{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.wasm.runtime.v8"],
+        release_date = "2021-12-02",
+        cpe = "N/A",
     ),
     com_github_google_quiche = dict(
         project_name = "QUICHE",
