@@ -25,10 +25,10 @@ void Filter::callCheck() {
                                                                config_->includePeerCertificate(),
                                                                config_->destinationLabels());
   // TODO: test this
-  const std::string server_name(read_callbacks_->connection().requestedServerName());
+  const std::string server_name(filter_callbacks_->connection().requestedServerName());
   if (!server_name.empty()) {
     auto attrs = check_request_.mutable_attributes();
-    (*attrs->mutable_destination()->mutable_service()) = server_name
+    (*attrs->mutable_destination()->mutable_service()) = server_name;
   }
 
   status_ = Status::Calling;
