@@ -24,6 +24,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
 
+#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -275,6 +276,56 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
                                             .setChildSpanName(child_span_name_)
                                             .setSampled(false);
   EXPECT_CALL(*child_span, setSampled(false));
+  EXPECT_CALL(*child_span, injectContext(_));
+
+  auto* request = client_.send(std::move(message_), callbacks_, options);
+  EXPECT_NE(request, nullptr);
+
+  expectSuccess(request, 200);
+
+  EXPECT_CALL(*child_span, setTag(Eq("onBeforeFinalizeUpstreamSpan"), Eq("called")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+  EXPECT_CALL(*child_span, finishSpan());
+
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  response_decoder_->decodeData(data, true);
+}
+
+TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpanKeepParentSampling) {
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                              stream_info_, {});
+        response_decoder_ = &decoder;
+        return nullptr;
+      }));
+
+  TestRequestHeaderMapImpl copy(message_->headers());
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "http");
+
+  EXPECT_CALL(parent_span_, spawnChild_(_, child_span_name_, _)).WillOnce(Return(child_span));
+
+  AsyncClient::RequestOptions options = AsyncClient::RequestOptions()
+                                            .setParentSpan(parent_span_)
+                                            .setChildSpanName(child_span_name_)
+                                            .setSampled(absl::nullopt);
+  EXPECT_CALL(*child_span, setSampled(_)).Times(0);
   EXPECT_CALL(*child_span, injectContext(_));
 
   auto* request = client_.send(std::move(message_), callbacks_, options);
