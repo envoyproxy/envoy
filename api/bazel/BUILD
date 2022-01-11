@@ -1,6 +1,7 @@
 load("@io_bazel_rules_go//proto:compiler.bzl", "go_proto_compiler")
 load("//:utils.bzl", "json_data")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
+load(":repository_locations_utils.bzl", "load_repository_locations_spec")
 
 licenses(["notice"])  # Apache 2
 
@@ -20,5 +21,5 @@ go_proto_compiler(
 
 json_data(
     name = "repository_locations",
-    data = REPOSITORY_LOCATIONS_SPEC,
+    data = load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
 )

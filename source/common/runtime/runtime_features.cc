@@ -57,7 +57,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.test_feature_true",
     // Begin alphabetically sorted section.
     "envoy.reloadable_features.allow_response_for_timeout",
-    "envoy.reloadable_features.allow_upstream_inline_write",
     "envoy.reloadable_features.conn_pool_delete_when_idle",
     "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc",
     "envoy.reloadable_features.correct_scheme_and_xfp",
@@ -113,6 +112,8 @@ constexpr const char* runtime_features[] = {
 constexpr const char* disabled_runtime_features[] = {
     // TODO(alyssawilk, junr03) flip (and add release notes + docs) these after Lyft tests
     "envoy.reloadable_features.allow_multiple_dns_addresses",
+    // TODO(alyssawilk) flip true after release.
+    "envoy.reloadable_features.allow_upstream_inline_write",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
     // When the runtime is flipped to true, use shared cache in getOrCreateRawAsyncClient method if

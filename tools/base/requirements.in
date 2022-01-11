@@ -12,7 +12,7 @@ envoy.dependency.cve_scan
 envoy.dependency.pip_check>=0.0.5
 envoy.distribution.release
 envoy.distribution.verify>=0.0.6
-envoy.docs.sphinx-runner>=0.0.3
+envoy.docs.sphinx-runner>=0.0.6
 envoy.gpg.identity>=0.0.6
 envoy.gpg.sign>=0.0.7
 flake8
