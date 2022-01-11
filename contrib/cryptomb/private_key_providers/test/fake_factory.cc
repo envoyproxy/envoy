@@ -24,12 +24,6 @@ namespace CryptoMb {
 FakeIppCryptoImpl::FakeIppCryptoImpl(bool supported_instruction_set)
     : supported_instruction_set_(supported_instruction_set) {}
 
-FakeIppCryptoImpl::~FakeIppCryptoImpl() {
-  BN_free(n_);
-  BN_free(e_);
-  BN_free(d_);
-}
-
 int FakeIppCryptoImpl::mbxIsCryptoMbApplicable(uint64_t) {
   return supported_instruction_set_ ? 1 : 0;
 }
@@ -153,10 +147,8 @@ FakeCryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
 
   bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
   if (pkey != nullptr && EVP_PKEY_id(pkey.get()) == EVP_PKEY_RSA) {
-    const BIGNUM *e, *n, *d;
     RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
-    RSA_get0_key(rsa, &n, &e, &d);
-    fakeIpp->setRsaKey(n, e, d);
+    fakeIpp->setRsaKey(rsa);
   }
 
   IppCryptoSharedPtr ipp = std::dynamic_pointer_cast<IppCrypto>(fakeIpp);
