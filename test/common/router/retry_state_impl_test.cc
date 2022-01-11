@@ -222,7 +222,7 @@ TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
 
-  // Post-connect failure over alernative protocols should be retried immediately with alternative
+  // Post-connect failure over alternative protocols should be retried immediately with alternative
   // protocols disabled.
   expectSchedulableCallback();
   EXPECT_EQ(RetryStatus::Yes,
