@@ -45,18 +45,26 @@ Matcher::Matcher(
   }
 
   hs_compile_error_t* compile_err;
-  if (hs_compile_multi(expressions.data(), flags_.data(), ids_.data(), expressions.size(),
-                       HS_MODE_BLOCK, nullptr, &database_, &compile_err) != HS_SUCCESS) {
+  hs_error_t err =
+      hs_compile_multi(expressions.data(), flags_.data(), ids_.data(), expressions.size(),
+                       HS_MODE_BLOCK, nullptr, &database_, &compile_err);
+  if (err != HS_SUCCESS) {
     std::string compile_err_message(compile_err->message);
+    int compile_err_expression = compile_err->expression;
     hs_free_compile_error(compile_err);
 
-    throw EnvoyException(compile_err_message);
+    if (compile_err_expression < 0) {
+      throw EnvoyException(fmt::format("unable to compile database: {}", compile_err_message));
+    } else {
+      throw EnvoyException(fmt::format("unable to compile pattern '{}': {}",
+                                       expressions.at(compile_err_expression),
+                                       compile_err_message));
+    }
   }
 
-  if (hs_alloc_scratch(database_, &scratch_) != HS_SUCCESS) {
-    hs_free_database(database_);
-
-    throw EnvoyException("unable to allocate scratch space.");
+  err = hs_alloc_scratch(database_, &scratch_);
+  if (err != HS_SUCCESS) {
+    throw EnvoyException(fmt::format("unable to allocate scratch space, error code {}.", err));
   }
 }
 
@@ -65,24 +73,25 @@ bool Matcher::match(absl::optional<absl::string_view> input) {
     return false;
   }
 
-  absl::MutexLock lock(&scratch_mutex_);
   bool matched = false;
   const absl::string_view input_str = *input;
-  hs_error_t err = hs_scan(
-      database_, input_str.data(), input_str.size(), 0, scratch_,
-      [](unsigned int, unsigned long long, unsigned long long, unsigned int, void* context) -> int {
-        bool* matched = static_cast<bool*>(context);
-        *matched = true;
+  hs_error_t err;
+  {
+    absl::MutexLock lock(&scratch_mutex_);
+    err = hs_scan(
+        database_, input_str.data(), input_str.size(), 0, scratch_,
+        [](unsigned int, unsigned long long, unsigned long long, unsigned int,
+           void* context) -> int {
+          bool* matched = static_cast<bool*>(context);
+          *matched = true;
 
-        // Always terminate on the first match.
-        return 1;
-      },
-      &matched);
+          // Always terminate on the first match.
+          return 1;
+        },
+        &matched);
+  }
   if (err != HS_SUCCESS && err != HS_SCAN_TERMINATED) {
-    hs_free_scratch(scratch_);
-    hs_free_database(database_);
-
-    throw EnvoyException("unable to scan.");
+    throw EnvoyException(fmt::format("unable to scan, error code {}.", err));
   }
 
   return matched;

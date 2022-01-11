@@ -15,7 +15,7 @@ namespace Hyperscan {
 class Matcher : public Envoy::Matcher::InputMatcher {
 public:
   explicit Matcher(
-      const envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan&);
+      const envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan& config);
   ~Matcher() override {
     hs_free_scratch(scratch_);
     hs_free_database(database_);

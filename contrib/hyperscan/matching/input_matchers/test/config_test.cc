@@ -59,7 +59,7 @@ public:
   Envoy::Matcher::InputMatcherPtr matcher_;
 };
 
-// Verify that default matching will be performed successfully.
+// Verify that matching will be performed successfully.
 TEST_F(ConfigTest, Regex) {
   setup({{"^/asdf/.+", {}}});
 
@@ -127,6 +127,13 @@ TEST_F(ConfigTest, RegexWithCombination) {
          {"1 | 2", {{"combination", "true"}}}});
 
   EXPECT_TRUE(matcher_->match("a"));
+}
+
+// Verify that invalid expression will cause a throw.
+TEST_F(ConfigTest, InvalidRegex) {
+  EXPECT_THROW_WITH_MESSAGE(
+      setup({{"(", {}}}), EnvoyException,
+      "unable to compile pattern '(': Missing close parenthesis for group started at index 0.");
 }
 
 } // namespace Hyperscan
