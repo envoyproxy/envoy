@@ -788,7 +788,10 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
                     route_entry_->internalRedirectPolicy().enabled());
   if (buffering &&
       getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
-    // The request is larger than we should buffer. Give up on the retry/shadow
+    ENVOY_LOG(debug,
+              "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
+              "up on the retry/shadow.",
+              callbacks_->decodingBuffer()->length() + data.length(), retry_shadow_buffer_limit_);
     cluster_->stats().retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
     buffering = false;
@@ -1226,15 +1229,16 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
 
   const StreamInfo::ResponseFlag response_flags = streamResetReasonToResponseFlag(reset_reason);
 
-  const std::string body = absl::StrCat(
-      "upstream connect error or disconnect/reset before headers.", (is_retry_ ? "" : " not"),
-      " retried. and the latest reset reason: ", Http::Utility::resetReasonToString(reset_reason),
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http_transport_failure_reason_in_body") &&
-              !transport_failure_reason.empty()
-          ? ", transport failure reason: "
-          : "",
-      transport_failure_reason);
+  const std::string body =
+      absl::StrCat("upstream connect error or disconnect/reset before headers. ",
+                   (is_retry_ ? "retried and the latest " : ""),
+                   "reset reason: ", Http::Utility::resetReasonToString(reset_reason),
+                   Runtime::runtimeFeatureEnabled(
+                       "envoy.reloadable_features.http_transport_failure_reason_in_body") &&
+                           !transport_failure_reason.empty()
+                       ? ", transport failure reason: "
+                       : "",
+                   transport_failure_reason);
   const std::string& basic_details =
       downstream_response_started_ ? StreamInfo::ResponseCodeDetails::get().LateUpstreamReset
                                    : StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset;

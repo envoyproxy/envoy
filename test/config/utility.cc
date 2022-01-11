@@ -810,20 +810,6 @@ void ConfigHelper::configureUpstreamTls(
       cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
     }
   });
-
-  addConfigModifier(
-      [http3](
-          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) {
-        if (http3) {
-          auto* route_config = hcm.mutable_route_config();
-          auto* virtual_host = route_config->mutable_virtual_hosts(0);
-          auto* route = virtual_host->mutable_routes(0)->mutable_route();
-          auto* retry_policy = route->mutable_retry_policy();
-          retry_policy->set_retry_on("retriable-status-codes");
-          retry_policy->add_retriable_status_codes(425);
-        }
-      });
 }
 
 void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string& value) {
@@ -1321,7 +1307,9 @@ void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
   addConfigModifier([function, this](envoy::config::bootstrap::v3::Bootstrap&) -> void {
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
         hcm_config;
-    loadHttpConnectionManager(hcm_config);
+    if (!loadHttpConnectionManager(hcm_config)) {
+      return;
+    }
     function(hcm_config);
     storeHttpConnectionManager(hcm_config);
   });

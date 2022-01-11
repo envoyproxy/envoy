@@ -211,17 +211,19 @@ TEST_F(RouterRetryStateImplTest, PolicyRefusedStream) {
   EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_.value());
 }
 
-TEST_F(RouterRetryStateImplTest, PolicyRefusedStreamUsingAltSvc) {
+TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
     return;
   }
 
-  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "refused-stream"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-envoy-retry-on", "refused-stream,alt-protocols-post-connect-failure"}};
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
 
-  // Non connect failure over alt-svc should be retried immediately with alt-svc disabled.
+  // Post-connect failure over alernative protocols should be retried immediately with alternative
+  // protocols disabled.
   expectSchedulableCallback();
   EXPECT_EQ(RetryStatus::Yes,
             state_->shouldRetryReset(remote_refused_stream_reset_, /*was_using_alt_svc=*/true,

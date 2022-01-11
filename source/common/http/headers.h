@@ -273,6 +273,7 @@ public:
     const std::string RetriableStatusCodes{"retriable-status-codes"};
     const std::string RetriableHeaders{"retriable-headers"};
     const std::string Reset{"reset"};
+    const std::string AltProtocolsPostConnectFailure{"alt-protocols-post-connect-failure"};
   } EnvoyRetryOnValues;
 
   struct {

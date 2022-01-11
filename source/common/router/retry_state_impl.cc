@@ -183,6 +183,8 @@ std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config)
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.Reset) {
       ret |= RetryPolicy::RETRY_ON_RESET;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.AltProtocolsPostConnectFailure) {
+      ret |= RetryPolicy::RETRY_ON_ALT_PROTOCOLS_POST_CONNECT_FAILURE;
     } else {
       all_fields_valid = false;
     }
@@ -433,16 +435,7 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
   const bool consider_disable_alt_svc = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc");
   if (consider_disable_alt_svc) {
-    if (reset_reason != Http::StreamResetReason::ConnectionFailure) {
-      ASSERT(was_using_alt_svc.has_value());
-      if (*was_using_alt_svc) {
-        // Retry any post-handshake failure immediately with no alt_svc if the request was sent over
-        // Http/3.
-        disable_alt_svc = true;
-        // TODO(danzh) consider making the retry configurable.
-        return RetryDecision::RetryNoBackoff;
-      }
-    } else {
+    if (reset_reason == Http::StreamResetReason::ConnectionFailure) {
       if (was_using_alt_svc.has_value()) {
         // Already got request encoder, so this must be a 0-RTT handshake failure. Retry
         // immediately.
@@ -454,6 +447,12 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
         // This is a pool failure.
         return RetryDecision::RetryWithBackoff;
       }
+    } else if (was_using_alt_svc.value() &&
+               (retry_on_ & RetryPolicy::RETRY_ON_ALT_PROTOCOLS_POST_CONNECT_FAILURE)) {
+      // Retry any post-handshake failure immediately with no alt_svc if the request was sent over
+      // Http/3.
+      disable_alt_svc = true;
+      return RetryDecision::RetryNoBackoff;
     }
   }
 
@@ -472,8 +471,9 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
     return RetryDecision::RetryWithBackoff;
   }
 
-  if (!consider_disable_alt_svc && (retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE) &&
+  if ((retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE) &&
       reset_reason == Http::StreamResetReason::ConnectionFailure) {
+    ASSERT(!consider_disable_alt_svc);
     return RetryDecision::RetryWithBackoff;
   }
 
