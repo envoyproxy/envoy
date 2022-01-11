@@ -102,10 +102,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
     // Add duration of call to dynamic metadata if applicable
     StreamInfo::TimingUtility timingUtility(filter_callbacks_->connection().streamInfo());
-    auto ext_authz_duration = timeSince(start_time_);
-    if (ext_authz_duration.has_value()) {
+    if (start_time_.has_value()) {
       ProtobufWkt::Value ext_authz_duration_value;
-      ext_authz_duration_value.set_number_value(ext_authz_duration->count());
+      ext_authz_duration_value.set_number_value(timeSince(start_time_)->count());
       (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
           ext_authz_duration_value;
     }
