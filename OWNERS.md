@@ -47,7 +47,7 @@ routing PRs, questions, etc. to the right place.
   * HTTP/3, upstream connection management.
 * Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
   * xDS APIs, configuration, control plane, fuzzing.
-* Kevin Baichoo ([KBaichoo](https://github.com/)) (kbaichoo@google.com)
+* Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
   * Data plane, overload management, flow control.
 
 
