@@ -21,6 +21,12 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
     Network::Address::InstanceConstSharedPtr source_address,
     Network::TransportSocketPtr&& transport_socket,
     const Network::ConnectionSocket::OptionsSharedPtr& options) {
+  // OS does not fill the address automatically so a pivotal address is populated.
+  // TODO(lambdai): provide option to fill the downstream remote address here.
+  if (source_address == nullptr) {
+    source_address =
+        std::make_shared<Network::Address::EnvoyInternalInstance>("internal_client_address");
+  }
 
   auto [io_handle_client, io_handle_server] =
       Extensions::IoSocket::UserSpace::IoHandleFactory::createIoHandlePair();
