@@ -378,12 +378,15 @@ public:
     collect<Stats::Histogram>(Type::Histograms, scope, histograms_);
   }
 
+
+#if 0
   void collectScopePrefixes(const Stats::Scope& scope) {
     collectPrefixes<Stats::TextReadout>(Type::TextReadouts, scope);
     collectPrefixes<Stats::Counter>(Type::Counters, scope);
     collectPrefixes<Stats::Gauge>(Type::Gauges, scope);
     collectPrefixes<Stats::Histogram>(Type::Histograms, scope);
   }
+#endif
 
   void emit() {
     emit<Stats::TextReadout>(Type::TextReadouts, text_readouts_);
@@ -409,6 +412,7 @@ public:
     scope.iterate(fn);
   }
 
+#if 0
   template <class StatType> void collectPrefixes(Type type, const Stats::Scope& scope) {
     // Bail early if the  requested type does not match the current type.
     if (params_.type_ != Type::All && params_.type_ != type) {
@@ -419,7 +423,7 @@ public:
       if (params_.shouldShowMetric(*stat)) {
         std::string name = stat->name();
         std::string::size_type dot = name.find('.');
-        if (dot != std::string::npos) {
+        if (dot != std::string::npos && dot != 0) {
           name.resize(dot);
           addScope(name);
         }
@@ -428,6 +432,7 @@ public:
     };
     scope.iterate(fn);
   }
+#endif
 
   template <class StatType> void emit(Type type, Stats::StatSet<StatType>& set) {
     // Bail early if the  requested type does not match the current type.
@@ -441,7 +446,7 @@ public:
 
     std::vector<Stats::RefcountPtr<StatType>> sorted;
     sorted.reserve(set.size());
-    for (const Stats::RefcountPtr<StatType>& stat : set) {
+    for (Stats::RefcountPtr<StatType> stat : set) {
       sorted.emplace_back(stat);
     }
 
@@ -471,7 +476,12 @@ public:
     }
   }
 
-  void addScope(const std::string& scope) { scopes_.insert(scope); }
+  void addScope(const std::string& scope) {
+    if (scope != params_.scope_) {
+      ENVOY_LOG_MISC(error, "Adding scope {} based on param {}", scope, params_.scope_);
+      scopes_.insert(scope);
+    }
+  }
 
   Render& render() { return render_; }
 
@@ -535,20 +545,24 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
       if (params.query_.find("show_json_scopes") != params.query_.end()) {
         ENVOY_LOG_MISC(error, "show_json_jscopes: scope={} params={}", prefix_str, params.scope_);
 
-        // Truncate at dot after the prefix.
-        if (prefix_str.size() > params.scope_.size() + 1 &&
-            prefix_str[params.scope_.size() + 1] == '.') {
-          std::string::size_type dot = prefix_str.find('.', params.scope_.size() + 2);
-          if (dot != std::string::npos) {
-            prefix_str.resize(dot);
-          }
-        }
-
         // If the scope name is blank, then we need to find all the prefixes in
         // the scope by iterating over all the stats in it.
-        if (prefix_str.empty()) {
-          context.collectScopePrefixes(scope);
-        } else {
+        //if (prefix_str.empty()) {
+        //context.collectScopePrefixes(scope);
+        //context.collectScope(scope);
+        //} else
+        if (params.scope_ == prefix_str) {
+          ENVOY_LOG_MISC(error, "...exact match; collecting stats");
+          context.collectScope(scope);
+        } else if (params.scope_.empty() || absl::StartsWith(prefix_str + ".", params.scope_ + ".")) {
+          // Truncate any hierarchy after the prefix.
+          size_t dot_search = params.scope_.empty() ? 0 : params.scope_.size() + 1;
+          ENVOY_LOG_MISC(error, "...searching for extra dots in {} after {}", prefix_str, dot_search);
+          size_t dot = prefix_str.find('.', dot_search);
+          if (dot != std::string::npos) {
+            ENVOY_LOG_MISC(error, "...truncating after {}", dot);
+            prefix_str.resize(dot);
+          }
           context.addScope(prefix_str);
         }
       } else if (prefix_str == params.scope_ || prefix_str.empty() || params.scope_.empty()) {
