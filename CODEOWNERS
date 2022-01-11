@@ -211,3 +211,4 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /contrib/sip_proxy/ @durd07 @nearbyfly @dorisd0102
 /contrib/cryptomb/ @rojkov @ipuustin
 /contrib/vcl/ @florincoras @rojkov
+/contrib/hyperscan/ @rojkov @zhxie
