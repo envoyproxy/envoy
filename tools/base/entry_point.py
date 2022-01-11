@@ -2,9 +2,12 @@ import subprocess
 import sys
 
 
-def main(*args):
-    subprocess.run(args)
+def main(*args) -> int:
+    try:
+        return subprocess.run(args).returncode
+    except KeyboardInterrupt:
+        return 1
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:])
+    sys.exit(main(*sys.argv[1:]))
