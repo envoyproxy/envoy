@@ -30,7 +30,7 @@ public:
   bool containsHeader(const LowerCaseString& name) const { return headers_.contains(name); }
 
 private:
-  absl::flat_hash_set<Http::LowerCaseString> headers_;
+  absl::flat_hash_set<LowerCaseString> headers_;
 };
 
 Checker::Checker(const envoy::config::common::mutation_rules::v3::HeaderMutationRules& rules)
@@ -54,7 +54,7 @@ CheckResult Checker::check(absl::string_view header_name) const {
 }
 
 bool Checker::isAllowed(absl::string_view header_name) const {
-  const Http::LowerCaseString lower_name(header_name);
+  const LowerCaseString lower_name(header_name);
   if (disallow_expression_ && disallow_expression_->match(lower_name)) {
     // Mutations are always disallowed if they match the expression.
     return false;

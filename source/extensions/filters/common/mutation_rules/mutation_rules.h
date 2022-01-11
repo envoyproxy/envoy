@@ -1,7 +1,5 @@
 #pragma once
 
-#include <string>
-
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 
 #include "source/common/common/regex.h"
