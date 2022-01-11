@@ -239,57 +239,42 @@ TEST_P(AdminStatsTest, HandlerStatsScoped) {
   Stats::ScopePtr scope3 = store_->createScope("scope1.scope2.scope3");
   scope3->counterFromStatName(makeStat("c4")).add(4);
   Stats::ScopePtr scope4 = store_->createScope("scope4");
-  scope4->counterFromStatName(makeStat("c5")).add(5);
+  scope4->counterFromStatName(makeStat("c5")).add(500);
+
+  // Duplicate created with the same name, overriding the stat value. This
+  // will all be de-duped by the handlers, and the values combined.
+  Stats::ScopePtr scope4a = store_->createScope("scope4");
+  scope4->counterFromStatName(makeStat("c5")).add(55);
 
   auto test = [this](absl::string_view params, const std::string& expected) {
     Buffer::OwnedImpl data;
-    std::string url = absl::StrCat("/stats?format=json", params);
+    std::string url = absl::StrCat("/stats?format=json&pretty", params);
     EXPECT_EQ(Http::Code::OK, handlerStats(url, data));
     EXPECT_THAT(data.toString(), JsonStringEq(expected)) << "params=" << params;
   };
-  test("&pretty", R"({
+  test("", R"({
     "stats": [
-     {
-      "name": "foo.c0",
-      "value": 0
-     },
-     {
-      "name": "foo.c1",
-      "value": 1
-     },
-     {
-      "name": "scope.c2",
-      "value": 2
-     },
-     {
-      "value": 3,
-      "name": "scope1.scope2.c3"
-     },
-     {
-      "value": 4,
-      "name": "scope1.scope2.scope3.c4"
-     },
-     {
-      "name": "scope4.c5",
-      "value": 5
-     }
-    ]
-   })");
+       {"name": "foo.c0", "value": 0},
+       {"name": "foo.c1", "value": 1},
+       {"name": "scope.c2", "value": 2},
+       {"name": "scope1.scope2.c3", "value": 3},
+       {"name": "scope1.scope2.scope3.c4", "value": 4},
+       {"name": "scope4.c5", "value": 555}]})");
   test("&show_json_scopes", R"({
     "stats": [
-      {"name":"foo.c0", "value":0},
-      {"name":"foo.c1", "value":1}],
+      {"name":"foo.c0", "value": 0},
+      {"name":"foo.c1", "value": 1}],
     "scopes": ["scope", "scope1", "scope4"]})");
   test("&show_json_scopes&scope=scope", R"({
     "stats":[
-       {"name":"scope.c2", "value":2}],
+       {"name":"scope.c2", "value": 2}],
      "scopes": []})");
   test("&show_json_scopes&scope=scope1", R"({
     "stats": [],
     "scopes": ["scope1.scope2"]})");
   test("&show_json_scopes&scope=scope4", R"({
     "stats": [
-       {"name":"scope4.c5", "value":5}],
+       {"name":"scope4.c5", "value": 555}],
     "scopes": []})");
   shutdownThreading();
 }
