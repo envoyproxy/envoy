@@ -247,7 +247,7 @@ public:
     html_.renderTableEnd();
   }
 
-  ~HtmlRender() { response_.add("</body>\n"); }
+  ~HtmlRender() override { response_.add("</body>\n"); }
 
   void noStats(Type type) override {
     groups_[type]; // Make an empty group for this type.
@@ -386,6 +386,23 @@ private:
 
 class StatsHandler::Context {
 public:
+  // We need to hold ref-counts to each stat in our intermediate sets to avoid
+  // having the stats be deleted while we are computing results.
+  template <class StatType> struct Hash {
+    size_t operator()(const Stats::RefcountPtr<StatType>& a) const { return a->statName().hash(); }
+  };
+
+  template <class StatType> struct Compare {
+    bool operator()(const Stats::RefcountPtr<StatType>& a,
+                    const Stats::RefcountPtr<StatType>& b) const {
+      return a->statName() == b->statName();
+    }
+  };
+
+  template <class StatType>
+  using SharedStatSet =
+      absl::flat_hash_set<Stats::RefcountPtr<StatType>, Hash<StatType>, Compare<StatType>>;
+
   Context(const Params& params, Render& render, Buffer::Instance& response)
       : params_(params), render_(render), response_(response) {}
 
@@ -405,7 +422,7 @@ public:
   }
 
   template <class StatType>
-  void collect(Type type, const Stats::Scope& scope, Stats::StatSet<StatType>& set) {
+  void collect(Type type, const Stats::Scope& scope, SharedStatSet<StatType>& set) {
     // Bail early if the  requested type does not match the current type.
     if (params_.type_ != Type::All && params_.type_ != type) {
       return;
@@ -420,7 +437,7 @@ public:
     scope.iterate(fn);
   }
 
-  template <class StatType> void emit(Type type, Stats::StatSet<StatType>& set) {
+  template <class StatType> void emit(Type type, SharedStatSet<StatType>& set) {
     // Bail early if the  requested type does not match the current type.
     if (params_.type_ != Type::All && params_.type_ != type) {
       return;
@@ -432,7 +449,7 @@ public:
 
     std::vector<Stats::RefcountPtr<StatType>> sorted;
     sorted.reserve(set.size());
-    for (Stats::RefcountPtr<StatType> stat : set) {
+    for (const Stats::RefcountPtr<StatType>& stat : set) {
       sorted.emplace_back(stat);
     }
 
@@ -472,10 +489,11 @@ public:
   const Params& params_;
   Render& render_;
   Buffer::Instance& response_;
-  Stats::StatSet<Stats::Counter> counters_;
-  Stats::StatSet<Stats::Gauge> gauges_;
-  Stats::StatSet<Stats::TextReadout> text_readouts_;
-  Stats::StatSet<Stats::Histogram> histograms_;
+
+  SharedStatSet<Stats::Counter> counters_;
+  SharedStatSet<Stats::Gauge> gauges_;
+  SharedStatSet<Stats::TextReadout> text_readouts_;
+  SharedStatSet<Stats::Histogram> histograms_;
   std::set<std::string> scopes_;
 };
 
