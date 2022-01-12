@@ -6,7 +6,6 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/stream_info/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
@@ -14,10 +13,7 @@ namespace {
 absl::optional<std::chrono::duration<double, std::milli>>
 timeSince(absl::optional<Envoy::MonotonicTime> start_time) {
   if (start_time.has_value()) {
-
-    auto ext_authz_duration =
-        std::chrono::duration<double, std::milli>(start_time->time_since_epoch().count());
-    return ext_authz_duration;
+    return std::chrono::duration<double, std::milli>(start_time->time_since_epoch().count());
   }
   return absl::nullopt;
 }
@@ -101,7 +97,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   if (!response->dynamic_metadata.fields().empty()) {
 
     // Add duration of call to dynamic metadata if applicable
-    StreamInfo::TimingUtility timingUtility(filter_callbacks_->connection().streamInfo());
     if (start_time_.has_value()) {
       ProtobufWkt::Value ext_authz_duration_value;
       ext_authz_duration_value.set_number_value(timeSince(start_time_)->count());
