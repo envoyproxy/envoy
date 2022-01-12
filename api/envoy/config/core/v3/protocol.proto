@@ -542,9 +542,8 @@ message Http3ProtocolOptions {
   // <https://datatracker.ietf.org/doc/html/rfc8441>`_
   // and settings `proposed for HTTP/3
   // <https://datatracker.ietf.org/doc/draft-ietf-httpbis-h3-websockets/>`_
-  //
-  // If absent, extended CONNECT is disallowed by default.
-  bool allow_extended_connect = 5;
+  // Note that HTTP/3 CONNECT is not yet an RFC.
+  bool allow_extended_connect = 5 [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 
 // A message to control transformations to the :scheme header
