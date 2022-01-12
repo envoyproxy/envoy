@@ -197,9 +197,10 @@ void CheckRequestUtils::createTcpCheck(
     const Protobuf::Map<std::string, std::string>& destination_labels) {
 
   auto attrs = request.mutable_attributes();
-  const std::string server_name(filter_callbacks_->connection().requestedServerName());
 
   auto* cb = const_cast<Network::ReadFilterCallbacks*>(callbacks);
+  const std::string server_name(cb->connection().requestedServerName());
+
   setAttrContextPeer(*attrs->mutable_source(), cb->connection(), "", false,
                      include_peer_certificate);
   setAttrContextPeer(*attrs->mutable_destination(), cb->connection(), server_name, true,
