@@ -58,6 +58,33 @@ A sample filter configuration could be:
                   address: 127.0.0.1
                   port_value: 10003
 
+
+
+A sample request to the specifiex auth service looks like 
+
+.. code-block:: json
+
+  {
+    "source":{
+      "address":{
+        "socket_address":{
+          "address": "172.17.0.1",
+          "port_value": 56746
+        }
+      }
+    }
+    "destination":{
+      "service": "www.bing.com",
+      "address":{
+        "socket_address": {
+          "address": "172.17.0.2",
+          "port_value": 10000
+        }
+      }
+    }
+  }
+
+
 Statistics
 ----------
 
