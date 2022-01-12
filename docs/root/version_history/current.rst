@@ -82,8 +82,8 @@ New Features
 * ext_authz: added :ref:`query_parameters_to_set <envoy_v3_api_field_service.auth.v3.OkHttpResponse.query_parameters_to_set>` and :ref:`query_parameters_to_remove <envoy_v3_api_field_service.auth.v3.OkHttpResponse.query_parameters_to_remove>` for adding and removing query string parameters when using a gRPC authorization server.
 * grpc_http_bridge: added :ref:`upgrade_protobuf_to_grpc <envoy_v3_api_field_extensions.filters.http.grpc_http1_bridge.v3.Config.upgrade_protobuf_to_grpc>` option for automatically framing protobuf payloads as gRPC requests.
 * grpc_json_transcoder: added support for matching unregistered custom verb :ref:`match_unregistered_custom_verb <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.match_unregistered_custom_verb>`.
-* http: added support for %REQUESTED_SERVER_NAME% to extract SNI as a custom header.
-* http: added support for %VIRTUAL_CLUSTER_NAME% to extract the matched Virtual Cluster name as a custom header.
+* http: added support for ``%REQUESTED_SERVER_NAME%`` to extract SNI as a custom header.
+* http: added support for ``%VIRTUAL_CLUSTER_NAME%`` to extract the matched Virtual Cluster name as a custom header.
 * http: added support for :ref:`retriable health check status codes <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.retriable_statuses>`.
 * http: added timing information about upstream connection and encryption establishment to stream info. These can currently be accessed via custom access loggers.
 * http: added support for :ref:`forwarding HTTP1 reason phrase <envoy_v3_api_field_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.forward_reason_phrase>`.
