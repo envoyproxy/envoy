@@ -276,7 +276,7 @@ public:
     if (params.used_only_) {
       url += "&usedonly";
     }
-    if (params.filter_string_.empty()) {
+    if (!params.filter_string_.empty()) {
       absl::StrAppend(&url, "&filter=", params.filter_string_);
     }
     response.add(absl::StrCat("<ul id='scopes-outline'></ul>\n"

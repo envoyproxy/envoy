@@ -5,15 +5,18 @@ function populateScopes(json) {
   populateScope(document.getElementById('scopes-outline'), json.stats, json.scopes, '');
 }
 
-// Fetches a Stats::Scope from the server and then populates it into the UI. Note
-// that the elements of the scope may have lots of hierarchy, which we will use to
-// populate synthetic scopes rather than providing a flattened view of the entire
-// scope.
+// Fetches a Stats::Scope from the server and then populates it into the
+// UI. Note that the stat leaves may have lots of hierarchy in their names,
+// which we will use to populate synthetic scopes rather than providing a
+// flattened view of the entire scope.
 function fetchScope(parent, value_record) {
   let url = 'stats?scope=' + value_record.name + '&show_json_scopes&format=json';
   url += '&type=' + document.getElementById('type').value;
   if (document.getElementById('usedonly').checked) {
     url += '&usedonly';
+  }
+  if (document.getElementById('filter').value) {
+    url += '&filter=' + document.getElementById('filter').value;
   }
   fetch(url).then((response) => response.json())
       .then(json => populateScope(parent,
@@ -51,15 +54,12 @@ class ValueRecord {
 // using the same JSON format sent by the server. When the user expands into
 // this synthetic hierarchy we can just populate the UI directly from the saved
 // values.
-function addNameToSyntheticScope(parent, synthetic_scope, name, value, prefix, names) {
+function addNameToSyntheticScope(synthetic_scope, name, value, names) {
   let value_record = names.get(synthetic_scope);
   if (!value_record) {
     value_record = new ValueRecord(names, synthetic_scope);
   }
   value_record.stats.push({name: name, value: value});
-
-  //addScope(parent, synthetic_scope,
-  //         (parent_tag) => populateScope(parent_tag, json, prefix));
 }
 
 // Adds a scope the the UI, underneath the specified parent HTML element.
@@ -142,18 +142,6 @@ function populateScope(parent, stats, scopes, prefix) {
       parent.appendChild(li_tag);
     }
   }
-
-/*
-  addScope(parent, sub_scope, (parent_tag) => fetchScope(parent_tag, sub_scope, prefix));
-
-  stats_to_render.sort((a, b) => a.name < b.name);
-  for (let stat of stats_to_render) {
-    const li_tag = document.createElement('li');
-    li_tag.textContent = stat.name + ": " + stat.value;
-    li_tag.setAttribute('title', stat.full_name);
-    parent.appendChild(li_tag);
-  }
-*/
 }
 
 // Process a stat from a scope, constructing a value-string for histograms.
@@ -192,7 +180,7 @@ function addStat(parent, name, value, prefix, names) {
   const split = name.split('.');
   if (split.length >= 2) {
     const synthetic_scope = prefix ? (prefix + '.' + split[0]) : split[0];
-    addNameToSyntheticScope(parent, synthetic_scope, full_name, value, prefix, names);
+    addNameToSyntheticScope(synthetic_scope, full_name, value, names);
   } else {
     let value_record = names.get(full_name);
     if (value_record == null) {
