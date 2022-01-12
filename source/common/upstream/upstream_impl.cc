@@ -278,7 +278,7 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
   case envoy::config::core::v3::DEGRADED:
     healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
     break;
-  default:;
+  default:
     break;
     // No health flags should be set.
   }
@@ -844,6 +844,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     configureLbPolicies(config);
   } else {
     switch (config.lb_policy()) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
       lb_type_ = LoadBalancerType::RoundRobin;
       break;
@@ -872,8 +873,6 @@ ClusterInfoImpl::ClusterInfoImpl(
       configureLbPolicies(config);
       break;
     }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 
@@ -1400,6 +1399,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
   Stats::StatName priority_stat_name;
   std::string priority_name;
   switch (priority) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::core::v3::DEFAULT:
     priority_stat_name = circuit_breakers_stat_names_.default_;
     priority_name = "default";
@@ -1408,8 +1408,6 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
     priority_stat_name = circuit_breakers_stat_names_.high_;
     priority_name = "high";
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const std::string runtime_prefix =
@@ -1789,6 +1787,7 @@ getDnsLookupFamilyFromCluster(const envoy::config::cluster::v3::Cluster& cluster
 Network::DnsLookupFamily
 getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily family) {
   switch (family) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::cluster::v3::Cluster::V6_ONLY:
     return Network::DnsLookupFamily::V6Only;
   case envoy::config::cluster::v3::Cluster::V4_ONLY:
@@ -1799,9 +1798,8 @@ getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily 
     return Network::DnsLookupFamily::V4Preferred;
   case envoy::config::cluster::v3::Cluster::ALL:
     return Network::DnsLookupFamily::All;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void reportUpstreamCxDestroy(const Upstream::HostDescriptionConstSharedPtr& host,

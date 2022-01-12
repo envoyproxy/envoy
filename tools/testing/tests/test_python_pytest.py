@@ -27,7 +27,15 @@ def test_pytest_add_arguments():
     runner.add_arguments(parser)
     assert (
         list(list(c) for c in parser.add_argument.call_args_list)
-        == [[('--cov-collect',),
+        == [[('--verbosity', '-v'),
+             {'choices': ['debug', 'info', 'warn', 'error'],
+              'default': 'info',
+              'help': 'Application log level'}],
+            [('--log-level', '-l'),
+             {'choices': ['debug', 'info', 'warn', 'error'],
+              'default': 'warn',
+              'help': 'Log level for non-application logs'}],
+            [('--cov-collect',),
              {'default': None, 'help': 'Collect coverage data to path'}]])
 
 

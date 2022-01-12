@@ -56,15 +56,15 @@ struct TestInput : public DataInput<TestData> {
 // Self-injecting factory for TestInput.
 class TestDataInputFactory : public DataInputFactory<TestData> {
 public:
+  TestDataInputFactory(absl::string_view factory_name, DataInputGetResult result)
+      : factory_name_(std::string(factory_name)), result_(result), injection_(*this) {}
   TestDataInputFactory(absl::string_view factory_name, absl::string_view data)
-      : factory_name_(std::string(factory_name)), value_(std::string(data)), injection_(*this) {}
+      : TestDataInputFactory(factory_name, {DataInputGetResult::DataAvailability::AllDataAvailable,
+                                            std::string(data)}) {}
 
   DataInputFactoryCb<TestData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
-    return [&]() {
-      return std::make_unique<TestInput>(
-          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, value_});
-    };
+    return [&]() { return std::make_unique<TestInput>(result_); };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -74,7 +74,7 @@ public:
 
 private:
   const std::string factory_name_;
-  const std::string value_;
+  const DataInputGetResult result_;
   Registry::InjectFactory<DataInputFactory<TestData>> injection_;
 };
 

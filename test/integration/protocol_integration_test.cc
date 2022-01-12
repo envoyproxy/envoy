@@ -3575,6 +3575,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
 TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
   SocketInterfaceSwap socket_swap;
 
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
@@ -3597,6 +3598,8 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
   codec_client_->sendData(*downstream_request, data, true);
 
   ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              HasSubstr("upstream_reset_before_response_started{connection_termination}"));
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
   socket_swap.write_matcher_->setWriteOverride(nullptr);

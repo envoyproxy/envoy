@@ -96,6 +96,8 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
         log_manager, dispatcher.timeSource(), health_check_config.event_log_path());
   }
   switch (health_check_config.health_checker_case()) {
+  case envoy::config::core::v3::HealthCheck::HealthCheckerCase::HEALTH_CHECKER_NOT_SET:
+    throw EnvoyException("invalid cluster config");
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
     return std::make_shared<ProdHttpHealthCheckerImpl>(cluster, health_check_config, dispatcher,
                                                        runtime, api.randomGenerator(),
@@ -120,10 +122,8 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
                                             validation_visitor, api));
     return factory.createCustomHealthChecker(health_check_config, *context);
   }
-  default:
-    // Checked by schema.
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
@@ -222,9 +222,8 @@ Http::Protocol codecClientTypeToProtocol(Http::CodecType codec_client_type) {
     return Http::Protocol::Http2;
   case Http::CodecType::HTTP3:
     return Http::Protocol::Http3;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM
 }
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
@@ -451,15 +450,15 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
 Http::CodecType
 HttpHealthCheckerImpl::codecClientType(const envoy::type::v3::CodecClientType& type) {
   switch (type) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::type::v3::HTTP3:
     return Http::CodecType::HTTP3;
   case envoy::type::v3::HTTP2:
     return Http::CodecType::HTTP2;
   case envoy::type::v3::HTTP1:
     return Http::CodecType::HTTP1;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM
 }
 
 Http::CodecClient*
