@@ -14,20 +14,19 @@ absl::string_view describePool(const ConnectionPool::Instance& pool) {
 }
 } // namespace
 
-ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
-                                                     Http::ResponseDecoder& decoder,
-                                                     PoolIterator pool_it,
-                                                     ConnectionPool::Callbacks& callbacks,
-                                                     bool has_early_data, bool should_use_alt_svc)
+ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(
+    ConnectivityGrid& grid, Http::ResponseDecoder& decoder, PoolIterator pool_it,
+    ConnectionPool::Callbacks& callbacks, bool can_use_early_data, bool can_use_alternate_protocols)
     : grid_(grid), decoder_(decoder), inner_callbacks_(&callbacks),
       next_attempt_timer_(
           grid_.dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })),
-      current_(pool_it), has_early_data_(has_early_data), should_use_alt_svc_(should_use_alt_svc) {
+      current_(pool_it), can_use_early_data_(can_use_early_data),
+      can_use_alternate_protocols_(can_use_alternate_protocols) {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc") &&
-      !should_use_alt_svc) {
+      !can_use_alternate_protocols) {
     // If alt_svc is explicitly disabled, there must have been a failed request over Http3 and the
-    // failure must be post-handshake.
+    // failure must be post-handshake. So disable HTTP/3 for this request.
     http3_attempt_failed_ = true;
   }
 }
@@ -44,9 +43,9 @@ ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::~ConnectionAttem
 
 ConnectivityGrid::StreamCreationResult
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::newStream() {
-  ASSERT(!parent_.grid_.isPoolHttp3(pool()) || parent_.should_use_alt_svc_);
-  auto* cancellable = pool().newStream(parent_.decoder_, *this, parent_.has_early_data_,
-                                       parent_.should_use_alt_svc_);
+  ASSERT(!parent_.grid_.isPoolHttp3(pool()) || parent_.can_use_alternate_protocols_);
+  auto* cancellable = pool().newStream(parent_.decoder_, *this, parent_.can_use_early_data_,
+                                       parent_.can_use_alternate_protocols_);
   if (cancellable == nullptr) {
     return StreamCreationResult::ImmediateResult;
   }
@@ -273,8 +272,8 @@ bool ConnectivityGrid::hasActiveConnections() const {
 
 ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& decoder,
                                                          ConnectionPool::Callbacks& callbacks,
-                                                         bool has_early_data,
-                                                         bool should_use_alt_svc) {
+                                                         bool can_use_early_data,
+                                                         bool can_use_alternate_protocols) {
   ASSERT(!deferred_deleting_);
 
   // New streams should not be created during draining.
@@ -287,13 +286,13 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   if (!shouldAttemptHttp3() ||
       (Runtime::runtimeFeatureEnabled(
            "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc") &&
-       !should_use_alt_svc)) {
+       !can_use_alternate_protocols)) {
     // Before skipping to the next pool, make sure it has been created.
     createNextPool();
     ++pool;
   }
-  auto wrapped_callback = std::make_unique<WrapperCallbacks>(*this, decoder, pool, callbacks,
-                                                             has_early_data, should_use_alt_svc);
+  auto wrapped_callback = std::make_unique<WrapperCallbacks>(
+      *this, decoder, pool, callbacks, can_use_early_data, can_use_alternate_protocols);
   ConnectionPool::Cancellable* ret = wrapped_callback.get();
   LinkedList::moveIntoList(std::move(wrapped_callback), wrapped_callbacks_);
   if (wrapped_callbacks_.front()->newStream() == StreamCreationResult::ImmediateResult) {

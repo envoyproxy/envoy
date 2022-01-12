@@ -2991,10 +2991,9 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
                                 absl::string_view(), cm_.thread_local_cluster_.conn_pool_.host_);
         return nullptr;
       }));
-  EXPECT_CALL(
-      *router_.retry_state_,
-      shouldRetryReset(
-          _, /*was_using_alt_svc=*/testing::Matcher<absl::optional<bool>>(absl::nullopt), _))
+  EXPECT_CALL(*router_.retry_state_,
+              shouldRetryReset(
+                  _, /*alternate_protocols_used=*/RetryState::AlternateProtocolsUsed::Unknown, _))
       .WillOnce(Return(RetryStatus::NoRetryLimitExceeded));
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
   router_.retry_state_->callback_();
@@ -3070,9 +3069,10 @@ TEST_F(RouterTest, RetryUpstreamReset) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(Http::StreamResetReason::RemoteReset, _, _))
-      .WillOnce(Invoke([this](const Http::StreamResetReason, absl::optional<bool> was_using_alt_svc,
+      .WillOnce(Invoke([this](const Http::StreamResetReason,
+                              RetryState::AlternateProtocolsUsed alternate_protocols_used,
                               RetryState::DoRetryResetCallback callback) {
-        EXPECT_TRUE(was_using_alt_svc.has_value() && !was_using_alt_svc.value());
+        EXPECT_EQ(RetryState::AlternateProtocolsUsed::No, alternate_protocols_used);
         router_.retry_state_->callback_ = [callback]() { callback(/*disable_alt_svc=*/false); };
         return RetryStatus::Yes;
       }));
@@ -3082,7 +3082,8 @@ TEST_F(RouterTest, RetryUpstreamReset) {
 
   // We expect this reset to kick off a new request.
   NiceMock<Http::MockRequestEncoder> encoder2;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, /*use_alt_svc=*/true))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_,
+              newStream(_, _, _, /*can_use_alternate_protocols=*/true))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
                      bool, bool) -> Http::ConnectionPool::Cancellable* {
@@ -3127,9 +3128,10 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(Http::StreamResetReason::RemoteReset, _, _))
-      .WillOnce(Invoke([this](const Http::StreamResetReason, absl::optional<bool> was_using_alt_svc,
+      .WillOnce(Invoke([this](const Http::StreamResetReason,
+                              RetryState::AlternateProtocolsUsed alternate_protocols_used,
                               RetryState::DoRetryResetCallback callback) {
-        EXPECT_TRUE(was_using_alt_svc.has_value() && was_using_alt_svc.value());
+        EXPECT_EQ(RetryState::AlternateProtocolsUsed::Yes, alternate_protocols_used);
         router_.retry_state_->callback_ = [callback]() { callback(/*disable_alt_svc=*/true); };
         return RetryStatus::Yes;
       }));

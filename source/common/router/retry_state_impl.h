@@ -65,7 +65,7 @@ public:
                                       bool& disable_early_data) override;
   bool wouldRetryFromRetriableStatusCode(Http::Code code) const override;
   RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason,
-                               absl::optional<bool> was_using_alt_svc,
+                               AlternateProtocolsUsed alternate_protocols_used,
                                DoRetryResetCallback callback) override;
   RetryStatus shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) override;
 
@@ -110,7 +110,8 @@ private:
   // disable_alt_svc: populated to tell the caller whether to disable alt svc or not when the return
   // value indicates retry.
   RetryDecision wouldRetryFromReset(const Http::StreamResetReason reset_reason,
-                                    absl::optional<bool> was_using_alt_svc, bool& disable_alt_svc);
+                                    AlternateProtocolsUsed alternate_protocols_used,
+                                    bool& disable_alternate_protocols);
   RetryStatus shouldRetry(RetryDecision would_retry, DoRetryCallback callback);
 
   const Upstream::ClusterInfo& cluster_;

@@ -197,13 +197,15 @@ TEST_F(RouterRetryStateImplTest, PolicyRefusedStream) {
 
   expectTimerCreateAndEnable();
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(remote_refused_stream_reset_, false, reset_callback_));
+            state_->shouldRetryReset(remote_refused_stream_reset_,
+                                     RetryState::AlternateProtocolsUsed::No, reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
   EXPECT_FALSE(retry_disable_alt_svc_);
 
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
-            state_->shouldRetryReset(remote_refused_stream_reset_, false, reset_callback_));
+            state_->shouldRetryReset(remote_refused_stream_reset_,
+                                     RetryState::AlternateProtocolsUsed::No, reset_callback_));
 
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
   EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
@@ -226,14 +228,15 @@ TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
   // protocols disabled.
   expectSchedulableCallback();
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(remote_refused_stream_reset_, /*was_using_alt_svc=*/true,
-                                     reset_callback_));
+            state_->shouldRetryReset(remote_refused_stream_reset_,
+                                     RetryState::AlternateProtocolsUsed::Yes, reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_schedulable_callback_->invokeCallback();
   EXPECT_TRUE(retry_disable_alt_svc_);
 
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
-            state_->shouldRetryReset(remote_refused_stream_reset_, false, reset_callback_));
+            state_->shouldRetryReset(remote_refused_stream_reset_,
+                                     RetryState::AlternateProtocolsUsed::No, reset_callback_));
 
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
   EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
@@ -246,7 +249,8 @@ TEST_F(RouterRetryStateImplTest, Policy5xxResetOverflow) {
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
   EXPECT_EQ(RetryStatus::No,
-            state_->shouldRetryReset(overflow_reset_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(overflow_reset_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, Policy5xxRemoteReset) {
@@ -255,12 +259,15 @@ TEST_F(RouterRetryStateImplTest, Policy5xxRemoteReset) {
   EXPECT_TRUE(state_->enabled());
 
   expectTimerCreateAndEnable();
-  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(remote_reset_, false, reset_callback_));
+  EXPECT_EQ(RetryStatus::Yes,
+            state_->shouldRetryReset(remote_reset_, RetryState::AlternateProtocolsUsed::No,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
-            state_->shouldRetryReset(remote_reset_, false, reset_callback_));
+            state_->shouldRetryReset(remote_reset_, RetryState::AlternateProtocolsUsed::No,
+                                     reset_callback_));
 
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
   EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
@@ -333,7 +340,8 @@ TEST_F(RouterRetryStateImplTest, PolicyGatewayErrorResetOverflow) {
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
   EXPECT_EQ(RetryStatus::No,
-            state_->shouldRetryReset(overflow_reset_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(overflow_reset_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyGatewayErrorRemoteReset) {
@@ -342,12 +350,15 @@ TEST_F(RouterRetryStateImplTest, PolicyGatewayErrorRemoteReset) {
   EXPECT_TRUE(state_->enabled());
 
   expectTimerCreateAndEnable();
-  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(remote_reset_, false, reset_callback_));
+  EXPECT_EQ(RetryStatus::Yes,
+            state_->shouldRetryReset(remote_reset_, RetryState::AlternateProtocolsUsed::No,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
-            state_->shouldRetryReset(remote_reset_, false, reset_callback_));
+            state_->shouldRetryReset(remote_reset_, RetryState::AlternateProtocolsUsed::No,
+                                     reset_callback_));
 
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
   EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
@@ -389,9 +400,12 @@ TEST_F(RouterRetryStateImplTest, Policy5xxRemote200RemoteReset) {
   EXPECT_EQ(RetryStatus::No,
             state_->shouldRetryHeaders(response_headers, request_headers, header_callback_));
   expectTimerCreateAndEnable();
-  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(remote_reset_, false, reset_callback_));
+  EXPECT_EQ(RetryStatus::Yes,
+            state_->shouldRetryReset(remote_reset_, RetryState::AlternateProtocolsUsed::No,
+                                     reset_callback_));
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
-            state_->shouldRetryReset(remote_reset_, false, reset_callback_));
+            state_->shouldRetryReset(remote_reset_, RetryState::AlternateProtocolsUsed::No,
+                                     reset_callback_));
 
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
   EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
@@ -406,14 +420,18 @@ TEST_F(RouterRetryStateImplTest, RuntimeGuard) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
-  EXPECT_EQ(RetryStatus::No, state_->shouldRetryReset(remote_reset_, false, reset_callback_));
+  EXPECT_EQ(RetryStatus::No,
+            state_->shouldRetryReset(remote_reset_, RetryState::AlternateProtocolsUsed::No,
+                                     reset_callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyConnectFailureOtherReset) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "connect-failure"}};
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
-  EXPECT_EQ(RetryStatus::No, state_->shouldRetryReset(remote_reset_, false, reset_callback_));
+  EXPECT_EQ(RetryStatus::No,
+            state_->shouldRetryReset(remote_reset_, RetryState::AlternateProtocolsUsed::No,
+                                     reset_callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyConnectFailureResetConnectFailure) {
@@ -423,7 +441,8 @@ TEST_F(RouterRetryStateImplTest, PolicyConnectFailureResetConnectFailure) {
 
   expectTimerCreateAndEnable();
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 }
@@ -447,7 +466,9 @@ TEST_F(RouterRetryStateImplTest, PolicyRetriable4xxReset) {
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
 
-  EXPECT_EQ(RetryStatus::No, state_->shouldRetryReset(remote_reset_, false, reset_callback_));
+  EXPECT_EQ(RetryStatus::No,
+            state_->shouldRetryReset(remote_reset_, RetryState::AlternateProtocolsUsed::No,
+                                     reset_callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, RetriableStatusCodes) {
@@ -486,7 +507,9 @@ TEST_F(RouterRetryStateImplTest, RetriableStatusCodesUpstreamReset) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "retriable-status-codes"}};
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
-  EXPECT_EQ(RetryStatus::No, state_->shouldRetryReset(remote_reset_, false, reset_callback_));
+  EXPECT_EQ(RetryStatus::No,
+            state_->shouldRetryReset(remote_reset_, RetryState::AlternateProtocolsUsed::No,
+                                     reset_callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, RetriableStatusCodesHeader) {
@@ -762,12 +785,15 @@ TEST_F(RouterRetryStateImplTest, PolicyResetRemoteReset) {
   EXPECT_TRUE(state_->enabled());
 
   expectTimerCreateAndEnable();
-  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(remote_reset_, false, reset_callback_));
+  EXPECT_EQ(RetryStatus::Yes,
+            state_->shouldRetryReset(remote_reset_, RetryState::AlternateProtocolsUsed::No,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
-            state_->shouldRetryReset(remote_reset_, false, reset_callback_));
+            state_->shouldRetryReset(remote_reset_, RetryState::AlternateProtocolsUsed::No,
+                                     reset_callback_));
 
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
   EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
@@ -851,7 +877,8 @@ TEST_F(RouterRetryStateImplTest, RouteConfigNoRetriesAllowed) {
 
   EXPECT_TRUE(state_->enabled());
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
 
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
   EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
@@ -868,7 +895,8 @@ TEST_F(RouterRetryStateImplTest, RouteConfigNoHeaderConfig) {
 
   expectTimerCreateAndEnable();
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 }
@@ -881,7 +909,8 @@ TEST_F(RouterRetryStateImplTest, NoAvailableRetries) {
   EXPECT_TRUE(state_->enabled());
 
   EXPECT_EQ(RetryStatus::NoOverflow,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_overflow_.value());
   EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_overflow_.value());
 }
@@ -897,25 +926,29 @@ TEST_F(RouterRetryStateImplTest, MaxRetriesHeader) {
 
   expectTimerCreateAndEnable();
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(*retry_timer_, enableTimer(_, _));
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(*retry_timer_, enableTimer(_, _));
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_EQ(1UL, cluster_.circuit_breakers_stats_.rq_retry_open_.value());
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
 
   EXPECT_EQ(3UL, cluster_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(0UL, cluster_.stats().upstream_rq_retry_success_.value());
@@ -936,28 +969,32 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   retry_timer_ = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(15), _));
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(190));
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(40), _));
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(190));
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(90), _));
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   // Connect failure over alt-svc should be retried immediately without disabling alt-svc.
   expectSchedulableCallback();
-  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, /*was_using_alt_svc=*/true,
-                                                       reset_callback_));
+  EXPECT_EQ(RetryStatus::Yes,
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Yes,
+                                     reset_callback_));
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
     EXPECT_CALL(callback_ready_, ready());
@@ -990,35 +1027,40 @@ TEST_F(RouterRetryStateImplTest, CustomBackOffInterval) {
   retry_timer_ = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(49), _));
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(350));
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(150), _));
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(751));
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(351), _));
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(2399));
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(799), _));
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(2399));
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1199), _));
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 }
@@ -1036,35 +1078,40 @@ TEST_F(RouterRetryStateImplTest, CustomBackOffIntervalDefaultMax) {
   retry_timer_ = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(49), _));
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(350));
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(150), _));
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(751));
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(351), _));
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(2999));
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(599), _));
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(2999));
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(999), _));
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 }
@@ -1223,7 +1270,8 @@ TEST_F(RouterRetryStateImplTest, Cancel) {
 
   expectTimerCreateAndEnable();
   EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, ZeroMaxRetriesHeader) {
@@ -1234,7 +1282,8 @@ TEST_F(RouterRetryStateImplTest, ZeroMaxRetriesHeader) {
   EXPECT_TRUE(state_->enabled());
 
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
-            state_->shouldRetryReset(connect_failure_, absl::nullopt, reset_callback_));
+            state_->shouldRetryReset(connect_failure_, RetryState::AlternateProtocolsUsed::Unknown,
+                                     reset_callback_));
 
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
   EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());

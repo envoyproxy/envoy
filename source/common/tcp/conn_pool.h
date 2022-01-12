@@ -179,7 +179,8 @@ public:
   }
   ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {
     TcpAttachContext context(&callbacks);
-    return newStreamImpl(context, /*has_early_data=*/false);
+    // TLS early data over TCP is not supported yet.
+    return newStreamImpl(context, /*can_use_early_data=*/false);
   }
   bool maybePreconnect(float preconnect_ratio) override {
     return maybePreconnectImpl(preconnect_ratio);

@@ -42,8 +42,8 @@ namespace Envoy {
 namespace Router {
 
 UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
-                                 std::unique_ptr<GenericConnPool>&& conn_pool, bool has_early_data,
-                                 bool use_alt_svc)
+                                 std::unique_ptr<GenericConnPool>&& conn_pool,
+                                 bool can_use_early_data, bool can_use_alternate_protocols)
     : parent_(parent), conn_pool_(std::move(conn_pool)), grpc_rq_success_deferred_(false),
       stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
@@ -52,7 +52,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
-      cleaned_up_(false), has_early_data_(has_early_data), use_alt_svc_(use_alt_svc) {
+      cleaned_up_(false), can_use_early_data_(can_use_early_data),
+      can_use_alternate_protocols_(can_use_alternate_protocols), had_upstream_(false) {
   if (parent_.config().start_child_span_) {
     span_ = parent_.callbacks()->activeSpan().spawnChild(
         parent_.callbacks()->tracingConfig(), "router " + parent.cluster()->name() + " egress",

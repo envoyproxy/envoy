@@ -341,14 +341,20 @@ class RetryState {
 public:
   enum class RetryDecision {
     // Retry the request immediately.
-    RetryNoBackoff,
+    RetryImmediately,
     // Retry the request with timed backoff delay.
     RetryWithBackoff,
     NoRetry,
   };
 
+  enum class AlternateProtocolsUsed {
+    Unknown,
+    Yes,
+    No,
+  };
+
   using DoRetryCallback = std::function<void()>;
-  using DoRetryResetCallback = std::function<void(bool disable_alt_svc)>;
+  using DoRetryResetCallback = std::function<void(bool disable_alternate_protocols)>;
   using DoRetryHeaderCallback = std::function<void(bool disable_early_data)>;
 
   virtual ~RetryState() = default;
@@ -408,14 +414,14 @@ public:
    * @param was_using_alt_svc whether the reset request was sent over alternative service or not.
    * nullopt means it wasn't sent at all before getting reset.
    * @param callback supplies the callback that will be invoked when the retry should take place.
-   *                 This is used to add timed backoff, etc. The callback will never be called
-   *                 inline.
+   *                 This is used to add timed backoff, etc. It takes a bool to indicate whether the
+   * retry should disable alternate protocols or not. The callback will never be called inline.
    * @return RetryStatus if a retry should take place. @param callback will be called at some point
    *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.
    */
   virtual RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason,
-                                       absl::optional<bool> was_using_alt_svc,
+                                       AlternateProtocolsUsed alternate_protocols_used,
                                        DoRetryResetCallback callback) PURE;
 
   /**
@@ -423,8 +429,8 @@ public:
    * timeout expires. This means the original request is not canceled, but a
    * new one is sent to hedge against the original request taking even longer.
    * @param callback supplies the callback that will be invoked when the retry should take place.
-   *                 This is used to add timed backoff, etc. The callback will never be called
-   *                 inline.
+   *                 This is used to add timed backoff, etc. It takes a bool to indicate whether the
+   * retry should disable early data or not. The callback will never be called inline.
    * @return RetryStatus if a retry should take place. @param callback will be called at some point
    *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.
@@ -1253,12 +1259,12 @@ public:
   /**
    * @return returns true if the downstream request could be sent as early data.
    */
-  virtual bool hasEarlyData() const PURE;
+  virtual bool canUseEarlyData() const PURE;
   /**
    * @return returns true if the downstream request can be sent to upstream using
    * protocols advertised in Alt-Svc by the upstream.
    */
-  virtual bool useAltSvc() const PURE;
+  virtual bool canUseAlternateProtocols() const PURE;
 };
 
 /**

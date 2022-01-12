@@ -109,7 +109,7 @@ public:
    *          the callbacks are called.
    */
   virtual Cancellable* newStream(Http::ResponseDecoder& response_decoder, Callbacks& callbacks,
-                                 bool has_early_data, bool should_use_alt_svc) PURE;
+                                 bool can_use_early_data, bool can_use_alternate_protocols) PURE;
 
   /**
    * Returns a user-friendly protocol description for logging.

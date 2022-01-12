@@ -32,8 +32,8 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
   // might get deleted inline as well. Only write the returned handle out if it is not nullptr to
   // deal with this case.
   Envoy::Http::ConnectionPool::Cancellable* handle = pool_data_.value().newStream(
-      callbacks->upstreamToDownstream(), *this, callbacks->upstreamToDownstream().hasEarlyData(),
-      callbacks->upstreamToDownstream().useAltSvc());
+      callbacks->upstreamToDownstream(), *this, callbacks->upstreamToDownstream().canUseEarlyData(),
+      callbacks->upstreamToDownstream().canUseAlternateProtocols());
   if (handle) {
     conn_pool_stream_handle_ = handle;
   }

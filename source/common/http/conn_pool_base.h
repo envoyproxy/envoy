@@ -68,7 +68,8 @@ public:
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          Http::ConnectionPool::Callbacks& callbacks,
-                                         bool has_early_data, bool should_use_alt_svc) override;
+                                         bool can_use_early_data,
+                                         bool can_use_alternate_protocols) override;
   bool maybePreconnect(float ratio) override { return maybePreconnectImpl(ratio); }
   bool hasActiveConnections() const override;
 
@@ -91,7 +92,7 @@ protected:
   friend class ActiveClient;
 
   // Interface for derived classes to indicate it only supports HTTP/3.
-  virtual bool onlySupportsAltSvc() const { return false; }
+  virtual bool isAlternateProtocol() const { return false; }
 
   Random::RandomGenerator& random_generator_;
 };

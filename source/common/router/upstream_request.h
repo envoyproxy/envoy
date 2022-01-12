@@ -38,7 +38,7 @@ class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public Event::DeferredDeletable {
 public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
-                  bool has_early_data, bool use_alt_svc);
+                  bool can_use_early_data, bool can_use_alternate_protocols);
   ~UpstreamRequest() override;
 
   // To be called from the destructor, or prior to deferred delete.
@@ -72,8 +72,8 @@ public:
   // UpstreamToDownstream
   const RouteEntry& routeEntry() const override;
   const Network::Connection& connection() const override;
-  bool hasEarlyData() const override { return has_early_data_; }
-  bool useAltSvc() const override { return use_alt_svc_; }
+  bool canUseEarlyData() const override { return can_use_early_data_; }
+  bool canUseAlternateProtocols() const override { return can_use_alternate_protocols_; }
 
   void disableDataFromDownstreamForFlowControl();
   void enableDataFromDownstreamForFlowControl();
@@ -189,11 +189,10 @@ private:
   bool record_timeout_budget_ : 1;
   // Track if one time clean up has been performed.
   bool cleaned_up_ : 1;
-
+  bool can_use_early_data_ : 1;
+  bool can_use_alternate_protocols_ : 1;
+  bool had_upstream_ : 1;
   Event::TimerPtr max_stream_duration_timer_;
-  bool has_early_data_;
-  bool use_alt_svc_ : 1;
-  bool had_upstream_{false};
 };
 
 } // namespace Router

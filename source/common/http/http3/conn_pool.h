@@ -122,8 +122,8 @@ public:
   bool trackStreamCapacity() override { return false; }
 
 protected:
-  bool onlySupportsAltSvc() const override {
-    // This will fail newStream(..., /*should_use_alt_svc=*/false) call.
+  bool isAlternateProtocol() const override {
+    // This will fail newStream(..., /*can_use_alternate_protocols=*/false) call.
     return true;
   }
 

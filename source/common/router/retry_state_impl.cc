@@ -228,7 +228,7 @@ RetryStateImpl::parseResetInterval(const Http::ResponseHeaderMap& response_heade
 }
 
 void RetryStateImpl::resetRetry() {
-  if (backoff_callback_) {
+  if (backoff_callback_ != nullptr) {
     cluster_.resourceManager(priority_).retries().dec();
     backoff_callback_ = nullptr;
   }
@@ -319,13 +319,13 @@ RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& re
 }
 
 RetryStatus RetryStateImpl::shouldRetryReset(Http::StreamResetReason reset_reason,
-                                             absl::optional<bool> was_using_alt_svc,
+                                             AlternateProtocolsUsed alternate_protocols_used,
                                              DoRetryResetCallback callback) {
 
   // Following wouldRetryFromReset() may override the value.
   bool disable_alt_svc = false;
   const RetryDecision retry_decision =
-      wouldRetryFromReset(reset_reason, was_using_alt_svc, disable_alt_svc);
+      wouldRetryFromReset(reset_reason, alternate_protocols_used, disable_alt_svc);
   return shouldRetry(retry_decision, [disable_alt_svc, callback]() { callback(disable_alt_svc); });
 }
 
@@ -380,11 +380,11 @@ RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_he
           return RetryDecision::RetryWithBackoff;
         }
         if (original_request.get(Http::Headers::get().EarlyData).empty()) {
-          // Retry iff the downstream request wasn't sent as early data. Otherwise, regardless if
-          // the request was sent as early date in upstream or not, don't retry. Instead, forwarding
+          // Retry if the downstream request wasn't received as early data. Otherwise, regardless if
+          // the request was sent as early data in upstream or not, don't retry. Instead, forward
           // the response to downstream.
           disable_early_data = true;
-          return RetryDecision::RetryNoBackoff;
+          return RetryDecision::RetryImmediately;
         }
       }
     }
@@ -424,8 +424,9 @@ RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_he
 
 RetryState::RetryDecision
 RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
-                                    absl::optional<bool> was_using_alt_svc, bool& disable_alt_svc) {
-  ASSERT(!disable_alt_svc);
+                                    AlternateProtocolsUsed alternate_protocols_used,
+                                    bool& disable_alternate_protocols) {
+  ASSERT(!disable_alternate_protocols);
   // First check "never retry" conditions so we can short circuit (we never
   // retry if the reset reason is overflow).
   if (reset_reason == Http::StreamResetReason::Overflow) {
@@ -436,23 +437,24 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
       "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc");
   if (consider_disable_alt_svc) {
     if (reset_reason == Http::StreamResetReason::ConnectionFailure) {
-      if (was_using_alt_svc.has_value()) {
+      if (alternate_protocols_used != AlternateProtocolsUsed::Unknown) {
         // Already got request encoder, so this must be a 0-RTT handshake failure. Retry
         // immediately.
         // TODO(danzh) consider making the retry configurable.
-        ASSERT(*was_using_alt_svc, "0-RTT was attempted on non-Quic connection and failed.");
-        return RetryDecision::RetryNoBackoff;
+        ASSERT(alternate_protocols_used == AlternateProtocolsUsed::Yes,
+               "0-RTT was attempted on non-Quic connection and failed.");
+        return RetryDecision::RetryImmediately;
       }
       if ((retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE)) {
         // This is a pool failure.
         return RetryDecision::RetryWithBackoff;
       }
-    } else if (was_using_alt_svc.value() &&
+    } else if (alternate_protocols_used == AlternateProtocolsUsed::Yes &&
                (retry_on_ & RetryPolicy::RETRY_ON_ALT_PROTOCOLS_POST_CONNECT_FAILURE)) {
       // Retry any post-handshake failure immediately with no alt_svc if the request was sent over
       // Http/3.
-      disable_alt_svc = true;
-      return RetryDecision::RetryNoBackoff;
+      disable_alternate_protocols = true;
+      return RetryDecision::RetryImmediately;
     }
   }
 
