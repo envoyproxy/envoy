@@ -1814,7 +1814,7 @@ TEST_F(StaticClusterImplTest, RoundRobinWithSlowStart) {
         slow_start_window: 60s
         aggression:
           default_value: 2.0
-          runtime_key: a_key 
+          runtime_key: a_key
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
@@ -1856,7 +1856,7 @@ TEST_F(StaticClusterImplTest, LeastRequestWithSlowStart) {
         slow_start_window: 60s
         aggression:
           default_value: 2.0
-          runtime_key: a_key 
+          runtime_key: a_key
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
