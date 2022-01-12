@@ -3609,7 +3609,7 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
 }
 
 #ifdef NDEBUG
-// These tests send invalid request and response header names which voilate ASSESRT while creating
+// These tests send invalid request and response header names which violate ASSERT while creating
 // such request/response headers. So they can only be run in NDEBUG mode.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidReqestHeaderName) {
   initialize();
