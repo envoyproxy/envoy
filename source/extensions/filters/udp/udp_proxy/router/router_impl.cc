@@ -68,20 +68,20 @@ RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::Udp
 const std::string RouterImpl::route(Network::Address::InstanceConstSharedPtr address) const {
   if (cluster_.has_value()) {
     return cluster_.value();
-  } else {
-    if (address->ip()) {
-      Network::Matching::NetworkMatchingDataImpl data(address->ip());
+  }
 
-      auto result = matcher_->match(data);
-      if (result.match_state_ == Matcher::MatchState::MatchComplete) {
-        if (result.on_match_.has_value()) {
-          return result.on_match_.value().action_cb_()->getTyped<RouteMatchAction>().cluster();
-        }
+  if (address->ip()) {
+    Network::Matching::NetworkMatchingDataImpl data(address->ip());
+
+    auto result = matcher_->match(data);
+    if (result.match_state_ == Matcher::MatchState::MatchComplete) {
+      if (result.on_match_.has_value()) {
+        return result.on_match_.value().action_cb_()->getTyped<RouteMatchAction>().cluster();
       }
     }
-
-    return EMPTY_STRING;
   }
+
+  return EMPTY_STRING;
 }
 
 const std::vector<std::string>& RouterImpl::allClusterNames() const { return cluster_names_; }

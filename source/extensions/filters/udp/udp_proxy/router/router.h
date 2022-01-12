@@ -14,12 +14,17 @@ namespace UdpProxy {
 namespace Router {
 
 /**
- * The router.
+ * The router which holds all clusters and determines the cluster which UDP data should be routed
+ * to.
  */
 class Router {
 public:
   virtual ~Router() = default;
 
+  /**
+   * Based on the source address of the incoming UDP data, determine the target route for the data.
+   * @return the cluster name or empty string if there is not matching route for the data.
+   */
   virtual const std::string route(Network::Address::InstanceConstSharedPtr address) const PURE;
 
   /**

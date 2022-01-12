@@ -43,7 +43,7 @@ void UdpProxyFilter::onClusterRemoval(const std::string& cluster) {
 }
 
 Network::FilterStatus UdpProxyFilter::onData(Network::UdpRecvData& data) {
-  auto route = config_->cluster(data.addresses_.peer_);
+  auto route = config_->route(data.addresses_.peer_);
   if (!cluster_infos_.contains(route)) {
     config_->stats().downstream_sess_no_route_.inc();
     return Network::FilterStatus::StopIteration;
