@@ -12,14 +12,12 @@ namespace Matching {
  */
 class MatchingDataImpl : public MatchingData {
 public:
+  MatchingDataImpl(const ConnectionSocket& socket) : socket_(socket) {}
   static absl::string_view name() { return "network"; }
-
-  void onSocket(const ConnectionSocket& socket) { socket_ = &socket; }
-
-  virtual const ConnectionSocket& socket() { return *socket_; }
+  const ConnectionSocket& socket() const override { return socket_; }
 
 private:
-  const ConnectionSocket* socket_{};
+  const ConnectionSocket& socket_;
 };
 
 } // namespace Matching

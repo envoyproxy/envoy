@@ -64,17 +64,19 @@ Matcher::DataInputGetResult SourceTypeInput::get(const MatchingData& data) const
 }
 
 Matcher::DataInputGetResult ServerNameInput::get(const MatchingData& data) const {
-  if (!data.socket().requestedServerName().empty()) {
+  const auto server_name = data.socket().requestedServerName();
+  if (!server_name.empty()) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(data.socket().requestedServerName())};
+            std::string(server_name)};
   }
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
 Matcher::DataInputGetResult TransportProtocolInput::get(const MatchingData& data) const {
-  if (!data.socket().detectedTransportProtocol().empty()) {
+  const auto transport_protocol = data.socket().detectedTransportProtocol();
+  if (!transport_protocol.empty()) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(data.socket().detectedTransportProtocol())};
+            std::string(transport_protocol)};
   }
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
