@@ -3567,9 +3567,11 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
   socket_swap.write_matcher_->setWriteOverride(nullptr);
-  // Shut down the server before os_calls goes out of scope to avoid syscalls
+  // Shut down the server and upstreams before os_calls goes out of scope to avoid syscalls
   // during its removal.
   test_server_.reset();
+  cleanupUpstreamAndDownstream();
+  fake_upstreams_.clear();
 }
 
 TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
