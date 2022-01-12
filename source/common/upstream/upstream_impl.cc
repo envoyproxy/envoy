@@ -808,6 +808,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                          factory_context.clusterManager().clusterCircuitBreakersStatNames()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       source_address_(getSourceAddress(config, bind_config)),
+      lb_round_robin_config_(config.round_robin_lb_config()),
       lb_least_request_config_(config.least_request_lb_config()),
       lb_ring_hash_config_(config.ring_hash_lb_config()),
       lb_maglev_config_(config.maglev_lb_config()),
