@@ -1,0 +1,12 @@
+diff --git a/src/fdr/teddy_runtime_common.h b/src/fdr/teddy_runtime_common.h
+index b76800e..6e587c2 100644
+--- a/src/fdr/teddy_runtime_common.h
++++ b/src/fdr/teddy_runtime_common.h
+@@ -362,6 +362,7 @@ m512 vectoredLoad512(m512 *p_mask, const u8 *ptr, const size_t start_offset,
+             *p_mask = set_mask_m512(~k);
+             return loadu512(ptr);
+         }
++        val = zeroes512();
+         assert(start_offset - start <= avail);
+         u64a k = ones_u64a << (64 - avail + start_offset - start)
+                            >> (64 - avail);

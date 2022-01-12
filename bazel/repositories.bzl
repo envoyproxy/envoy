@@ -527,6 +527,8 @@ def _io_hyperscan():
     external_http_archive(
         name = "io_hyperscan",
         build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:hyperscan.patch"],
     )
 
 def _io_opentracing_cpp():
