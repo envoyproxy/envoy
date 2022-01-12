@@ -80,6 +80,15 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "stateful_session_mock",
+    srcs = ["stateful_session.cc"],
+    hdrs = ["stateful_session.h"],
+    deps = [
+        "//envoy/http:stateful_session_interface",
+    ],
+)
+
+envoy_cc_mock(
     name = "stream_decoder_mock",
     srcs = ["stream_decoder.cc"],
     hdrs = ["stream_decoder.h"],

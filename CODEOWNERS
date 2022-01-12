@@ -161,6 +161,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/common/local_ratelimit @mattklein123 @rgs1
 # HTTP Kill Request
 /*/extensions/filters/http/kill_request @qqustc @htuch
+# HTTP Stateful Session
+/*/extensions/filters/http/stateful_session @wbpcode @dio
 # Rate limit expression descriptor
 /*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
 # hash input matcher
@@ -195,6 +197,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/matching/input_matchers/ip @aguinet @snowp
 # Key Value store
 /*/extensions/key_value @alyssawilk @ryantheoptimist
+# Stateful session
+/*/extensions/http/stateful_session/cookie @wbpcode @dio
 # DNS Resolver
 /*/extensions/network/dns_resolver/cares @junr03 @yanavlasov
 /*/extensions/network/dns_resolver/apple @junr03 @yanavlasov
