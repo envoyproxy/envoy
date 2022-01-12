@@ -430,7 +430,7 @@ public:
 
     Stats::IterateFn<StatType> fn = [this, &set](const Stats::RefcountPtr<StatType>& stat) -> bool {
       if (params_.shouldShowMetric(*stat)) {
-        set.insert(stat.get());
+        set.insert(stat);
       }
       return true;
     };
