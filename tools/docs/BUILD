@@ -20,10 +20,9 @@ py_binary(
     srcs = [
         "generate_external_deps_rst.py",
     ],
-    deps = [
-        "//tools/dependency:exports",
-        "//tools/dependency:utils",
-    ],
+    args = ["$(location //bazel:all_repository_locations)"],
+    data = ["//bazel:all_repository_locations"],
+    deps = ["//tools/dependency:utils"],
 )
 
 py_binary(

@@ -40,17 +40,17 @@ MAINTAINERS = {
     'davinci26': 'U013608CUDV',
     'rojkov': 'UH5EXLYQK',
     'RyanTheOptimist': 'U01SW3JC8GP',
+    'adisuissa': 'UT17EMMTP',
+    'KBaichoo': 'U016ZPU8KBK',
 }
 
 # First pass reviewers who are not maintainers should get
 # notifications but not result in a PR not getting assigned a
 # maintainer owner.
 FIRST_PASS = {
-    'adisuissa': 'UT17EMMTP',
     'dmitri-d': 'UB1883Q5S',
     'tonya11en': 'U989BG2CW',
     'esmet': 'U01BCGBUUAE',
-    'KBaichoo': 'U016ZPU8KBK',
     'wbpcode': 'U017KF5C0Q6',
     'mathetake': 'UG9TD2FSB',
 }

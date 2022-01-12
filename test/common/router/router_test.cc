@@ -6039,5 +6039,76 @@ TEST_F(RouterTest, HasEarlyDataAndRetryUpon425) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
+// Test the case that request with upstream override host.
+TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
+  NiceMock<Http::MockRequestEncoder> encoder_for_first_reqeust;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+      .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
+                           Http::ConnectionPool::Callbacks& callbacks, bool,
+                           bool) -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder_for_first_reqeust, cm_.thread_local_cluster_.conn_pool_.host_,
+                              upstream_stream_info_, Http::Protocol::Http10);
+        return nullptr;
+      }));
+  expectResponseTimerCreate();
+
+  // Simulate the load balancer to call the `overrideHostToSelect`. When `overrideHostToSelect` of
+  // `LoadBalancerContext` is called, `upstreamOverrideHost` of StreamDecoderFilterCallbacks will be
+  // called to get address of upstream host that should be selected first.
+  EXPECT_CALL(callbacks_, upstreamOverrideHost())
+      .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
+
+  auto override_host = router_.overrideHostToSelect();
+  EXPECT_EQ("1.2.3.4", override_host->first);
+  EXPECT_EQ(~static_cast<uint32_t>(0), override_host->second);
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  // Simulate the normal first request.
+  router_.decodeHeaders(headers, true);
+
+  // Mock response with status 503.
+  router_.retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers_503(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  ASSERT(response_decoder != nullptr);
+  // NOLINTNEXTLINE: Silence null pointer access warning
+  response_decoder->decodeHeaders(std::move(response_headers_503), true);
+
+  // Kick off a new request.
+  NiceMock<Http::MockRequestEncoder> encoder_for_retry_request;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+      .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
+                           Http::ConnectionPool::Callbacks& callbacks, bool,
+                           bool) -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder_for_retry_request, cm_.thread_local_cluster_.conn_pool_.host_,
+                              upstream_stream_info_, Http::Protocol::Http10);
+        return nullptr;
+      }));
+  router_.retry_state_->callback_();
+
+  // Simulate the load balancer to call the `overrideHostToSelect` again. The upstream override host
+  // will be ignored when the request is retried.
+  EXPECT_CALL(callbacks_, upstreamOverrideHost()).Times(0);
+  EXPECT_EQ(absl::nullopt, router_.overrideHostToSelect());
+
+  // Normal response.
+  Http::ResponseHeaderMapPtr response_headers_200(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+
+  EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _, _)).WillOnce(Return(RetryStatus::No));
+  ASSERT(response_decoder != nullptr);
+  // NOLINTNEXTLINE: Silence null pointer access warning
+  response_decoder->decodeHeaders(std::move(response_headers_200), true);
+
+  EXPECT_EQ(2, callbacks_.stream_info_.attemptCount().value());
+
+  router_.onDestroy();
+}
+
 } // namespace Router
 } // namespace Envoy
