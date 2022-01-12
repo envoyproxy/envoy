@@ -20,6 +20,7 @@ Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+* http: removed ``envoy.reloadable_features.strip_port_from_connect`` and legacy code paths.
 
 New Features
 ------------
