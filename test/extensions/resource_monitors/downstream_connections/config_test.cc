@@ -22,6 +22,7 @@ TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateMonitorInvalidConfig) 
       Registry::FactoryRegistry<Server::Configuration::ProactiveResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.downstream_connections");
   EXPECT_NE(factory, nullptr);
+  EXPECT_EQ("envoy.resource_monitors.downstream_connections", factory->name());
 
   envoy::extensions::resource_monitors::downstream_connections::v3::DownstreamConnectionsConfig
       config;
@@ -38,11 +39,12 @@ TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateMonitorInvalidConfig) 
                           "MaxActiveDownstreamConnections: value must be greater than 0");
 }
 
-TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateMonitor) {
+TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateCustomMonitor) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ProactiveResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.downstream_connections");
   EXPECT_NE(factory, nullptr);
+  EXPECT_EQ("envoy.resource_monitors.downstream_connections", factory->name());
 
   envoy::extensions::resource_monitors::downstream_connections::v3::DownstreamConnectionsConfig
       config;
@@ -54,6 +56,26 @@ TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateMonitor) {
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
   auto monitor = factory->createProactiveResourceMonitor(config, context);
   EXPECT_NE(monitor, nullptr);
+}
+
+TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateDefaultMonitor) {
+  auto factory =
+      Registry::FactoryRegistry<Server::Configuration::ProactiveResourceMonitorFactory>::getFactory(
+          "envoy.resource_monitors.downstream_connections");
+  EXPECT_NE(factory, nullptr);
+
+  Event::MockDispatcher dispatcher;
+  Api::ApiPtr api = Api::createApiForTest();
+  Server::MockOptions options;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+  auto config = factory->createEmptyConfigProto();
+
+  EXPECT_THROW_WITH_REGEX(factory->createProactiveResourceMonitor(*config, context),
+                          ProtoValidationException,
+                          "Proto constraint validation failed "
+                          "\\(DownstreamConnectionsConfigValidationError."
+                          "MaxActiveDownstreamConnections: value must be greater than 0");
 }
 
 } // namespace
