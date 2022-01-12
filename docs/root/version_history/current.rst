@@ -23,7 +23,6 @@ Minor Behavior Changes
 * json: switching from rapidjson to nlohmann/json. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.remove_legacy_json`` to false.
 * listener: destroy per network filter chain stats when a network filter chain is removed during the listener in place update.
 * router: take elapsed time into account when setting the ``x-envoy-expected-rq-timeout-ms header`` for retries, and never send a value that's longer than the request timeout. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` to false.
-* stateful session http filter: added :ref:`stateful session http filter <config_http_filters_stateful_session>`.
 * stream_info: response code details with empty space characters (' ', '\\t', '\\f', '\\v', '\\n', '\\r') is not accepted by the ``setResponseCodeDetails()`` API.
 * upstream: fixed a bug where auto_config didn't work for wrapped TLS sockets (e.g. if proxy proto were configured for TLS).
 
@@ -97,6 +96,7 @@ New Features
 * oauth filter: setting ``IdToken`` and ``RefreshToken`` cookies if they are provided by Identity provider along with ``AccessToken``.
 * perf: added support for `Perfetto <https://perfetto.dev>`_ performance tracing.
 * router: added support for the :ref:`config_http_conn_man_headers_x-forwarded-host` header.
+* stateful session http filter: added :ref:`stateful session http filter <config_http_filters_stateful_session>`.
 * stats: added text_readouts query parameter to prometheus stats to return gauges made from text readouts.
 * tcp: added a :ref:`FilterState <envoy_v3_api_msg_type.v3.HashPolicy.FilterState>` :ref:`hash policy <envoy_v3_api_msg_type.v3.HashPolicy>`, used by :ref:`TCP proxy <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.hash_policy>` to allow hashing load balancer algorithms to hash on objects in filter state.
 * tcp_proxy: added support to populate upstream http connect header values from stream info.
