@@ -146,6 +146,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/http:codec_interface",
         "//source/common/http:codec_helper_lib",
+        "@com_github_google_quiche//:http2_adapter",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
