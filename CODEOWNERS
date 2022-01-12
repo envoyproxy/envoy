@@ -40,11 +40,11 @@ extensions/filters/common/original_src @snowp @klarose
 # header_to_metadata extension
 /*/extensions/filters/http/header_to_metadata @rgs1 @zuercher
 # alts transport socket extension
-/*/extensions/transport_sockets/alts @antoniovicente @asraa @yangminzhu
+/*/extensions/transport_sockets/alts @antoniovicente @adisuissa @yangminzhu
 # tcp_stats transport socket extension
 /*/extensions/transport_sockets/tcp_stats @ggreenway @mattklein123
 # tls transport socket extension
-/*/extensions/transport_sockets/tls @lizan @asraa @ggreenway
+/*/extensions/transport_sockets/tls @lizan @ggreenway
 # tls SPIFFE certificate validator extension
 /*/extensions/transport_sockets/tls/cert_validator/spiffe @mathetake @lizan
 # proxy protocol socket extension
@@ -115,7 +115,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/grpc_web @fengli79 @lizan
 /*/extensions/filters/http/grpc_stats @kyessenov @lizan
 /*/extensions/filters/common/original_src @klarose @snowp
-/*/extensions/filters/listener/tls_inspector @ggreenway @asraa
+/*/extensions/filters/listener/tls_inspector @ggreenway @KBaichoo
 /*/extensions/grpc_credentials/example @wozz @htuch
 /*/extensions/grpc_credentials/file_based_metadata @wozz @htuch
 /*/extensions/internal_redirect @alyssawilk @penguingao
