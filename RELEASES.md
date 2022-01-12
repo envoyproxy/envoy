@@ -56,6 +56,7 @@ stable releases and sending announcements about them. This role is rotating on a
 | 2021 Q2 | Dmitri Dolguikh ([dmitri-d](https://github.com/dmitri-d))      |
 | 2021 Q3 | Takeshi Yoneda ([mathetake](https://github.com/mathetake))     |
 | 2021 Q4 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    |
+| 2022 Q1 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    |
 
 ## Release schedule
 
@@ -77,5 +78,6 @@ As of 2022, the targeted release dates are the 15th day of each quarter.
 | 1.19.0  | 2021/06/30 | 2021/07/13 |  +13 days  | 2022/07/13  |
 | 1.20.0  | 2021/09/30 | 2021/10/05 |   +5 days  | 2022/10/05  |
 | 1.21.0  | 2022/01/15 | 2022/01/12 |   -3 days  | 2023/01/12  |
+| 1.22.0  | 2022/04/15 |            |            |             |
 
 [repokitteh]: https://github.com/repokitteh
