@@ -58,9 +58,7 @@ A sample filter configuration could be:
                   address: 127.0.0.1
                   port_value: 10003
 
-
-
-A sample request to the specifiex auth service looks like 
+A sample request to the specific auth service looks like 
 
 .. code-block:: json
 
@@ -83,7 +81,6 @@ A sample request to the specifiex auth service looks like
       }
     }
   }
-
 
 Statistics
 ----------
