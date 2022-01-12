@@ -23,6 +23,7 @@ Minor Behavior Changes
 * json: switching from rapidjson to nlohmann/json. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.remove_legacy_json`` to false.
 * listener: destroy per network filter chain stats when a network filter chain is removed during the listener in place update.
 * router: take elapsed time into account when setting the ``x-envoy-expected-rq-timeout-ms header`` for retries, and never send a value that's longer than the request timeout. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` to false.
+* stateful session http filter: added :ref:`stateful session http filter <config_http_filters_stateful_session>`.
 * stream_info: response code details with empty space characters (' ', '\\t', '\\f', '\\v', '\\n', '\\r') is not accepted by the ``setResponseCodeDetails()`` API.
 * upstream: fixed a bug where auto_config didn't work for wrapped TLS sockets (e.g. if proxy proto were configured for TLS).
 
@@ -34,6 +35,7 @@ Bug Fixes
 * ext_authz: fix the ext_authz network filter to correctly set response flag and code details to ``UAEX`` when a connection is denied.
 * hcm: stop processing the response if encoding it has caused downstream reset. The fix is guarded by ``envoy.reloadable_features.handle_stream_reset_during_hcm_encoding``.
 * listener: fixed issue where more than one listener could listen on the same port if using reuse port, thus randomly accepting connections on different listeners. This configuration is now rejected.
+* tcp: fixing a log error where errors both from the kernel and the transport were not handled gracefully.
 * thrift_proxy: do not close downstream connections when an upstream connection overflow happens.
 * thrift_proxy: fix the thrift_proxy connection manager to correctly report success/error response metrics when performing :ref:`payload passthrough <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.payload_passthrough>`.
 
