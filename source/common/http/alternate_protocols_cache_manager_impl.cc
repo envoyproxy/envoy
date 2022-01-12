@@ -54,8 +54,8 @@ AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
   AlternateProtocolsCacheSharedPtr new_cache = std::make_shared<AlternateProtocolsCacheImpl>(
       dispatcher.timeSource(), std::move(store), options.max_entries().value());
 
-  for (const envoy::config::core::v3::AlternateProtocolsCacheEntry& entry :
-       options.prepopulated_entries()) {
+  for (const envoy::config::core::v3::AlternateProtocolsCacheOptions::AlternateProtocolsCacheEntry&
+           entry : options.prepopulated_entries()) {
     const AlternateProtocolsCacheImpl::Origin origin = {"https", entry.hostname(), entry.port()};
     std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocol = {
         {"h3", entry.hostname(), entry.port(),
