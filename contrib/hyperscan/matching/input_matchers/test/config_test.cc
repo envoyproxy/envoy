@@ -59,6 +59,13 @@ public:
   Envoy::Matcher::InputMatcherPtr matcher_;
 };
 
+#ifdef HYPERSCAN_DISABLED
+// Verify that incompatible architecture will cause a throw.
+TEST_F(ConfigTest, IncompatibleArchitecture) {
+  EXPECT_THROW_WITH_MESSAGE(setup({{"^/asdf/.+", {}}}), EnvoyException,
+                            "X86_64 architecture is required for Hyperscan.");
+}
+#else
 // Verify that matching will be performed successfully.
 TEST_F(ConfigTest, Regex) {
   setup({{"^/asdf/.+", {}}});
@@ -135,6 +142,7 @@ TEST_F(ConfigTest, InvalidRegex) {
       setup({{"(", {}}}), EnvoyException,
       "unable to compile pattern '(': Missing close parenthesis for group started at index 0.");
 }
+#endif
 
 } // namespace Hyperscan
 } // namespace InputMatchers
