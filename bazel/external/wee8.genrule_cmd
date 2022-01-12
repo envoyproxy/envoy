@@ -29,7 +29,7 @@ rm -rf out/wee8
 
 # Export compiler configuration.
 export CFLAGS="$${CFLAGS-} -Wno-unknown-warning-option"
-export CXXFLAGS="$${CXXFLAGS-} -Wno-sign-compare -Wno-deprecated-copy -Wno-unknown-warning-option -Wno-range-loop-analysis -Wno-shorten-64-to-32"
+export CXXFLAGS="$${CXXFLAGS-} -Wno-sign-compare -Wno-deprecated-copy -Wno-unknown-warning-option -Wno-range-loop-analysis -Wno-shorten-64-to-32 -Wno-invalid-offsetof"
 if [[ ( $${SYSTEM} == "Darwin" && $${CXX-} == "" ) || $${CXX-} == *clang* ]]; then
   export CC=$${CC:-clang}
   export CXX=$${CXX:-clang++}
