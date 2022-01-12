@@ -14,6 +14,7 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//envoy/event:dispatcher_interface",
+        "//envoy/http:stateful_session_interface",
         "//envoy/json:json_object_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/router:route_config_provider_manager_interface",
