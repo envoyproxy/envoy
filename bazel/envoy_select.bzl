@@ -67,6 +67,16 @@ def envoy_select_wasm_v8(xs):
         "//conditions:default": xs,
     })
 
+# Selects True or False depending on the Wasm runtimes enabled in the current build.
+def envoy_select_wasm_v8_bool():
+    return select({
+        "@envoy//bazel:wasm_wamr": False,
+        "@envoy//bazel:wasm_wasmtime": False,
+        "@envoy//bazel:wasm_wavm": False,
+        "@envoy//bazel:wasm_none": False,
+        "//conditions:default": True,
+    })
+
 # Selects the given values depending on the Wasm runtimes enabled in the current build.
 def envoy_select_wasm_wamr(xs):
     return select({
