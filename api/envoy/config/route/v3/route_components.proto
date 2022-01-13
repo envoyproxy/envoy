@@ -439,7 +439,7 @@ message WeightedCluster {
 
   // Specifies the key for looking up the random value that is used in weighted cluster picking algorithm.
   // This enables providing the random value through configuration.
-  string provided_random_value_key = 4;
+  string random_value_key = 4;
 }
 
 // [#next-free-field: 14]
