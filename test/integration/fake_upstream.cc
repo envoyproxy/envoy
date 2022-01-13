@@ -323,6 +323,37 @@ public:
   }
 };
 
+class TestHttp2ServerConnectionImpl : public Http::Http2::ServerConnectionImpl {
+public:
+  TestHttp2ServerConnectionImpl(
+      Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks,
+      Http::Http2::CodecStats& stats, Random::RandomGenerator& random_generator,
+      const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+      const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action)
+      : ServerConnectionImpl(connection, callbacks, stats, random_generator, http2_options,
+                             max_request_headers_kb, max_request_headers_count,
+                             headers_with_underscores_action) {}
+
+  void updateConcurrentStreams(uint32_t max_streams) {
+    int rc;
+    if (use_new_codec_wrapper_) {
+      absl::InlinedVector<http2::adapter::Http2Setting, 1> settings;
+      settings.insert(settings.end(), {{http2::adapter::MAX_CONCURRENT_STREAMS, max_streams}});
+      adapter_->SubmitSettings(settings);
+      rc = adapter_->Send();
+    } else {
+      absl::InlinedVector<nghttp2_settings_entry, 1> settings;
+      settings.insert(settings.end(), {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, max_streams}});
+      rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, settings.data(), settings.size());
+      ASSERT(rc == 0);
+      rc = nghttp2_session_send(session_);
+    }
+    ASSERT(rc == 0);
+  }
+};
+
 FakeHttpConnection::FakeHttpConnection(
     FakeUpstream& fake_upstream, SharedConnectionWrapper& shared_connection, Http::CodecType type,
     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
@@ -342,7 +373,7 @@ FakeHttpConnection::FakeHttpConnection(
   } else if (type == Http::CodecType::HTTP2) {
     envoy::config::core::v3::Http2ProtocolOptions http2_options = fake_upstream.http2Options();
     Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();
-    codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
+    codec_ = std::make_unique<TestHttp2ServerConnectionImpl>(
         shared_connection_.connection(), *this, stats, random_, http2_options,
         max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
   } else {
@@ -398,18 +429,25 @@ void FakeHttpConnection::encodeGoAway() {
 }
 
 void FakeHttpConnection::updateConcurrentStreams(uint64_t max_streams) {
-  ASSERT(type_ >= Http::CodecType::HTTP3);
+  ASSERT(type_ >= Http::CodecType::HTTP2);
 
+  if (type_ == Http::CodecType::HTTP2) {
+    postToConnectionThread([this, max_streams]() {
+      auto codec = dynamic_cast<TestHttp2ServerConnectionImpl*>(codec_.get());
+      codec->updateConcurrentStreams(max_streams);
+    });
+  } else {
 #ifdef ENVOY_ENABLE_QUIC
-  postToConnectionThread([this, max_streams]() {
-    auto codec = dynamic_cast<Quic::QuicHttpServerConnectionImpl*>(codec_.get());
-    quic::test::QuicSessionPeer::SetMaxOpenIncomingBidirectionalStreams(&codec->quicServerSession(),
-                                                                        max_streams);
-    codec->quicServerSession().SendMaxStreams(1, false);
-  });
+    postToConnectionThread([this, max_streams]() {
+      auto codec = dynamic_cast<Quic::QuicHttpServerConnectionImpl*>(codec_.get());
+      quic::test::QuicSessionPeer::SetMaxOpenIncomingBidirectionalStreams(
+          &codec->quicServerSession(), max_streams);
+      codec->quicServerSession().SendMaxStreams(1, false);
+    });
 #else
-  UNREFERENCED_PARAMETER(max_streams);
+    UNREFERENCED_PARAMETER(max_streams);
 #endif
+  }
 }
 
 void FakeHttpConnection::encodeProtocolError() {

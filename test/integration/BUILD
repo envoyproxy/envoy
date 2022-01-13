@@ -396,6 +396,7 @@ envoy_cc_test(
     srcs = [
         "buffer_accounting_integration_test.cc",
     ],
+    shard_count = 2,
     deps = [
         ":base_overload_integration_test_lib",
         ":http_integration_lib",
