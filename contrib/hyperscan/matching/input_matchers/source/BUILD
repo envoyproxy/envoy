@@ -20,7 +20,7 @@ envoy_contrib_package()
 
 envoy_cmake(
     name = "hyperscan",
-    build_data = ["@org_boost//:all"],
+    build_data = ["@org_boost//:header"],
     cache_entries = {
         "BOOST_ROOT": "$EXT_BUILD_ROOT/external/org_boost",
         "BUILD_EXAMPLES": "off",

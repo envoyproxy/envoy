@@ -449,7 +449,17 @@ def _com_github_zlib_ng_zlib_ng():
 def _org_boost():
     external_http_archive(
         name = "org_boost",
-        build_file_content = BUILD_ALL_CONTENT,
+        build_file_content = """
+filegroup(
+    name = "header",
+    srcs = glob([
+        "boost/**/*.h",
+        "boost/**/*.hpp",
+        "boost/**/*.ipp",
+    ]),
+    visibility = ["//visibility:public"],
+)
+""",
     )
     native.bind(
         name = "boost",
