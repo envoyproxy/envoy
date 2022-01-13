@@ -171,6 +171,7 @@ void EnvoyQuicServerSession::setHttp3Options(
           quic::QuicTime::Delta::FromMilliseconds(initial_interval));
     }
   }
+  set_allow_extended_connect(http3_options_->allow_extended_connect());
 }
 
 void EnvoyQuicServerSession::storeConnectionMapPosition(FilterChainToConnectionMap& connection_map,
