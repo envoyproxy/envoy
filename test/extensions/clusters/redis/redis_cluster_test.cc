@@ -662,12 +662,16 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
   expectHealthyHosts(std::get<3>(GetParam()));
 }
 
-TEST_F(RedisClusterTest, PrimaryAddressAsHostname) {
+TEST_F(RedisClusterTest, AddressAsHostname) {
   setupFromV3Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
   const std::list<std::string> primary_resolved_addresses{"127.0.1.1"};
   const std::list<std::string> replica_resolved_addresses{"127.0.1.2"};
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "replica.org",
+                         replica_resolved_addresses);
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com",
+                         primary_resolved_addresses);
   expectRedisResolve(true);
 
   EXPECT_CALL(membership_updated_, ready());
@@ -675,12 +679,54 @@ TEST_F(RedisClusterTest, PrimaryAddressAsHostname) {
   cluster_->initialize([&]() -> void { initialized_.ready(); });
 
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22120));
+  expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.2:22120"}));
+  EXPECT_EQ(0U, cluster_->info()->stats().update_failure_.value());
+}
+
+TEST_F(RedisClusterTest, AddressAsHostnameFailure) {
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+  const std::list<std::string> primary_resolved_addresses{"127.0.1.1"};
+  const std::list<std::string> replica_resolved_addresses{"127.0.1.2"};
+
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+
+  // 1. Primary resolution is successful, but replica fails.
+  // Expect cluster slot update to be successful, with just one healthy host, and failure counter to be updated.
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com",
                          primary_resolved_addresses);
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "replica.org",
-                         replica_resolved_addresses);
+                         replica_resolved_addresses,
+                         Network::DnsResolver::ResolutionStatus::Failure);
+  expectRedisResolve(true);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() -> void { initialized_.ready(); });
+
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
   expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22120));
-  expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.2:22120"}));
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120"}));
+  EXPECT_EQ(1UL, cluster_->info()->stats().update_failure_.value());
+
+  // 2. Primary resolution fails, so replica resolution is not even called.
+  // Expect cluster slot update to be successful, with just one healthy host, and failure counter to be updated.
+  expectRedisResolve(true);
+  resolve_timer_->invokeCallback();
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com",
+                         primary_resolved_addresses,
+                         Network::DnsResolver::ResolutionStatus::Failure);
+  // NOTE: Intentionally commented out. Replica DNS resolution should even reach. It's here for illustrative purposes.
+  // expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "replica.org",
+  //                        replica_resolved_addresses);
+  expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22120));
+  // healthy hosts is same as before, but failure count increases by 1
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(2UL, cluster_->info()->stats().update_failure_.value());
 }
 
 TEST_F(RedisClusterTest, EmptyDnsResponse) {
