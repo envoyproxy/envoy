@@ -5,11 +5,14 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/matcher/matcher.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/matching/data_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/common/matcher/trie_matcher.h"
 
 #include "test/common/matcher/test_utility.h"
 #include "test/mocks/matcher/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -439,6 +442,51 @@ matcher_tree:
         "nested", {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
     validateUnableToMatch();
   }
+}
+
+TEST(TrieMatcherIntegrationTest, NetworkMatchingData) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/envoy.type.matcher.v3.DestinationIPInput
+  custom_match:
+    name: ip_matcher
+    typed_config:
+      "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+      range_matchers:
+      - ranges:
+        - address_prefix: 192.0.0.0
+          prefix_len: 2
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: foo
+  )EOF";
+  xds::type::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  StringActionFactory action_factory;
+  Registry::InjectFactory<ActionFactory<absl::string_view>> inject_action(action_factory);
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  MockMatchTreeValidationVisitor<Network::MatchingData> validation_visitor;
+  EXPECT_CALL(validation_visitor, performDataInputValidation(_, _)).Times(testing::AnyNumber());
+  absl::string_view context = "";
+  MatchTreeFactory<Network::MatchingData, absl::string_view> matcher_factory(
+      context, factory_context, validation_visitor);
+  auto match_tree = matcher_factory.create(matcher);
+
+  Network::MockConnectionSocket socket;
+  socket.connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("192.168.0.1", 8080));
+  Network::Matching::MatchingDataImpl data(socket);
+
+  const auto result = match_tree()->match(data);
+  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
+  EXPECT_EQ(result.on_match_->action_cb_()->getTyped<StringAction>().string_, "foo");
 }
 
 } // namespace

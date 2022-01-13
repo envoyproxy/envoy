@@ -232,6 +232,7 @@ TEST(MatchingData, ApplicationProtocolInput) {
     EXPECT_EQ(result.data_, "'h2','http/1.1'");
   }
 }
+
 } // namespace Matching
 } // namespace Network
 } // namespace Envoy
