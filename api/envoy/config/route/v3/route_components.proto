@@ -436,6 +436,10 @@ message WeightedCluster {
   // configuration file will be used as the default weight. See the :ref:`runtime documentation
   // <operations_runtime>` for how key names map to the underlying implementation.
   string runtime_key_prefix = 2;
+
+  // Specifies the key for looking up the random value that is used in weighted cluster picking algorithm.
+  // This enables providing the random value through configuration.
+  string provided_random_value_key = 4;
 }
 
 // [#next-free-field: 14]
