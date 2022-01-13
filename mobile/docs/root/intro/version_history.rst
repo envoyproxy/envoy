@@ -6,9 +6,21 @@ Pending Release
 
 Bugfixes:
 
+Features:
+
+0.4.5 (January 13, 2022)
+========================
+
+Based off Envoy `v1.21.0 <https://github.com/envoyproxy/envoy/releases/tag/v1.21.0>`_
+
+Bugfixes:
+
 - Decompressor: decompress even when `no-transform` is specified  (:issue:`#1995 <1995>`)
 
 Features:
+
+- HTTP: any negotiated ALPN now passed up as `x-envoy-upstream-alpn` header (:issue: `#1965 <1965>`)
+
 
 0.4.4 (December 30, 2021)
 =========================

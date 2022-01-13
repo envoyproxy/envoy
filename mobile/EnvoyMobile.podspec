@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
     s.name = 'EnvoyMobile'
-    s.version = '0.4.4'
+    s.version = '0.4.5'
     s.author = 'Envoy Mobile Project Authors'
     s.summary = 'Multiplatform client HTTP/networking library built on the Envoy project's core networking layer'
     s.homepage = 'https://envoy-mobile.github.io'
