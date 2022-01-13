@@ -693,7 +693,8 @@ TEST_F(RedisClusterTest, AddressAsHostnameFailure) {
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
 
   // 1. Primary resolution is successful, but replica fails.
-  // Expect cluster slot update to be successful, with just one healthy host, and failure counter to be updated.
+  // Expect cluster slot update to be successful, with just one healthy host, and failure counter to
+  // be updated.
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com",
                          primary_resolved_addresses);
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "replica.org",
@@ -713,15 +714,18 @@ TEST_F(RedisClusterTest, AddressAsHostnameFailure) {
   EXPECT_EQ(1UL, cluster_->info()->stats().update_failure_.value());
 
   // 2. Primary resolution fails, so replica resolution is not even called.
-  // Expect cluster slot update to be successful, with just one healthy host, and failure counter to be updated.
+  // Expect cluster slot update to be successful, with just one healthy host, and failure counter to
+  // be updated.
   expectRedisResolve(true);
   resolve_timer_->invokeCallback();
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com",
                          primary_resolved_addresses,
                          Network::DnsResolver::ResolutionStatus::Failure);
-  // NOTE: Intentionally commented out. Replica DNS resolution should even reach. It's here for illustrative purposes.
+  // NOTE: Intentionally commented out. Replica DNS resolution should even reach. It's here for
+  // illustrative purposes.
+
   // expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "replica.org",
-  //                        replica_resolved_addresses);
+  // replica_resolved_addresses);
   expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22120));
   // healthy hosts is same as before, but failure count increases by 1
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());

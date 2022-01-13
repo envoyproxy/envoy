@@ -1,11 +1,12 @@
 #include "redis_cluster.h"
 
+#include <memory>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.h"
 #include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.validate.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
-#include <memory>
 
 namespace Envoy {
 namespace Extensions {
@@ -344,7 +345,8 @@ void RedisCluster::RedisDiscoverySession::resolveHostname(std::shared_ptr<Cluste
           auto& slot = (**slots)[index];
           ENVOY_LOG(trace, "async DNS resolution complete for {}", slot.primary_hostname_);
           updateDnsStats(status, response.empty());
-          // If DNS resolution for a primary fails, we stop resolution for remaining, and reset the timer.
+          // If DNS resolution for a primary fails, we stop resolution for remaining, and reset the
+          // timer.
           if (status != Network::DnsResolver::ResolutionStatus::Success) {
             ENVOY_LOG(error, "Unable to resolve cluster slot primary hostname {}",
                       slot.primary_hostname_);
