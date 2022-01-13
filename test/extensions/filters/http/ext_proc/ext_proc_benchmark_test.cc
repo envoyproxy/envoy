@@ -1,12 +1,11 @@
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
-#include "envoy/service/ext_proc/v3/external_processor.pb.h"
-
 #include "envoy/http/header_map.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/common/common/perf_annotation.h"
 
-#include "test/common/http/common.h"
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/test_processor.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
@@ -15,7 +14,6 @@
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
-
 #include "gtest/gtest.h"
 
 namespace Envoy {
