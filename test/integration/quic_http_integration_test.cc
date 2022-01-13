@@ -704,41 +704,6 @@ TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
   EXPECT_EQ(failure_reason, codec_client_->connection()->transportFailureReason());
 }
 
-// HTTP3 doesn't support 101 SwitchProtocol response code, the client should
-// reset the request.
-TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void { hcm.set_proxy_100_continue(true); });
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                                                 {":path", "/dynamo/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"},
-                                                                 {"expect", "100-continue"}});
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  // Wait for the request headers to be received upstream.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "101"}}, false);
-  ASSERT_TRUE(response->waitForReset());
-  codec_client_->close();
-  EXPECT_FALSE(response->complete());
-
-  // Verify stream error counters are correctly incremented.
-  std::string counter_scope = GetParam() == Network::Address::IpVersion::v4
-                                  ? "listener.127.0.0.1_0.http3.downstream.rx."
-                                  : "listener.[__1]_0.http3.downstream.rx.";
-  std::string error_code = "quic_reset_stream_error_code_QUIC_STREAM_GENERAL_PROTOCOL_ERROR";
-  test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1U);
-}
-
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
   initialize();
 
@@ -767,6 +732,14 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
   auto response = std::move(encoder_decoder.second);
 
   ASSERT_TRUE(response->waitForReset());
+  EXPECT_FALSE(response->complete());
+
+  // Verify stream error counters are correctly incremented.
+  std::string counter_scope = GetParam() == Network::Address::IpVersion::v4
+                                  ? "listener.127.0.0.1_0.http3.downstream.tx."
+                                  : "listener.[__1]_0.http3.downstream.tx.";
+  std::string error_code = "quic_connection_close_error_code_QUIC_HTTP_FRAME_ERROR";
+  test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1U);
 }
 
 TEST_P(QuicHttpIntegrationTest, Http3ClientKeepalive) {
