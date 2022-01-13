@@ -486,7 +486,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
 
   // Start the fourth connection.
   codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), absl::nullopt,
-                                         /*wait_for_1rtt_key*/ false);
+                                         /*wait_for_1rtt_key*/ true);
   Http::TestRequestHeaderMapImpl request{{":method", "GET"},
                                          {":path", "/test/long/url"},
                                          {":scheme", "http"},
@@ -498,9 +498,9 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   // and the header should be forwarded as is.
   EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "2"));
   upstream_request_->encodeHeaders(too_early_response_headers, true);
-  ASSERT_TRUE(response3->waitForEndStream());
+  ASSERT_TRUE(response4->waitForEndStream());
   // 425 response should be forwarded back to the client.
-  EXPECT_EQ("425", response3->headers().getStatusValue());
+  EXPECT_EQ("425", response4->headers().getStatusValue());
   codec_client_->close();
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {

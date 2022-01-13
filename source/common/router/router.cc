@@ -999,12 +999,13 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
   upstream_request.outlierDetectionTimeoutRecorded(true);
 
   if (!downstream_response_started_ && retry_state_) {
-    RetryStatus retry_status =
-        retry_state_->shouldHedgeRetryPerTryTimeout([this, &upstream_request]() -> void {
+    RetryStatus retry_status = retry_state_->shouldHedgeRetryPerTryTimeout(
+        [this,
+         can_use_alternate_protocols = upstream_request.canUseAlternateProtocols()]() -> void {
           // Without any knowledge about what's going on in the connection pool, retry the request
           // with the safest settings which is no early data but keep using or not using alt-svc as
           // before. In this way, QUIC won't be falsely marked as broken.
-          doRetry(/*can_use_early_data*/ false, upstream_request.canUseAlternateProtocols());
+          doRetry(/*can_use_early_data*/ false, can_use_alternate_protocols);
         });
 
     if (retry_status == RetryStatus::Yes) {
