@@ -1,13 +1,13 @@
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 
 #include "source/common/common/macros.h"
-#include "source/common/http/headers.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_set.h"
-#include "absl/strings/numbers.h"
 #include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
 
 namespace Envoy {
 namespace Extensions {
