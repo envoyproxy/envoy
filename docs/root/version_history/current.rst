@@ -10,7 +10,7 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
-* ext_authz: added requested server name in ext_authz network filter for auth review. 
+* ext_authz: added requested server name in ext_authz network filter for auth review.
 
 Bug Fixes
 ---------
