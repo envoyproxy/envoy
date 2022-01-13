@@ -1434,6 +1434,49 @@ TEST_F(Http2ConnPoolImplTest, PreconnectWithoutMultiplexing) {
   closeAllClients();
 }
 
+TEST_F(Http2ConnPoolImplTest, IncreaseCapacityWithSettingsFrame) {
+  TestScopedRuntime scoped_runtime;
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(100);
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
+
+  // The initial capacity is determined by configured max_concurrent_streams.
+  expectClientsCreate(1);
+  ActiveTestRequest r1(*this, 0, false);
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, 100 /*capacity*/);
+
+  // When the connection connects, there is 99 spare capacity in this pool.
+  EXPECT_CALL(*test_clients_[0].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&r1.inner_decoder_), ReturnRef(r1.inner_encoder_)));
+  EXPECT_CALL(r1.callbacks_.pool_ready_, ready());
+  expectClientConnect(0);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 99 /*capacity*/);
+  EXPECT_EQ(pool_->owningList(Envoy::ConnectionPool::ActiveClient::State::READY).size(), 1);
+
+  // Settings frame results in 0 capacity, the state of client changes from READY to BUSY.
+  NiceMock<MockReceivedSettings> settings;
+  settings.max_concurrent_streams_ = 1;
+  test_clients_[0].codec_client_->onSettings(settings);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 0 /*capacity*/);
+  EXPECT_EQ(pool_->owningList(Envoy::ConnectionPool::ActiveClient::State::READY).size(), 0);
+
+  // Settings frame results in 9 capacity, the state of client changes from BUSY to READY.
+  settings.max_concurrent_streams_ = 10;
+  test_clients_[0].codec_client_->onSettings(settings);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 9 /*capacity*/);
+  EXPECT_EQ(pool_->owningList(Envoy::ConnectionPool::ActiveClient::State::READY).size(), 1);
+
+  // Settings frame with capacity of 150 which will be restricted by configured
+  // max_concurrent_streams, then results in 99 capacity.
+  settings.max_concurrent_streams_ = 150;
+  test_clients_[0].codec_client_->onSettings(settings);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 99 /*capacity*/);
+  EXPECT_EQ(pool_->owningList(Envoy::ConnectionPool::ActiveClient::State::READY).size(), 1);
+
+  // Close connection.
+  closeAllClients();
+  CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*capacity*/);
+}
+
 TEST_F(Http2ConnPoolImplTest, DisconnectWithNegativeCapacity) {
   TestScopedRuntime scoped_runtime;
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(6);
