@@ -294,7 +294,8 @@ public:
         envoy::extensions::cache::simple_http_cache::v3::SimpleHttpCacheConfig>();
   }
   // From HttpCacheFactory
-  HttpCache& getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&) override {
+  HttpCache& getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&,
+                      Server::Configuration::FactoryContext&) override {
     return cache_;
   }
 

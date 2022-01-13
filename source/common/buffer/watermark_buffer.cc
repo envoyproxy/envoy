@@ -105,6 +105,12 @@ void WatermarkBuffer::appendSliceForTest(absl::string_view data) {
   appendSliceForTest(data.data(), data.size());
 }
 
+size_t WatermarkBuffer::addFragments(absl::Span<const absl::string_view> fragments) {
+  size_t total_size_to_write = OwnedImpl::addFragments(fragments);
+  checkHighAndOverflowWatermarks();
+  return total_size_to_write;
+}
+
 void WatermarkBuffer::setWatermarks(uint32_t high_watermark) {
   uint32_t overflow_watermark_multiplier =
       Runtime::getInteger("envoy.buffer.overflow_multiplier", 0);

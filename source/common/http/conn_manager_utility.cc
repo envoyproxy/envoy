@@ -436,12 +436,14 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
   }
 
   const std::string client_cert_details_str = absl::StrJoin(client_cert_details, ";");
+
+  ENVOY_BUG(config.forwardClientCert() == ForwardClientCertType::AppendForward ||
+                config.forwardClientCert() == ForwardClientCertType::SanitizeSet,
+            "error in client cert logic");
   if (config.forwardClientCert() == ForwardClientCertType::AppendForward) {
     request_headers.appendForwardedClientCert(client_cert_details_str, ",");
   } else if (config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
     request_headers.setForwardedClientCert(client_cert_details_str);
-  } else {
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

@@ -295,6 +295,7 @@ private:
 
     bool registerForAction(const std::string&, Event::Dispatcher&, OverloadActionCb) override {
       // This method shouldn't be called by the admin listener
+      IS_ENVOY_BUG("Unexpected function call");
       return false;
     }
 

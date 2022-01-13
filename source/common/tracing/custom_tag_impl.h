@@ -13,6 +13,8 @@ public:
   explicit CustomTagBase(const std::string& tag) : tag_(tag) {}
   absl::string_view tag() const override { return tag_; }
   void applySpan(Span& span, const CustomTagContext& ctx) const override;
+  void applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
+                const CustomTagContext& ctx) const override;
   virtual absl::string_view value(const CustomTagContext& ctx) const PURE;
 
 protected:
@@ -58,6 +60,8 @@ public:
   MetadataCustomTag(const std::string& tag,
                     const envoy::type::tracing::v3::CustomTag::Metadata& metadata);
   void applySpan(Span& span, const CustomTagContext& ctx) const override;
+  void applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
+                const CustomTagContext& ctx) const override;
   absl::string_view value(const CustomTagContext&) const override { return default_value_; }
   const envoy::config::core::v3::Metadata* metadata(const CustomTagContext& ctx) const;
 

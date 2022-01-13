@@ -271,6 +271,7 @@ public:
     std::string value_copy(value);
     absl::MutexLock lock(&mutex_);
     value_ = std::move(value_copy);
+    flags_ |= Flags::Used;
   }
   std::string value() const override {
     absl::MutexLock lock(&mutex_);
