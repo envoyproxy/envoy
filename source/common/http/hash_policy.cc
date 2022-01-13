@@ -46,7 +46,7 @@ public:
     const auto header = headers.get(header_name_);
     if (!header.empty()) {
       absl::InlinedVector<absl::string_view, 1> header_values;
-      auto num_headers_to_hash = header.size();
+      size_t num_headers_to_hash = header.size();
       header_values.reserve(num_headers_to_hash);
 
       for (size_t i = 0; i < num_headers_to_hash; i++) {
