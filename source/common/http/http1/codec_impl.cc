@@ -84,9 +84,12 @@ constexpr size_t CRLF_SIZE = 2;
 
 } // namespace
 
-const std::string StreamEncoderImpl::CRLF = "\r\n";
+static constexpr absl::string_view CRLF = "\r\n";
 // Last chunk as defined here https://tools.ietf.org/html/rfc7230#section-4.1
-const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n";
+static constexpr absl::string_view LAST_CHUNK = "0\r\n";
+
+static constexpr absl::string_view SPACE = " ";
+static constexpr absl::string_view COLON_SPACE = ": ";
 
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      StreamInfo::BytesMeterSharedPtr&& bytes_meter)
@@ -101,20 +104,12 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
   }
 }
 
-void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const char* value,
-                                     uint32_t value_size) {
-
-  ASSERT(key_size > 0);
-  const uint64_t old_buffer_length = connection_.buffer().length();
-  connection_.copyToBuffer(key, key_size);
-  connection_.addCharToBuffer(':');
-  connection_.addCharToBuffer(' ');
-  connection_.copyToBuffer(value, value_size);
-  connection_.addToBuffer(CRLF);
-  bytes_meter_->addHeaderBytesSent(connection_.buffer().length() - old_buffer_length);
-}
 void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view value) {
-  this->encodeHeader(key.data(), key.size(), value.data(), value.size());
+  ASSERT(!key.empty());
+
+  const uint64_t header_size = connection_.buffer().addFragments({key, COLON_SPACE, value, CRLF});
+
+  bytes_meter_->addHeaderBytesSent(header_size);
 }
 
 void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::string_view value,
@@ -231,7 +226,7 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
     }
   }
 
-  connection_.addToBuffer(CRLF);
+  connection_.buffer().add(CRLF);
 
   if (end_stream) {
     endEncode();
@@ -285,7 +280,6 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
       return HeaderMap::Iterate::Continue;
     });
 
-    flushOutput();
     connection_.buffer().add(CRLF);
   }
 
@@ -299,8 +293,7 @@ void StreamEncoderImpl::encodeMetadata(const MetadataMapVector&) {
 
 void StreamEncoderImpl::endEncode() {
   if (chunk_encoding_) {
-    connection_.buffer().add(LAST_CHUNK);
-    connection_.buffer().add(CRLF);
+    connection_.buffer().addFragments({LAST_CHUNK, CRLF});
   }
 
   flushOutput(true);
@@ -349,16 +342,6 @@ uint64_t ConnectionImpl::flushOutput(bool end_encode) {
   return bytes_encoded;
 }
 
-void ConnectionImpl::addToBuffer(absl::string_view data) { output_buffer_->add(data); }
-
-void ConnectionImpl::addCharToBuffer(char c) { output_buffer_->add(&c, 1); }
-
-void ConnectionImpl::addIntToBuffer(uint64_t i) { output_buffer_->add(absl::StrCat(i)); }
-
-void ConnectionImpl::copyToBuffer(const char* data, uint64_t length) {
-  output_buffer_->add(data, length);
-}
-
 void StreamEncoderImpl::resetStream(StreamResetReason reason) {
   connection_.onResetStreamBase(reason);
 }
@@ -396,8 +379,8 @@ const Network::Address::InstanceConstSharedPtr& StreamEncoderImpl::connectionLoc
   return connection_.connection().connectionInfoProvider().localAddress();
 }
 
-static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
-static const char HTTP_10_RESPONSE_PREFIX[] = "HTTP/1.0 ";
+static constexpr absl::string_view RESPONSE_PREFIX = "HTTP/1.1 ";
+static constexpr absl::string_view HTTP_10_RESPONSE_PREFIX = "HTTP/1.0 ";
 
 void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) {
   started_response_ = true;
@@ -406,26 +389,26 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
   ASSERT(headers.Status() != nullptr);
   uint64_t numeric_status = Utility::getResponseStatus(headers);
 
+  absl::string_view response_prefix;
   if (connection_.protocol() == Protocol::Http10 && connection_.supportsHttp10()) {
-    connection_.copyToBuffer(HTTP_10_RESPONSE_PREFIX, sizeof(HTTP_10_RESPONSE_PREFIX) - 1);
+    response_prefix = HTTP_10_RESPONSE_PREFIX;
   } else {
-    connection_.copyToBuffer(RESPONSE_PREFIX, sizeof(RESPONSE_PREFIX) - 1);
+    response_prefix = RESPONSE_PREFIX;
   }
-  connection_.addIntToBuffer(numeric_status);
-  connection_.addCharToBuffer(' ');
 
   StatefulHeaderKeyFormatterOptConstRef formatter(headers.formatter());
 
+  absl::string_view reason_phrase;
   if (formatter.has_value() && !formatter->getReasonPhrase().empty()) {
-    connection_.addToBuffer(formatter->getReasonPhrase());
+    reason_phrase = formatter->getReasonPhrase();
   } else {
     const char* status_string = CodeUtility::toString(static_cast<Code>(numeric_status));
     uint32_t status_string_len = strlen(status_string);
-    connection_.copyToBuffer(status_string, status_string_len);
+    reason_phrase = {status_string, status_string_len};
   }
 
-  connection_.addCharToBuffer('\r');
-  connection_.addCharToBuffer('\n');
+  connection_.buffer().addFragments(
+      {response_prefix, absl::StrCat(numeric_status), SPACE, reason_phrase, CRLF});
 
   if (numeric_status >= 300) {
     // Don't do special CONNECT logic if the CONNECT was rejected.
@@ -435,7 +418,7 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
   encodeHeadersBase(headers, absl::make_optional<uint64_t>(numeric_status), end_stream, false);
 }
 
-static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
+static constexpr absl::string_view REQUEST_POSTFIX = " HTTP/1.1\r\n";
 
 Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
   // Required headers must be present. This can only happen by some erroneous processing after the
@@ -459,14 +442,15 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
     upgrade_request_ = true;
   }
 
-  connection_.copyToBuffer(method->value().getStringView().data(), method->value().size());
-  connection_.addCharToBuffer(' ');
+  absl::string_view host_or_path_view;
   if (is_connect) {
-    connection_.copyToBuffer(host->value().getStringView().data(), host->value().size());
+    host_or_path_view = host->value().getStringView();
   } else {
-    connection_.copyToBuffer(path->value().getStringView().data(), path->value().size());
+    host_or_path_view = path->value().getStringView();
   }
-  connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
+
+  connection_.buffer().addFragments(
+      {method->value().getStringView(), SPACE, host_or_path_view, REQUEST_POSTFIX});
 
   encodeHeadersBase(headers, absl::nullopt, end_stream,
                     HeaderUtility::requestShouldHaveNoBody(headers));

@@ -562,14 +562,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "nlohmann JSON",
         project_desc = "Fast JSON parser/generator for C++",
         project_url = "https://nlohmann.github.io/json",
-        version = "3.10.4",
-        sha256 = "1155fd1a83049767360e9a120c43c578145db3204d2b309eba49fbbedd0f4ed3",
+        version = "3.10.5",
+        sha256 = "5daca6ca216495edf89d167f808d1d03c4a4d929cef7da5e10f135ae1540c7e4",
         strip_prefix = "json-{version}",
         urls = ["https://github.com/nlohmann/json/archive/v{version}.tar.gz"],
         # This will be a replacement for rapidJSON used in extensions and may also be a fast
         # replacement for protobuf JSON.
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2021-10-16",
+        release_date = "2022-01-03",
         cpe = "cpe:2.3:a:json-for-modern-cpp_project:json-for-modern-cpp:*",
     ),
     # This is an external dependency needed while running the
@@ -870,12 +870,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "5406ceca917fb93d21728112106391202ee36d4d",
-        sha256 = "8b3d9ca2ea1958a4b410cdeee89bd024efbf36e6ddd29811486efd0d63817551",
+        version = "faf6f0e8f4169884a7626e70b38d5583248a0e81",
+        sha256 = "1f41bbc72d103e3debfdafcf0ae6c02a4e036ea360cb205038d3602c19277020",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["dataplane_core"],
-        release_date = "2022-01-10",
+        release_date = "2022-01-11",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(

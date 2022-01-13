@@ -46,6 +46,8 @@ TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoy) {
                "KillRequestFilter is crashing Envoy!!!");
 }
 
+// Disabled for coverage per #18569
+#if !defined(ENVOY_CONFIG_COVERAGE)
 // Request crash Envoy controlled via response.
 TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyOnResponse) {
   const std::string filter_config_response =
@@ -74,8 +76,6 @@ TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyOnResp
                "KillRequestFilter is crashing Envoy!!!");
 }
 
-// Disabled for coverage per #18569
-#if !defined(ENVOY_CONFIG_COVERAGE)
 TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyWithCustomKillHeader) {
   const std::string filter_config_with_custom_kill_header =
       R"EOF(
