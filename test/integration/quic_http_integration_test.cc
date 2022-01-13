@@ -221,7 +221,6 @@ public:
       cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
           http2_options.value(), quic::kStreamReceiveWindowLimit);
     }
-    cluster->http3_options_.set_allow_extended_connect(true);
     *cluster->http3_options_.mutable_quic_protocol_options() = client_quic_options_;
     Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
         cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
