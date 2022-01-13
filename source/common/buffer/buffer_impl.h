@@ -218,12 +218,18 @@ public:
    *        and the read only returns two bytes, the caller should set
    *        reservation.len_ = 2 and then call `commit(reservation)`.
    * @return whether the Reservation was successfully committed to the Slice.
+   * @note template parameter `SafeCommit` can be used to disable memory range check.
    */
-  bool commit(const Reservation& reservation) {
-    if (static_cast<const uint8_t*>(reservation.mem_) != base_ + reservable_ ||
-        reservable_ + reservation.len_ > capacity_ || reservable_ >= capacity_) {
-      // The reservation is not from this Slice.
-      return false;
+  template <bool SafeCommit = true> bool commit(const Reservation& reservation) {
+    if constexpr (SafeCommit) {
+      if (static_cast<const uint8_t*>(reservation.mem_) != base_ + reservable_ ||
+          reservable_ + reservation.len_ > capacity_ || reservable_ >= capacity_) {
+        // The reservation is not from this Slice.
+        return false;
+      }
+    } else {
+      ASSERT(static_cast<const uint8_t*>(reservation.mem_) == base_ + reservable_ &&
+             reservable_ + reservation.len_ <= capacity_);
     }
     reservable_ += reservation.len_;
     return true;
@@ -736,6 +742,8 @@ public:
   Reservation reserveForReadWithLengthForTest(uint64_t length) {
     return reserveWithMaxLength(length);
   }
+
+  size_t addFragments(absl::Span<const absl::string_view> fragments) override;
 
 protected:
   static constexpr uint64_t default_read_reservation_size_ =
