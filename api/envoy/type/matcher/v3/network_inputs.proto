@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.type.matcher.v3;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type.matcher.v3";
 option java_outer_classname = "NetworkInputsProto";
@@ -43,14 +42,14 @@ message DirectSourceIPInput {
 message SourceTypeInput {
 }
 
-// Input that matches by the requested server name (e.g. SNI in TLS), when detected by one of the listener filters.
+// Input that matches by the requested server name (e.g. SNI in TLS).
 //
-// :ref:`TLS Inspector <config_listener_filters_tls_inspector>` provides the requested server name based on SNI.
+// :ref:`TLS Inspector <config_listener_filters_tls_inspector>` provides the requested server name based on SNI,
+// when TLS protocol is detected.
 message ServerNameInput {
 }
 
-// Input that matches by the transport protocol, when
-// detected by one of the listener filters.
+// Input that matches by the transport protocol.
 //
 // Suggested values include:
 //
@@ -60,7 +59,9 @@ message ServerNameInput {
 message TransportProtocolInput {
 }
 
-// List of quoted and comma-separated requested application protocols, when detected by one of the listener filters.
+// List of quoted and comma-separated requested application protocols. The list consists of a
+// single negotiated application protocol once the network stream is established.
+//
 // Examples:
 //
 // * ``'h2','http/1.1'``
