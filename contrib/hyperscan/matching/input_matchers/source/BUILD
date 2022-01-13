@@ -29,7 +29,7 @@ envoy_cmake(
     },
     env = select({
         "//bazel:gcc_build": {"CXXFLAGS": "-lstdc++"},
-        "//conditions:default": {},
+        "//conditions:default": {"CXXFLAGS": ""},
     }),
     lib_source = "@io_hyperscan//:all",
     out_static_libs = ["libhs.a"],

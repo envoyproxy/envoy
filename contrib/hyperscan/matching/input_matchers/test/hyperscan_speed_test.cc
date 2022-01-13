@@ -18,10 +18,11 @@ static const std::vector<std::string> ClusterInputs = {
 
 static const std::vector<const char*> ClusterRePatterns = {"^cluster\\.((.*?)\\.)"};
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_RE2(benchmark::State& state) {
   re2::RE2 re(ClusterRePatterns[0]);
   uint32_t passes = 0;
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     for (const std::string& cluster_input : ClusterInputs) {
       if (re2::RE2::FullMatch(cluster_input, re)) {
         ++passes;
@@ -32,6 +33,7 @@ static void BM_RE2(benchmark::State& state) {
 }
 BENCHMARK(BM_RE2);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_Hyperscan(benchmark::State& state) {
   hs_database_t* database{};
   hs_scratch_t* scratch{};
@@ -42,7 +44,7 @@ static void BM_Hyperscan(benchmark::State& state) {
                  "");
   RELEASE_ASSERT(hs_alloc_scratch(database, &scratch) == HS_SUCCESS, "");
   uint32_t passes = 0;
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     for (const std::string& cluster_input : ClusterInputs) {
       hs_error_t err = hs_scan(
           database, cluster_input.data(), cluster_input.size(), 0, scratch,

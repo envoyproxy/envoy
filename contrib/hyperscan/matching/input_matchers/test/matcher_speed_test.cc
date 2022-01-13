@@ -18,13 +18,14 @@ static const std::vector<std::string> ClusterInputs = {
 
 static const std::string ClusterRePattern = "^cluster\\.((.*?)\\.)";
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_CompiledGoogleReMatcher(benchmark::State& state) {
   envoy::type::matcher::v3::RegexMatcher config;
   config.mutable_google_re2();
   config.set_regex(ClusterRePattern);
   const auto matcher = Regex::CompiledGoogleReMatcher(config);
   uint32_t passes = 0;
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     for (const std::string& cluster_input : ClusterInputs) {
       if (matcher.match(cluster_input)) {
         ++passes;
@@ -35,13 +36,14 @@ static void BM_CompiledGoogleReMatcher(benchmark::State& state) {
 }
 BENCHMARK(BM_CompiledGoogleReMatcher);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_HyperscanMatcher(benchmark::State& state) {
   envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan config;
   auto regex = config.add_regexes();
   regex->set_regex(ClusterRePattern);
   auto matcher = Extensions::Matching::InputMatchers::Hyperscan::Matcher(config);
   uint32_t passes = 0;
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     for (const std::string& cluster_input : ClusterInputs) {
       if (matcher.match(cluster_input)) {
         ++passes;
