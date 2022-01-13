@@ -80,8 +80,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.preserve_downstream_scheme",
     "envoy.reloadable_features.proxy_102_103",
     "envoy.reloadable_features.remove_legacy_json",
-    "envoy.reloadable_features.require_strict_1xx_and_204_response_headers",
-    "envoy.reloadable_features.send_strict_1xx_and_204_response_headers",
     "envoy.reloadable_features.strip_port_from_connect",
     "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place",
     "envoy.reloadable_features.udp_per_event_loop_read_limit",
