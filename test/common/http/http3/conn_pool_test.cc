@@ -153,8 +153,8 @@ TEST_F(Http3ConnPoolImplTest, NewStreamFail) {
   ConnPoolCallbacks callbacks;
 
   EXPECT_CALL(callbacks.pool_failure_, ready());
-  EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks, /*has_early_data=*/false,
-                                      /*should_use_alt_svc=*/false));
+  EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks, /*can_use_early_data=*/false,
+                                      /*can_use_alternate_protocols=*/false));
   EXPECT_EQ(callbacks.reason_, ConnectionPool::PoolFailureReason::NotQualified);
 }
 

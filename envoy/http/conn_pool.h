@@ -100,11 +100,11 @@ public:
    *                      callbacks is called and the routine returns nullptr. NOTE: Once a callback
    *                      is called, the handle is no longer valid and any further cancellation
    *                      should be done by resetting the stream.
-   * @param has_early_data whether the new stream will be used to send early data or not. If true,
+   * @param can_use_early_data whether the new stream can be sent as early data or not. If true,
    * the connection might be ready immediately.
-   * @param should_use_alt_svc whether to attempt the advertised alternative service or not for this
-   * new stream if the pool supports. If false and the pool only suppports alt-svc, callback will be
-   * invoked with an immediate failure.
+   * @param can_use_alternate_protocols whether to attempt the advertised alternate protocols or not
+   * for this new stream if the pool supports. If false and the pool only suppports alt-svc,
+   * callback will be invoked with an immediate failure.
    * @warning Do not call cancel() from the callbacks, as the request is implicitly canceled when
    *          the callbacks are called.
    */

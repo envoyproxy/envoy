@@ -228,11 +228,11 @@ public:
       EXPECT_CALL(*test.test_clients_[client_index].codec_, newStream(_))
           .WillOnce(DoAll(SaveArgAddress(&inner_decoder_), ReturnRef(inner_encoder_)));
       EXPECT_CALL(callbacks_.pool_ready_, ready());
-      EXPECT_EQ(nullptr, test.pool_->newStream(decoder_, callbacks_, /*has_early_data=*/false,
-                                               /*should_use_alt_svc=*/false));
+      EXPECT_EQ(nullptr, test.pool_->newStream(decoder_, callbacks_, /*can_use_early_data=*/false,
+                                               /*can_use_alternate_protocols=*/false));
     } else {
-      handle_ = test.pool_->newStream(decoder_, callbacks_, /*has_early_data=*/false,
-                                      /*should_use_alt_svc=*/false);
+      handle_ = test.pool_->newStream(decoder_, callbacks_, /*can_use_early_data=*/false,
+                                      /*can_use_alternate_protocols=*/false);
       EXPECT_NE(nullptr, handle_);
     }
   }
@@ -924,8 +924,8 @@ TEST_F(Http2ConnPoolImplTest, PendingStreamsMaxPendingCircuitBreaker) {
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
   EXPECT_CALL(callbacks.pool_failure_, ready());
-  EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks, /*has_early_data=*/false,
-                                      /*should_use_alt_svc=*/false));
+  EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks, /*can_use_early_data=*/false,
+                                      /*can_use_alternate_protocols=*/false));
 
   expectStreamConnect(0, r1);
   expectClientConnect(0);
@@ -1293,8 +1293,8 @@ TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {
   ConnPoolCallbacks callbacks;
   MockResponseDecoder decoder;
   EXPECT_CALL(callbacks.pool_failure_, ready());
-  EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks, /*has_early_data=*/false,
-                                      /*should_use_alt_svc=*/false));
+  EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks, /*can_use_early_data=*/false,
+                                      /*can_use_alternate_protocols=*/false));
 
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());

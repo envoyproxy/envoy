@@ -411,8 +411,8 @@ public:
   /**
    * Determine whether a request should be retried after a reset based on the reason for the reset.
    * @param reset_reason supplies the reset reason.
-   * @param was_using_alt_svc whether the reset request was sent over alternative service or not.
-   * nullopt means it wasn't sent at all before getting reset.
+   * @param alternate_protocols_used whether the reset request was sent over alternate protocol or
+   * not. nullopt means it wasn't sent at all before getting reset.
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. It takes a bool to indicate whether the
    * retry should disable alternate protocols or not. The callback will never be called inline.

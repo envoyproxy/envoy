@@ -25,8 +25,8 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc") &&
       !can_use_alternate_protocols) {
-    // If alt_svc is explicitly disabled, there must have been a failed request over Http3 and the
-    // failure must be post-handshake. So disable HTTP/3 for this request.
+    // If alternate protocols are explicitly disabled, there must have been a failed request over
+    // Http3 and the failure must be post-handshake. So disable HTTP/3 for this request.
     http3_attempt_failed_ = true;
   }
 }

@@ -28,9 +28,9 @@ struct TcpAttachContext : public Envoy::ConnectionPool::AttachContext {
 
 class TcpPendingStream : public Envoy::ConnectionPool::PendingStream {
 public:
-  TcpPendingStream(Envoy::ConnectionPool::ConnPoolImplBase& parent, bool has_early_data,
+  TcpPendingStream(Envoy::ConnectionPool::ConnPoolImplBase& parent, bool can_use_early_data,
                    TcpAttachContext& context)
-      : Envoy::ConnectionPool::PendingStream(parent, has_early_data), context_(context) {}
+      : Envoy::ConnectionPool::PendingStream(parent, can_use_early_data), context_(context) {}
   Envoy::ConnectionPool::AttachContext& context() override { return context_; }
 
   TcpAttachContext context_;
@@ -187,9 +187,9 @@ public:
   }
 
   ConnectionPool::Cancellable* newPendingStream(Envoy::ConnectionPool::AttachContext& context,
-                                                bool has_early_data) override {
+                                                bool can_use_early_data) override {
     Envoy::ConnectionPool::PendingStreamPtr pending_stream = std::make_unique<TcpPendingStream>(
-        *this, has_early_data, typedContext<TcpAttachContext>(context));
+        *this, can_use_early_data, typedContext<TcpAttachContext>(context));
     return addPendingStream(std::move(pending_stream));
   }
 

@@ -715,7 +715,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                                  method == Http::Headers::get().MethodValues.Trace);
 
     if (retry_state_ == nullptr) {
-      ENVOY_LOG(warn, "No retry policy is configured. There won't be any fallback for alt_svc "
+      ENVOY_LOG(warn, "No retry policy is configured. There won't be any fallback for alternate "
                       "protocol failure.");
     }
     // TODO(danzh) Right now whether to try early data or not depends on retry policy on retry on
@@ -1155,25 +1155,27 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
   if (downstream_response_started_ || !retry_state_ || upstream_request.retried()) {
     return false;
   }
-  RetryState::AlternateProtocolsUsed was_using_alt_svc =
+  RetryState::AlternateProtocolsUsed was_using_alternate_protocol =
       RetryState::AlternateProtocolsUsed::Unknown;
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc") &&
       upstream_request.hadUpstream()) {
-    was_using_alt_svc = (upstream_request.streamInfo().protocol().has_value() &&
-                         upstream_request.streamInfo().protocol().value() == Http::Protocol::Http3)
-                            ? RetryState::AlternateProtocolsUsed::Yes
-                            : RetryState::AlternateProtocolsUsed::No;
+    was_using_alternate_protocol =
+        (upstream_request.streamInfo().protocol().has_value() &&
+         upstream_request.streamInfo().protocol().value() == Http::Protocol::Http3)
+            ? RetryState::AlternateProtocolsUsed::Yes
+            : RetryState::AlternateProtocolsUsed::No;
   }
   const RetryStatus retry_status = retry_state_->shouldRetryReset(
-      reset_reason, was_using_alt_svc,
+      reset_reason, was_using_alternate_protocol,
       [this, can_use_early_data = upstream_request.canUseEarlyData(),
-       can_use_alt_svc =
-           upstream_request.canUseAlternateProtocols()](bool disable_alt_svc) -> void {
+       can_use_alternate_protocols =
+           upstream_request.canUseAlternateProtocols()](bool disable_alternate_protocols) -> void {
         // This retry might be because of ConnectionFailure of 0-RTT handshake. In this case, though
         // the original request is retried with the same can_use_early_data setting, it will not be
         // sent as early data by the underlying connection pool grid.
-        doRetry(can_use_early_data, disable_alt_svc ? false : can_use_alt_svc);
+        doRetry(can_use_early_data,
+                disable_alternate_protocols ? false : can_use_alternate_protocols);
       });
   if (retry_status == RetryStatus::Yes) {
     runRetryOptionsPredicates(upstream_request);
@@ -1409,9 +1411,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
     } else {
       const RetryStatus retry_status = retry_state_->shouldRetryHeaders(
           *headers, *downstream_headers_,
-          [this, can_use_alt_svc = upstream_request.canUseAlternateProtocols(),
+          [this, can_use_alternate_protocols = upstream_request.canUseAlternateProtocols(),
            had_early_data = upstream_request.canUseEarlyData()](bool disable_early_data) -> void {
-            doRetry((disable_early_data ? false : had_early_data), can_use_alt_svc);
+            doRetry((disable_early_data ? false : had_early_data), can_use_alternate_protocols);
           });
       if (retry_status == RetryStatus::Yes) {
         runRetryOptionsPredicates(upstream_request);
@@ -1758,7 +1760,7 @@ void Filter::runRetryOptionsPredicates(UpstreamRequest& retriable_request) {
   }
 }
 
-void Filter::doRetry(bool can_use_early_data, bool can_use_alt_svc) {
+void Filter::doRetry(bool can_use_early_data, bool can_use_alternate_protocols) {
   ENVOY_STREAM_LOG(debug, "performing retry", *callbacks_);
 
   is_retry_ = true;
@@ -1781,7 +1783,7 @@ void Filter::doRetry(bool can_use_early_data, bool can_use_alt_svc) {
     return;
   }
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
-      *this, std::move(generic_conn_pool), can_use_early_data, can_use_alt_svc);
+      *this, std::move(generic_conn_pool), can_use_early_data, can_use_alternate_protocols);
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);

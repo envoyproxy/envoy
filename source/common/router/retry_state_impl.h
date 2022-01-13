@@ -107,8 +107,8 @@ private:
   void resetRetry();
   // Returns if the retry policy would retry the reset and how. Does not
   // take into account circuit breaking or remaining tries.
-  // disable_alt_svc: populated to tell the caller whether to disable alt svc or not when the return
-  // value indicates retry.
+  // disable_alternate_protocols: populated to tell the caller whether to disable alt svc or not
+  // when the return value indicates retry.
   RetryDecision wouldRetryFromReset(const Http::StreamResetReason reset_reason,
                                     AlternateProtocolsUsed alternate_protocols_used,
                                     bool& disable_alternate_protocols);

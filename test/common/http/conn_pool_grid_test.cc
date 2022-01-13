@@ -306,7 +306,7 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnectsFirstFail) 
   EXPECT_TRUE(grid_.isHttp3Broken());
 }
 
-// Test that newStream() with alt_svc disabled.
+// Test that newStream() with alternate protocols disabled.
 TEST_F(ConnectivityGridTest, NewStreamWithAltSvcDisabled) {
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
@@ -324,7 +324,7 @@ TEST_F(ConnectivityGridTest, NewStreamWithAltSvcDisabled) {
   EXPECT_TRUE(grid_.isHttp3Broken());
 }
 
-// Test that newStream() with alt_svc disabled and TCP connection also fails.
+// Test that newStream() with alternate protocols disabled and TCP connection also fails.
 TEST_F(ConnectivityGridTest, NewStreamWithAltSvcDisabledFail) {
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
