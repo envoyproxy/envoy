@@ -64,7 +64,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.fix_added_trailers",
     "envoy.reloadable_features.grpc_bridge_stats_disabled",
     "envoy.reloadable_features.handle_stream_reset_during_hcm_encoding",
-    "envoy.reloadable_features.hash_multiple_header_values",
     "envoy.reloadable_features.health_check.graceful_goaway_handling",
     "envoy.reloadable_features.http2_consume_stream_refused_errors",
     "envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect",

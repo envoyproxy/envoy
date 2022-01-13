@@ -46,12 +46,8 @@ public:
     const auto header = headers.get(header_name_);
     if (!header.empty()) {
       absl::InlinedVector<absl::string_view, 1> header_values;
-
-      size_t num_headers_to_hash = 1;
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hash_multiple_header_values")) {
-        num_headers_to_hash = header.size();
-        header_values.reserve(num_headers_to_hash);
-      }
+      auto num_headers_to_hash = header.size();
+      header_values.reserve(num_headers_to_hash);
 
       for (size_t i = 0; i < num_headers_to_hash; i++) {
         header_values.push_back(header[i]->value().getStringView());
