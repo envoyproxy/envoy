@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
+#include "envoy/http/header_map.h"
 
 #include "source/common/common/regex.h"
 
@@ -12,6 +13,7 @@ namespace Filters {
 namespace Common {
 namespace MutationRules {
 
+enum class CheckOperation { SET, APPEND, REMOVE };
 enum class CheckResult { OK, IGNORE, FAIL };
 
 class ExtraRoutingHeaders;
@@ -21,15 +23,17 @@ class ExtraRoutingHeaders;
 class Checker {
 public:
   explicit Checker(const envoy::config::common::mutation_rules::v3::HeaderMutationRules& rules);
-  // Return whether the current rules allow the named header to be modified.
+  // Return whether the current rules allow the named header to be modified or removed.
   // The header name in question can include HTTP headers or internal headers
   // that start with ":". The result will specify whether the attempt should
   // be accepted, whether it should be silently ignored, or whether it should
   // cause the current HTTP operation to fail.
-  CheckResult check(absl::string_view header_name) const;
+  CheckResult check(CheckOperation op, const Http::LowerCaseString& header_name,
+                    absl::string_view header_value) const;
 
 private:
-  bool isAllowed(absl::string_view header_name) const;
+  bool isAllowed(CheckOperation op, const Http::LowerCaseString& header_name) const;
+  bool isValidValue(const Http::LowerCaseString& header_name, absl::string_view header_value) const;
   static const ExtraRoutingHeaders& extraRoutingHeaders();
 
   envoy::config::common::mutation_rules::v3::HeaderMutationRules rules_;

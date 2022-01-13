@@ -1,12 +1,12 @@
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 
-#include "envoy/http/header_map.h"
-
 #include "source/common/common/macros.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/numbers.h"
 #include "absl/strings/match.h"
 
 namespace Envoy {
@@ -15,6 +15,7 @@ namespace Filters {
 namespace Common {
 namespace MutationRules {
 
+using Http::HeaderUtility;
 using Http::LowerCaseString;
 
 class ExtraRoutingHeaders {
@@ -27,7 +28,7 @@ public:
     headers_.insert(hdrs.Scheme);
   }
 
-  bool containsHeader(const LowerCaseString& name) const { return headers_.contains(name); }
+  const absl::flat_hash_set<LowerCaseString>& headers() const { return headers_; }
 
 private:
   absl::flat_hash_set<LowerCaseString> headers_;
@@ -43,8 +44,10 @@ Checker::Checker(const envoy::config::common::mutation_rules::v3::HeaderMutation
   }
 }
 
-CheckResult Checker::check(absl::string_view header_name) const {
-  if (isAllowed(header_name)) {
+CheckResult Checker::check(CheckOperation op, const LowerCaseString& header_name,
+                           absl::string_view header_value) const {
+  if (isAllowed(op, header_name) &&
+      (op == CheckOperation::REMOVE || isValidValue(header_name, header_value))) {
     return CheckResult::OK;
   }
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules_, disallow_is_error, false)) {
@@ -53,13 +56,16 @@ CheckResult Checker::check(absl::string_view header_name) const {
   return CheckResult::IGNORE;
 }
 
-bool Checker::isAllowed(absl::string_view header_name) const {
-  const LowerCaseString lower_name(header_name);
-  if (disallow_expression_ && disallow_expression_->match(lower_name)) {
+bool Checker::isAllowed(CheckOperation op, const LowerCaseString& header_name) const {
+  if (op == CheckOperation::REMOVE && !HeaderUtility::isModifiableHeader(header_name)) {
+    // No matter what, you can't remove the "host" or any ":" headers.
+    return false;
+  }
+  if (disallow_expression_ && disallow_expression_->match(header_name)) {
     // Mutations are always disallowed if they match the expression.
     return false;
   }
-  if (allow_expression_ && allow_expression_->match(lower_name)) {
+  if (allow_expression_ && allow_expression_->match(header_name)) {
     // Mutations are always allowed if they match the expression.
     return true;
   }
@@ -68,20 +74,50 @@ bool Checker::isAllowed(absl::string_view header_name) const {
     return false;
   }
   if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules_, allow_all_routing, false) &&
-      extraRoutingHeaders().containsHeader(lower_name)) {
+      extraRoutingHeaders().headers().contains(header_name)) {
     // If false, check the pre-defined list of "extra routing headers"
     // and fail if the header is in that list.
     return false;
   }
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules_, disallow_system, false) &&
-      absl::StartsWith(lower_name, ":")) {
+      absl::StartsWith(header_name, ":")) {
     // If true, disallow changes to all internal headers.
     return false;
   }
   if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules_, allow_envoy, false) &&
-      absl::StartsWith(lower_name, Http::Headers::get().prefix())) {
+      absl::StartsWith(header_name, Http::Headers::get().prefix())) {
     // If false, prevent changes to "x-envoy" headers (or the equivalent).
     return false;
+  }
+  return true;
+}
+
+bool Checker::isValidValue(const LowerCaseString& header_name,
+                           absl::string_view header_value) const {
+  if (!absl::StartsWith(header_name, ":") && !HeaderUtility::headerValueIsValid(header_value)) {
+    // For non-internal headers, make sure that value matches character set.
+    return false;
+  }
+  // Make specific checks for sensitive headers that will cause Envoy to behave
+  // badly if set to invalid values.
+  const auto& hdrs = Http::Headers::get();
+  if ((header_name == hdrs.Host || header_name == hdrs.HostLegacy) &&
+      !HeaderUtility::authorityIsValid(header_value)) {
+    return false;
+  }
+  if (header_name == hdrs.Scheme && !HeaderUtility::schemeIsValid(header_value)) {
+    return false;
+  }
+  if (header_name == hdrs.Status) {
+    uint32_t status;
+    if (!absl::SimpleAtoi(header_value, &status)) {
+      // :status is not actually a number.
+      return false;
+    }
+    if (status < 200) {
+      // :status is not valid value (likely 0).
+      return false;
+    }
   }
   return true;
 }
