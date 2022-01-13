@@ -6,7 +6,6 @@
 
 #include "source/common/crypto/utility.h"
 #include "source/common/http/utility.h"
-#include "source/extensions/common/utility.h"
 #include "source/extensions/filters/common/lua/wrappers.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/lua/wrappers.h"

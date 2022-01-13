@@ -31,3 +31,5 @@ New Features
 
 Deprecated
 ----------
+
+* http: removing support for long-deprecated old style filter names, e.g. envoy.router, envoy.lua.

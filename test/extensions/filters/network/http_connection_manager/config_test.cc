@@ -1707,17 +1707,6 @@ http2_protocol_options:
       R"(inconsistent HTTP/2 custom SETTINGS parameter\(s\) detected; identifiers = \{0x0a\})");
 }
 
-// Test that the deprecated extension name is disabled by default.
-// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
-TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.http_connection_manager";
-
-  ASSERT_EQ(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
-          deprecated_name));
-}
-
 TEST_F(HttpConnectionManagerConfigTest, AlwaysSetRequestIdInResponseDefault) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http

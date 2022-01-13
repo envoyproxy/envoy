@@ -49,7 +49,6 @@
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/common/upstream/logical_dns_cluster.h"
 #include "source/common/upstream/original_dst_cluster.h"
-#include "source/extensions/filters/network/common/utility.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -161,11 +160,7 @@ absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExten
   absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
 
   for (const auto& it : config.typed_extension_protocol_options()) {
-    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
-    // We only handle deprecated network filter names here because no existing HTTP filter has
-    // protocol options.
-    auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
-
+    auto& name = it.first;
     auto object = createProtocolOptionsConfig(name, it.second, factory_context);
     if (object != nullptr) {
       options[name] = std::move(object);
