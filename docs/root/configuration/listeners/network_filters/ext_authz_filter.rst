@@ -58,7 +58,7 @@ A sample filter configuration could be:
                   address: 127.0.0.1
                   port_value: 10003
 
-A sample request to the specific auth service looks like
+A sample request body to the specified auth service looks like
 
 .. code-block:: json
 
@@ -75,8 +75,8 @@ A sample request to the specific auth service looks like
       "service": "www.bing.com",
       "address":{
         "socket_address": {
-          "address": "172.17.0.2",
-          "port_value": 10000
+          "address": "127.0.0.1",
+          "port_value": 10003
         }
       }
     }
