@@ -71,8 +71,8 @@ without further review.
 * Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
 * Tim Walsh ([twghu](https://github.com/twghu)) (walsh@redhat.com)
 
-In addition to the permanent Envoy PST, we have additional temporary
-contributors from:
+In addition to the permanent Envoy security team, we have additional temporary
+contributors to envoy-setec and relevant Slack channels from:
 
 * [Trail of Bits](https://www.trailofbits.com/) expiring 9/30/2022.
   * Adam Meily ([ameily](https://github.com/ameily))
