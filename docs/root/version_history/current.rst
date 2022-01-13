@@ -10,6 +10,7 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* network_ext_authz: added requested server name for auth review.
 
 Bug Fixes
 ---------
