@@ -427,10 +427,8 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   waitForNextUpstreamRequest(0);
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
-    // 425 response will be retried by Envoy without Early-Data header.
     upstream_request_->encodeHeaders(too_early_response_headers, true);
-    upstream_request_.reset();
-
+    // 425 response will be retried by Envoy, so expect another upstream request.
     waitForNextUpstreamRequest(0);
     EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
   }
