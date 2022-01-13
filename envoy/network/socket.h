@@ -23,8 +23,6 @@ namespace Network {
 // avoid #ifdef proliferation.
 struct SocketOptionName {
   SocketOptionName() = default;
-  SocketOptionName(const SocketOptionName&) = default;
-  SocketOptionName& operator=(const SocketOptionName&) = default;
   SocketOptionName(int level, int option, const std::string& name)
       : value_(std::make_tuple(level, option, name)) {}
 
