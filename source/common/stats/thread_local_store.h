@@ -476,6 +476,12 @@ private:
   };
 
   template <class StatFn> bool iterHelper(StatFn fn) const {
+    // Note that any thread can delete a scope at any time, and so another
+    // thread may have initiatated destruction when we enter iterHelper.
+    // However the first thing that happens is releaseScopeCrossThread, which
+    // takes lock_, and doesn't release it until scopes_.erase(scope) finishes.
+    // thus there is no race risk with iterating over scopes while another
+    // thread deletes them.
     Thread::LockGuard lock(lock_);
     for (ScopeImpl* scope : scopes_) {
       if (!scope->iterate(fn)) {
