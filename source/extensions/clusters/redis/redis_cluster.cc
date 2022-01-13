@@ -354,8 +354,8 @@ void RedisCluster::RedisDiscoverySession::resolveHostname(std::shared_ptr<Cluste
             return;
           }
           // Primary slot address resolved
-          slot.setPrimary(
-              Network::Utility::getAddressWithPort(*response.front().address_, slot.primary_port_));
+          slot.setPrimary(Network::Utility::getAddressWithPort(
+              *response.front().addrInfo().address_, slot.primary_port_));
           // Continue on to resolve replicas
           resolveReplicas(std::move(slots), index);
         });
@@ -385,8 +385,8 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(std::shared_ptr<Cluste
             ENVOY_LOG(warn, "Unable to resolve cluster replica address {}", replica.first);
           } else {
             // Replica resolved
-            slot.addReplica(
-                Network::Utility::getAddressWithPort(*response.front().address_, replica.second));
+            slot.addReplica(Network::Utility::getAddressWithPort(
+                *response.front().addrInfo().address_, replica.second));
           }
           // We go back to same index as there may be more replicas
           resolveReplicas(std::move(slots), index);
