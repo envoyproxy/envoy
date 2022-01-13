@@ -26,7 +26,7 @@ Removed Config or Runtime
 
 New Features
 ------------
-* http: added support for :ref:`proxy_status_config <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.proxy_status_config>` for configuring [`Proxy-Status`](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-proxy-status-08) HTTP response header fields.
+* http: added support for :ref:`proxy_status_config <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.proxy_status_config>` for configuring `Proxy-Status <https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-proxy-status-08>`_ HTTP response header fields.
 
 
 Deprecated
