@@ -71,6 +71,14 @@ without further review.
 * Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
 * Tim Walsh ([twghu](https://github.com/twghu)) (walsh@redhat.com)
 
+In addition to the permanent Envoy PST, we have additional temporary
+contributors from:
+
+* [Trail of Bits](https://www.trailofbits.com/) until MM/DD/YYYY.
+  * Adam Meily ([ameily](https://github.com/ameily))
+  * Alessandro Gario ([alessandrogario](https://github.com/alessandrogario))
+  * Mike Myers ([mike-myers-tob](https://github.com/mike-myers-tob))
+
 # Emeritus maintainers
 
 * Constance Caramanolis ([ccaraman](https://github.com/ccaraman)) (ccaramanolis@lyft.com)
