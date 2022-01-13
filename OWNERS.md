@@ -27,8 +27,6 @@ routing PRs, questions, etc. to the right place.
 
 # Maintainers
 
-* Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
-  * Fuzzing, security, headers, HTTP/gRPC, router, access log, tests.
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
   * Data plane, codecs, security, configuration.
 * Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
@@ -47,6 +45,11 @@ routing PRs, questions, etc. to the right place.
   * Scalability and performance.
 * Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
   * HTTP/3, upstream connection management.
+* Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
+  * xDS APIs, configuration, control plane, fuzzing.
+* Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
+  * Data plane, overload management, flow control.
+
 
 # Senior extension maintainers
 
@@ -74,6 +77,7 @@ without further review.
 * Roman Dzhabarov ([RomanDzhabarov](https://github.com/RomanDzhabarov)) (rdzhabarov@lyft.com)
 * Bill Gallagher ([wgallagher](https://github.com/wgallagher)) (bgallagher@lyft.com)
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
+* Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
 
 # Friends of Envoy
 

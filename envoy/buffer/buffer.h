@@ -469,6 +469,13 @@ public:
   }
 
   /**
+   * Copy multiple string type fragments to the buffer.
+   * @param fragments A sequence of string views with variable length.
+   * @return The total size of the data copied to the buffer.
+   */
+  virtual size_t addFragments(absl::Span<const absl::string_view> fragments) PURE;
+
+  /**
    * Set the buffer's high watermark. The buffer's low watermark is implicitly set to half the high
    * watermark. Setting the high watermark to 0 disables watermark functionality.
    * @param watermark supplies the buffer high watermark size threshold, in bytes.

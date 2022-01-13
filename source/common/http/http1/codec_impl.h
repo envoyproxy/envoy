@@ -91,9 +91,6 @@ protected:
                          bool end_stream, bool bodiless_request);
   void encodeTrailersBase(const HeaderMap& headers);
 
-  static const std::string CRLF;
-  static const std::string LAST_CHUNK;
-
   Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
   ConnectionImpl& connection_;
   uint32_t read_disable_calls_{};
@@ -105,15 +102,6 @@ protected:
   bool is_response_to_connect_request_ : 1;
 
 private:
-  /**
-   * Called to encode an individual header.
-   * @param key supplies the header to encode.
-   * @param key_size supplies the byte size of the key.
-   * @param value supplies the value to encode.
-   * @param value_size supplies the byte size of the value.
-   */
-  void encodeHeader(const char* key, uint32_t key_size, const char* value, uint32_t value_size);
-
   /**
    * Called to encode an individual header.
    * @param key supplies the header to encode as a string_view.
@@ -231,13 +219,8 @@ public:
    */
   uint64_t flushOutput(bool end_encode = false);
 
-  void addToBuffer(absl::string_view data);
-  void addCharToBuffer(char c);
-  void addIntToBuffer(uint64_t i);
   Buffer::Instance& buffer() { return *output_buffer_; }
-  uint64_t bufferRemainingSize();
-  void copyToBuffer(const char* data, uint64_t length);
-  void reserveBuffer(uint64_t size);
+
   void readDisable(bool disable) {
     if (connection_.state() == Network::Connection::State::Open) {
       connection_.readDisable(disable);
