@@ -939,5 +939,66 @@ TEST(ValidateHeaders, ContentLength) {
   EXPECT_TRUE(should_close_connection);
 }
 
+TEST(ValidateHeaders, ParseCommaDelimitedHeader) {
+  std::vector<absl::string_view> tokens;
+  std::vector<absl::string_view> expected;
+
+  // Basic case
+  expected = {"one", "two", "three"};
+  tokens = HeaderUtility::parseCommaDelimitedHeader("one,two,three");
+  EXPECT_EQ(tokens, expected);
+
+  // Whitespace at the end or beginning of tokens
+  tokens = HeaderUtility::parseCommaDelimitedHeader("one  ,   two, three");
+  EXPECT_EQ(tokens, expected);
+
+  // Empty tokens are removed (from beginning, middle, and end of the string)
+  tokens = HeaderUtility::parseCommaDelimitedHeader(", one,, two, three,,,");
+  EXPECT_EQ(tokens, expected);
+
+  // Whitespace is not removed from the middle of the tokens
+  expected = {"one", "two", "t  hree"};
+  tokens = HeaderUtility::parseCommaDelimitedHeader("one, two, t  hree");
+  EXPECT_EQ(tokens, expected);
+
+  // Semicolons are kept as part of the tokens
+  expected = {"one", "two;foo", "three"};
+  tokens = HeaderUtility::parseCommaDelimitedHeader("one, two;foo, three");
+  EXPECT_EQ(tokens, expected);
+
+  // Check that a single token is parsed regardless of commas
+  expected = {"foo"};
+  tokens = HeaderUtility::parseCommaDelimitedHeader("foo");
+  EXPECT_EQ(tokens, expected);
+  tokens = HeaderUtility::parseCommaDelimitedHeader("foo,");
+  EXPECT_EQ(tokens, expected);
+
+  // Empty string is handled
+  expected = {};
+  tokens = HeaderUtility::parseCommaDelimitedHeader("");
+  EXPECT_EQ(tokens, expected);
+
+  // Empty string is handled (whitespace)
+  tokens = HeaderUtility::parseCommaDelimitedHeader("   ");
+  EXPECT_EQ(tokens, expected);
+}
+
+TEST(ValidateHeaders, GetSemicolonDelimitedAttribute) {
+  // Basic case
+  EXPECT_EQ(HeaderUtility::getSemicolonDelimitedAttribute("foo;bar=1"), "foo");
+
+  // Only attribute without semicolon
+  EXPECT_EQ(HeaderUtility::getSemicolonDelimitedAttribute("foo"), "foo");
+
+  // Only attribute with semicolon
+  EXPECT_EQ(HeaderUtility::getSemicolonDelimitedAttribute("foo;"), "foo");
+
+  // Two semicolons, case 1
+  EXPECT_EQ(HeaderUtility::getSemicolonDelimitedAttribute("foo;;"), "foo");
+
+  // Two semicolons, case 2
+  EXPECT_EQ(HeaderUtility::getSemicolonDelimitedAttribute(";foo;"), "");
+}
+
 } // namespace Http
 } // namespace Envoy

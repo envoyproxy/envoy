@@ -442,5 +442,22 @@ HeaderUtility::validateContentLength(absl::string_view header_value,
   return HeaderValidationResult::ACCEPT;
 }
 
+std::vector<absl::string_view>
+HeaderUtility::parseCommaDelimitedHeader(absl::string_view header_value) {
+  std::vector<absl::string_view> values;
+  for (absl::string_view s : absl::StrSplit(header_value, ',')) {
+    absl::string_view token = absl::StripAsciiWhitespace(s);
+    if (token.empty()) {
+      continue;
+    }
+    values.emplace_back(token);
+  }
+  return values;
+}
+
+absl::string_view HeaderUtility::getSemicolonDelimitedAttribute(absl::string_view value) {
+  return absl::StripAsciiWhitespace(StringUtil::cropRight(value, ";"));
+}
+
 } // namespace Http
 } // namespace Envoy

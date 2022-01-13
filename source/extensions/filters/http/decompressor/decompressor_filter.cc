@@ -76,11 +76,12 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
     // remove the q-value to indicate that the content encoding setting that we
     // add has max priority (i.e. q-value 1.0).
     std::vector<absl::string_view> newContentEncodings;
-    std::vector<absl::string_view> contentEncodings = StringUtil::splitToken(
-        headers.getInlineValue(accept_encoding_handle.handle()), ",", true, true);
+    std::vector<absl::string_view> contentEncodings =
+        Http::HeaderUtility::parseCommaDelimitedHeader(
+            headers.getInlineValue(accept_encoding_handle.handle()));
     for (absl::string_view contentEncoding : contentEncodings) {
       absl::string_view strippedEncoding =
-          StringUtil::trim(StringUtil::cropRight(contentEncoding, ";"));
+          Http::HeaderUtility::getSemicolonDelimitedAttribute(contentEncoding);
       if (strippedEncoding != config_->contentEncoding()) {
         // Add back all content encodings back except for the content encoding that we want to add.
         // For example, if content encoding is "gzip", this filters out encodings "gzip" and
