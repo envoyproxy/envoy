@@ -36,6 +36,7 @@ Removed Config or Runtime
 * http: removed ``envoy.reloadable_features.allow_response_for_timeout`` and legacy code paths.
 * udp: removed ``envoy.reloadable_features.udp_per_event_loop_read_limit`` and legacy code paths.
 
+* upstream: removed ``envoy.reloadable_features.health_check.graceful_goaway_handling`` and legacy code paths.
 
 New Features
 ------------
