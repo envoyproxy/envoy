@@ -28,6 +28,7 @@ Removed Config or Runtime
 
 New Features
 ------------
+* http3: downstream HTTP/3 support is now GA! Upstream HTTP/3 also GA for specific deployments. See :ref:`here <arch_overview_http3>` for details.
 
 
 Deprecated
