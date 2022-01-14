@@ -1664,40 +1664,6 @@ typed_config:
 }
 #endif // USE_CEL_PARSER
 
-// Test that the deprecated extension names are disabled by default.
-// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
-TEST_F(AccessLogImplTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  {
-    envoy::config::accesslog::v3::AccessLog config;
-    config.set_name("envoy.file_access_log");
-
-    EXPECT_THROW(
-        Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config),
-        EnvoyException);
-  }
-
-  {
-    envoy::config::accesslog::v3::AccessLog config;
-    config.set_name("envoy.http_grpc_access_log");
-
-    EXPECT_THROW(
-        Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config),
-        EnvoyException);
-  }
-
-  {
-    envoy::config::accesslog::v3::AccessLog config;
-    config.set_name("envoy.tcp_grpc_access_log");
-
-    EXPECT_THROW(
-        Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config),
-        EnvoyException);
-  }
-}
-
 } // namespace
 } // namespace AccessLog
 } // namespace Envoy

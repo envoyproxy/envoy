@@ -131,6 +131,24 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
   return Http::FilterDataStatus::Continue;
 }
 
+Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
+  if (filter_state_ == FilterState::DecodeServingFromCache) {
+    // This call was invoked during decoding by decoder_callbacks_->encodeTrailers because a fresh
+    // cached response was found and is being added to the encoding stream -- ignore it.
+    return Http::FilterTrailersStatus::Continue;
+  }
+  if (filter_state_ == FilterState::EncodeServingFromCache) {
+    // Stop the encoding stream until the cached response is fetched & added to the encoding stream.
+    return Http::FilterTrailersStatus::StopIteration;
+  }
+  response_has_trailers_ = !trailers.empty();
+  if (insert_) {
+    ENVOY_STREAM_LOG(debug, "CacheFilter::encodeTrailers inserting trailers", *encoder_callbacks_);
+    insert_->insertTrailers(trailers);
+  }
+  return Http::FilterTrailersStatus::Continue;
+}
+
 void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
   ASSERT(lookup_, "CacheFilter is trying to call getHeaders with no LookupContext");
 
@@ -323,7 +341,7 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
 
   filter_state_ == FilterState::DecodeServingFromCache
       ? decoder_callbacks_->encodeData(*body, end_stream)
-      : encoder_callbacks_->addEncodedData(*body, true);
+      : encoder_callbacks_->addEncodedData(*body, !response_has_trailers_);
 
   if (!remaining_ranges_.empty()) {
     getBody();
