@@ -106,7 +106,7 @@ public:
     const HandlerCb handler_;
     const bool removable_;
     const bool mutates_server_state_;
-    const ParamDescriptorVec params_;
+    const ParamDescriptorVec params_{};
   };
 
   virtual ~Admin() = default;
