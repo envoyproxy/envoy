@@ -1,7 +1,6 @@
 # 1. Use already imported python dependencies.
 # 2. Fix the include path for //external:zlib.
 # 3. Respect --define=no_debug_info=1.
-# 4. Remove all symbols during linking.
 
 diff --git a/BUILD.bazel b/BUILD.bazel
 index d03ca08c52..329d4141cd 100644
@@ -32,15 +31,6 @@ index 0e9559a65f..ec17c4069e 100644
          }),
          includes = ["include"],
          linkopts = select({
-@@ -160,7 +165,7 @@ def _default_args():
-                 "Advapi32.lib",
-             ],
-             "@v8//bazel/config:is_macos": ["-pthread"],
--            "//conditions:default": ["-Wl,--no-as-needed -ldl -pthread"],
-+            "//conditions:default": ["-Wl,-s", "-Wl,--no-as-needed", "-ldl", "-pthread"],
-         }) + select({
-             ":should_add_rdynamic": ["-rdynamic"],
-             "//conditions:default": [],
 diff --git a/src/snapshot/snapshot-utils.cc b/src/snapshot/snapshot-utils.cc
 index 6db6698d7e..b56d31085f 100644
 --- a/src/snapshot/snapshot-utils.cc
