@@ -249,6 +249,14 @@ public:
    *         was hit.
    */
   virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
+
+  /**
+   * Returns the aggregated prefix for this scope. Note that if this is a nested scope,
+   * it will include names from every level.
+   *
+   * @return the prefix.
+   */
+  virtual StatName prefix() const PURE;
 };
 
 } // namespace Stats

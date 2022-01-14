@@ -139,9 +139,11 @@ bool ThreadLocalStoreImpl::slowRejects(StatsMatcher::FastResult fast_reject_resu
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;
-  forEachCounter(
-      [&ret](std::size_t size) mutable { ret.reserve(size); },
-      [&ret](Counter& counter) mutable { ret.emplace_back(CounterSharedPtr(&counter)); });
+  forEachCounter([&ret](std::size_t size) { ret.reserve(size); },
+                 [&ret](Counter& counter) {
+                   ret.emplace_back(CounterSharedPtr(&counter));
+                   return true;
+                 });
   return ret;
 }
 
@@ -160,11 +162,12 @@ ScopePtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
 std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
-  forEachGauge([&ret](std::size_t size) mutable { ret.reserve(size); },
-               [&ret](Gauge& gauge) mutable {
+  forEachGauge([&ret](std::size_t size) { ret.reserve(size); },
+               [&ret](Gauge& gauge) {
                  if (gauge.importMode() != Gauge::ImportMode::Uninitialized) {
                    ret.emplace_back(GaugeSharedPtr(&gauge));
                  }
+                 return true;
                });
   return ret;
 }
@@ -172,9 +175,10 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
 std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<TextReadoutSharedPtr> ret;
-  forEachTextReadout([&ret](std::size_t size) mutable { ret.reserve(size); },
-                     [&ret](TextReadout& text_readout) mutable {
+  forEachTextReadout([&ret](std::size_t size) { ret.reserve(size); },
+                     [&ret](TextReadout& text_readout) {
                        ret.emplace_back(TextReadoutSharedPtr(&text_readout));
+                       return true;
                      });
   return ret;
 }
@@ -395,6 +399,9 @@ ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, StatNam
       central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {}
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
+  // Note that scope iteration is thread-safe due to the lock held in
+  // releaseScopeCrossThread. For more details see the comment in
+  // ThreadLocalStoreImpl::iterHelper, and the lock it takes prior to the loop.
   parent_.releaseScopeCrossThread(this);
   prefix_.free(symbolTable());
 }
@@ -964,6 +971,16 @@ void ThreadLocalStoreImpl::forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) con
 
 void ThreadLocalStoreImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const {
   alloc_.forEachTextReadout(f_size, f_stat);
+}
+
+void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,
+                                        StatFn<const Scope> f_scope) const {
+  Thread::LockGuard lock(lock_);
+  f_size(scopes_.size() + 1 /* for default_scope_ */);
+  f_scope(*default_scope_);
+  for (ScopeImpl* scope : scopes_) {
+    f_scope(*scope);
+  }
 }
 
 void ThreadLocalStoreImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
