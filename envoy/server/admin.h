@@ -74,7 +74,14 @@ public:
  */
 class Admin {
 public:
-  virtual ~Admin() = default;
+  struct ParamDescriptor {
+    enum class Type { Boolean, String, Enum, Mask, Hidden };
+    const Type type_;
+    const std::string id_;   // HTML form ID and query-param name (JS var name rules).
+    const std::string help_; // Help text rendered into UI.
+    std::vector<absl::string_view> choices_{}; // Valid values for enums or masks
+  };
+  using ParamDescriptorVec = std::vector<ParamDescriptor>;
 
   /**
    * Callback for admin URL handlers.
@@ -91,6 +98,20 @@ public:
       Buffer::Instance& response, AdminStream& admin_stream)>;
 
   /**
+   * Individual admin handler including prefix, help text, and callback.
+   */
+  struct UrlHandler {
+    const std::string prefix_;
+    const std::string help_text_;
+    const HandlerCb handler_;
+    const bool removable_;
+    const bool mutates_server_state_;
+    const ParamDescriptorVec params_;
+  };
+
+  virtual ~Admin() = default;
+
+  /**
    * Add an admin handler.
    * @param prefix supplies the URL prefix to handle.
    * @param help_text supplies the help text for the handler.
@@ -100,7 +121,8 @@ public:
    * @return bool true if the handler was added, false if it was not added.
    */
   virtual bool addHandler(const std::string& prefix, const std::string& help_text,
-                          HandlerCb callback, bool removable, bool mutates_server_state) PURE;
+                          HandlerCb callback, bool removable, bool mutates_server_state,
+                          const ParamDescriptorVec& params) PURE;
 
   /**
    * Remove an admin handler if it is removable.
