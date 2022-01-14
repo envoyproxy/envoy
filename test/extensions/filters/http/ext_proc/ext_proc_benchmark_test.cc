@@ -51,9 +51,11 @@ class BenchmarkTest : public HttpIntegrationTest,
                       public Grpc::BaseGrpcClientIntegrationParamTest,
                       public testing::Test {
 protected:
-  BenchmarkTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
+  BenchmarkTest() : HttpIntegrationTest(Http::CodecType::HTTP2, getIpVersion()) {}
 
-  Network::Address::IpVersion ipVersion() const override {
+  Network::Address::IpVersion ipVersion() const override { return getIpVersion(); }
+
+  static Network::Address::IpVersion getIpVersion() {
     return Network::Test::supportsIpVersion(Network::Address::IpVersion::v4)
                ? Network::Address::IpVersion::v4
                : Network::Address::IpVersion::v6;
