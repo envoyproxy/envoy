@@ -1,6 +1,6 @@
 # 1. Use already imported python dependencies.
 # 2. Fix the include path for //external:zlib.
-# 3. Respect --define=no_debug_info=1.
+# 3. Add support for --define=no_debug_info=1.
 
 diff --git a/BUILD.bazel b/BUILD.bazel
 index d03ca08c52..329d4141cd 100644
