@@ -10,6 +10,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -300,6 +301,9 @@ request_direction_config:
 }
 
 TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingOnlyOnce) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.append_to_accept_content_encoding_only_once", "true"}});
   setUpFilter(R"EOF(
 decompressor_library:
   typed_config:
@@ -316,6 +320,26 @@ request_direction_config:
     headers_before_filter.addCopy("accept-encoding", "br,mock, mock\t,mock ;q=0.3");
   }
   decompressionActive(headers_before_filter, true /* end_with_data */, absl::nullopt, "br,mock");
+}
+
+TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingOnlyOnceLegacy) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.append_to_accept_content_encoding_only_once", "false"}});
+  setUpFilter(R"EOF(
+decompressor_library:
+  typed_config:
+    "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+request_direction_config:
+  advertise_accept_encoding: true
+)EOF");
+  Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
+                                                       {"content-length", "256"}};
+  if (isRequestDirection()) {
+    headers_before_filter.addCopy("accept-encoding", "br,mock, mock\t,mock ;q=0.3");
+  }
+  decompressionActive(headers_before_filter, true /* end_with_data */, absl::nullopt,
+                      "br,mock, mock\t,mock ;q=0.3,mock");
 }
 
 TEST_P(DecompressorFilterTest, DecompressionDisabled) {

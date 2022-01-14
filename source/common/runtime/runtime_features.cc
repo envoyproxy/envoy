@@ -58,6 +58,7 @@ constexpr const char* runtime_features[] = {
     // Begin alphabetically sorted section.
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.allow_upstream_inline_write",
+    "envoy.reloadable_features.append_to_accept_content_encoding_only_once",
     "envoy.reloadable_features.conn_pool_delete_when_idle",
     "envoy.reloadable_features.correct_scheme_and_xfp",
     "envoy.reloadable_features.correctly_validate_alpn",
