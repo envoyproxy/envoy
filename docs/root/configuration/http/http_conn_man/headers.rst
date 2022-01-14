@@ -587,7 +587,55 @@ Supported variable names are:
       <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
-    Same as **%DOWNSTREAM_REMOTE_ADDRESS%** excluding port if the address is an IP address.
+    Remote address of the downstream connection. If the address is an IP address the output does
+    *not* include port.
+
+    .. note::
+
+      This may not be the physical remote address of the peer if the address has been inferred from
+      :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
+      <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_REMOTE_PORT%
+    Similar to **%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%**, but only extracts
+    the port portion of the **%DOWNSTREAM_REMOTE_ADDRESS%**
+
+    .. note::
+
+      This may not be the physical remote address of the peer if the address has been inferred from
+      :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
+      <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_DIRECT_REMOTE_ADDRESS%
+    Direct remote address of the downstream connection. If the address is an IP address it includes both
+    address and port.
+
+    .. note::
+
+      This is always the physical remote address of the peer even if the downstream remote address has
+      been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
+      or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%
+    The direct remote address of the downstream connection. If the address is an IP address the output does
+    *not* include port.
+
+    .. note::
+
+      This is always the physical remote address of the peer even if the downstream remote address has
+      been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
+      or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_DIRECT_REMOTE_PORT%
+    Similar to **%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%**, but only extracts
+    the port portion of the **%DOWNSTREAM_DIRECT_REMOTE_ADDRESS%**
+
+    .. note::
+
+      This is always the physical remote address of the peer even if the downstream remote address has
+      been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
+      or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+
 
 %DOWNSTREAM_LOCAL_ADDRESS%
     Local address of the downstream connection. If the address is an IP address it includes both
@@ -726,10 +774,26 @@ Supported variable names are:
 
     This works both on request and response headers.
 
+%UPSTREAM_LOCAL_ADDRESS%
+    Local address of the upstream connection. If the address is an IP address it includes both
+    address and port.
+
+%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
+    Same as **%UPSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+
+%UPSTREAM_LOCAL_PORT%
+    Similar to **%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%UPSTREAM_LOCAL_ADDRESS%**
+
 %UPSTREAM_REMOTE_ADDRESS%
     Remote address of the upstream host. If the address is an IP address it includes both address
     and port. The upstream remote address cannot be added to request headers as the upstream host
     has not been selected when custom request headers are generated.
+
+%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
+    Same as **%UPSTREAM_REMOTE_ADDRESS%** excluding port if the address is an IP address.
+
+%UPSTREAM_REMOTE_PORT%
+    Similar to **%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%UPSTREAM_REMOTE_ADDRESS%**
 
 %PER_REQUEST_STATE(reverse.dns.data.name)%
     Populates the header with values set on the stream info filterState() object. To be

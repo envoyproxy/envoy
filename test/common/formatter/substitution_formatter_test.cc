@@ -516,12 +516,115 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_ADDRESS");
+
+    // Validate for IPv4 address
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.1.2.3", 18443)};
+    stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
+    EXPECT_EQ("127.1.2.3:18443", upstream_format.format(request_headers, response_headers,
+                                                        response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("127.1.2.3:18443")));
+
+    // Validate for IPv6 address
+    address =
+        Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 19443)};
+    stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
+    EXPECT_EQ("[::1]:19443", upstream_format.format(request_headers, response_headers,
+                                                    response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("[::1]:19443")));
+
+    // Validate for Pipe
+    address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
+    stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
+    EXPECT_EQ("/foo", upstream_format.format(request_headers, response_headers, response_trailers,
+                                             stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("/foo")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT");
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.0.0.3", 18443)};
+    stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
+    EXPECT_EQ("127.0.0.3", upstream_format.format(request_headers, response_headers,
+                                                  response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("127.0.0.3")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_PORT");
+
+    // Validate for IPv4 address
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.1.2.3", 18443)};
+    stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
+    EXPECT_EQ("18443", upstream_format.format(request_headers, response_headers, response_trailers,
+                                              stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("18443")));
+
+    // Validate for IPv6 address
+    address =
+        Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 19443)};
+    stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
+    EXPECT_EQ("19443", upstream_format.format(request_headers, response_headers, response_trailers,
+                                              stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("19443")));
+
+    // Validate for Pipe
+    address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
+    stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
+    EXPECT_EQ("", upstream_format.format(request_headers, response_headers, response_trailers,
+                                         stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("")));
+  }
+
+  {
     StreamInfoFormatter upstream_format("UPSTREAM_HOST");
     EXPECT_EQ("10.0.0.1:443", upstream_format.format(request_headers, response_headers,
                                                      response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
                 ProtoEq(ValueUtil::stringValue("10.0.0.1:443")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_ADDRESS");
+    EXPECT_EQ("10.0.0.1:443", upstream_format.format(request_headers, response_headers,
+                                                     response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("10.0.0.1:443")));
+  }
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT");
+    EXPECT_EQ("10.0.0.1", upstream_format.format(request_headers, response_headers,
+                                                 response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("10.0.0.1")));
+  }
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_PORT");
+    EXPECT_EQ("443", upstream_format.format(request_headers, response_headers, response_trailers,
+                                            stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("443")));
   }
 
   {
@@ -680,21 +783,39 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter upstream_format("DOWNSTREAM_REMOTE_PORT");
+    EXPECT_EQ("0", upstream_format.format(request_headers, response_headers, response_trailers,
+                                          stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("0")));
+  }
+
+  {
     StreamInfoFormatter upstream_format("DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT");
-    EXPECT_EQ("127.0.0.1", upstream_format.format(request_headers, response_headers,
+    EXPECT_EQ("127.0.0.3", upstream_format.format(request_headers, response_headers,
                                                   response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
-                ProtoEq(ValueUtil::stringValue("127.0.0.1")));
+                ProtoEq(ValueUtil::stringValue("127.0.0.3")));
   }
 
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_DIRECT_REMOTE_ADDRESS");
-    EXPECT_EQ("127.0.0.1:0", upstream_format.format(request_headers, response_headers,
-                                                    response_trailers, stream_info, body));
+    EXPECT_EQ("127.0.0.3:63443", upstream_format.format(request_headers, response_headers,
+                                                        response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
-                ProtoEq(ValueUtil::stringValue("127.0.0.1:0")));
+                ProtoEq(ValueUtil::stringValue("127.0.0.3:63443")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("DOWNSTREAM_DIRECT_REMOTE_PORT");
+    EXPECT_EQ("63443", upstream_format.format(request_headers, response_headers, response_trailers,
+                                              stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("63443")));
   }
 
   {

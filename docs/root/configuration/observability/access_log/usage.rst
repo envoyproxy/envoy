@@ -414,6 +414,22 @@ The following command operators are supported:
   Local address of the upstream connection. If the address is an IP address it includes both
   address and port.
 
+%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
+  Same as **%UPSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+
+%UPSTREAM_LOCAL_PORT%
+  Similar to **%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%UPSTREAM_LOCAL_ADDRESS%**
+
+%UPSTREAM_REMOTE_ADDRESS%
+  Remote address of the upstream connection. If the address is an IP address it includes both
+  address and port.
+
+%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
+  Same as **%UPSTREAM_REMOTE_ADDRESS%** excluding port if the address is an IP address.
+
+%UPSTREAM_REMOTE_PORT%
+  Similar to **%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%UPSTREAM_REMOTE_ADDRESS%**
+
 .. _config_access_log_format_upstream_transport_failure_reason:
 
 %UPSTREAM_TRANSPORT_FAILURE_REASON%
@@ -445,6 +461,16 @@ The following command operators are supported:
     :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
     <config_http_conn_man_headers_x-forwarded-for>`.
 
+%DOWNSTREAM_REMOTE_PORT%
+  Similar to **%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%**, but only extracts
+  the port portion of the **%DOWNSTREAM_REMOTE_ADDRESS%**
+
+  .. note::
+
+    This may not be the physical remote address of the peer if the address has been inferred from
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
+    <config_http_conn_man_headers_x-forwarded-for>`.
+
 %DOWNSTREAM_DIRECT_REMOTE_ADDRESS%
   Direct remote address of the downstream connection. If the address is an IP address it includes both
   address and port.
@@ -465,6 +491,16 @@ The following command operators are supported:
     been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
+%DOWNSTREAM_DIRECT_REMOTE_PORT%
+  Similar to **%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%**, but only extracts
+  the port portion of the **%DOWNSTREAM_DIRECT_REMOTE_ADDRESS%**
+
+  .. note::
+
+    This is always the physical remote address of the peer even if the downstream remote address has
+    been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
+    or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+
 %DOWNSTREAM_LOCAL_ADDRESS%
   Local address of the downstream connection. If the address is an IP address it includes both
   address and port.
@@ -475,7 +511,10 @@ The following command operators are supported:
   option was set to true, this represents the original destination address and port.
 
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
-    Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+  Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+
+%DOWNSTREAM_LOCAL_PORT%
+  Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
 
 .. _config_access_log_format_connection_id:
 
@@ -488,9 +527,6 @@ The following command operators are supported:
 
 %GRPC_STATUS%
   gRPC status code which is easy to interpret with text message corresponding with number.
-
-%DOWNSTREAM_LOCAL_PORT%
-    Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
 
 .. _config_access_log_format_req:
 
