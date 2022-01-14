@@ -324,11 +324,6 @@ def _com_github_mirror_tclap():
         name = "com_github_mirror_tclap",
         build_file = "@envoy//bazel/external:tclap.BUILD",
         patch_args = ["-p1"],
-        # If and when we pick up tclap 1.4 or later release,
-        # this entire issue was refactored away 6 years ago;
-        # https://sourceforge.net/p/tclap/code/ci/5d4ffbf2db794af799b8c5727fb6c65c079195ac/
-        # https://github.com/envoyproxy/envoy/pull/8572#discussion_r337554195
-        patches = ["@envoy//bazel:tclap-win64-ull-sizet.patch"],
     )
     native.bind(
         name = "tclap",
