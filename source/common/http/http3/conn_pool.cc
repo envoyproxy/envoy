@@ -72,6 +72,12 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
       host->cluster().perConnectionBufferLimitBytes());
 }
 
+void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
+  if (connect_callback_ != absl::nullopt) {
+    connect_callback_->get().onConnectSucceeded();
+  }
+}
+
 // Make sure all connections are torn down before quic_info_ is deleted.
 Http3ConnPoolImpl::~Http3ConnPoolImpl() { destructAllConnections(); }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 #include "envoy/upstream/upstream.h"
 
@@ -97,6 +98,13 @@ public:
   uint64_t quiche_capacity_ = 100;
 };
 
+class PoolConnectResultCallback {
+public:
+  virtual ~PoolConnectResultCallback() = default;
+  virtual void onConnectSucceeded() PURE;
+  virtual void onConnectFailedWithEarlyData() PURE;
+};
+
 // Http3 subclass of FixedHttpConnPoolImpl which exists to store quic data.
 class Http3ConnPoolImpl : public FixedHttpConnPoolImpl {
 public:
@@ -121,10 +129,18 @@ public:
   // the HTTP3 active client does.
   bool trackStreamCapacity() override { return false; }
 
+  void setConnectResultCallback(PoolConnectResultCallback& callback) {
+    connect_callback_ = std::reference_wrapper<PoolConnectResultCallback>(callback);
+  }
+
+protected:
+  void onConnected(Envoy::ConnectionPool::ActiveClient&) override;
+
 private:
   // Store quic helpers which can be shared between connections and must live
   // beyond the lifetime of individual connections.
   std::unique_ptr<Quic::PersistentQuicInfoImpl> quic_info_;
+  absl::optional<std::reference_wrapper<PoolConnectResultCallback>> connect_callback_;
 };
 
 ConnectionPool::InstancePtr

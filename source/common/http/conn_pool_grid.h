@@ -2,6 +2,7 @@
 
 #include "source/common/http/alternate_protocols_cache_impl.h"
 #include "source/common/http/conn_pool_base.h"
+#include "source/common/http/http3/conn_pool.h"
 #include "source/common/http/http3_status_tracker.h"
 #include "source/common/quic/quic_stat_names.h"
 
@@ -14,6 +15,7 @@ namespace Http {
 // [WiFi / cellular] [ipv4 / ipv6] [QUIC / TCP].
 // Currently only [QUIC / TCP are handled]
 class ConnectivityGrid : public ConnectionPool::Instance,
+                         public Http3::PoolConnectResultCallback,
                          protected Logger::Loggable<Logger::Id::pool> {
 public:
   struct ConnectivityOptions {
@@ -170,6 +172,10 @@ public:
   // Marks that HTTP/3 is working, which resets the exponential backoff counter in the
   // event that HTTP/3 is marked broken again.
   void markHttp3Confirmed();
+
+  // Http3::PoolConnectResultCallback
+  void onConnectSucceeded() override;
+  void onConnectFailedWithEarlyData() override;
 
 protected:
   // Set the required idle callback on the pool.

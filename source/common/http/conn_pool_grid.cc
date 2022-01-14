@@ -1,6 +1,5 @@
 #include "source/common/http/conn_pool_grid.h"
 
-#include "source/common/http/http3/conn_pool.h"
 #include "source/common/http/mixed_conn_pool.h"
 
 #include "quiche/quic/core/quic_versions.h"
@@ -110,9 +109,6 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
   if (!grid_.isPoolHttp3(attempt->pool())) {
     tcp_attempt_succeeded_ = true;
     maybeMarkHttp3Broken();
-  } else {
-    ENVOY_LOG(trace, "Marking HTTP/3 confirmed for host '{}'.", grid_.host_->hostname());
-    grid_.markHttp3Confirmed();
   }
 
   auto delete_this_on_return = attempt->removeFromList(connection_attempts_);
@@ -403,6 +399,15 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
 
   ENVOY_LOG(trace, "HTTP/3 is not available to host '{}', skipping.", host_->hostname());
   return false;
+}
+
+void ConnectivityGrid::onConnectSucceeded() {
+  ENVOY_LOG(trace, "Marking HTTP/3 confirmed for host '{}'.", host_->hostname());
+  markHttp3Confirmed();
+}
+
+void ConnectivityGrid::onConnectFailedWithEarlyData() {
+  // TODO(danzh) mark HTTP/3 suspecious once we support 0-RTT.
 }
 
 } // namespace Http
