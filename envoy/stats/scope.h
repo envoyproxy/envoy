@@ -251,10 +251,10 @@ public:
   virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
 
   /**
-   * Returns the aggregated prefix for this scope. Note that if this is a nested scope,
-   * it will include names from every level.
-   *
-   * @return the prefix.
+   * @return the aggregated prefix for this scope. A trailing dot is not
+   * included, even if one was supplied when creating the scope. If this is a
+   * nested scope, it will include names from every level. E.g.
+   *     store.createScope("foo").createScope("bar").prefix() will be the StatName "foo.bar"
    */
   virtual StatName prefix() const PURE;
 };

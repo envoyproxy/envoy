@@ -476,12 +476,6 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
 }
 
 TEST_F(StatsThreadLocalStoreTest, ForEach) {
-  auto collect_counters = [this]() -> std::vector<std::string> {
-    std::vector<std::string> names;
-    store_->forEachCounter([](size_t) {},
-                           [&names](Counter& counter) { names.push_back(counter.name()); });
-    return names;
-  };
   auto collect_scopes = [this]() -> std::vector<std::string> {
     std::vector<std::string> names;
     store_->forEachScope([](size_t) {},
@@ -490,21 +484,49 @@ TEST_F(StatsThreadLocalStoreTest, ForEach) {
                          });
     return names;
   };
+  auto collect_counters = [this]() -> std::vector<std::string> {
+    std::vector<std::string> names;
+    store_->forEachCounter([](size_t) {},
+                           [&names](Counter& counter) { names.push_back(counter.name()); });
+    return names;
+  };
+  auto collect_gauges = [this]() -> std::vector<std::string> {
+    std::vector<std::string> names;
+    store_->forEachGauge([](size_t) {}, [&names](Gauge& gauge) { names.push_back(gauge.name()); });
+    return names;
+  };
+  auto collect_text_readouts = [this]() -> std::vector<std::string> {
+    std::vector<std::string> names;
+    store_->forEachTextReadout(
+        [](size_t) {},
+        [&names](TextReadout& text_readout) { names.push_back(text_readout.name()); });
+    return names;
+  };
 
   const std::vector<std::string> empty;
 
   EXPECT_THAT(collect_scopes(), UnorderedElementsAreArray({"", ""}));
   EXPECT_THAT(collect_counters(), UnorderedElementsAreArray(empty));
+  EXPECT_THAT(collect_gauges(), UnorderedElementsAreArray(empty));
+  EXPECT_THAT(collect_text_readouts(), UnorderedElementsAreArray(empty));
 
   ScopePtr scope1 = store_->createScope("scope1");
   scope1->counterFromString("counter1");
+  scope1->gaugeFromString("gauge1", Gauge::ImportMode::Accumulate);
+  scope1->textReadoutFromString("tr1");
   ScopePtr scope2 = scope1->createScope("scope2");
   scope2->counterFromString("counter2");
+  scope2->gaugeFromString("gauge2", Gauge::ImportMode::Accumulate);
+  scope2->textReadoutFromString("tr2");
   ScopePtr scope3 = store_->createScope("scope3");
   EXPECT_THAT(collect_scopes(),
               UnorderedElementsAreArray({"", "", "scope1", "scope1.scope2", "scope3"}));
   EXPECT_THAT(collect_counters(),
               UnorderedElementsAreArray({"scope1.counter1", "scope1.scope2.counter2"}));
+  EXPECT_THAT(collect_gauges(),
+              UnorderedElementsAreArray({"scope1.gauge1", "scope1.scope2.gauge2"}));
+  EXPECT_THAT(collect_text_readouts(),
+              UnorderedElementsAreArray({"scope1.tr1", "scope1.scope2.tr2"}));
 }
 
 // Validate that we sanitize away bad characters in the stats prefix.
