@@ -20,8 +20,10 @@ public:
   void getHeaders(LookupHeadersCallback&& cb) override {
     auto entry = cache_.lookup(request_);
     body_ = std::move(entry.body_);
+    trailers_ = std::move(entry.trailers_);
     cb(entry.response_headers_ ? request_.makeLookupResult(std::move(entry.response_headers_),
-                                                           std::move(entry.metadata_), body_.size())
+                                                           std::move(entry.metadata_), body_.size(),
+                                                           trailers_ != nullptr)
                                : LookupResult{});
   }
 
@@ -30,9 +32,10 @@ public:
     cb(std::make_unique<Buffer::OwnedImpl>(&body_[range.begin()], range.length()));
   }
 
-  void getTrailers(LookupTrailersCallback&&) override {
-    ENVOY_BUG(false, "trailers not supported");
-    // TODO(toddmgreer): Support trailers.
+  // The cache must call cb with the cached trailers.
+  void getTrailers(LookupTrailersCallback&& cb) override {
+    ASSERT(trailers_);
+    cb(std::move(trailers_));
   }
 
   const LookupRequest& request() const { return request_; }
@@ -42,6 +45,7 @@ private:
   SimpleHttpCache& cache_;
   const LookupRequest request_;
   std::string body_;
+  Http::ResponseTrailerMapPtr trailers_;
 };
 
 class SimpleInsertContext : public InsertContext {
@@ -77,8 +81,10 @@ public:
     }
   }
 
-  void insertTrailers(const Http::ResponseTrailerMap&) override {
-    ENVOY_BUG(false, "trailers not supported");
+  void insertTrailers(const Http::ResponseTrailerMap& trailers) override {
+    ASSERT(!committed_);
+    trailers_ = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(trailers);
+    commit();
   }
 
   void onDestroy() override {}
@@ -88,9 +94,10 @@ private:
     committed_ = true;
     if (VaryHeaderUtils::hasVary(*response_headers_)) {
       cache_.varyInsert(key_, std::move(response_headers_), std::move(metadata_), body_.toString(),
-                        request_headers_, vary_allow_list_);
+                        request_headers_, vary_allow_list_, std::move(trailers_));
     } else {
-      cache_.insert(key_, std::move(response_headers_), std::move(metadata_), body_.toString());
+      cache_.insert(key_, std::move(response_headers_), std::move(metadata_), body_.toString(),
+                    std::move(trailers_));
     }
   }
 
@@ -102,6 +109,7 @@ private:
   SimpleHttpCache& cache_;
   Buffer::OwnedImpl body_;
   bool committed_ = false;
+  Http::ResponseTrailerMapPtr trailers_;
 };
 } // namespace
 
@@ -188,17 +196,22 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
   if (VaryHeaderUtils::hasVary(*iter->second.response_headers_)) {
     return varyLookup(request, iter->second.response_headers_);
   } else {
+    Http::ResponseTrailerMapPtr trailers_map;
+    if (iter->second.trailers_) {
+      trailers_map = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*iter->second.trailers_);
+    }
     return SimpleHttpCache::Entry{
         Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*iter->second.response_headers_),
-        iter->second.metadata_, iter->second.body_};
+        iter->second.metadata_, iter->second.body_, std::move(trailers_map)};
   }
 }
 
 void SimpleHttpCache::insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
-                             ResponseMetadata&& metadata, std::string&& body) {
+                             ResponseMetadata&& metadata, std::string&& body,
+                             Http::ResponseTrailerMapPtr&& trailers) {
   absl::WriterMutexLock lock(&mutex_);
-  map_[key] =
-      SimpleHttpCache::Entry{std::move(response_headers), std::move(metadata), std::move(body)};
+  map_[key] = SimpleHttpCache::Entry{std::move(response_headers), std::move(metadata),
+                                     std::move(body), std::move(trailers)};
 }
 
 SimpleHttpCache::Entry
@@ -226,17 +239,22 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
     return SimpleHttpCache::Entry{};
   }
   ASSERT(iter->second.response_headers_);
+  Http::ResponseTrailerMapPtr trailers_map;
+  if (iter->second.trailers_) {
+    trailers_map = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*iter->second.trailers_);
+  }
 
   return SimpleHttpCache::Entry{
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*iter->second.response_headers_),
-      iter->second.metadata_, iter->second.body_};
+      iter->second.metadata_, iter->second.body_, std::move(trailers_map)};
 }
 
 void SimpleHttpCache::varyInsert(const Key& request_key,
                                  Http::ResponseHeaderMapPtr&& response_headers,
                                  ResponseMetadata&& metadata, std::string&& body,
                                  const Http::RequestHeaderMap& request_headers,
-                                 const VaryAllowList& vary_allow_list) {
+                                 const VaryAllowList& vary_allow_list,
+                                 Http::ResponseTrailerMapPtr&& trailers) {
   absl::WriterMutexLock lock(&mutex_);
 
   absl::btree_set<absl::string_view> vary_header_values =
@@ -253,8 +271,8 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
   }
 
   varied_request_key.add_custom_fields(vary_identifier.value());
-  map_[varied_request_key] =
-      SimpleHttpCache::Entry{std::move(response_headers), std::move(metadata), std::move(body)};
+  map_[varied_request_key] = SimpleHttpCache::Entry{
+      std::move(response_headers), std::move(metadata), std::move(body), std::move(trailers)};
 
   // Add a special entry to flag that this request generates varied responses.
   auto iter = map_.find(request_key);
@@ -268,7 +286,8 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
     // have inserted for that resource. For the first entry simply use vary_identifier as the
     // entry_list; for future entries append vary_identifier to existing list.
     std::string entry_list;
-    map_[request_key] = SimpleHttpCache::Entry{std::move(vary_only_map), {}, std::move(entry_list)};
+    map_[request_key] =
+        SimpleHttpCache::Entry{std::move(vary_only_map), {}, std::move(entry_list), {}};
   }
 }
 

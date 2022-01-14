@@ -665,6 +665,7 @@ public:
   MOCK_METHOD(void, setWatermarks, (uint32_t), (override));
   MOCK_METHOD(uint32_t, highWatermark, (), (const, override));
   MOCK_METHOD(bool, highWatermarkTriggered, (), (const, override));
+  MOCK_METHOD(size_t, addFragments, (absl::Span<const absl::string_view>));
 };
 
 // Test verifies that decoder calls Buffer::linearize method

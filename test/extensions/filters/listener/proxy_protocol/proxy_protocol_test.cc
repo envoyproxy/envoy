@@ -1560,17 +1560,6 @@ TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
   EXPECT_NE(dynamic_cast<ProxyProtocol::Filter*>(added_filter.get()), nullptr);
 }
 
-// Test that the deprecated extension name is disabled by default.
-// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
-TEST(ProxyProtocolConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.listener.proxy_protocol";
-
-  ASSERT_EQ(
-      nullptr,
-      Registry::FactoryRegistry<
-          Server::Configuration::NamedListenerFilterConfigFactory>::getFactory(deprecated_name));
-}
-
 } // namespace
 } // namespace ProxyProtocol
 } // namespace ListenerFilters
