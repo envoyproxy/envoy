@@ -199,6 +199,7 @@ void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_
       .WillOnce(Invoke([expected_count](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
       }));
+  ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
   EXPECT_EQ(1U,
@@ -299,6 +300,7 @@ void RouterTestBase::testAppendCluster(absl::optional<Http::LowerCaseString> clu
         EXPECT_FALSE(cluster_header.empty());
         EXPECT_EQ("fake_cluster", cluster_header[0]->value().getStringView());
       }));
+  ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
@@ -349,6 +351,7 @@ void RouterTestBase::testAppendUpstreamHost(
         EXPECT_FALSE(host_address_header.empty());
         EXPECT_EQ("10.0.0.5:9211", host_address_header[0]->value().getStringView());
       }));
+  ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }

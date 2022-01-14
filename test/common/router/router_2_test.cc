@@ -334,6 +334,7 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
   EXPECT_CALL(*child_span, finishSpan());
+  ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
@@ -371,6 +372,7 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
   // Upstream responds back to envoy.
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), false);
 
   // The reset occurs after the upstream response, so the span has a valid status code but also an
@@ -520,6 +522,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
   EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
   EXPECT_CALL(*child_span_2, finishSpan());
+  ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 

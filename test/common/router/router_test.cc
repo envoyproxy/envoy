@@ -2028,6 +2028,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
         EXPECT_EQ(headers.Status()->value(), "200");
         EXPECT_TRUE(end_stream);
       }));
+  ASSERT(response_decoder1);
   response_decoder1->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 
@@ -2108,6 +2109,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _, _))
       .WillOnce(Return(RetryStatus::NoOverflow));
   // Not end_stream, otherwise we wouldn't need to reset.
+  ASSERT(response_decoder2);
   response_decoder2->decodeHeaders(std::move(bad_response_headers), false);
 
   // Now write a 200 back. We expect the 2nd stream to be reset and stats to be
@@ -2323,6 +2325,7 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _, _)).Times(0);
   EXPECT_CALL(*router_.retry_state_, wouldRetryFromHeaders(_, _, _))
       .WillOnce(Return(RetryState::RetryDecision::RetryWithBackoff));
+  ASSERT(response_decoder1);
   response_decoder1->decodeHeaders(std::move(response_headers1), true);
 
   EXPECT_CALL(
@@ -2382,6 +2385,7 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
   EXPECT_CALL(*router_.retry_state_, wouldRetryFromHeaders(_, _, _))
       .WillOnce(Return(RetryState::RetryDecision::RetryWithBackoff));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
+  ASSERT(response_decoder1);
   response_decoder1->decodeHeaders(std::move(response_headers1), true);
 
   // Now trigger the retry for the per try timeout earlier.
@@ -2851,6 +2855,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _, _))
       .WillOnce(Return(RetryStatus::NoRetryLimitExceeded));
+  ASSERT(response_decoder2);
   response_decoder2->decodeHeaders(std::move(bad_response_headers1), true);
 
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
@@ -3255,6 +3260,7 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putHttpResponseCode(200));
+  ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
@@ -6014,7 +6020,7 @@ TEST_F(RouterTest, HasEarlyDataAndRetryUpon425) {
         router_.retry_state_->callback_ = [callback]() { callback(/*disable_early_data=*/true); };
         return RetryStatus::Yes;
       }));
-
+  ASSERT(response_decoder1);
   response_decoder1->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 

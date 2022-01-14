@@ -793,7 +793,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     ENVOY_LOG(debug,
               "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
               "up on the retry/shadow.",
-              callbacks_->decodingBuffer()->length() + data.length(), retry_shadow_buffer_limit_);
+              getLength(callbacks_->decodingBuffer()) + data.length(), retry_shadow_buffer_limit_);
     cluster_->stats().retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
     buffering = false;
