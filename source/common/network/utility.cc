@@ -345,14 +345,12 @@ Address::InstanceConstSharedPtr Utility::getIpv6LoopbackAddress() {
                          new Address::Ipv6Instance("::1", 0, nullptr));
 }
 
-Address::InstanceConstSharedPtr Utility::getIpv4AnyAddress() {
-  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr,
-                         new Address::Ipv4Instance(static_cast<uint32_t>(0)));
+Address::InstanceConstSharedPtr Utility::getIpv4AnyAddress(uint32_t port) {
+  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr, new Address::Ipv4Instance(port));
 }
 
-Address::InstanceConstSharedPtr Utility::getIpv6AnyAddress() {
-  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr,
-                         new Address::Ipv6Instance(static_cast<uint32_t>(0)));
+Address::InstanceConstSharedPtr Utility::getIpv6AnyAddress(uint32_t port) {
+  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr, new Address::Ipv6Instance(port));
 }
 
 const std::string& Utility::getIpv4CidrCatchAllAddress() {

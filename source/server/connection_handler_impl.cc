@@ -256,8 +256,9 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.listener_wildcard_match_ip_family")) {
     std::string addr_str =
-        address.ip()->version() == Network::Address::IpVersion::v4 ? "0.0.0.0:" : "[::]:";
-    addr_str += std::to_string(address.ip()->port());
+        address.ip()->version() == Network::Address::IpVersion::v4
+            ? Network::Utility::getIpv4AnyAddress(address.ip()->port())->asString()
+            : Network::Utility::getIpv6AnyAddress(address.ip()->port())->asString();
 
     auto iter = tcp_listener_map_by_address_.find(addr_str);
     if (iter != tcp_listener_map_by_address_.end()) {
