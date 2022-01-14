@@ -81,8 +81,8 @@ TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
 
 TEST_P(AdminStatsTest, HandlerStatsPlainText) {
   const std::string url = "/stats";
-  Http::TestResponseHeaderMapImpl response_headers;
-  Buffer::OwnedImpl data;
+  Http::TestResponseHeaderMapImpl response_headers, used_response_headers;
+  Buffer::OwnedImpl data, used_data;
   MockAdminStream admin_stream;
   Configuration::MockStatsConfig stats_config;
   EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
@@ -114,16 +114,21 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
 
   Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
   EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_EQ("t: \"hello world\"\n"
-            "c1: 10\n"
-            "c2: 20\n"
-            "h1: P0(200.0,200.0) P25(202.5,202.5) P50(205.0,205.0) P75(207.5,207.5) "
-            "P90(209.0,209.0) P95(209.5,209.5) P99(209.9,209.9) P99.5(209.95,209.95) "
-            "P99.9(209.99,209.99) P100(210.0,210.0)\n"
-            "h2: P0(100.0,100.0) P25(102.5,102.5) P50(105.0,105.0) P75(107.5,107.5) "
-            "P90(109.0,109.0) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
-            "P99.9(109.99,109.99) P100(110.0,110.0)\n",
-            data.toString());
+  constexpr char expected[] =
+      "t: \"hello world\"\n"
+      "c1: 10\n"
+      "c2: 20\n"
+      "h1: P0(200.0,200.0) P25(202.5,202.5) P50(205.0,205.0) P75(207.5,207.5) "
+      "P90(209.0,209.0) P95(209.5,209.5) P99(209.9,209.9) P99.5(209.95,209.95) "
+      "P99.9(209.99,209.99) P100(210.0,210.0)\n"
+      "h2: P0(100.0,100.0) P25(102.5,102.5) P50(105.0,105.0) P75(107.5,107.5) "
+      "P90(109.0,109.0) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
+      "P99.9(109.99,109.99) P100(110.0,110.0)\n";
+  EXPECT_EQ(expected, data.toString());
+
+  code = handler.handlerStats(url + "?usedonly", used_response_headers, used_data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+  EXPECT_EQ(expected, used_data.toString());
 
   shutdownThreading();
 }

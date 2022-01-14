@@ -27,8 +27,6 @@ routing PRs, questions, etc. to the right place.
 
 # Maintainers
 
-* Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
-  * Fuzzing, security, headers, HTTP/gRPC, router, access log, tests.
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
   * Data plane, codecs, security, configuration.
 * Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
@@ -47,6 +45,11 @@ routing PRs, questions, etc. to the right place.
   * Scalability and performance.
 * Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
   * HTTP/3, upstream connection management.
+* Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
+  * xDS APIs, configuration, control plane, fuzzing.
+* Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
+  * Data plane, overload management, flow control.
+
 
 # Senior extension maintainers
 
@@ -68,12 +71,21 @@ without further review.
 * Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
 * Tim Walsh ([twghu](https://github.com/twghu)) (walsh@redhat.com)
 
+In addition to the permanent Envoy security team, we have additional temporary
+contributors to envoy-setec and relevant Slack channels from:
+
+* [Trail of Bits](https://www.trailofbits.com/) expiring 9/30/2022.
+  * Adam Meily ([ameily](https://github.com/ameily))
+  * Alessandro Gario ([alessandrogario](https://github.com/alessandrogario))
+  * Mike Myers ([mike-myers-tob](https://github.com/mike-myers-tob))
+
 # Emeritus maintainers
 
 * Constance Caramanolis ([ccaraman](https://github.com/ccaraman)) (ccaramanolis@lyft.com)
 * Roman Dzhabarov ([RomanDzhabarov](https://github.com/RomanDzhabarov)) (rdzhabarov@lyft.com)
 * Bill Gallagher ([wgallagher](https://github.com/wgallagher)) (bgallagher@lyft.com)
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
+* Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
 
 # Friends of Envoy
 

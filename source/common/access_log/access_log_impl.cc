@@ -40,15 +40,15 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) const {
   }
 
   switch (config_.op()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::accesslog::v3::ComparisonFilter::GE:
     return lhs >= value;
   case envoy::config::accesslog::v3::ComparisonFilter::EQ:
     return lhs == value;
   case envoy::config::accesslog::v3::ComparisonFilter::LE:
     return lhs <= value;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
@@ -86,9 +86,10 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
           Config::Utility::getAndCheckFactory<ExtensionFilterFactory>(config.extension_filter());
       return factory.createFilter(config.extension_filter(), runtime, random);
     }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::FILTER_SPECIFIER_NOT_SET:
+    PANIC_DUE_TO_PROTO_UNSET;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 bool TraceableRequestFilter::evaluate(const StreamInfo::StreamInfo& info,

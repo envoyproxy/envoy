@@ -170,7 +170,7 @@ message HttpProtocolOptions {
     // is incremented for each rejected request.
     REJECT_REQUEST = 1;
 
-    // Drop the header with name containing underscores. The header is dropped before the filter chain is
+    // Drop the client header with name containing underscores. The header is dropped before the filter chain is
     // invoked and as such filters will not see dropped headers. The
     // "httpN.dropped_headers_with_underscores" is incremented for each dropped header.
     DROP_HEADER = 2;
@@ -214,6 +214,8 @@ message HttpProtocolOptions {
   // Action to take when a client request with a header name containing underscore characters is received.
   // If this setting is not specified, the value defaults to ALLOW.
   // Note: upstream responses are not affected by this setting.
+  // Note: this only affects client headers. It does not affect headers added
+  // by Envoy filters and does not have any impact if added to cluster config.
   HeadersWithUnderscoresAction headers_with_underscores_action = 5;
 
   // Optional maximum requests for both upstream and downstream connections.

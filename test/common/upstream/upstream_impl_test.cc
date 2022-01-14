@@ -1795,6 +1795,90 @@ TEST_F(StaticClusterImplTest, RingHash) {
   EXPECT_TRUE(cluster.info()->addedViaApi());
 }
 
+TEST_F(StaticClusterImplTest, RoundRobinWithSlowStart) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 11001
+    round_robin_lb_config:
+      slow_start_config:
+        slow_start_window: 60s
+        aggression:
+          default_value: 2.0
+          runtime_key: a_key
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_, options_);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), true);
+  cluster.initialize([] {});
+
+  EXPECT_EQ(LoadBalancerType::RoundRobin, cluster.info()->lbType());
+  auto slow_start_config = cluster.info()->lbRoundRobinConfig()->slow_start_config();
+  EXPECT_EQ(std::chrono::milliseconds(60000),
+            std::chrono::milliseconds(
+                DurationUtil::durationToMilliseconds(slow_start_config.slow_start_window())));
+  EXPECT_EQ(2.0, slow_start_config.aggression().default_value());
+  EXPECT_TRUE(cluster.info()->addedViaApi());
+}
+
+TEST_F(StaticClusterImplTest, LeastRequestWithSlowStart) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    lb_policy: least_request
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 11001
+    least_request_lb_config:
+      slow_start_config:
+        slow_start_window: 60s
+        aggression:
+          default_value: 2.0
+          runtime_key: a_key
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_, options_);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), true);
+  cluster.initialize([] {});
+
+  EXPECT_EQ(LoadBalancerType::LeastRequest, cluster.info()->lbType());
+  auto slow_start_config = cluster.info()->lbLeastRequestConfig()->slow_start_config();
+  EXPECT_EQ(std::chrono::milliseconds(60000),
+            std::chrono::milliseconds(
+                DurationUtil::durationToMilliseconds(slow_start_config.slow_start_window())));
+  EXPECT_EQ(2.0, slow_start_config.aggression().default_value());
+  EXPECT_TRUE(cluster.info()->addedViaApi());
+}
+
 TEST_F(StaticClusterImplTest, OutlierDetector) {
   const std::string yaml = R"EOF(
     name: addressportconfig

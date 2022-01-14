@@ -43,7 +43,8 @@ DecompressorFilterConfig::DirectionConfig::DirectionConfig(
         proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : stats_(generateStats(stats_prefix, scope)),
-      decompression_enabled_(proto_config.enabled(), runtime) {}
+      decompression_enabled_(proto_config.enabled(), runtime),
+      ignore_no_transform_header_(proto_config.ignore_no_transform_header()) {}
 
 DecompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::RequestDirectionConfig&
