@@ -220,8 +220,7 @@ ConnectionHandlerImpl::ActiveListenerDetails::internalListener() {
 
 ConnectionHandlerImpl::ActiveListenerDetailsOptRef
 ConnectionHandlerImpl::findActiveListenerByTag(uint64_t listener_tag) {
-  auto iter = listener_map_by_tag_.find(listener_tag);
-  if (iter != listener_map_by_tag_.end()) {
+  if (auto iter = listener_map_by_tag_.find(listener_tag); iter != listener_map_by_tag_.end()) {
     return *iter->second;
   }
   return absl::nullopt;
@@ -242,9 +241,9 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag) {
 Network::BalancedConnectionHandlerOptRef
 ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Instance& address) {
   // We do not return stopped listeners.
-  auto listener_it = tcp_listener_map_by_address_.find(address.asStringView());
   // If there is exact address match, return the corresponding listener.
-  if (listener_it != tcp_listener_map_by_address_.end()) {
+  if (auto listener_it = tcp_listener_map_by_address_.find(address.asStringView());
+      listener_it != tcp_listener_map_by_address_.end()) {
     return Network::BalancedConnectionHandlerOptRef(
         listener_it->second->tcpListener().value().get());
   }
