@@ -29,7 +29,7 @@ AdminHandlerSharedPtr AdminHandler::getSingleton(Server::Admin& admin,
 AdminHandler::AdminHandler(Server::Admin& admin, Event::Dispatcher& main_thread_dispatcher)
     : admin_(admin), main_thread_dispatcher_(main_thread_dispatcher) {
   const bool rc =
-      admin_.addHandler("/tap", "tap filter control", MAKE_ADMIN_HANDLER(handler), true, true, {});
+      admin_.addHandler("/tap", "tap filter control", MAKE_ADMIN_HANDLER(handler), true, true);
   RELEASE_ASSERT(rc, "/tap admin endpoint is taken");
   if (admin_.socket().addressType() == Network::Address::Type::Pipe) {
     ENVOY_LOG(warn, "Admin tapping (via /tap) is unreliable when the admin endpoint is a pipe and "

@@ -8,8 +8,5 @@ cat "$1"
 echo '<style>'
 cat "$2"
 echo '</style>'
-echo '<script>'
-cat "$3"
-echo '</script>'
 echo '</head>'
 echo ')EOF";'

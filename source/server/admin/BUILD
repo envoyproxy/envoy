@@ -88,12 +88,10 @@ genrule(
     srcs = [
         "admin_head_start.html",
         "admin.css",
-        "admin.js",
     ],
     outs = ["admin_html_gen.h"],
     cmd = "./$(location :generate_admin_html.sh) \
-        $(location admin_head_start.html) $(location admin.css) \
-        $(location admin.js)> $@",
+        $(location admin_head_start.html) $(location admin.css) > $@",
     tools = [":generate_admin_html.sh"],
     visibility = ["//visibility:private"],
 )

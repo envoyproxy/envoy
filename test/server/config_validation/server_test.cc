@@ -181,7 +181,7 @@ TEST(ValidationTest, Admin) {
   ValidationAdmin admin(local_address);
   std::string empty = "";
   Server::Admin::HandlerCb cb;
-  EXPECT_TRUE(admin.addHandler(empty, empty, cb, false, false, {}));
+  EXPECT_TRUE(admin.addHandler(empty, empty, cb, false, false));
   EXPECT_TRUE(admin.removeHandler(empty));
   EXPECT_EQ(1, admin.concurrency());
   admin.socket();

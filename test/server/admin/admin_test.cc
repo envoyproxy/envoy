@@ -101,7 +101,7 @@ TEST_P(AdminInstanceTest, CustomHandler) {
                      AdminStream&) -> Http::Code { return Http::Code::Accepted; };
 
   // Test removable handler.
-  EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false, {})));
+  EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false)));
   Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
@@ -112,11 +112,11 @@ TEST_P(AdminInstanceTest, CustomHandler) {
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
 
   // Add non removable handler.
-  EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, false, false, {}));
+  EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, false, false));
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
 
   // Add again and make sure it is not there twice.
-  EXPECT_FALSE(admin_.addHandler("/foo/bar", "hello", callback, false, false, {}));
+  EXPECT_FALSE(admin_.addHandler("/foo/bar", "hello", callback, false, false));
 
   // Try to remove non removable handler, and make sure it is not removed.
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
@@ -129,7 +129,7 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/foo<script>alert('hi')</script>\" contains invalid character '<'",
                       EXPECT_FALSE(admin_.addHandler("/foo<script>alert('hi')</script>", "hello",
-                                                     callback, true, false, {})));
+                                                     callback, true, false)));
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
@@ -138,7 +138,7 @@ TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/bar?queryShouldNotBeInPrefix\" contains invalid character '?'",
                       EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello",
-                                                     callback, true, false, {})));
+                                                     callback, true, false)));
 }
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
@@ -148,7 +148,7 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
   // It's OK to have help text with HTML characters in it, but when we render the home
   // page they need to be escaped.
   const std::string planets = "jupiter>saturn>mars";
-  EXPECT_TRUE(admin_.addHandler("/planets", planets, callback, true, false, {}));
+  EXPECT_TRUE(admin_.addHandler("/planets", planets, callback, true, false));
 
   Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;

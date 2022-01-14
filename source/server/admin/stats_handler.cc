@@ -406,11 +406,11 @@ public:
   Context(const Params& params, Render& render, Buffer::Instance& response)
       : params_(params), render_(render), response_(response) {}
 
-  void collectScope(const Stats::Scope& scope) {
-    collect<Stats::TextReadout>(Type::TextReadouts, scope, text_readouts_);
-    collect<Stats::Counter>(Type::Counters, scope, counters_);
-    collect<Stats::Gauge>(Type::Gauges, scope, gauges_);
-    collect<Stats::Histogram>(Type::Histograms, scope, histograms_);
+  void collectStats(const Stats::Store& stats) {
+    collect<Stats::TextReadout>(Type::TextReadouts, stats, text_readouts_);
+    collect<Stats::Counter>(Type::Counters, stats, counters_);
+    collect<Stats::Gauge>(Type::Gauges, stats, gauges_);
+    collect<Stats::Histogram>(Type::Histograms, stats, histograms_);
   }
 
   void emit() {
@@ -418,23 +418,45 @@ public:
     emit<Stats::Counter>(Type::Counters, counters_);
     emit<Stats::Gauge>(Type::Gauges, gauges_);
     emit<Stats::Histogram>(Type::Histograms, histograms_);
-    emitScopes();
   }
 
   template <class StatType>
-  void collect(Type type, const Stats::Scope& scope, SharedStatSet<StatType>& set) {
+  void collect(Type type, const Stats::Store& stats, SharedStatSet<StatType>& set) {
     // Bail early if the  requested type does not match the current type.
     if (params_.type_ != Type::All && params_.type_ != type) {
       return;
     }
 
-    Stats::IterateFn<StatType> fn = [this, &set](const Stats::RefcountPtr<StatType>& stat) -> bool {
-      if (params_.shouldShowMetric(*stat)) {
-        set.insert(stat);
+    collectHelper(stats, [this, &set](StatType& stat) {
+      if (params_.shouldShowMetric(stat)) {
+        set.insert(&stat);
       }
       return true;
-    };
-    scope.iterate(fn);
+    });
+  }
+
+  void collectHelper(const Stats::Store& stats, Stats::StatFn<Stats::TextReadout&> fn) {
+    for (const Stats::TextReadoutSharedPtr& text_readout : stats.textReadouts()) {
+      fn(*text_readout);
+    }
+  }
+
+  void collectHelper(const Stats::Store& stats, Stats::StatFn<Stats::Counter&> fn) {
+    for (const Stats::CounterSharedPtr& counter : stats.counters()) {
+      fn(*counter);
+    }
+  }
+
+  void collectHelper(const Stats::Store& stats, Stats::StatFn<Stats::Gauge&> fn) {
+    for (const Stats::GaugeSharedPtr& gauge : stats.gauges()) {
+      fn(*gauge);
+    }
+  }
+
+  void collectHelper(const Stats::Store& stats, Stats::StatFn<Stats::Histogram&> fn) {
+    for (const Stats::ParentHistogramSharedPtr& histogram : stats.histograms()) {
+      fn(*histogram);
+    }
   }
 
   template <class StatType> void emit(Type type, SharedStatSet<StatType>& set) {
@@ -518,50 +540,10 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     break;
   }
 
-  // The default HTML view, with no scope query-param specified (or an empty string), we will
-  // just generate some HTML to initiate a JSON request to populate the scopes. This way the
-  // rendering for scopes and sub-scopes can be handled consistently in JavaScript.
-  if (params.scope_.empty() && params.format_ == Format::Html) {
-    StatsHandler::HtmlRender::renderAjaxRequestForScopes(response, params);
-  } else {
-    Context context(params, *render, response);
-
-    // Note that multiple scopes can exist with the same name, and also that
-    // scopes may be created/destroyed in other threads, whenever we are not
-    // holding the store's lock. So when we traverse the scopes, we'll both
-    // look for Scope objects matching our expected name, and we'll create
-    // a sorted list of sort names for use in populating next/previous buttons.
-    auto scope_fn = [this, &params, &context](const Stats::Scope& scope) {
-      std::string prefix_str = server_.stats().symbolTable().toString(scope.prefix());
-
-      if (params.query_.find("show_json_scopes") != params.query_.end()) {
-        if (params.scope_ == prefix_str) {
-          context.collectScope(scope);
-        } else if (params.scope_.empty() ||
-                   absl::StartsWith(prefix_str + ".", params.scope_ + ".")) {
-          // Truncate any hierarchy after the prefix.
-          size_t dot_search = params.scope_.empty() ? 0 : params.scope_.size() + 1;
-          size_t dot = prefix_str.find('.', dot_search);
-          if (dot != std::string::npos) {
-            prefix_str.resize(dot);
-          }
-          context.addScope(prefix_str);
-        }
-      } else if (prefix_str == params.scope_ || prefix_str.empty() || params.scope_.empty()) {
-        // If the scope matches the prefix of what the user wants, append in the
-        // stats from it. Note that scopes with a prefix of "" will match anything
-        // the user types, in which case we'll still be filtering based on stat
-        // name prefix.
-        context.collectScope(scope);
-      } else if (absl::StartsWith(prefix_str, params.scope_) &&
-                 prefix_str[params.scope_.size()] == '.') {
-        context.addScope(prefix_str);
-      }
-    };
-    stats.forEachScope([](size_t) {}, scope_fn);
-    context.emit();
-    render->render(response);
-  }
+  Context context(params, *render, response);
+  context.collectStats(stats);
+  context.emit();
+  render->render(response);
 
   if (params.format_ == Format::Html) {
     response.add("</body>\n");

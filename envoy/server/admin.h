@@ -122,7 +122,7 @@ public:
    */
   virtual bool addHandler(const std::string& prefix, const std::string& help_text,
                           HandlerCb callback, bool removable, bool mutates_server_state,
-                          const ParamDescriptorVec& params) PURE;
+                          const ParamDescriptorVec& params = {}) PURE;
 
   /**
    * Remove an admin handler if it is removable.

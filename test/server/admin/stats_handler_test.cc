@@ -224,60 +224,6 @@ TEST_P(AdminStatsTest, HandlerStatsPage) {
 }
 #endif
 
-TEST_P(AdminStatsTest, HandlerStatsScoped) {
-  InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
-
-  store_->counterFromStatName(makeStat("foo.c0")).add(0);
-  Stats::ScopePtr scope0 = store_->createScope("");
-  store_->counterFromStatName(makeStat("foo.c1")).add(1);
-  Stats::ScopePtr scope = store_->createScope("scope");
-  scope->counterFromStatName(makeStat("c2")).add(2);
-  Stats::ScopePtr scope2 = store_->createScope("scope1.scope2");
-  scope2->counterFromStatName(makeStat("c3")).add(3);
-  Stats::ScopePtr scope3 = store_->createScope("scope1.scope2.scope3");
-  scope3->counterFromStatName(makeStat("c4")).add(4);
-  Stats::ScopePtr scope4 = store_->createScope("scope4");
-  scope4->counterFromStatName(makeStat("c5")).add(500);
-
-  // Duplicate created with the same name, overriding the stat value. This
-  // will all be de-duped by the handlers, and the values combined.
-  Stats::ScopePtr scope4a = store_->createScope("scope4");
-  scope4->counterFromStatName(makeStat("c5")).add(55);
-
-  auto test = [this](absl::string_view params, const std::string& expected) {
-    Buffer::OwnedImpl data;
-    std::string url = absl::StrCat("/stats?format=json&pretty", params);
-    EXPECT_EQ(Http::Code::OK, handlerStats(url, data));
-    EXPECT_THAT(data.toString(), JsonStringEq(expected)) << "params=" << params;
-  };
-  test("", R"({
-    "stats": [
-       {"name": "foo.c0", "value": 0},
-       {"name": "foo.c1", "value": 1},
-       {"name": "scope.c2", "value": 2},
-       {"name": "scope1.scope2.c3", "value": 3},
-       {"name": "scope1.scope2.scope3.c4", "value": 4},
-       {"name": "scope4.c5", "value": 555}]})");
-  test("&show_json_scopes", R"({
-    "stats": [
-      {"name":"foo.c0", "value": 0},
-      {"name":"foo.c1", "value": 1}],
-    "scopes": ["scope", "scope1", "scope4"]})");
-  test("&show_json_scopes&scope=scope", R"({
-    "stats":[
-       {"name":"scope.c2", "value": 2}],
-     "scopes": []})");
-  test("&show_json_scopes&scope=scope1", R"({
-    "stats": [],
-    "scopes": ["scope1.scope2"]})");
-  test("&show_json_scopes&scope=scope4", R"({
-    "stats": [
-       {"name":"scope4.c5", "value": 555}],
-    "scopes": []})");
-  shutdownThreading();
-}
-
 TEST_P(AdminStatsTest, HandlerStatsJson) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
