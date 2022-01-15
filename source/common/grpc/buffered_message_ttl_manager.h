@@ -9,6 +9,8 @@
 namespace Envoy {
 namespace Grpc {
 
+// This class is used to manage the lifetime of messages stored in BufferedAsyncClient. Messages
+// whose survival period has expired will be deleted from the Buffer.
 class BufferedMessageTtlManager {
 public:
   BufferedMessageTtlManager(Event::Dispatcher& dispatcher, BufferedAsyncClientCallbacks& callbacks,
@@ -18,7 +20,7 @@ public:
 
   ~BufferedMessageTtlManager() { timer_->disableTimer(); }
 
-  void setDeadline(absl::flat_hash_set<uint64_t>&& ids) {
+  void addDeadlineEntry(absl::flat_hash_set<uint64_t>&& ids) {
     const auto expires_at = dispatcher_.timeSource().monotonicTime() + message_ack_timeout_;
     deadline_.emplace(expires_at, std::move(ids));
 
@@ -27,7 +29,7 @@ public:
     }
   }
 
-  const std::queue<std::pair<MonotonicTime, absl::flat_hash_set<uint64_t>>>& deadline() {
+  const std::queue<std::pair<MonotonicTime, absl::flat_hash_set<uint64_t>>>& deadlineForTest() {
     return deadline_;
   }
 
@@ -41,9 +43,6 @@ private:
         break;
       }
       for (auto&& id : it.second) {
-        // If the retrieved message is a PendingFlush, it means that the message
-        // has timed out. A timeout is treated as an error, and the callback will
-        // re-buffer the message.
         callbacks_.onError(id);
       }
       deadline_.pop();

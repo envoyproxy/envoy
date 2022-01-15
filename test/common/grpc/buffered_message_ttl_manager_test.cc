@@ -41,25 +41,25 @@ public:
 TEST_F(BufferedMessageTtlManagerTest, Basic) {
   absl::flat_hash_set<uint64_t> ids{0};
   EXPECT_CALL(callbacks_, onError(_)).WillOnce(Invoke([this] {
-    EXPECT_EQ(ttl_manager_->deadline().size(), 1);
+    EXPECT_EQ(ttl_manager_->deadlineForTest().size(), 1);
     absl::flat_hash_set<uint64_t> ids{1, 2};
     EXPECT_CALL(callbacks_, onError(_)).Times(2);
-    ttl_manager_->setDeadline(std::move(ids));
+    ttl_manager_->addDeadlineEntry(std::move(ids));
   }));
-  ttl_manager_->setDeadline(std::move(ids));
+  ttl_manager_->addDeadlineEntry(std::move(ids));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(ttl_manager_->deadline().size(), 0);
+  EXPECT_EQ(ttl_manager_->deadlineForTest().size(), 0);
 
   // Test if deadline queue is empty after queue cleared once.
   absl::flat_hash_set<uint64_t> ids2{3};
   EXPECT_CALL(callbacks_, onError(_)).WillOnce(Invoke([this] {
-    EXPECT_EQ(ttl_manager_->deadline().size(), 1);
+    EXPECT_EQ(ttl_manager_->deadlineForTest().size(), 1);
   }));
-  ttl_manager_->setDeadline(std::move(ids2));
+  ttl_manager_->addDeadlineEntry(std::move(ids2));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(ttl_manager_->deadline().size(), 0);
+  EXPECT_EQ(ttl_manager_->deadlineForTest().size(), 0);
 }
 
 } // namespace
