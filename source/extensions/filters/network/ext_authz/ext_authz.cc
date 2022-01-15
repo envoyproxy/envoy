@@ -95,7 +95,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   }
 
   if (!response->dynamic_metadata.fields().empty()) {
-
     // Add duration of call to dynamic metadata if applicable
     if (start_time_.has_value()) {
       ProtobufWkt::Value ext_authz_duration_value;
@@ -103,7 +102,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
           ext_authz_duration_value;
     }
-
     filter_callbacks_->connection().streamInfo().setDynamicMetadata(
         NetworkFilterNames::get().ExtAuthorization, response->dynamic_metadata);
   }
