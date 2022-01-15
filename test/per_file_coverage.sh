@@ -52,6 +52,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/listener/tls_inspector:92.3"
 "source/extensions/filters/network/common:96.0"
 "source/extensions/filters/network/common/redis:96.2"
+"source/extensions/filters/network/ext_authz/network:95.8"
 "source/extensions/filters/network/mongo_proxy:95.5"
 "source/extensions/filters/network/sni_cluster:88.9"
 "source/extensions/filters/network/sni_dynamic_forward_proxy:95.2"
