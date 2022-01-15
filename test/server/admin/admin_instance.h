@@ -29,6 +29,8 @@ public:
   Http::Code postCallback(absl::string_view path_and_query,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
 
+  Stats::SymbolTable& symbolTable() { return listener_scope_.symbolTable(); }
+
   std::string address_out_path_;
   std::string cpu_profile_path_;
   NiceMock<MockInstance> server_;

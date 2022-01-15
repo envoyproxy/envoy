@@ -80,6 +80,38 @@ public:
   Stats::CustomStatNamespacesImpl custom_namespaces_;
 };
 
+TEST(StatsHandlerTest, ParseParamsType) {
+  Buffer::OwnedImpl response;
+  StatsHandler::Params params;
+
+  ASSERT_EQ(Http::Code::OK, params.parse("?type=TextReadouts", response));
+  EXPECT_EQ(StatsHandler::Type::TextReadouts, params.type_);
+  ASSERT_EQ(Http::Code::OK, params.parse("?type=Gauges", response));
+  EXPECT_EQ(StatsHandler::Type::Gauges, params.type_);
+  ASSERT_EQ(Http::Code::OK, params.parse("?type=Counters", response));
+  EXPECT_EQ(StatsHandler::Type::Counters, params.type_);
+  ASSERT_EQ(Http::Code::OK, params.parse("?type=Histograms", response));
+  EXPECT_EQ(StatsHandler::Type::Histograms, params.type_);
+  ASSERT_EQ(Http::Code::OK, params.parse("?type=All", response));
+  EXPECT_EQ(StatsHandler::Type::All, params.type_);
+  EXPECT_EQ(Http::Code::BadRequest, params.parse("?type=bogus", response));
+}
+
+TEST(StatsHandlerTest, ParseParamsFormat) {
+  Buffer::OwnedImpl response;
+  StatsHandler::Params params;
+
+  ASSERT_EQ(Http::Code::OK, params.parse("?format=text", response));
+  EXPECT_EQ(StatsHandler::Format::Text, params.format_);
+  ASSERT_EQ(Http::Code::OK, params.parse("?format=html", response));
+  EXPECT_EQ(StatsHandler::Format::Html, params.format_);
+  ASSERT_EQ(Http::Code::OK, params.parse("?format=json", response));
+  EXPECT_EQ(StatsHandler::Format::Json, params.format_);
+  ASSERT_EQ(Http::Code::OK, params.parse("?format=prometheus", response));
+  EXPECT_EQ(StatsHandler::Format::Prometheus, params.format_);
+  EXPECT_EQ(Http::Code::BadRequest, params.parse("?format=bogus", response));
+}
+
 class AdminStatsTest : public StatsHandlerTest,
                        public testing::TestWithParam<Network::Address::IpVersion> {};
 
@@ -835,8 +867,23 @@ TEST_P(AdminInstanceTest, RecentLookups) {
   EXPECT_THAT(body, HasSubstr("Lookup tracking is not enabled"));
   EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
 
-  // We can't test RecentLookups in admin unit tests as it doesn't work with a
-  // fake symbol table. However we cover this solidly in integration tests.
+  // Enable it, do a lookup, and run again.
+  EXPECT_EQ(Http::Code::OK,
+            admin_.request("/stats/recentlookups/enable", "POST", response_headers, body));
+  Stats::StatNamePool pool(symbolTable());
+  pool.add("new_stat_name");
+  body.clear();
+  ASSERT_EQ(Http::Code::OK, admin_.request("/stats/recentlookups", "GET", response_headers, body));
+  EXPECT_THAT(body, Not(HasSubstr("new_stat_name")));
+  EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
+
+  // Disable and the previous behavior should be restored.
+  ASSERT_EQ(Http::Code::OK,
+            admin_.request("/stats/recentlookups/disable", "POST", response_headers, body));
+  body.clear();
+  EXPECT_EQ(Http::Code::OK, admin_.request("/stats/recentlookups", "GET", response_headers, body));
+  EXPECT_THAT(body, HasSubstr("Lookup tracking is not enabled"));
+  EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
 }
 
 class StatsHandlerPrometheusTest : public StatsHandlerTest {

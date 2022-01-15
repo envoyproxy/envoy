@@ -55,6 +55,7 @@ TEST_F(AdminHtmlGeneratorTest, RenderUrlHandlerNoQuery) {
   EXPECT_THAT(out, HasSubstr("param help"));
   EXPECT_THAT(out, HasSubstr("<button class='button-as-link'>prefix</button>"));
   EXPECT_THAT(out, Not(HasSubstr(" onchange='prefix.submit()")));
+  EXPECT_THAT(out, Not(HasSubstr(" type='hidden' ")));
 }
 
 TEST_F(AdminHtmlGeneratorTest, RenderUrlHandlerWithQuery) {
@@ -67,6 +68,7 @@ TEST_F(AdminHtmlGeneratorTest, RenderUrlHandlerWithQuery) {
   EXPECT_THAT(out, HasSubstr("param help"));
   EXPECT_THAT(out, HasSubstr("<button class='button-as-link'>prefix</button>"));
   EXPECT_THAT(out, Not(HasSubstr(" onchange='prefix.submit()")));
+  EXPECT_THAT(out, Not(HasSubstr(" type='hidden' ")));
 }
 
 TEST_F(AdminHtmlGeneratorTest, RenderUrlHandlerSubmitOnChange) {
@@ -75,6 +77,13 @@ TEST_F(AdminHtmlGeneratorTest, RenderUrlHandlerSubmitOnChange) {
   std::string out = data_.toString();
   EXPECT_THAT(out, HasSubstr(" onchange='prefix.submit()"));
   EXPECT_THAT(out, Not(HasSubstr("<button class='button-as-link'>prefix</button>")));
+  EXPECT_THAT(out, Not(HasSubstr(" type='hidden' ")));
+}
+
+TEST_F(AdminHtmlGeneratorTest, RenderUrlHandlerHiddenParam) {
+  generator_.renderInput("scope", "stats", Admin::ParamDescriptor::Type::Hidden, query_params_, {});
+  std::string out = data_.toString();
+  EXPECT_THAT(out, HasSubstr(" type='hidden' "));
 }
 
 } // namespace Server
