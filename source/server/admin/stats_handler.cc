@@ -238,7 +238,6 @@ public:
              StatsHandler& stats_handler, const Params& params)
       : response_(response), html_(response) {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
-    html_.setVisibleSubmit(false);
     html_.setSubmitOnChange(true);
     html_.renderHead();
     html_.renderTableBegin();

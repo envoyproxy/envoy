@@ -45,6 +45,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "admin_html_generator_test",
+    srcs = ["admin_html_generator_test.cc"],
+    deps = [
+        "//source/server/admin:admin_html_generator_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "admin_filter_test",
     srcs = ["admin_filter_test.cc"],
     deps = [

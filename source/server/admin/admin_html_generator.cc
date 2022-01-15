@@ -91,9 +91,13 @@ void AdminHtmlGenerator::renderUrlHandler(const Admin::UrlHandler& handler,
   // For handlers that mutate state, render the link as a button in a POST form,
   // rather than an anchor tag. This should discourage crawlers that find the /
   // page from accidentally mutating all the server state by GETting all the hrefs.
-  const char* button_style = handler.mutates_server_state_ ? "" : " class='button-as-link'";
   const char* method = handler.mutates_server_state_ ? "post" : "get";
-  if (visible_submit_) {
+  if (submit_on_change_) {
+    response_.add(absl::StrCat("\n<form action='", path, "' method='", method, "' id='", path,
+                               "' class='home-form'></form>\n"));
+  } else {
+    // Render an explicit visible submit as a link (for GET) or button (for POST).
+    const char* button_style = handler.mutates_server_state_ ? "" : " class='button-as-link'";
     response_.add(absl::StrCat("\n<tr class='vert-space'></tr>\n", "<tr", row_class, ">\n",
                                "  <td class='home-data'><form action='", path, "' method='", method,
                                "' id='", path, "' class='home-form'>\n", "    <button",
@@ -101,9 +105,6 @@ void AdminHtmlGenerator::renderUrlHandler(const Admin::UrlHandler& handler,
                                "  </form></td>\n"
                                "  <td class='home-data'>",
                                Html::Utility::sanitize(handler.help_text_), "</td>\n", "</tr>\n"));
-  } else {
-    response_.add(absl::StrCat("\n<form action='", path, "' method='", method, "' id='", path,
-                               "' class='home-form'></form>\n"));
   }
 
   std::vector<std::string> params;
