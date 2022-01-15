@@ -347,6 +347,17 @@ public:
   virtual absl::optional<uint64_t> upstreamConnectionId() const PURE;
 
   /**
+   * @param interface name of the upstream connection's local socket.
+   */
+  virtual void setUpstreamInterfaceName(absl::string_view interface_name) PURE;
+
+  /**
+   * @return interface name of the upstream connection's local socket, or absl::nullopt if not
+   * available.
+   */
+  virtual absl::optional<absl::string_view> upstreamInterfaceName() const PURE;
+
+  /**
    * @param connection_info sets the upstream ssl connection.
    */
   virtual void
@@ -404,6 +415,15 @@ public:
    */
   virtual const FilterStateSharedPtr& upstreamFilterState() const PURE;
   virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
+
+  /**
+   * Getters and setters for the number of streams started on this connection.
+   * For upstream connections this is updated as streams are created.
+   * For downstream connections this is latched at the time the upstream stream
+   * is assigned.
+   */
+  virtual void setUpstreamNumStreams(uint64_t num_streams) PURE;
+  virtual uint64_t upstreamNumStreams() const PURE;
 };
 
 /**
@@ -425,8 +445,9 @@ public:
   virtual void setResponseCode(uint32_t code) PURE;
 
   /**
-   * @param rc_details the response code details string to set for this request.
-   * See ResponseCodeDetailValues above for well-known constants.
+   * @param rc_details the response code details string to set for this request. It should not
+   * contain any empty or space characters (' ', '\t', '\f', '\v', '\n', '\r'). See
+   * ResponseCodeDetailValues above for well-known constants.
    */
   virtual void setResponseCodeDetails(absl::string_view rc_details) PURE;
 

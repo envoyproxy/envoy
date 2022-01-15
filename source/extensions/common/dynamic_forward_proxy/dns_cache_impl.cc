@@ -362,7 +362,9 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   if (new_address != nullptr &&
       (current_address == nullptr || *current_address != *new_address ||
        DnsUtils::listChanged(address_list, primary_host_info->host_info_->addressList()))) {
-    ENVOY_LOG(debug, "host '{}' address has changed", host);
+    ENVOY_LOG_EVENT(
+        debug, "dns_cache_update_address", "host '{}' address has changed from {} to {}", host,
+        current_address ? current_address->asStringView() : "<empty>", new_address->asStringView());
     primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
 
     runAddUpdateCallbacks(host, primary_host_info->host_info_);

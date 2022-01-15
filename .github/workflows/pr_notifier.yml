@@ -21,6 +21,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r ./.github/actions/pr_notifier/requirements.txt
     - name: Notify about PRs
-      run: python ./.github/actions/pr_notifier/pr_notifier.py
+      run: python ./.github/actions/pr_notifier/pr_notifier.py --cron_job
       env:
         SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

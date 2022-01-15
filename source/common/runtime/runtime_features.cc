@@ -59,13 +59,14 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.conn_pool_delete_when_idle",
     "envoy.reloadable_features.correct_scheme_and_xfp",
+    "envoy.reloadable_features.correctly_validate_alpn",
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.enable_grpc_async_client_cache",
     "envoy.reloadable_features.fix_added_trailers",
     "envoy.reloadable_features.grpc_bridge_stats_disabled",
     "envoy.reloadable_features.handle_stream_reset_during_hcm_encoding",
-    "envoy.reloadable_features.hash_multiple_header_values",
     "envoy.reloadable_features.health_check.graceful_goaway_handling",
+    "envoy.reloadable_features.http2_allow_capacity_increase_by_settings",
     "envoy.reloadable_features.http2_consume_stream_refused_errors",
     "envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect",
     "envoy.reloadable_features.http_reject_path_with_fragment",
@@ -80,9 +81,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.preserve_downstream_scheme",
     "envoy.reloadable_features.proxy_102_103",
     "envoy.reloadable_features.remove_legacy_json",
-    "envoy.reloadable_features.require_strict_1xx_and_204_response_headers",
-    "envoy.reloadable_features.send_strict_1xx_and_204_response_headers",
-    "envoy.reloadable_features.strip_port_from_connect",
     "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place",
     "envoy.reloadable_features.udp_per_event_loop_read_limit",
     "envoy.reloadable_features.unquote_log_string_values",
@@ -111,6 +109,8 @@ constexpr const char* runtime_features[] = {
 constexpr const char* disabled_runtime_features[] = {
     // TODO(alyssawilk, junr03) flip (and add release notes + docs) these after Lyft tests
     "envoy.reloadable_features.allow_multiple_dns_addresses",
+    // TODO(alyssawilk) flip true after release.
+    "envoy.reloadable_features.allow_upstream_inline_write",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
     // TODO(dmitri-d) reset to true to enable unified mux by default

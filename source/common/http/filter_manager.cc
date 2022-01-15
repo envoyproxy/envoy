@@ -285,10 +285,11 @@ void FilterMatchState::evaluateMatchTreeWithNewData(MatchDataUpdateFunc update_f
   match_tree_evaluated_ = match_result.match_state_ == Matcher::MatchState::MatchComplete;
 
   if (match_tree_evaluated_ && match_result.result_) {
-    if (SkipAction().typeUrl() == match_result.result_->typeUrl()) {
+    const auto result = match_result.result_();
+    if (SkipAction().typeUrl() == result->typeUrl()) {
       skip_filter_ = true;
     } else {
-      filter_->onMatchCallback(*match_result.result_);
+      filter_->onMatchCallback(*result);
     }
   }
 }
@@ -748,7 +749,7 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("fatal error adding decoded data");
   }
 }
 
@@ -1229,7 +1230,7 @@ void FilterManager::addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::In
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("fatal error adding decoded data");
   }
 }
 
@@ -1663,6 +1664,14 @@ uint64_t ActiveStreamFilterBase::streamId() const { return parent_.streamId(); }
 
 Buffer::BufferMemoryAccountSharedPtr ActiveStreamDecoderFilter::account() const {
   return parent_.account();
+}
+
+void ActiveStreamDecoderFilter::setUpstreamOverrideHost(absl::string_view host) {
+  parent_.upstream_override_host_.emplace(std::move(host));
+}
+
+absl::optional<absl::string_view> ActiveStreamDecoderFilter::upstreamOverrideHost() const {
+  return parent_.upstream_override_host_;
 }
 
 } // namespace Http

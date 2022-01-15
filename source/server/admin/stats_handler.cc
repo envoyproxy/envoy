@@ -1,5 +1,8 @@
 #include "source/server/admin/stats_handler.h"
 
+#include <functional>
+#include <vector>
+
 #include "envoy/admin/v3/mutex_stats.pb.h"
 
 #include "source/common/common/empty_string.h"
@@ -132,13 +135,19 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
   const Http::Utility::QueryParams params =
       Http::Utility::parseAndDecodeQueryString(path_and_query);
   const bool used_only = params.find("usedonly") != params.end();
+  const bool text_readouts = params.find("text_readouts") != params.end();
+
+  const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
+      text_readouts ? server_.stats().textReadouts() : std::vector<Stats::TextReadoutSharedPtr>();
+
   absl::optional<std::regex> regex;
   if (!Utility::filterParam(params, response, regex)) {
     return Http::Code::BadRequest;
   }
-  PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
-                                              server_.stats().histograms(), response, used_only,
-                                              regex, server_.api().customStatNamespaces());
+
+  PrometheusStatsFormatter::statsAsPrometheus(
+      server_.stats().counters(), server_.stats().gauges(), server_.stats().histograms(),
+      text_readouts_vec, response, used_only, regex, server_.api().customStatNamespaces());
   return Http::Code::OK;
 }
 
