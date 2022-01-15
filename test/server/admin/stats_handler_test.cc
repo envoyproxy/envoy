@@ -80,6 +80,14 @@ public:
   Stats::CustomStatNamespacesImpl custom_namespaces_;
 };
 
+TEST(StatsHandlerTest, TypeToString) {
+  EXPECT_EQ("TextReadouts", StatsHandler::typeToString(StatsHandler::Type::TextReadouts));
+  EXPECT_EQ("Gauges", StatsHandler::typeToString(StatsHandler::Type::Gauges));
+  EXPECT_EQ("Counters", StatsHandler::typeToString(StatsHandler::Type::Counters));
+  EXPECT_EQ("Histograms", StatsHandler::typeToString(StatsHandler::Type::Histograms));
+  EXPECT_EQ("All", StatsHandler::typeToString(StatsHandler::Type::All));
+}
+
 TEST(StatsHandlerTest, ParseParamsType) {
   Buffer::OwnedImpl response;
   StatsHandler::Params params;

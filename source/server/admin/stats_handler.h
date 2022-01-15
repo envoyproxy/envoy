@@ -80,7 +80,20 @@ public:
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
 
+  /**
+   * When stats are rendered in HTML mode, users can tweak parameters after the
+   * stats page as up, such as tweaking the filter. To enable this, we use the
+   * stats UrlHandler both for the admin home page and for rendering in the /stats
+   * endpoint.
+   *
+   * @return a URL handler for stats.
+   */
   Admin::UrlHandler statsHandler();
+
+  /**
+   * @return a string representation for a type.
+   */
+  static absl::string_view typeToString(Type type);
 
 private:
   class Context;
@@ -97,8 +110,6 @@ private:
   static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
                                     Stats::Store& stats,
                                     Stats::CustomStatNamespaces& custom_namespaces);
-
-  static absl::string_view typeToString(Type type);
 };
 
 } // namespace Server
