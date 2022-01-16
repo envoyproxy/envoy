@@ -192,34 +192,28 @@ TEST_P(AdminStatsTest, HandlerStatsHtml) {
   scope->gaugeFromStatName(makeStat("g2"), Stats::Gauge::ImportMode::Accumulate).set(2);
   Stats::ScopePtr scope2 = store_->createScope("scope1.scope2");
   scope2->textReadoutFromStatName(makeStat("t3")).set("text readout value");
+  scope2->counterFromStatName(makeStat("unset"));
 
-  auto test = [this](absl::string_view params, const std::vector<std::string>& expected) {
+  auto test = [this](absl::string_view params, const std::vector<std::string>& expected,
+                     const std::vector<std::string>& not_expected) {
     Buffer::OwnedImpl data;
     std::string url = absl::StrCat("/stats?format=html", params);
     EXPECT_EQ(Http::Code::OK, handlerStats(url, data));
     for (const std::string& expect : expected) {
       EXPECT_THAT(data.toString(), HasSubstr(expect)) << "params=" << params;
     }
+    for (const std::string& not_expect : not_expected) {
+      EXPECT_THAT(data.toString(), Not(HasSubstr(not_expect))) << "params=" << params;
+    }
   };
-  test("", {"foo.c0: 0", "foo.c1: 1", "scope.g2: 2"});
-  /*
-  test("&show_json_scopes", R"({
-    "stats": [
-      {"name":"foo.c0", "value": 0},
-      {"name":"foo.c1", "value": 1}],
-    "scopes": ["scope", "scope1", "scope4"]})");
-  test("&show_json_scopes&scope=scope", R"({
-    "stats":[
-       {"name":"scope.c2", "value": 2}],
-     "scopes": []})");
-  test("&show_json_scopes&scope=scope1", R"({
-    "stats": [],
-    "scopes": ["scope1.scope2"]})");
-  test("&show_json_scopes&scope=scope4", R"({
-    "stats": [
-       {"name":"scope4.c5", "value": 555}],
-    "scopes": []})");
-  */
+  test("",
+       {"foo.c0: 0", "foo.c1: 1", "scope.g2: 2", "scope1.scope2.unset: 0", // expected
+        "scope1.scope2.t3: \"text readout value\"", "No Histograms found"},
+       {"No TextReadouts found"});                   // not expected
+  test("&type=Counters", {"foo.c0: 0", "foo.c1: 1"}, // expected
+       {"No Histograms found", "scope.g2: 2"});      // not expected
+  test("&usedonly", {"foo.c0: 0", "foo.c1: 1"},      // expected
+       {"scope1.scope2.unset"});                     // not expected
   shutdownThreading();
 }
 
