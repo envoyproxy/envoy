@@ -228,38 +228,6 @@ bool StatName::startsWith(StatName prefix) const {
     }
   }
   return true;
-
-#if 0
-  std::vector<Symbol> prefix_symbols;
-
-  // Decode the prefix as a StatNameVec.
-  TokenIter iter(symbolic_prefix.data(), symbolic_prefix.dataSize());
-  for (TokenIter::Type type; (type = iter.next()) != TokenIter::Type::End;) {
-    if (type != TokenIter::Type::Symbol) {
-      // Disallow dynamic components. We don't have a current need for prefixes
-      // to be expressed dynamically, and handling that case would add
-      // complexity.
-      return false;
-    }
-    prefix_symbols.push_back(iter.symbol());
-  }
-
-  // Now decode the StatName, matching against the symbols. It's OK for there to
-  // be dynamic string_view elements after the prefix match.
-  {
-    TokenIter iter(data(), dataSize());
-    uint32_t index = 0;
-    for (TokenIter::Type type; (type = iter.next()) != TokenIter::Type::End; ++index) {
-      if (index == prefix_symbols.size()) {
-        return true;
-      }
-      if (type != TokenIter::Type::Symbol || iter.symbol() != prefix_symbols[index]) {
-        return false;
-      }
-    }
-    return index == prefix_symbols.size();
-  }
-#endif
 }
 
 std::vector<absl::string_view> SymbolTableImpl::decodeStrings(const SymbolTable::Storage array,
