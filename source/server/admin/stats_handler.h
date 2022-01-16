@@ -72,7 +72,7 @@ public:
   Http::Code handlerStats(absl::string_view path_and_query,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                           AdminStream&);
-  Http::Code handlerStatsPrometheus(absl::string_view path_and_query,
+  Http::Code handlerPrometheusStats(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
   Http::Code handlerContention(absl::string_view path_and_query,
@@ -80,10 +80,11 @@ public:
                                Buffer::Instance& response, AdminStream&);
 
   /**
-   * When stats are rendered in HTML mode, users can tweak parameters after the
-   * stats page as up, such as tweaking the filter. To enable this, we use the
-   * stats UrlHandler both for the admin home page and for rendering in the /stats
-   * endpoint.
+   * When stats are rendered in HTML mode, we want users to be able to tweak
+   * parameters after the stats page is rendered, such as tweaking the filter or
+   * `usedonly`. We use the same stats UrlHandler both for the admin home page
+   * and for rendering in /stats?format=html. We share the same UrlHandler in
+   * both contexts by defining an API for it here.
    *
    * @return a URL handler for stats.
    */

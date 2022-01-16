@@ -498,7 +498,7 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
   return Http::Code::OK;
 }
 
-Http::Code StatsHandler::handlerStatsPrometheus(absl::string_view path_and_query,
+Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
                                                 Http::ResponseHeaderMap&,
                                                 Buffer::Instance& response, AdminStream&) {
   Params params;
