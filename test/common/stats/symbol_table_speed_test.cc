@@ -3,6 +3,7 @@
 //
 // NOLINT(namespace-envoy)
 
+#include "source/common/common/hash.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 #include "source/common/stats/isolated_store_impl.h"
@@ -94,3 +95,36 @@ static void bmJoinElements(benchmark::State& state) {
   }
 }
 BENCHMARK(bmJoinElements);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmCompareElements(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<absl::string_view> all_tokens = {"alpha",   "beta", "gamma", "delta",
+                                                     "epsilon", "zeta", "eta",   "theta"};
+  std::vector<Envoy::Stats::StatName> names;
+
+  // Form 64 4-token names selecting pseudo-randomly from the above set.
+  const uint32_t num_tokens_per_word = 4;
+  const uint32_t num_words = 64;
+  for (uint32_t i = 0; i < num_words; ++i) {
+    std::vector<absl::string_view> tokens;
+    for (uint32_t j = 0; j < num_tokens_per_word; ++j) {
+      const uint64_t seed = i * num_words + j;
+      uint32_t index = Envoy::HashUtil::xxHash64("input", seed);
+      tokens.push_back(all_tokens[index % all_tokens.size()]);
+    }
+    names.push_back(pool.add(absl::StrJoin(tokens, ".")));
+  }
+
+  uint32_t compare_total = 0;
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    const uint64_t seed = compare_total++;
+    uint32_t a = Envoy::HashUtil::xxHash64("first", seed) % names.size();
+    uint32_t b = Envoy::HashUtil::xxHash64("second", seed) % names.size();
+    benchmark::DoNotOptimize(symbol_table.lessThan(names[a], names[b]));
+  }
+}
+BENCHMARK(bmCompareElements);

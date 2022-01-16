@@ -73,6 +73,8 @@ public:
    */
   class Encoding {
   public:
+    class TokenIter;
+
     /**
      * Before destructing SymbolEncoding, you must call moveToMemBlock. This
      * transfers ownership, and in particular, the responsibility to call
