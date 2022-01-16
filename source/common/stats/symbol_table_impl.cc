@@ -218,9 +218,10 @@ bool StatName::startsWith(StatName prefix) const {
       return false; // "a.b" does not start with "a.b.c"
     }
     if (prefix_type != TokenIter::Type::Symbol) {
-      // Disallow dynamic components. We don't have a current need for prefixes
-      // to be expressed dynamically, and handling that case would add
-      // complexity. In particular we'd need to take locks to decode to strings.
+      // Disallow dynamic components in the prefix. We don't have a current need
+      // for prefixes to be expressed dynamically, and handling that case would
+      // add complexity. In particular we'd need to take locks to decode to
+      // strings.
       return false;
     }
     if (this_type != TokenIter::Type::Symbol || this_iter.symbol() != prefix_iter.symbol()) {
@@ -482,6 +483,9 @@ void SymbolTableImpl::newSymbol() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
 }
 
 bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
+  // Proactively take the table lock in anticipation that we'll need to
+  // convert at least one symbol to a string_view, and it's easier not to
+  // bother to lazily take the lock.
   Thread::LockGuard lock(lock_);
   Encoding::TokenIter a_iter(a.data(), a.dataSize());
   Encoding::TokenIter b_iter(b.data(), b.dataSize());
