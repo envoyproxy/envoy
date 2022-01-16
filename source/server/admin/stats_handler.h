@@ -49,7 +49,6 @@ public:
     Type start_type_{Type::TextReadouts};
     std::string filter_string_;
     absl::optional<std::regex> filter_;
-    std::string scope_;
     Http::Utility::QueryParams query_;
   };
 

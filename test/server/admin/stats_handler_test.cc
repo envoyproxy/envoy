@@ -181,88 +181,47 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
   shutdownThreading();
 }
 
-#if 0
-TEST_P(AdminStatsTest, HandlerStatsPage) {
+TEST_P(AdminStatsTest, HandlerStatsHtml) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  // no text readouts for now.
-  for (uint32_t i = 0; i < 10; ++i) {
-    store_->counterFromString(absl::StrCat("c", i)).add(10 * i);
-  }
-  store_->gaugeFromString("g1", Stats::Gauge::ImportMode::Accumulate).set(100);
-  store_->gaugeFromString("g2", Stats::Gauge::ImportMode::Accumulate).set(200);
-  store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+  store_->counterFromStatName(makeStat("foo.c0")).add(0);
+  Stats::ScopePtr scope0 = store_->createScope("");
+  store_->counterFromStatName(makeStat("foo.c1")).add(1);
+  Stats::ScopePtr scope = store_->createScope("scope");
+  scope->gaugeFromStatName(makeStat("g2"), Stats::Gauge::ImportMode::Accumulate).set(2);
+  Stats::ScopePtr scope2 = store_->createScope("scope1.scope2");
+  scope2->textReadoutFromStatName(makeStat("t3")).set("text readout value");
 
-  auto test_page = [this](absl::string_view direction, absl::string_view start,
-                          absl::string_view expected_items, absl::string_view prev,
-                          absl::string_view next) {
+  auto test = [this](absl::string_view params, const std::vector<std::string>& expected) {
     Buffer::OwnedImpl data;
-    std::string url = "/stats?format=html&pagesize=4&type=All&";
-    if (direction == "prev") {
-      absl::StrAppend(&url, "before=", start);
-    } else {
-      absl::StrAppend(&url, "after=", start);
-    }
-
-    Http::Code code = handlerStats(url, data);
-    EXPECT_EQ(Http::Code::OK, code);
-
-    // Find all the line between "<pre>" and "</pre>", and collect
-    // the first token of each line, up to the ":".
-    bool in_pre = false;
-    std::string out = data.toString();
-    std::vector<absl::string_view> item_vector;
-    for (absl::string_view line : absl::StrSplit(out, '\n')) {
-      if (line == "<pre>") {
-        in_pre = true;
-      } else if (line == "</pre>") {
-        in_pre = false;
-      } else if (in_pre) {
-        absl::string_view::size_type colon = line.find(':');
-        if (colon != absl::string_view::npos) {
-          item_vector.push_back(line.substr(0, colon));
-        }
-      }
-    }
-    std::string actual_items = absl::StrJoin(item_vector, ",");
-    EXPECT_EQ(expected_items, actual_items) << "url=" << url;
-
-    auto nav = [](absl::string_view direction, absl::string_view start = "") -> std::string {
-      std::string out = absl::StrCat("javascript:", direction);
-      if (!start.empty()) {
-        absl::StrAppend(&out, "(\"", start, "\")");
-      }
-      return out;
-    };
-
-    if (prev.empty()) {
-      EXPECT_THAT(out, Not(HasSubstr(nav("prev")))) << "url=" << url;
-    } else {
-      EXPECT_THAT(out, HasSubstr(nav("prev", prev))) << "url=" << url;
-    }
-    if (next.empty()) {
-      EXPECT_THAT(out, Not(HasSubstr(nav("next")))) << "url=" << url;
-    } else {
-      EXPECT_THAT(out, HasSubstr(nav("next", next))) << "url=" << url;
+    std::string url = absl::StrCat("/stats?format=html", params);
+    EXPECT_EQ(Http::Code::OK, handlerStats(url, data));
+    for (const std::string& expect : expected) {
+      EXPECT_THAT(data.toString(), HasSubstr(expect)) << "params=" << params;
     }
   };
-
-  // Forward walk to end.
-  test_page("next", "", "c0,c1,c2,c3", "", "Counters:c3");
-  test_page("next", "Counters:c3", "c4,c5,c6,c7", "Counters:c4", "Counters:c7");
-  test_page("next", "Counters:c7", "c8,c9,g1,g2", "Counters:c8", "Histograms:");
-  test_page("next", "Gauges:g2", "h1", "Histograms:h1", "");
-
-  // Reverse walk to beginning.
-  test_page("prev", "Histograms:h1", "c9,g1,g2,h1", "Counters:c9", "Histograms:h1");
-  test_page("prev", "Counters:c9", "c5,c6,c7,c8", "Counters:c5", "Counters:c8");
-  test_page("prev", "Counters:c5", "c1,c2,c3,c4", "Counters:c1", "Counters:c4");
-  test_page("prev", "Counters:c1", "c0", "TextReadouts:", "Counters:c0");
-
+  test("", {"foo.c0: 0", "foo.c1: 1", "scope.g2: 2"});
+  /*
+  test("&show_json_scopes", R"({
+    "stats": [
+      {"name":"foo.c0", "value": 0},
+      {"name":"foo.c1", "value": 1}],
+    "scopes": ["scope", "scope1", "scope4"]})");
+  test("&show_json_scopes&scope=scope", R"({
+    "stats":[
+       {"name":"scope.c2", "value": 2}],
+     "scopes": []})");
+  test("&show_json_scopes&scope=scope1", R"({
+    "stats": [],
+    "scopes": ["scope1.scope2"]})");
+  test("&show_json_scopes&scope=scope4", R"({
+    "stats": [
+       {"name":"scope4.c5", "value": 555}],
+    "scopes": []})");
+  */
   shutdownThreading();
 }
-#endif
 
 TEST_P(AdminStatsTest, HandlerStatsJson) {
   InSequence s;

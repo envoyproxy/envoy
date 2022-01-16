@@ -87,15 +87,10 @@ bool StatsHandler::Params::shouldShowMetric(const Stats::Metric& metric) const {
   if (used_only_ && !metric.used()) {
     return false;
   }
-  if (!scope_.empty() || filter_.has_value()) {
+  if (filter_.has_value()) {
     std::string name = metric.name();
-    if (filter_.has_value() && !std::regex_search(name, filter_.value())) {
+    if (!std::regex_search(name, filter_.value())) {
       return false;
-    }
-    if (!scope_.empty()) {
-      if (!absl::StartsWith(name, scope_ + ".")) {
-        return false;
-      }
     }
   }
   return true;
@@ -152,10 +147,6 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
     }
   }
 
-  auto scope_iter = query_.find("scope");
-  if (scope_iter != query_.end()) {
-    scope_ = scope_iter->second;
-  }
   return Http::Code::OK;
 }
 
@@ -267,24 +258,6 @@ public:
     }
   }
 
-  static void renderAjaxRequestForScopes(Buffer::Instance& response, const Params& params) {
-    // Delegate to JavaScript to fetch all top-level scopes and render as an outline.
-    std::string url =
-        absl::StrCat("stats?format=json&show_json_scopes&type=", typeToString(params.type_));
-    if (params.used_only_) {
-      url += "&usedonly";
-    }
-    if (!params.filter_string_.empty()) {
-      absl::StrAppend(&url, "&filter=", params.filter_string_);
-    }
-    response.add(absl::StrCat("<ul id='scopes-outline'></ul>\n"
-                              "<script>\n"
-                              "  fetch('",
-                              url, "')\n", "    .then(response => response.json())\n",
-                              "    .then(data => populateScopes(data));\n"
-                              "</script>\n"));
-  }
-
 private:
   Buffer::Instance& response_;
   AdminHtmlGenerator html_;
@@ -353,9 +326,6 @@ public:
 
     auto* document_fields = document_.mutable_fields();
     (*document_fields)["stats"] = ValueUtil::listValue(stats_array_);
-    if (params_.query_.find("show_json_scopes") != params_.query_.end()) {
-      (*document_fields)["scopes"] = ValueUtil::listValue(scope_array_);
-    }
     response.add(MessageUtil::getJsonStringFromMessageOrDie(document_, params_.pretty_, true));
   }
 
@@ -481,8 +451,6 @@ public:
       render_.generate(*stat);
     }
   }
-
-  Render& render() { return render_; }
 
   const Params& params_;
   Render& render_;

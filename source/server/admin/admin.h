@@ -199,7 +199,6 @@ public:
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
   void closeSocket();
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
-  Server::Instance& server() { return server_; }
 
   AdminFilter::AdminServerCallbackFunction createCallbackFunction() {
     return [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
