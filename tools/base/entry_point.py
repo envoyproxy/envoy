@@ -6,8 +6,9 @@ ENTRY_POINT_ALIAS = "_ENTRY_POINT_ALIAS_"
 
 
 def find_tool_path():
-    entry_point_alias = ENTRY_POINT_ALIAS.split("/external/")[1]
-
+    entry_point_alias = f"external/{ENTRY_POINT_ALIAS.split('/external/')[1]}"
+    if pathlib.Path(entry_point_alias).exists():
+        return entry_point_alias
     for x in pathlib.Path(".").glob(f"**/{entry_point_alias}"):
         return x
 

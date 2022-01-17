@@ -98,37 +98,32 @@ def envoy_entry_point(
     A `py_binary` is dynamically created to wrap the `entry_point` with provided
     `args` and `data`.
     """
-    entry_point_name = "entry_point_%s" % name
-    native.alias(
-        name = entry_point_name,
-        actual = entry_point(
-            pkg = pkg,
-            script = script or pkg,
-        ),
+    actual_entry_point = entry_point(
+        pkg = pkg,
+        script = script or pkg,
     )
     entry_point_script = "%s%s" % (envoy_prefix, main)
     entry_point_py = "entry_point_%s_main.py" % name
     entry_point_wrapper = "entry_point_%s_wrapper" % name
     entry_point_path = "$(location %s)" % entry_point_script
-    entry_point_alias = "$(location :%s)" % entry_point_name
+    entry_point_alias = "$(location %s)" % actual_entry_point
 
     native.genrule(
         name = entry_point_wrapper,
         cmd = """
         sed s#_ENTRY_POINT_ALIAS_#%s# %s > \"$@\"
         """ % (entry_point_alias, entry_point_path),
-        exec_tools = [
+        tools = [
+            actual_entry_point,
             entry_point_script,
-            entry_point_name,
         ],
         outs = [entry_point_py],
     )
 
     py_binary(
         name = name,
-        srcs = [entry_point_wrapper],
+        srcs = [entry_point_wrapper, actual_entry_point],
         main = entry_point_py,
         args = (args or []),
-        deps = [entry_point_name],
         data = (data or []),
     )
