@@ -37,8 +37,10 @@ private:
 
 public:
   // HttpCache
-  LookupContextPtr makeLookupContext(LookupRequest&& request) override;
-  InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context) override;
+  LookupContextPtr makeLookupContext(LookupRequest&& request,
+                                     Http::StreamDecoderFilterCallbacks& callbacks) override;
+  InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context,
+                                     Http::StreamEncoderFilterCallbacks& callbacks) override;
   void updateHeaders(const LookupContext& lookup_context,
                      const Http::ResponseHeaderMap& response_headers,
                      const ResponseMetadata& metadata) override;
