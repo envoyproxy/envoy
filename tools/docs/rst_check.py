@@ -8,7 +8,7 @@ from envoy.base import checker
 
 INVALID_REFLINK = r".* ref:.*"
 REF_WITH_PUNCTUATION_REGEX = r".*\. <[^<]*>`\s*"
-VERSION_HISTORY_NEW_LINE_REGEX = r"\* ([a-z \-_]+): ([a-z:`]+)"
+VERSION_HISTORY_NEW_LINE_REGEX = r"\* ([0-9a-z \-_]+): ([a-z:`]+)"
 VERSION_HISTORY_SECTION_NAME = r"^[A-Z][A-Za-z ]*$"
 # Make sure backticks come in pairs.
 # Exceptions: reflinks (ref:`` where the backtick won't be preceded by a space

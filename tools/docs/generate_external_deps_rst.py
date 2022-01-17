@@ -2,12 +2,13 @@
 
 # Generate RST lists of external dependencies.
 
-from collections import defaultdict, namedtuple
+import json
 import os
 import pathlib
 import sys
 import tarfile
 import urllib.parse
+from collections import defaultdict, namedtuple
 
 from tools.dependency import utils as dep_utils
 
@@ -73,7 +74,8 @@ def csv_row(dep):
 
 
 def main():
-    output_filename = sys.argv[1]
+    repository_locations = json.loads(pathlib.Path(sys.argv[1]).read_text())
+    output_filename = sys.argv[2]
     generated_rst_dir = os.path.dirname(output_filename)
     security_rst_root = os.path.join(generated_rst_dir, "intro/arch_overview/security")
 
@@ -82,7 +84,7 @@ def main():
     Dep = namedtuple('Dep', ['name', 'sort_name', 'version', 'cpe', 'release_date'])
     use_categories = defaultdict(lambda: defaultdict(list))
     # Bin rendered dependencies into per-use category lists.
-    for k, v in dep_utils.repository_locations().items():
+    for k, v in repository_locations.items():
         cpe = v.get('cpe', '')
         if cpe == 'N/A':
             cpe = ''
