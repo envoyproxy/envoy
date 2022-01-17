@@ -60,6 +60,7 @@ The following sandboxes are available:
     jaeger_native_tracing
     jaeger_tracing
     load_reporting_service
+    locality_load_balancing
     lua
     mysql
     postgres

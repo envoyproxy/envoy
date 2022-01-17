@@ -310,7 +310,7 @@ void SubstitutionFormatParser::parseCommandHeader(const std::string& token, cons
   if (!subs.empty()) {
     throw EnvoyException(
         // Header format rules support only one alternative header.
-        // docs/root/configuration/access_log.rst#format-rules
+        // docs/root/configuration/observability/access_log/access_log.rst#format-rules
         absl::StrCat("More than 1 alternative header specified in token: ", token));
   }
 
@@ -685,297 +685,436 @@ private:
   FieldExtractor field_extractor_;
 };
 
+const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnownFieldExtractors() {
+  CONSTRUCT_ON_FIRST_USE(
+      FieldExtractorLookupTbl,
+      {{"REQUEST_DURATION",
+        []() {
+          return std::make_unique<StreamInfoDurationFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                StreamInfo::TimingUtility timing(stream_info);
+                return timing.lastDownstreamRxByteReceived();
+              });
+        }},
+       {"REQUEST_TX_DURATION",
+        []() {
+          return std::make_unique<StreamInfoDurationFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                StreamInfo::TimingUtility timing(stream_info);
+                return timing.lastUpstreamTxByteSent();
+              });
+        }},
+       {"RESPONSE_DURATION",
+        []() {
+          return std::make_unique<StreamInfoDurationFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                StreamInfo::TimingUtility timing(stream_info);
+                return timing.firstUpstreamRxByteReceived();
+              });
+        }},
+       {"RESPONSE_TX_DURATION",
+        []() {
+          return std::make_unique<StreamInfoDurationFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                StreamInfo::TimingUtility timing(stream_info);
+                auto downstream = timing.lastDownstreamTxByteSent();
+                auto upstream = timing.firstUpstreamRxByteReceived();
+
+                absl::optional<std::chrono::nanoseconds> result;
+                if (downstream && upstream) {
+                  result = downstream.value() - upstream.value();
+                }
+
+                return result;
+              });
+        }},
+       {"BYTES_RECEIVED",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.bytesReceived();
+              });
+        }},
+       {"UPSTREAM_WIRE_BYTES_RECEIVED",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.getUpstreamBytesMeter()->wireBytesReceived();
+              });
+        }},
+       {"UPSTREAM_HEADER_BYTES_RECEIVED",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.getUpstreamBytesMeter()->headerBytesReceived();
+              });
+        }},
+       {"DOWNSTREAM_WIRE_BYTES_RECEIVED",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.getDownstreamBytesMeter()->wireBytesReceived();
+              });
+        }},
+       {"DOWNSTREAM_HEADER_BYTES_RECEIVED",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.getDownstreamBytesMeter()->headerBytesReceived();
+              });
+        }},
+       {"PROTOCOL",
+        []() {
+          return std::make_unique<StreamInfoStringFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return SubstitutionFormatUtils::protocolToString(stream_info.protocol());
+              });
+        }},
+       {"RESPONSE_CODE",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.responseCode().value_or(0);
+              });
+        }},
+       {"RESPONSE_CODE_DETAILS",
+        []() {
+          return std::make_unique<StreamInfoStringFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.responseCodeDetails();
+              });
+        }},
+       {"CONNECTION_TERMINATION_DETAILS",
+        []() {
+          return std::make_unique<StreamInfoStringFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.connectionTerminationDetails();
+              });
+        }},
+       {"BYTES_SENT",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesSent(); });
+        }},
+       {"UPSTREAM_WIRE_BYTES_SENT",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.getUpstreamBytesMeter()->wireBytesSent();
+              });
+        }},
+       {"UPSTREAM_HEADER_BYTES_SENT",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.getUpstreamBytesMeter()->headerBytesSent();
+              });
+        }},
+       {"DOWNSTREAM_WIRE_BYTES_SENT",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.getDownstreamBytesMeter()->wireBytesSent();
+              });
+        }},
+       {"DOWNSTREAM_HEADER_BYTES_SENT",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.getDownstreamBytesMeter()->headerBytesSent();
+              });
+        }},
+       {"DURATION",
+        []() {
+          return std::make_unique<StreamInfoDurationFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.requestComplete();
+              });
+        }},
+       {"RESPONSE_FLAGS",
+        []() {
+          return std::make_unique<StreamInfoStringFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return StreamInfo::ResponseFlagUtils::toShortString(stream_info);
+              });
+        }},
+       {"UPSTREAM_HOST",
+        []() {
+          return StreamInfoAddressFieldExtractor::withPort(
+              [](const StreamInfo::StreamInfo& stream_info)
+                  -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+                if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
+                  return stream_info.upstreamInfo()->upstreamHost()->address();
+                }
+                return nullptr;
+              });
+        }},
+       {"UPSTREAM_CLUSTER",
+        []() {
+          return std::make_unique<StreamInfoStringFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                std::string upstream_cluster_name;
+                if (stream_info.upstreamClusterInfo().has_value() &&
+                    stream_info.upstreamClusterInfo().value() != nullptr) {
+                  if (Runtime::runtimeFeatureEnabled(
+                          "envoy.reloadable_features.use_observable_cluster_name")) {
+                    upstream_cluster_name =
+                        stream_info.upstreamClusterInfo().value()->observabilityName();
+                  } else {
+                    upstream_cluster_name = stream_info.upstreamClusterInfo().value()->name();
+                  }
+                }
+
+                return upstream_cluster_name.empty()
+                           ? absl::nullopt
+                           : absl::make_optional<std::string>(upstream_cluster_name);
+              });
+        }},
+       {"UPSTREAM_LOCAL_ADDRESS",
+        []() {
+          return StreamInfoAddressFieldExtractor::withPort(
+              [](const StreamInfo::StreamInfo& stream_info)
+                  -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+                if (stream_info.upstreamInfo().has_value()) {
+                  return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
+                }
+                return nullptr;
+              });
+        }},
+       {"UPSTREAM_REQUEST_ATTEMPT_COUNT",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.attemptCount().value_or(0);
+              });
+        }},
+       {"DOWNSTREAM_LOCAL_ADDRESS",
+        []() {
+          return StreamInfoAddressFieldExtractor::withPort(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.downstreamAddressProvider().localAddress();
+              });
+        }},
+       {"DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT",
+        []() {
+          return StreamInfoAddressFieldExtractor::withoutPort(
+              [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                return stream_info.downstreamAddressProvider().localAddress();
+              });
+        }},
+       {"DOWNSTREAM_LOCAL_PORT",
+        []() {
+          return StreamInfoAddressFieldExtractor::justPort(
+              [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                return stream_info.downstreamAddressProvider().localAddress();
+              });
+        }},
+       {"DOWNSTREAM_REMOTE_ADDRESS",
+        []() {
+          return StreamInfoAddressFieldExtractor::withPort(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.downstreamAddressProvider().remoteAddress();
+              });
+        }},
+       {"DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT",
+        []() {
+          return StreamInfoAddressFieldExtractor::withoutPort(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.downstreamAddressProvider().remoteAddress();
+              });
+        }},
+       {"DOWNSTREAM_DIRECT_REMOTE_ADDRESS",
+        []() {
+          return StreamInfoAddressFieldExtractor::withPort(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.downstreamAddressProvider().directRemoteAddress();
+              });
+        }},
+       {"DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT",
+        []() {
+          return StreamInfoAddressFieldExtractor::withoutPort(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.downstreamAddressProvider().directRemoteAddress();
+              });
+        }},
+       {"CONNECTION_ID",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.downstreamAddressProvider().connectionID().value_or(0);
+              });
+        }},
+       {"REQUESTED_SERVER_NAME",
+        []() {
+          return std::make_unique<StreamInfoStringFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                absl::optional<std::string> result;
+                if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
+                  result =
+                      std::string(stream_info.downstreamAddressProvider().requestedServerName());
+                }
+                return result;
+              });
+        }},
+       {"ROUTE_NAME",
+        []() {
+          return std::make_unique<StreamInfoStringFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                absl::optional<std::string> result;
+                std::string route_name = stream_info.getRouteName();
+                if (!route_name.empty()) {
+                  result = route_name;
+                }
+                return result;
+              });
+        }},
+       {"DOWNSTREAM_PEER_URI_SAN",
+        []() {
+          return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+              [](const Ssl::ConnectionInfo& connection_info) {
+                return absl::StrJoin(connection_info.uriSanPeerCertificate(), ",");
+              });
+        }},
+       {"DOWNSTREAM_LOCAL_URI_SAN",
+        []() {
+          return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+              [](const Ssl::ConnectionInfo& connection_info) {
+                return absl::StrJoin(connection_info.uriSanLocalCertificate(), ",");
+              });
+        }},
+       {"DOWNSTREAM_PEER_SUBJECT",
+        []() {
+          return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+              [](const Ssl::ConnectionInfo& connection_info) {
+                return connection_info.subjectPeerCertificate();
+              });
+        }},
+       {"DOWNSTREAM_LOCAL_SUBJECT",
+        []() {
+          return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+              [](const Ssl::ConnectionInfo& connection_info) {
+                return connection_info.subjectLocalCertificate();
+              });
+        }},
+       {"DOWNSTREAM_TLS_SESSION_ID",
+        []() {
+          return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+              [](const Ssl::ConnectionInfo& connection_info) {
+                return connection_info.sessionId();
+              });
+        }},
+       {"DOWNSTREAM_TLS_CIPHER",
+        []() {
+          return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+              [](const Ssl::ConnectionInfo& connection_info) {
+                return connection_info.ciphersuiteString();
+              });
+        }},
+       {"DOWNSTREAM_TLS_VERSION",
+        []() {
+          return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+              [](const Ssl::ConnectionInfo& connection_info) {
+                return connection_info.tlsVersion();
+              });
+        }},
+       {"DOWNSTREAM_PEER_FINGERPRINT_256",
+        []() {
+          return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+              [](const Ssl::ConnectionInfo& connection_info) {
+                return connection_info.sha256PeerCertificateDigest();
+              });
+        }},
+       {"DOWNSTREAM_PEER_FINGERPRINT_1",
+        []() {
+          return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+              [](const Ssl::ConnectionInfo& connection_info) {
+                return connection_info.sha1PeerCertificateDigest();
+              });
+        }},
+       {"DOWNSTREAM_PEER_SERIAL",
+        []() {
+          return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+              [](const Ssl::ConnectionInfo& connection_info) {
+                return connection_info.serialNumberPeerCertificate();
+              });
+        }},
+       {"DOWNSTREAM_PEER_ISSUER",
+        []() {
+          return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+              [](const Ssl::ConnectionInfo& connection_info) {
+                return connection_info.issuerPeerCertificate();
+              });
+        }},
+       {"DOWNSTREAM_PEER_CERT",
+        []() {
+          return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+              [](const Ssl::ConnectionInfo& connection_info) {
+                return connection_info.urlEncodedPemEncodedPeerCertificate();
+              });
+        }},
+       {"UPSTREAM_TRANSPORT_FAILURE_REASON",
+        []() {
+          return std::make_unique<StreamInfoStringFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                absl::optional<std::string> result;
+                if (stream_info.upstreamInfo().has_value() && !stream_info.upstreamInfo()
+                                                                   .value()
+                                                                   .get()
+                                                                   .upstreamTransportFailureReason()
+                                                                   .empty()) {
+                  result =
+                      stream_info.upstreamInfo().value().get().upstreamTransportFailureReason();
+                }
+                return result;
+              });
+        }},
+       {"HOSTNAME",
+        []() {
+          absl::optional<std::string> hostname = SubstitutionFormatUtils::getHostname();
+          return std::make_unique<StreamInfoStringFieldExtractor>(
+              [hostname](const StreamInfo::StreamInfo&) { return hostname; });
+        }},
+       {"FILTER_CHAIN_NAME",
+        []() {
+          return std::make_unique<StreamInfoStringFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+                if (!stream_info.filterChainName().empty()) {
+                  return stream_info.filterChainName();
+                }
+                return absl::nullopt;
+              });
+        }},
+       {"VIRTUAL_CLUSTER_NAME",
+        []() {
+          return std::make_unique<StreamInfoStringFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+                return stream_info.virtualClusterName();
+              });
+        }},
+       {"TLS_JA3_FINGERPRINT", []() {
+          return std::make_unique<StreamInfoStringFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) {
+                absl::optional<std::string> result;
+                if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
+                  result = std::string(stream_info.downstreamAddressProvider().ja3Hash());
+                }
+                return result;
+              });
+        }}});
+}
+
 StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
-  // TODO: Change this huge if-else ladder to use a switch case instead.
-  if (field_name == "REQUEST_DURATION") {
-    field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.lastDownstreamRxByteReceived();
-        });
-  } else if (field_name == "REQUEST_TX_DURATION") {
-    field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.lastUpstreamTxByteSent();
-        });
-  } else if (field_name == "RESPONSE_DURATION") {
-    field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.firstUpstreamRxByteReceived();
-        });
-  } else if (field_name == "RESPONSE_TX_DURATION") {
-    field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          auto downstream = stream_info.lastDownstreamTxByteSent();
-          auto upstream = stream_info.firstUpstreamRxByteReceived();
+  const FieldExtractorLookupTbl& extractors = getKnownFieldExtractors();
 
-          absl::optional<std::chrono::nanoseconds> result;
-          if (downstream && upstream) {
-            result = downstream.value() - upstream.value();
-          }
+  auto it = extractors.find(field_name);
 
-          return result;
-        });
-  } else if (field_name == "BYTES_RECEIVED") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesReceived(); });
-  } else if (field_name == "UPSTREAM_WIRE_BYTES_RECEIVED") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.getUpstreamBytesMeter()->wireBytesReceived();
-        });
-  } else if (field_name == "UPSTREAM_HEADER_BYTES_RECEIVED") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.getUpstreamBytesMeter()->headerBytesReceived();
-        });
-  } else if (field_name == "DOWNSTREAM_WIRE_BYTES_RECEIVED") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.getDownstreamBytesMeter()->wireBytesReceived();
-        });
-  } else if (field_name == "DOWNSTREAM_HEADER_BYTES_RECEIVED") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.getDownstreamBytesMeter()->headerBytesReceived();
-        });
-  } else if (field_name == "PROTOCOL") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return SubstitutionFormatUtils::protocolToString(stream_info.protocol());
-        });
-  } else if (field_name == "RESPONSE_CODE") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.responseCode().value_or(0);
-        });
-  } else if (field_name == "RESPONSE_CODE_DETAILS") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.responseCodeDetails();
-        });
-  } else if (field_name == "CONNECTION_TERMINATION_DETAILS") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.connectionTerminationDetails();
-        });
-  } else if (field_name == "BYTES_SENT") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesSent(); });
-  } else if (field_name == "UPSTREAM_WIRE_BYTES_SENT") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.getUpstreamBytesMeter()->wireBytesSent();
-        });
-  } else if (field_name == "UPSTREAM_HEADER_BYTES_SENT") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.getUpstreamBytesMeter()->headerBytesSent();
-        });
-  } else if (field_name == "DOWNSTREAM_WIRE_BYTES_SENT") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.getDownstreamBytesMeter()->wireBytesSent();
-        });
-  } else if (field_name == "DOWNSTREAM_HEADER_BYTES_SENT") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.getDownstreamBytesMeter()->headerBytesSent();
-        });
-  } else if (field_name == "DURATION") {
-    field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) { return stream_info.requestComplete(); });
-  } else if (field_name == "RESPONSE_FLAGS") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return StreamInfo::ResponseFlagUtils::toShortString(stream_info);
-        });
-  } else if (field_name == "UPSTREAM_HOST") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.upstreamHost() ? stream_info.upstreamHost()->address() : nullptr;
-        });
-  } else if (field_name == "UPSTREAM_CLUSTER") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          std::string upstream_cluster_name;
-          if (stream_info.upstreamClusterInfo().has_value() &&
-              stream_info.upstreamClusterInfo().value() != nullptr) {
-            if (Runtime::runtimeFeatureEnabled(
-                    "envoy.reloadable_features.use_observable_cluster_name")) {
-              upstream_cluster_name =
-                  stream_info.upstreamClusterInfo().value()->observabilityName();
-            } else {
-              upstream_cluster_name = stream_info.upstreamClusterInfo().value()->name();
-            }
-          }
-
-          return upstream_cluster_name.empty()
-                     ? absl::nullopt
-                     : absl::make_optional<std::string>(upstream_cluster_name);
-        });
-  } else if (field_name == "UPSTREAM_LOCAL_ADDRESS") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.upstreamLocalAddress();
-        });
-  } else if (field_name == "UPSTREAM_REQUEST_ATTEMPT_COUNT") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.attemptCount().value_or(0);
-        });
-  } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamAddressProvider().localAddress();
-        });
-  } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT") {
-    field_extractor_ = StreamInfoAddressFieldExtractor::withoutPort(
-        [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamAddressProvider().localAddress();
-        });
-  } else if (field_name == "DOWNSTREAM_LOCAL_PORT") {
-    field_extractor_ = StreamInfoAddressFieldExtractor::justPort(
-        [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamAddressProvider().localAddress();
-        });
-  } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamAddressProvider().remoteAddress();
-        });
-  } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withoutPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamAddressProvider().remoteAddress();
-        });
-  } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamAddressProvider().directRemoteAddress();
-        });
-  } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withoutPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamAddressProvider().directRemoteAddress();
-        });
-  } else if (field_name == "CONNECTION_ID") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamAddressProvider().connectionID().value_or(0);
-        });
-  } else if (field_name == "REQUESTED_SERVER_NAME") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          absl::optional<std::string> result;
-          if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
-            result = std::string(stream_info.downstreamAddressProvider().requestedServerName());
-          }
-          return result;
-        });
-  } else if (field_name == "ROUTE_NAME") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          absl::optional<std::string> result;
-          std::string route_name = stream_info.getRouteName();
-          if (!route_name.empty()) {
-            result = route_name;
-          }
-          return result;
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_URI_SAN") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return absl::StrJoin(connection_info.uriSanPeerCertificate(), ",");
-        });
-  } else if (field_name == "DOWNSTREAM_LOCAL_URI_SAN") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return absl::StrJoin(connection_info.uriSanLocalCertificate(), ",");
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_SUBJECT") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.subjectPeerCertificate();
-        });
-  } else if (field_name == "DOWNSTREAM_LOCAL_SUBJECT") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.subjectLocalCertificate();
-        });
-  } else if (field_name == "DOWNSTREAM_TLS_SESSION_ID") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) { return connection_info.sessionId(); });
-  } else if (field_name == "DOWNSTREAM_TLS_CIPHER") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.ciphersuiteString();
-        });
-  } else if (field_name == "DOWNSTREAM_TLS_VERSION") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) { return connection_info.tlsVersion(); });
-  } else if (field_name == "DOWNSTREAM_PEER_FINGERPRINT_256") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.sha256PeerCertificateDigest();
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_FINGERPRINT_1") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.sha1PeerCertificateDigest();
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_SERIAL") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.serialNumberPeerCertificate();
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_ISSUER") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.issuerPeerCertificate();
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_CERT") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.urlEncodedPemEncodedPeerCertificate();
-        });
-  } else if (field_name == "UPSTREAM_TRANSPORT_FAILURE_REASON") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          absl::optional<std::string> result;
-          if (!stream_info.upstreamTransportFailureReason().empty()) {
-            result = stream_info.upstreamTransportFailureReason();
-          }
-          return result;
-        });
-  } else if (field_name == "HOSTNAME") {
-    absl::optional<std::string> hostname = SubstitutionFormatUtils::getHostname();
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [hostname](const StreamInfo::StreamInfo&) { return hostname; });
-  } else if (field_name == "FILTER_CHAIN_NAME") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-          if (!stream_info.filterChainName().empty()) {
-            return stream_info.filterChainName();
-          }
-          return absl::nullopt;
-        });
-  } else if (field_name == "VIRTUAL_CLUSTER_NAME") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-          return stream_info.virtualClusterName();
-        });
-  } else if (field_name == "TLS_JA3_FINGERPRINT") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          absl::optional<std::string> result;
-          if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
-            result = std::string(stream_info.downstreamAddressProvider().ja3Hash());
-          }
-          return result;
-        });
-  } else {
+  if (it == extractors.end()) {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }
+
+  // Create a pointer to the formatter by calling a function
+  // associated with formatter's name.
+  field_extractor_ = (*it).second();
 }
 
 absl::optional<std::string> StreamInfoFormatter::format(const Http::RequestHeaderMap&,
@@ -1134,9 +1273,8 @@ uint64_t HeadersByteSizeFormatter::extractHeadersByteSize(
     return response_headers.byteSize();
   case HeaderType::ResponseTrailers:
     return response_trailers.byteSize();
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 absl::optional<std::string>

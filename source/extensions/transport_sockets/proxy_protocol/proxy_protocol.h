@@ -39,7 +39,7 @@ private:
   ProxyProtocolConfig_Version version_{ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1};
 };
 
-class UpstreamProxyProtocolSocketFactory : public Network::TransportSocketFactory {
+class UpstreamProxyProtocolSocketFactory : public PassthroughFactory {
 public:
   UpstreamProxyProtocolSocketFactory(Network::TransportSocketFactoryPtr transport_socket_factory,
                                      ProxyProtocolConfig config);
@@ -47,11 +47,9 @@ public:
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
-  bool implementsSecureTransport() const override;
   bool usesProxyProtocolOptions() const override { return true; }
 
 private:
-  Network::TransportSocketFactoryPtr transport_socket_factory_;
   ProxyProtocolConfig config_;
 };
 

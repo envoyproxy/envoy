@@ -212,6 +212,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   pmb.SetQueryParamUnescapePlus(proto_config.query_param_unescape_plus());
+  pmb.SetMatchUnregisteredCustomVerb(proto_config.match_unregistered_custom_verb());
 
   path_matcher_ = pmb.Build();
 
@@ -463,7 +464,8 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     decoder_callbacks_->sendLocalReply(
         static_cast<Http::Code>(http_code), status.message().ToString(), nullptr, absl::nullopt,
         absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{",
-                     MessageUtil::codeEnumToString(status.code()), "}"));
+                     StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(status.code())),
+                     "}"));
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -743,7 +745,10 @@ bool JsonTranscoderFilter::checkIfTranscoderFailed(const std::string& details) {
         Http::Code::BadRequest,
         absl::string_view(request_status.message().data(), request_status.message().size()),
         nullptr, absl::nullopt,
-        absl::StrCat(details, "{", MessageUtil::codeEnumToString(request_status.code()), "}"));
+        absl::StrCat(
+            details, "{",
+            StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(request_status.code())),
+            "}"));
 
     return true;
   }

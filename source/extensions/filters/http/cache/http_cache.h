@@ -9,6 +9,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/server/factory_context.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
@@ -204,7 +205,8 @@ public:
   // - LookupResult::response_ranges_ entries are satisfiable (as documented
   // there).
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
-                                ResponseMetadata&& metadata, uint64_t content_length) const;
+                                ResponseMetadata&& metadata, uint64_t content_length,
+                                bool has_trailers) const;
 
   const Http::RequestHeaderMap& requestHeaders() const { return *request_headers_; }
   const VaryAllowList& varyAllowList() const { return vary_allow_list_; }
@@ -368,8 +370,12 @@ public:
 
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).
+  //
+  // Pass factory context to allow HttpCache to use async client, stats scope
+  // etc.
   virtual HttpCache&
-  getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config) PURE;
+  getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
+           Server::Configuration::FactoryContext& context) PURE;
   ~HttpCacheFactory() override = default;
 
 private:

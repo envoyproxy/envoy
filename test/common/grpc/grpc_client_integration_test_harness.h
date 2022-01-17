@@ -342,7 +342,7 @@ public:
                                                    stats_scope_, createGoogleGrpcConfig(), *api_,
                                                    google_grpc_stat_names_);
 #else
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
 #endif
   }
 

@@ -12,12 +12,12 @@ namespace Envoy {
 class SocketInterfaceSwap {
 public:
   // Object of this class hold the state determining the IoHandle which
-  // should return EAGAIN from the `writev` call.
+  // should return the supplied return from the `writev` or `sendmsg` calls.
   struct IoHandleMatcher {
     Network::IoSocketError* returnOverride(Envoy::Network::TestIoSocketHandle* io_handle) {
       absl::MutexLock lock(&mutex_);
       if (error_ && (io_handle->localAddress()->ip()->port() == src_port_ ||
-                     io_handle->peerAddress()->ip()->port() == dst_port_)) {
+                     (dst_port_ && io_handle->peerAddress()->ip()->port() == dst_port_))) {
         ASSERT(matched_iohandle_ == nullptr || matched_iohandle_ == io_handle,
                "Matched multiple io_handles, expected at most one to match.");
         matched_iohandle_ = io_handle;
@@ -40,12 +40,12 @@ public:
       dst_port_ = port;
     }
 
-    void setWritevReturnsEgain() {
-      setWritevOverride(Network::IoSocketError::getIoSocketEagainInstance());
+    void setWriteReturnsEgain() {
+      setWriteOverride(Network::IoSocketError::getIoSocketEagainInstance());
     }
 
     // The caller is responsible for memory management.
-    void setWritevOverride(Network::IoSocketError* error) {
+    void setWriteOverride(Network::IoSocketError* error) {
       absl::WriterMutexLock lock(&mutex_);
       ASSERT(src_port_ != 0 || dst_port_ != 0);
       error_ = error;
@@ -70,7 +70,7 @@ public:
 
   Envoy::Network::SocketInterface* const previous_socket_interface_{
       Envoy::Network::SocketInterfaceSingleton::getExisting()};
-  std::shared_ptr<IoHandleMatcher> writev_matcher_{std::make_shared<IoHandleMatcher>()};
+  std::shared_ptr<IoHandleMatcher> write_matcher_{std::make_shared<IoHandleMatcher>()};
   std::unique_ptr<Envoy::Network::SocketInterfaceLoader> test_socket_interface_loader_;
 };
 

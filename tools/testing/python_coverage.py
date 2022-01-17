@@ -34,6 +34,7 @@ class CoverageRunner(runner.Runner):
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         """Add arguments to the arg parser"""
+        super().add_arguments(parser)
         parser.add_argument("cov_data", help="Path to coverage data")
         parser.add_argument("cov_html", help="Path to coverage html")
 

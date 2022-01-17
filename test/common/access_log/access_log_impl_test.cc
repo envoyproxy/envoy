@@ -106,7 +106,7 @@ typed_config:
   EXPECT_CALL(*file_, write(_));
 
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  stream_info_.onUpstreamHostSelected(
+  stream_info_.upstreamInfo()->setUpstreamHost(
       Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234", simTime()));
   stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination);
 
@@ -217,7 +217,7 @@ typed_config:
 
 TEST_F(AccessLogImplTest, UpstreamHost) {
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  stream_info_.onUpstreamHostSelected(
+  stream_info_.upstreamInfo()->setUpstreamHost(
       Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234", simTime()));
 
   const std::string yaml = R"EOF(
@@ -1663,40 +1663,6 @@ typed_config:
                           EnvoyException, "Not able to parse filter expression: .*");
 }
 #endif // USE_CEL_PARSER
-
-// Test that the deprecated extension names are disabled by default.
-// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
-TEST_F(AccessLogImplTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  {
-    envoy::config::accesslog::v3::AccessLog config;
-    config.set_name("envoy.file_access_log");
-
-    EXPECT_THROW(
-        Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config),
-        EnvoyException);
-  }
-
-  {
-    envoy::config::accesslog::v3::AccessLog config;
-    config.set_name("envoy.http_grpc_access_log");
-
-    EXPECT_THROW(
-        Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config),
-        EnvoyException);
-  }
-
-  {
-    envoy::config::accesslog::v3::AccessLog config;
-    config.set_name("envoy.tcp_grpc_access_log");
-
-    EXPECT_THROW(
-        Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config),
-        EnvoyException);
-  }
-}
 
 } // namespace
 } // namespace AccessLog

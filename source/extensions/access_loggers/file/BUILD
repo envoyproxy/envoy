@@ -7,7 +7,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Access log implementation that writes to a file.
-# Public docs: docs/root/configuration/access_log.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/access_log
 
 envoy_extension_package()
 

@@ -4,6 +4,8 @@
 #include "envoy/router/router.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/common/assert.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -38,10 +40,15 @@ public:
   const VirtualClusterStatNames& virtualClusterStatNames() const override {
     return virtual_cluster_stat_names_;
   }
+  GenericConnPoolFactory& genericConnPoolFactory() override {
+    ASSERT(generic_conn_pool_factory_ != nullptr);
+    return *generic_conn_pool_factory_;
+  }
 
 private:
   const StatNames stat_names_;
   const VirtualClusterStatNames virtual_cluster_stat_names_;
+  GenericConnPoolFactory* generic_conn_pool_factory_;
 };
 
 } // namespace Router

@@ -246,7 +246,7 @@ public:
   std::shared_ptr<UpstreamRequest> getUpstreamRequest(const std::string& host) {
     try {
       return tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.at(host);
-    } catch (std::out_of_range&) {
+    } catch (std::out_of_range const&) {
       return nullptr;
     }
   }
