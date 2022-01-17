@@ -1,3 +1,4 @@
+# Workaround for uninitialized use
 diff --git a/src/fdr/teddy_runtime_common.h b/src/fdr/teddy_runtime_common.h
 index b76800e..6e587c2 100644
 --- a/src/fdr/teddy_runtime_common.h

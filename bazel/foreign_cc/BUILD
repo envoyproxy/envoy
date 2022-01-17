@@ -105,6 +105,8 @@ configure_make(
 
 configure_make(
     name = "ragel",
+    # Workaround for the issue with statically linked libstdc++
+    # using -l:libstdc++.a.
     env = {
         "CXXFLAGS": "-lstdc++",
     },

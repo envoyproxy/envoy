@@ -85,7 +85,7 @@ bool Matcher::match(absl::optional<absl::string_view> input) {
           bool* matched = static_cast<bool*>(context);
           *matched = true;
 
-          // Always terminate on the first match.
+          // Non-zero if the matching should cease. Always terminate on the first match.
           return 1;
         },
         &matched);
