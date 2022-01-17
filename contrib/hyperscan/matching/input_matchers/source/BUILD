@@ -24,13 +24,8 @@ envoy_cmake(
     cache_entries = {
         "BOOST_ROOT": "$EXT_BUILD_ROOT/external/org_boost",
         "BUILD_EXAMPLES": "off",
-        "CMAKE_CXX_FLAGS": "$CXXFLAGS",
         "RAGEL": "$EXT_BUILD_DEPS/ragel/bin/ragel",
     },
-    env = select({
-        "//bazel:gcc_build": {"CXXFLAGS": "-lstdc++"},
-        "//conditions:default": {"CXXFLAGS": ""},
-    }),
     lib_source = "@io_hyperscan//:all",
     out_static_libs = ["libhs.a"],
     tags = ["skip_on_windows"],
