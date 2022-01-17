@@ -170,10 +170,10 @@ class Validator(object):
         Raises:
           DependencyError: on a dependency validation error.
         """
-        print('Validating build dependency structure...')
         queried_core_ext_deps = self._build_graph.query_external_deps(
             '//source/exe:envoy_main_common_with_core_extensions_lib', '//source/extensions/...')
         queried_all_deps = self._build_graph.query_external_deps('//source/...')
+        print(f'Validating build dependency structure for {len(queried_all_deps)} deps...')
         if queried_all_deps != queried_core_ext_deps:
             raise DependencyError(
                 'Invalid build graph structure. deps(//source/...) != '
@@ -186,11 +186,11 @@ class Validator(object):
         Raises:
           DependencyError: on a dependency validation error.
         """
-        print('Validating test-only dependencies...')
         # Validate that //source doesn't depend on test_only
         queried_source_deps = self._build_graph.query_external_deps('//source/...')
         expected_test_only_deps = self._dep_info.deps_by_use_category('test_only')
         bad_test_only_deps = expected_test_only_deps.intersection(queried_source_deps)
+        print(f'Validating {len(expected_test_only_deps)} test-only dependencies...')
         if len(bad_test_only_deps) > 0:
             raise DependencyError(
                 f'//source depends on test-only dependencies: {bad_test_only_deps}')
@@ -214,7 +214,6 @@ class Validator(object):
         Raises:
           DependencyError: on a dependency validation error.
         """
-        print('Validating data-plane dependencies...')
         # Necessary but not sufficient for dataplane. With some refactoring we could
         # probably have more precise tagging of dataplane/controlplane/other deps in
         # these paths.
@@ -226,6 +225,7 @@ class Validator(object):
         # It's hard to disentangle API and dataplane today.
         expected_dataplane_core_deps = self._dep_info.deps_by_use_category('dataplane_core').union(
             self._dep_info.deps_by_use_category('api'))
+        print(f'Validating data-plane {len(expected_dataplane_core_deps)} dependencies...')
         bad_dataplane_core_deps = queried_dataplane_core_min_deps.difference(
             expected_dataplane_core_deps)
         if len(bad_dataplane_core_deps) > 0:
@@ -243,7 +243,6 @@ class Validator(object):
         Raises:
           DependencyError: on a dependency validation error.
         """
-        print('Validating control-plane dependencies...')
         # Necessary but not sufficient for controlplane. With some refactoring we could
         # probably have more precise tagging of dataplane/controlplane/other deps in
         # these paths.
@@ -254,6 +253,7 @@ class Validator(object):
             self._dep_info.deps_by_use_category('api'))
         bad_controlplane_core_deps = queried_controlplane_core_min_deps.difference(
             expected_controlplane_core_deps)
+        print(f'Validating control-plane {len(expected_controlplane_core_deps)} dependencies...')
         if len(bad_controlplane_core_deps) > 0:
             raise DependencyError(
                 f'Observed controlplane core deps {queried_controlplane_core_min_deps} is not covered '
@@ -270,10 +270,10 @@ class Validator(object):
         Raises:
           DependencyError: on a dependency validation error.
         """
-        print(f'Validating extension {name} dependencies...')
         queried_deps = self._build_graph.query_external_deps(target)
         marginal_deps = queried_deps.difference(self._queried_core_deps)
         expected_deps = []
+        print(f'Validating extension {name} ({len(marginal_deps)}) dependencies...')
         for d in marginal_deps:
             metadata = self._dep_info.get_metadata(d)
             if metadata:

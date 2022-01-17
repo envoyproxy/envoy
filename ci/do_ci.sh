@@ -449,7 +449,7 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
 
   echo "verifying dependencies..."
   # Validate dependency relationships between core/extensions and external deps.
-  "${ENVOY_SRCDIR}"/tools/dependency/validate.py
+  time "${ENVOY_SRCDIR}"/tools/dependency/validate.py
 
   # Validate repository metadata.
   echo "check repositories..."
