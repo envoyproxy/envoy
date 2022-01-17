@@ -139,8 +139,8 @@ bool ThreadLocalStoreImpl::slowRejects(StatsMatcher::FastResult fast_reject_resu
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;
-  forEachCounter([&ret](std::size_t size) mutable { ret.reserve(size); },
-                 [&ret](Counter& counter) mutable -> bool {
+  forEachCounter([&ret](std::size_t size) { ret.reserve(size); },
+                 [&ret](Counter& counter) {
                    ret.emplace_back(CounterSharedPtr(&counter));
                    return true;
                  });
@@ -162,8 +162,8 @@ ScopePtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
 std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
-  forEachGauge([&ret](std::size_t size) mutable { ret.reserve(size); },
-               [&ret](Gauge& gauge) mutable -> bool {
+  forEachGauge([&ret](std::size_t size) { ret.reserve(size); },
+               [&ret](Gauge& gauge) {
                  if (gauge.importMode() != Gauge::ImportMode::Uninitialized) {
                    ret.emplace_back(GaugeSharedPtr(&gauge));
                  }
@@ -175,8 +175,8 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
 std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<TextReadoutSharedPtr> ret;
-  forEachTextReadout([&ret](std::size_t size) mutable { ret.reserve(size); },
-                     [&ret](TextReadout& text_readout) mutable -> bool {
+  forEachTextReadout([&ret](std::size_t size) { ret.reserve(size); },
+                     [&ret](TextReadout& text_readout) {
                        ret.emplace_back(TextReadoutSharedPtr(&text_readout));
                        return true;
                      });
