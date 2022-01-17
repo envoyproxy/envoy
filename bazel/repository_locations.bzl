@@ -1069,7 +1069,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "19851efd2616a66f9abd84f55f1d094e03252d87b1d78ae0f5d992121d1dd9cc",
         strip_prefix = "emsdk-{version}/bazel",
         urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.tar.gz"],
-        use_category = ["build"],
+        use_category = ["test_only"],
         release_date = "2022-01-16",
     ),
     rules_rust = dict(
