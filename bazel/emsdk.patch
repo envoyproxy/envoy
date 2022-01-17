@@ -1,42 +1,12 @@
 diff --git a/bazel/emscripten_toolchain/crosstool.bzl b/bazel/emscripten_toolchain/crosstool.bzl
-index ce87ebb..6257d96 100644
+index ce87ebb..bb45b42 100644
 --- a/bazel/emscripten_toolchain/crosstool.bzl
 +++ b/bazel/emscripten_toolchain/crosstool.bzl
-@@ -77,6 +77,7 @@ def _impl(ctx):
-     emcc_script = "emcc.%s" % ctx.attr.script_extension
-     emcc_link_script = "emcc_link.%s" % ctx.attr.script_extension
-     emar_script = "emar.%s" % ctx.attr.script_extension
-+    emdwp_script = "emdwp.%s" % ctx.attr.script_extension
- 
-     ################################################################
-     # Tools
-@@ -92,6 +93,7 @@ def _impl(ctx):
+@@ -92,6 +92,7 @@ def _impl(ctx):
      tool_paths = [
          tool_path(name = "ar", path = emar_script),
          tool_path(name = "cpp", path = "/bin/false"),
-+        tool_path(name = "dwp", path = emdwp_script),
++        tool_path(name = "dwp", path = "/bin/false"),
          tool_path(name = "gcc", path = emcc_script),
          tool_path(name = "gcov", path = "/bin/false"),
          tool_path(name = "ld", path = emcc_link_script),
-diff --git a/bazel/emscripten_toolchain/emdwp.bat b/bazel/emscripten_toolchain/emdwp.bat
-new file mode 100644
-index 0000000..22fe0f3
---- /dev/null
-+++ b/bazel/emscripten_toolchain/emdwp.bat
-@@ -0,0 +1,5 @@
-+@ECHO OFF
-+
-+call external\emsdk\emscripten_toolchain\env.bat
-+
-+py -3 %EMSCRIPTEN%\emdwp.py %*
-diff --git a/bazel/emscripten_toolchain/emdwp.sh b/bazel/emscripten_toolchain/emdwp.sh
-new file mode 100755
-index 0000000..f993138
---- /dev/null
-+++ b/bazel/emscripten_toolchain/emdwp.sh
-@@ -0,0 +1,5 @@
-+#!/bin/bash
-+
-+source $(dirname $0)/env.sh
-+
-+exec python3 $EMSCRIPTEN/emdwp.py "$@"
