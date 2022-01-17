@@ -411,8 +411,6 @@ def _net_colm_open_source_ragel():
     external_http_archive(
         name = "net_colm_open_source_ragel",
         build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:ragel.patch"],
     )
     native.bind(
         name = "ragel",
