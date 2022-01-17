@@ -341,54 +341,6 @@ TEST_P(ProtocolIntegrationTest, Upstream304ResponseWithContentLength) {
   EXPECT_TRUE(response->headers().get(Http::LowerCaseString("transfer-encoding")).empty());
 }
 
-// Upstream 304 response with Content-Length and no actual body
-// The legacy behavior is the same when upstream set content-length header
-TEST_P(ProtocolIntegrationTest, Upstream304ResponseWithContentLengthLegacy) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.no_chunked_encoding_header_for_304",
-                                    "false");
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/test/long/url"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"},
-                                     {"if-none-match", "\"1234567890\""}});
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "304"},
-                                                                   {"etag", "\"1234567890\""},
-                                                                   {"content-length", "123"}},
-                                   true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("304", response->headers().getStatusValue());
-  EXPECT_EQ(
-      "123",
-      response->headers().get(Http::LowerCaseString("content-length"))[0]->value().getStringView());
-  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("transfer-encoding")).empty());
-
-  // Make a HEAD request to make sure the previous 304 response with Content-Length did not cause
-  // issue.
-  response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "HEAD"},
-                                     {":path", "/test/long/url"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"},
-                                     {"if-none-match", "\"1234567890\""}});
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "304"},
-                                                                   {"etag", "\"1234567890\""},
-                                                                   {"content-length", "123"}},
-                                   true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("304", response->headers().getStatusValue());
-  EXPECT_EQ(
-      "123",
-      response->headers().get(Http::LowerCaseString("content-length"))[0]->value().getStringView());
-  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("transfer-encoding")).empty());
-}
-
 // Upstream 304 response without Content-Length
 // No content-length nor transfer-encoding header should be added for all protocol combinations.
 TEST_P(ProtocolIntegrationTest, 304ResponseWithoutContentLength) {
@@ -410,46 +362,6 @@ TEST_P(ProtocolIntegrationTest, 304ResponseWithoutContentLength) {
   EXPECT_TRUE(response->headers().get(Http::LowerCaseString("content-length")).empty());
 }
 
-// Upstream 304 response without Content-Length
-// The legacy behavior varies base on protocol combinations.
-TEST_P(ProtocolIntegrationTest, 304ResponseWithoutContentLengthLegacy) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.no_chunked_encoding_header_for_304",
-                                    "false");
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/test/long/url"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"},
-                                     {"if-none-match", "\"1234567890\""}});
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(
-      Http::TestResponseHeaderMapImpl{{":status", "304"}, {"etag", "\"1234567890\""}}, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("304", response->headers().getStatusValue());
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
-    if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
-      ASSERT_FALSE(response->headers().get(Http::LowerCaseString("transfer-encoding")).empty());
-      EXPECT_EQ("chunked", response->headers()
-                               .get(Http::LowerCaseString("transfer-encoding"))[0]
-                               ->value()
-                               .getStringView());
-      ASSERT_TRUE(response->headers().get(Http::LowerCaseString("content-length")).empty());
-    } else {
-      EXPECT_TRUE(response->headers().get(Http::LowerCaseString("transfer-encoding")).empty());
-      ASSERT_FALSE(response->headers().get(Http::LowerCaseString("content-length")).empty());
-      EXPECT_EQ("0", response->headers()
-                         .get(Http::LowerCaseString("content-length"))[0]
-                         ->value()
-                         .getStringView());
-    }
-  } else {
-    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("transfer-encoding")).empty());
-  }
-}
-
 // Upstream 304 response for HEAD request without Content-Length
 // Response to HEAD request is the same as response to GET request and consistent with different
 // protocol combinations.
@@ -469,38 +381,6 @@ TEST_P(ProtocolIntegrationTest, 304HeadResponseWithoutContentLength) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("304", response->headers().getStatusValue());
   EXPECT_TRUE(response->headers().get(Http::LowerCaseString("transfer-encoding")).empty());
-  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("content-length")).empty());
-}
-
-// Upstream 304 response for HEAD request without Content-Length
-// The legacy behavior is different between GET and HEAD request and between protocol combinations.
-TEST_P(ProtocolIntegrationTest, 304HeadResponseWithoutContentLengthLegacy) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.no_chunked_encoding_header_for_304",
-                                    "false");
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "HEAD"},
-                                     {":path", "/test/long/url"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"},
-                                     {"if-none-match", "\"1234567890\""}});
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(
-      Http::TestResponseHeaderMapImpl{{":status", "304"}, {"etag", "\"1234567890\""}}, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("304", response->headers().getStatusValue());
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
-
-    ASSERT_FALSE(response->headers().get(Http::LowerCaseString("transfer-encoding")).empty());
-    EXPECT_EQ("chunked", response->headers()
-                             .get(Http::LowerCaseString("transfer-encoding"))[0]
-                             ->value()
-                             .getStringView());
-  } else {
-    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("transfer-encoding")).empty());
-  }
   EXPECT_TRUE(response->headers().get(Http::LowerCaseString("content-length")).empty());
 }
 

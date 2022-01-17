@@ -180,7 +180,7 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       // For 1xx and 204 responses, do not send the chunked encoding header or enable chunked
       // encoding: https://tools.ietf.org/html/rfc7230#section-3.3.1
       chunk_encoding_ = false;
-    } else if (status && *status == 304 && connection_.noChunkedEncodingHeaderFor304()) {
+    } else if (status && *status == 304) {
       // For 304 response, since it should never have a body, we should not need to chunk_encode at
       // all.
       chunk_encoding_ = false;
@@ -473,8 +473,6 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       encode_only_header_key_formatter_(encodeOnlyFormatterFromSettings(settings)),
       processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
       deferred_end_stream_headers_(false), dispatching_(false),
-      no_chunked_encoding_header_for_304_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.no_chunked_encoding_header_for_304")),
       output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
           [&]() -> void { this->onBelowLowWatermark(); },
           [&]() -> void { this->onAboveHighWatermark(); },
@@ -882,8 +880,7 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   os << spaces << "Http1::ConnectionImpl " << this << DUMP_MEMBER(dispatching_)
      << DUMP_MEMBER(dispatching_slice_already_drained_) << DUMP_MEMBER(reset_stream_called_)
      << DUMP_MEMBER(handling_upgrade_) << DUMP_MEMBER(deferred_end_stream_headers_)
-     << DUMP_MEMBER(processing_trailers_) << DUMP_MEMBER(no_chunked_encoding_header_for_304_)
-     << DUMP_MEMBER(buffered_body_.length());
+     << DUMP_MEMBER(processing_trailers_) << DUMP_MEMBER(buffered_body_.length());
 
   // Dump header parsing state, and any progress on headers.
   os << DUMP_MEMBER(header_parsing_state_);
