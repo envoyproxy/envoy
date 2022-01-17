@@ -101,6 +101,8 @@ bool StatsHandler::Params::shouldShowMetric(const Stats::Metric& metric) const {
   return true;
 }
 
+bool StatsHandler::Params::matchesAny() const { return !used_only_ && !filter_.has_value(); }
+
 Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& response) {
   query_ = Http::Utility::parseAndDecodeQueryString(url);
   used_only_ = query_.find("usedonly") != query_.end();
@@ -413,6 +415,13 @@ public:
     collect<Stats::Histogram>(Type::Histograms, scope, histograms_);
   }
 
+  /** @return true if any of the stats in the scope pass the filter regex and used-only.*/
+  bool hasAny(const Stats::Scope& scope) {
+    return has<Stats::TextReadout>(Type::TextReadouts, scope) ||
+           has<Stats::Counter>(Type::Counters, scope) || has<Stats::Gauge>(Type::Gauges, scope) ||
+           has<Stats::Histogram>(Type::Histograms, scope);
+  }
+
   void emit() {
     emit<Stats::TextReadout>(Type::TextReadouts, text_readouts_);
     emit<Stats::Counter>(Type::Counters, counters_);
@@ -435,6 +444,20 @@ public:
       return true;
     };
     scope.iterate(fn);
+  }
+
+  /** @return true if any stats matching the filter and used-only are in the scope. */
+  template <class StatType> bool has(Type type, const Stats::Scope& scope) {
+    // Bail early if the  requested type does not match the current type.
+    if (params_.type_ != Type::All && params_.type_ != type) {
+      return false;
+    }
+
+    Stats::IterateFn<StatType> fn = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
+      // Stop iteration if any stat matches the filter by returning false.
+      return !params_.shouldShowMetric(*stat);
+    };
+    return !scope.iterate(fn); // We found a match if the iteration was stopped.
   }
 
   template <class StatType> void emit(Type type, SharedStatSet<StatType>& set) {
@@ -478,9 +501,9 @@ public:
     }
   }
 
-  void addScope(const std::string& scope) {
-    if (scope != params_.scope_) {
-      scopes_.insert(scope);
+  void addScope(const Stats::Scope& scope, const std::string& scope_name) {
+    if (scope_name != params_.scope_ && (params_.matchesAny() || hasAny(scope))) {
+      scopes_.insert(scope_name);
     }
   }
 
@@ -545,7 +568,7 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
           if (dot != std::string::npos) {
             prefix_str.resize(dot);
           }
-          context.addScope(prefix_str);
+          context.addScope(scope, prefix_str);
         }
       } else if (prefix_str == params.scope_ || prefix_str.empty() || params.scope_.empty()) {
         // If the scope matches the prefix of what the user wants, append in the
@@ -555,7 +578,7 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
         context.collectScope(scope);
       } else if (absl::StartsWith(prefix_str, params.scope_) &&
                  prefix_str[params.scope_.size()] == '.') {
-        context.addScope(prefix_str);
+        context.addScope(scope, prefix_str);
       }
     };
     stats.forEachScope([](size_t) {}, scope_fn);

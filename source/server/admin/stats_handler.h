@@ -75,6 +75,7 @@ private:
   struct Params {
     Http::Code parse(absl::string_view url, Buffer::Instance& response);
     bool shouldShowMetric(const Stats::Metric& metric) const;
+    bool matchesAny() const;
 
     bool used_only_{false};
     bool prometheus_text_readouts_{false};
