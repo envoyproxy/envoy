@@ -352,13 +352,24 @@ class StatsHandler::Context {
 public:
   // We need to hold ref-counts to each stat in our intermediate sets to avoid
   // having the stats be deleted while we are computing results.
+  //
+  // We provide hash/compare methods from Stat* so the emplace operation does
+  // not create an intermediate RefcountPtr for lookup, which would then need to
+  // be destroyed, which would need an Allocator lock. Since the allocator locks
+  // is held during the forEach lambda call, that would deadlock.
   template <class StatType> struct Hash {
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
     size_t operator()(const Stats::RefcountPtr<StatType>& a) const { return a->statName().hash(); }
+    size_t operator()(const StatType* stat) const { return stat->statName().hash(); }
   };
 
   template <class StatType> struct Compare {
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
     bool operator()(const Stats::RefcountPtr<StatType>& a,
                     const Stats::RefcountPtr<StatType>& b) const {
+      return a->statName() == b->statName();
+    }
+    bool operator()(const Stats::RefcountPtr<StatType>& a, const StatType* b) const {
       return a->statName() == b->statName();
     }
   };
@@ -393,31 +404,26 @@ public:
 
     collectHelper(stats, [this, &set](StatType& stat) {
       if (params_.shouldShowMetric(stat)) {
-        set.insert(&stat);
+        set.emplace(&stat);
       }
       return true;
     });
   }
 
   void collectHelper(const Stats::Store& stats, Stats::StatFn<Stats::TextReadout&> fn) {
-    for (const Stats::TextReadoutSharedPtr& text_readout : stats.textReadouts()) {
-      fn(*text_readout);
-    }
+    stats.forEachTextReadout(nullptr, fn);
   }
 
   void collectHelper(const Stats::Store& stats, Stats::StatFn<Stats::Counter&> fn) {
-    for (const Stats::CounterSharedPtr& counter : stats.counters()) {
-      fn(*counter);
-    }
+    stats.forEachCounter(nullptr, fn);
   }
 
   void collectHelper(const Stats::Store& stats, Stats::StatFn<Stats::Gauge&> fn) {
-    for (const Stats::GaugeSharedPtr& gauge : stats.gauges()) {
-      fn(*gauge);
-    }
+    stats.forEachGauge(nullptr, fn);
   }
 
   void collectHelper(const Stats::Store& stats, Stats::StatFn<Stats::Histogram&> fn) {
+    // TODO(jmarantz)): when #19166 lands convert to stats.forEachHistogram(nullptr, fn);
     for (const Stats::ParentHistogramSharedPtr& histogram : stats.histograms()) {
       fn(*histogram);
     }
