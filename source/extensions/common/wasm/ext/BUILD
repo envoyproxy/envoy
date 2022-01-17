@@ -52,6 +52,11 @@ cc_library(
     alwayslink = 1,
 )
 
+filegroup(
+    name = "envoy_proxy_wasm_api_js",
+    srcs = ["envoy_proxy_wasm_api.js"],
+)
+
 # NB: this target is compiled both to native code and to Wasm. Hence the generic rule.
 proto_library(
     name = "declare_property_proto",

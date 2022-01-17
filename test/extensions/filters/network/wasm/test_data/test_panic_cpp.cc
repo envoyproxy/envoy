@@ -24,7 +24,10 @@ public:
 static RegisterContextFactory register_PanicContext(CONTEXT_FACTORY(PanicContext),
                                                     ROOT_FACTORY(PanicRootContext), "panic");
 
-static int* badptr = nullptr;
+// With Emscripten, dereferencing a null pointer does not immediately cause a segmentation fault,
+// so use an invalid address to trigger it.
+static int* badptr = reinterpret_cast<int*>(0xDEADBEEF);
+
 FilterStatus PanicContext::onNewConnection() {
   *badptr = 0;
   return FilterStatus::Continue;

@@ -73,7 +73,7 @@ public:
     } else {
       if (std::get<1>(GetParam()) == "cpp") {
         code = TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-            "test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
+            "test/extensions/filters/http/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"));
       } else {
         auto filename = !root_id.empty() ? root_id : vm_configuration;
         const auto basic_path = TestEnvironment::runfilesPath(

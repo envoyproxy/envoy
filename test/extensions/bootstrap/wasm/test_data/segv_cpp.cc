@@ -6,7 +6,9 @@
 // Required Proxy-Wasm ABI version.
 extern "C" PROXY_WASM_KEEPALIVE void proxy_abi_version_0_1_0() {}
 
-static int* badptr = nullptr;
+// With Emscripten, dereferencing a null pointer does not immediately cause a segmentation fault,
+// so use an invalid address to trigger it.
+static int* badptr = reinterpret_cast<int*>(0xDEADBEEF);
 
 extern "C" PROXY_WASM_KEEPALIVE uint32_t proxy_on_configure(uint32_t, uint32_t) {
   logError("before badptr");

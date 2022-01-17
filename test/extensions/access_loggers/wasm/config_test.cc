@@ -73,7 +73,8 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
   std::string code;
   if (GetParam() != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-        "{{ test_rundir }}/test/extensions/access_loggers/wasm/test_data/test_cpp.wasm"));
+        "{{ test_rundir "
+        "}}/test/extensions/access_loggers/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"));
   } else {
     code = "AccessLoggerTestCpp";
   }

@@ -27,9 +27,9 @@ protected:
         absl::StrCat("envoy.wasm.runtime.", GetParam()));
     if (GetParam() != "null") {
       config_.mutable_config()->mutable_vm_config()->mutable_code()->mutable_local()->set_filename(
-          TestEnvironment::substitute(
-              "{{ test_rundir "
-              "}}/test/extensions/stats_sinks/wasm/test_data/test_context_cpp.wasm"));
+          TestEnvironment::substitute("{{ test_rundir "
+                                      "}}/test/extensions/stats_sinks/wasm/test_data/"
+                                      "test_context_cpp.wasm/proxy_wasm_test_context_cpp.wasm"));
     } else {
       config_.mutable_config()
           ->mutable_vm_config()

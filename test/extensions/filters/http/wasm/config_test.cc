@@ -87,7 +87,7 @@ TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasm) {
     },
     "code": {
       "local": {
-        "filename": "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
+        "filename": "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"
       }
     },
   }}}
@@ -123,7 +123,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasm) {
          value: "some configuration"
       code:
         local:
-          filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
+          filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"
   )EOF"));
 
   envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
@@ -173,7 +173,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmFailOpenOk) {
          value: "some configuration"
       code:
         local:
-          filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
+          filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"
   )EOF"));
 
   envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
@@ -197,7 +197,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadInlineWasm) {
   }
 #endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
+      "{{ test_rundir "
+      "}}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"));
   EXPECT_FALSE(code.empty());
   const std::string yaml = absl::StrCat(R"EOF(
   config:
@@ -247,7 +248,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
   }
 #endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
+      "{{ test_rundir "
+      "}}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
       Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
@@ -302,7 +304,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
   }
 #endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
+      "{{ test_rundir "
+      "}}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
       Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
@@ -374,7 +377,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
   }
 #endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
+      "{{ test_rundir "
+      "}}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
       Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
@@ -572,7 +576,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteConnectionReset) {
   }
 #endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
+      "{{ test_rundir "
+      "}}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
       Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
@@ -620,7 +625,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessWith503) {
   }
 #endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
+      "{{ test_rundir "
+      "}}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
       Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
@@ -671,7 +677,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessIncorrectSha256) {
   }
 #endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
+      "{{ test_rundir "
+      "}}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
       Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
@@ -723,7 +730,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteMultipleRetries) {
 #endif
   initializeForRemote();
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
+      "{{ test_rundir "
+      "}}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
       Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(

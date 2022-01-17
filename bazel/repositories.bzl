@@ -215,7 +215,7 @@ def envoy_dependencies(skip_targets = []):
     _upb()
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
-    _emscripten_toolchain()
+    _emsdk()
     _rules_fuzzing()
     external_http_archive("proxy_wasm_rust_sdk")
     external_http_archive("com_googlesource_code_re2")
@@ -939,17 +939,8 @@ def _proxy_wasm_cpp_sdk():
 def _proxy_wasm_cpp_host():
     external_http_archive(name = "proxy_wasm_cpp_host")
 
-def _emscripten_toolchain():
-    external_http_archive(
-        name = "emscripten_toolchain",
-        build_file_content = _build_all_content(exclude = [
-            "upstream/emscripten/cache/is_vanilla.txt",
-            ".emscripten_sanity",
-        ]),
-        patch_cmds = [
-            "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 2.0.7 && ./emsdk activate --embedded 2.0.7; fi",
-        ],
-    )
+def _emsdk():
+    external_http_archive(name = "emsdk")
 
 def _com_github_google_jwt_verify():
     external_http_archive("com_github_google_jwt_verify")

@@ -66,8 +66,10 @@ TEST_P(WasmCommonContextTest, OnStat) {
     // TODO(PiotrSikora): There are no Emscripten releases for arm64.
     return;
 #endif
-    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
-        "{{ test_rundir }}/test/extensions/stats_sinks/wasm/test_data/test_context_cpp.wasm")));
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        absl::StrCat("{{ test_rundir "
+                     "}}/test/extensions/stats_sinks/wasm/test_data/test_context_cpp.wasm/"
+                     "proxy_wasm_test_context_cpp.wasm")));
   } else {
     // The name of the Null VM plugin.
     code = "CommonWasmTestContextCpp";

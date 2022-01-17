@@ -98,11 +98,12 @@ class WasmNullTest : public WasmTestBase, public testing::TestWithParam<std::str
 public:
   void createWasm() {
     WasmTestBase::createWasm(GetParam());
-    const auto code =
-        GetParam() != "null"
-            ? TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-                  "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/stats_cpp.wasm"))
-            : "WasmStatsCpp";
+    const auto code = GetParam() != "null"
+                          ? TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+                                "{{ test_rundir "
+                                "}}/test/extensions/bootstrap/wasm/test_data/stats_cpp.wasm/"
+                                "proxy_wasm_stats_cpp.wasm"))
+                          : "WasmStatsCpp";
     EXPECT_FALSE(code.empty());
     EXPECT_TRUE(wasm_->load(code, false));
     EXPECT_TRUE(wasm_->initialize());
@@ -119,8 +120,13 @@ public:
   void setWasmCode(std::string vm_configuration) {
     const auto basic_path =
         absl::StrCat("test/extensions/bootstrap/wasm/test_data/", vm_configuration);
-    code_ = TestEnvironment::readFileToStringForTest(
-        TestEnvironment::runfilesPath(basic_path + "_" + std::get<1>(GetParam()) + ".wasm"));
+    if (std::get<1>(GetParam()) == "cpp") {
+      code_ = TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+          basic_path + "_cpp.wasm/proxy_wasm_" + vm_configuration + "_cpp.wasm"));
+    } else {
+      code_ = TestEnvironment::readFileToStringForTest(
+          TestEnvironment::runfilesPath(basic_path + "_" + std::get<1>(GetParam()) + ".wasm"));
+    }
 
     EXPECT_FALSE(code_.empty());
   }
@@ -177,8 +183,10 @@ TEST_P(WasmTest, BadSignature) {
   }
 #endif
   createWasm();
-  const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/bad_signature_cpp.wasm"));
+  const auto code = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir "
+                                  "}}/test/extensions/bootstrap/wasm/test_data/"
+                                  "bad_signature_cpp.wasm/proxy_wasm_bad_signature_cpp.wasm"));
   EXPECT_FALSE(code.empty());
   EXPECT_TRUE(wasm_->load(code, false));
   EXPECT_FALSE(wasm_->initialize());
@@ -194,7 +202,8 @@ TEST_P(WasmTest, Segv) {
 #endif
   createWasm();
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/segv_cpp.wasm"));
+      "{{ test_rundir "
+      "}}/test/extensions/bootstrap/wasm/test_data/segv_cpp.wasm/proxy_wasm_segv_cpp.wasm"));
   EXPECT_FALSE(code.empty());
   EXPECT_TRUE(wasm_->load(code, false));
   EXPECT_TRUE(wasm_->initialize());
@@ -213,7 +222,8 @@ TEST_P(WasmTest, DivByZero) {
 #endif
   createWasm();
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/segv_cpp.wasm"));
+      "{{ test_rundir "
+      "}}/test/extensions/bootstrap/wasm/test_data/segv_cpp.wasm/proxy_wasm_segv_cpp.wasm"));
   EXPECT_FALSE(code.empty());
   EXPECT_TRUE(wasm_->load(code, false));
   EXPECT_TRUE(wasm_->initialize());
@@ -231,8 +241,10 @@ TEST_P(WasmTest, IntrinsicGlobals) {
   }
 #endif
   createWasm();
-  const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/emscripten_cpp.wasm"));
+  const auto code = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir "
+                                  "}}/test/extensions/bootstrap/wasm/test_data/emscripten_cpp.wasm/"
+                                  "proxy_wasm_emscripten_cpp.wasm"));
   EXPECT_FALSE(code.empty());
   EXPECT_TRUE(wasm_->load(code, false));
   EXPECT_TRUE(wasm_->initialize());
@@ -256,8 +268,10 @@ TEST_P(WasmTest, Asm2Wasm) {
   }
 #endif
   createWasm();
-  const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/asm2wasm_cpp.wasm"));
+  const auto code = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir "
+                                  "}}/test/extensions/bootstrap/wasm/test_data/asm2wasm_cpp.wasm/"
+                                  "proxy_wasm_asm2wasm_cpp.wasm"));
   EXPECT_FALSE(code.empty());
   EXPECT_TRUE(wasm_->load(code, false));
   EXPECT_TRUE(wasm_->initialize());

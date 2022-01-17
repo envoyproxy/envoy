@@ -1004,8 +1004,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (C++ SDK)",
         project_desc = "WebAssembly for Proxies (C++ SDK)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk",
-        version = "fd0be8405db25de0264bdb78fae3a82668c03782",
-        sha256 = "c57de2425b5c61d7f630c5061e319b4557ae1f1c7526e5a51c33dc1299471b08",
+        version = "011ced83a6995167147c00d5baf40a7c356ceefa",
+        sha256 = "64c31d8b01dd03b852186ea0405b6e78fe9b2dfa3cf9ffd30dd47be2f7f2c06f",
         strip_prefix = "proxy-wasm-cpp-sdk-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -1021,7 +1021,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2021-06-24",
+        release_date = "2022-01-17",
         cpe = "N/A",
     ),
     proxy_wasm_cpp_host = dict(
@@ -1060,16 +1060,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-07-13",
         cpe = "N/A",
     ),
-    emscripten_toolchain = dict(
+    emsdk = dict(
         project_name = "Emscripten SDK",
         project_desc = "Emscripten SDK (use by Wasm)",
         project_url = "https://github.com/emscripten-core/emsdk",
-        version = "2.0.7",
-        sha256 = "ce7a5c76e8b425aca874cea329fd9ac44b203b777053453b6a37b4496c5ce34f",
-        strip_prefix = "emsdk-{version}",
+        # v3.1.1 with Bazel fixes
+        version = "7eecde8afcb89fbdff2597d6cce61a24ae2c34f3",
+        sha256 = "19851efd2616a66f9abd84f55f1d094e03252d87b1d78ae0f5d992121d1dd9cc",
+        strip_prefix = "emsdk-{version}/bazel",
         urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.tar.gz"],
         use_category = ["build"],
-        release_date = "2020-10-13",
+        release_date = "2022-01-16",
     ),
     rules_rust = dict(
         project_name = "Bazel rust rules",

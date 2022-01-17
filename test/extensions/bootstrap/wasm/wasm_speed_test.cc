@@ -61,8 +61,8 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
   if (runtime == "null") {
     code = "WasmSpeedCpp";
   } else {
-    code = TestEnvironment::readFileToStringForTest(
-        TestEnvironment::runfilesPath("test/extensions/bootstrap/wasm/test_data/speed_cpp.wasm"));
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+        "test/extensions/bootstrap/wasm/test_data/speed_cpp.wasm/proxy_wasm_speed_cpp.wasm"));
   }
   EXPECT_FALSE(code.empty());
   EXPECT_TRUE(wasm->load(code, false));

@@ -29,7 +29,8 @@ public:
   }
   void initialize() override {
     auto httpwasm = TestEnvironment::substitute(
-        "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/http_cpp.wasm");
+        "{{ test_rundir "
+        "}}/test/extensions/bootstrap/wasm/test_data/http_cpp.wasm/proxy_wasm_http_cpp.wasm");
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* wasm = bootstrap.mutable_static_resources()->add_clusters();
       wasm->MergeFrom(bootstrap.static_resources().clusters()[0]);
