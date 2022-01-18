@@ -898,8 +898,8 @@ private:
 
 using SymbolTablePtr = std::unique_ptr<SymbolTable>;
 
-// TODO(jmarantz): rename all ~87 occurrences of SymbolTableImpl in the codebase
-// to SymbolTable, and drop this alias.
+// TODO(jmarantz): rename all remaining ~47 occurrences of SymbolTableImpl in
+// the codebase to SymbolTable, and drop this alias.
 using SymbolTableImpl = SymbolTable;
 
 } // namespace Stats
