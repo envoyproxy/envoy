@@ -1,3 +1,32 @@
+diff --git a/bazel/BUILD b/bazel/BUILD
+index c84bf3f..1f99197 100644
+--- a/bazel/BUILD
++++ b/bazel/BUILD
+@@ -24,12 +24,17 @@ config_setting(
+     ],
+ )
+ 
++filegroup(
++    name = "empty",
++)
++
+ alias(
+     name = "binaries",
+     actual = select({
+         ":linux": "@emscripten_bin_linux//:all",
+         ":macos": "@emscripten_bin_mac//:all",
+         ":windows": "@emscripten_bin_win//:all",
++        "//conditions:default": ":empty",
+     }),
+ )
+ 
+@@ -39,5 +44,6 @@ alias(
+         ":linux": "@emscripten_npm_linux//:node_modules",
+         ":macos": "@emscripten_npm_mac//:node_modules",
+         ":windows": "@emscripten_npm_win//:node_modules",
++        "//conditions:default": ":empty",
+     }),
+ )
 diff --git a/bazel/emscripten_toolchain/crosstool.bzl b/bazel/emscripten_toolchain/crosstool.bzl
 index ce87ebb..c1ba75e 100644
 --- a/bazel/emscripten_toolchain/crosstool.bzl
