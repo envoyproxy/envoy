@@ -55,6 +55,7 @@ def envoy_py_binary(
         name = None,
         deps = [],
         data = [],
+        args = [],
         visibility = ["//visibility:public"],
         envoy_prefix = "@envoy",
         test = True):
@@ -67,6 +68,7 @@ def envoy_py_binary(
         srcs = ["%s.py" % name],
         deps = deps,
         data = data,
+        args = args,
         visibility = visibility,
     )
 
