@@ -55,6 +55,7 @@ cc_library(
 filegroup(
     name = "envoy_proxy_wasm_api_js",
     srcs = ["envoy_proxy_wasm_api.js"],
+    visibility = ["//visibility:public"],
 )
 
 # NB: this target is compiled both to native code and to Wasm. Hence the generic rule.
