@@ -32,6 +32,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "wasm_test",
+    size = "enormous",  # For WAVM without precompilation.
     srcs = ["wasm_test.cc"],
     args = [
         # Force creation of c-ares DnsResolverImpl when running test on macOS.
