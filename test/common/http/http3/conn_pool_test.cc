@@ -1,6 +1,10 @@
+#include <chrono>
+#include <memory>
+
 #include "source/common/http/http3/conn_pool.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
 
+#include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -37,11 +41,31 @@ TEST(Convert, Basic) {
             protocol_options->initial_stream_window_size().value());
 }
 
+class Http3ConnPoolImplPeer {
+public:
+  static std::list<Envoy::ConnectionPool::ActiveClientPtr>&
+  connectingClients(Http3ConnPoolImpl& pool) {
+    return pool.connecting_clients_;
+  }
+};
+
 class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
+  Http3ConnPoolImplTest() {
+    EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _, _))
+        .WillRepeatedly(Return(ssl_context_));
+    factory_.emplace(std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
+                         new NiceMock<Ssl::MockClientContextConfig>),
+                     context_);
+    factory_->initialize();
+  }
+
   void initialize() {
     EXPECT_CALL(mockHost(), address()).WillRepeatedly(Return(test_address_));
-    EXPECT_CALL(mockHost(), transportSocketFactory()).WillRepeatedly(testing::ReturnRef(factory_));
+    EXPECT_CALL(mockHost(), transportSocketFactory()).WillRepeatedly(testing::ReturnRef(*factory_));
+    EXPECT_CALL(mockHost().cluster_, connectTimeout())
+        .WillRepeatedly(Return(std::chrono::milliseconds(10000)));
+
     new Event::MockSchedulableCallback(&dispatcher_);
     Network::ConnectionSocket::OptionsSharedPtr options;
     Network::TransportSocketOptionsConstSharedPtr transport_options;
@@ -53,19 +77,17 @@ public:
   Upstream::MockHost& mockHost() { return static_cast<Upstream::MockHost&>(*host_); }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
-  std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
   NiceMock<Random::MockRandomGenerator> random_;
   Upstream::ClusterConnectivityState state_;
   Network::Address::InstanceConstSharedPtr test_address_ =
       Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
-  Quic::QuicClientTransportSocketFactory factory_{
-      std::unique_ptr<Envoy::Ssl::ClientContextConfig>(new NiceMock<Ssl::MockClientContextConfig>),
-      context_};
+  absl::optional<Quic::QuicClientTransportSocketFactory> factory_;
+  Ssl::ClientContextSharedPtr ssl_context_{new Ssl::MockClientContext()};
   Stats::IsolatedStoreImpl store_;
   Quic::QuicStatNames quic_stat_names_{store_.symbolTable()};
-  ConnectionPool::InstancePtr pool_;
+  std::unique_ptr<Http3ConnPoolImpl> pool_;
 };
 
 class MockQuicClientTransportSocketFactory : public Quic::QuicClientTransportSocketFactory {
@@ -122,9 +144,30 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
   EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
 }
 
-TEST_F(Http3ConnPoolImplTest, CreationWithBufferLimits) {
+class MockPoolConnectResultCallback : public PoolConnectResultCallback {
+public:
+  MOCK_METHOD(void, onConnectSucceeded, ());
+  MOCK_METHOD(void, onConnectFailedWithEarlyData, ());
+};
+
+TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
   EXPECT_CALL(mockHost().cluster_, perConnectionBufferLimitBytes);
   initialize();
+
+  MockPoolConnectResultCallback connect_result_callback;
+  MockResponseDecoder decoder;
+  ConnPoolCallbacks callbacks;
+  pool_->setConnectResultCallback(connect_result_callback);
+
+  ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks);
+  EXPECT_NE(nullptr, cancellable);
+  std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
+      Http3ConnPoolImplPeer::connectingClients(*pool_);
+  EXPECT_EQ(1u, clients.size());
+  EXPECT_CALL(connect_result_callback, onConnectSucceeded()).WillOnce(Invoke([cancellable]() {
+    cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
+  }));
+  pool_->onConnectionEvent(*clients.front(), "", Network::ConnectionEvent::Connected);
 }
 
 TEST_F(Http3ConnPoolImplTest, CreationWithConfig) {

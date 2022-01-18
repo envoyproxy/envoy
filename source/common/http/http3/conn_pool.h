@@ -137,13 +137,15 @@ protected:
   void onConnected(Envoy::ConnectionPool::ActiveClient&) override;
 
 private:
+  friend class Http3ConnPoolImplPeer;
+
   // Store quic helpers which can be shared between connections and must live
   // beyond the lifetime of individual connections.
   std::unique_ptr<Quic::PersistentQuicInfoImpl> quic_info_;
   absl::optional<std::reference_wrapper<PoolConnectResultCallback>> connect_callback_;
 };
 
-ConnectionPool::InstancePtr
+std::unique_ptr<Http3ConnPoolImpl>
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,

@@ -1,6 +1,7 @@
 #include "source/common/http/http3/conn_pool.h"
 
 #include <cstdint>
+#include <memory>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/upstream/upstream.h"
@@ -81,7 +82,7 @@ void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
 // Make sure all connections are torn down before quic_info_ is deleted.
 Http3ConnPoolImpl::~Http3ConnPoolImpl() { destructAllConnections(); }
 
-ConnectionPool::InstancePtr
+std::unique_ptr<Http3ConnPoolImpl>
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
