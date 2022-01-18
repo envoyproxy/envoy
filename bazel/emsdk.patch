@@ -45,27 +45,35 @@ index ce87ebb..c1ba75e 100644
          # Blaze also tests if this feature is supported before setting preprocessor_defines
          # (...but why?)
 diff --git a/bazel/emscripten_toolchain/emcc.sh b/bazel/emscripten_toolchain/emcc.sh
-index 5fdaf9c..235dbf0 100755
+index 5fdaf9c..96a190b 100755
 --- a/bazel/emscripten_toolchain/emcc.sh
 +++ b/bazel/emscripten_toolchain/emcc.sh
-@@ -2,4 +2,4 @@
+@@ -2,4 +2,13 @@
  
  source $(dirname $0)/env.sh
  
 -exec python3 $EMSCRIPTEN/emcc.py "$@"
-+exec python3 $EMSCRIPTEN/emcc.py "$@" -fno-sanitize=all
++ARGS=($@)
++
++# Remove sanitizers from parameters.
++for ((i = 0; i < ${#ARGS[@]}; i++)); do
++  if [[ "${ARGS[i]}" == -fsanitize=* || "${ARGS[i]}" == -l:* || "${ARGS[i]}" == -D*SANITIZE* ]]; then
++    unset "ARGS[i]"
++  fi
++done
++
++exec python3 $EMSCRIPTEN/emcc.py "${ARGS[@]}"
 diff --git a/bazel/emscripten_toolchain/emcc_link.sh b/bazel/emscripten_toolchain/emcc_link.sh
-index 44f3235..88fb771 100755
+index 44f3235..6abcfa1 100755
 --- a/bazel/emscripten_toolchain/emcc_link.sh
 +++ b/bazel/emscripten_toolchain/emcc_link.sh
-@@ -2,4 +2,11 @@
+@@ -2,4 +2,10 @@
  
  source $(dirname $0)/env.sh
  
 +# Remove sanitizers from parameters.
 +if [[ "$1" == *.params ]]; then
-+    sed 's/-l:.*$//g' ${1:1} > ${1:1}.tmp
-+    echo "-fno-sanitize=all" >> ${1:1}.tmp
++    sed -e 's/-fsanitize.*$//g' -e 's/-l:.*$//g' ${1:1} > ${1:1}.tmp
 +    mv ${1:1}.tmp ${1:1}
 +fi
 +
