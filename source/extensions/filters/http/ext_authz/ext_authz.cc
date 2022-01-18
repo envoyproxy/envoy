@@ -8,16 +8,6 @@
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
 
-namespace {
-absl::optional<std::chrono::duration<double, std::milli>>
-timeSince(absl::optional<Envoy::MonotonicTime> start_time) {
-  if (start_time.has_value()) {
-    return std::chrono::duration<double, std::milli>(start_time->time_since_epoch().count());
-  }
-  return absl::nullopt;
-}
-} // namespace
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -226,7 +216,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     // Add duration of call to dynamic metadata if applicable
     if (start_time_.has_value()) {
       ProtobufWkt::Value ext_authz_duration_value;
-      ext_authz_duration_value.set_number_value(timeSince(start_time_)->count());
+      ext_authz_duration_value.set_number_value(start_time_->time_since_epoch().count());
       (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
           ext_authz_duration_value;
     }
