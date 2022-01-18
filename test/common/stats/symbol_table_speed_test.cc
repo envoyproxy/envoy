@@ -96,17 +96,17 @@ static void bmJoinElements(benchmark::State& state) {
 }
 BENCHMARK(bmJoinElements);
 
-// NOLINTNEXTLINE(readability-identifier-naming)
-static void bmCompareElements(benchmark::State& state) {
-  Envoy::Stats::SymbolTableImpl symbol_table;
-  Envoy::Stats::StatNamePool pool(symbol_table);
-  const std::vector<absl::string_view> all_tokens = {"alpha",   "beta", "gamma", "delta",
-                                                     "epsilon", "zeta", "eta",   "theta"};
+static std::vector<Envoy::Stats::StatName> prepareNames(Envoy::Stats::StatNamePool& pool,
+                                                        uint32_t num_words) {
+  const std::vector<absl::string_view> all_tokens = {
+      "alpha", "beta",  "gamma",  "delta",   "epsilon", "zeta", "eta",     "theta",
+      "iota",  "kappa", "lambda", "mu",      "nu",      "xi",   "omicron", "pi",
+      "rho",   "sigma", "tau",    "upsilon", "phi",     "chi",  "psi",     "omega",
+  };
   std::vector<Envoy::Stats::StatName> names;
 
   // Form 64 4-token names selecting pseudo-randomly from the above set.
   const uint32_t num_tokens_per_word = 4;
-  const uint32_t num_words = 64;
   for (uint32_t i = 0; i < num_words; ++i) {
     std::vector<absl::string_view> tokens;
     for (uint32_t j = 0; j < num_tokens_per_word; ++j) {
@@ -116,6 +116,14 @@ static void bmCompareElements(benchmark::State& state) {
     }
     names.push_back(pool.add(absl::StrJoin(tokens, ".")));
   }
+  return names;
+}
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmCompareElements(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names = prepareNames(pool, 64);
 
   uint32_t compare_total = 0;
 
@@ -128,3 +136,39 @@ static void bmCompareElements(benchmark::State& state) {
   }
 }
 BENCHMARK(bmCompareElements);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmSortByStatNames(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names = prepareNames(pool, 100 * 1000);
+
+  struct Getter {
+    Envoy::Stats::StatName operator()(const Envoy::Stats::StatName& stat_name) const {
+      return stat_name;
+    }
+  };
+  Getter getter;
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    std::vector<Envoy::Stats::StatName> sort = names;
+    Envoy::Stats::sortByStatNames<Envoy::Stats::StatName>(symbol_table, sort.begin(), sort.end(),
+                                                          getter);
+  }
+}
+BENCHMARK(bmSortByStatNames);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmStdSort(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names = prepareNames(pool, 100 * 1000);
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    std::vector<Envoy::Stats::StatName> sort = names;
+    std::sort(sort.begin(), sort.end(), Envoy::Stats::StatNameLessThan(symbol_table));
+  }
+}
+BENCHMARK(bmStdSort);
