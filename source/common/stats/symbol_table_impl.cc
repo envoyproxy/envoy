@@ -219,11 +219,11 @@ void SymbolTableImpl::Encoding::appendToMemBlock(StatName stat_name,
   }
 }
 
-SymbolTableImpl::SymbolTableImpl()
+SymbolTableImpl::SymbolTable()
     // Have to be explicitly initialized, if we want to use the ABSL_GUARDED_BY macro.
     : next_symbol_(FirstValidSymbol), monotonic_counter_(FirstValidSymbol) {}
 
-SymbolTableImpl::~SymbolTableImpl() {
+SymbolTableImpl::~SymbolTable() {
   // To avoid leaks into the symbol table, we expect all StatNames to be freed.
   // Note: this could potentially be short-circuited if we decide a fast exit
   // is needed in production. But it would be good to ensure clean up during
