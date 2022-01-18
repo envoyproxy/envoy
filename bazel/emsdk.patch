@@ -1,12 +1,15 @@
 diff --git a/bazel/emscripten_toolchain/crosstool.bzl b/bazel/emscripten_toolchain/crosstool.bzl
-index ce87ebb..bb45b42 100644
+index ce87ebb..c1ba75e 100644
 --- a/bazel/emscripten_toolchain/crosstool.bzl
 +++ b/bazel/emscripten_toolchain/crosstool.bzl
-@@ -92,6 +92,7 @@ def _impl(ctx):
-     tool_paths = [
-         tool_path(name = "ar", path = emar_script),
-         tool_path(name = "cpp", path = "/bin/false"),
-+        tool_path(name = "dwp", path = "/bin/false"),
-         tool_path(name = "gcc", path = emcc_script),
-         tool_path(name = "gcov", path = "/bin/false"),
-         tool_path(name = "ld", path = emcc_link_script),
+@@ -298,10 +298,6 @@ def _impl(ctx):
+         # Blaze also tests if this feature is supported, before setting the "pic" build-variable.
+         feature(name = "pic"),
+ 
+-        # Blaze requests this feature if fission is requested
+-        # Blaze also tests if it's supported to see if we support fission.
+-        feature(name = "per_object_debug_info"),
+-
+         # Blaze requests this feature by default.
+         # Blaze also tests if this feature is supported before setting preprocessor_defines
+         # (...but why?)
