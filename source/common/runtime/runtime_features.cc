@@ -87,7 +87,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.unquote_log_string_values",
     "envoy.reloadable_features.update_expected_rq_timeout_on_retry",
     "envoy.reloadable_features.use_dns_ttl",
-    "envoy.reloadable_features.use_observable_cluster_name",
     "envoy.reloadable_features.validate_connect",
     "envoy.reloadable_features.vhds_heartbeats",
     "envoy.restart_features.explicit_wildcard_resource",
