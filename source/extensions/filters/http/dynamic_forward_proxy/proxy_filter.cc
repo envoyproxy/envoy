@@ -147,9 +147,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     auto const& host = config_->cache().getHost(headers.Host()->value().getStringView());
     if (host.has_value()) {
       if (!host.value()->address()) {
-        decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
-                                           ResponseStrings::get().DnsResolutionFailure, nullptr,
-                                           absl::nullopt, RcDetails::get().DnsResolutionFailure);
+        onDnsResolutionFail();
         return Http::FilterHeadersStatus::StopIteration;
       }
       addHostAddressToFilterState(host.value()->address());
@@ -173,8 +171,9 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void ProxyFilter::addHostAddressToFilterState(const Network::Address::InstanceConstSharedPtr& address) {
-  ASSERT(address);  // null pointer checks must be done before calling this function.
+void ProxyFilter::addHostAddressToFilterState(
+    const Network::Address::InstanceConstSharedPtr& address) {
+  ASSERT(address); // null pointer checks must be done before calling this function.
 
   if (!config_->saveUpstreamAddress()) {
     return;
@@ -194,6 +193,13 @@ void ProxyFilter::addHostAddressToFilterState(const Network::Address::InstanceCo
                         StreamInfo::FilterState::LifeSpan::Request);
 }
 
+void ProxyFilter::onDnsResolutionFail() {
+  decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DnsResolutionFailed);
+  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
+                                     ResponseStrings::get().DnsResolutionFailure, nullptr,
+                                     absl::nullopt, RcDetails::get().DnsResolutionFailure);
+}
+
 void ProxyFilter::onLoadDnsCacheComplete(
     const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   ENVOY_STREAM_LOG(debug, "load DNS cache complete, continuing after adding resolved host: {}",
@@ -203,12 +209,7 @@ void ProxyFilter::onLoadDnsCacheComplete(
   circuit_breaker_.reset();
 
   if (!host_info->address()) {
-    // Generally in Envoy it is not Ok to send a local reply at 2 code points with the same
-    // details, but here we could leak prior queries if we differentiate new failures from
-    // cached failures, so intentionally reuse the details.
-    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
-                                       ResponseStrings::get().DnsResolutionFailure, nullptr,
-                                       absl::nullopt, RcDetails::get().DnsResolutionFailure);
+    onDnsResolutionFail();
     return;
   }
   addHostAddressToFilterState(host_info->address());

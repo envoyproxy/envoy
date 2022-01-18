@@ -526,6 +526,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
           }));
 
   EXPECT_CALL(*host_info, address());
+  EXPECT_CALL(callbacks_, streamInfo());
   EXPECT_CALL(callbacks_,
               sendLocalReply(Http::Code::ServiceUnavailable, Eq("DNS resolution failure"), _, _,
                              Eq("dns_resolution_failure")));

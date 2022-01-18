@@ -10,6 +10,7 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* dynamic_forward_proxy: if a DNS resolution fails, failing immediately with a specific resolution error, rather than finishing up all local filters and failing to select an upstream host.
 * http: now the max concurrent streams of http2 connection can not only be adjusted down according to the SETTINGS frame but also can be adjusted up, of course, it can not exceed the configured upper bounds. This fix is guarded by ``envoy.reloadable_features.http2_allow_capacity_increase_by_settings``.
 
 Bug Fixes
