@@ -79,9 +79,9 @@ public:
   }
   const envoy::config::route::v3::RouteConfiguration& protobufConfigurationCast() override {
     ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(
-        &base_.protobufConfiguration()));
+        &RouteConfigUpdateReceiverImpl::protobufConfiguration()));
     return static_cast<const envoy::config::route::v3::RouteConfiguration&>(
-        base_.protobufConfiguration());
+        RouteConfigUpdateReceiverImpl::protobufConfiguration());
   }
 
 private:

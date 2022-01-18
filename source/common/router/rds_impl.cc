@@ -63,8 +63,8 @@ StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
 }
 
 ConfigConstSharedPtr StaticRouteConfigProviderImpl::configCast() {
-  ASSERT(dynamic_cast<const Config*>(base_.config().get()));
-  return std::static_pointer_cast<const Config>(base_.config());
+  ASSERT(dynamic_cast<const Config*>(StaticRouteConfigProviderImpl::config().get()));
+  return std::static_pointer_cast<const Config>(StaticRouteConfigProviderImpl::config());
 }
 
 // TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
@@ -188,8 +188,8 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
 }
 
 ConfigConstSharedPtr RdsRouteConfigProviderImpl::configCast() {
-  ASSERT(dynamic_cast<const Config*>(base_.config().get()));
-  return std::static_pointer_cast<const Config>(base_.config());
+  ASSERT(dynamic_cast<const Config*>(RdsRouteConfigProviderImpl::config().get()));
+  return std::static_pointer_cast<const Config>(RdsRouteConfigProviderImpl::config());
 }
 
 // Schedules a VHDS request on the main thread and queues up the callback to use when the VHDS
