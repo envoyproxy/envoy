@@ -21,7 +21,9 @@ namespace ConnectHandler {
  */
 #define ALL_CONNECT_HANDLER_STATS(COUNTER)                                                          \
   COUNTER(read_error)                                                                               \
+  COUNTER(write_error)                                                                              \
   COUNTER(connect_not_found)                                                                        \
+  COUNTER(connect_found)                                                                            \
 
 /**
  * Definition of all stats for the connect handler. @see stats_macros.h

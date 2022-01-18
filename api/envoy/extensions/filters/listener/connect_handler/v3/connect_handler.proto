@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.extensions.filters.listener.connect_handler.v3;
 
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.listener.connect_handler.v3";
 option java_outer_classname = "ConnectHandlerProto";
