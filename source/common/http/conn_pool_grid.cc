@@ -409,7 +409,7 @@ void ConnectivityGrid::onConnectSucceeded() {
 }
 
 void ConnectivityGrid::onConnectFailedWithEarlyData() {
-  // TODO(danzh) mark HTTP/3 suspecious once we support 0-RTT.
+  // TODO(danzh) mark HTTP/3 suspicious once we support 0-RTT.
 }
 
 } // namespace Http
