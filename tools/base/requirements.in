@@ -25,7 +25,6 @@ ply
 pygithub
 pyreadline
 pytest
-pytest-asyncio
 pytest-cov
 pytest-patches
 pyyaml

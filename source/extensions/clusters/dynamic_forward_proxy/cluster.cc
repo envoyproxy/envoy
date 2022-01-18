@@ -9,7 +9,6 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
-#include "source/extensions/filters/network/common/utility.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
 

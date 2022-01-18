@@ -354,7 +354,7 @@ ClientContextConfigImpl::ClientContextConfigImpl(
   }
 }
 
-const unsigned ServerContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_VERSION;
+const unsigned ServerContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_2_VERSION;
 const unsigned ServerContextConfigImpl::DEFAULT_MAX_VERSION = TLS1_3_VERSION;
 
 const std::string ServerContextConfigImpl::DEFAULT_CIPHER_SUITES =
