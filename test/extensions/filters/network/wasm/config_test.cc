@@ -60,8 +60,8 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNetworkFilterConfigTest,
                          Envoy::Extensions::Common::Wasm::runtime_values);
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -106,8 +106,8 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineWasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -181,8 +181,8 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCodeFailOpenNackConfig) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailClosed) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -210,8 +210,8 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailClosed) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -238,8 +238,8 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefault) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -271,8 +271,8 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefaul
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -306,8 +306,8 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigAllowOnVmStart) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }

@@ -74,8 +74,8 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmIntegrationTest,
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmIntegrationTest);
 
 TEST_P(WasmIntegrationTest, FilterMakesCallInConfigureTime) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }

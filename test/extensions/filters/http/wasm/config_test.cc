@@ -69,8 +69,8 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmFilterConfigTest,
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmFilterConfigTest);
 
 TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -107,8 +107,8 @@ TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasm) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -156,8 +156,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasm) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmFailOpenOk) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -190,8 +190,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmFailOpenOk) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadInlineWasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -241,8 +241,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadInlineBadCode) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -297,8 +297,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -370,8 +370,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -569,8 +569,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteConnectionReset) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -618,8 +618,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteConnectionReset) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessWith503) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -670,8 +670,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessWith503) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessIncorrectSha256) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -722,8 +722,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessIncorrectSha256) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteMultipleRetries) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
