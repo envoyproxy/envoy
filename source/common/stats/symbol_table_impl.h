@@ -45,7 +45,6 @@ using StatNameSetPtr = std::unique_ptr<StatNameSet>;
 using DynamicSpan = std::pair<uint32_t, uint32_t>;
 using DynamicSpans = std::vector<DynamicSpan>;
 
-
 /** A Symbol represents a string-token with a small index. */
 using Symbol = uint32_t;
 

@@ -89,7 +89,6 @@ envoy_cc_library(
     deps = [
         ":symbol_table_lib",
         "//envoy/stats:stats_interface",
-        "//envoy/stats:symbol_table_interface",
         "//source/common/config:well_known_names",
     ],
 )
@@ -193,6 +192,7 @@ envoy_cc_library(
     external_deps = ["abseil_base"],
     deps = [
         ":recent_lookups_lib",
+        "//envoy/stats:symbol_table_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:mem_block_builder_lib",
         "//source/common/common:minimal_logger_lib",
