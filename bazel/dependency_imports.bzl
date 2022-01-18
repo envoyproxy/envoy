@@ -31,7 +31,7 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     )
     rules_cc_dependencies()
     rules_cc_toolchains()
-    emsdk_emscripten_deps(emscripten_version = "3.1.1")
+    emsdk_emscripten_deps()
 
     custom_exec_properties(
         name = "envoy_large_machine_exec_property",
