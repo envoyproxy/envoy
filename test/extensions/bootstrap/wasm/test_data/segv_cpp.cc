@@ -8,8 +8,15 @@ extern "C" PROXY_WASM_KEEPALIVE void proxy_abi_version_0_1_0() {}
 
 // With Emscripten, dereferencing a null pointer does not immediately cause a segmentation fault,
 // so use an invalid address to trigger it.
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#endif
 #pragma warning(suppress : 4312)
 static uintptr_t* badptr = reinterpret_cast<uintptr_t*>(0xDEADBEEF);
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 extern "C" PROXY_WASM_KEEPALIVE uint32_t proxy_on_configure(uint32_t, uint32_t) {
   logError("before badptr");

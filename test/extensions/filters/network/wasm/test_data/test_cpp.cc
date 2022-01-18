@@ -11,8 +11,15 @@ START_WASM_PLUGIN(NetworkTestCpp)
 
 // With Emscripten, dereferencing a null pointer does not immediately cause a segmentation fault,
 // so use an invalid address to trigger it.
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#endif
 #pragma warning(suppress : 4312)
 static uintptr_t* badptr = reinterpret_cast<uintptr_t*>(0xDEADBEEF);
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 class ExampleContext : public Context {
 public:
