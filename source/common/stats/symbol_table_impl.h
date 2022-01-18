@@ -903,6 +903,12 @@ void sortByStatNames(const SymbolTable& symbol_table, Iter begin, Iter end,
     GetStatName getter_;
   };
 
+  // Grab the lock once before sorting begins, so we don't have to re-take
+  // it on every comparison.
+  //
+  // TODO(jmarantz): Once SymbolTable is changed to a concrete class from an
+  // interface, we'll be able to change this free function into a method,
+  // take the lock directly, and remove the withLockHeld method.
   symbol_table.withLockHeld([begin, end, get_stat_name, &symbol_table]() {
     Compare compare(symbol_table, get_stat_name);
     std::sort(begin, end, compare);

@@ -14,8 +14,6 @@
 #include "absl/synchronization/blocking_counter.h"
 #include "gtest/gtest.h"
 
-using testing::ElementsAre;
-
 namespace Envoy {
 namespace Stats {
 
