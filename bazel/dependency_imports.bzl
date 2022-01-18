@@ -53,8 +53,8 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     go_repository(
         name = "org_golang_x_net",
         importpath = "golang.org/x/net",
-        sum = "h1:0mm1VjtFUOIlE1SbDlwjYaDxZVDP2S5ou6y0gSgXHu8=",
-        version = "v0.0.0-20200226121028-0de0cce0169b",
+        sum = "h1:LO7XpTYMwTqxjLcGWPijK3vRXg1aWdlNOVOHRq45d7c=",
+        version = "v0.0.0-20210813160813-60bc85c4be6d",
         # project_url = "https://pkg.go.dev/golang.org/x/net",
         # last_update = "2020-02-26"
         # use_category = ["api"],
@@ -63,8 +63,8 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     go_repository(
         name = "org_golang_x_text",
         importpath = "golang.org/x/text",
-        sum = "h1:cokOdA+Jmi5PJGXLlLllQSgYigAEfHXJAERHVMaCc2k=",
-        version = "v0.3.3",
+        sum = "h1:olpwvP2KacW1ZWvsR7uQhoyTYvKAupfQrRGBFM352Gk=",
+        version = "v0.3.7",
         # project_url = "https://pkg.go.dev/golang.org/x/text",
         # last_update = "2021-06-16"
         # use_category = ["api"],
@@ -73,8 +73,8 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     go_repository(
         name = "com_github_spf13_afero",
         importpath = "github.com/spf13/afero",
-        sum = "h1:8q6vk3hthlpb2SouZcnBVKboxWQWMDNF38bwholZrJc=",
-        version = "v1.3.4",
+        sum = "h1:xoax2sJ2DT8S8xA2paPFjDCScCNeWsg75VG0DLRreiY=",
+        version = "v1.6.0",
         # project_url = "https://pkg.go.dev/github.com/spf13/afero",
         # last_update = "2021-03-20"
         # use_category = ["api"],
@@ -93,8 +93,8 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     go_repository(
         name = "com_github_iancoleman_strcase",
         importpath = "github.com/iancoleman/strcase",
-        sum = "h1:ux/56T2xqZO/3cP1I2F86qpeoYPCOzk+KF/UH/Ar+lk=",
-        version = "v0.0.0-20180726023541-3605ed457bf7",
+        sum = "h1:05I4QRnGpI0m37iZQRuskXh+w77mr6Z41lwQzuHLwW0=",
+        version = "v0.2.0",
         # project_url = "https://pkg.go.dev/github.com/iancoleman/strcase",
         # last_update = "2020-11-22"
         # use_category = ["api"],
