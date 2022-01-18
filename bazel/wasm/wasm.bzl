@@ -1,5 +1,6 @@
 load("@proxy_wasm_cpp_sdk//bazel:defs.bzl", "proxy_wasm_cc_binary")
 load("@rules_rust//rust:rust.bzl", "rust_binary")
+load("//bazel:envoy_select.bzl", "envoy_select_wasm_v8_bool")
 
 def _wasm_rust_transition_impl(settings, attr):
     return {
@@ -97,10 +98,7 @@ def wasm_rust_binary(name, tags = [], wasi = False, **kwargs):
 
     bin_rule(
         name = name,
-        precompile = select({
-            "@envoy//bazel:linux_x86_64": True,
-            "//conditions:default": False,
-        }),
+        precompile = envoy_select_wasm_v8_bool(),
         binary = ":" + wasm_name,
         tags = tags + ["manual"],
     )
