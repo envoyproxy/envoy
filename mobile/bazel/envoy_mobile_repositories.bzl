@@ -54,9 +54,9 @@ def upstream_envoy_overrides():
     http_archive(
         name = "boringssl",
         patches = ["@envoy_mobile//bazel:boringssl.patch"],
-        sha256 = "70e9d8737e35d67f94b9e742ca59c02c36f30f1d822d5a3706511a23798d8049",
-        strip_prefix = "boringssl-75edea1922aefe415e0e60ac576116634b0a94f8",
-        urls = ["https://github.com/google/boringssl/archive/75edea1922aefe415e0e60ac576116634b0a94f8.tar.gz"],
+        sha256 = "579cb415458e9f3642da0a39a72f79fdfe6dc9c1713b3a823f1e276681b9703e",
+        strip_prefix = "boringssl-648cbaf033401b7fe7acdce02f275b06a88aab5c",
+        urls = ["https://github.com/google/boringssl/archive/648cbaf033401b7fe7acdce02f275b06a88aab5c.tar.gz"],
     )
 
     # Envoy uses rules_python v0.1.0, which does not include tooling for packaging Python.  The
