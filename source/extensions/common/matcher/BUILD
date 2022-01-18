@@ -19,3 +19,19 @@ envoy_cc_library(
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "trie_matcher_lib",
+    srcs = ["trie_matcher.cc"],
+    hdrs = ["trie_matcher.h"],
+    deps = [
+        "//envoy/matcher:matcher_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:factory_context_interface",
+        "//source/common/matcher:matcher_lib",
+        "//source/common/network:lc_trie_lib",
+        "//source/common/network:utility_lib",
+        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
+    ],
+)

@@ -256,7 +256,11 @@ AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl&
   } else {
     child_span_ = std::make_unique<Tracing::NullSpan>();
   }
-  child_span_->setSampled(options.sampled_);
+  // Span gets sampled by default, as sampled_ defaults to true.
+  // If caller overrides sampled_ with empty value, sampling status of the parent is kept.
+  if (options.sampled_.has_value()) {
+    child_span_->setSampled(options.sampled_.value());
+  }
 }
 
 void AsyncRequestImpl::initialize() {

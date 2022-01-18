@@ -7,6 +7,8 @@
 #include "envoy/tcp/conn_pool.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/extensions/filters/network/dubbo_proxy/filters/filter.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/router.h"
@@ -36,7 +38,7 @@ public:
   FilterStatus onMessageEncoded(MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) override;
 
   // Upstream::LoadBalancerContextBase
-  const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
+  const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override;
   const Network::Connection* downstreamConnection() const override;
 
   // Tcp::ConnectionPool::UpstreamCallbacks
@@ -91,6 +93,7 @@ private:
   void cleanup();
 
   Upstream::ClusterManager& cluster_manager_;
+  Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_;
 
   DubboFilters::DecoderFilterCallbacks* callbacks_{};
   DubboFilters::EncoderFilterCallbacks* encoder_callbacks_{};

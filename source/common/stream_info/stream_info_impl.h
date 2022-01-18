@@ -14,6 +14,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 
@@ -22,22 +23,18 @@
 namespace Envoy {
 namespace StreamInfo {
 
-namespace {
-
-using ReplacementMap = absl::flat_hash_map<std::string, std::string>;
-
-const ReplacementMap& emptySpaceReplacement() {
-  CONSTRUCT_ON_FIRST_USE(
-      ReplacementMap,
-      ReplacementMap{{" ", "_"}, {"\t", "_"}, {"\f", "_"}, {"\v", "_"}, {"\n", "_"}, {"\r", "_"}});
-}
-
-} // namespace
-
 struct UpstreamInfoImpl : public UpstreamInfo {
   void setUpstreamConnectionId(uint64_t id) override { upstream_connection_id_ = id; }
 
   absl::optional<uint64_t> upstreamConnectionId() const override { return upstream_connection_id_; }
+
+  void setUpstreamInterfaceName(absl::string_view interface_name) override {
+    upstream_connection_interface_name_ = std::string(interface_name);
+  }
+
+  absl::optional<absl::string_view> upstreamInterfaceName() const override {
+    return upstream_connection_interface_name_;
+  }
 
   void
   setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
@@ -46,9 +43,6 @@ struct UpstreamInfoImpl : public UpstreamInfo {
 
   Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
     return upstream_ssl_info_;
-  }
-  void setUpstreamTiming(const UpstreamTiming& upstream_timing) override {
-    upstream_timing_ = upstream_timing;
   }
   UpstreamTiming& upstreamTiming() override { return upstream_timing_; }
   const UpstreamTiming& upstreamTiming() const override { return upstream_timing_; }
@@ -82,14 +76,18 @@ struct UpstreamInfoImpl : public UpstreamInfo {
     os << spaces << "UpstreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(upstream_connection_id_)
        << "\n";
   }
+  void setUpstreamNumStreams(uint64_t num_streams) override { num_streams_ = num_streams; }
+  uint64_t upstreamNumStreams() const override { return num_streams_; }
 
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   UpstreamTiming upstream_timing_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   absl::optional<uint64_t> upstream_connection_id_;
+  absl::optional<std::string> upstream_connection_interface_name_;
   std::string upstream_transport_failure_reason_;
   FilterStateSharedPtr upstream_filter_state_;
+  size_t num_streams_{};
 };
 
 struct StreamInfoImpl : public StreamInfo {
@@ -129,89 +127,15 @@ struct StreamInfoImpl : public StreamInfo {
                                                                 start_time_monotonic_);
   }
 
-  void maybeCreateUpstreamInfo() {
-    if (!upstream_info_) {
-      upstream_info_ = std::make_shared<UpstreamInfoImpl>();
-    }
-  }
-
-  void setUpstreamConnectionId(uint64_t id) override {
-    maybeCreateUpstreamInfo();
-    upstream_info_->setUpstreamConnectionId(id);
-  }
-
-  absl::optional<uint64_t> upstreamConnectionId() const override {
-    if (!upstream_info_) {
-      return absl::nullopt;
-    }
-    return upstream_info_->upstreamConnectionId();
-  }
-
-  absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const override {
-    if (!downstream_timing_.has_value()) {
-      return absl::nullopt;
-    }
-    return duration(downstream_timing_.value().lastDownstreamRxByteReceived());
-  }
-
-  void setUpstreamTiming(const UpstreamTiming& upstream_timing) override {
-    maybeCreateUpstreamInfo();
-    upstream_info_->setUpstreamTiming(upstream_timing);
-  }
-
   void setUpstreamInfo(std::shared_ptr<UpstreamInfo> info) override { upstream_info_ = info; }
+
   std::shared_ptr<UpstreamInfo> upstreamInfo() override { return upstream_info_; }
+
   OptRef<const UpstreamInfo> upstreamInfo() const override {
     if (!upstream_info_) {
       return {};
     }
     return *upstream_info_;
-  }
-  UpstreamTiming& upstreamTiming() override {
-    maybeCreateUpstreamInfo();
-    return upstream_info_->upstreamTiming();
-  }
-
-  absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
-    if (!upstream_info_) {
-      return absl::nullopt;
-    }
-    return duration(upstream_info_->upstreamTiming().first_upstream_tx_byte_sent_);
-  }
-
-  absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const override {
-    if (!upstream_info_) {
-      return absl::nullopt;
-    }
-    return duration(upstream_info_->upstreamTiming().last_upstream_tx_byte_sent_);
-  }
-
-  absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const override {
-    if (!upstream_info_) {
-      return absl::nullopt;
-    }
-    return duration(upstream_info_->upstreamTiming().first_upstream_rx_byte_received_);
-  }
-
-  absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const override {
-    if (!upstream_info_) {
-      return absl::nullopt;
-    }
-    return duration(upstream_info_->upstreamTiming().last_upstream_rx_byte_received_);
-  }
-
-  absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const override {
-    if (!downstream_timing_.has_value()) {
-      return absl::nullopt;
-    }
-    return duration(downstream_timing_.value().firstDownstreamTxByteSent());
-  }
-
-  absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const override {
-    if (!downstream_timing_.has_value()) {
-      return absl::nullopt;
-    }
-    return duration(downstream_timing_.value().lastDownstreamTxByteSent());
   }
 
   absl::optional<std::chrono::nanoseconds> requestComplete() const override {
@@ -228,6 +152,12 @@ struct StreamInfoImpl : public StreamInfo {
       downstream_timing_ = DownstreamTiming();
     }
     return downstream_timing_.value();
+  }
+  OptRef<const DownstreamTiming> downstreamTiming() const override {
+    if (!downstream_timing_.has_value()) {
+      return {};
+    }
+    return {*downstream_timing_};
   }
 
   void addBytesReceived(uint64_t bytes_received) override { bytes_received_ += bytes_received; }
@@ -247,7 +177,8 @@ struct StreamInfoImpl : public StreamInfo {
   void setResponseCode(uint32_t code) override { response_code_ = code; }
 
   void setResponseCodeDetails(absl::string_view rc_details) override {
-    response_code_details_.emplace(absl::StrReplaceAll(rc_details, emptySpaceReplacement()));
+    ASSERT(!StringUtil::hasEmptySpace(rc_details));
+    response_code_details_.emplace(rc_details);
   }
 
   const absl::optional<std::string>& connectionTerminationDetails() const override {
@@ -274,35 +205,18 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t responseFlags() const override { return response_flags_; }
 
-  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
-    maybeCreateUpstreamInfo();
-    upstream_info_->setUpstreamHost(host);
-  }
-
-  Upstream::HostDescriptionConstSharedPtr upstreamHost() const override {
-    if (!upstream_info_) {
-      return nullptr;
-    }
-    return upstream_info_->upstreamHost();
-  }
-
   void setRouteName(absl::string_view route_name) override {
     route_name_ = std::string(route_name);
   }
 
   const std::string& getRouteName() const override { return route_name_; }
 
-  void setUpstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& upstream_local_address) override {
-    maybeCreateUpstreamInfo();
-    upstream_info_->setUpstreamLocalAddress(upstream_local_address);
+  void setVirtualClusterName(const absl::optional<std::string>& virtual_cluster_name) override {
+    virtual_cluster_name_ = virtual_cluster_name;
   }
 
-  const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const override {
-    if (!upstream_info_) {
-      return legacy_upstream_local_address_;
-    }
-    return upstream_info_->upstreamLocalAddress();
+  const absl::optional<std::string>& virtualClusterName() const override {
+    return virtual_cluster_name_;
   }
 
   bool healthCheck() const override { return health_check_request_; }
@@ -311,15 +225,6 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Network::ConnectionInfoProvider& downstreamAddressProvider() const override {
     return *downstream_connection_info_provider_;
-  }
-
-  void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
-    maybeCreateUpstreamInfo();
-    upstream_info_->setUpstreamSslConnection(connection_info);
-  }
-
-  Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
-    return upstream_info_ ? upstream_info_->upstreamSslConnection() : nullptr;
   }
 
   Router::RouteConstSharedPtr route() const override { return route_; }
@@ -333,29 +238,6 @@ struct StreamInfoImpl : public StreamInfo {
 
   const FilterStateSharedPtr& filterState() override { return filter_state_; }
   const FilterState& filterState() const override { return *filter_state_; }
-
-  const FilterStateSharedPtr& upstreamFilterState() const override {
-    if (!upstream_info_) {
-      return legacy_upstream_filter_state_;
-    }
-    return upstream_info_->upstreamFilterState();
-  }
-  void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) override {
-    maybeCreateUpstreamInfo();
-    return upstream_info_->setUpstreamFilterState(filter_state);
-  }
-
-  void setUpstreamTransportFailureReason(absl::string_view failure_reason) override {
-    maybeCreateUpstreamInfo();
-    upstream_info_->setUpstreamTransportFailureReason(failure_reason);
-  }
-
-  const std::string& upstreamTransportFailureReason() const override {
-    if (!upstream_info_) {
-      return legacy_upstream_transport_failure_reason_;
-    }
-    return upstream_info_->upstreamTransportFailureReason();
-  }
 
   void setRequestHeaders(const Http::RequestHeaderMap& headers) override {
     request_headers_ = &headers;
@@ -440,9 +322,11 @@ struct StreamInfoImpl : public StreamInfo {
   Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
   FilterStateSharedPtr filter_state_;
-  FilterStateSharedPtr legacy_upstream_filter_state_;
   std::string route_name_;
   absl::optional<uint32_t> attempt_count_;
+  // TODO(agrawroh): Check if the owner of this storage outlives the StreamInfo. We should only copy
+  // the string if it could outlive the StreamInfo.
+  absl::optional<std::string> virtual_cluster_name_;
 
 private:
   static Network::ConnectionInfoProviderSharedPtr emptyDownstreamAddressProvider() {
@@ -466,12 +350,10 @@ private:
   std::shared_ptr<UpstreamInfo> upstream_info_;
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
-  Network::Address::InstanceConstSharedPtr legacy_upstream_local_address_;
   const Network::ConnectionInfoProviderSharedPtr downstream_connection_info_provider_;
   const Http::RequestHeaderMap* request_headers_{};
   Http::RequestIdStreamInfoProviderSharedPtr request_id_provider_;
   absl::optional<DownstreamTiming> downstream_timing_;
-  std::string legacy_upstream_transport_failure_reason_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_;

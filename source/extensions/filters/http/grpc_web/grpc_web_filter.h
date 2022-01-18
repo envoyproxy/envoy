@@ -14,7 +14,7 @@ namespace HttpFilters {
 namespace GrpcWeb {
 
 /**
- * See docs/configuration/http_filters/grpc_web_filter.rst
+ * See https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/grpc_web_filter
  */
 class GrpcWebFilter : public Http::StreamFilter, NonCopyable {
 public:

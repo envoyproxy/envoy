@@ -21,7 +21,9 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get(), push_promise_index),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
-      quic_stat_names_(quic_stat_names), scope_(scope) {}
+      quic_stat_names_(quic_stat_names), scope_(scope) {
+  streamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+}
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());
@@ -31,7 +33,7 @@ EnvoyQuicClientSession::~EnvoyQuicClientSession() {
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return server_id().host(); }
 
 void EnvoyQuicClientSession::connect() {
-  streamInfo().upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
+  streamInfo().upstreamInfo()->upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
   dynamic_cast<EnvoyQuicClientConnection*>(network_connection_)
       ->setUpConnectionSocket(
           *static_cast<EnvoyQuicClientConnection*>(connection())->connectionSocket(), *this);
@@ -133,8 +135,9 @@ void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
   // before use. This may result in OnCanCreateNewOutgoingStream with zero
   // available streams.
   OnCanCreateNewOutgoingStream(false);
-  streamInfo().upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
-  streamInfo().upstreamTiming().onUpstreamHandshakeComplete(dispatcher_.timeSource());
+  streamInfo().upstreamInfo()->upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
+  streamInfo().upstreamInfo()->upstreamTiming().onUpstreamHandshakeComplete(
+      dispatcher_.timeSource());
 
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }

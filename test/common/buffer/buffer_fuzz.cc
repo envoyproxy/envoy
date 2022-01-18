@@ -135,7 +135,7 @@ public:
     return mutableStart();
   }
 
-  Buffer::SliceDataPtr extractMutableFrontSlice() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  Buffer::SliceDataPtr extractMutableFrontSlice() override { PANIC("not implemented"); }
 
   void move(Buffer::Instance& rhs) override { move(rhs, rhs.length()); }
 
@@ -186,6 +186,16 @@ public:
   }
 
   std::string toString() const override { return std::string(data_.data() + start_, size_); }
+
+  size_t addFragments(absl::Span<const absl::string_view> fragments) override {
+    size_t total_size_to_write = 0;
+
+    for (const auto& fragment : fragments) {
+      total_size_to_write += fragment.size();
+      add(fragment.data(), fragment.size());
+    }
+    return total_size_to_write;
+  }
 
   void setWatermarks(uint32_t) override {
     // Not implemented.

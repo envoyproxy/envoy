@@ -236,16 +236,20 @@ private:
 
   struct VirtualClusterBase : public VirtualCluster {
   public:
-    VirtualClusterBase(Stats::StatName stat_name, Stats::ScopePtr&& scope,
-                       const VirtualClusterStatNames& stat_names)
-        : stat_name_(stat_name), scope_(std::move(scope)),
+    VirtualClusterBase(const absl::optional<std::string>& name, Stats::StatName stat_name,
+                       Stats::ScopePtr&& scope, const VirtualClusterStatNames& stat_names)
+        : name_(name), stat_name_(stat_name), scope_(std::move(scope)),
           stats_(generateStats(*scope_, stat_names)) {}
 
     // Router::VirtualCluster
+    // name_ and stat_name_ are two different representations for the same string, retained in
+    // memory to avoid symbol-table locks that would be needed when converting on-the-fly.
+    const absl::optional<std::string>& name() const override { return name_; }
     Stats::StatName statName() const override { return stat_name_; }
     VirtualClusterStats& stats() const override { return stats_; }
 
   private:
+    const absl::optional<std::string> name_;
     const Stats::StatName stat_name_;
     Stats::ScopePtr scope_;
     mutable VirtualClusterStats stats_;
@@ -259,8 +263,8 @@ private:
 
   struct CatchAllVirtualCluster : public VirtualClusterBase {
     CatchAllVirtualCluster(Stats::Scope& scope, const VirtualClusterStatNames& stat_names)
-        : VirtualClusterBase(stat_names.other_, scope.scopeFromStatName(stat_names.other_),
-                             stat_names) {}
+        : VirtualClusterBase(absl::nullopt, stat_names.other_,
+                             scope.scopeFromStatName(stat_names.other_), stat_names) {}
   };
 
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;

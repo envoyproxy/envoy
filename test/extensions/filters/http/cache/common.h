@@ -73,7 +73,7 @@ std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {
   case CacheEntryStatus::NotSatisfiableRange:
     return os << "NotSatisfiableRange";
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("reached unexpected code");
 }
 
 std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range) {

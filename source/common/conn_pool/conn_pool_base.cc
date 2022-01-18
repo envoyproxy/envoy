@@ -208,22 +208,25 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
                                       bool delay_attaching_stream) {
   ENVOY_CONN_LOG(debug, "destroying stream: {} remaining", client, client.numActiveStreams());
   ASSERT(num_active_streams_ > 0);
-  // Reflect there's one less stream in flight.
-  bool had_negative_capacity = client.hadNegativeDeltaOnStreamClosed();
   state_.decrActiveStreams(1);
   num_active_streams_--;
   host_->stats().rq_active_.dec();
   host_->cluster().stats().upstream_rq_active_.dec();
   host_->cluster().resourceManager(priority_).requests().dec();
-  // If the effective client capacity was limited by concurrency, increase connecting capacity.
-  // If the effective client capacity was limited by max total streams, this will not result in an
-  // increment as no capacity is freed up.
   // We don't update the capacity for HTTP/3 as the stream count should only
   // increase when a MAX_STREAMS frame is received.
-  if (trackStreamCapacity() && (client.remaining_streams_ > client.concurrent_stream_limit_ -
-                                                                client.numActiveStreams() - 1 ||
-                                had_negative_capacity)) {
-    state_.incrConnectingAndConnectedStreamCapacity(1);
+  if (trackStreamCapacity()) {
+    // If the effective client capacity was limited by concurrency, increase connecting capacity.
+    bool limited_by_concurrency =
+        client.remaining_streams_ > client.concurrent_stream_limit_ - client.numActiveStreams() - 1;
+    // The capacity calculated by concurrency could be negative if a SETTINGS frame lowered the
+    // number of allowed streams. In this case, effective client capacity was still limited by
+    // concurrency, compare client.concurrent_stream_limit_ and client.numActiveStreams() directly
+    // to avoid overflow.
+    bool negative_capacity = client.concurrent_stream_limit_ < client.numActiveStreams() + 1;
+    if (negative_capacity || limited_by_concurrency) {
+      state_.incrConnectingAndConnectedStreamCapacity(1);
+    }
   }
   if (client.state() == ActiveClient::State::DRAINING && client.numActiveStreams() == 0) {
     // Close out the draining client if we no longer have active streams.
@@ -595,6 +598,7 @@ uint32_t translateZeroToUnlimited(uint32_t limit) {
 ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
                            uint32_t concurrent_stream_limit)
     : parent_(parent), remaining_streams_(translateZeroToUnlimited(lifetime_stream_limit)),
+      configured_stream_limit_(translateZeroToUnlimited(concurrent_stream_limit)),
       concurrent_stream_limit_(translateZeroToUnlimited(concurrent_stream_limit)),
       connect_timer_(parent_.dispatcher().createTimer([this]() { onConnectTimeout(); })) {
   conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(

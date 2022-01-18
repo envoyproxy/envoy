@@ -190,5 +190,15 @@ public:
 
 using TextReadoutSharedPtr = RefcountPtr<TextReadout>;
 
+/**
+ * Callback invoked to provide size of stats container.
+ */
+using SizeFn = std::function<void(std::size_t)>;
+
+/**
+ * Callback invoked for each stat during iteration.
+ */
+template <typename Stat> using StatFn = std::function<void(Stat&)>;
+
 } // namespace Stats
 } // namespace Envoy

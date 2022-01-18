@@ -502,6 +502,11 @@ public:
   virtual ~VirtualCluster() = default;
 
   /**
+   * @return the string name of the virtual cluster.
+   */
+  virtual const absl::optional<std::string>& name() const PURE;
+
+  /**
    * @return the stat-name of the virtual cluster.
    */
   virtual Stats::StatName statName() const PURE;

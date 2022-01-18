@@ -211,7 +211,7 @@ envoy_cmake(
         # options, and they cannot be nested.
         # If https://github.com/bazelbuild/rules_foreign_cc/issues/289 is fixed
         # this can be removed.
-        # More details https://github.com/lyft/envoy-mobile/issues/116
+        # More details https://github.com/envoyproxy/envoy-mobile/issues/116
         "_GNU_SOURCE": "on",
     },
     lib_source = "@com_github_libevent_libevent//:all",
@@ -219,7 +219,7 @@ envoy_cmake(
         # macOS organization of libevent is different from Windows/Linux.
         # Including libevent_core is a requirement on those platforms, but
         # results in duplicate symbols when built on macOS.
-        # See https://github.com/lyft/envoy-mobile/issues/677 for details.
+        # See https://github.com/envoyproxy/envoy-mobile/issues/677 for details.
         "//bazel:apple": [
             "libevent.a",
             "libevent_pthreads.a",
@@ -386,9 +386,11 @@ envoy_cmake(
     name = "wamr",
     cache_entries = {
         "LLVM_DIR": "$EXT_BUILD_DEPS/copy_llvm/llvm/lib/cmake/llvm",
-        "WAMR_BUILD_INTERP": "0",
-        "WAMR_BUILD_JIT": "1",
-        "WAMR_BUILD_AOT": "1",
+        "WAMR_BUILD_INTERP": "1",
+        "WAMR_BUILD_FAST_INTERP": "1",
+        "WAMR_BUILD_JIT": "0",
+        "WAMR_BUILD_LAZY_JIT": "0",
+        "WAMR_BUILD_AOT": "0",
         "WAMR_BUILD_SIMD": "0",
         "WAMR_BUILD_MULTI_MODULE": "1",
         "WAMR_BUILD_LIBC_WASI": "0",
