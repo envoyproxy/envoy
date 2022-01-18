@@ -487,6 +487,11 @@ bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
   // convert at least one symbol to a string_view, and it's easier not to
   // bother to lazily take the lock.
   Thread::LockGuard lock(lock_);
+  return lessThanLockHeld(a, b);
+}
+
+bool SymbolTableImpl::lessThanLockHeld(const StatName& a, const StatName& b) const
+    ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   Encoding::TokenIter a_iter(a.data(), a.dataSize());
   Encoding::TokenIter b_iter(b.data(), b.dataSize());
   while (true) {

@@ -199,6 +199,16 @@ public:
   void setRecentLookupCapacity(uint64_t capacity) override;
   uint64_t recentLookupCapacity() const override;
   DynamicSpans getDynamicSpans(StatName stat_name) const override;
+  void withLockHeld(std::function<void()> f) const override {
+    Thread::LockGuard lock(lock_);
+    f();
+  }
+
+  /**
+   * See doc for lessThan(). This variant requires the lock be taken
+   * before calling. It is used to help sort() speed.
+   */
+  bool lessThanLockHeld(const StatName& a, const StatName& b) const override;
 
 private:
   friend class StatName;
@@ -860,6 +870,39 @@ private:
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;
 };
+
+/**
+ * Sorts a range by StatName. This API is more efficient than
+ * calling std::sort directly as it takes a single lock for the
+ * entire sort, rather than locking on each comparison.
+ *
+ * @param begin the beginning of the range to sort
+ * @param end the end of the range to sort
+ * @param get_stat_name a functor that takes an Obj and returns a StatName.
+ */
+template <class Obj, class Iter, class GetStatName>
+void sortByStatNames(const SymbolTable& symbol_table, Iter begin, Iter end,
+                     GetStatName get_stat_name) {
+
+  struct Compare {
+    Compare(const SymbolTable& symbol_table, GetStatName getter)
+        : symbol_table_(symbol_table), getter_(getter) {}
+
+    bool operator()(const Obj& a, const Obj& b) const {
+      StatName a_stat_name = getter_(a);
+      StatName b_stat_name = getter_(b);
+      return symbol_table_.lessThanLockHeld(a_stat_name, b_stat_name);
+    }
+
+    const SymbolTable& symbol_table_;
+    GetStatName getter_;
+  };
+
+  symbol_table.withLockHeld([begin, end, get_stat_name, &symbol_table]() {
+    Compare compare(symbol_table, get_stat_name);
+    std::sort(begin, end, compare);
+  });
+}
 
 } // namespace Stats
 } // namespace Envoy
