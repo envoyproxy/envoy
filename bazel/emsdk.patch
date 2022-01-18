@@ -1,14 +1,12 @@
 diff --git a/bazel/BUILD b/bazel/BUILD
-index c84bf3f..1f99197 100644
+index c84bf3f..0433f02 100644
 --- a/bazel/BUILD
 +++ b/bazel/BUILD
-@@ -24,12 +24,17 @@ config_setting(
+@@ -24,12 +24,15 @@ config_setting(
      ],
  )
  
-+filegroup(
-+    name = "empty",
-+)
++filegroup(name = "empty")
 +
  alias(
      name = "binaries",
@@ -20,7 +18,7 @@ index c84bf3f..1f99197 100644
      }),
  )
  
-@@ -39,5 +44,6 @@ alias(
+@@ -39,5 +42,6 @@ alias(
          ":linux": "@emscripten_npm_linux//:node_modules",
          ":macos": "@emscripten_npm_mac//:node_modules",
          ":windows": "@emscripten_npm_win//:node_modules",
@@ -42,3 +40,29 @@ index ce87ebb..c1ba75e 100644
          # Blaze requests this feature by default.
          # Blaze also tests if this feature is supported before setting preprocessor_defines
          # (...but why?)
+diff --git a/bazel/emscripten_toolchain/emcc.sh b/bazel/emscripten_toolchain/emcc.sh
+index 5fdaf9c..235dbf0 100755
+--- a/bazel/emscripten_toolchain/emcc.sh
++++ b/bazel/emscripten_toolchain/emcc.sh
+@@ -2,4 +2,4 @@
+ 
+ source $(dirname $0)/env.sh
+ 
+-exec python3 $EMSCRIPTEN/emcc.py "$@"
++exec python3 $EMSCRIPTEN/emcc.py "$@" -fno-sanitize=all
+diff --git a/bazel/emscripten_toolchain/emcc_link.sh b/bazel/emscripten_toolchain/emcc_link.sh
+index 44f3235..88fb771 100755
+--- a/bazel/emscripten_toolchain/emcc_link.sh
++++ b/bazel/emscripten_toolchain/emcc_link.sh
+@@ -2,4 +2,11 @@
+ 
+ source $(dirname $0)/env.sh
+ 
++# Remove sanitizers from parameters.
++if [[ "$1" == *.params ]]; then
++    sed 's/-l:.*$//g' ${1:1} > ${1:1}.tmp
++    echo "-fno-sanitize=all" >> ${1:1}.tmp
++    mv ${1:1}.tmp ${1:1}
++fi
++
+ exec python3 $(dirname $0)/link_wrapper.py "$@"
