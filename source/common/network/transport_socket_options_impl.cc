@@ -67,32 +67,40 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   absl::optional<Network::ProxyProtocolData> proxy_protocol_options;
 
   bool needs_transport_socket_options = false;
-  if (filter_state.hasData<UpstreamServerName>(UpstreamServerName::key())) {
-    const auto& upstream_server_name =
-        filter_state.getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
-    server_name = upstream_server_name.value();
-    needs_transport_socket_options = true;
+  if (const auto* state = filter_state.getDataReadOnlyGeneric(UpstreamServerName::key());
+      state != nullptr) {
+    if (const auto* typed_state = dynamic_cast<const UpstreamServerName*>(state);
+        typed_state != nullptr) {
+      server_name = typed_state->value();
+      needs_transport_socket_options = true;
+    }
   }
 
-  if (filter_state.hasData<Network::ApplicationProtocols>(Network::ApplicationProtocols::key())) {
-    const auto& alpn = filter_state.getDataReadOnly<Network::ApplicationProtocols>(
-        Network::ApplicationProtocols::key());
-    application_protocols = alpn.value();
-    needs_transport_socket_options = true;
+  if (const auto* state = filter_state.getDataReadOnlyGeneric(Network::ApplicationProtocols::key());
+      state != nullptr) {
+    if (const auto* typed_state = dynamic_cast<const Network::ApplicationProtocols*>(state);
+        typed_state != nullptr) {
+      application_protocols = typed_state->value();
+      needs_transport_socket_options = true;
+    }
   }
 
-  if (filter_state.hasData<UpstreamSubjectAltNames>(UpstreamSubjectAltNames::key())) {
-    const auto& upstream_subject_alt_names =
-        filter_state.getDataReadOnly<UpstreamSubjectAltNames>(UpstreamSubjectAltNames::key());
-    subject_alt_names = upstream_subject_alt_names.value();
-    needs_transport_socket_options = true;
+  if (const auto* state = filter_state.getDataReadOnlyGeneric(UpstreamSubjectAltNames::key());
+      state != nullptr) {
+    if (const auto* typed_state = dynamic_cast<const UpstreamSubjectAltNames*>(state);
+        typed_state != nullptr) {
+      subject_alt_names = typed_state->value();
+      needs_transport_socket_options = true;
+    }
   }
 
-  if (filter_state.hasData<ProxyProtocolFilterState>(ProxyProtocolFilterState::key())) {
-    const auto& proxy_protocol_filter_state =
-        filter_state.getDataReadOnly<ProxyProtocolFilterState>(ProxyProtocolFilterState::key());
-    proxy_protocol_options.emplace(proxy_protocol_filter_state.value());
-    needs_transport_socket_options = true;
+  if (const auto* state = filter_state.getDataReadOnlyGeneric(ProxyProtocolFilterState::key());
+      state != nullptr) {
+    if (const auto* typed_state = dynamic_cast<const ProxyProtocolFilterState*>(state);
+        typed_state != nullptr) {
+      proxy_protocol_options.emplace(typed_state->value());
+      needs_transport_socket_options = true;
+    }
   }
 
   if (needs_transport_socket_options) {
