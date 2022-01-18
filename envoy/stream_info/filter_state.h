@@ -93,8 +93,13 @@ public:
    * cast to the type specified.
    */
   template <typename T> const T& getDataReadOnly(absl::string_view data_name) const {
-    const T* result = dynamic_cast<const T*>(getDataReadOnlyGeneric(data_name));
-    if (!result) {
+    const auto* generic_result = getDataReadOnlyGeneric(data_name);
+    if (generic_result == nullptr) {
+      throw EnvoyException("FilterState::getDataReadOnly<T> called for unknown data name.");
+    }
+
+    const T* result = dynamic_cast<const T*>(generic_result);
+    if (result == nullptr) {
       ExceptionUtil::throwEnvoyException(
           fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
     }
@@ -103,8 +108,7 @@ public:
 
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).
-   * @return a const reference to the stored data.
-   * An exception will be thrown if the data does not exist.
+   * @return a const pointer to the stored data or nullptr if the data does not exist.
    */
   virtual const Object* getDataReadOnlyGeneric(absl::string_view data_name) const PURE;
 
@@ -117,13 +121,24 @@ public:
    * |data_name| cannot be dynamically cast to the type specified.
    */
   template <typename T> T& getDataMutable(absl::string_view data_name) {
-    T* result = dynamic_cast<T*>(getDataMutableGeneric(data_name));
+    auto* generic_result = getDataMutableGeneric(data_name);
+    if (generic_result == nullptr) {
+      throw EnvoyException("FilterState::getDataMutable<T> called for unknown data name.");
+    }
+
+    T* result = dynamic_cast<T*>(generic_result);
     if (!result) {
       ExceptionUtil::throwEnvoyException(
           fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
     }
     return *result;
   }
+
+  /**
+   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @return a pointer to the stored data or nullptr if the data does not exist.
+   */
+  virtual Object* getDataMutableGeneric(absl::string_view data_name) PURE;
 
   /**
    * @param data_name the name of the data being probed.
@@ -159,9 +174,6 @@ public:
    * either the top LifeSpan or the parent is not yet created.
    */
   virtual FilterStateSharedPtr parent() const PURE;
-
-protected:
-  virtual Object* getDataMutableGeneric(absl::string_view data_name) PURE;
 };
 
 } // namespace StreamInfo
