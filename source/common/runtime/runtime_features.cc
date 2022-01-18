@@ -57,10 +57,12 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.test_feature_true",
     // Begin alphabetically sorted section.
     "envoy.reloadable_features.allow_response_for_timeout",
+    "envoy.reloadable_features.allow_upstream_inline_write",
     "envoy.reloadable_features.conn_pool_delete_when_idle",
     "envoy.reloadable_features.correct_scheme_and_xfp",
     "envoy.reloadable_features.correctly_validate_alpn",
     "envoy.reloadable_features.disable_tls_inspector_injection",
+    "envoy.reloadable_features.enable_grpc_async_client_cache",
     "envoy.reloadable_features.fix_added_trailers",
     "envoy.reloadable_features.grpc_bridge_stats_disabled",
     "envoy.reloadable_features.handle_stream_reset_during_hcm_encoding",
@@ -85,7 +87,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.unquote_log_string_values",
     "envoy.reloadable_features.update_expected_rq_timeout_on_retry",
     "envoy.reloadable_features.use_dns_ttl",
-    "envoy.reloadable_features.use_observable_cluster_name",
     "envoy.reloadable_features.validate_connect",
     "envoy.reloadable_features.vhds_heartbeats",
     "envoy.restart_features.explicit_wildcard_resource",
@@ -108,14 +109,8 @@ constexpr const char* runtime_features[] = {
 constexpr const char* disabled_runtime_features[] = {
     // TODO(alyssawilk, junr03) flip (and add release notes + docs) these after Lyft tests
     "envoy.reloadable_features.allow_multiple_dns_addresses",
-    // TODO(alyssawilk) flip true after release.
-    "envoy.reloadable_features.allow_upstream_inline_write",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
-    // When the runtime is flipped to true, use shared cache in getOrCreateRawAsyncClient method if
-    // CacheOption is CacheWhenRuntimeEnabled.
-    // Caller that use AlwaysCache option will always cache, unaffected by this runtime.
-    "envoy.reloadable_features.enable_grpc_async_client_cache",
     // TODO(dmitri-d) reset to true to enable unified mux by default
     "envoy.reloadable_features.unified_mux",
     // TODO(birenroy): flip to true in a future PR to enable by default

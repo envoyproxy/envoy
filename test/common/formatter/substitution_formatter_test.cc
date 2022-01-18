@@ -540,23 +540,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    TestScopedRuntime scoped_runtime;
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.use_observable_cluster_name", "false"}});
-    StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
-    const std::string upstream_cluster_name = "cluster_name";
-    auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
-    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
-    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
-    EXPECT_CALL(*cluster_info_mock, name()).WillRepeatedly(ReturnRef(upstream_cluster_name));
-    EXPECT_EQ("cluster_name", upstream_format.format(request_headers, response_headers,
-                                                     response_trailers, stream_info, body));
-    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body),
-                ProtoEq(ValueUtil::stringValue("cluster_name")));
-  }
-
-  {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = nullptr;
     EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
