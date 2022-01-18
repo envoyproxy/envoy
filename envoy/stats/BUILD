@@ -52,9 +52,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "symbol_table_interface",
     hdrs = ["symbol_table.h"],
-    deps = [
-        "//source/common/stats:symbol_table_lib",
-    ],
 )
 
 envoy_cc_library(
