@@ -16,6 +16,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* data plane: fixing error handling where writing to a socket failed while under the stack of processing. This should genreally affect HTTP/3. This behavioral change can be reverted by setting ``envoy.reloadable_features.allow_upstream_inline_write`` to false.
 
 Removed Config or Runtime
 -------------------------
