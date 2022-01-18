@@ -1,3 +1,7 @@
+# 1. Remove sanitizers from parameters.
+# 2. Fix for per_object_debug_info. (https://github.com/emscripten-core/emsdk/pull/969)
+# 3. Fix for non-x86_64 archs. (https://github.com/emscripten-core/emsdk/pull/970)
+
 diff --git a/bazel/BUILD b/bazel/BUILD
 index c84bf3f..0433f02 100644
 --- a/bazel/BUILD
