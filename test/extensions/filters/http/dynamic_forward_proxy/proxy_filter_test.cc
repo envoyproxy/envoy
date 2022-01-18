@@ -409,7 +409,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, AddResolvedHostFilterStateMetadata
             return host_info;
           }));
 
-  EXPECT_CALL(*host_info, address());
+  EXPECT_CALL(*host_info, address()).Times(2).WillRepeatedly(Return(host_info->address_));
 
   EXPECT_CALL(callbacks_, streamInfo());
   EXPECT_CALL(callbacks_, streamInfo());
@@ -468,7 +468,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
             return host_info;
           }));
 
-  EXPECT_CALL(*host_info, address());
+  EXPECT_CALL(*host_info, address()).Times(2).WillRepeatedly(Return(host_info->address_));
 
   EXPECT_CALL(callbacks_, dispatcher());
   EXPECT_CALL(callbacks_, streamInfo());
@@ -500,9 +500,6 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
-  EXPECT_CALL(callbacks_, streamInfo());
-  auto& filter_state = callbacks_.streamInfo().filterState();
-
   InSequence s;
 
   // Setup test host
@@ -529,14 +526,13 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
           }));
 
   EXPECT_CALL(*host_info, address());
-  EXPECT_CALL(callbacks_, streamInfo());
-  EXPECT_CALL(callbacks_, dispatcher());
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-
-  // We do not expect FilterState to be populated
-  EXPECT_FALSE(
-      filter_state->hasData<StreamInfo::UpstreamAddress>(StreamInfo::UpstreamAddress::key()));
+  EXPECT_CALL(callbacks_,
+              sendLocalReply(Http::Code::ServiceUnavailable, Eq("DNS resolution failure"), _, _,
+                             Eq("dns_resolution_failure")));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
 
   filter_->onDestroy();
 }

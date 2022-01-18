@@ -24,11 +24,13 @@ void latchTime(Http::StreamDecoderFilterCallbacks* decoder_callbacks, absl::stri
 struct ResponseStringValues {
   const std::string DnsCacheOverflow = "DNS cache overflow";
   const std::string PendingRequestOverflow = "Dynamic forward proxy pending request overflow";
+  const std::string DnsResolutionFailure = "DNS resolution failure";
 };
 
 struct RcDetailsValues {
   const std::string DnsCacheOverflow = "dns_cache_overflow";
   const std::string PendingRequestOverflow = "dynamic_forward_proxy_pending_request_overflow";
+  const std::string DnsResolutionFailure = "dns_resolution_failure";
 };
 
 using CustomClusterType = envoy::config::cluster::v3::Cluster::CustomClusterType;
@@ -144,6 +146,12 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
     auto const& host = config_->cache().getHost(headers.Host()->value().getStringView());
     if (host.has_value()) {
+      if (!host.value()->address()) {
+        decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
+                                           ResponseStrings::get().DnsResolutionFailure, nullptr,
+                                           absl::nullopt, RcDetails::get().DnsResolutionFailure);
+        return Http::FilterHeadersStatus::StopIteration;
+      }
       addHostAddressToFilterState(host.value()->address());
     }
 
@@ -165,19 +173,10 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void ProxyFilter::addHostAddressToFilterState(
-    const Network::Address::InstanceConstSharedPtr& address) {
+void ProxyFilter::addHostAddressToFilterState(const Network::Address::InstanceConstSharedPtr& address) {
+  ASSERT(address);  // null pointer checks must be done before calling this function.
 
   if (!config_->saveUpstreamAddress()) {
-    return;
-  }
-
-  // `onLoadDnsCacheComplete` is called by DNS cache on first resolution even if there was a
-  // resolution failure (null address). This check makes sure that we do not add null address to
-  // FilterState when this happens.
-  if (!address) {
-    ENVOY_STREAM_LOG(debug, "Cannot add address to filter state: invalid address",
-                     *decoder_callbacks_);
     return;
   }
 
@@ -203,6 +202,15 @@ void ProxyFilter::onLoadDnsCacheComplete(
   ASSERT(circuit_breaker_ != nullptr);
   circuit_breaker_.reset();
 
+  if (!host_info->address()) {
+    // Generally in Envoy it is not Ok to send a local reply at 2 code points with the same
+    // details, but here we could leak prior queries if we differentiate new failures from
+    // cached failures, so intentionally reuse the details.
+    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
+                                       ResponseStrings::get().DnsResolutionFailure, nullptr,
+                                       absl::nullopt, RcDetails::get().DnsResolutionFailure);
+    return;
+  }
   addHostAddressToFilterState(host_info->address());
 
   decoder_callbacks_->continueDecoding();
