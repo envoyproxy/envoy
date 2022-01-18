@@ -503,6 +503,8 @@ TEST_F(StatsThreadLocalStoreTest, ForEach) {
     return names;
   };
 
+  // TODO(pradeepcrao): add tests for histograms when forEachHistogram is added
+
   const std::vector<std::string> empty;
 
   EXPECT_THAT(collect_scopes(), UnorderedElementsAreArray({"", ""}));

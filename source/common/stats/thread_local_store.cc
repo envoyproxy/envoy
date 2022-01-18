@@ -140,10 +140,7 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;
   forEachCounter([&ret](std::size_t size) { ret.reserve(size); },
-                 [&ret](Counter& counter) {
-                   ret.emplace_back(CounterSharedPtr(&counter));
-                   return true;
-                 });
+                 [&ret](Counter& counter) { ret.emplace_back(CounterSharedPtr(&counter)); });
   return ret;
 }
 
@@ -167,7 +164,6 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
                  if (gauge.importMode() != Gauge::ImportMode::Uninitialized) {
                    ret.emplace_back(GaugeSharedPtr(&gauge));
                  }
-                 return true;
                });
   return ret;
 }
@@ -175,11 +171,9 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
 std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<TextReadoutSharedPtr> ret;
-  forEachTextReadout([&ret](std::size_t size) { ret.reserve(size); },
-                     [&ret](TextReadout& text_readout) {
-                       ret.emplace_back(TextReadoutSharedPtr(&text_readout));
-                       return true;
-                     });
+  forEachTextReadout(
+      [&ret](std::size_t size) { ret.reserve(size); },
+      [&ret](TextReadout& text_readout) { ret.emplace_back(TextReadoutSharedPtr(&text_readout)); });
   return ret;
 }
 
