@@ -33,7 +33,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/rds/rds_route_config_provider_impl.h"
 #include "source/common/rds/rds_route_config_subscription.h"
-#include "source/common/rds/route_config_provider_manager_impl.h"
+#include "source/common/rds/route_config_provider_manager.h"
 #include "source/common/rds/route_config_update_receiver_impl.h"
 #include "source/common/rds/static_route_config_provider_impl.h"
 #include "source/common/router/vhds.h"
@@ -203,7 +203,7 @@ public:
 
 private:
   ProtoTraitsImpl proto_traits_;
-  Rds::RouteConfigProviderManagerImpl manager_;
+  Rds::RouteConfigProviderManager manager_;
 };
 
 using RouteConfigProviderManagerImplPtr = std::unique_ptr<RouteConfigProviderManagerImpl>;

@@ -9,7 +9,7 @@
 #include "source/common/config/opaque_resource_decoder_impl.h"
 #include "source/common/rds/rds_route_config_provider_impl.h"
 #include "source/common/rds/rds_route_config_subscription.h"
-#include "source/common/rds/route_config_provider_manager_impl.h"
+#include "source/common/rds/route_config_provider_manager.h"
 #include "source/common/rds/route_config_update_receiver_impl.h"
 #include "source/common/rds/static_route_config_provider_impl.h"
 
@@ -220,7 +220,7 @@ public:
 
   NiceMock<Init::MockManager> outer_init_manager_;
   TestTraits traits_;
-  RouteConfigProviderManagerImpl manager_;
+  RouteConfigProviderManager manager_;
   const std::string rds_type_ = "TestRDS";
   const std::string route_config_name_ = "test_route";
 };

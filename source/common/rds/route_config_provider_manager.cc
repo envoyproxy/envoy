@@ -1,12 +1,13 @@
-#include "source/common/rds/route_config_provider_manager_impl.h"
+#include "source/common/rds/route_config_provider_manager.h"
 
 #include "source/common/rds/util.h"
 
 namespace Envoy {
 namespace Rds {
 
-RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
-    Server::Admin& admin, const std::string& config_tracker_key, ProtoTraits& proto_traits)
+RouteConfigProviderManager::RouteConfigProviderManager(Server::Admin& admin,
+                                                       const std::string& config_tracker_key,
+                                                       ProtoTraits& proto_traits)
     : config_tracker_entry_(admin.getConfigTracker().add(
           config_tracker_key,
           [this](const Matchers::StringMatcher& matcher) { return dumpRouteConfigs(matcher); })),
@@ -16,17 +17,16 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
   RELEASE_ASSERT(config_tracker_entry_, "");
 }
 
-void RouteConfigProviderManagerImpl::eraseStaticProvider(RouteConfigProvider* provider) {
+void RouteConfigProviderManager::eraseStaticProvider(RouteConfigProvider* provider) {
   static_route_config_providers_.erase(provider);
 }
 
-void RouteConfigProviderManagerImpl::eraseDynamicProvider(uint64_t manager_identifier) {
+void RouteConfigProviderManager::eraseDynamicProvider(uint64_t manager_identifier) {
   dynamic_route_config_providers_.erase(manager_identifier);
 }
 
 std::unique_ptr<envoy::admin::v3::RoutesConfigDump>
-RouteConfigProviderManagerImpl::dumpRouteConfigs(
-    const Matchers::StringMatcher& name_matcher) const {
+RouteConfigProviderManager::dumpRouteConfigs(const Matchers::StringMatcher& name_matcher) const {
   auto config_dump = std::make_unique<envoy::admin::v3::RoutesConfigDump>();
 
   for (const auto& element : dynamic_route_config_providers_) {
@@ -63,14 +63,14 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs(
   return config_dump;
 }
 
-RouteConfigProviderPtr RouteConfigProviderManagerImpl::addStaticProvider(
+RouteConfigProviderPtr RouteConfigProviderManager::addStaticProvider(
     std::function<RouteConfigProviderPtr()> create_static_provider) {
   auto provider = create_static_provider();
   static_route_config_providers_.insert(provider.get());
   return provider;
 }
 
-RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::addDynamicProvider(
+RouteConfigProviderSharedPtr RouteConfigProviderManager::addDynamicProvider(
     const Protobuf::Message& rds, const std::string& route_config_name, Init::Manager& init_manager,
     std::function<
         std::pair<RouteConfigProviderSharedPtr, const Init::Target*>(uint64_t manager_identifier)>
@@ -90,9 +90,9 @@ RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::addDynamicProvider(
 }
 
 RouteConfigProviderSharedPtr
-RouteConfigProviderManagerImpl::reuseDynamicProvider(uint64_t manager_identifier,
-                                                     Init::Manager& init_manager,
-                                                     const std::string& route_config_name) {
+RouteConfigProviderManager::reuseDynamicProvider(uint64_t manager_identifier,
+                                                 Init::Manager& init_manager,
+                                                 const std::string& route_config_name) {
   auto it = dynamic_route_config_providers_.find(manager_identifier);
   if (it == dynamic_route_config_providers_.end()) {
     return RouteConfigProviderSharedPtr();
