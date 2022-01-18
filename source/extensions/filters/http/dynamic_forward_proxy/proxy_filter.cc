@@ -145,6 +145,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     ENVOY_STREAM_LOG(debug, "DNS cache entry already loaded, continuing", *decoder_callbacks_);
 
     auto const& host = config_->cache().getHost(headers.Host()->value().getStringView());
+    latchTime(decoder_callbacks_, DNS_END);
     if (host.has_value()) {
       if (!host.value()->address()) {
         onDnsResolutionFail();
@@ -153,7 +154,6 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
       addHostAddressToFilterState(host.value()->address());
     }
 
-    latchTime(decoder_callbacks_, DNS_END);
     return Http::FilterHeadersStatus::Continue;
   }
   case LoadDnsCacheEntryStatus::Loading:
