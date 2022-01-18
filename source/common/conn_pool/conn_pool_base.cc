@@ -323,9 +323,9 @@ std::list<ActiveClientPtr>& ConnPoolImplBase::owningList(ActiveClient::State sta
   case ActiveClient::State::DRAINING:
     return busy_clients_;
   case ActiveClient::State::CLOSED:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("unexpected");
 }
 
 void ConnPoolImplBase::transitionActiveClientState(ActiveClient& client,

@@ -21,7 +21,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/network/dns_resolver:90.7"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
 "source/common/protobuf:94.8"
 "source/common/quic:91.8"
-"source/common/router:96.5"
+"source/common/router:96.3"
 "source/common/secret:94.9"
 "source/common/signal:86.9" # Death tests don't report LCOV
 "source/common/singleton:95.7"
