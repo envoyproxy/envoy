@@ -1,7 +1,6 @@
 #pragma once
 
 #include <algorithm>
-#include <cstring>
 #include <memory>
 #include <stack>
 #include <string>
@@ -18,6 +17,7 @@
 
 #include "absl/container/fixed_array.h"
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 
@@ -896,8 +896,11 @@ private:
   StringStatNameMap builtin_stat_names_;
 };
 
-using SymbolTableImpl = SymbolTable;
 using SymbolTablePtr = std::unique_ptr<SymbolTable>;
+
+// TODO(jmarantz): rename all ~87 occurrences of SymbolTableImpl in the codebase
+// to SymbolTable, and drop this alias.
+using SymbolTableImpl = SymbolTable;
 
 } // namespace Stats
 } // namespace Envoy

@@ -189,7 +189,10 @@ envoy_cc_library(
     name = "symbol_table_lib",
     srcs = ["symbol_table_impl.cc"],
     hdrs = ["symbol_table_impl.h"],
-    external_deps = ["abseil_base"],
+    external_deps = [
+        "abseil_base",
+        "abseil_inlined_vector",
+    ],
     deps = [
         ":recent_lookups_lib",
         "//envoy/stats:symbol_table_interface",
