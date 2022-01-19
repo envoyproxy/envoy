@@ -30,14 +30,11 @@ static const std::string option_string = R"EOF(
 )EOF";
 
 class ConfigTest : public ::testing::Test {
-public:
-  ConfigTest() = default;
+protected:
+  using Option = std::pair<const absl::string_view, const absl::string_view>;
+  using Regex = std::pair<const absl::string_view, const std::vector<Option>>;
 
-  void
-  setup(const std::vector<
-        std::pair<const absl::string_view,
-                  const std::vector<std::pair<const absl::string_view, const absl::string_view>>>>
-            setup_configs) {
+  void setup(const std::vector<Regex> setup_configs) {
     std::string regex_strs;
     for (auto& setup_config : setup_configs) {
       std::string option_strs;
@@ -98,7 +95,7 @@ TEST_F(ConfigTest, RegexWithDotAll) {
 
 // Verify that `^` and `$` anchors match any newlines in data.
 TEST_F(ConfigTest, RegexWithMultiline) {
-  setup({{"^/asdf/.+", {{"multiline", "true"}}}});
+  setup({{"^/asdf/.+$", {{"multiline", "true"}}}});
 
   EXPECT_TRUE(matcher_->match("/asdf/1"));
   EXPECT_FALSE(matcher_->match("/ASDF/1"));
