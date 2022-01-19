@@ -80,7 +80,8 @@ def envoy_entry_point(
         entry_point = base_entry_point,
         script = None,
         data = None,
-        args = None):
+        args = None,
+        envoy_prefix = "@envoy"):
     """This macro provides the convenience of using an `entry_point` while
     also being able to create a rule with associated `args` and `data`, as is
     possible with the normal `py_binary` rule.
@@ -97,19 +98,32 @@ def envoy_entry_point(
     A `py_binary` is dynamically created to wrap the `entry_point` with provided
     `args` and `data`.
     """
-    script = script or pkg
-    entry_point_name = "%s_entry_point" % name
-    native.alias(
-        name = entry_point_name,
-        actual = entry_point(
-            pkg = pkg,
-            script = script,
-        ),
+    actual_entry_point = entry_point(
+        pkg = pkg,
+        script = script or pkg,
     )
+    entry_point_script = "%s%s" % (envoy_prefix, main)
+    entry_point_py = "entry_point_%s_main.py" % name
+    entry_point_wrapper = "entry_point_%s_wrapper" % name
+    entry_point_path = "$(location %s)" % entry_point_script
+    entry_point_alias = "$(location %s)" % actual_entry_point
+
+    native.genrule(
+        name = entry_point_wrapper,
+        cmd = """
+        sed s#_ENTRY_POINT_ALIAS_#%s# %s > \"$@\"
+        """ % (entry_point_alias, entry_point_path),
+        tools = [
+            actual_entry_point,
+            entry_point_script,
+        ],
+        outs = [entry_point_py],
+    )
+
     py_binary(
         name = name,
-        srcs = [main],
-        main = main,
-        args = ["$(location %s)" % entry_point_name] + args,
-        data = [entry_point_name] + data,
+        srcs = [entry_point_wrapper, actual_entry_point],
+        main = entry_point_py,
+        args = (args or []),
+        data = (data or []),
     )
