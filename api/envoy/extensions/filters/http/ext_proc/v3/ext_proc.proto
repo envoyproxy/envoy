@@ -32,7 +32,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // * Request and response attributes are not sent and not processed.
 // * Dynamic metadata in responses from the external processor is ignored.
 // * "async mode" is not implemented
-// * Per-route configuration is not implemented
 
 // The filter communicates with an external gRPC service called an "external processor"
 // that can do a variety of things with the request and response:
