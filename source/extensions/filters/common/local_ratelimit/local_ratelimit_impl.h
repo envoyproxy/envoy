@@ -64,7 +64,7 @@ private:
   };
 
   void onFillTimer();
-  void onFillTimerHelper(const TokenState& state, const RateLimit::TokenBucket& bucket);
+  void onFillTimerHelper(TokenState& state, const RateLimit::TokenBucket& bucket);
   void onFillTimerDescriptorHelper();
   bool requestAllowedHelper(const TokenState& tokens) const;
 

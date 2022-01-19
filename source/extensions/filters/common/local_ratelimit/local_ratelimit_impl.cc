@@ -74,12 +74,11 @@ LocalRateLimiterImpl::~LocalRateLimiterImpl() {
 
 void LocalRateLimiterImpl::onFillTimer() {
   onFillTimerHelper(tokens_, token_bucket_);
-  tokens_.fill_time_ = time_source_.monotonicTime();
   onFillTimerDescriptorHelper();
   fill_timer_->enableTimer(absl::ToChronoMilliseconds(token_bucket_.fill_interval_));
 }
 
-void LocalRateLimiterImpl::onFillTimerHelper(const TokenState& tokens,
+void LocalRateLimiterImpl::onFillTimerHelper(TokenState& tokens,
                                              const RateLimit::TokenBucket& bucket) {
   // Relaxed consistency is used for all operations because we don't care about ordering, just the
   // final atomic correctness.
@@ -95,6 +94,9 @@ void LocalRateLimiterImpl::onFillTimerHelper(const TokenState& tokens,
     // Loop while the weak CAS fails trying to update the tokens value.
   } while (!tokens.tokens_.compare_exchange_weak(expected_tokens, new_tokens_value,
                                                  std::memory_order_relaxed));
+
+  // Update fill time at last.
+  tokens.fill_time_ = time_source_.monotonicTime();
 }
 
 void LocalRateLimiterImpl::onFillTimerDescriptorHelper() {
@@ -104,7 +106,6 @@ void LocalRateLimiterImpl::onFillTimerDescriptorHelper() {
             current_time - descriptor.token_state_->fill_time_) >=
         absl::ToChronoMilliseconds(descriptor.token_bucket_.fill_interval_)) {
       onFillTimerHelper(*descriptor.token_state_, descriptor.token_bucket_);
-      descriptor.token_state_->fill_time_ = current_time;
     }
   }
 }
@@ -173,19 +174,22 @@ int64_t LocalRateLimiterImpl::remainingFillInterval(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
   using namespace std::literals;
 
+  auto current_time = time_source_.monotonicTime();
   if (!descriptors_.empty() && !request_descriptors.empty()) {
     for (const auto& request_descriptor : request_descriptors) {
       auto it = descriptors_.find(request_descriptor);
       if (it != descriptors_.end()) {
+        ASSERT(std::chrono::duration_cast<std::chrono::milliseconds>(
+                   current_time - it->token_state_->fill_time_) <=
+               absl::ToChronoMilliseconds(it->token_bucket_.fill_interval_));
         return absl::ToInt64Seconds(
             it->token_bucket_.fill_interval_ -
-            absl::Seconds((time_source_.monotonicTime() - it->token_state_->fill_time_) / 1s));
+            absl::Seconds((current_time - it->token_state_->fill_time_) / 1s));
       }
     }
   }
-  return absl::ToInt64Seconds(
-      token_bucket_.fill_interval_ -
-      absl::Seconds((time_source_.monotonicTime() - tokens_.fill_time_) / 1s));
+  return absl::ToInt64Seconds(token_bucket_.fill_interval_ -
+                              absl::Seconds((current_time - tokens_.fill_time_) / 1s));
 }
 
 } // namespace LocalRateLimit
