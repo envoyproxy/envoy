@@ -67,40 +67,32 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   absl::optional<Network::ProxyProtocolData> proxy_protocol_options;
 
   bool needs_transport_socket_options = false;
-  if (const auto* state = filter_state.getDataReadOnlyGeneric(UpstreamServerName::key());
-      state != nullptr) {
-    if (const auto* typed_state = dynamic_cast<const UpstreamServerName*>(state);
-        typed_state != nullptr) {
-      server_name = typed_state->value();
-      needs_transport_socket_options = true;
-    }
+  if (auto typed_data =
+          filter_state.getDataReadOnlyTyped<UpstreamServerName>(UpstreamServerName::key());
+      typed_data != nullptr) {
+    server_name = typed_data->value();
+    needs_transport_socket_options = true;
   }
 
-  if (const auto* state = filter_state.getDataReadOnlyGeneric(Network::ApplicationProtocols::key());
-      state != nullptr) {
-    if (const auto* typed_state = dynamic_cast<const Network::ApplicationProtocols*>(state);
-        typed_state != nullptr) {
-      application_protocols = typed_state->value();
-      needs_transport_socket_options = true;
-    }
+  if (auto typed_data = filter_state.getDataReadOnlyTyped<Network::ApplicationProtocols>(
+          Network::ApplicationProtocols::key());
+      typed_data != nullptr) {
+    application_protocols = typed_data->value();
+    needs_transport_socket_options = true;
   }
 
-  if (const auto* state = filter_state.getDataReadOnlyGeneric(UpstreamSubjectAltNames::key());
-      state != nullptr) {
-    if (const auto* typed_state = dynamic_cast<const UpstreamSubjectAltNames*>(state);
-        typed_state != nullptr) {
-      subject_alt_names = typed_state->value();
-      needs_transport_socket_options = true;
-    }
+  if (auto typed_data = filter_state.getDataReadOnlyTyped<UpstreamSubjectAltNames>(
+          UpstreamSubjectAltNames::key());
+      typed_data != nullptr) {
+    subject_alt_names = typed_data->value();
+    needs_transport_socket_options = true;
   }
 
-  if (const auto* state = filter_state.getDataReadOnlyGeneric(ProxyProtocolFilterState::key());
-      state != nullptr) {
-    if (const auto* typed_state = dynamic_cast<const ProxyProtocolFilterState*>(state);
-        typed_state != nullptr) {
-      proxy_protocol_options.emplace(typed_state->value());
-      needs_transport_socket_options = true;
-    }
+  if (auto typed_data = filter_state.getDataReadOnlyTyped<ProxyProtocolFilterState>(
+          ProxyProtocolFilterState::key());
+      typed_data != nullptr) {
+    proxy_protocol_options.emplace(typed_data->value());
+    needs_transport_socket_options = true;
   }
 
   if (needs_transport_socket_options) {

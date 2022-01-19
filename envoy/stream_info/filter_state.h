@@ -95,7 +95,8 @@ public:
   template <typename T> const T& getDataReadOnly(absl::string_view data_name) const {
     const auto* generic_result = getDataReadOnlyGeneric(data_name);
     if (generic_result == nullptr) {
-      throw EnvoyException("FilterState::getDataReadOnly<T> called for unknown data name.");
+      ExceptionUtil::throwEnvoyException(
+          "FilterState::getDataReadOnly<T> called for unknown data name.");
     }
 
     const T* result = dynamic_cast<const T*>(generic_result);
@@ -104,6 +105,16 @@ public:
           fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
     }
     return *result;
+  }
+
+  /**
+   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @return a typed pointer to the stored data or nullptr if the data does not exist or the data
+   * type does not match the expected type.
+   */
+  template <typename T> const T* getDataReadOnlyTyped(absl::string_view data_name) const {
+    const auto* generic_result = getDataReadOnlyGeneric(data_name);
+    return generic_result == nullptr ? nullptr : dynamic_cast<const T*>(generic_result);
   }
 
   /**
@@ -123,7 +134,8 @@ public:
   template <typename T> T& getDataMutable(absl::string_view data_name) {
     auto* generic_result = getDataMutableGeneric(data_name);
     if (generic_result == nullptr) {
-      throw EnvoyException("FilterState::getDataMutable<T> called for unknown data name.");
+      ExceptionUtil::throwEnvoyException(
+          "FilterState::getDataMutable<T> called for unknown data name.");
     }
 
     T* result = dynamic_cast<T*>(generic_result);
@@ -136,7 +148,19 @@ public:
 
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).
+   * @return a typed pointer to the stored data or nullptr if the data does not exist or the data
+   * type does not match the expected type.
+   * An exception will be thrown if the data is not mutable.
+   */
+  template <typename T> T* getDataMutableTyped(absl::string_view data_name) {
+    auto* generic_result = getDataMutableGeneric(data_name);
+    return generic_result == nullptr ? nullptr : dynamic_cast<T*>(generic_result);
+  }
+
+  /**
+   * @param data_name the name of the data being looked up (mutable/readonly).
    * @return a pointer to the stored data or nullptr if the data does not exist.
+   * An exception will be thrown if the data is not mutable.
    */
   virtual Object* getDataMutableGeneric(absl::string_view data_name) PURE;
 
@@ -146,8 +170,7 @@ public:
    * data store.
    */
   template <typename T> bool hasData(absl::string_view data_name) const {
-    return (hasDataWithName(data_name) &&
-            (dynamic_cast<const T*>(getDataReadOnlyGeneric(data_name)) != nullptr));
+    return getDataReadOnlyTyped<T>(data_name) != nullptr;
   }
 
   /**
