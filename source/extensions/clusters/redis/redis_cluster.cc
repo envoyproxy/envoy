@@ -376,6 +376,7 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(std::shared_ptr<Cluste
   auto& slot = (**slots)[index];
   if (slot.replicas_to_resolve_.empty()) {
     resolveHostname(std::move(slots), index + 1);
+    return;
   }
 
   std::size_t replica_idx = 0;
