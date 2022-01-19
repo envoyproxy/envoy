@@ -12,11 +12,13 @@
 #include "contrib/sip_proxy/filters/network/source/protocol.h"
 #include "contrib/sip_proxy/filters/network/source/router/router.h"
 #include "contrib/sip_proxy/filters/network/source/sip.h"
+#include "contrib/sip_proxy/filters/network/source/tra/tra.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace SipProxy {
+class TrafficRoutingAssistantHandler;
 namespace SipFilters {
 
 enum class ResponseStatus {
@@ -86,7 +88,9 @@ public:
 
   virtual std::shared_ptr<Router::TransactionInfos> transactionInfos() PURE;
   virtual std::shared_ptr<SipProxy::SipSettings> settings() PURE;
+  virtual std::shared_ptr<SipProxy::TrafficRoutingAssistantHandler> traHandler() PURE;
   virtual void onReset() PURE;
+  virtual void continueHanding() PURE;
 };
 
 /**
