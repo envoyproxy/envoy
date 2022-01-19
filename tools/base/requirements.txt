@@ -673,6 +673,7 @@ six==1.16.0 \
     # via
     #   pynacl
     #   sphinxcontrib-httpdomain
+    #   thrift
 slackclient==2.9.3 \
     --hash=sha256:07ec8fa76f6aa64852210ae235ff9e637ba78124e06c0b07a7eeea4abb955965 \
     --hash=sha256:2d68d668c02f4038299897e5c4723ab85dd40a3548354924b24f333a435856f8
@@ -753,6 +754,11 @@ sphinxext-rediraffe==0.2.7 \
     # via
     #   -r requirements.in
     #   envoy.docs.sphinx-runner
+thrift==0.15.0 \
+    --hash=sha256:87c8205a71cf8bbb111cb99b1f7495070fbc9cabb671669568854210da5b3e29
+    # via
+    #   -r requirements.in
+    #   twitter.common.rpc
 toml==0.10.2 \
     --hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b \
     --hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f
@@ -765,6 +771,17 @@ trycast==0.3.0 \
     --hash=sha256:1b7b4c0d4b0d674770a53f34a762e52a6cd6879eb251ab21625602699920080d \
     --hash=sha256:687185b812e8d1c45f2ba841e8de7bdcdee0695dcf3464f206800505d4c65f26
     # via envoy.base.utils
+twitter.common.finagle-thrift==0.3.9 \
+    --hash=sha256:1e3a57d11f94f58745e6b83348ecd4fa74194618704f45444a15bc391fde497a
+    # via
+    #   -r requirements.in
+    #   twitter.common.rpc
+twitter.common.lang==0.3.9 \
+    --hash=sha256:56d1d266fd4767941d11c27061a57bc1266a3342e551bde3780f9e9eb5ad0ed1
+    # via twitter.common.rpc
+twitter.common.rpc==0.3.9 \
+    --hash=sha256:0792b63fb2fb32d970c2e9a409d3d00633190a22eb185145fe3d9067fdaa4514
+    # via -r requirements.in
 typing-extensions==3.10.0.2 \
     --hash=sha256:49f75d16ff11f1cd258e1b988ccff82a3ca5570217d7ad8c5f48205dd99a677e \
     --hash=sha256:d8226d10bc02a29bcc81df19a26e56a9647f8b0a6d4a83924139f4a8b01f17b7 \
