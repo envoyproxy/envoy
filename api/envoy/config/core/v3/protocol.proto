@@ -128,6 +128,24 @@ message UpstreamHttpProtocolOptions {
 // HTTP Alternative Services and https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04
 // for the "HTTPS" DNS resource record.
 message AlternateProtocolsCacheOptions {
+  // Allows pre-populating the cache with HTTP/3 alternate protocols entries with a 7 day lifetime.
+  // This will cause Envoy to attempt HTTP/3 to those upstreams, even if the upstreams have not
+  // advertised HTTP/3 support. These entries will be overwritten by alt-svc
+  // response headers or cached values.
+  // As with regular cached entries, if the origin response would result in clearing an existing
+  // alternate protocol cache entry, pre-populated entries will also be cleared.
+  // Adding a cache entry with hostname=foo.com port=123 is the equivalent of getting
+  // response headers
+  // alt-svc: h3=:"123"; ma=86400" in a response to a request to foo.com:123
+  message AlternateProtocolsCacheEntry {
+    // The host name for the alternate protocol entry.
+    string hostname = 1
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // The port for the alternate protocol entry.
+    uint32 port = 2 [(validate.rules).uint32 = {lt: 65535 gt: 0}];
+  }
+
   // The name of the cache. Multiple named caches allow independent alternate protocols cache
   // configurations to operate within a single Envoy process using different configurations. All
   // alternate protocols cache options with the same name *must* be equal in all fields when
@@ -148,7 +166,11 @@ message AlternateProtocolsCacheOptions {
   // :ref:`key value store <envoy_v3_api_msg_config.common.key_value.v3.KeyValueStoreConfig>` to flush
   // alternate protocols entries to disk.
   // This function is currently only supported if concurrency is 1
+  // Cached entries will take precedence over pre-populated entries below.
   TypedExtensionConfig key_value_store_config = 3;
+
+  // Allows pre-populating the cache with entries, as described above.
+  repeated AlternateProtocolsCacheEntry prepopulated_entries = 4;
 }
 
 // [#next-free-field: 7]
