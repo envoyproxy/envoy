@@ -4,23 +4,25 @@
 
 #include "envoy/event/dispatcher.h"
 
-#include "source/common/grpc/buffered_async_client.h"
-
 namespace Envoy {
 namespace Grpc {
+
+using BufferedMessageExpirationCallback = std::function<void(uint64_t)>;
 
 // This class is used to manage the lifetime of messages stored in BufferedAsyncClient. Messages
 // whose survival period has expired will be deleted from the Buffer.
 class BufferedMessageTtlManager {
 public:
-  BufferedMessageTtlManager(Event::Dispatcher& dispatcher, BufferedAsyncClientCallbacks& callbacks,
+  BufferedMessageTtlManager(Event::Dispatcher& dispatcher,
+                            BufferedMessageExpirationCallback&& expiry_callback,
                             std::chrono::milliseconds message_ack_timeout)
-      : dispatcher_(dispatcher), message_ack_timeout_(message_ack_timeout), callbacks_(callbacks),
+      : dispatcher_(dispatcher), message_ack_timeout_(message_ack_timeout),
+        expiry_callback_(expiry_callback),
         timer_(dispatcher_.createTimer([this] { checkExpiredMessages(); })) {}
 
   ~BufferedMessageTtlManager() { timer_->disableTimer(); }
 
-  void addDeadlineEntry(absl::flat_hash_set<uint64_t>&& ids) {
+  void addDeadlineEntry(const absl::flat_hash_set<uint64_t>& ids) {
     const auto expires_at = dispatcher_.timeSource().monotonicTime() + message_ack_timeout_;
     deadline_.emplace(expires_at, std::move(ids));
 
@@ -43,7 +45,7 @@ private:
         break;
       }
       for (auto&& id : it.second) {
-        callbacks_.onError(id);
+        expiry_callback_(id);
       }
       deadline_.pop();
     }
@@ -57,7 +59,7 @@ private:
 
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds message_ack_timeout_;
-  BufferedAsyncClientCallbacks& callbacks_;
+  BufferedMessageExpirationCallback expiry_callback_;
   Event::TimerPtr timer_;
   std::queue<std::pair<MonotonicTime, absl::flat_hash_set<uint64_t>>> deadline_;
 };

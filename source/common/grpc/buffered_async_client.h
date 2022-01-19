@@ -1,7 +1,9 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 
+#include "source/common/grpc/buffered_message_ttl_manager.h"
 #include "source/common/grpc/typed_async_client.h"
 #include "source/common/protobuf/utility.h"
 
@@ -12,39 +14,20 @@ namespace Grpc {
 
 enum class BufferState { Buffered, PendingFlush };
 
-class BufferedAsyncClientCallbacks {
-public:
-  virtual ~BufferedAsyncClientCallbacks() = default;
-
-  /**
-   * Called if a message related with id has been proceeded successfully.
-   *
-   * @param id the ID related with buffered messages. This ID must be already published by client.
-   * If not, this callback will do nothing.
-   */
-  virtual void onSuccess(uint64_t id) PURE;
-
-  /**
-   * Called if a message related with id has not been proceeded.
-   *
-   * @param id the ID related with buffered messages. This ID must be already published by client.
-   * If not, this callback will do nothing.
-   */
-  virtual void onError(uint64_t id) PURE;
-};
-
 // This class wraps bidirectional gRPC and provides message arrival guarantee.
 // It stores messages to be sent or in the process of being sent in a buffer,
 // and can track the status of the message based on the ID assigned to each message.
 // If a message fails to be sent, it can be re-buffered to guarantee its arrival.
-template <class RequestType, class ResponseType>
-class BufferedAsyncClient : public BufferedAsyncClientCallbacks {
+template <class RequestType, class ResponseType> class BufferedAsyncClient {
 public:
   BufferedAsyncClient(uint32_t max_buffer_bytes, const Protobuf::MethodDescriptor& service_method,
                       Grpc::AsyncStreamCallbacks<ResponseType>& callbacks,
-                      const Grpc::AsyncClient<RequestType, ResponseType>& client)
+                      const Grpc::AsyncClient<RequestType, ResponseType>& client,
+                      Event::Dispatcher& dispatcher, std::chrono::milliseconds message_timeout_msec)
       : max_buffer_bytes_(max_buffer_bytes), service_method_(service_method), callbacks_(callbacks),
-        client_(client) {}
+        client_(client),
+        ttl_manager_(
+            dispatcher, [this](uint64_t id) { this->onError(id); }, message_timeout_msec) {}
 
   ~BufferedAsyncClient() {
     if (active_stream_ != nullptr) {
@@ -92,12 +75,13 @@ public:
       active_stream_->sendMessage(message, false);
     }
 
+    ttl_manager_.addDeadlineEntry(inflight_message_ids);
     return inflight_message_ids;
   }
 
-  void onSuccess(uint64_t message_id) override { erasePendingMessage(message_id); }
+  void onSuccess(uint64_t message_id) { erasePendingMessage(message_id); }
 
-  void onError(uint64_t message_id) override {
+  void onError(uint64_t message_id) {
     const auto& message_it = message_buffer_.find(message_id);
 
     if (message_it == message_buffer_.end() ||
@@ -144,6 +128,7 @@ private:
   absl::btree_map<uint64_t, std::pair<BufferState, RequestType>> message_buffer_;
   uint32_t current_buffer_bytes_ = 0;
   uint64_t next_message_id_ = 0;
+  BufferedMessageTtlManager ttl_manager_;
 };
 
 template <class RequestType, class ResponseType>
