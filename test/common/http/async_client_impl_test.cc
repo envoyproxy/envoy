@@ -585,6 +585,64 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+TEST_F(AsyncClientImplTest, DataBufferForRetryOverflow) {
+  ON_CALL(runtime_.snapshot_, featureEnabled("upstream.use_retry", 100))
+      .WillByDefault(Return(true));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                              stream_info_, {});
+        response_decoder_ = &decoder;
+        return nullptr;
+      }));
+
+  TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+
+  // large body must be > 64KB
+  Buffer::InstancePtr large_body{new Buffer::OwnedImpl(std::string((1 << 16) + 1, 'a'))};
+
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(large_body.get()), true));
+
+  headers.setReferenceEnvoyRetryOn(Headers::get().EnvoyRetryOnValues._5xx);
+  AsyncClient::Stream* stream =
+      client_.start(stream_callbacks_, AsyncClient::StreamOptions().setBufferBodyForRetry(true));
+  stream->sendHeaders(headers, false);
+  stream->sendData(*large_body, true);
+
+  // Expect retry and retry timer create.
+  timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "503"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), true);
+
+  // Retry request.
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                              stream_info_, {});
+        response_decoder_ = &decoder;
+        return nullptr;
+      }));
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+
+  // On retry, data will be empty because it was larger than > 64KB
+  Buffer::InstancePtr empty_buffer{new Buffer::OwnedImpl("")};
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(empty_buffer.get()), true));
+  timer_->invokeCallback();
+
+  // Normal response.
+  expectResponseHeaders(stream_callbacks_, 200, true);
+  EXPECT_CALL(stream_callbacks_, onComplete());
+  ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers2), true);
+  dispatcher_.clearDeferredDeleteList();
+}
+
 TEST_F(AsyncClientImplTest, MultipleStreams) {
   // Start stream 1
   Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};

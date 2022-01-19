@@ -158,10 +158,8 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
     return;
   }
 
-  // TODO(mattklein123): We trust callers currently to not do anything insane here if they set up
-  // buffering on an async client call. We should potentially think about limiting the size of
-  // buffering that we allow here.
-  if (buffered_body_ != nullptr) {
+  if (buffered_body_ != nullptr &&
+      buffered_body_->length() + data.length() <= buffered_body_size_limit_) {
     buffered_body_->add(data);
   }
 

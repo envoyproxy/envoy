@@ -44,6 +44,12 @@
 
 namespace Envoy {
 namespace Http {
+namespace {
+// Limit the size of buffer for data used for retries.
+// The default is set to 64KB. Since the existence of a buffer for
+// retries is non-trivial to the user, this value is not varied.
+constexpr uint64_t kBufferLimitForRetry = 1 << 16;
+} // namespace
 
 class AsyncStreamImpl;
 class AsyncRequestImpl;
@@ -420,6 +426,7 @@ private:
   bool local_closed_{};
   bool remote_closed_{};
   Buffer::InstancePtr buffered_body_;
+  uint64_t buffered_body_size_limit_ = kBufferLimitForRetry;
   bool encoded_response_headers_{};
   bool is_grpc_request_{};
   bool is_head_request_{false};
