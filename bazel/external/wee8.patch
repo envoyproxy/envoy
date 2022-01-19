@@ -113,7 +113,7 @@
 -          rebase_path("//tools/msan/ignorelist.txt", root_build_dir)
 +    if (!defined(msan_blacklist_path)) {
 +      msan_blacklist_path =
-+          rebase_path("//tools/msan/blacklist.txt", root_build_dir)
++          rebase_path("//tools/msan/ignorelist.txt", root_build_dir)
      }
      cflags = [
        "-fsanitize=memory",
@@ -197,3 +197,14 @@
      ]
    }
  }
+--- build/config/clang/BUILD.gn
++++ build/config/clang/BUILD.gn
+@@ -5,7 +5,7 @@
+ import("clang.gni")
+ 
+ config("find_bad_constructs") {
+-  if (clang_use_chrome_plugins) {
++  if (false) {
+     cflags = []
+ 
+     # The plugin is built directly into clang, so there's no need to load it

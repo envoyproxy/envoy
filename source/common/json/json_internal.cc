@@ -109,7 +109,7 @@ private:
       return "String";
     }
 
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    return "";
   }
 
   struct Value {
@@ -196,18 +196,20 @@ public:
   bool null() override { return handleValueEvent(Field::createNull()); }
   bool string(std::string& value) override { return handleValueEvent(Field::createValue(value)); }
   bool binary(binary_t&) override { return false; }
-  bool parse_error(std::size_t, const std::string& token,
+  bool parse_error(std::size_t at, const std::string& token,
                    const nlohmann::detail::exception& ex) override {
-    // Errors are formatted like "[json.exception.parse_error.101] parse error: explanatory string."
-    // or "[json.exception.parse_error.101] parser error at (position): explanatory string.".
+    // Parse errors are formatted like "[json.exception.parse_error.101] parse error: explanatory
+    // string." or "[json.exception.parse_error.101] parser error at (position): explanatory
+    // string.". All errors start with "[json.exception.<error_type>.<error_num]" see:
     // https://json.nlohmann.me/home/exceptions/#parse-errors
+    // The `parse_error` method will be called also for non-parse errors.
     absl::string_view error = ex.what();
-    // Colon will always exist in the parse error.
+
+    // Colon will always exist in the parse error. For non-parse error use the
+    // ending ']' as a separator.
     auto end = error.find(": ");
-    if (end == std::string::npos) {
-      ENVOY_BUG(false, "Error string not present. Check nlohmann/json "
-                       "documentation in case error string changed.");
-    } else {
+    auto prefix_end = error.find(']');
+    if (end != std::string::npos) {
       // Extract portion after ": " to get error string.
       error_ = std::string(error.substr(end + 2));
       // Extract position information if present.
@@ -216,6 +218,14 @@ public:
         start += 3;
         error_position_ = absl::StrCat(error.substr(start, end - start), ", token ", token);
       }
+    } else if ((prefix_end != std::string::npos) && (absl::StartsWith(error, ErrorPrefix))) {
+      // Non-parse error, fetching position from the arguments as it is not
+      // present in the error string.
+      error_position_ = absl::StrCat("position: ", at);
+      error_ = std::string(error.substr(prefix_end + 1));
+    } else {
+      IS_ENVOY_BUG("Error string not present. Check nlohmann/json "
+                   "documentation in case error string changed.");
     }
     return false;
   }
@@ -247,6 +257,8 @@ private:
 
   std::string error_;
   std::string error_position_;
+
+  static constexpr absl::string_view ErrorPrefix = "[json.exception.";
 };
 
 struct JsonContainer {

@@ -42,17 +42,15 @@
 #include "source/common/router/reset_header_parser.h"
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
-#include "source/extensions/filters/http/common/utility.h"
 
 #include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Router {
 namespace {
-
-const std::string DEPRECATED_ROUTER_NAME = "envoy.router";
 
 constexpr uint32_t DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES = 4096;
 
@@ -367,7 +365,7 @@ RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& trac
     overall_sampling_ = tracing.overall_sampling();
   }
   for (const auto& tag : tracing.custom_tags()) {
-    custom_tags_.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
+    custom_tags_.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
   }
 }
 
@@ -940,14 +938,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& rou
   if (route.has_metadata()) {
     auto filter_metadata = route.metadata().filter_metadata().find("envoy.filters.http.router");
     if (filter_metadata == route.metadata().filter_metadata().end()) {
-      // TODO(zuercher): simply return `ret` when deprecated filter names are removed.
-      filter_metadata = route.metadata().filter_metadata().find(DEPRECATED_ROUTER_NAME);
-      if (filter_metadata == route.metadata().filter_metadata().end()) {
-        return ret;
-      }
-
-      Extensions::Common::Utility::ExtensionNameUtil::checkDeprecatedExtensionName(
-          "http filter", DEPRECATED_ROUTER_NAME, "envoy.filters.http.router");
+      return ret;
     }
     for (const auto& it : filter_metadata->second.fields()) {
       if (it.second.kind_case() == ProtobufWkt::Value::kStringValue) {
@@ -1430,7 +1421,7 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     const envoy::config::route::v3::VirtualCluster& virtual_cluster, Stats::Scope& scope,
     const VirtualClusterStatNames& stat_names)
     : StatNameProvider(virtual_cluster.name(), scope.symbolTable()),
-      VirtualClusterBase(stat_name_storage_.statName(),
+      VirtualClusterBase(virtual_cluster.name(), stat_name_storage_.statName(),
                          scope.scopeFromStatName(stat_name_storage_.statName()), stat_names) {
   if (virtual_cluster.headers().empty()) {
     throw EnvoyException("virtual clusters must define 'headers'");
@@ -1544,9 +1535,10 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     if (match.result_) {
       // The only possible action that can be used within the route matching context
       // is the RouteMatchAction, so this must be true.
-      ASSERT(match.result_->typeUrl() == RouteMatchAction::staticTypeUrl());
-      ASSERT(dynamic_cast<RouteMatchAction*>(match.result_.get()));
-      const RouteMatchAction& route_action = static_cast<const RouteMatchAction&>(*match.result_);
+      const auto result = match.result_();
+      ASSERT(result->typeUrl() == RouteMatchAction::staticTypeUrl());
+      ASSERT(dynamic_cast<RouteMatchAction*>(result.get()));
+      const RouteMatchAction& route_action = static_cast<const RouteMatchAction&>(*result);
 
       if (route_action.route()->matches(headers, stream_info, random_value)) {
         return route_action.route();
@@ -1735,10 +1727,7 @@ PerFilterConfigs::PerFilterConfigs(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
   for (const auto& it : typed_configs) {
-    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
-    const auto& name =
-        Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
-
+    const auto& name = it.first;
     auto object = createRouteSpecificFilterConfig(name, it.second, optional_http_filters,
                                                   factory_context, validator);
     if (object != nullptr) {

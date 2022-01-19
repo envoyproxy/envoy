@@ -798,7 +798,7 @@ const envoy::config::core::v3::Metadata& FactoryContextImpl::listenerMetadata() 
 }
 const Envoy::Config::TypedMetadata& FactoryContextImpl::listenerTypedMetadata() const {
   // TODO(nareddyt): Needs an implementation for this context. Currently not used.
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 envoy::config::core::v3::TrafficDirection FactoryContextImpl::direction() const {
   return config_.traffic_direction();

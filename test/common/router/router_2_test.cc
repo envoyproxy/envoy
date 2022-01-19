@@ -280,10 +280,6 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
           }));
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::UpstreamRemoteReset));
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillRepeatedly(Invoke([&](const Upstream::HostDescriptionConstSharedPtr& host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -301,7 +297,7 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
-  EXPECT_EQ(callbacks_.details(), "upstream_reset_before_response_started{remote reset}");
+  EXPECT_EQ(callbacks_.details(), "upstream_reset_before_response_started{remote_reset}");
 }
 
 class RouterTestChildSpan : public RouterTestBase {
@@ -728,10 +724,6 @@ TEST_F(RouterTestSupressGRPCStatsEnabled, ExcludeTimeoutHttpStats) {
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
 
   expectResponseTimerCreate();
 
@@ -793,10 +785,6 @@ TEST_F(RouterTestSupressGRPCStatsDisabled, IncludeHttpTimeoutStats) {
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
 
   expectResponseTimerCreate();
 

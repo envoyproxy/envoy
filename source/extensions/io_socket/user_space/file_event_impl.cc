@@ -57,7 +57,7 @@ void FileEventImpl::setEnabled(uint32_t events) {
   }
   ENVOY_LOG(
       trace,
-      "User space file event {} set enabled events {} and events {} is active. Will {} reschedule.",
+      "User space file event {} set enabled events {} and events {} is active. Will {}reschedule.",
       static_cast<void*>(this), events, events_to_notify, was_enabled ? "not " : "");
 }
 

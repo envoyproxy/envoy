@@ -43,6 +43,79 @@ absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(absl::string_view
   return absl::nullopt;
 }
 
+OptRef<const UpstreamTiming> getUpstreamTiming(const StreamInfo& stream_info) {
+  OptRef<const UpstreamInfo> info = stream_info.upstreamInfo();
+  if (!info.has_value()) {
+    return {};
+  }
+  return info.value().get().upstreamTiming();
+}
+
+absl::optional<std::chrono::nanoseconds> duration(const absl::optional<MonotonicTime>& time,
+                                                  const StreamInfo& stream_info) {
+  if (!time.has_value()) {
+    return absl::nullopt;
+  }
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(time.value() -
+                                                              stream_info.startTimeMonotonic());
+}
+
+absl::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamTxByteSent() {
+  OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().first_upstream_tx_byte_sent_, stream_info_);
+}
+
+absl::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamTxByteSent() {
+  OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().last_upstream_tx_byte_sent_, stream_info_);
+}
+
+absl::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamRxByteReceived() {
+  OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().first_upstream_rx_byte_received_, stream_info_);
+}
+
+absl::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamRxByteReceived() {
+  OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().last_upstream_rx_byte_received_, stream_info_);
+}
+
+absl::optional<std::chrono::nanoseconds> TimingUtility::firstDownstreamTxByteSent() {
+  OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().firstDownstreamTxByteSent(), stream_info_);
+}
+
+absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamTxByteSent() {
+  OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().lastDownstreamTxByteSent(), stream_info_);
+}
+
+absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamRxByteReceived() {
+  OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().lastDownstreamRxByteReceived(), stream_info_);
+}
+
 const std::string&
 Utility::formatDownstreamAddressNoPort(const Network::Address::Instance& address) {
   if (address.type() == Network::Address::Type::Ip) {

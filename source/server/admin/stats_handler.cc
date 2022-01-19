@@ -1,5 +1,8 @@
 #include "source/server/admin/stats_handler.h"
 
+#include <functional>
+#include <vector>
+
 #include "envoy/admin/v3/mutex_stats.pb.h"
 
 #include "source/common/common/empty_string.h"
@@ -132,13 +135,19 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
   const Http::Utility::QueryParams params =
       Http::Utility::parseAndDecodeQueryString(path_and_query);
   const bool used_only = params.find("usedonly") != params.end();
+  const bool text_readouts = params.find("text_readouts") != params.end();
+
+  const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
+      text_readouts ? server_.stats().textReadouts() : std::vector<Stats::TextReadoutSharedPtr>();
+
   absl::optional<std::regex> regex;
   if (!Utility::filterParam(params, response, regex)) {
     return Http::Code::BadRequest;
   }
-  PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
-                                              server_.stats().histograms(), response, used_only,
-                                              regex, server_.api().customStatNamespaces());
+
+  PrometheusStatsFormatter::statsAsPrometheus(
+      server_.stats().counters(), server_.stats().gauges(), server_.stats().histograms(),
+      text_readouts_vec, response, used_only, regex, server_.api().customStatNamespaces());
   return Http::Code::OK;
 }
 
@@ -169,11 +178,11 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
                                Buffer::Instance& response) {
   // Display plain stats if format query param is not there.
   for (const auto& text_readout : text_readouts) {
-    response.add(fmt::format("{}: \"{}\"\n", text_readout.first,
-                             Html::Utility::sanitize(text_readout.second)));
+    response.addFragments(
+        {text_readout.first, ": \"", Html::Utility::sanitize(text_readout.second), "\"\n"});
   }
   for (const auto& stat : all_stats) {
-    response.add(fmt::format("{}: {}\n", stat.first, stat.second));
+    response.addFragments({stat.first, ": ", absl::StrCat(stat.second), "\n"});
   }
   std::map<std::string, std::string> all_histograms;
   for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
@@ -183,7 +192,7 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
     }
   }
   for (const auto& histogram : all_histograms) {
-    response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
+    response.addFragments({histogram.first, ": ", histogram.second, "\n"});
   }
 }
 

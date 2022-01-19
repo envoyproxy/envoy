@@ -4,11 +4,16 @@
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.validate.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/protobuf/message_validator_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Http {
 namespace HeaderFormatters {
 namespace PreserveCase {
+
+PreserveCaseHeaderFormatter::PreserveCaseHeaderFormatter(const bool forward_reason_phrase)
+    : forward_reason_phrase_(forward_reason_phrase) {}
 
 std::string PreserveCaseHeaderFormatter::format(absl::string_view key) const {
   const auto remembered_key_itr = original_header_keys_.find(key);
@@ -34,12 +39,28 @@ void PreserveCaseHeaderFormatter::processKey(absl::string_view key) {
   original_header_keys_.emplace(key);
 }
 
+void PreserveCaseHeaderFormatter::setReasonPhrase(absl::string_view reason_phrase) {
+  if (forward_reason_phrase_) {
+    reason_phrase_ = std::string(reason_phrase);
+  }
+};
+
+absl::string_view PreserveCaseHeaderFormatter::getReasonPhrase() const {
+  return absl::string_view(reason_phrase_);
+};
+
 class PreserveCaseFormatterFactory : public Envoy::Http::StatefulHeaderKeyFormatterFactory {
 public:
+  PreserveCaseFormatterFactory(const bool forward_reason_phrase)
+      : forward_reason_phrase_(forward_reason_phrase) {}
+
   // Envoy::Http::StatefulHeaderKeyFormatterFactory
   Envoy::Http::StatefulHeaderKeyFormatterPtr create() override {
-    return std::make_unique<PreserveCaseHeaderFormatter>();
+    return std::make_unique<PreserveCaseHeaderFormatter>(forward_reason_phrase_);
   }
+
+private:
+  const bool forward_reason_phrase_;
 };
 
 class PreserveCaseFormatterFactoryConfig
@@ -47,10 +68,17 @@ class PreserveCaseFormatterFactoryConfig
 public:
   // Envoy::Http::StatefulHeaderKeyFormatterFactoryConfig
   std::string name() const override { return "preserve_case"; }
+
   Envoy::Http::StatefulHeaderKeyFormatterFactorySharedPtr
-  createFromProto(const Protobuf::Message&) override {
-    return std::make_shared<PreserveCaseFormatterFactory>();
+  createFromProto(const Protobuf::Message& message) override {
+    auto config =
+        MessageUtil::downcastAndValidate<const envoy::extensions::http::header_formatters::
+                                             preserve_case::v3::PreserveCaseFormatterConfig&>(
+            message, ProtobufMessage::getStrictValidationVisitor());
+
+    return std::make_shared<PreserveCaseFormatterFactory>(config.forward_reason_phrase());
   }
+
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::http::header_formatters::preserve_case::v3::
                                 PreserveCaseFormatterConfig>();

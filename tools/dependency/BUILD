@@ -7,41 +7,22 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 py_library(
-    name = "exports",
-    srcs = ["exports.py"],
-    data = [
-        "//bazel:repository_locations.bzl",
-        "@envoy_api//bazel:repository_locations.bzl",
-        "@envoy_api//bazel:repository_locations_utils.bzl",
-    ],
-)
-
-py_library(
     name = "utils",
     srcs = ["utils.py"],
-    deps = [":exports"],
 )
 
 py_binary(
     name = "cve_scan",
-    srcs = [
-        "cve_scan.py",
-        "utils.py",
+    srcs = ["cve_scan.py"],
+    args = [
+        "$(location :cve.yaml)",
+        "--repository_locations=$(location //bazel:all_repository_locations)",
     ],
-    args = ["$(location :cve.yaml)"],
     data = [
         ":cve.yaml",
-        ":exports",
-        requirement("envoy.base.utils"),
+        "//bazel:all_repository_locations",
     ],
-)
-
-py_binary(
-    name = "cve_scan_test",
-    srcs = ["cve_scan_test.py"],
-    data = [
-        ":cve_scan",
-    ],
+    deps = [requirement("envoy.dependency.cve_scan")],
 )
 
 py_binary(

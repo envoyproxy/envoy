@@ -67,15 +67,6 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 
-// Test that the deprecated extension name is disabled by default.
-// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
-TEST(ZipkinTracerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.zipkin";
-
-  ASSERT_EQ(nullptr, Registry::FactoryRegistry<Server::Configuration::TracerFactory>::getFactory(
-                         deprecated_name));
-}
-
 } // namespace
 } // namespace Zipkin
 } // namespace Tracers

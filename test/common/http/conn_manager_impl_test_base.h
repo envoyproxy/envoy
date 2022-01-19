@@ -4,6 +4,7 @@
 #include "source/common/http/context_impl.h"
 #include "source/common/http/date_provider_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/tracing/custom_tag_impl.h"
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
@@ -153,7 +154,7 @@ public:
   originalIpDetectionExtensions() const override {
     return ip_detection_extensions_;
   }
-  uint64_t maxRequestsPerConnection() const override { return 0; }
+  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -184,6 +185,7 @@ public:
   absl::optional<std::string> user_agent_;
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
+  uint64_t max_requests_per_connection_{};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
   std::chrono::milliseconds stream_idle_timeout_{};
