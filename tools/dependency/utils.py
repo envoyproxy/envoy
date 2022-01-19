@@ -2,17 +2,6 @@
 
 from collections import namedtuple
 
-from tools.dependency.exports import (
-    api_repository_locations, envoy_repository_locations, repository_locations_utils)
-
-
-# All repository location metadata in the Envoy repository.
-def repository_locations():
-    spec_loader = repository_locations_utils.load_repository_locations_spec
-    locations = spec_loader(envoy_repository_locations.REPOSITORY_LOCATIONS_SPEC)
-    locations.update(spec_loader(api_repository_locations.REPOSITORY_LOCATIONS_SPEC))
-    return locations
-
 
 # Obtain GitHub project URL from a list of URLs.
 def get_github_project_url(urls):

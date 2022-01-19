@@ -28,6 +28,7 @@ class PytestRunner(runner.Runner):
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         """Add arguments to the arg parser"""
+        super().add_arguments(parser)
         parser.add_argument("--cov-collect", default=None, help="Collect coverage data to path")
 
     def pytest_args(self, coveragerc: str) -> list:

@@ -387,7 +387,7 @@ TEST_F(QuicPlatformTest, QuicNotReached) {
 #ifdef NDEBUG
   QUIC_NOTREACHED(); // Expect no-op.
 #else
-  EXPECT_DEATH(QUIC_NOTREACHED(), "not reached");
+  EXPECT_DEATH(QUIC_NOTREACHED(), "reached unexpected code");
 #endif
 }
 
@@ -498,6 +498,7 @@ TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
 
 TEST_F(QuicPlatformTest, QuicFlags) {
   auto& flag_registry = quiche::FlagRegistry::getInstance();
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_default_to_bbr));
   flag_registry.resetFlags();
 
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));

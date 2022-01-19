@@ -58,6 +58,7 @@ protected:
     make_stat(*store_, {Stats::DynamicName("dynamic1")});
     make_stat(*scope_, {pool_.add("symbolic2")});
     make_stat(*scope_, {Stats::DynamicName("dynamic2")});
+    make_stat(*scope_, {Stats::DynamicSavedName("dynamicsaved3")});
   }
 
   template <class StatType> IterateFn<StatType> iterOnce() {
@@ -129,8 +130,8 @@ protected:
   template <class StatType> void storeAll(const MakeStatFn make_stat) {
     init(make_stat);
     EXPECT_TRUE(store_->iterate(iterAll<StatType>()));
-    EXPECT_THAT(results_,
-                UnorderedElementsAre("symbolic1", "dynamic1", "scope.symbolic2", "scope.dynamic2"));
+    EXPECT_THAT(results_, UnorderedElementsAre("symbolic1", "dynamic1", "scope.symbolic2",
+                                               "scope.dynamicsaved3", "scope.dynamic2"));
   }
 
   template <class StatType> void scopeOnce(const MakeStatFn make_stat) {
@@ -152,7 +153,8 @@ protected:
   template <class StatType> void scopeAll(const MakeStatFn make_stat) {
     init(make_stat);
     EXPECT_TRUE(scope_->iterate(iterAll<StatType>()));
-    EXPECT_THAT(results_, UnorderedElementsAre("scope.symbolic2", "scope.dynamic2"));
+    EXPECT_THAT(results_,
+                UnorderedElementsAre("scope.symbolic2", "scope.dynamic2", "scope.dynamicsaved3"));
   }
 
   SymbolTablePtr symbol_table_;
