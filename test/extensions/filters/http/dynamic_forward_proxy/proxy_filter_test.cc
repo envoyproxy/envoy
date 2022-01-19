@@ -11,6 +11,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/transport_socket_match.h"
 
+using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Eq;
 using testing::InSequence;
@@ -380,7 +381,8 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, AddResolvedHostFilterStateMetadata
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
-  EXPECT_CALL(callbacks_, streamInfo());
+  EXPECT_CALL(callbacks_, streamInfo()).Times(AnyNumber());
+  EXPECT_CALL(callbacks_, dispatcher()).Times(AnyNumber());
   auto& filter_state = callbacks_.streamInfo().filterState();
 
   InSequence s;
@@ -411,10 +413,6 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, AddResolvedHostFilterStateMetadata
 
   EXPECT_CALL(*host_info, address()).Times(2).WillRepeatedly(Return(host_info->address_));
 
-  EXPECT_CALL(callbacks_, streamInfo());
-  EXPECT_CALL(callbacks_, streamInfo());
-  EXPECT_CALL(callbacks_, dispatcher());
-
   // Host was resolved successfully, so continue filter iteration.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
@@ -431,7 +429,8 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
-  EXPECT_CALL(callbacks_, streamInfo()).Times(testing::AnyNumber());
+  EXPECT_CALL(callbacks_, streamInfo()).Times(AnyNumber());
+  EXPECT_CALL(callbacks_, dispatcher()).Times(AnyNumber());
 
   // Pre-populate the filter state with an address.
   auto& filter_state = callbacks_.streamInfo().filterState();
@@ -470,10 +469,6 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
 
   EXPECT_CALL(*host_info, address()).Times(2).WillRepeatedly(Return(host_info->address_));
 
-  EXPECT_CALL(callbacks_, dispatcher());
-  EXPECT_CALL(callbacks_, streamInfo());
-  EXPECT_CALL(callbacks_, streamInfo());
-
   // Host was resolved successfully, so continue filter iteration.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
@@ -500,6 +495,8 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
+  EXPECT_CALL(callbacks_, streamInfo()).Times(AnyNumber());
+  EXPECT_CALL(callbacks_, dispatcher()).Times(AnyNumber());
   InSequence s;
 
   // Setup test host
@@ -511,8 +508,6 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
-  EXPECT_CALL(callbacks_, streamInfo());
-  EXPECT_CALL(callbacks_, dispatcher());
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _))
       .WillOnce(Invoke([&](absl::string_view, uint16_t, ProxyFilter::LoadDnsCacheEntryCallbacks&) {
         return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
@@ -526,7 +521,6 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
           }));
 
   EXPECT_CALL(*host_info, address());
-  EXPECT_CALL(callbacks_, streamInfo());
   EXPECT_CALL(callbacks_,
               sendLocalReply(Http::Code::ServiceUnavailable, Eq("DNS resolution failure"), _, _,
                              Eq("dns_resolution_failure")));
