@@ -29,7 +29,7 @@ public:
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   uint32_t maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   uint32_t remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
-  uint32_t
+  int64_t
   remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
 
 private:

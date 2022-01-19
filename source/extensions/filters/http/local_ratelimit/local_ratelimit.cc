@@ -99,7 +99,7 @@ uint32_t FilterConfig::remainingTokens(
   return rate_limiter_.remainingTokens(request_descriptors);
 }
 
-uint32_t FilterConfig::remainingFillInterval(
+int64_t FilterConfig::remainingFillInterval(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
   return rate_limiter_.remainingFillInterval(request_descriptors);
 }
@@ -205,7 +205,7 @@ uint32_t Filter::remainingTokens(absl::Span<const RateLimit::LocalDescriptor> re
              : config->remainingTokens(request_descriptors);
 }
 
-uint32_t
+int64_t
 Filter::remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) {
   const auto* config = getConfig();
   return config->rateLimitPerConnection()

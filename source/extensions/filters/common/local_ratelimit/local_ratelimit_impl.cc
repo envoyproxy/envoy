@@ -169,7 +169,7 @@ uint32_t LocalRateLimiterImpl::remainingTokens(
   return tokens_.tokens_.load(std::memory_order_relaxed);
 }
 
-uint32_t LocalRateLimiterImpl::remainingFillInterval(
+int64_t LocalRateLimiterImpl::remainingFillInterval(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
   using namespace std::literals;
 
@@ -177,15 +177,15 @@ uint32_t LocalRateLimiterImpl::remainingFillInterval(
     for (const auto& request_descriptor : request_descriptors) {
       auto it = descriptors_.find(request_descriptor);
       if (it != descriptors_.end()) {
-        return static_cast<uint32_t>(absl::ToInt64Seconds(
+        return absl::ToInt64Seconds(
             it->token_bucket_.fill_interval_ -
-            absl::Seconds((time_source_.monotonicTime() - it->token_state_->fill_time_) / 1s)));
+            absl::Seconds((time_source_.monotonicTime() - it->token_state_->fill_time_) / 1s));
       }
     }
   }
-  return static_cast<uint32_t>(absl::ToInt64Seconds(
+  return absl::ToInt64Seconds(
       token_bucket_.fill_interval_ -
-      absl::Seconds((time_source_.monotonicTime() - tokens_.fill_time_) / 1s)));
+      absl::Seconds((time_source_.monotonicTime() - tokens_.fill_time_) / 1s));
 }
 
 } // namespace LocalRateLimit

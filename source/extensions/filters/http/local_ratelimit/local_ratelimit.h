@@ -87,7 +87,7 @@ public:
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   uint32_t maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   uint32_t remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
-  uint32_t
+  int64_t
   remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   bool enabled() const;
   bool enforced() const;
@@ -169,7 +169,7 @@ private:
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
   uint32_t maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
   uint32_t remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
-  uint32_t remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
+  int64_t remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
   void pushRequestDescriptors(
       absl::optional<std::vector<RateLimit::LocalDescriptor>> request_descriptors);
 
