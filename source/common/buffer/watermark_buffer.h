@@ -34,6 +34,7 @@ public:
   void add(const Instance& data) override;
   void prepend(absl::string_view data) override;
   void prepend(Instance& data) override;
+  size_t addFragments(absl::Span<const absl::string_view> fragments) override;
   void drain(uint64_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;

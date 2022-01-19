@@ -15,19 +15,5 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/server:filter_config_interface",
-        "//source/extensions/common:utility_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "utility_lib",
-    hdrs = ["utility.h"],
-    # Used by core.  TODO(#9953) clean up.
-    visibility = ["//visibility:public"],
-    deps = [
-        "//envoy/runtime:runtime_interface",
-        "//source/common/common:macros",
-        "//source/extensions/common:utility_lib",
-        "//source/extensions/filters/network:well_known_names",
     ],
 )

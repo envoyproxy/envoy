@@ -682,6 +682,17 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMiss
   testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "");
 }
 
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithInvalidUpstreamMetadata) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host;
+  stream_info.upstreamInfo()->setUpstreamHost(host);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      testFormatting(stream_info, "UPSTREAM_METADATA(1)", ""), EnvoyException,
+      "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+      "...]), actual format UPSTREAM_METADATA1");
+}
+
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithRequestMetadata) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   envoy::config::core::v3::Metadata metadata;
@@ -824,6 +835,29 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA({\"a\":1}), because JSON field from line 1 accessed with type 'Array' "
       "does not match actual type 'Object'.");
+
+  // Number overflow.
+  EXPECT_THROW_WITH_MESSAGE(
+      StreamInfoHeaderFormatter(
+          "UPSTREAM_METADATA(-"
+          "5211111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+          "1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+          "1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+          "1111111111111111111111111111111111111111111111111)",
+          false),
+      EnvoyException,
+      "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+      "...]), actual format "
+      "UPSTREAM_METADATA(-"
+      "52111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      "1111111111111111111111111111111111111), because JSON supplied is not valid. Error(position: "
+      "314):  number overflow parsing '-"
+      "52111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      "1111111111111111111111111111111111111'\n");
 }
 
 TEST(HeaderParserTest, TestParseInternal) {
