@@ -224,19 +224,13 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
           NetworkFilters::Common::Redis::RedisCommandStats::createRedisCommandStats(
               parent_.info()->statsScope().symbolTable())) {}
 
-// Convert the cluster slot IP/Port response to and address, return null if the response
+// Convert the cluster slot IP/Port response to an address, return null if the response
 // does not match the expected type.
 Network::Address::InstanceConstSharedPtr
-RedisCluster::RedisDiscoverySession::RedisDiscoverySession::processClusterByIP(
-    const NetworkFilters::Common::Redis::RespValue& value) {
-
-  const auto& array = value.asArray();
-  try {
-    return Network::Utility::parseInternetAddress(array[0].asString(), array[1].asInteger(), false);
-  } catch (const EnvoyException& ex) {
-    // Probably ElastiCache use case: hostname instead of IP
-    return nullptr;
-  }
+RedisCluster::RedisDiscoverySession::RedisDiscoverySession::ipAddressFromClusterEntry(
+    const std::vector<NetworkFilters::Common::Redis::RespValue>& array) {
+  return Network::Utility::parseInternetAddressNoThrow(array[0].asString(), array[1].asInteger(),
+                                                       false);
 }
 
 RedisCluster::RedisDiscoverySession::~RedisDiscoverySession() {
@@ -312,12 +306,10 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
 
 void RedisCluster::RedisDiscoverySession::updateDnsStats(
     Network::DnsResolver::ResolutionStatus status, bool empty_response) {
-  if (status == Network::DnsResolver::ResolutionStatus::Failure || empty_response) {
-    if (status == Network::DnsResolver::ResolutionStatus::Failure) {
-      parent_.info_->stats().update_failure_.inc();
-    } else {
-      parent_.info_->stats().update_empty_.inc();
-    }
+  if (status == Network::DnsResolver::ResolutionStatus::Failure) {
+    parent_.info_->stats().update_failure_.inc();
+  } else if (empty_response) {
+    parent_.info_->stats().update_empty_.inc();
   }
 }
 
@@ -326,6 +318,14 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(ClusterSlotsPt
   resolveHostname(s, 0);
 }
 
+/**
+ * Resolve the primary cluster entry hostname in the slot. If the primary is already resolved,
+ * proceed to resolve replicas. Additionally, if the primary is successfully resolved, we proceed to
+ * resolve replicas.
+ *
+ * @param slots the list of slots which may need DNS resolution
+ * @param index the specific index into `slots` whose primary cluster entry needs to be resolved
+ */
 void RedisCluster::RedisDiscoverySession::resolveHostname(std::shared_ptr<ClusterSlotsPtr> slots,
                                                           std::size_t index) {
   if (index >= (**slots).size()) {
@@ -364,19 +364,30 @@ void RedisCluster::RedisDiscoverySession::resolveHostname(std::shared_ptr<Cluste
   }
 }
 
+/**
+ * Resolve the replicas in a cluster entry. If there are no replicas, simply move to the next
+ * cluster entry. Once the last replica is resolved, we move to resolving the next cluster entry.
+ *
+ * @param slots the list of slots which may need DNS resolution
+ * @param index the specific index into `slots` whose replicas need to be resolved
+ */
 void RedisCluster::RedisDiscoverySession::resolveReplicas(std::shared_ptr<ClusterSlotsPtr> slots,
                                                           std::size_t index) {
   auto& slot = (**slots)[index];
-  if (!slot.replicas_to_resolve_.empty()) {
-    const auto replica = slot.replicas_to_resolve_.back();
-    slot.replicas_to_resolve_.pop_back();
+  if (slot.replicas_to_resolve_.empty()) {
+    resolveHostname(std::move(slots), index + 1);
+  }
+
+  std::size_t replica_idx = 0;
+  while (replica_idx < slot.replicas_to_resolve_.size()) {
+    auto replica = slot.replicas_to_resolve_[replica_idx];
     ENVOY_LOG(trace, "starting async DNS resolution for replica address {}", replica.first);
     parent_.dns_resolver_->resolve(
         replica.first, parent_.dns_lookup_family_,
-        [this, index, slots = std::move(slots),
-         replica](Network::DnsResolver::ResolutionStatus status,
-                  std::list<Network::DnsResponse>&& response) -> void {
+        [this, index, slots, replica_idx](Network::DnsResolver::ResolutionStatus status,
+                                          std::list<Network::DnsResponse>&& response) -> void {
           auto& slot = (**slots)[index];
+          auto& replica = slot.replicas_to_resolve_[replica_idx];
           ENVOY_LOG(trace, "async DNS resolution complete for {}", replica.first);
           updateDnsStats(status, response.empty());
           // If DNS resolution fails here, we move on to resolve other replicas in the list.
@@ -388,11 +399,13 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(std::shared_ptr<Cluste
             slot.addReplica(Network::Utility::getAddressWithPort(
                 *response.front().addrInfo().address_, replica.second));
           }
-          // We go back to same index as there may be more replicas
-          resolveReplicas(std::move(slots), index);
+          // eventually call into the resolveHostname recursion once the last replica in the list is
+          // resolved.
+          if (replica_idx == slot.replicas_to_resolve_.size() - 1) {
+            resolveHostname(std::move(slots), index + 1);
+          }
         });
-  } else {
-    resolveHostname(std::move(slots), index + 1);
+    replica_idx++;
   }
 }
 
@@ -419,21 +432,22 @@ void RedisCluster::RedisDiscoverySession::onResponse(
 
   auto cluster_slots = std::make_unique<std::vector<ClusterSlot>>();
 
+  // https://redis.io/commands/cluster-slots
   // CLUSTER SLOTS represents nested array of redis instances, like this:
   //
-  // 1) 1) (integer) 0                <-- start slot range
-  //    2) (integer) 5460             <-- end slot range
+  // 1) 1) (integer) 0                                      <-- start slot range
+  //    2) (integer) 5460                                   <-- end slot range
   //
-  //    3) 1) "127.0.0.1"                                   |
-  //       2) (integer) 30001                               <-  master for slot as IP(HOST) / Port /
-  //       ID 3) "09dbe9720cda62f7865eabc5fd8857c5d2678366"    |
+  //    3) 1) "127.0.0.1"                                   <-- primary slot IP ADDR(HOSTNAME)
+  //       2) (integer) 30001                               <-- primary slot PORT
+  //       3) "09dbe9720cda62f7865eabc5fd8857c5d2678366"
   //
-  //    4) 1) "127.0.0.1"                                   |
-  //       2) (integer) 30004                               <- replicas in the same format as master
-  //       3) "821d8ca00d7ccf931ed3ffc7e3db0599d2271abf"    |
+  //    4) 1) "127.0.0.2"                                   <-- replica slot IP ADDR(HOSTNAME)
+  //       2) (integer) 30004                               <-- replica slot PORT
+  //       3) "821d8ca00d7ccf931ed3ffc7e3db0599d2271abf"
   //
   // Loop through the cluster slot response and error checks for each field.
-  bool address_resolve_required = false;
+  bool address_resolution_required = false;
   for (const NetworkFilters::Common::Redis::RespValue& part : value->asArray()) {
     if (part.type() != NetworkFilters::Common::Redis::RespType::Array) {
       onUnexpectedResponse(value);
@@ -459,12 +473,13 @@ void RedisCluster::RedisDiscoverySession::onResponse(
       return;
     }
     // Try to parse primary slot address as IP address
-    // It may fail in AWS ElastiCache use case: it uses hostnames instead of IPs.
-    // If this is the case - we'll come back later and try to resolve hostnames asynchronously.
+    // It may fail in case the address is a hostname. If this is the case - we'll come back later
+    // and try to resolve hostnames asynchronously. For example, AWS ElastiCache returns hostname
+    // instead of IP address.
     ClusterSlot slot(slot_range[SlotRangeStart].asInteger(), slot_range[SlotRangeEnd].asInteger(),
-                     processClusterByIP(slot_range[SlotPrimary]));
+                     ipAddressFromClusterEntry(slot_range[SlotPrimary].asArray()));
     if (slot.primary() == nullptr) {
-      // Primary address is hostname: save the name for further resolving
+      // Primary address is potentially a hostname, save it for async DNS resolution.
       const auto& array = slot_range[SlotPrimary].asArray();
       slot.primary_hostname_ = array[0].asString();
       slot.primary_port_ = array[1].asInteger();
@@ -477,29 +492,29 @@ void RedisCluster::RedisDiscoverySession::onResponse(
         onUnexpectedResponse(value);
         return;
       }
-      auto replica_address = processClusterByIP(*replica);
+      auto replica_address = ipAddressFromClusterEntry(replica->asArray());
       if (replica_address) {
         slot.addReplica(std::move(replica_address));
       } else {
-        // Possible AWS ElastiCache use case: hostname instead of IP
+        // Replica address is potentially a hostname, save it for async DNS resolution.
         const auto& array = replica->asArray();
         slot.addReplicaToResolve(array[0].asString(), array[1].asInteger());
       }
     }
-    // If at least one (primary, replicas) address is hostname, schedule DNS resolving
+    // If at least one (primary, replicas) address is hostname, schedule DNS resolution
     if (slot.primary() == nullptr || !slot.replicas_to_resolve_.empty()) {
-      address_resolve_required = true;
+      address_resolution_required = true;
     }
     cluster_slots->push_back(std::move(slot));
   }
 
-  if (!address_resolve_required) {
+  if (address_resolution_required) {
+    // DNS resolution is required, defer finalizing the slot update until resolution is complete.
+    resolveClusterHostnames(std::move(cluster_slots));
+  } else {
     // All slots addresses were represented by IP/Port pairs.
     parent_.onClusterSlotUpdate(std::move(cluster_slots));
     resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
-  } else {
-    // Resolve hostnames, once completed run onClusterSlotUpdate() / enable timer
-    resolveClusterHostnames(std::move(cluster_slots));
   }
 }
 
