@@ -2,19 +2,14 @@
 
 # Validate extension metadata
 
+import json
 import pathlib
 import re
 import sys
 from functools import cached_property
-from importlib.abc import Loader
-from importlib.util import spec_from_loader, module_from_spec
-from importlib.machinery import ModuleSpec, SourceFileLoader
 from typing import Iterator
 
 from envoy.base import checker, utils
-
-BUILD_CONFIG_PATH = "source/extensions/extensions_build_config.bzl"
-CONTRIB_BUILD_CONFIG_PATH = "contrib/contrib_build_config.bzl"
 
 BUILTIN_EXTENSIONS = (
     "envoy.request_id.uuid", "envoy.upstreams.tcp.generic", "envoy.transport_sockets.tls",
@@ -93,13 +88,11 @@ class ExtensionsChecker(checker.Checker):
 
     @cached_property
     def configured_extensions(self) -> dict:
-        return ExtensionsChecker._load_build_config(
-            "extensions_build_config", BUILD_CONFIG_PATH, "EXTENSIONS")
+        return json.loads(pathlib.Path(self.args.build_config).read_text())
 
     @cached_property
     def configured_contrib_extensions(self) -> dict:
-        return ExtensionsChecker._load_build_config(
-            "contrib_build_config", CONTRIB_BUILD_CONFIG_PATH, "CONTRIB_EXTENSIONS")
+        return json.loads(pathlib.Path(self.args.contrib_build_config).read_text())
 
     @property
     def fuzzed_count(self) -> int:
@@ -125,22 +118,11 @@ class ExtensionsChecker(checker.Checker):
             if "network" in ext and data["security_posture"] == "robust_to_untrusted_downstream"
         ])
 
-    @staticmethod
-    def _load_build_config(name, build_config_path, dictionary_name) -> dict:
-        # build configs must have a .bzl suffix for Starlark import, so we are forced to do this
-        # workaround.
-        _extensions_build_config_spec = spec_from_loader(
-            name, SourceFileLoader(name, build_config_path))
-
-        if not isinstance(_extensions_build_config_spec, ModuleSpec):
-            raise ExtensionsConfigurationError(f"Unable to parse build config {build_config_path}")
-        extensions_build_config = module_from_spec(_extensions_build_config_spec)
-
-        if not isinstance(_extensions_build_config_spec.loader, Loader):
-            raise ExtensionsConfigurationError(f"Unable to parse build config {build_config_path}")
-
-        _extensions_build_config_spec.loader.exec_module(extensions_build_config)
-        return getattr(extensions_build_config, dictionary_name)
+    def add_arguments(self, parser):
+        super().add_arguments(parser)
+        parser.add_argument("--build_config")
+        parser.add_argument("--contrib_build_config")
+        parser.add_argument("--core_extensions")
 
     def check_fuzzed(self) -> None:
         if self.robust_to_downstream_count == self.fuzzed_count:
@@ -203,9 +185,9 @@ class ExtensionsChecker(checker.Checker):
             yield f"Unknown status for {extension}: {status}"
 
 
-def main() -> int:
-    return ExtensionsChecker().run()
+def main(*args) -> int:
+    return ExtensionsChecker(*args).run()
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(*sys.argv[1:]))
