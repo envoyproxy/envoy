@@ -34,7 +34,6 @@ const char EnvoyFavicon[] =
     "ddvT64wV0jRrr7FekO/XEjwuwwhuw7Ef7NY+dlfXpLb06EtHUJdVbsxvNUqBrwj/QGeEUSfwBAkmWHn5Bb/gAAAABJRU5";
 
 const char AdminHtmlTableBegin[] = R"(
-<body>
   <table class='home-table'>
     <thead>
       <th class='home-data'>Command</th>

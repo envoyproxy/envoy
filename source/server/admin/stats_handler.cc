@@ -178,143 +178,119 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
 class StatsHandler::Render {
 public:
   virtual ~Render() = default;
-  virtual void generate(Stats::Counter&) PURE;
-  virtual void generate(Stats::Gauge&) PURE;
-  virtual void generate(Stats::TextReadout&) PURE;
-  virtual void generate(Stats::Histogram&) PURE;
+  virtual void generate(const std::string& name, uint64_t value) PURE;
+  virtual void generate(const std::string& name, const std::string& value) PURE;
+  virtual void generate(const std::string& name,
+                        const Stats::ParentHistogramSharedPtr& histogram) PURE;
   virtual void noStats(Type type) { UNREFERENCED_PARAMETER(type); }
-  virtual void render(Buffer::Instance& response) PURE;
+  virtual void render() PURE;
 };
 
 class StatsHandler::TextRender : public StatsHandler::Render {
-protected:
-  using Group = std::vector<std::string>;
-
 public:
-  void generate(Stats::TextReadout& text_readout) override {
-    groups_[Type::TextReadouts].emplace_back(absl::StrCat(
-        text_readout.name(), ": \"", Html::Utility::sanitize(text_readout.value()), "\"\n"));
-  }
-  void generate(Stats::Counter& counter) override {
-    groups_[Type::Counters].emplace_back(absl::StrCat(counter.name(), ": ", counter.value(), "\n"));
-  }
-  void generate(Stats::Gauge& gauge) override {
-    groups_[Type::Gauges].emplace_back(absl::StrCat(gauge.name(), ": ", gauge.value(), "\n"));
-  }
-  void generate(Stats::Histogram& histogram) override {
-    Stats::ParentHistogram* phist = dynamic_cast<Stats::ParentHistogram*>(&histogram);
-    if (phist != nullptr) {
-      groups_[Type::Histograms].emplace_back(
-          absl::StrCat(phist->name(), ": ", phist->quantileSummary(), "\n"));
-    }
+  TextRender(Buffer::Instance& response) : response_(response) {}
+
+  void generate(const std::string& name, uint64_t value) override {
+    response_.addFragments({name, ": ", absl::StrCat(value), "\n"});
   }
 
-  void render(Buffer::Instance& response) override {
-    for (const auto& iter : groups_) {
-      const Group& group = iter.second;
-      for (const std::string& str : group) {
-        response.add(str);
-      }
-    }
+  void generate(const std::string& name, const std::string& value) override {
+    response_.addFragments({name, ": \"", Html::Utility::sanitize(value), "\"\n"});
   }
+
+  void generate(const std::string& name,
+                const Stats::ParentHistogramSharedPtr& histogram) override {
+    response_.addFragments({name, ": ", histogram->quantileSummary(), "\n"});
+  }
+
+  void render() override {}
 
 protected:
-  std::map<Type, Group> groups_; // Ordered by Type's numeric value.
+  Buffer::Instance& response_;
 };
 
 class StatsHandler::HtmlRender : public StatsHandler::TextRender {
 public:
   HtmlRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
              StatsHandler& stats_handler, const Params& params)
-      : response_(response), html_(response) {
+      : TextRender(response), html_(response) {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
     html_.setSubmitOnChange(true);
     html_.renderHead();
+    response_.add("<body>\n");
     html_.renderTableBegin();
     html_.renderUrlHandler(stats_handler.statsHandler(), params.query_);
     html_.renderInput("scope", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
     html_.renderTableEnd();
+    response_.add("<pre>\n");
   }
 
-  ~HtmlRender() override { response_.add("</body>\n"); }
+  ~HtmlRender() override { response_.add("</pre></body>\n"); }
 
   void noStats(Type type) override {
-    groups_[type]; // Make an empty group for this type.
+    response_.add(
+        absl::StrCat("</pre>\n<br/><i>No ", typeToString(type), " found</i><br/>\n<pre>\n"));
   }
 
-  void render(Buffer::Instance&) override {
-    for (const auto& iter : groups_) {
-      absl::string_view label = StatsHandler::typeToString(iter.first);
-      const Group& group = iter.second;
-      if (group.empty()) {
-        response_.add(absl::StrCat("<br/><i>No ", label, " found</i><br/>\n"));
-      } else {
-        response_.add(absl::StrCat("<h1>", label, "</h1>\n<pre>\n"));
-        for (const std::string& str : group) {
-          response_.add(str);
-        }
-        response_.add("</pre>\n");
-      }
-    }
-  }
+  void render() override {}
 
 private:
-  Buffer::Instance& response_;
   AdminHtmlGenerator html_;
 };
 
 class StatsHandler::JsonRender : public StatsHandler::Render {
 public:
-  explicit JsonRender(const Params& params) : params_(params) {}
-
-  void generate(Stats::Counter& counter) override {
-    add(counter, ValueUtil::numberValue(counter.value()));
+  JsonRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+             const Params& params)
+      : response_(response), params_(params) {
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   }
-  void generate(Stats::Gauge& gauge) override { add(gauge, ValueUtil::numberValue(gauge.value())); }
-  void generate(Stats::TextReadout& text_readout) override {
-    add(text_readout, ValueUtil::stringValue(text_readout.value()));
+
+  void generate(const std::string& name, uint64_t value) override {
+    add(name, ValueUtil::numberValue(value));
   }
-  void generate(Stats::Histogram& histogram) override {
-    Stats::ParentHistogram* phist = dynamic_cast<Stats::ParentHistogram*>(&histogram);
-    if (phist != nullptr) {
-      if (!found_used_histogram_) {
-        auto* histograms_obj_fields = histograms_obj_.mutable_fields();
+  void generate(const std::string& name, const std::string& value) override {
+    add(name, ValueUtil::stringValue(value));
+  }
+  void generate(const std::string& name,
+                const Stats::ParentHistogramSharedPtr& histogram) override {
+    if (!found_used_histogram_) {
+      auto* histograms_obj_fields = histograms_obj_.mutable_fields();
 
-        // It is not possible for the supported quantiles to differ across histograms, so it is ok
-        // to send them once.
-        Stats::HistogramStatisticsImpl empty_statistics;
-        std::vector<ProtobufWkt::Value> supported_quantile_array;
-        for (double quantile : empty_statistics.supportedQuantiles()) {
-          supported_quantile_array.push_back(ValueUtil::numberValue(quantile * 100));
-        }
-        (*histograms_obj_fields)["supported_quantiles"] =
-            ValueUtil::listValue(supported_quantile_array);
-        found_used_histogram_ = true;
+      // It is not possible for the supported quantiles to differ across histograms, so it is ok
+      // to send them once.
+      Stats::HistogramStatisticsImpl empty_statistics;
+      std::vector<ProtobufWkt::Value> supported_quantile_array;
+      for (double quantile : empty_statistics.supportedQuantiles()) {
+        supported_quantile_array.push_back(ValueUtil::numberValue(quantile * 100));
       }
-
-      ProtobufWkt::Struct computed_quantile;
-      auto* computed_quantile_fields = computed_quantile.mutable_fields();
-      (*computed_quantile_fields)["name"] = ValueUtil::stringValue(histogram.name());
-
-      std::vector<ProtobufWkt::Value> computed_quantile_value_array;
-      for (size_t i = 0; i < phist->intervalStatistics().supportedQuantiles().size(); ++i) {
-        ProtobufWkt::Struct computed_quantile_value;
-        auto* computed_quantile_value_fields = computed_quantile_value.mutable_fields();
-        const auto& interval = phist->intervalStatistics().computedQuantiles()[i];
-        const auto& cumulative = phist->cumulativeStatistics().computedQuantiles()[i];
-        (*computed_quantile_value_fields)["interval"] =
-            std::isnan(interval) ? ValueUtil::nullValue() : ValueUtil::numberValue(interval);
-        (*computed_quantile_value_fields)["cumulative"] =
-            std::isnan(cumulative) ? ValueUtil::nullValue() : ValueUtil::numberValue(cumulative);
-
-        computed_quantile_value_array.push_back(ValueUtil::structValue(computed_quantile_value));
-      }
-      (*computed_quantile_fields)["values"] = ValueUtil::listValue(computed_quantile_value_array);
-      computed_quantile_array_.push_back(ValueUtil::structValue(computed_quantile));
+      (*histograms_obj_fields)["supported_quantiles"] =
+          ValueUtil::listValue(supported_quantile_array);
+      found_used_histogram_ = true;
     }
+
+    ProtobufWkt::Struct computed_quantile;
+    auto* computed_quantile_fields = computed_quantile.mutable_fields();
+    (*computed_quantile_fields)["name"] = ValueUtil::stringValue(name);
+
+    std::vector<ProtobufWkt::Value> computed_quantile_value_array;
+    for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
+      ProtobufWkt::Struct computed_quantile_value;
+      auto* computed_quantile_value_fields = computed_quantile_value.mutable_fields();
+      const auto& interval = histogram->intervalStatistics().computedQuantiles()[i];
+      const auto& cumulative = histogram->cumulativeStatistics().computedQuantiles()[i];
+      (*computed_quantile_value_fields)["interval"] =
+          std::isnan(interval) ? ValueUtil::nullValue() : ValueUtil::numberValue(interval);
+      (*computed_quantile_value_fields)["cumulative"] =
+          std::isnan(cumulative) ? ValueUtil::nullValue() : ValueUtil::numberValue(cumulative);
+
+      computed_quantile_value_array.push_back(ValueUtil::structValue(computed_quantile_value));
+    }
+    (*computed_quantile_fields)["values"] = ValueUtil::listValue(computed_quantile_value_array);
+    computed_quantile_array_.push_back(ValueUtil::structValue(computed_quantile));
   }
 
-  void render(Buffer::Instance& response) override {
+  void render() override {
     if (found_used_histogram_) {
       auto* histograms_obj_fields = histograms_obj_.mutable_fields();
       (*histograms_obj_fields)["computed_quantiles"] =
@@ -326,18 +302,19 @@ public:
 
     auto* document_fields = document_.mutable_fields();
     (*document_fields)["stats"] = ValueUtil::listValue(stats_array_);
-    response.add(MessageUtil::getJsonStringFromMessageOrDie(document_, params_.pretty_, true));
+    response_.add(MessageUtil::getJsonStringFromMessageOrDie(document_, params_.pretty_, true));
   }
 
 private:
-  template <class StatType, class Value> void add(StatType& stat, const Value& value) {
+  template <class Value> void add(const std::string& name, const Value& value) {
     ProtobufWkt::Struct stat_obj;
     auto* stat_obj_fields = stat_obj.mutable_fields();
-    (*stat_obj_fields)["name"] = ValueUtil::stringValue(stat.name());
+    (*stat_obj_fields)["name"] = ValueUtil::stringValue(name);
     (*stat_obj_fields)["value"] = value;
     stats_array_.push_back(ValueUtil::structValue(stat_obj));
   }
 
+  Buffer::Instance& response_;
   const StatsHandler::Params& params_;
   ProtobufWkt::Struct document_;
   std::vector<ProtobufWkt::Value> stats_array_;
@@ -350,64 +327,62 @@ private:
 
 class StatsHandler::Context {
 public:
-  // We need to hold ref-counts to each stat in our intermediate sets to avoid
-  // having the stats be deleted while we are computing results.
-  //
-  // We provide hash/compare methods from Stat* so the emplace operation does
-  // not create an intermediate RefcountPtr for lookup, which would then need to
-  // be destroyed, which would need an Allocator lock. Since the allocator locks
-  // is held during the forEach lambda call, that would deadlock.
-  template <class StatType> struct Hash {
-    using is_transparent = void; // NOLINT(readability-identifier-naming)
-    size_t operator()(const Stats::RefcountPtr<StatType>& a) const { return a->statName().hash(); }
-    size_t operator()(const StatType* stat) const { return stat->statName().hash(); }
-  };
-
-  template <class StatType> struct Compare {
-    using is_transparent = void; // NOLINT(readability-identifier-naming)
-    bool operator()(const Stats::RefcountPtr<StatType>& a,
-                    const Stats::RefcountPtr<StatType>& b) const {
-      return a->statName() == b->statName();
-    }
-    bool operator()(const Stats::RefcountPtr<StatType>& a, const StatType* b) const {
-      return a->statName() == b->statName();
-    }
-  };
-
-  template <class StatType>
-  using SharedStatSet =
-      absl::flat_hash_set<Stats::RefcountPtr<StatType>, Hash<StatType>, Compare<StatType>>;
+  template <class ValueType> using NameValue = std::pair<std::string, ValueType>;
+  template <class ValueType> using NameValueVec = std::vector<NameValue<ValueType>>;
 
   Context(const Params& params, Render& render, Buffer::Instance& response)
       : params_(params), render_(render), response_(response) {}
 
-  void collectStats(const Stats::Store& stats) {
-    collect<Stats::TextReadout>(Type::TextReadouts, stats, text_readouts_);
-    collect<Stats::Counter>(Type::Counters, stats, counters_);
-    collect<Stats::Gauge>(Type::Gauges, stats, gauges_);
-    collect<Stats::Histogram>(Type::Histograms, stats, histograms_);
+  // Iterates through the various stat types, and renders them.
+  void collectAndEmitStats(const Stats::Store& stats) {
+    NameValueVec<std::string> text_readouts;
+    collect<Stats::TextReadout>(Type::TextReadouts, stats, text_readouts);
+    emit<std::string>(text_readouts);
+
+    // We collect counters and gauges together and co-mingle them before sorting.
+    // Note that the user can use type 'type=' query-param to show only desired
+    // type; the default is All.
+    NameValueVec<uint64_t> counters_and_gauges;
+    collect<Stats::Counter>(Type::Counters, stats, counters_and_gauges);
+    collect<Stats::Gauge>(Type::Gauges, stats, counters_and_gauges);
+    emit<uint64_t>(counters_and_gauges);
+
+    NameValueVec<Stats::ParentHistogramSharedPtr> histograms;
+    collect<Stats::ParentHistogram>(Type::Histograms, stats, histograms);
+    emit<Stats::ParentHistogramSharedPtr>(histograms);
   }
 
-  void emit() {
-    emit<Stats::TextReadout>(Type::TextReadouts, text_readouts_);
-    emit<Stats::Counter>(Type::Counters, counters_);
-    emit<Stats::Gauge>(Type::Gauges, gauges_);
-    emit<Stats::Histogram>(Type::Histograms, histograms_);
+  template <class ValueType> void emit(NameValueVec<ValueType>& name_value_vec) {
+    std::sort(name_value_vec.begin(), name_value_vec.end());
+    for (NameValue<ValueType>& name_value : name_value_vec) {
+      render_.generate(name_value.first, name_value.second);
+      name_value = NameValue<ValueType>(); // free memory after rendering
+    }
   }
 
-  template <class StatType>
-  void collect(Type type, const Stats::Store& stats, SharedStatSet<StatType>& set) {
+  template <class StatType, class ValueType>
+  void collect(Type type, const Stats::Store& stats, NameValueVec<ValueType>& vec) {
     // Bail early if the  requested type does not match the current type.
     if (params_.type_ != Type::All && params_.type_ != type) {
       return;
     }
 
-    collectHelper(stats, [this, &set](StatType& stat) {
+    size_t previous_size = vec.size();
+    collectHelper(stats, [this, &vec](StatType& stat) {
       if (params_.shouldShowMetric(stat)) {
-        set.emplace(&stat);
+        vec.emplace_back(std::make_pair(stat.name(), saveValue(stat)));
       }
-      return true;
     });
+    if (previous_size == vec.size()) {
+      render_.noStats(type);
+    }
+  }
+
+  std::string saveValue(Stats::TextReadout& text_readout) { return text_readout.value(); }
+  uint64_t saveValue(Stats::Counter& counter) { return counter.value(); }
+  uint64_t saveValue(Stats::Gauge& gauge) { return gauge.value(); }
+  Stats::ParentHistogramSharedPtr saveValue(Stats::ParentHistogram& histogram) {
+    return Stats::ParentHistogramSharedPtr(&histogram);
   }
 
   void collectHelper(const Stats::Store& stats, Stats::StatFn<Stats::TextReadout&> fn) {
@@ -422,51 +397,16 @@ public:
     stats.forEachGauge(nullptr, fn);
   }
 
-  void collectHelper(const Stats::Store& stats, Stats::StatFn<Stats::Histogram&> fn) {
+  void collectHelper(const Stats::Store& stats, Stats::StatFn<Stats::ParentHistogram> fn) {
     // TODO(jmarantz)): when #19166 lands convert to stats.forEachHistogram(nullptr, fn);
-    for (const Stats::ParentHistogramSharedPtr& histogram : stats.histograms()) {
+    for (Stats::ParentHistogramSharedPtr& histogram : stats.histograms()) {
       fn(*histogram);
-    }
-  }
-
-  template <class StatType> void emit(Type type, SharedStatSet<StatType>& set) {
-    // Bail early if the  requested type does not match the current type.
-    if (params_.type_ != Type::All && params_.type_ != type) {
-      return;
-    }
-
-    if (set.empty()) {
-      render_.noStats(type);
-    }
-
-    std::vector<Stats::RefcountPtr<StatType>> sorted;
-    sorted.reserve(set.size());
-    for (const Stats::RefcountPtr<StatType>& stat : set) {
-      sorted.emplace_back(stat);
-    }
-
-    struct Cmp {
-      bool operator()(const Stats::RefcountPtr<StatType>& a,
-                      const Stats::RefcountPtr<StatType>& b) const {
-        return a->constSymbolTable().lessThan(a->statName(), b->statName());
-      }
-    };
-    std::sort(sorted.begin(), sorted.end(), Cmp());
-
-    for (const Stats::RefcountPtr<StatType>& stat : sorted) {
-      render_.generate(*stat);
     }
   }
 
   const Params& params_;
   Render& render_;
   Buffer::Instance& response_;
-
-  SharedStatSet<Stats::Counter> counters_;
-  SharedStatSet<Stats::Gauge> gauges_;
-  SharedStatSet<Stats::TextReadout> text_readouts_;
-  SharedStatSet<Stats::Histogram> histograms_;
-  std::set<std::string> scopes_;
 };
 
 Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
@@ -479,28 +419,20 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     render = std::make_unique<HtmlRender>(response_headers, response, *this, params);
     break;
   case Format::Json:
-    render = std::make_unique<JsonRender>(params);
-    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+    render = std::make_unique<JsonRender>(response_headers, response, params);
     break;
   case Format::Prometheus:
     ASSERT(false);
     ABSL_FALLTHROUGH_INTENDED;
   case Format::Text:
-    render = std::make_unique<TextRender>();
+    render = std::make_unique<TextRender>(response);
     break;
   }
 
   Context context(params, *render, response);
-  context.collectStats(stats);
-  context.emit();
-  render->render(response);
+  context.collectAndEmitStats(stats);
+  render->render();
 
-  if (params.format_ == Format::Html) {
-    response.add("</body>\n");
-  }
-
-  // Display plain stats if format query param is not there.
-  // statsAsText(counters_and_gauges, text_readouts, histograms, response);
   return Http::Code::OK;
 }
 
