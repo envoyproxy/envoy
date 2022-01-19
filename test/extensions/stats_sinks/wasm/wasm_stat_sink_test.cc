@@ -62,8 +62,8 @@ TEST_P(WasmCommonContextTest, OnStat) {
   std::string code;
   NiceMock<Stats::MockMetricSnapshot> snapshot_;
   if (GetParam() != "null") {
-#if defined(__aarch64__)
-    // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+    // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
     return;
 #endif
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
