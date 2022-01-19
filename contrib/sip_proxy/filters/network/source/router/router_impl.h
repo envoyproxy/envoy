@@ -13,13 +13,18 @@
 #include "envoy/upstream/thread_local_cluster.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 
+#include "absl/types/any.h"
 #include "absl/types/optional.h"
+#include "contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha/tra.pb.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/route.pb.h"
 #include "contrib/sip_proxy/filters/network/source/conn_manager.h"
 #include "contrib/sip_proxy/filters/network/source/decoder_events.h"
+#include "contrib/sip_proxy/filters/network/source/filters/factory_base.h"
 #include "contrib/sip_proxy/filters/network/source/filters/filter.h"
 #include "contrib/sip_proxy/filters/network/source/router/router.h"
 
@@ -111,7 +116,7 @@ struct RouterStats {
 };
 
 class UpstreamRequest;
-class TransactionInfoItem : public Logger::Loggable<Logger::Id::connection> {
+class TransactionInfoItem : public Logger::Loggable<Logger::Id::filter> {
 public:
   TransactionInfoItem(SipFilters::DecoderFilterCallbacks* active_trans,
                       std::shared_ptr<UpstreamRequest> upstream_request)
@@ -139,7 +144,7 @@ private:
 };
 
 struct ThreadLocalTransactionInfo : public ThreadLocal::ThreadLocalObject,
-                                    public Logger::Loggable<Logger::Id::connection> {
+                                    public Logger::Loggable<Logger::Id::filter> {
   ThreadLocalTransactionInfo(std::shared_ptr<TransactionInfo> parent, Event::Dispatcher& dispatcher,
                              std::chrono::milliseconds transaction_timeout, std::string own_domain,
                              std::string domain_match_parameter_name)
@@ -268,8 +273,11 @@ class Router : public Upstream::LoadBalancerContextBase,
                Logger::Loggable<Logger::Id::connection> {
 public:
   Router(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
-         Stats::Scope& scope)
-      : cluster_manager_(cluster_manager), stats_(generateStats(stat_prefix, scope)) {}
+         Stats::Scope& scope, Server::Configuration::FactoryContext& context)
+      : cluster_manager_(cluster_manager), stats_(generateStats(stat_prefix, scope)),
+        context_(context) {
+    UNREFERENCED_PARAMETER(context_);
+  }
 
   // SipFilters::DecoderFilter
   void onDestroy() override;
@@ -291,19 +299,27 @@ public:
   }
 
   bool shouldSelectAnotherHost(const Upstream::Host& host) override {
-    if (!metadata_->destination().has_value()) {
+    if (!metadata_->destination().empty()) {
       return false;
     }
-    return host.address()->ip()->addressAsString() != metadata_->destination().value();
+    return host.address()->ip()->addressAsString() != metadata_->destination();
   }
 
+private:
+  void cleanup();
   RouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return RouterStats{ALL_SIP_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
                                             POOL_GAUGE_PREFIX(scope, prefix),
                                             POOL_HISTOGRAM_PREFIX(scope, prefix))};
   }
 
-  void cleanup();
+  FilterStatus handleAffinity();
+  FilterStatus messageHandlerWithLoadbalancer(std::shared_ptr<TransactionInfo> transaction_info,
+                                              MessageMetadataSharedPtr metadata, std::string dest,
+                                              bool& lb_ret);
+
+  QueryStatus handleCustomizedAffinity(std::string type, std::string key,
+                                       MessageMetadataSharedPtr metadata);
 
   Upstream::ClusterManager& cluster_manager_;
   RouterStats stats_;
@@ -315,17 +331,21 @@ public:
   std::shared_ptr<UpstreamRequest> upstream_request_;
   SipFilters::DecoderFilterCallbacks* callbacks_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
+  Upstream::ThreadLocalCluster* thread_local_cluster_;
   std::shared_ptr<TransactionInfos> transaction_infos_{};
   std::shared_ptr<SipSettings> settings_;
+  Server::Configuration::FactoryContext& context_;
+  // bool continue_handling_;
 };
 
 class ThreadLocalActiveConn;
 class ResponseDecoder : public DecoderCallbacks,
                         public DecoderEventHandler,
-                        public Logger::Loggable<Logger::Id::connection> {
+                        public Logger::Loggable<Logger::Id::filter> {
 public:
   ResponseDecoder(UpstreamRequest& parent)
       : parent_(parent), decoder_(std::make_unique<Decoder>(*this)) {}
+  ~ResponseDecoder() override = default;
   bool onData(Buffer::Instance& data);
 
   // DecoderEventHandler
@@ -374,7 +394,7 @@ public:
   void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
-  void onRequestStart();
+  void onRequestStart(bool continue_handling = false);
   void onRequestComplete();
   void onResponseComplete();
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
@@ -403,10 +423,7 @@ public:
     return conn_data_->connection().write(data, end_stream);
   }
 
-  absl::string_view getLocalIp() {
-    ENVOY_LOG(
-        debug, "Local ip: {}",
-        conn_data_->connection().connectionInfoProvider().localAddress()->ip()->addressAsString());
+  absl::string_view localAddress() {
     return conn_data_->connection()
         .connectionInfoProvider()
         .localAddress()
@@ -417,7 +434,7 @@ public:
   std::shared_ptr<TransactionInfo> transactionInfo() { return transaction_info_; }
 
 private:
-  Upstream::TcpPoolData& conn_pool_data_;
+  Upstream::TcpPoolData& conn_pool_;
 
   Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
   Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
