@@ -29,7 +29,7 @@ public:
     initializeTimer();
 
     rate_limiter_ = std::make_shared<LocalRateLimiterImpl>(
-        fill_interval, max_tokens, tokens_per_fill, dispatcher_, descriptors_, true);
+        fill_interval, max_tokens, tokens_per_fill, dispatcher_, descriptors_);
   }
 
   Thread::ThreadSynchronizer& synchronizer() { return rate_limiter_->synchronizer_; }
@@ -46,7 +46,7 @@ public:
 // Make sure we fail with a fill rate this is too fast.
 TEST_F(LocalRateLimiterImplTest, TooFastFillRate) {
   EXPECT_THROW_WITH_MESSAGE(
-      LocalRateLimiterImpl(std::chrono::milliseconds(49), 100, 1, dispatcher_, descriptors_, true),
+      LocalRateLimiterImpl(std::chrono::milliseconds(49), 100, 1, dispatcher_, descriptors_),
       EnvoyException, "local rate limit token bucket fill timer must be >= 50ms");
 }
 
@@ -216,7 +216,7 @@ public:
     initializeTimer();
 
     rate_limiter_ = std::make_shared<LocalRateLimiterImpl>(
-        fill_interval, max_tokens, tokens_per_fill, dispatcher_, descriptors_, true);
+        fill_interval, max_tokens, tokens_per_fill, dispatcher_, descriptors_);
   }
   const std::string single_descriptor_config_yaml = R"(
   entries:
@@ -251,7 +251,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitDivisibleByTokenFi
                             *descriptors_.Add());
 
   EXPECT_THROW_WITH_MESSAGE(
-      LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_, descriptors_, true),
+      LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_, descriptors_),
       EnvoyException, "local rate descriptor limit is not a multiple of token bucket fill timer");
 }
 
@@ -262,14 +262,14 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DuplicateDescriptor) {
                             *descriptors_.Add());
 
   EXPECT_THROW_WITH_MESSAGE(
-      LocalRateLimiterImpl(std::chrono::milliseconds(50), 1, 1, dispatcher_, descriptors_, true),
+      LocalRateLimiterImpl(std::chrono::milliseconds(50), 1, 1, dispatcher_, descriptors_),
       EnvoyException, "duplicate descriptor in the local rate descriptor: foo2=bar2");
 }
 
 // Verify no exception for per route config without descriptors.
 TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitNoExceptionWithoutDescriptor) {
-  VERBOSE_EXPECT_NO_THROW(LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_,
-                                               descriptors_, true));
+  VERBOSE_EXPECT_NO_THROW(
+      LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_, descriptors_));
 }
 
 // Verify various token bucket CAS edge cases for descriptors.

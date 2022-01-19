@@ -49,7 +49,7 @@ public:
       Envoy::Event::Dispatcher& dispatcher,
       const Protobuf::RepeatedPtrField<
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptor)
-      : rate_limiter_(fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptor, true) {}
+      : rate_limiter_(fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptor) {}
   static const std::string& key();
   const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& value() const {
     return rate_limiter_;

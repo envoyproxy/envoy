@@ -52,7 +52,7 @@ FilterConfig::FilterConfig(
       descriptors_(config.descriptors()),
       rate_limit_per_connection_(config.local_rate_limit_per_downstream_connection()),
       rate_limiter_(Filters::Common::LocalRateLimit::LocalRateLimiterImpl(
-          fill_interval_, max_tokens_, tokens_per_fill_, dispatcher, descriptors_, true)),
+          fill_interval_, max_tokens_, tokens_per_fill_, dispatcher, descriptors_)),
       local_info_(local_info), runtime_(runtime),
       filter_enabled_(
           config.has_filter_enabled()

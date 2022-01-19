@@ -20,8 +20,7 @@ Config::Config(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.token_bucket(), tokens_per_fill, 1),
           dispatcher,
           Protobuf::RepeatedPtrField<
-              envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>(),
-          false)),
+              envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>())),
       enabled_(proto_config.runtime_enabled(), runtime),
       stats_(generateStats(proto_config.stat_prefix(), scope)) {}
 

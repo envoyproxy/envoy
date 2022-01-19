@@ -22,8 +22,7 @@ public:
       const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
       const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
       const Protobuf::RepeatedPtrField<
-          envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
-      bool initialize_fill_time);
+          envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors);
   ~LocalRateLimiterImpl();
 
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
