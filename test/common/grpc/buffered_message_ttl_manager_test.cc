@@ -14,9 +14,6 @@ namespace Envoy {
 namespace Grpc {
 namespace {
 
-using testing::Invoke;
-using testing::NiceMock;
-
 class BufferedMessageTtlManagerTest : public testing::Test {
 public:
   BufferedMessageTtlManagerTest()
