@@ -45,6 +45,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-10-29",
         use_category = ["build"],
     ),
+    rules_apple_linker = dict(
+        project_name = "rules_apple_linker",
+        project_desc = "Bazel rules for overriding the linker for builds targeting Apple platforms",
+        project_url = "https://github.com/keith/rules_apple_linker",
+        version = "0.1.0",
+        strip_prefix = "rules_apple_linker-{version}",
+        sha256 = "cd8900b0654707a9ddbb3d833d065bf98983ec3f2d51f9a854d23e0da7d03520",
+        urls = ["https://github.com/keith/rules_apple_linker/archive/refs/tags/{version}.tar.gz"],
+        release_date = "2022-01-18",
+        use_category = ["build"],
+    ),
     rules_fuzzing = dict(
         project_name = "Fuzzing Rules for Bazel",
         project_desc = "Bazel rules for fuzz tests",

@@ -151,6 +151,12 @@ def envoy_stdlib_deps():
         "//conditions:default": ["@envoy//bazel:static_stdlib"],
     })
 
+def envoy_linking_deps():
+    return select({
+        "@envoy//bazel:apple": ["@rules_apple_linker//:lld"],
+        "//conditions:default": [],
+    })
+
 # Dependencies on tcmalloc_and_profiler should be wrapped with this function.
 def tcmalloc_external_dep(repository):
     return select({

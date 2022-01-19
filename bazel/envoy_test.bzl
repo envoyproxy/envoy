@@ -168,7 +168,7 @@ def envoy_cc_test(
         linkopts = _envoy_test_linkopts(),
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
-        deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps + ["googletest"]] + [
+        deps = envoy_stdlib_deps() + envoy_linking_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps + ["googletest"]] + [
             repository + "//test:main",
             repository + "//test/test_common:test_version_linkstamp",
         ] + select({
