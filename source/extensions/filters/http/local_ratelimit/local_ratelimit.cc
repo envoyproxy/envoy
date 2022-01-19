@@ -22,16 +22,14 @@ const std::string& PerConnectionRateLimiter::key() {
 }
 
 LocalRateLimitRequestDescriptorsQueue::LocalRateLimitRequestDescriptorsQueue()
-    : request_descriptors_queue_(
-          std::queue<absl::optional<std::vector<RateLimit::LocalDescriptor>>>()) {}
+    : request_descriptors_queue_(std::queue<std::vector<RateLimit::LocalDescriptor>>()) {}
 
 void LocalRateLimitRequestDescriptorsQueue::push(
-    absl::optional<std::vector<RateLimit::LocalDescriptor>> request_descriptors) {
+    std::vector<RateLimit::LocalDescriptor> request_descriptors) {
   request_descriptors_queue_.push(request_descriptors);
 }
 
-absl::optional<std::vector<RateLimit::LocalDescriptor>>
-LocalRateLimitRequestDescriptorsQueue::pop() {
+std::vector<RateLimit::LocalDescriptor> LocalRateLimitRequestDescriptorsQueue::pop() {
   auto request_descriptors = std::move(request_descriptors_queue_.front());
   request_descriptors_queue_.pop();
   return request_descriptors;
@@ -121,7 +119,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   const auto* config = getConfig();
 
   if (!config->enabled()) {
-    pushRequestDescriptors(absl::nullopt);
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -161,24 +158,22 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   const auto* config = getConfig();
 
-  if (config->enableXRateLimitHeaders()) {
+  if (config->enabled() && config->enableXRateLimitHeaders()) {
     auto descriptors = decoder_callbacks_->streamInfo()
                            .filterState()
                            ->getDataMutable<LocalRateLimitRequestDescriptorsQueue>(
                                LocalRateLimitRequestDescriptorsQueue::key())
                            .pop();
-    if (descriptors.has_value()) {
-      auto limit = maxTokens(descriptors.value());
-      auto remaining = remainingTokens(descriptors.value());
-      auto reset = remainingFillInterval(descriptors.value());
+    auto limit = maxTokens(descriptors);
+    auto remaining = remainingTokens(descriptors);
+    auto reset = remainingFillInterval(descriptors);
 
-      headers.addCopy(HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
-                      limit);
-      headers.addCopy(HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining,
-                      remaining);
-      headers.addCopy(HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
-                      reset);
-    }
+    headers.addCopy(HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
+                    limit);
+    headers.addCopy(HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining,
+                    remaining);
+    headers.addCopy(HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
+                    reset);
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -213,8 +208,7 @@ Filter::remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> reque
              : config->remainingFillInterval(request_descriptors);
 }
 
-void Filter::pushRequestDescriptors(
-    absl::optional<std::vector<RateLimit::LocalDescriptor>> request_descriptors) {
+void Filter::pushRequestDescriptors(std::vector<RateLimit::LocalDescriptor> request_descriptors) {
   if (!decoder_callbacks_->streamInfo()
            .filterState()
            ->hasData<LocalRateLimitRequestDescriptorsQueue>(
