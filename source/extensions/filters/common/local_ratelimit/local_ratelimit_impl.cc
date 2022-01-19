@@ -15,7 +15,7 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
     const Protobuf::RepeatedPtrField<
         envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
-    bool init_fill_time)
+    bool initialize_fill_time)
     : fill_timer_(fill_interval > std::chrono::milliseconds(0)
                       ? dispatcher.createTimer([this] { onFillTimer(); })
                       : nullptr),
@@ -28,7 +28,7 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
   token_bucket_.tokens_per_fill_ = tokens_per_fill;
   token_bucket_.fill_interval_ = absl::FromChrono(fill_interval);
   tokens_.tokens_ = max_tokens;
-  if (init_fill_time) {
+  if (initialize_fill_time) {
     tokens_.fill_time_ = time_source_.monotonicTime();
   }
 

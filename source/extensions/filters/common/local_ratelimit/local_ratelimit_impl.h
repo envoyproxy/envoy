@@ -23,7 +23,7 @@ public:
       const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
       const Protobuf::RepeatedPtrField<
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
-      bool init_fill_time);
+      bool initialize_fill_time);
   ~LocalRateLimiterImpl();
 
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
