@@ -82,7 +82,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.update_expected_rq_timeout_on_retry",
     "envoy.reloadable_features.use_dns_ttl",
     "envoy.reloadable_features.validate_connect",
-    "envoy.reloadable_features.vhds_heartbeats",
     "envoy.restart_features.explicit_wildcard_resource",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
     // Misplaced flags: please do not add flags to this section.
