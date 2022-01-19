@@ -175,7 +175,6 @@ public:
 
   // Http3::PoolConnectResultCallback
   void onConnectSucceeded() override;
-  void onConnectFailedWithEarlyData() override;
 
 protected:
   // Set the required idle callback on the pool.

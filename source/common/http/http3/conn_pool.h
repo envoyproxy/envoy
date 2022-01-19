@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <functional>
 
+#include "envoy/common/optref.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/http/codec_client.h"
@@ -98,11 +98,13 @@ public:
   uint64_t quiche_capacity_ = 100;
 };
 
+// An interface to propagate H3 handshake result.
 class PoolConnectResultCallback {
 public:
   virtual ~PoolConnectResultCallback() = default;
+
+  // Called when the handshake completes.
   virtual void onConnectSucceeded() PURE;
-  virtual void onConnectFailedWithEarlyData() PURE;
 };
 
 // Http3 subclass of FixedHttpConnPoolImpl which exists to store quic data.
@@ -115,7 +117,7 @@ public:
                     Random::RandomGenerator& random_generator,
                     Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
                     CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
-                    TimeSource& time_source);
+                    TimeSource& time_source, OptRef<PoolConnectResultCallback> connect_callback);
 
   ~Http3ConnPoolImpl() override;
 
@@ -129,10 +131,6 @@ public:
   // the HTTP3 active client does.
   bool trackStreamCapacity() override { return false; }
 
-  void setConnectResultCallback(PoolConnectResultCallback& callback) {
-    connect_callback_ = std::reference_wrapper<PoolConnectResultCallback>(callback);
-  }
-
 protected:
   void onConnected(Envoy::ConnectionPool::ActiveClient&) override;
 
@@ -142,7 +140,7 @@ private:
   // Store quic helpers which can be shared between connections and must live
   // beyond the lifetime of individual connections.
   std::unique_ptr<Quic::PersistentQuicInfoImpl> quic_info_;
-  absl::optional<std::reference_wrapper<PoolConnectResultCallback>> connect_callback_;
+  OptRef<PoolConnectResultCallback> connect_callback_;
 };
 
 std::unique_ptr<Http3ConnPoolImpl>
@@ -151,7 +149,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-                 Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope);
+                 Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope,
+                 OptRef<PoolConnectResultCallback> connect_callback);
 
 } // namespace Http3
 } // namespace Http

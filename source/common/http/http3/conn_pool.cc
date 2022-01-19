@@ -57,9 +57,10 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
     CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
-    TimeSource& time_source)
+    TimeSource& time_source, OptRef<PoolConnectResultCallback> connect_callback)
     : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
-                            random_generator, state, client_fn, codec_fn, protocol) {
+                            random_generator, state, client_fn, codec_fn, protocol),
+      connect_callback_(connect_callback) {
   auto source_address = host_->cluster().sourceAddress();
   if (!source_address.get()) {
     auto host_address = host->address();
@@ -75,7 +76,7 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
 
 void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
   if (connect_callback_ != absl::nullopt) {
-    connect_callback_->get().onConnectSucceeded();
+    connect_callback_->onConnectSucceeded();
   }
 }
 
@@ -88,7 +89,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-                 Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope) {
+                 Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope,
+                 OptRef<PoolConnectResultCallback> connect_callback) {
   return std::make_unique<Http3ConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
       [&quic_stat_names,
@@ -136,7 +138,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                                                  pool->randomGenerator())};
         return codec;
       },
-      std::vector<Protocol>{Protocol::Http3}, time_source);
+      std::vector<Protocol>{Protocol::Http3}, time_source, connect_callback);
 }
 
 } // namespace Http3

@@ -1722,9 +1722,10 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
 #ifdef ENVOY_ENABLE_QUIC
-    return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
-                                         priority, options, transport_socket_options, state, source,
-                                         quic_stat_names_, stats_);
+    return Http::Http3::allocateConnPool(
+        dispatcher, context_.api().randomGenerator(), host, priority, options,
+        transport_socket_options, state, source, quic_stat_names_, stats_,
+        makeOptRefFromPtr<Http::Http3::PoolConnectResultCallback>(nullptr));
 #else
     UNREFERENCED_PARAMETER(source);
     // Should be blocked by configuration checking at an earlier point.
