@@ -764,6 +764,18 @@ public:
                                       bool insert_envoy_original_path) const PURE;
 
   /**
+   * Returns the request header transforms that would be applied if finalizeRequestHeaders were
+   * called now. This is useful if you want to obtain request header transforms which was or will be
+   * applied through finalizeRequestHeaders call. Note: do not use unless you are sure that there
+   * will be no route modifications later in the filter chain.
+   * @param stream_info holds additional information about the request.
+   * @param do_formatting whether or not to evaluate configured transformations; if false, returns
+   * original values instead.
+   */
+  virtual Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                          bool do_formatting = true) const PURE;
+
+  /**
    * @return const HashPolicy* the optional hash policy for the route.
    */
   virtual const Http::HashPolicy* hashPolicy() const PURE;
