@@ -34,9 +34,12 @@ static const std::string ErrorPrefix = "ext_proc_error";
 static const int DefaultImmediateStatus = 200;
 static const std::string FilterName = "envoy.filters.http.ext_proc";
 
-// Set up a class that contains a MutationChecker that can check for valid
-// values of headers on an "ImmediateResponse" message but allow common
-// actions on that header.
+// Changes to headers are normally tested against the MutationRules supplied
+// with configuration. When writing an immediate response message, however,
+// we want to support a more liberal set of rules so that filters can create
+// custom error messages, and we want to prevent the MutationRules in the
+// configuration from making that impossible. This is a fixed, permissive
+// set of rules for that purpose.
 class ImmediateMutationChecker {
 public:
   ImmediateMutationChecker() {
@@ -526,16 +529,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   if (processing_status.ok()) {
     stats_.stream_msgs_received_.inc();
-  } else if (absl::IsInvalidArgument(processing_status)) {
-    ENVOY_LOG(debug, "Sending immediate response: {}", processing_status.message());
-    processing_complete_ = true;
-    closeStream();
-    cleanUpTimers();
-    ImmediateResponse invalid_mutation_response;
-    invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
-    invalid_mutation_response.set_details(std::string(processing_status.message()));
-    sendImmediateResponse(invalid_mutation_response);
-  } else {
+  } else if (absl::IsFailedPrecondition(processing_status)) {
+    // Processing code uses this specific error code in the case that a
+    // message was received out of order.
     stats_.spurious_msgs_received_.inc();
     // When a message is received out of order, ignore it and also
     // ignore the stream for the rest of this filter instance's lifetime
@@ -545,6 +541,16 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     closeStream();
     clearAsyncState();
     processing_complete_ = true;
+  } else {
+    // Any other error results in an immediate response with an error message.
+    ENVOY_LOG(debug, "Sending immediate response: {}", processing_status.message());
+    processing_complete_ = true;
+    closeStream();
+    cleanUpTimers();
+    ImmediateResponse invalid_mutation_response;
+    invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
+    invalid_mutation_response.set_details(std::string(processing_status.message()));
+    sendImmediateResponse(invalid_mutation_response);
   }
 }
 
