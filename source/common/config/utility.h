@@ -29,8 +29,8 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/singleton/const_singleton.h"
-#include "source/common/version/api_version_struct.h"
 #include "source/common/version/api_version.h"
+#include "source/common/version/api_version_struct.h"
 
 #include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
