@@ -91,7 +91,7 @@ def _config(key):
 sys.path.append(os.path.abspath("./_ext"))
 
 extensions = [
-    'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig', 'intersphinx_custom',
+    'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig', 'sphinx.ext.intersphinx',
     'sphinx_tabs.tabs', 'sphinx_copybutton', 'validating_code_block', 'sphinxext.rediraffe',
     'powershell_lexer'
 ]
@@ -103,6 +103,10 @@ extlinks = {
     'repo': ('https://github.com/envoyproxy/envoy/blob/{}/%s'.format(blob_sha), ''),
     'api': ('https://github.com/envoyproxy/envoy/blob/{}/api/%s'.format(blob_sha), ''),
 }
+
+# Only lookup intersphinx for explicitly prefixed in cross-references
+# This makes docs versioning work
+intersphinx_disabled_domains = ['std']
 
 # Setup global substitutions
 if 'pre-release' in release_level:

@@ -5,15 +5,12 @@ HTTP3 overview
 
 .. warning::
 
-  HTTP/3 support is still in Alpha, and should be used with caution.
-  Outstanding issues required for HTTP/3 to go GA can be found
-  `here <https://github.com/envoyproxy/envoy/labels/quic-mvp>`_
-  For example QUIC does not currently support in-place filter chain updates, so users
-  requiring dynamic config reload for QUIC should wait until
-  `#13115 <https://github.com/envoyproxy/envoy/issues/13115>`_ has been addressed.
+  HTTP/3 downstream support is ready for production use, but continued improvements are coming,
+  tracked in the `area-quic <https://github.com/envoyproxy/envoy/labels/area%2Fquic>`_ tag.
 
-  For general feature requests beyond production readiness, you can track
-  the `area-quic <https://github.com/envoyproxy/envoy/labels/area%2Fquic>`_ tag.
+  HTTP/3 upstream support is fine for locally controlled networks, but is not ready for
+  general internet use, and is missing some key latency features. See details below.
+
 
 HTTP3 downstream
 ----------------
@@ -21,7 +18,7 @@ HTTP3 downstream
 Downstream Envoy HTTP/3 support can be turned up via adding
 :ref:`quic_options <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>`,
 ensuring the downstream transport socket is a QuicDownstreamTransport, and setting the codec
-to HTTP/3.
+to HTTP/3. Please note that hot restart is not gracefully handled for HTTP/3 yet.
 
 See example :repo:`downstream HTTP/3 configuration </configs/envoyproxy_io_proxy_http3_downstream.yaml>` for example configuration.
 
@@ -43,9 +40,12 @@ It is recommanded to monitor some UDP listener and QUIC connection stats:
 HTTP3 upstream
 --------------
 
-HTTP/3 upstream support is still in Alpha, and should be used with caution.
-Outstanding issues required for HTTP/3 to go GA can be found
-`here <https://github.com/envoyproxy/envoy/labels/quic-mvp>`_
+HTTP/3 upstream support is implemented, but is missing some key features. The code is now covered by Envoy's
+security policy, and is fine to use in production environments the network is under the deployer's control
+(e.g. will not randomly black-hole connections). It is not reccomended for use on the open internet
+until blackhole detection and fail-over to TCP is implemented. There are also a number of major latency
+improvements underway such as upstream support for 0-rtt handshakes: see open issues for upstream HTTP/3
+`here <https://github.com/envoyproxy/envoy/labels/quic-upstream-mvp>`_
 
 Envoy HTTP/3 support can be turned up by turning up HTTP/3 support in
 :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`,
