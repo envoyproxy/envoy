@@ -219,22 +219,21 @@ def post_to_assignee(client, assignees_and_messages, assignees_map):
 def post_to_oncall(client, unassigned_prs, out_slo_prs):
     # Post updates to #envoy-maintainer-oncall
     unassigned_prs = maintainers_and_messages['unassigned']
-    if unassigned_prs:
-        try:
-            client.chat_postMessage(
-                channel='#envoy-maintainer-oncall',
-                text=("*'Unassigned' PRs* (PRs with no maintainer assigned)\n%s" % unassigned_prs))
-            client.chat_postMessage(
-                channel='#envoy-maintainer-oncall',
-                text=("*Stalled PRs* (PRs with review out-SLO, please address)\n%s" % out_slo_prs))
-            issue_link = "https://github.com/envoyproxy/envoy/issues?q=is%3Aissue+is%3Aopen+label%3Atriage"
-            client.chat_postMessage(
-                channel='#envoy-maintainer-oncall',
-                text=(
-                    "*Untriaged Issues* (please tag and cc area experts)\n<%s|%s>" %
-                    (issue_link, issue_link)))
-        except SlackApiError as e:
-            print("Unexpected error %s", e.response["error"])
+    try:
+        client.chat_postMessage(
+            channel='#envoy-maintainer-oncall',
+            text=("*'Unassigned' PRs* (PRs with no maintainer assigned)\n%s" % unassigned_prs))
+        client.chat_postMessage(
+            channel='#envoy-maintainer-oncall',
+            text=("*Stalled PRs* (PRs with review out-SLO, please address)\n%s" % out_slo_prs))
+        issue_link = "https://github.com/envoyproxy/envoy/issues?q=is%3Aissue+is%3Aopen+label%3Atriage"
+        client.chat_postMessage(
+            channel='#envoy-maintainer-oncall',
+            text=(
+                "*Untriaged Issues* (please tag and cc area experts)\n<%s|%s>" %
+                (issue_link, issue_link)))
+    except SlackApiError as e:
+        print("Unexpected error %s", e.response["error"])
 
 
 if __name__ == '__main__':
