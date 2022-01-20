@@ -81,9 +81,9 @@ The following overload actions are supported:
     - Envoy will immediately respond with a 503 response code to new requests
 
   * - envoy.overload_actions.disable_http_keepalive
-    - Envoy will drain HTTP/2, HTTP/3 connections using ``GOAWAY`` with a drain
-      grace period. For HTTP/1, Envoy will set a drain timer to close the more
-      idle recently used connections.
+    - Envoy will drain HTTP/2 and HTTP/3 connections using ``GOAWAY`` with a
+      drain grace period. For HTTP/1, Envoy will set a drain timer to close the
+      more idle recently used connections.
 
   * - envoy.overload_actions.stop_accepting_connections
     - Envoy will stop accepting new network connections on its configured listeners
