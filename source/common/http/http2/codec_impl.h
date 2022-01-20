@@ -357,10 +357,9 @@ protected:
     absl::string_view details_;
 
     /**
-     * Tracks events for a stream that is backed up. e.g. headers pending,
-     * trailers, data, etc.
+     * Tracks buffering that may occur for a stream if it is backed up.
      */
-    struct BackedUpStreamManager {
+    struct BufferedStreamManager {
       bool body_buffered_{false};
       bool trailers_buffered_{false};
       // We either will get the end stream bit via header, data or trailers.
@@ -373,9 +372,15 @@ protected:
       // TODO(kbaichoo): perhaps we can achieve this in another way, e.g. defer
       // the onStreamClose.
       bool flush_all_data_{false};
+
+      // We received a call to onStreamClose for the stream, but deferred it
+      // as the stream had pending data to process and the stream was not reset.
+      bool buffered_on_stream_close_{false};
+
+      bool has_buffered_data() const { return body_buffered_ || trailers_buffered_; }
     };
 
-    BackedUpStreamManager stream_manager_;
+    BufferedStreamManager stream_manager_;
     Event::SchedulableCallbackPtr process_buffered_data_callback_;
 
   protected:

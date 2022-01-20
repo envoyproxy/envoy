@@ -379,6 +379,15 @@ void ConnectionImpl::StreamImpl::processBufferedData(bool stream_being_destroyed
     remote_end_stream_ = true; // buffered trailers imply remote_end_stream_.
     decodeTrailers();
   }
+
+  // If we buffered the on stream close, lets unwind
+  // TODO(kbaichoo): if we ended up resetting, in between, does this implictly
+  // get called onStreamClose? Don't think so...
+  if (stream_manager_.buffered_on_stream_close_ && !stream_manager_.trailers_buffered_ &&
+      !stream_manager_.body_buffered_) {
+    // TODO(kbaichoo): we should buffer the error code as well..
+    parent_.onStreamClose(stream_id_, 0);
+  }
 }
 
 void ConnectionImpl::StreamImpl::readDisable(bool disable) {
@@ -1348,6 +1357,8 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
   StreamImpl* stream = getStream(stream_id);
   if (stream) {
     ENVOY_CONN_LOG(debug, "stream closed: {}", connection_, error_code);
+    // Consume buffered on stream_close.
+    stream->stream_manager_.buffered_on_stream_close_ = false;
     if (!stream->remote_end_stream_ || !stream->local_end_stream_) {
       StreamResetReason reason;
       if (stream->reset_due_to_messaging_error_) {
@@ -1378,13 +1389,16 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
 
       stream->runResetCallbacks(reason);
     } else {
-      ENVOY_CONN_LOG(debug, "Processing buffered data for stream: {}", connection_, stream_id);
-      // We should flush through all data related to this stream if it was
-      // buffered. Seems like this is the route for non-reset streams...
-      // TODO(kbaichoo): defer the stream deletion, ensure the IT WON'T HAVE
-      // DANGLING CONNECTION REFERENCE
-      // ALSO ENSURE THIS ONLY RUNS FOR NON-RESET STREAMS.
-      stream->processBufferedData(true);
+      if (!stream->reset_reason_.has_value() && stream->stream_manager_.has_buffered_data()) {
+        ASSERT(error_code ==
+               NGHTTP2_NO_ERROR); // If there was an error, we shouldn't be doing this.
+        ENVOY_CONN_LOG(debug, "Processing buffered data for stream: {}", connection_, stream_id);
+        // Buffer the call, rely on the stream->process_buffered_data_callback_
+        // to end up invoking.
+        stream->stream_manager_.buffered_on_stream_close_ = true;
+        // TODO(kbaichoo): is this a sensible value to return?
+        return 0;
+      }
     }
 
     stream->destroy();
