@@ -163,7 +163,7 @@ TEST_F(ConnectivityGridTest, Success) {
 
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_.callbacks(), nullptr);
-  grid_.onConnectSucceeded();
+  grid_.onHandshakeComplete();
   EXPECT_TRUE(grid_.isHttp3Confirmed());
   EXPECT_CALL(callbacks_.pool_ready_, ready());
   grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);

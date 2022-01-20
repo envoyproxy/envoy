@@ -76,7 +76,7 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
 
 void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
   if (connect_callback_ != absl::nullopt) {
-    connect_callback_->onConnectSucceeded();
+    connect_callback_->onHandshakeComplete();
   }
 }
 

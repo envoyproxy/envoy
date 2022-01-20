@@ -174,7 +174,7 @@ public:
   void markHttp3Confirmed();
 
   // Http3::PoolConnectResultCallback
-  void onConnectSucceeded() override;
+  void onHandshakeComplete() override;
 
 protected:
   // Set the required idle callback on the pool.

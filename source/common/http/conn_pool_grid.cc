@@ -228,11 +228,10 @@ absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool(
   // HTTP/3 is hard-coded as higher priority, H2 as secondary.
   ConnectionPool::InstancePtr pool;
   if (pools_.empty()) {
-    auto h3_pool =
+    pool =
         Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_, options_,
                                 transport_socket_options_, state_, time_source_, quic_stat_names_,
                                 scope_, makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this));
-    pool = std::move(h3_pool);
   } else {
     pool = std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
                                                    options_, transport_socket_options_, state_);
@@ -403,7 +402,7 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
   return false;
 }
 
-void ConnectivityGrid::onConnectSucceeded() {
+void ConnectivityGrid::onHandshakeComplete() {
   ENVOY_LOG(trace, "Marking HTTP/3 confirmed for host '{}'.", host_->hostname());
   markHttp3Confirmed();
 }

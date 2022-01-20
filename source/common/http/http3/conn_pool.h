@@ -104,7 +104,7 @@ public:
   virtual ~PoolConnectResultCallback() = default;
 
   // Called when the handshake completes.
-  virtual void onConnectSucceeded() PURE;
+  virtual void onHandshakeComplete() PURE;
 };
 
 // Http3 subclass of FixedHttpConnPoolImpl which exists to store quic data.
