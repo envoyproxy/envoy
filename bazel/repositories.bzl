@@ -455,7 +455,7 @@ filegroup(
         "boost/**/*.hpp",
         "boost/**/*.ipp",
     ]),
-    visibility = ["//visibility:public"],
+    visibility = ["@envoy//contrib/hyperscan/matching/input_matchers/source:__pkg__"],
 )
 """,
     )
