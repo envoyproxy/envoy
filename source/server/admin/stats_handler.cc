@@ -9,6 +9,7 @@
 #include "source/common/html/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/memory/stats.h"
 #include "source/server/admin/admin_html_generator.h"
 #include "source/server/admin/prometheus_stats.h"
 #include "source/server/admin/utils.h"
@@ -327,14 +328,21 @@ private:
 
 class StatsHandler::Context {
 public:
+#define STRING_SORT 1
+#if STRING_SORT
   template <class ValueType> using NameValue = std::pair<std::string, ValueType>;
   template <class ValueType> using NameValueVec = std::vector<NameValue<ValueType>>;
+#else
+  template <class StatType> using StatVec = std::vector<Stats::RefcountPtr<StatType>>;
+#endif
 
   Context(const Params& params, Render& render, Buffer::Instance& response)
       : params_(params), render_(render), response_(response) {}
 
   // Iterates through the various stat types, and renders them.
   void collectAndEmitStats(const Stats::Store& stats) {
+    uint64_t mem_start = Memory::Stats::totalCurrentlyAllocated();
+#if STRING_SORT
     NameValueVec<std::string> text_readouts;
     collect<Stats::TextReadout>(Type::TextReadouts, stats, text_readouts);
     emit<std::string>(text_readouts);
@@ -345,13 +353,36 @@ public:
     NameValueVec<uint64_t> counters_and_gauges;
     collect<Stats::Counter>(Type::Counters, stats, counters_and_gauges);
     collect<Stats::Gauge>(Type::Gauges, stats, counters_and_gauges);
+    ENVOY_LOG_MISC(error, "Memory Peak: {}", Memory::Stats::totalCurrentlyAllocated() - mem_start);
     emit<uint64_t>(counters_and_gauges);
 
     NameValueVec<Stats::ParentHistogramSharedPtr> histograms;
     collect<Stats::ParentHistogram>(Type::Histograms, stats, histograms);
     emit<Stats::ParentHistogramSharedPtr>(histograms);
+#else
+    const Stats::SymbolTable& symbol_table = stats.constSymbolTable();
+
+    StatVec<Stats::TextReadout> text_readouts;
+    collect<Stats::TextReadout>(Type::TextReadouts, stats, text_readouts);
+    emit<Stats::TextReadout>(text_readouts, symbol_table);
+
+    // TODO(jmarantz): merge-sort the counter & stats values together.
+    StatVec<Stats::Counter> counters;
+    StatVec<Stats::Gauge> gauges;
+    collect<Stats::Counter>(Type::Counters, stats, counters);
+    collect<Stats::Gauge>(Type::Gauges, stats, gauges);
+    ENVOY_LOG_MISC(error, "Memory Peak: {}", Memory::Stats::totalCurrentlyAllocated() - mem_start);
+
+    emit<Stats::Counter>(counters, symbol_table);
+    emit<Stats::Gauge>(gauges, symbol_table);
+
+    StatVec<Stats::ParentHistogram> histograms;
+    collect<Stats::ParentHistogram>(Type::Histograms, stats, histograms);
+    emit<Stats::ParentHistogram>(histograms, symbol_table);
+#endif
   }
 
+#if STRING_SORT
   template <class ValueType> void emit(NameValueVec<ValueType>& name_value_vec) {
     std::sort(name_value_vec.begin(), name_value_vec.end());
     for (NameValue<ValueType>& name_value : name_value_vec) {
@@ -359,9 +390,34 @@ public:
       name_value = NameValue<ValueType>(); // free memory after rendering
     }
   }
+#else
+  template <class StatType>
+  void emit(StatVec<StatType>& stat_vec, const Stats::SymbolTable& symbol_table) {
+    struct Compare {
+      Compare(const Stats::SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+      bool operator()(const Stats::RefcountPtr<StatType>& a,
+                      const Stats::RefcountPtr<StatType>& b) {
+        return symbol_table_.lessThan(a->statName(), b->statName());
+      }
+      const Stats::SymbolTable& symbol_table_;
+    };
 
+    std::sort(stat_vec.begin(), stat_vec.end(), Compare(symbol_table));
+    for (Stats::RefcountPtr<StatType>& stat : stat_vec) {
+      render_.generate(stat->name(), saveValue(*stat));
+      stat.reset(); // free memory after rendering
+    }
+  }
+#endif
+
+#if STRING_SORT
   template <class StatType, class ValueType>
-  void collect(Type type, const Stats::Store& stats, NameValueVec<ValueType>& vec) {
+  void collect(Type type, const Stats::Store& stats, NameValueVec<ValueType>& vec)
+#else
+  template <class StatType>
+  void collect(Type type, const Stats::Store& stats, StatVec<StatType>& vec)
+#endif
+  {
     // Bail early if the  requested type does not match the current type.
     if (params_.type_ != Type::All && params_.type_ != type) {
       return;
@@ -370,7 +426,11 @@ public:
     size_t previous_size = vec.size();
     collectHelper(stats, [this, &vec](StatType& stat) {
       if (params_.shouldShowMetric(stat)) {
+#if STRING_SORT
         vec.emplace_back(std::make_pair(stat.name(), saveValue(stat)));
+#else
+        vec.emplace_back(Stats::RefcountPtr<StatType>(&stat));
+#endif
       }
     });
     if (previous_size == vec.size()) {
