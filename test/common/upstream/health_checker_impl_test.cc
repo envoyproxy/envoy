@@ -1098,7 +1098,7 @@ TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
     )EOF";
 
   auto socket_factory = new Network::MockTransportSocketFactory();
-  EXPECT_CALL(*socket_factory, implementsSecureTransport()).Times(2).WillRepeatedly(Return(true));
+  EXPECT_CALL(*socket_factory, implementsSecureTransport()).WillRepeatedly(Return(true));
   auto transport_socket_match = new NiceMock<Upstream::MockTransportSocketMatcher>(
       Network::TransportSocketFactoryPtr(socket_factory));
   cluster_->info_->transport_socket_matcher_.reset(transport_socket_match);
@@ -2564,9 +2564,7 @@ TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
   // We expect that this default_socket_factory will NOT be used to create a transport socket for
   // the health check connection.
   EXPECT_CALL(*default_socket_factory, createTransportSocket(_)).Times(0);
-  EXPECT_CALL(*default_socket_factory, implementsSecureTransport())
-      .Times(2)
-      .WillRepeatedly(Return(true));
+  EXPECT_CALL(*default_socket_factory, implementsSecureTransport()).WillRepeatedly(Return(true));
   auto transport_socket_match =
       std::make_unique<Upstream::MockTransportSocketMatcher>(std::move(default_socket_factory));
 
@@ -2627,9 +2625,7 @@ TEST_F(HttpHealthCheckerImplTest, NoTransportSocketMatchCriteria) {
   // The default_socket_factory should be used to create a transport socket for the health check
   // connection.
   EXPECT_CALL(*default_socket_factory, createTransportSocket(_));
-  EXPECT_CALL(*default_socket_factory, implementsSecureTransport())
-      .Times(2)
-      .WillRepeatedly(Return(true));
+  EXPECT_CALL(*default_socket_factory, implementsSecureTransport()).WillRepeatedly(Return(true));
   auto transport_socket_match =
       std::make_unique<Upstream::MockTransportSocketMatcher>(std::move(default_socket_factory));
   // We expect resolve() to be called exactly once for endpoint socket matching. We should not
