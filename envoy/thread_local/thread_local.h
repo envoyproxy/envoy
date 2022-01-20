@@ -77,6 +77,8 @@ protected:
   // Callers must use the TypedSlot API, below.
   virtual void runOnAllThreads(const UpdateCb& update_cb) PURE;
   virtual void runOnAllThreads(const UpdateCb& update_cb, const Event::PostCb& complete_cb) PURE;
+
+  virtual bool isShutdown() PURE;
 };
 
 using SlotPtr = std::unique_ptr<Slot>;
@@ -176,6 +178,8 @@ public:
   void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& complete_cb) {
     slot_->runOnAllThreads(makeSlotUpdateCb(cb), complete_cb);
   }
+
+  bool isShutdown() { return slot_->isShutdown(); };
 
 private:
   static OptRef<T> getOpt(ThreadLocalObjectSharedPtr obj) {

@@ -47,6 +47,7 @@ private:
     void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& complete_cb) override;
     bool currentThreadRegistered() override;
     void set(InitializeCb cb) override;
+    bool isShutdown() override { return parent_.shutdown_; }
 
     InstanceImpl& parent_;
     const uint32_t index_;
