@@ -357,30 +357,24 @@ void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadat
 void ConnectionImpl::StreamImpl::processBufferedData(bool stream_being_destroyed) {
   ENVOY_CONN_LOG(debug, "Stream {} processing buffered data.", parent_.connection_, stream_id_);
 
-  auto next_stage = stream_manager_.getNextStage();
+  // On the response path (upstream -> downstream), we want to flush the
+  // buffered data to the downstream if the stream is being closed.
+  // TODO(kbaichoo): perhaps we can achieve this in another way, e.g. defer the
+  // onStreamClose call.
   stream_manager_.flush_all_data_ = stream_being_destroyed;
   bool continue_processing = stream_being_destroyed || !buffersOverrun();
-  while (continue_processing && next_stage.has_value()) {
-    switch (next_stage.value()) {
-    case BackedUpStreamManager::Stage::Body:
-      if (stream_manager_.data_end_stream_) {
-        remote_end_stream_ = true; // restore the deferred end_stream from the remote.
-      } else if (stream_manager_.trailers_buffered_) {
-        // Avoid inversion in the case where we saw trailers, acquiring the
-        // remote_end_stream_ being set to true, but the trailers ended up being
-        // buffered. The buffered decodeTrailers call will restore the
-        // remote_end_stream_.
-        remote_end_stream_ = false;
-      }
-      decodeData();
-      break;
-    case BackedUpStreamManager::Stage::Trailers:
-      remote_end_stream_ = true; // buffered trailers imply remote_end_stream_.
-      decodeTrailers();
-      break;
+
+  if (stream_manager_.body_buffered_ && continue_processing) {
+    if (stream_manager_.data_end_stream_) {
+      remote_end_stream_ = true; // restore the deferred end_stream from the remote.
     }
-    next_stage = stream_manager_.getNextStage();
-    continue_processing = stream_being_destroyed || !buffersOverrun();
+    decodeData();
+  }
+
+  continue_processing = stream_being_destroyed || !buffersOverrun();
+  if (stream_manager_.trailers_buffered_ && continue_processing) {
+    remote_end_stream_ = true; // buffered trailers imply remote_end_stream_.
+    decodeTrailers();
   }
 }
 
@@ -438,18 +432,6 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
   }
 }
 
-absl::optional<ConnectionImpl::StreamImpl::BackedUpStreamManager::Stage>
-ConnectionImpl::StreamImpl::BackedUpStreamManager::getNextStage() {
-  if (body_buffered_) {
-    return Stage::Body;
-  }
-  if (trailers_buffered_) {
-    return Stage::Trailers;
-  }
-
-  return absl::nullopt;
-}
-
 void ConnectionImpl::StreamImpl::decodeData() {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.defer_processing_backedup_streams") &&
@@ -463,10 +445,15 @@ void ConnectionImpl::StreamImpl::decodeData() {
   // Any buffered data will be consumed.
   stream_manager_.body_buffered_ = false;
 
+  // Avoid inversion in the case where we saw trailers, acquiring the
+  // remote_end_stream_ being set to true, but the trailers ended up being
+  // buffered.
+  const bool send_end_stream = remote_end_stream_ && !stream_manager_.trailers_buffered_;
+
   // It's possible that we are waiting to send a deferred reset, so only raise data if local
   // is not complete.
   if (!deferred_reset_) {
-    decoder().decodeData(*pending_recv_data_, remote_end_stream_);
+    decoder().decodeData(*pending_recv_data_, send_end_stream);
   }
 
   pending_recv_data_->drain(pending_recv_data_->length());

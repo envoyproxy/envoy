@@ -360,19 +360,6 @@ protected:
      * trailers, data, etc.
      */
     struct BackedUpStreamManager {
-
-      /**
-       * Which decode call should next be called since it was deferred.
-       */
-      // TODO(kbaichoo): We might need to add support for metadata.
-      enum class Stage {
-        Body,     // We've buffered body
-        Trailers, // We've buffered trailers
-      };
-
-      // Returns the next stage of stream data to process that was deferred.
-      absl::optional<Stage> getNextStage();
-
       bool body_buffered_{false};
       bool trailers_buffered_{false};
       // We either will get the end stream bit via header, data or trailers.
