@@ -106,15 +106,17 @@ public:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
   Buffer::InstancePtr buffer_;
   const std::string cert_data_{"cert-data"};
+  const absl::string_view requested_server_name_{"server.name"};
 };
 
 // Verify that createTcpCheck's dependencies are invoked when it's called.
 // Verify that the source certificate is not set by default.
 TEST_F(CheckRequestUtilsTest, BasicTcp) {
   envoy::service::auth::v3::CheckRequest request;
-  EXPECT_CALL(net_callbacks_, connection()).Times(2).WillRepeatedly(ReturnRef(connection_));
+  EXPECT_CALL(net_callbacks_, connection()).Times(3).WillRepeatedly(ReturnRef(connection_));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+  EXPECT_CALL(connection_, requestedServerName()).WillOnce(Return(requested_server_name_));
   EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
@@ -127,13 +129,14 @@ TEST_F(CheckRequestUtilsTest, BasicTcp) {
   EXPECT_EQ(request.attributes().source().certificate().size(), 0);
   EXPECT_EQ("value_1", request.attributes().destination().labels().at("label_1"));
   EXPECT_EQ("value_2", request.attributes().destination().labels().at("label_2"));
+  EXPECT_EQ("server.name", request.attributes().destination().service());
 }
 
 // Verify that createTcpCheck's dependencies are invoked when it's called.
 // Verify that createTcpCheck populates the source certificate correctly.
 TEST_F(CheckRequestUtilsTest, TcpPeerCertificate) {
   envoy::service::auth::v3::CheckRequest request;
-  EXPECT_CALL(net_callbacks_, connection()).Times(2).WillRepeatedly(ReturnRef(connection_));
+  EXPECT_CALL(net_callbacks_, connection()).Times(3).WillRepeatedly(ReturnRef(connection_));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
