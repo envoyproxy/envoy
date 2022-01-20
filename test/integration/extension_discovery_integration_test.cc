@@ -745,10 +745,10 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ReloadBoth) {
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   Http::TestRequestHeaderMapImpl banned_request_headers{
       {":method", "GET"}, {":path", "/private/key"}, {":scheme", "http"}, {":authority", "host"}};
   {
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
     auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
     ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
