@@ -100,7 +100,7 @@ public:
 
   // Config::ExtensionConfigProvider
   const std::string& name() override { return DynamicFilterConfigProviderImplBase::name(); }
-  absl::optional<FactoryCb> config() override { return *tls_->config_; }
+  absl::optional<FactoryCb> config() override { return tls_->config_; }
 
   // Config::DynamicExtensionConfigProviderBase
   void onConfigUpdate(const Protobuf::Message& message, const std::string&,

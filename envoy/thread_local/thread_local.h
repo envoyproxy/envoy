@@ -78,7 +78,12 @@ protected:
   virtual void runOnAllThreads(const UpdateCb& update_cb) PURE;
   virtual void runOnAllThreads(const UpdateCb& update_cb, const Event::PostCb& complete_cb) PURE;
 
-  virtual bool isShutdown() PURE;
+  /**
+   * Returns whether or not global threading has been shutdown.
+   *
+   * @return true if global threading has been shutdown or false if not.
+   */
+  virtual bool isShutdown() const PURE;
 };
 
 using SlotPtr = std::unique_ptr<Slot>;
@@ -179,7 +184,12 @@ public:
     slot_->runOnAllThreads(makeSlotUpdateCb(cb), complete_cb);
   }
 
-  bool isShutdown() { return slot_->isShutdown(); };
+  /**
+   * Returns whether or not global threading has been shutdown.
+   *
+   * @return true if global threading has been shutdown or false if not.
+   */
+  bool isShutdown() const { return slot_->isShutdown(); };
 
 private:
   static OptRef<T> getOpt(ThreadLocalObjectSharedPtr obj) {
