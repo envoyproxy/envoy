@@ -140,10 +140,7 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;
   forEachCounter([&ret](std::size_t size) { ret.reserve(size); },
-                 [&ret](Counter& counter) {
-                   ret.emplace_back(CounterSharedPtr(&counter));
-                   return true;
-                 });
+                 [&ret](Counter& counter) { ret.emplace_back(CounterSharedPtr(&counter)); });
   return ret;
 }
 
@@ -175,11 +172,9 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
 std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<TextReadoutSharedPtr> ret;
-  forEachTextReadout([&ret](std::size_t size) { ret.reserve(size); },
-                     [&ret](TextReadout& text_readout) {
-                       ret.emplace_back(TextReadoutSharedPtr(&text_readout));
-                       return true;
-                     });
+  forEachTextReadout(
+      [&ret](std::size_t size) { ret.reserve(size); },
+      [&ret](TextReadout& text_readout) { ret.emplace_back(TextReadoutSharedPtr(&text_readout)); });
   return ret;
 }
 
@@ -976,7 +971,9 @@ void ThreadLocalStoreImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout>
 void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,
                                         StatFn<const Scope> f_scope) const {
   Thread::LockGuard lock(lock_);
-  f_size(scopes_.size() + 1 /* for default_scope_ */);
+  if (f_size != nullptr) {
+    f_size(scopes_.size() + 1 /* for default_scope_ */);
+  }
   f_scope(*default_scope_);
   for (ScopeImpl* scope : scopes_) {
     f_scope(*scope);

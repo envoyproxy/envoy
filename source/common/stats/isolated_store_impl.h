@@ -228,7 +228,9 @@ public:
   }
 
   void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override {
-    f_size(1);
+    if (f_size != nullptr) {
+      f_size(1);
+    }
     const Scope& scope = *this;
     f_stat(scope);
   }

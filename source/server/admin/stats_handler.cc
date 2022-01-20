@@ -638,9 +638,8 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
 
 std::string StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& counters_and_gauges,
                                       const std::map<std::string, std::string>& text_readouts,
-                                      const std::vector<Stats::HistogramSharedPtr>& all_histograms,
+                                      const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
                                       const bool pretty_print) {
-
   ProtobufWkt::Struct document;
   std::vector<ProtobufWkt::Value> stats_array;
   for (const auto& text_readout : text_readouts) {

@@ -163,6 +163,7 @@ public:
   bool iterate(const IterateFn<TextReadout>& fn) const override {
     return wrapped_scope_->iterate(fn);
   }
+  StatName prefix() const override { return wrapped_scope_->prefix(); }
 
   StatName prefix() const override { return wrapped_scope_->prefix(); }
 
@@ -394,6 +395,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.textReadouts();
   }
+  StatName prefix() const override { return store_.prefix(); }
 
   bool iterate(const IterateFn<Counter>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return store_.iterate(fn); }
