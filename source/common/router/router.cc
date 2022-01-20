@@ -1180,11 +1180,8 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   const std::string body =
       absl::StrCat("upstream connect error or disconnect/reset before headers. reset reason: ",
                    Http::Utility::resetReasonToString(reset_reason),
-                   Runtime::runtimeFeatureEnabled(
-                       "envoy.reloadable_features.http_transport_failure_reason_in_body") &&
-                           !transport_failure_reason.empty()
-                       ? ", transport failure reason: "
-                       : "",
+
+                   !transport_failure_reason.empty() ? ", transport failure reason: " : "",
                    transport_failure_reason);
   const std::string& basic_details =
       downstream_response_started_ ? StreamInfo::ResponseCodeDetails::get().LateUpstreamReset
