@@ -19,11 +19,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
-void Http1BridgeFilter::chargeStat(const Http::ResponseHeaderOrTrailerMap& headers) {
-  context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_stat_names_,
-                      headers.GrpcStatus());
-}
-
 Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const bool protobuf_request = Grpc::Common::isProtobufRequestHeaders(headers);
   if (upgrade_protobuf_ && protobuf_request) {
@@ -35,9 +30,6 @@ Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMa
   }
 
   const bool grpc_request = Grpc::Common::isGrpcRequestHeaders(headers);
-  if (grpc_request) {
-    setupStatTracking(headers);
-  }
 
   const absl::optional<Http::Protocol>& protocol = decoder_callbacks_->streamInfo().protocol();
   ASSERT(protocol);
@@ -116,14 +108,6 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::ResponseTrail
   // NOTE: We will still write the trailers, but the HTTP/1.1 codec will just eat them and end
   //       the chunk encoded response which is what we want.
   return Http::FilterTrailersStatus::Continue;
-}
-
-void Http1BridgeFilter::setupStatTracking(const Http::RequestHeaderMap& headers) {
-  cluster_ = decoder_callbacks_->clusterInfo();
-  if (!cluster_) {
-    return;
-  }
-  request_stat_names_ = context_.resolveDynamicServiceAndMethod(headers.Path());
 }
 
 } // namespace GrpcHttp1Bridge
