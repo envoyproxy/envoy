@@ -853,17 +853,24 @@ private:
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
 
   /**
-   * Returns a vector of header parsers which applied or will apply header transformations to the
-   * request/response in this route.
-   * @param get_request_header_parser specifies whether to get request header parsers or response
-   *        header parsers.
+   * Returns a vector of request header parsers which applied or will apply header transformations
+   * to the request in this route.
    * @param specificity_ascend specifies whether the returned parsers will be sorted from least
    *        specific to most specific (global connection manager level header parser, virtual host
    *        level header parser and finally route-level parser.) or the reverse.
-   * @return a vector of header parsers.
+   * @return a vector of request header parsers.
    */
-  std::vector<const HeaderParser*> getHeaderParsers(bool get_request_header_parser,
-                                                    bool specificity_ascend) const;
+  std::vector<const HeaderParser*> getRequestHeaderParsers(bool specificity_ascend) const;
+
+  /**
+   * Returns a vector of response header parsers which applied or will apply header transformations
+   * to the response in this route.
+   * @param specificity_ascend specifies whether the returned parsers will be sorted from least
+   *        specific to most specific (global connection manager level header parser, virtual host
+   *        level header parser and finally route-level parser.) or the reverse.
+   * @return a vector of request header parsers.
+   */
+  std::vector<const HeaderParser*> getResponseHeaderParsers(bool specificity_ascend) const;
 
   absl::optional<RuntimeData> loadRuntimeData(const envoy::config::route::v3::RouteMatch& route);
 

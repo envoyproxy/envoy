@@ -137,6 +137,24 @@ const envoy::config::route::v3::WeightedCluster::ClusterWeight& validateWeighted
   return cluster;
 }
 
+// Returns a vector of header parsers, sorted by specificity. The `specificity_ascend` parameter
+// specifies whether the returned parsers will be sorted from least specific to most specific
+// (global connection manager level header parser, virtual host level header parser and finally
+// route-level parser.) or the reverse.
+std::vector<const HeaderParser*>
+getHeaderParsers(const HeaderParser* global_route_config_header_parser,
+                 const HeaderParser* vhost_header_parser, const HeaderParser* route_header_parser,
+                 bool specificity_ascend) {
+  if (specificity_ascend) {
+    // Sorted from least to most specific: global connection manager level headers, virtual host
+    // level headers and finally route-level headers.
+    return {global_route_config_header_parser, vhost_header_parser, route_header_parser};
+  } else {
+    // Sorted from most to least specific.
+    return {route_header_parser, vhost_header_parser, global_route_config_header_parser};
+  }
+}
+
 } // namespace
 
 const std::string& OriginalConnectPort::key() {
@@ -645,8 +663,7 @@ const std::string& RouteEntryImplBase::clusterName() const { return cluster_name
 void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool insert_envoy_original_path) const {
-  for (const HeaderParser* header_parser : getHeaderParsers(
-           /*get_request_header_parser=*/true,
+  for (const HeaderParser* header_parser : getRequestHeaderParsers(
            /*specificity_ascend=*/vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
     header_parser->evaluateHeaders(headers, stream_info);
@@ -692,8 +709,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
 
 void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info) const {
-  for (const HeaderParser* header_parser : getHeaderParsers(
-           /*get_request_header_parser=*/false,
+  for (const HeaderParser* header_parser : getResponseHeaderParsers(
            /*specificity_ascend=*/vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
     header_parser->evaluateHeaders(headers, stream_info);
@@ -704,8 +720,7 @@ Http::HeaderTransforms
 RouteEntryImplBase::responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                              bool do_formatting) const {
   Http::HeaderTransforms transforms;
-  for (const HeaderParser* header_parser : getHeaderParsers(
-           /*get_request_header_parser=*/false,
+  for (const HeaderParser* header_parser : getResponseHeaderParsers(
            /*specificity_ascend=*/vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
     mergeTransforms(transforms, header_parser->getHeaderTransforms(stream_info, do_formatting));
@@ -717,8 +732,7 @@ Http::HeaderTransforms
 RouteEntryImplBase::requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                             bool do_formatting) const {
   Http::HeaderTransforms transforms;
-  for (const HeaderParser* header_parser : getHeaderParsers(
-           /*get_request_header_parser=*/true,
+  for (const HeaderParser* header_parser : getRequestHeaderParsers(
            /*specificity_ascend=*/vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
     mergeTransforms(transforms, header_parser->getHeaderTransforms(stream_info, do_formatting));
@@ -727,29 +741,17 @@ RouteEntryImplBase::requestHeaderTransforms(const StreamInfo::StreamInfo& stream
 }
 
 std::vector<const HeaderParser*>
-RouteEntryImplBase::getHeaderParsers(bool get_request_header_parser,
-                                     bool specificity_ascend) const {
-  std::vector<const HeaderParser*> parsers;
-  const HeaderParser* global_route_config_header_parser =
-      get_request_header_parser ? &vhost_.globalRouteConfig().requestHeaderParser()
-                                : &vhost_.globalRouteConfig().responseHeaderParser();
-  const HeaderParser* vhost_header_parser =
-      get_request_header_parser ? &vhost_.requestHeaderParser() : &vhost_.responseHeaderParser();
-  const HeaderParser* route_header_parser =
-      get_request_header_parser ? request_headers_parser_.get() : response_headers_parser_.get();
-  if (specificity_ascend) {
-    // Appends user-specified request headers from least to most specific: global connection manager
-    // level headers, virtual host level headers and finally route-level headers.
-    parsers.push_back(global_route_config_header_parser);
-    parsers.push_back(vhost_header_parser);
-    parsers.push_back(route_header_parser);
-  } else {
-    // Appends user-specified request headers from most to least specific.
-    parsers.push_back(route_header_parser);
-    parsers.push_back(vhost_header_parser);
-    parsers.push_back(global_route_config_header_parser);
-  }
-  return parsers;
+RouteEntryImplBase::getRequestHeaderParsers(bool specificity_ascend) const {
+  return getHeaderParsers(&vhost_.globalRouteConfig().requestHeaderParser(),
+                          &vhost_.requestHeaderParser(), request_headers_parser_.get(),
+                          specificity_ascend);
+}
+
+std::vector<const HeaderParser*>
+RouteEntryImplBase::getResponseHeaderParsers(bool specificity_ascend) const {
+  return getHeaderParsers(&vhost_.globalRouteConfig().responseHeaderParser(),
+                          &vhost_.responseHeaderParser(), response_headers_parser_.get(),
+                          specificity_ascend);
 }
 
 absl::optional<RouteEntryImplBase::RuntimeData>
