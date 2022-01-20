@@ -59,20 +59,6 @@ private:
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl rate_limiter_;
 };
 
-class LocalRateLimitRequestDescriptorsQueue : public StreamInfo::FilterState::Object {
-public:
-  LocalRateLimitRequestDescriptorsQueue();
-  static const std::string& key();
-  void push(std::vector<RateLimit::LocalDescriptor> request_descriptors);
-  std::vector<RateLimit::LocalDescriptor> pop();
-  const std::queue<std::vector<RateLimit::LocalDescriptor>>& value() const {
-    return request_descriptors_queue_;
-  }
-
-private:
-  std::queue<std::vector<RateLimit::LocalDescriptor>> request_descriptors_queue_;
-};
-
 /**
  * Global configuration for the HTTP local rate limit filter.
  */
@@ -170,10 +156,11 @@ private:
   uint32_t maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
   uint32_t remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
   int64_t remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
-  void pushRequestDescriptors(std::vector<RateLimit::LocalDescriptor> request_descriptors);
 
   const FilterConfig* getConfig() const;
   FilterConfigSharedPtr config_;
+
+  absl::optional<std::vector<RateLimit::LocalDescriptor>> stored_descriptors_;
 };
 
 } // namespace LocalRateLimitFilter
