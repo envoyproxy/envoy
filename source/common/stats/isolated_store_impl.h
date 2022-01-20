@@ -101,7 +101,7 @@ public:
     return true;
   }
 
-  void forEachStat(SizeFn f_size, std::function<void(Base&)> f_stat) const {
+  void forEachStat(SizeFn f_size, StatFn<Base> f_stat) const {
     if (f_size != nullptr) {
       f_size(stats_.size());
     }
@@ -231,6 +231,16 @@ public:
     UNREFERENCED_PARAMETER(f_size);
     UNREFERENCED_PARAMETER(f_stat);
   }
+
+  void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override {
+    if (f_size != nullptr) {
+      f_size(1);
+    }
+    const Scope& scope = *this;
+    f_stat(scope);
+  }
+
+  Stats::StatName prefix() const override { return StatName(); }
 
   void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override {
     forEachCounter(f_size, f_stat);
