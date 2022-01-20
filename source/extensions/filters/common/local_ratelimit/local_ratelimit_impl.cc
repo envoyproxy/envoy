@@ -23,11 +23,15 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
   }
 
-  token_bucket_.max_tokens_ = max_tokens;
-  token_bucket_.tokens_per_fill_ = tokens_per_fill;
-  token_bucket_.fill_interval_ = absl::FromChrono(fill_interval);
-  tokens_.tokens_ = max_tokens;
-  tokens_.fill_time_ = time_source_.monotonicTime();
+  RateLimit::TokenBucket default_token_bucket;
+  default_token_bucket.max_tokens_ = max_tokens;
+  default_token_bucket.tokens_per_fill_ = tokens_per_fill;
+  default_token_bucket.fill_interval_ = absl::FromChrono(fill_interval);
+  default_descriptor_.token_bucket_ = default_token_bucket;
+  auto default_token_state = std::make_unique<TokenState>();
+  default_token_state->tokens_ = max_tokens;
+  default_token_state->fill_time_ = time_source_.monotonicTime();
+  default_descriptor_.token_state_ = std::move(default_token_state);
 
   if (fill_timer_) {
     fill_timer_->enableTimer(fill_interval);
@@ -41,7 +45,8 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     RateLimit::TokenBucket token_bucket;
     token_bucket.fill_interval_ =
         absl::Milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(descriptor.token_bucket(), fill_interval, 0));
-    if (token_bucket.fill_interval_ % token_bucket_.fill_interval_ != absl::ZeroDuration()) {
+    if (token_bucket.fill_interval_ % default_descriptor_.token_bucket_.fill_interval_ !=
+        absl::ZeroDuration()) {
       throw EnvoyException(
           "local rate descriptor limit is not a multiple of token bucket fill timer");
     }
@@ -70,9 +75,10 @@ LocalRateLimiterImpl::~LocalRateLimiterImpl() {
 }
 
 void LocalRateLimiterImpl::onFillTimer() {
-  onFillTimerHelper(tokens_, token_bucket_);
+  onFillTimerHelper(*default_descriptor_.token_state_, default_descriptor_.token_bucket_);
   onFillTimerDescriptorHelper();
-  fill_timer_->enableTimer(absl::ToChronoMilliseconds(token_bucket_.fill_interval_));
+  fill_timer_->enableTimer(
+      absl::ToChronoMilliseconds(default_descriptor_.token_bucket_.fill_interval_));
 }
 
 void LocalRateLimiterImpl::onFillTimerHelper(TokenState& tokens,
@@ -128,43 +134,35 @@ bool LocalRateLimiterImpl::requestAllowedHelper(const TokenState& tokens) const 
   return true;
 }
 
-bool LocalRateLimiterImpl::requestAllowed(
+const LocalRateLimiterImpl::LocalDescriptorImpl& LocalRateLimiterImpl::descriptorHelper(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
   if (!descriptors_.empty() && !request_descriptors.empty()) {
+    // The override rate limit descriptor is selected by the first full match from the request
+    // descriptors.
     for (const auto& request_descriptor : request_descriptors) {
       auto it = descriptors_.find(request_descriptor);
       if (it != descriptors_.end()) {
-        return requestAllowedHelper(*it->token_state_);
+        return *it;
       }
     }
   }
-  return requestAllowedHelper(tokens_);
+  return default_descriptor_;
+}
+
+bool LocalRateLimiterImpl::requestAllowed(
+    absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
+  return requestAllowedHelper(*descriptorHelper(request_descriptors).token_state_);
 }
 
 uint32_t LocalRateLimiterImpl::maxTokens(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
-  if (!descriptors_.empty() && !request_descriptors.empty()) {
-    for (const auto& request_descriptor : request_descriptors) {
-      auto it = descriptors_.find(request_descriptor);
-      if (it != descriptors_.end()) {
-        return it->token_bucket_.max_tokens_;
-      }
-    }
-  }
-  return token_bucket_.max_tokens_;
+  return descriptorHelper(request_descriptors).token_bucket_.max_tokens_;
 }
 
 uint32_t LocalRateLimiterImpl::remainingTokens(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
-  if (!descriptors_.empty() && !request_descriptors.empty()) {
-    for (const auto& request_descriptor : request_descriptors) {
-      auto it = descriptors_.find(request_descriptor);
-      if (it != descriptors_.end()) {
-        return it->token_state_->tokens_.load(std::memory_order_relaxed);
-      }
-    }
-  }
-  return tokens_.tokens_.load(std::memory_order_relaxed);
+  return descriptorHelper(request_descriptors)
+      .token_state_->tokens_.load(std::memory_order_relaxed);
 }
 
 int64_t LocalRateLimiterImpl::remainingFillInterval(
@@ -172,21 +170,13 @@ int64_t LocalRateLimiterImpl::remainingFillInterval(
   using namespace std::literals;
 
   auto current_time = time_source_.monotonicTime();
-  if (!descriptors_.empty() && !request_descriptors.empty()) {
-    for (const auto& request_descriptor : request_descriptors) {
-      auto it = descriptors_.find(request_descriptor);
-      if (it != descriptors_.end()) {
-        ASSERT(std::chrono::duration_cast<std::chrono::milliseconds>(
-                   current_time - it->token_state_->fill_time_) <=
-               absl::ToChronoMilliseconds(it->token_bucket_.fill_interval_));
-        return absl::ToInt64Seconds(
-            it->token_bucket_.fill_interval_ -
-            absl::Seconds((current_time - it->token_state_->fill_time_) / 1s));
-      }
-    }
-  }
-  return absl::ToInt64Seconds(token_bucket_.fill_interval_ -
-                              absl::Seconds((current_time - tokens_.fill_time_) / 1s));
+  auto& descriptor = descriptorHelper(request_descriptors);
+  ASSERT(std::chrono::duration_cast<std::chrono::milliseconds>(
+             current_time - descriptor.token_state_->fill_time_) <=
+         absl::ToChronoMilliseconds(descriptor.token_bucket_.fill_interval_));
+  return absl::ToInt64Seconds(
+      descriptor.token_bucket_.fill_interval_ -
+      absl::Seconds((current_time - descriptor.token_state_->fill_time_) / 1s));
 }
 
 } // namespace LocalRateLimit
