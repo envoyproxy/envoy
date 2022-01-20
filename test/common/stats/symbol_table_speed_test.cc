@@ -172,3 +172,41 @@ static void bmStdSort(benchmark::State& state) {
   }
 }
 BENCHMARK(bmStdSort);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmSortStrings(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> stat_names = prepareNames(pool, 100 * 1000);
+  std::vector<std::string> names;
+  for (Envoy::Stats::StatName stat_name : stat_names) {
+    names.emplace_back(symbol_table.toString(stat_name));
+  }
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    std::vector<std::string> sort = names;
+    std::sort(sort.begin(), sort.end());
+  }
+}
+BENCHMARK(bmSortStrings);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmSetStrings(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> stat_names = prepareNames(pool, 100 * 1000);
+  std::vector<std::string> names;
+  for (Envoy::Stats::StatName stat_name : stat_names) {
+    names.emplace_back(symbol_table.toString(stat_name));
+  }
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    std::set<std::string> sorted(names.begin(), names.end());
+    for (const std::string& str : sorted) {
+      benchmark::DoNotOptimize(str);
+    }
+  }
+}
+BENCHMARK(bmSetStrings);
