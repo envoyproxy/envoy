@@ -69,6 +69,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.health_check.graceful_goaway_handling",
     "envoy.reloadable_features.http2_allow_capacity_increase_by_settings",
     "envoy.reloadable_features.http2_consume_stream_refused_errors",
+    "envoy.reloadable_features.http2_new_codec_wrapper",
     "envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect",
     "envoy.reloadable_features.http_reject_path_with_fragment",
     "envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled",
@@ -111,8 +112,6 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.test_feature_false",
     // TODO(dmitri-d) reset to true to enable unified mux by default
     "envoy.reloadable_features.unified_mux",
-    // TODO(birenroy): flip to true in a future PR to enable by default
-    "envoy.reloadable_features.http2_new_codec_wrapper",
 };
 
 RuntimeFeatures::RuntimeFeatures() {
