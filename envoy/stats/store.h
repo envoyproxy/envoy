@@ -52,15 +52,22 @@ public:
   virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
 
   /**
-   * Iterate over all stats. Note, that implementations can potentially hold on to a mutex that
-   * will deadlock if the passed in functors try to create or delete a stat.
-   * @param f_size functor that is provided the current number of all stats. Note that this is
-   * called only once, prior to any calls to f_stat.
-   * @param f_stat functor that is provided one stat at a time from the stats container.
+   * Iterate over all stats. Note, that implementations can potentially hold on
+   * to a mutex that will deadlock if the passed in functors try to create or
+   * delete a stat. Also note that holding onto the stat or scope reference
+   * after forEach* is not supported, as scope/stat deletions can occur in any
+   * thread. Implementation locks ensures the stat/scope is valid until the
+   * f_stat returns.
+   *
+   * @param f_size functor that is provided the current number of all
+   * stats. Note that this is called only once, prior to any calls to f_stat.
+   * @param f_stat functor that is provided one stat at a time from the stats
+   * container.
    */
   virtual void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const PURE;
   virtual void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const PURE;
   virtual void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
+  virtual void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const PURE;
 
   /**
    * Iterate over all stats that need to be flushed to sinks. Note, that implementations can
