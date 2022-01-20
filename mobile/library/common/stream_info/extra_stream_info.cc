@@ -6,14 +6,14 @@ namespace Envoy {
 namespace StreamInfo {
 namespace {
 
-void setFromOptional(uint64_t& to_set, const absl::optional<MonotonicTime>& time) {
+void setFromOptional(int64_t& to_set, const absl::optional<MonotonicTime>& time) {
   if (time.has_value()) {
     to_set = std::chrono::duration_cast<std::chrono::milliseconds>(time.value().time_since_epoch())
                  .count();
   }
 }
 
-void setFromOptional(uint64_t& to_set, absl::optional<std::chrono::nanoseconds> time, long offset) {
+void setFromOptional(int64_t& to_set, absl::optional<std::chrono::nanoseconds> time, long offset) {
   if (time.has_value()) {
     to_set = offset + std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count();
   }

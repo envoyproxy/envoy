@@ -157,34 +157,36 @@ typedef struct {
 
 /**
  * Contains internal HTTP stream metrics which sent at stream end.
+ *
+ * Note: for the signed fields, -1 means not present.
  */
 typedef struct {
   // The time the request started, in ms since the epoch.
-  uint64_t request_start_ms;
+  int64_t request_start_ms;
   // The time the DNS resolution for this request started, in ms since the epoch.
-  uint64_t dns_start_ms;
+  int64_t dns_start_ms;
   // The time the DNS resolution for this request completed, in ms since the epoch.
-  uint64_t dns_end_ms;
+  int64_t dns_end_ms;
   // The time the upstream connection started, in ms since the epoch.
   // This may not be set if socket_reused is false.
-  uint64_t connect_start_ms;
+  int64_t connect_start_ms;
   // The time the upstream connection completed, in ms since the epoch.
   // This may not be set if socket_reused is false.
-  uint64_t connect_end_ms;
+  int64_t connect_end_ms;
   // The time the SSL handshake started, in ms since the epoch.
   // This may not be set if socket_reused is false.
-  uint64_t ssl_start_ms;
+  int64_t ssl_start_ms;
   // The time the SSL handshake completed, in ms since the epoch.
   // This may not be set if socket_reused is false.
-  uint64_t ssl_end_ms;
+  int64_t ssl_end_ms;
   // The time the first byte of the request was sent upstream, in ms since the epoch.
-  uint64_t sending_start_ms;
+  int64_t sending_start_ms;
   // The time the last byte of the request was sent upstream, in ms since the epoch.
-  uint64_t sending_end_ms;
+  int64_t sending_end_ms;
   // The time the first byte of the response was received, in ms since the epoch.
-  uint64_t response_start_ms;
+  int64_t response_start_ms;
   // The time the last byte of the request was received, in ms since the epoch.
-  uint64_t request_end_ms;
+  int64_t request_end_ms;
   // True if the upstream socket had been used previously.
   uint64_t socket_reused;
   // The number of bytes sent upstream.
