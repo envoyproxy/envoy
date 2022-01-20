@@ -1970,5 +1970,75 @@ TEST_F(HistogramTest, UnsinkedHistogramsAreMerged) {
   EXPECT_EQ(h1.cumulativeStatistics().bucketSummary(), h2.cumulativeStatistics().bucketSummary());
 }
 
+// Verify that recording values for histograms that are not sinked does not
+// cause them to grow in memory over time.
+TEST(HistogramTest1, SinkedHistogramMemoryTest) {
+  SymbolTableImpl symbol_table;
+  AllocatorImpl alloc(symbol_table);
+  ThreadLocalStoreImpl store(alloc);
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
+  store.initializeThreading(main_thread_dispatcher, tls);
+
+  StatNamePool pool(store.symbolTable());
+  std::unique_ptr<Stats::TestUtil::TestSinkPredicates> moved_sink_predicates =
+      std::make_unique<Stats::TestUtil::TestSinkPredicates>();
+  Stats::TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
+  Stats::StatName stat_name = pool.add("h1");
+  sink_predicates->sinkedStatNames().insert(stat_name);
+  store.setSinkPredicates(std::move(moved_sink_predicates));
+
+  Histogram& h1 = store.histogramFromStatName(stat_name, Stats::Histogram::Unit::Unspecified);
+  stat_name = pool.add("h2");
+  Histogram& h2 = store.histogramFromStatName(stat_name, Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("h2", h2.name());
+
+  // Create a random number generator to populate histogram values
+  std::random_device random_d;
+  std::mt19937_64 generator(random_d());
+  std::uniform_int_distribution<uint64_t> distribution(0, 20000000);
+  h1.recordValue(2);
+  h2.recordValue(2);
+
+  size_t memoryUsageSnapshot = Memory::Stats::totalCurrentlyAllocated();
+  std::cout << memoryUsageSnapshot << std::endl;
+  const size_t num_flushes = 10000000;
+  const size_t num_updates = 20;
+  // Outer loop for flushes.
+  size_t idxe = 0;
+  for (size_t idx = 0; idx < num_flushes; ++idx) {
+    // Inner loop to record histogram values.
+    for (size_t idx2 = 0; idx2 < num_updates; ++idx2) {
+      h1.recordValue(distribution(generator));
+      h2.recordValue(distribution(generator));
+    }
+
+    store.mergeHistograms([&store, sink_predicates]() -> void {
+      size_t num_iterations = 0;
+      size_t num_sinked_histograms = 0;
+      store.forEachSinkedHistogram(
+          [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
+          [&num_iterations, sink_predicates](Stats::ParentHistogram& histogram) {
+            EXPECT_NE(sink_predicates->sinkedStatNames().find(histogram.statName()),
+                      sink_predicates->sinkedStatNames().end());
+            ++num_iterations;
+          });
+      EXPECT_EQ(num_sinked_histograms, 1);
+      EXPECT_EQ(num_iterations, 1);
+    });
+    if (idx == static_cast<uint64_t>(std::pow(10, idxe))) {
+      std::cout << idx << "  "
+                << static_cast<int64_t>(Memory::Stats::totalCurrentlyAllocated()) -
+                       static_cast<int64_t>(memoryUsageSnapshot)
+                << std::endl;
+      idxe++;
+    }
+  }
+  tls.shutdownGlobalThreading();
+  store.shutdownThreading();
+  tls.shutdownThread();
+}
 } // namespace Stats
 } // namespace Envoy
