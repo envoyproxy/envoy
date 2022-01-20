@@ -230,7 +230,7 @@ TEST_F(QuicPlatformTest, QuicThread) {
   EXPECT_EQ(1, value);
 
   // QuicThread will panic if it's started but not joined.
-  EXPECT_DEATH({ AdderThread(&value, 2).Start(); },
+  EXPECT_DEATH({ QuicThread("test_thread").Start(); },
                "QuicThread should be joined before destruction");
 }
 
