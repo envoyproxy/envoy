@@ -747,13 +747,14 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ReloadBoth) {
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
   Http::TestRequestHeaderMapImpl banned_request_headers{
       {":method", "GET"}, {":path", "/private/key"}, {":scheme", "http"}, {":authority", "host"}};
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   {
-    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
     auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
     ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("403", response->headers().getStatusValue());
   }
+  codec_client_->close();
 
   // Rename the listener to force delete the first listener and wait for the deletion.
   listener_config_.set_name("updated");
