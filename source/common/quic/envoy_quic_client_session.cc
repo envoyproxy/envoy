@@ -138,6 +138,7 @@ void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
   streamInfo().upstreamInfo()->upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
   streamInfo().upstreamInfo()->upstreamTiming().onUpstreamHandshakeComplete(
       dispatcher_.timeSource());
+
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 
