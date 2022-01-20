@@ -100,22 +100,6 @@ def envoy_repo():
     if "envoy_repo" not in native.existing_rules().keys():
         _envoy_repo(name = "envoy_repo")
 
-# Python dependencies.
-def _python_deps():
-    # TODO(htuch): convert these to pip3_import.
-    external_http_archive(
-        name = "com_github_twitter_common_lang",
-        build_file = "@envoy//bazel/external:twitter_common_lang.BUILD",
-    )
-    external_http_archive(
-        name = "com_github_twitter_common_rpc",
-        build_file = "@envoy//bazel/external:twitter_common_rpc.BUILD",
-    )
-    external_http_archive(
-        name = "com_github_twitter_common_finagle_thrift",
-        build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
-    )
-
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
     external_http_archive("grpc_httpjson_transcoding")
@@ -236,7 +220,6 @@ def envoy_dependencies(skip_targets = []):
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
 
-    _python_deps()
     _cc_deps()
     _go_deps(skip_targets)
     _rust_deps()
