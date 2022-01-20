@@ -46,12 +46,13 @@ def envoy_mobile_kt_library(name, visibility = None, srcs = [], deps = []):
 #     name = "java_jni_lib.jnilib",
 #     native_dep = "libjava_jni_lib.so",
 # )
-def envoy_mobile_so_to_jni_lib(name, native_dep):
+def envoy_mobile_so_to_jni_lib(name, native_dep, testonly = False):
     lib_name = native_lib_name(native_dep)
     output = "{}.jnilib".format(lib_name)
 
     return native.genrule(
         name = name,
+        testonly = testonly,
         outs = [output],
         srcs = [native_dep],
         cmd = """

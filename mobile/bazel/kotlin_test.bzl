@@ -74,6 +74,7 @@ def envoy_mobile_android_test(name, srcs, deps = [], native_deps = [], repositor
         visibility = ["//visibility:public"],
         data = native_deps,
         exports = deps,
+        testonly = True,
     )
 
     native.android_local_test(

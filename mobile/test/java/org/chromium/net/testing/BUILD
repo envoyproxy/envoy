@@ -21,6 +21,7 @@ android_library(
         "NativeTestServer.java",
         "PathUtils.java",
         "StrictModeContext.java",
+        "TestFilesInstaller.java",
         "TestUploadDataProvider.java",
         "TestUrlRequestCallback.java",
         "UrlUtils.java",
