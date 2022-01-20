@@ -731,5 +731,58 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailTerminalFilterNotAtEndOfFilte
   EXPECT_EQ("500", response->headers().getStatusValue());
 }
 
+// Validate that deleting listeners does not break active ECDC subscription.
+TEST_P(ExtensionDiscoveryIntegrationTest, ReloadBoth) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter("foo", false);
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({"http"});
+  sendXdsResponse("foo", "1", denyPrivateConfig());
+  test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
+                                 1);
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl banned_request_headers{
+      {":method", "GET"}, {":path", "/private/key"}, {":scheme", "http"}, {":authority", "host"}};
+  {
+    auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("403", response->headers().getStatusValue());
+  }
+
+  // Rename the listener to force delete the first listener and wait for the deletion.
+  listener_config_.set_name("updated");
+  sendLdsResponse("updated");
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+
+  // Verify ECDS is still applied on the new listener.
+  registerTestServerPorts({"http"});
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  {
+    auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("403", response->headers().getStatusValue());
+  }
+
+  // Update ECDS but keep the connection.
+  {
+    sendXdsResponse("foo", "2", allowAllConfig());
+    test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
+                                   2);
+    auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+}
+
 } // namespace
 } // namespace Envoy
