@@ -371,8 +371,11 @@ void ConnectionImpl::StreamImpl::processBufferedData(bool stream_being_destroyed
     decodeData();
   }
 
+  // Sometimes processing the buffered data, means we should abort from
+  // processing buffered data e.g. say if a local reply occured. As such check
+  // if we have been reset...
   continue_processing = stream_being_destroyed || !buffersOverrun();
-  if (stream_manager_.trailers_buffered_ && continue_processing) {
+  if (stream_manager_.trailers_buffered_ && continue_processing && !reset_reason_.has_value()) {
     remote_end_stream_ = true; // buffered trailers imply remote_end_stream_.
     decodeTrailers();
   }
@@ -746,6 +749,7 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   // end the local stream. However, if we're resetting the stream due to
   // overload, we should reset the stream as soon as possible to free used
   // resources.
+  reset_reason_ = reason;
   if (useDeferredReset() && local_end_stream_ && !local_end_stream_sent_ &&
       reason != StreamResetReason::OverloadManager) {
     ASSERT(parent_.getStream(stream_id_) != nullptr);
@@ -1343,9 +1347,6 @@ ssize_t ConnectionImpl::onSend(const uint8_t* data, size_t length) {
 int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
   StreamImpl* stream = getStream(stream_id);
   if (stream) {
-    // We should flush through all data related to this stream if it was
-    // buffered.
-    stream->processBufferedData(true);
     ENVOY_CONN_LOG(debug, "stream closed: {}", connection_, error_code);
     if (!stream->remote_end_stream_ || !stream->local_end_stream_) {
       StreamResetReason reason;
@@ -1376,6 +1377,14 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
       }
 
       stream->runResetCallbacks(reason);
+    } else {
+      ENVOY_CONN_LOG(debug, "Processing buffered data for stream: {}", connection_, stream_id);
+      // We should flush through all data related to this stream if it was
+      // buffered. Seems like this is the route for non-reset streams...
+      // TODO(kbaichoo): defer the stream deletion, ensure the IT WON'T HAVE
+      // DANGLING CONNECTION REFERENCE
+      // ALSO ENSURE THIS ONLY RUNS FOR NON-RESET STREAMS.
+      stream->processBufferedData(true);
     }
 
     stream->destroy();

@@ -342,6 +342,10 @@ protected:
     std::unique_ptr<NewMetadataEncoder> metadata_encoder_;
     std::unique_ptr<MetadataEncoder> metadata_encoder_old_;
     absl::optional<StreamResetReason> deferred_reset_;
+    // Just here for now to hold the reset reason if we
+    // ended up getting reset in any form. Useful for comm in buffered data case
+    // e.g. to bail out because we're now reset..
+    absl::optional<StreamResetReason> reset_reason_;
     HeaderString cookies_;
     bool local_end_stream_sent_ : 1;
     bool remote_end_stream_ : 1;
