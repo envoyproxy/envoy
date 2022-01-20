@@ -19,11 +19,11 @@ namespace ConnectHandler {
 /**
  * All stats for the connect handler. @see stats_macros.h
  */
-#define ALL_CONNECT_HANDLER_STATS(COUNTER)                                                          \
-  COUNTER(read_error)                                                                               \
-  COUNTER(write_error)                                                                              \
-  COUNTER(connect_not_found)                                                                        \
-  COUNTER(connect_found)                                                                            \
+#define ALL_CONNECT_HANDLER_STATS(COUNTER)                                                         \
+  COUNTER(read_error)                                                                              \
+  COUNTER(write_error)                                                                             \
+  COUNTER(connect_not_found)                                                                       \
+  COUNTER(connect_found)
 
 /**
  * Definition of all stats for the connect handler. @see stats_macros.h
@@ -50,10 +50,9 @@ public:
   const ConnectHandlerStats& stats() const { return stats_; }
 
   static constexpr uint32_t MAX_INSPECT_SIZE = 8192;
-  
+
 private:
   ConnectHandlerStats stats_;
-
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -84,7 +83,7 @@ private:
   static http_parser_settings settings_;
 };
 
-} // namespace TlsInspector
+} // namespace ConnectHandler
 } // namespace ListenerFilters
 } // namespace Extensions
 } // namespace Envoy

@@ -32,7 +32,7 @@ http_parser_settings Filter::settings_{
 thread_local uint8_t Filter::buf_[Config::MAX_INSPECT_SIZE];
 
 namespace {
-  constexpr absl::string_view response_body = " 200 Connection Established\r\n\r\n";
+constexpr absl::string_view response_body = " 200 Connection Established\r\n\r\n";
 }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
@@ -107,78 +107,75 @@ ParseState Filter::onRead() {
 }
 
 ParseState Filter::parseConnect(absl::string_view data) {
-    const size_t len = std::min(data.length(), HTTP1_CONNECT_PREFACE.length());
-    if (HTTP1_CONNECT_PREFACE.compare(0, len, data, 0, len) == 0) {
-        if (data.length() < HTTP1_CONNECT_PREFACE.length()) {
-            return ParseState::Continue;
+  const size_t len = std::min(data.length(), HTTP1_CONNECT_PREFACE.length());
+  if (HTTP1_CONNECT_PREFACE.compare(0, len, data, 0, len) == 0) {
+    if (data.length() < HTTP1_CONNECT_PREFACE.length()) {
+      return ParseState::Continue;
+    } else {
+      absl::string_view new_data = data.substr(parser_.nread);
+      size_t pos = new_data.find("\r\n\r\n");
+      if (pos != absl::string_view::npos) {
+        new_data = new_data.substr(0, pos + 4);
+        ssize_t rc = http_parser_execute(&parser_, &settings_, new_data.data(), new_data.length());
+        ENVOY_LOG(trace, "connect handler: http_parser parsed {} chars, error code: {}", rc,
+                  HTTP_PARSER_ERRNO(&parser_));
+
+        // Errors in parsing HTTP.
+        if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
+          ENVOY_LOG(trace, "connect handler: errors in parsing HTTP");
+          config_->stats().connect_not_found_.inc();
+          return ParseState::Done;
         }
-        else {
-            absl::string_view new_data = data.substr(parser_.nread);
-            size_t pos = new_data.find("\r\n\r\n");
-            if (pos != absl::string_view::npos) {
-                new_data = new_data.substr(0, pos + 4);
-                ssize_t rc = http_parser_execute(&parser_, &settings_, new_data.data(), new_data.length());
-                ENVOY_LOG(trace, "connect handler: http_parser parsed {} chars, error code: {}", rc,
-                    HTTP_PARSER_ERRNO(&parser_));
-
-                // Errors in parsing HTTP.
-                if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
-                    ENVOY_LOG(trace, "connect handler: errors in parsing HTTP");
-                    config_->stats().connect_not_found_.inc();
-                    return ParseState::Done;
-                }
-                if (parser_.http_major == 1) {
-                    if (parser_.http_minor == 0) {
-                      protocol_ = Http::Headers::get().ProtocolStrings.Http10String;
-                    }
-                    else if (parser_.http_minor == 1) {
-                      protocol_ = Http::Headers::get().ProtocolStrings.Http11String;
-                    }
-                } else {
-                  ENVOY_LOG(trace, "connect:handler: unsupported http version: {}.{}", parser_.http_major, parser_.http_minor);
-                  config_->stats().connect_not_found_.inc();
-                  return ParseState::Done;
-                }
-
-                std::vector<absl::string_view> fields = absl::StrSplit(data, absl::ByAnyChar(" :"));
-
-                // drain data from listener
-                auto result = cb_->socket().ioHandle().recv(buf_, pos + 4, 0);
-                
-                if (!result.ok()) {
-                  config_->stats().read_error_.inc();
-                  return ParseState::Error;
-                }
-                // Remote closed
-                if (result.return_value_ == 0) {
-                  return ParseState::Error;
-                }
-                // terminate CONNECT request
-                resp_buf_.add(protocol_);
-                resp_buf_.add(response_body);
-                result = cb_->socket().ioHandle().write(resp_buf_);
-                if (!result.ok()) {
-                  config_->stats().write_error_.inc();
-                  return ParseState::Error;
-                }
-                // Remote closed
-                if (result.return_value_ == 0) {
-                  return ParseState::Error;
-                }
-                cb_->socket().setRequestedServerName(fields[1]);
-                config_->stats().connect_found_.inc();
-                return ParseState::Done;
-            }
-            else {
-                return ParseState::Continue;
-            }
+        if (parser_.http_major == 1) {
+          if (parser_.http_minor == 0) {
+            protocol_ = Http::Headers::get().ProtocolStrings.Http10String;
+          } else if (parser_.http_minor == 1) {
+            protocol_ = Http::Headers::get().ProtocolStrings.Http11String;
+          }
+        } else {
+          ENVOY_LOG(trace, "connect:handler: unsupported http version: {}.{}", parser_.http_major,
+                    parser_.http_minor);
+          config_->stats().connect_not_found_.inc();
+          return ParseState::Done;
         }
-    }
-    else {
-        ENVOY_LOG(trace, "connect handler: no CONNECT request found");
-        config_->stats().connect_not_found_.inc();
+
+        std::vector<absl::string_view> fields = absl::StrSplit(data, absl::ByAnyChar(" :"));
+
+        // drain data from listener
+        auto result = cb_->socket().ioHandle().recv(buf_, pos + 4, 0);
+
+        if (!result.ok()) {
+          config_->stats().read_error_.inc();
+          return ParseState::Error;
+        }
+        // Remote closed
+        if (result.return_value_ == 0) {
+          return ParseState::Error;
+        }
+        // terminate CONNECT request
+        resp_buf_.add(protocol_);
+        resp_buf_.add(response_body);
+        result = cb_->socket().ioHandle().write(resp_buf_);
+        if (!result.ok()) {
+          config_->stats().write_error_.inc();
+          return ParseState::Error;
+        }
+        // Remote closed
+        if (result.return_value_ == 0) {
+          return ParseState::Error;
+        }
+        cb_->socket().setRequestedServerName(fields[1]);
+        config_->stats().connect_found_.inc();
         return ParseState::Done;
+      } else {
+        return ParseState::Continue;
+      }
     }
+  } else {
+    ENVOY_LOG(trace, "connect handler: no CONNECT request found");
+    config_->stats().connect_not_found_.inc();
+    return ParseState::Done;
+  }
 }
 } // namespace ConnectHandler
 } // namespace ListenerFilters

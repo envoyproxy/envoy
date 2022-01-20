@@ -41,14 +41,14 @@ public:
     EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
     EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
 
-    if(multiple_read) {
+    if (multiple_read) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-        .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
 
       EXPECT_CALL(dispatcher_, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
-                                              Event::FileReadyType::Read))
-        .WillOnce(DoAll(SaveArg<1>(&file_event_callback_),
-                        ReturnNew<NiceMock<Event::MockFileEvent>>()));
+                                                Event::FileReadyType::Read))
+          .WillOnce(DoAll(SaveArg<1>(&file_event_callback_),
+                          ReturnNew<NiceMock<Event::MockFileEvent>>()));
       filter_->onAccept(cb_);
     }
   }
@@ -108,7 +108,7 @@ TEST_F(ConnectHandlerTest, InlineReadNonConnect) {
             memcpy(buffer, data.data(), data.size());
             return Api::SysCallSizeResult{ssize_t(data.size()), 0};
           }));
-          
+
   EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).Times(0);
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   auto accepted = filter_->onAccept(cb_);
@@ -132,8 +132,7 @@ TEST_F(ConnectHandlerTest, InlineReadRemoteClose) {
 // Test that filter detects HTTP/0.9 Connect
 TEST_F(ConnectHandlerTest, InlineReadHTTP09Connect) {
   init();
-  const absl::string_view data =
-      "CONNECT www.example.com:443 HTTP/0.9\r\n\r\n";
+  const absl::string_view data = "CONNECT www.example.com:443 HTTP/0.9\r\n\r\n";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(
@@ -154,10 +153,8 @@ TEST_F(ConnectHandlerTest, InlineReadHTTP09Connect) {
 // Test handling incoming HTTP/1.0 Connect request
 TEST_F(ConnectHandlerTest, InlineReadHTTP10Connect) {
   init();
-  const absl::string_view data =
-      "CONNECT www.example.com:443 HTTP/1.0\r\n\r\n";
-  const absl::string_view expect_response = 
-      "HTTP/1.0 200 Connection Established\r\n\r\n";
+  const absl::string_view data = "CONNECT www.example.com:443 HTTP/1.0\r\n\r\n";
+  const absl::string_view expect_response = "HTTP/1.0 200 Connection Established\r\n\r\n";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(
@@ -166,7 +163,7 @@ TEST_F(ConnectHandlerTest, InlineReadHTTP10Connect) {
             memcpy(buffer, data.data(), data.size());
             return Api::SysCallSizeResult{ssize_t(data.size()), 0};
           }));
-  EXPECT_CALL(os_sys_calls_, recv(42, _, _, 0))        
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, 0))
       .WillOnce(
           Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
             ASSERT(length == data.size());
@@ -174,12 +171,13 @@ TEST_F(ConnectHandlerTest, InlineReadHTTP10Connect) {
             return Api::SysCallSizeResult{ssize_t(data.size()), 0};
           }));
   EXPECT_CALL(os_sys_calls_, writev(42, _, _))
-      .WillOnce(
-          Invoke([&expect_response](os_fd_t, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
+      .WillOnce(Invoke(
+          [&expect_response](os_fd_t, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
             ASSERT(num_iov == 1);
-            ASSERT(absl::string_view(static_cast<char*>(iov[0].iov_base), iov[0].iov_len) == expect_response);
+            ASSERT(absl::string_view(static_cast<char*>(iov[0].iov_base), iov[0].iov_len) ==
+                   expect_response);
             return Api::SysCallSizeResult{ssize_t(expect_response.size()), 0};
-            }));
+          }));
   EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).Times(0);
   EXPECT_CALL(socket_, setRequestedServerName("www.example.com"));
   auto accepted = filter_->onAccept(cb_);
@@ -190,10 +188,8 @@ TEST_F(ConnectHandlerTest, InlineReadHTTP10Connect) {
 // Test handling incoming HTTP/1.1 Connect request.
 TEST_F(ConnectHandlerTest, InlineReadHTTP11Connect) {
   init();
-  const absl::string_view data =
-      "CONNECT www.example.com:443 HTTP/1.1\r\n\r\n";
-  const absl::string_view expect_response = 
-      "HTTP/1.1 200 Connection Established\r\n\r\n";
+  const absl::string_view data = "CONNECT www.example.com:443 HTTP/1.1\r\n\r\n";
+  const absl::string_view expect_response = "HTTP/1.1 200 Connection Established\r\n\r\n";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(
@@ -202,7 +198,7 @@ TEST_F(ConnectHandlerTest, InlineReadHTTP11Connect) {
             memcpy(buffer, data.data(), data.size());
             return Api::SysCallSizeResult{ssize_t(data.size()), 0};
           }));
-  EXPECT_CALL(os_sys_calls_, recv(42, _, _, 0))        
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, 0))
       .WillOnce(
           Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
             ASSERT(length == data.size());
@@ -210,12 +206,13 @@ TEST_F(ConnectHandlerTest, InlineReadHTTP11Connect) {
             return Api::SysCallSizeResult{ssize_t(data.size()), 0};
           }));
   EXPECT_CALL(os_sys_calls_, writev(42, _, _))
-      .WillOnce(
-          Invoke([&expect_response](os_fd_t, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
+      .WillOnce(Invoke(
+          [&expect_response](os_fd_t, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
             ASSERT(num_iov == 1);
-            ASSERT(absl::string_view(static_cast<char*>(iov[0].iov_base), iov[0].iov_len) == expect_response);
+            ASSERT(absl::string_view(static_cast<char*>(iov[0].iov_base), iov[0].iov_len) ==
+                   expect_response);
             return Api::SysCallSizeResult{ssize_t(expect_response.size()), 0};
-            }));
+          }));
   EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).Times(0);
   EXPECT_CALL(socket_, setRequestedServerName("www.example.com"));
   auto accepted = filter_->onAccept(cb_);
@@ -226,8 +223,7 @@ TEST_F(ConnectHandlerTest, InlineReadHTTP11Connect) {
 // Test that filter detects invalid Connect request.
 TEST_F(ConnectHandlerTest, InlineReadParseError) {
   init();
-  const absl::string_view data =
-      "CONNECT \r\n\r\n";
+  const absl::string_view data = "CONNECT \r\n\r\n";
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(
           Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -245,12 +241,10 @@ TEST_F(ConnectHandlerTest, InlineReadParseError) {
   EXPECT_EQ(1, cfg_->stats().connect_not_found_.value());
 }
 
-
 // Test that filter detects read errors in draining data.
-TEST_F(ConnectHandlerTest, DrainError){
+TEST_F(ConnectHandlerTest, DrainError) {
   init();
-  const absl::string_view data =
-      "CONNECT www.example.com:443 HTTP/1.1\r\n\r\n";
+  const absl::string_view data = "CONNECT www.example.com:443 HTTP/1.1\r\n\r\n";
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(
           Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -258,12 +252,12 @@ TEST_F(ConnectHandlerTest, DrainError){
             memcpy(buffer, data.data(), data.size());
             return Api::SysCallSizeResult{ssize_t(data.size()), 0};
           }));
-  EXPECT_CALL(os_sys_calls_, recv(42, _, _, 0))        
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, 0))
       .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_NOT_SUP}));
   EXPECT_CALL(os_sys_calls_, writev(42, _, _)).Times(0);
   EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).Times(0);
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
-  EXPECT_CALL(socket_, close()).Times(1);
+  EXPECT_CALL(socket_, close());
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
   EXPECT_EQ(1, cfg_->stats().read_error_.value());
@@ -272,15 +266,14 @@ TEST_F(ConnectHandlerTest, DrainError){
 // Test that filter detects closed remote connection in draining data.
 TEST_F(ConnectHandlerTest, DrainRemoteClose) {
   init();
-  const absl::string_view data =
-      "CONNECT www.example.com:443 HTTP/1.1\r\n\r\n";
+  const absl::string_view data = "CONNECT www.example.com:443 HTTP/1.1\r\n\r\n";
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(
           Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
             ASSERT(length >= data.size());
             memcpy(buffer, data.data(), data.size());
             return Api::SysCallSizeResult{ssize_t(data.size()), 0};
-          }));  
+          }));
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, 0))
       .WillOnce(Return(Api::SysCallSizeResult{ssize_t(0), 0}));
   EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).Times(0);
@@ -294,8 +287,7 @@ TEST_F(ConnectHandlerTest, DrainRemoteClose) {
 // Test that filter detects write errors in sending response.
 TEST_F(ConnectHandlerTest, ResponseError) {
   init();
-  const absl::string_view data =
-      "CONNECT www.example.com:443 HTTP/1.1\r\n\r\n";
+  const absl::string_view data = "CONNECT www.example.com:443 HTTP/1.1\r\n\r\n";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(
@@ -304,7 +296,7 @@ TEST_F(ConnectHandlerTest, ResponseError) {
             memcpy(buffer, data.data(), data.size());
             return Api::SysCallSizeResult{ssize_t(data.size()), 0};
           }));
-  EXPECT_CALL(os_sys_calls_, recv(42, _, _, 0))        
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, 0))
       .WillOnce(
           Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
             ASSERT(length == data.size());
@@ -315,7 +307,7 @@ TEST_F(ConnectHandlerTest, ResponseError) {
       .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_NOT_SUP}));
   EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).Times(0);
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
-  EXPECT_CALL(socket_, close()).Times(1);
+  EXPECT_CALL(socket_, close());
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
   EXPECT_EQ(1, cfg_->stats().write_error_.value());
@@ -324,16 +316,15 @@ TEST_F(ConnectHandlerTest, ResponseError) {
 // Test that filter detects closed remote connection in sending response.
 TEST_F(ConnectHandlerTest, ResponseRemoteClose) {
   init();
-  const absl::string_view data =
-      "CONNECT www.example.com:443 HTTP/1.1\r\n\r\n";
+  const absl::string_view data = "CONNECT www.example.com:443 HTTP/1.1\r\n\r\n";
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(
           Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
             ASSERT(length >= data.size());
             memcpy(buffer, data.data(), data.size());
             return Api::SysCallSizeResult{ssize_t(data.size()), 0};
-          }));  
-  EXPECT_CALL(os_sys_calls_, recv(42, _, _, 0))        
+          }));
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, 0))
       .WillOnce(
           Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
             ASSERT(length == data.size());
@@ -350,14 +341,12 @@ TEST_F(ConnectHandlerTest, ResponseRemoteClose) {
   EXPECT_EQ(0, cfg_->stats().connect_not_found_.value());
 }
 
-// Test with the Connect request spreads over multiple socket reads.   
+// Test with the Connect request spreads over multiple socket reads.
 TEST_F(ConnectHandlerTest, MultipleRead) {
   init(true);
-  const absl::string_view data =
-      "CONNECT www.example.com:443 HTTP/1.1\r\n\r\n";
-  const absl::string_view expect_response = 
-      "HTTP/1.1 200 Connection Established\r\n\r\n";
-   {
+  const absl::string_view data = "CONNECT www.example.com:443 HTTP/1.1\r\n\r\n";
+  const absl::string_view expect_response = "HTTP/1.1 200 Connection Established\r\n\r\n";
+  {
     InSequence s;
 
     for (size_t i = 1; i <= data.size(); i++) {
@@ -369,20 +358,21 @@ TEST_F(ConnectHandlerTest, MultipleRead) {
                 return Api::SysCallSizeResult{ssize_t(i), 0};
               }));
     }
-    EXPECT_CALL(os_sys_calls_, recv(42, _, _, 0))        
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, 0))
         .WillOnce(
             Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length == data.size());
-                memcpy(buffer, data.data(), data.size());
-                return Api::SysCallSizeResult{ssize_t(data.size()), 0};
-              }));
+              ASSERT(length == data.size());
+              memcpy(buffer, data.data(), data.size());
+              return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+            }));
     EXPECT_CALL(os_sys_calls_, writev(42, _, _))
-        .WillOnce(
-            Invoke([&expect_response](os_fd_t, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
-                ASSERT(num_iov == 1);
-                ASSERT(absl::string_view(static_cast<char*>(iov[0].iov_base), iov[0].iov_len) == expect_response);
-                return Api::SysCallSizeResult{ssize_t(expect_response.size()), 0};
-              }));
+        .WillOnce(Invoke(
+            [&expect_response](os_fd_t, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
+              ASSERT(num_iov == 1);
+              ASSERT(absl::string_view(static_cast<char*>(iov[0].iov_base), iov[0].iov_len) ==
+                     expect_response);
+              return Api::SysCallSizeResult{ssize_t(expect_response.size()), 0};
+            }));
   }
 
   bool got_continue = false;
@@ -399,9 +389,8 @@ TEST_F(ConnectHandlerTest, MultipleRead) {
 // Test Read error in multiple socket reads scenario.
 TEST_F(ConnectHandlerTest, ErrorInMultipleRead) {
   init(true);
-  const absl::string_view data =
-      "CONNECT www.example.com:443";
-   {
+  const absl::string_view data = "CONNECT www.example.com:443";
+  {
     InSequence s;
 
     for (size_t i = 1; i <= data.size(); i++) {
