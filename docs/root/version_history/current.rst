@@ -28,6 +28,7 @@ Removed Config or Runtime
 * http: removed ``envoy.reloadable_features.require_strict_1xx_and_204_response_headers`` and ``envoy.reloadable_features.send_strict_1xx_and_204_response_headers`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.strip_port_from_connect`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.use_observable_cluster_name`` and legacy code paths.
+* grpc_bridge_filter: removed ``envoy.reloadable_features.grpc_bridge_stats_disabled`` and legacy code paths.
 
 
 New Features

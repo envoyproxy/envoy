@@ -54,13 +54,6 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
-  bool doStatTracking() const {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_bridge_stats_disabled")) {
-      return false;
-    }
-    return request_stat_names_.has_value();
-  }
-
 private:
   void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
   void setupStatTracking(const Http::RequestHeaderMap& headers);

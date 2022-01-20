@@ -65,9 +65,6 @@ Http::FilterDataStatus Http1BridgeFilter::decodeData(Buffer::Instance& data, boo
 
 Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                            bool end_stream) {
-  if (doStatTracking()) {
-    chargeStat(headers);
-  }
 
   if (!do_bridging_ || end_stream) {
     return Http::FilterHeadersStatus::Continue;
@@ -90,9 +87,6 @@ Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance& data, boo
 }
 
 Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
-  if (doStatTracking()) {
-    chargeStat(trailers);
-  }
 
   if (do_bridging_) {
     // Here we check for grpc-status. If it's not zero, we change the response code. We assume

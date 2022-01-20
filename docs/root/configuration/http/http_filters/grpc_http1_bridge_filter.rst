@@ -40,8 +40,7 @@ More info: wire format in `gRPC over HTTP/2 <https://github.com/grpc/grpc/blob/m
 
    Note that statistics should be collected by the dedicated :ref:`gRPC stats filter
    <config_http_filters_grpc_stats>` instead. The use of this filter for gRPC telemetry
-   has been disabled. Set the runtime value of ``envoy.reloadable_features.grpc_bridge_stats_disabled``
-   to false to turn on stat collection.
+   has been disabled.
 
 Protobuf upgrade support
 ------------------------
