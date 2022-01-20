@@ -26,7 +26,7 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(
           "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc") &&
       !can_use_alternate_protocols) {
     // If alternate protocols are explicitly disabled, there must have been a failed request over
-    // Http3 and the failure must be post-handshake. So disable HTTP/3 for this request.
+    // HTTP/3 and the failure must be post-handshake. So disable HTTP/3 for this request.
     http3_attempt_failed_ = true;
   }
 }
@@ -283,10 +283,11 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     createNextPool();
   }
   PoolIterator pool = pools_.begin();
-  if (!shouldAttemptHttp3() ||
-      (Runtime::runtimeFeatureEnabled(
-           "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc") &&
-       !can_use_alternate_protocols)) {
+  if (!shouldAttemptHttp3() || !can_use_alternate_protocols) {
+    ASSERT(can_use_alternate_protocols ||
+           Runtime::runtimeFeatureEnabled(
+               "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc"));
+
     // Before skipping to the next pool, make sure it has been created.
     createNextPool();
     ++pool;

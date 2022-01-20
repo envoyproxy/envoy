@@ -715,8 +715,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                                  method == Http::Headers::get().MethodValues.Trace);
 
     if (retry_state_ == nullptr) {
-      ENVOY_LOG(warn, "No retry policy is configured. There won't be any fallback for alternate "
-                      "protocol failure.");
+      ENVOY_LOG_EVERY_POW_2(
+          warn, "No retry policy is configured. There won't be any fallback for alternate "
+                "protocol failure.");
     }
     // TODO(danzh) Right now whether to try early data or not depends on retry policy on retry on
     // 425 response. In addition to this, the decisions should also depend on reset retry policies.
@@ -1406,8 +1407,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
       // We already retried this request (presumably for a per try timeout) so
       // we definitely won't retry it again. Check if we would have retried it
       // if we could.
-      bool dumb;
-      could_not_retry = retry_state_->wouldRetryFromHeaders(*headers, *downstream_headers_, dumb) !=
+      bool retry_as_early_data; // Not going to be used as we are not retrying.
+      could_not_retry = retry_state_->wouldRetryFromHeaders(*headers, *downstream_headers_,
+                                                            retry_as_early_data) !=
                         RetryState::RetryDecision::NoRetry;
     } else {
       const RetryStatus retry_status = retry_state_->shouldRetryHeaders(

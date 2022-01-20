@@ -122,10 +122,7 @@ public:
   bool trackStreamCapacity() override { return false; }
 
 protected:
-  bool isAlternateProtocol() const override {
-    // This will fail newStream(..., /*can_use_alternate_protocols=*/false) call.
-    return true;
-  }
+  bool isAlternateProtocol() const override { return true; }
 
 private:
   // Store quic helpers which can be shared between connections and must live
