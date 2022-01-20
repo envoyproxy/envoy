@@ -4,8 +4,8 @@
 #include <memory>
 #include <vector>
 
-#include "envoy/common/pure.h"
 #include "envoy/common/optref.h"
+#include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
