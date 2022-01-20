@@ -318,6 +318,8 @@ public:
     UNREFERENCED_PARAMETER(sink_predicates);
   }
 
+  OptRef<SinkPredicates> sinkPredicates() override { return OptRef<SinkPredicates>{}; }
+
   Counter& counterFromString(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.counterFromString(name);

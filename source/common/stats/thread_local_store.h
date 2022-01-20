@@ -269,6 +269,7 @@ public:
   void forEachSinkedHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override;
 
   void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override;
+  OptRef<SinkPredicates> sinkPredicates() override { return sink_predicates_; }
 
   /**
    * @return a thread synchronizer object used for controlling thread behavior in tests.

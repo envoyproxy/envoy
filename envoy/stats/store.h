@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/optref.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
@@ -141,6 +142,8 @@ public:
    * during hot restart.
    */
   virtual void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) PURE;
+
+  virtual OptRef<SinkPredicates> sinkPredicates() PURE;
 };
 
 using StoreRootPtr = std::unique_ptr<StoreRoot>;

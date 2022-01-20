@@ -1606,9 +1606,8 @@ TEST_F(HistogramTest, ForEachHistogram) {
 TEST_F(HistogramTest, ForEachSinkedHistogram) {
   StatNamePool pool(store_->symbolTable());
 
-  std::unique_ptr<Stats::TestUtil::TestSinkPredicates> moved_sink_predicates =
+  std::unique_ptr<Stats::TestUtil::TestSinkPredicates> sink_predicates =
       std::make_unique<Stats::TestUtil::TestSinkPredicates>();
-  Stats::TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
   std::vector<std::reference_wrapper<Stats::Histogram>> sinked_histograms;
   std::vector<std::reference_wrapper<Stats::Histogram>> unsinked_histograms;
 
@@ -1628,7 +1627,7 @@ TEST_F(HistogramTest, ForEachSinkedHistogram) {
     }
   }
 
-  store_->setSinkPredicates(std::move(moved_sink_predicates));
+  store_->setSinkPredicates(std::move(sink_predicates));
 
   // Create some histograms after setting the predicates.
   for (size_t idx = num_stats / 2; idx < num_stats; ++idx) {
@@ -1636,7 +1635,9 @@ TEST_F(HistogramTest, ForEachSinkedHistogram) {
     Stats::StatName stat_name = pool.add(name);
     // sink every 3rd stat
     if ((idx + 1) % 3 == 0) {
-      sink_predicates->sinkedStatNames().insert(stat_name);
+      static_cast<Stats::TestUtil::TestSinkPredicates*>(store_->sinkPredicates().ptr())
+          ->sinkedStatNames()
+          .insert(stat_name);
       sinked_histograms.emplace_back(
           store_->histogramFromStatName(stat_name, Stats::Histogram::Unit::Unspecified));
     } else {
@@ -1652,7 +1653,8 @@ TEST_F(HistogramTest, ForEachSinkedHistogram) {
   size_t num_iterations = 0;
   store_->forEachSinkedHistogram(
       [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
-      [&num_iterations, sink_predicates](Stats::ParentHistogram& histogram) {
+      [&num_iterations, sink_predicates = static_cast<Stats::TestUtil::TestSinkPredicates*>(
+                            store_->sinkPredicates().ptr())](Stats::ParentHistogram& histogram) {
         EXPECT_NE(sink_predicates->sinkedStatNames().find(histogram.statName()),
                   sink_predicates->sinkedStatNames().end());
         ++num_iterations;
@@ -1926,12 +1928,11 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
 // to mergeHistograms
 TEST_F(HistogramTest, UnsinkedHistogramsAreMerged) {
   StatNamePool pool(store_->symbolTable());
-  std::unique_ptr<Stats::TestUtil::TestSinkPredicates> moved_sink_predicates =
-      std::make_unique<Stats::TestUtil::TestSinkPredicates>();
-  Stats::TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
+  store_->setSinkPredicates(std::make_unique<Stats::TestUtil::TestSinkPredicates>());
+  auto& sink_predicates =
+      static_cast<Stats::TestUtil::TestSinkPredicates&>(store_->sinkPredicates().ref());
   Stats::StatName stat_name = pool.add("h1");
-  sink_predicates->sinkedStatNames().insert(stat_name);
-  store_->setSinkPredicates(std::move(moved_sink_predicates));
+  sink_predicates.sinkedStatNames().insert(stat_name);
 
   auto& h1 = static_cast<ParentHistogramImpl&>(
       store_->histogramFromStatName(stat_name, Stats::Histogram::Unit::Unspecified));
@@ -1950,14 +1951,14 @@ TEST_F(HistogramTest, UnsinkedHistogramsAreMerged) {
   EXPECT_THAT(h1.cumulativeStatistics().bucketSummary(), HasSubstr(" B10: 0,"));
   EXPECT_THAT(h2.cumulativeStatistics().bucketSummary(), HasSubstr(" B10: 0,"));
 
-  store_->mergeHistograms([this, sink_predicates]() -> void {
+  store_->mergeHistograms([this, &sink_predicates]() -> void {
     size_t num_iterations = 0;
     size_t num_sinked_histograms = 0;
     store_->forEachSinkedHistogram(
         [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
-        [&num_iterations, sink_predicates](Stats::ParentHistogram& histogram) {
-          EXPECT_NE(sink_predicates->sinkedStatNames().find(histogram.statName()),
-                    sink_predicates->sinkedStatNames().end());
+        [&num_iterations, &sink_predicates](Stats::ParentHistogram& histogram) {
+          EXPECT_NE(sink_predicates.sinkedStatNames().find(histogram.statName()),
+                    sink_predicates.sinkedStatNames().end());
           ++num_iterations;
         });
     EXPECT_EQ(num_sinked_histograms, 1);
