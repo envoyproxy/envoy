@@ -51,6 +51,7 @@ envoy_cc_library(
         ":protocol_interface",
         ":stats_lib",
         "//contrib/sip_proxy/filters/network/source/router:router_interface",
+        "//contrib/sip_proxy/filters/network/source/tra:tra_lib",
         "//envoy/event:deferred_deletable",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",
@@ -64,6 +65,7 @@ envoy_cc_library(
         "//source/common/network:filter_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/common/tracing:http_tracer_lib",
     ],
 )
 
@@ -134,6 +136,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",
+        "@envoy_api//contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha:pkg_cc_proto",
     ],
 )
 
