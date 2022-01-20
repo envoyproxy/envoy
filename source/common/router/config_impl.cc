@@ -934,6 +934,12 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   } else {
     final_path = headers.getPathValue();
   }
+
+  if (!absl::StartsWith(final_path, "/")) {
+    final_path_value = absl::StrCat("/", final_path);
+    final_path = final_path_value;
+  }
+
   if (!path_redirect_has_query_ && strip_query_) {
     const size_t path_end = final_path.find('?');
     if (path_end != absl::string_view::npos) {
