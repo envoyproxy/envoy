@@ -45,7 +45,7 @@ public:
     EXPECT_CALL(http_stream_, sendHeaders(_, _));
     EXPECT_CALL(http_stream_, reset());
 
-    raw_client_ = std::make_shared<AsyncClientImpl>(cm_, config_, test_time_.timeSystem());
+    raw_client_ = std::make_shared<AsyncClientImpl>(cm_, config_, dispatcher_->timeSource());
     client_ = std::make_unique<AsyncClient<helloworld::HelloRequest, helloworld::HelloReply>>(
         raw_client_);
   }
@@ -91,7 +91,6 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Http::MockAsyncClient> http_client_;
   Http::MockAsyncClientStream http_stream_;
-  DangerousDeprecatedTestTime test_time_;
   std::shared_ptr<AsyncClientImpl> raw_client_;
   std::unique_ptr<AsyncClient<helloworld::HelloRequest, helloworld::HelloReply>> client_;
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> callback_;
