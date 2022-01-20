@@ -207,12 +207,24 @@ TEST_F(QuicPlatformTest, QuicThread) {
 
     ~AdderThread() override = default;
 
+    void waitForRun() {
+      // Wait for Run() to finish.
+      std::unique_lock<std::mutex> lk(m_);
+      cv_.wait(lk);
+    }
+
   protected:
-    void Run() override { *value_ += increment_; }
+    void Run() override {
+      std::unique_lock<std::mutex> lk(m_);
+      *value_ += increment_;
+      cv_.notify_one();
+    }
 
   private:
     int* value_;
     int increment_;
+    std::mutex m_;
+    std::condition_variable cv_;
   };
 
   int value = 0;
@@ -230,8 +242,13 @@ TEST_F(QuicPlatformTest, QuicThread) {
   EXPECT_EQ(1, value);
 
   // QuicThread will panic if it's started but not joined.
-  EXPECT_DEATH({ QuicThread("test_thread").Start(); },
-               "QuicThread should be joined before destruction");
+  EXPECT_DEATH(
+      {
+        AdderThread t3(&value, 2);
+        t3.Start();
+        t3.waitForRun();
+      },
+      "QuicThread should be joined before destruction");
 }
 
 TEST_F(QuicPlatformTest, QuicLog) {
