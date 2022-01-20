@@ -339,12 +339,6 @@ public:
   virtual void continueDecoding() PURE;
 
   /**
-   * @return the codec level receiving body buffer if the codec supports delayed
-   * processing.
-   */
-  virtual const Buffer::Instance* streamReceivedBodyBuffer() const PURE;
-
-  /**
    * @return const Buffer::Instance* the currently buffered data as buffered by this filter or
    *         previous ones in the filter chain. May be nullptr if nothing has been buffered yet.
    */

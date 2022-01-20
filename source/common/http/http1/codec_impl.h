@@ -61,7 +61,6 @@ public:
   void resetStream(StreamResetReason reason) override;
   void readDisable(bool disable) override;
   uint32_t bufferLimit() const override;
-  const Buffer::Instance* streamReceivedBodyBuffer() const override { return nullptr; }
   absl::string_view responseDetails() override { return details_; }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override;
   void setFlushTimeout(std::chrono::milliseconds) override {

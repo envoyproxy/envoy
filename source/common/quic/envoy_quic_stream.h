@@ -76,7 +76,6 @@ public:
     removeCallbacksHelper(callbacks);
   }
   uint32_t bufferLimit() const override { return send_buffer_simulation_.highWatermark(); }
-  const Buffer::Instance* streamReceivedBodyBuffer() const override { return nullptr; }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
     return connection()->connectionInfoProvider().localAddress();
   }

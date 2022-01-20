@@ -763,17 +763,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   bool buffering = (retry_state_ && retry_state_->enabled()) || !active_shadow_policies_.empty() ||
                    (internal_redirects_with_body_enabled_ && route_entry_ &&
                     route_entry_->internalRedirectPolicy().enabled());
-
-  uint64_t buffered_bytes_for_request = data.length() + getLength(callbacks_->decodingBuffer());
-
-  // Account for the case where we are holding data in the codec
-  // for the stream, and that buffer isn't the one we are currently processing.
-  if (auto* stream_received_body_buffer = callbacks_->streamReceivedBodyBuffer();
-      stream_received_body_buffer != nullptr && stream_received_body_buffer != &data) {
-    buffered_bytes_for_request += stream_received_body_buffer->length();
-  }
-
-  if (buffering && buffered_bytes_for_request > retry_shadow_buffer_limit_) {
+  if (buffering &&
+      getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
     // The request is larger than we should buffer. Give up on the retry/shadow
     cluster_->stats().retry_or_shadow_abandoned_.inc();
     retry_state_.reset();

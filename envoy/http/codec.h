@@ -332,12 +332,6 @@ public:
   virtual uint32_t bufferLimit() const PURE;
 
   /**
-   * @return the codec level receiving body buffer if the codec supports delayed
-   * processing.
-   */
-  virtual const Buffer::Instance* streamReceivedBodyBuffer() const PURE;
-
-  /**
    * @return string_view optionally return the reason behind codec level errors.
    *
    * This information is communicated via direct accessor rather than passed with the
