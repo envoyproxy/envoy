@@ -731,7 +731,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailTerminalFilterNotAtEndOfFilte
   EXPECT_EQ("500", response->headers().getStatusValue());
 }
 
-// Validate that deleting listeners does not break active ECDC subscription.
+// Validate that deleting listeners does not break active ECDS subscription.
 TEST_P(ExtensionDiscoveryIntegrationTest, ReloadBoth) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter("foo", false);
