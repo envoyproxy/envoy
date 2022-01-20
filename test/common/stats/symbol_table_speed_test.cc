@@ -179,6 +179,7 @@ static void bmSortStrings(benchmark::State& state) {
   Envoy::Stats::StatNamePool pool(symbol_table);
   const std::vector<Envoy::Stats::StatName> stat_names = prepareNames(pool, 100 * 1000);
   std::vector<std::string> names;
+  names.reserve(stat_names.size());
   for (Envoy::Stats::StatName stat_name : stat_names) {
     names.emplace_back(symbol_table.toString(stat_name));
   }
@@ -197,6 +198,7 @@ static void bmSetStrings(benchmark::State& state) {
   Envoy::Stats::StatNamePool pool(symbol_table);
   const std::vector<Envoy::Stats::StatName> stat_names = prepareNames(pool, 100 * 1000);
   std::vector<std::string> names;
+  names.reserve(stat_names.size());
   for (Envoy::Stats::StatName stat_name : stat_names) {
     names.emplace_back(symbol_table.toString(stat_name));
   }
