@@ -209,22 +209,22 @@ TEST_F(QuicPlatformTest, QuicThread) {
 
     void waitForRun() {
       // Wait for Run() to finish.
-      std::unique_lock<std::mutex> lk(m_);
-      cv_.wait(lk);
+      absl::MutexLock lk(&m_);
+      cv_.Wait(&m_);
     }
 
   protected:
     void Run() override {
-      std::unique_lock<std::mutex> lk(m_);
+      absl::MutexLock lk(&m_);
       *value_ += increment_;
-      cv_.notify_one();
+      cv_.Signal();
     }
 
   private:
     int* value_;
     int increment_;
-    std::mutex m_;
-    std::condition_variable cv_;
+    absl::Mutex m_;
+    absl::CondVar cv_;
   };
 
   int value = 0;
