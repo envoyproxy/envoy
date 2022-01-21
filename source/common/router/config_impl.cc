@@ -45,15 +45,12 @@
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
-#include "source/extensions/filters/http/common/utility.h"
 
 #include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Router {
 namespace {
-
-const std::string DEPRECATED_ROUTER_NAME = "envoy.router";
 
 constexpr uint32_t DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES = 4096;
 
@@ -925,6 +922,12 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   } else {
     final_path = headers.getPathValue();
   }
+
+  if (!absl::StartsWith(final_path, "/")) {
+    final_path_value = absl::StrCat("/", final_path);
+    final_path = final_path_value;
+  }
+
   if (!path_redirect_has_query_ && strip_query_) {
     const size_t path_end = final_path.find('?');
     if (path_end != absl::string_view::npos) {
@@ -941,14 +944,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& rou
   if (route.has_metadata()) {
     auto filter_metadata = route.metadata().filter_metadata().find("envoy.filters.http.router");
     if (filter_metadata == route.metadata().filter_metadata().end()) {
-      // TODO(zuercher): simply return `ret` when deprecated filter names are removed.
-      filter_metadata = route.metadata().filter_metadata().find(DEPRECATED_ROUTER_NAME);
-      if (filter_metadata == route.metadata().filter_metadata().end()) {
-        return ret;
-      }
-
-      Extensions::Common::Utility::ExtensionNameUtil::checkDeprecatedExtensionName(
-          "http filter", DEPRECATED_ROUTER_NAME, "envoy.filters.http.router");
+      return ret;
     }
     for (const auto& it : filter_metadata->second.fields()) {
       if (it.second.kind_case() == ProtobufWkt::Value::kStringValue) {
@@ -1737,10 +1733,7 @@ PerFilterConfigs::PerFilterConfigs(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
   for (const auto& it : typed_configs) {
-    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
-    const auto& name =
-        Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
-
+    const auto& name = it.first;
     auto object = createRouteSpecificFilterConfig(name, it.second, optional_http_filters,
                                                   factory_context, validator);
     if (object != nullptr) {

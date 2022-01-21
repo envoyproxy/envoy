@@ -1731,12 +1731,66 @@ TEST_P(Http2FrameIntegrationTest, SetDetailsTwice) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("too_many_headers"));
 }
 
+TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
+  // Configure max concurrent streams to 2.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
+        ->mutable_max_concurrent_streams()
+        ->set_value(2);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+
+  beginSession();
+  FakeRawConnectionPtr fake_upstream_connection1;
+
+  // Start a request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makePostRequest(1, "host", "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection1));
+  const Http2Frame settings_frame = Http2Frame::makeSettingsFrame(
+      Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 1}});
+  ASSERT_TRUE(fake_upstream_connection1->write(std::string(settings_frame)));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
+
+  // Start another request, it should create another upstream connection because of the max
+  // concurrent streams of upstream connection created above.
+  FakeRawConnectionPtr fake_upstream_connection2;
+  sendFrame(Http2Frame::makePostRequest(3, "host", "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->write(std::string(settings_frame)));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 2);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 2);
+
+  // Start the third request and adjust the max concurrent streams of one connection created
+  // above to 2.
+  const Http2Frame settings_frame2 = Http2Frame::makeSettingsFrame(
+      Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 3}});
+  ASSERT_TRUE(fake_upstream_connection1->write(std::string(settings_frame2)));
+  sendFrame(Http2Frame::makePostRequest(5, "host", "/path/to/long/url"));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 3);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 2);
+
+  // The configured max concurrent streams is 2, even the SETTINGS frame above wants to
+  // set the max concurrent streams to 3, it still reaches the upper bound. So the new request
+  // below should result in the third connection.
+  sendFrame(Http2Frame::makePostRequest(7, "host", "/path/to/long/url"));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 4);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 3);
+
+  // Cleanup.
+  tcp_client_->close();
+}
+
 TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
   beginSession();
   FakeRawConnectionPtr fake_upstream_connection;
 
   const uint32_t client_stream_idx = 1;
-  // Start a request request and wait for it to reach the upstream.
+  // Start a request and wait for it to reach the upstream.
   sendFrame(Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
@@ -1750,7 +1804,6 @@ TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
       Http2Frame::makeEmptyGoAwayFrame(12345, Http2Frame::ErrorCode::NoError);
   const Http2Frame settings_max_connections_frame = Http2Frame::makeSettingsFrame(
       Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 0}});
-  ;
   ASSERT_TRUE(fake_upstream_connection->write(std::string(rst_stream) + std::string(go_away_frame) +
                                               std::string(settings_max_connections_frame)));
 
@@ -1973,6 +2026,34 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
     // http2.violation.of.messaging.rule
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("violation"));
   }
+}
+
+// HTTP/2 and HTTP/3 don't support 101 SwitchProtocol response code, the client should
+// reset the request.
+TEST_P(MultiplexedIntegrationTest, Reset101SwitchProtocolResponse) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.set_proxy_100_continue(true); });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/dynamo/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"expect", "100-continue"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Wait for the request headers to be received upstream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "101"}}, false);
+  ASSERT_TRUE(response->waitForReset());
+  codec_client_->close();
+  EXPECT_FALSE(response->complete());
 }
 
 } // namespace Envoy

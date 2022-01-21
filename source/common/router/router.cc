@@ -77,27 +77,20 @@ uint64_t FilterUtility::percentageOfTimeout(const std::chrono::milliseconds resp
   return static_cast<uint64_t>(response_time.count() * TimeoutPrecisionFactor / timeout.count());
 }
 
-void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure,
-                                      bool upstream_secure) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_downstream_scheme")) {
-    if (Http::HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
-      return;
-    }
-    // After all the changes in https://github.com/envoyproxy/envoy/issues/14587
-    // this path should only occur if a buggy filter has removed the :scheme
-    // header. In that case best-effort set from X-Forwarded-Proto.
-    absl::string_view xfp = headers.getForwardedProtoValue();
-    if (Http::HeaderUtility::schemeIsValid(xfp)) {
-      headers.setScheme(xfp);
-      return;
-    }
+void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure) {
+  if (Http::HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
+    return;
   }
-  const bool transport_secure =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_downstream_scheme")
-          ? downstream_secure
-          : upstream_secure;
+  // After all the changes in https://github.com/envoyproxy/envoy/issues/14587
+  // this path should only occur if a buggy filter has removed the :scheme
+  // header. In that case best-effort set from X-Forwarded-Proto.
+  absl::string_view xfp = headers.getForwardedProtoValue();
+  if (Http::HeaderUtility::schemeIsValid(xfp)) {
+    headers.setScheme(xfp);
+    return;
+  }
 
-  if (transport_secure) {
+  if (downstream_secure) {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Https);
   } else {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
@@ -677,8 +670,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_.suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(
-      headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr,
-      host->transportSocketFactory().implementsSecureTransport());
+      headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr);
 
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
@@ -1243,11 +1235,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
       absl::StrCat("upstream connect error or disconnect/reset before headers. ",
                    (is_retry_ ? "retried and the latest " : ""),
                    "reset reason: ", Http::Utility::resetReasonToString(reset_reason),
-                   Runtime::runtimeFeatureEnabled(
-                       "envoy.reloadable_features.http_transport_failure_reason_in_body") &&
-                           !transport_failure_reason.empty()
-                       ? ", transport failure reason: "
-                       : "",
+                   !transport_failure_reason.empty() ? ", transport failure reason: " : "",
                    transport_failure_reason);
   const std::string& basic_details =
       downstream_response_started_ ? StreamInfo::ResponseCodeDetails::get().LateUpstreamReset
