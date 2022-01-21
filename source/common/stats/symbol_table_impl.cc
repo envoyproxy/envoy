@@ -142,6 +142,7 @@ public:
   // The type of token reached.
   enum class TokenType { StringView, Symbol, End };
 
+  TokenIter(StatName stat_name) : array_(stat_name.data()), size_(stat_name.dataSize()) {}
   TokenIter(const SymbolTable::Storage array, size_t size) : array_(array), size_(size) {}
 
   /**
