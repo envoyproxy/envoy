@@ -77,27 +77,20 @@ uint64_t FilterUtility::percentageOfTimeout(const std::chrono::milliseconds resp
   return static_cast<uint64_t>(response_time.count() * TimeoutPrecisionFactor / timeout.count());
 }
 
-void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure,
-                                      bool upstream_secure) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_downstream_scheme")) {
-    if (Http::HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
-      return;
-    }
-    // After all the changes in https://github.com/envoyproxy/envoy/issues/14587
-    // this path should only occur if a buggy filter has removed the :scheme
-    // header. In that case best-effort set from X-Forwarded-Proto.
-    absl::string_view xfp = headers.getForwardedProtoValue();
-    if (Http::HeaderUtility::schemeIsValid(xfp)) {
-      headers.setScheme(xfp);
-      return;
-    }
+void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure) {
+  if (Http::HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
+    return;
   }
-  const bool transport_secure =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_downstream_scheme")
-          ? downstream_secure
-          : upstream_secure;
+  // After all the changes in https://github.com/envoyproxy/envoy/issues/14587
+  // this path should only occur if a buggy filter has removed the :scheme
+  // header. In that case best-effort set from X-Forwarded-Proto.
+  absl::string_view xfp = headers.getForwardedProtoValue();
+  if (Http::HeaderUtility::schemeIsValid(xfp)) {
+    headers.setScheme(xfp);
+    return;
+  }
 
-  if (transport_secure) {
+  if (downstream_secure) {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Https);
   } else {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
@@ -677,8 +670,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_.suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(
-      headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr,
-      host->transportSocketFactory().implementsSecureTransport());
+      headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr);
 
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
@@ -1133,7 +1125,11 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
       upstream_request.upstreamHost()->stats().rq_error_.inc();
     }
 
-    upstream_request.removeFromList(upstream_requests_);
+    auto request_ptr = upstream_request.removeFromList(upstream_requests_);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
+      request_ptr->cleanUp();
+      callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
+    }
     return true;
   } else if (retry_status == RetryStatus::NoOverflow) {
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
@@ -1167,7 +1163,11 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                                     ? Http::Code::BadGateway
                                     : Http::Code::ServiceUnavailable;
   chargeUpstreamAbort(error_code, dropped, upstream_request);
-  upstream_request.removeFromList(upstream_requests_);
+  auto request_ptr = upstream_request.removeFromList(upstream_requests_);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
+    request_ptr->cleanUp();
+    callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
+  }
 
   // If there are other in-flight requests that might see an upstream response,
   // don't return anything downstream.
@@ -1180,11 +1180,8 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   const std::string body =
       absl::StrCat("upstream connect error or disconnect/reset before headers. reset reason: ",
                    Http::Utility::resetReasonToString(reset_reason),
-                   Runtime::runtimeFeatureEnabled(
-                       "envoy.reloadable_features.http_transport_failure_reason_in_body") &&
-                           !transport_failure_reason.empty()
-                       ? ", transport failure reason: "
-                       : "",
+
+                   !transport_failure_reason.empty() ? ", transport failure reason: " : "",
                    transport_failure_reason);
   const std::string& basic_details =
       downstream_response_started_ ? StreamInfo::ResponseCodeDetails::get().LateUpstreamReset
@@ -1277,7 +1274,12 @@ void Filter::onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
 
 void Filter::resetAll() {
   while (!upstream_requests_.empty()) {
-    upstream_requests_.back()->removeFromList(upstream_requests_)->resetStream();
+    auto request_ptr = upstream_requests_.back()->removeFromList(upstream_requests_);
+    request_ptr->resetStream();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
+      request_ptr->cleanUp();
+      callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
+    }
   }
 }
 
@@ -1355,8 +1357,12 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
         if (!end_stream || !upstream_request.encodeComplete()) {
           upstream_request.resetStream();
         }
-        upstream_request.removeFromList(upstream_requests_);
-
+        auto request_ptr = upstream_request.removeFromList(upstream_requests_);
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.allow_upstream_inline_write")) {
+          request_ptr->cleanUp();
+          callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
+        }
         return;
       } else if (retry_status == RetryStatus::NoOverflow) {
         callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
@@ -1386,7 +1392,12 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
     // Reset the stream because there are other in-flight requests that we'll
     // wait around for and we're not interested in consuming any body/trailers.
-    upstream_request.removeFromList(upstream_requests_)->resetStream();
+    auto request_ptr = upstream_request.removeFromList(upstream_requests_);
+    request_ptr->resetStream();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
+      request_ptr->cleanUp();
+      callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
+    }
     return;
   }
 

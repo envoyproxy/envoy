@@ -24,6 +24,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
 
+#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -299,6 +300,56 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
   response_decoder_->decodeData(data, true);
 }
 
+TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpanKeepParentSampling) {
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                              stream_info_, {});
+        response_decoder_ = &decoder;
+        return nullptr;
+      }));
+
+  TestRequestHeaderMapImpl copy(message_->headers());
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "http");
+
+  EXPECT_CALL(parent_span_, spawnChild_(_, child_span_name_, _)).WillOnce(Return(child_span));
+
+  AsyncClient::RequestOptions options = AsyncClient::RequestOptions()
+                                            .setParentSpan(parent_span_)
+                                            .setChildSpanName(child_span_name_)
+                                            .setSampled(absl::nullopt);
+  EXPECT_CALL(*child_span, setSampled(_)).Times(0);
+  EXPECT_CALL(*child_span, injectContext(_));
+
+  auto* request = client_.send(std::move(message_), callbacks_, options);
+  EXPECT_NE(request, nullptr);
+
+  expectSuccess(request, 200);
+
+  EXPECT_CALL(*child_span, setTag(Eq("onBeforeFinalizeUpstreamSpan"), Eq("called")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+  EXPECT_CALL(*child_span, finishSpan());
+
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  response_decoder_->decodeData(data, true);
+}
+
 TEST_F(AsyncClientImplTest, BasicHashPolicy) {
   message_->body().add("test body");
   Buffer::Instance& data = message_->body();
@@ -531,6 +582,7 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
   EXPECT_CALL(stream_callbacks_, onComplete());
   ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers2), true);
+  dispatcher_.clearDeferredDeleteList();
 }
 
 TEST_F(AsyncClientImplTest, MultipleStreams) {
@@ -865,6 +917,7 @@ TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
   response_decoder_->decodeData(*body, false);
 
   stream->reset();
+  dispatcher_.clearDeferredDeleteList();
 }
 
 TEST_F(AsyncClientImplTest, SendDataAfterRemoteClosure) {
@@ -979,6 +1032,7 @@ TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
       static_cast<Http::AsyncStreamImpl*>(stream);
   filter_callbacks->encodeHeaders(
       ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false, "details");
+  dispatcher_.clearDeferredDeleteList();
 }
 
 TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
@@ -1016,6 +1070,7 @@ TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
   response_decoder_->decodeData(*body, false);
 
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
+  dispatcher_.clearDeferredDeleteList();
 }
 
 TEST_F(AsyncClientImplTest, ResetAfterResponseStart) {

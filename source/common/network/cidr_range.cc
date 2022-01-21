@@ -7,7 +7,6 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
-#include "envoy/config/core/v3/address.pb.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
@@ -111,6 +110,10 @@ CidrRange CidrRange::create(const std::string& address, int length) {
 }
 
 CidrRange CidrRange::create(const envoy::config::core::v3::CidrRange& cidr) {
+  return create(Utility::parseInternetAddress(cidr.address_prefix()), cidr.prefix_len().value());
+}
+
+CidrRange CidrRange::create(const xds::core::v3::CidrRange& cidr) {
   return create(Utility::parseInternetAddress(cidr.address_prefix()), cidr.prefix_len().value());
 }
 

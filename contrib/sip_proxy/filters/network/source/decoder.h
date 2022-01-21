@@ -14,6 +14,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace SipProxy {
 
+using TrafficRoutingAssistantMap = std::map<std::string, std::map<std::string, std::string>>;
+
 #define ALL_PROTOCOL_STATES(FUNCTION)                                                              \
   FUNCTION(StopIteration)                                                                          \
   FUNCTION(WaitForData)                                                                            \
@@ -135,11 +137,10 @@ public:
    *             Continue otherwise.
    * @throw EnvoyException on Sip protocol errors
    */
-  FilterStatus onData(Buffer::Instance& data);
+  FilterStatus onData(Buffer::Instance& data, bool continue_handling = false);
   std::string getOwnDomain() { return callbacks_.getOwnDomain(); }
   std::string getDomainMatchParamName() { return callbacks_.getDomainMatchParamName(); }
 
-protected:
   MessageMetadataSharedPtr metadata() { return metadata_; }
 
 private:
@@ -183,6 +184,9 @@ private:
   MsgType sipMsgType(absl::string_view top_line);
   MethodType sipMethod(absl::string_view top_line);
 
+  static absl::string_view domain(absl::string_view sip_header, HeaderType header_type);
+  static void getParamFromHeader(absl::string_view header, MessageMetadataSharedPtr metadata);
+
   int parseTopLine(absl::string_view& top_line);
 
   HeaderType current_header_{HeaderType::TopLine};
@@ -219,6 +223,7 @@ private:
     virtual int processServiceRoute(absl::string_view& header);
     virtual int processWwwAuth(absl::string_view& header);
     virtual int processAuth(absl::string_view& header);
+    virtual int processPCookieIPMap(absl::string_view& header);
 
     MessageMetadataSharedPtr metadata() { return parent_.metadata(); }
 

@@ -64,17 +64,6 @@ TEST(ExtAuthzFilterConfigTest, ValidateFail) {
 
 TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) { expectCorrectProto(); }
 
-// Test that the deprecated extension name is disabled by default.
-// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
-TEST(ExtAuthzConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.ext_authz";
-
-  ASSERT_EQ(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
-          deprecated_name));
-}
-
 } // namespace ExtAuthz
 } // namespace NetworkFilters
 } // namespace Extensions
