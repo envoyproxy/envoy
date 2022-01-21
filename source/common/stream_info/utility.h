@@ -136,14 +136,14 @@ public:
   //   - details     is |stream_info.responseCodeDetails()|, but the field is
   //                 present only if configured in |proxy_status_config|.
   static const std::string
-  makeProxyStatusHeader(const StreamInfo& stream_info, const ProxyStatusError error,
+  makeProxyStatusHeader(const StreamInfo& stream_info, ProxyStatusError error,
                         absl::string_view node_id,
                         const envoy::extensions::filters::network::http_connection_manager::v3::
                             HttpConnectionManager::ProxyStatusConfig& proxy_status_config);
 
   // Returns a view into the string representation of a given ProxyStatusError
   // enum.
-  static const absl::string_view proxyStatusErrorToString(const ProxyStatusError proxy_status);
+  static const absl::string_view proxyStatusErrorToString(ProxyStatusError proxy_status);
 
   // Reads |stream_info.responseFlag| and returns an applicable ProxyStatusError, or nullopt
   // if no ProxyStatusError is applicable.
