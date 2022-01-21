@@ -73,8 +73,6 @@ public:
    */
   class Encoding {
   public:
-    class TokenIter;
-
     /**
      * Before destructing SymbolEncoding, you must call moveToMemBlock. This
      * transfers ownership, and in particular, the responsibility to call
@@ -171,6 +169,10 @@ public:
     static std::pair<uint64_t, size_t> decodeNumber(const uint8_t* encoding);
 
   private:
+    friend class StatName;
+    friend class SymbolTableImpl;
+    class TokenIter;
+
     size_t data_bytes_required_{0};
     MemBlockBuilder<uint8_t> mem_block_;
   };

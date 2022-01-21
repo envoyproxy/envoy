@@ -140,18 +140,18 @@ SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage ar
 class SymbolTableImpl::Encoding::TokenIter {
 public:
   // The type of token reached.
-  enum class Type { StringView, Symbol, End };
+  enum class TokenType { StringView, Symbol, End };
 
   TokenIter(const SymbolTable::Storage array, size_t size) : array_(array), size_(size) {}
 
   /**
    * Parses the next token. The token can then be retrieved by calling
    * stringView() or symbol().
-   * @return The type of token, Type::End if we have reached the end of the StatName.
+   * @return The type of token, TokenType::End if we have reached the end of the StatName.
    */
-  Type next() {
+  TokenType next() {
     if (size_ == 0) {
-      return Type::End;
+      return TokenType::End;
     }
     if (*array_ == LiteralStringIndicator) {
       // To avoid scanning memory to find the literal size during decode, we
@@ -167,19 +167,25 @@ public:
       string_view_ = absl::string_view(reinterpret_cast<const char*>(array_), length);
       size_ -= length;
       array_ += length;
-      return Type::StringView;
+      return TokenType::StringView;
     }
     std::pair<uint64_t, size_t> symbol_consumed = decodeNumber(array_);
     symbol_ = symbol_consumed.first;
     size_ -= symbol_consumed.second;
     array_ += symbol_consumed.second;
-    return Type::Symbol;
+    return TokenType::Symbol;
   }
 
-  /** @return the current string_view -- only valid to call if next()==Type::StringView */
+  /**
+   * @return the current string_view -- only valid to call if next()==TokenType::StringView
+   *
+   * Note -- this is performance critical code, and adding an absl::optional or
+   * assertion may add unnecessary overhead, so we rely on the above 'only
+   * valid' note instead.
+   */
   absl::string_view stringView() const { return string_view_; }
 
-  /** @return the current symbol -- only valid to call if next()==Type::Symbol */
+  /** @return the current symbol -- only valid to call if next()==TokenType::Symbol */
   Symbol symbol() const { return symbol_; }
 
 private:
@@ -194,11 +200,12 @@ void SymbolTableImpl::Encoding::decodeTokens(
     const std::function<void(Symbol)>& symbol_token_fn,
     const std::function<void(absl::string_view)>& string_view_token_fn) {
   TokenIter iter(array, size);
-  TokenIter::Type type;
-  while ((type = iter.next()) != TokenIter::Type::End) {
-    if (type == TokenIter::Type::StringView) {
+  TokenIter::TokenType type;
+  while ((type = iter.next()) != TokenIter::TokenType::End) {
+    if (type == TokenIter::TokenType::StringView) {
       string_view_token_fn(iter.stringView());
     } else {
+      ASSERT(type == TokenIter::TokenType::Symbol);
       symbol_token_fn(iter.symbol());
     }
   }
@@ -209,22 +216,22 @@ bool StatName::startsWith(StatName prefix) const {
   TokenIter prefix_iter(prefix.data(), prefix.dataSize());
   TokenIter this_iter(data(), dataSize());
   while (true) {
-    TokenIter::Type prefix_type = prefix_iter.next();
-    TokenIter::Type this_type = this_iter.next();
-    if (prefix_type == TokenIter::Type::End) {
+    TokenIter::TokenType prefix_type = prefix_iter.next();
+    TokenIter::TokenType this_type = this_iter.next();
+    if (prefix_type == TokenIter::TokenType::End) {
       break; // "a.b.c" starts with "a.b" or "a.b.c"
     }
-    if (this_type == TokenIter::Type::End) {
+    if (this_type == TokenIter::TokenType::End) {
       return false; // "a.b" does not start with "a.b.c"
     }
-    if (prefix_type != TokenIter::Type::Symbol) {
+    if (prefix_type != TokenIter::TokenType::Symbol) {
       // Disallow dynamic components in the prefix. We don't have a current need
       // for prefixes to be expressed dynamically, and handling that case would
       // add complexity. In particular we'd need to take locks to decode to
       // strings.
       return false;
     }
-    if (this_type != TokenIter::Type::Symbol || this_iter.symbol() != prefix_iter.symbol()) {
+    if (this_type != TokenIter::TokenType::Symbol || this_iter.symbol() != prefix_iter.symbol()) {
       return false;
     }
   }
@@ -495,23 +502,23 @@ bool SymbolTableImpl::lessThanLockHeld(const StatName& a, const StatName& b) con
   Encoding::TokenIter a_iter(a.data(), a.dataSize());
   Encoding::TokenIter b_iter(b.data(), b.dataSize());
   while (true) {
-    Encoding::TokenIter::Type a_type = a_iter.next();
-    Encoding::TokenIter::Type b_type = b_iter.next();
-    if (b_type == Encoding::TokenIter::Type::End) {
+    Encoding::TokenIter::TokenType a_type = a_iter.next();
+    Encoding::TokenIter::TokenType b_type = b_iter.next();
+    if (b_type == Encoding::TokenIter::TokenType::End) {
       return false; // "x.y.z" > "x.y", "x.y" == "x.y"
     }
-    if (a_type == Encoding::TokenIter::Type::End) {
+    if (a_type == Encoding::TokenIter::TokenType::End) {
       return true; // "x.y" < "x.y.z"
     }
-    if (a_type == b_type && a_type == Encoding::TokenIter::Type::Symbol &&
+    if (a_type == b_type && a_type == Encoding::TokenIter::TokenType::Symbol &&
         a_iter.symbol() == b_iter.symbol()) {
       continue; // matching symbols don't need to be decoded to strings
     }
 
-    absl::string_view a_token = a_type == Encoding::TokenIter::Type::Symbol
+    absl::string_view a_token = a_type == Encoding::TokenIter::TokenType::Symbol
                                     ? fromSymbol(a_iter.symbol())
                                     : a_iter.stringView();
-    absl::string_view b_token = b_type == Encoding::TokenIter::Type::Symbol
+    absl::string_view b_token = b_type == Encoding::TokenIter::TokenType::Symbol
                                     ? fromSymbol(b_iter.symbol())
                                     : b_iter.stringView();
     if (a_token != b_token) {
