@@ -201,19 +201,6 @@ public:
   void onGoAway(Http::GoAwayErrorCode error_code) override;
   void onSettings(ReceivedSettings& settings) override;
 
-  // As this is called once when the stream is closed, it's a good place to
-  // update the counter as one stream has been "returned" and the negative
-  // capacity should be reduced.
-  bool hadNegativeDeltaOnStreamClosed() override {
-    int ret = negative_capacity_ != 0;
-    if (negative_capacity_ > 0) {
-      negative_capacity_--;
-    }
-    return ret;
-  }
-
-  uint64_t negative_capacity_{};
-
 protected:
   MultiplexedActiveClientBase(Envoy::Http::HttpConnPoolImplBase& parent,
                               Upstream::Host::CreateConnectionData& data,

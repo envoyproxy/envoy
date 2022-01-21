@@ -156,8 +156,11 @@ void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) 
   ASSERT_FALSE(response->trailers()->get(Http::LowerCaseString("upstream_connect_start")).empty());
   ASSERT_FALSE(
       response->trailers()->get(Http::LowerCaseString("upstream_connect_complete")).empty());
-  ASSERT_FALSE(
-      response->trailers()->get(Http::LowerCaseString("upstream_handshake_complete")).empty());
+
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("num_streams")).empty());
+  EXPECT_EQ(
+      "1",
+      response->headers().get(Http::LowerCaseString("num_streams"))[0]->value().getStringView());
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, BidirectionalStreaming) { bidirectionalStreaming(1024); }
@@ -490,7 +493,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, TestManyResponseHeadersRejected) {
 
   Http::TestResponseHeaderMapImpl many_headers(default_response_headers_);
   for (int i = 0; i < 100; i++) {
-    many_headers.addCopy("many", std::string(1, 'a'));
+    many_headers.addCopy(absl::StrCat("many", i), std::string(1, 'a'));
   }
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
@@ -545,46 +548,42 @@ TEST_P(MultiplexedUpstreamIntegrationTest, LargeResponseHeadersRejected) {
   EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
-// Regression test to make sure that configuring upstream logs over gRPC will not crash Envoy.
-// TODO(asraa): Test output of the upstream logs.
-// See https://github.com/envoyproxy/envoy/issues/8828.
-TEST_P(MultiplexedUpstreamIntegrationTest, ConfigureHttpOverGrpcLogs) {
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void {
-        // Configure just enough of an upstream access log to reference the upstream headers.
-        const std::string yaml_string = R"EOF(
-name: router
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  upstream_log:
-    name: grpc_accesslog
-    filter:
-      not_health_check_filter: {}
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
-      common_config:
-        log_name: foo
-        transport_api_version: V3
-        grpc_service:
-          envoy_grpc:
-            cluster_name: cluster_0
-  )EOF";
-        // Replace the terminal envoy.router.
-        hcm.clear_http_filters();
-        TestUtility::loadFromYaml(yaml_string, *hcm.add_http_filters());
-      });
+TEST_P(MultiplexedUpstreamIntegrationTest, NoInitialStreams) {
+  // Set the fake upstream to start with 0 streams available.
+  upstreamConfig().http2_options_.mutable_max_concurrent_streams()->set_value(0);
+  EXPECT_EQ(0, upstreamConfig().http2_options_.max_concurrent_streams().value());
 
+  envoy::config::listener::v3::QuicProtocolOptions options;
+  options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(0);
+  mergeOptions(options);
   initialize();
 
-  // Send the request.
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest();
+  // Create the client connection and send a request.
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"},
+                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "100"},
+                                     {"x-envoy-max-retries", "100"}});
 
-  // Send the response headers.
+  // There should now be an upstream connection, but no upstream stream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_FALSE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_,
+                                                           std::chrono::milliseconds(100)));
+
+  // Update the upstream to have 1 stream available. Now Envoy should ship the
+  // original request upstream.
+  fake_upstream_connection_->updateConcurrentStreams(1);
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  // Make sure the standard request/response pipeline works as expected.
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
@@ -605,10 +604,11 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
                                      {":authority", "host"},
-                                     {AutonomousStream::NO_END_STREAM, ""}});
+                                     {AutonomousStream::NO_END_STREAM, "true"}});
   // Wait until the response is sent to ensure the SETTINGS frame has been read
   // by Envoy.
   response->waitForHeaders();
+  ASSERT_FALSE(response->complete());
 
   // Now send a second request and make sure it is processed. Previously it
   // would be queued on the original connection, as Envoy would ignore the
@@ -617,6 +617,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
   FakeStreamPtr upstream_request2;
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response2->waitForEndStream());
+  cleanupUpstreamAndDownstream();
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/13933

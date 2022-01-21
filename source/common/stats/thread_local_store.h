@@ -244,14 +244,10 @@ public:
   std::vector<TextReadoutSharedPtr> textReadouts() const override;
   std::vector<ParentHistogramSharedPtr> histograms() const override;
 
-  void forEachCounter(std::function<void(std::size_t)> f_size,
-                      std::function<void(Stats::Counter&)> f_stat) const override;
-
-  void forEachGauge(std::function<void(std::size_t)> f_size,
-                    std::function<void(Stats::Gauge&)> f_stat) const override;
-
-  void forEachTextReadout(std::function<void(std::size_t)> f_size,
-                          std::function<void(Stats::TextReadout&)> f_stat) const override;
+  void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
+  void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
+  void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
+  void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
@@ -266,6 +262,12 @@ public:
   void mergeHistograms(PostMergeCb merge_cb) override;
 
   Histogram& tlsHistogram(ParentHistogramImpl& parent, uint64_t id);
+
+  void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
+  void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
+  void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
+
+  void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override;
 
   /**
    * @return a thread synchronizer object used for controlling thread behavior in tests.
@@ -447,6 +449,8 @@ private:
     findStatLockHeld(StatName name,
                      StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const;
 
+    StatName prefix() const override { return prefix_.statName(); }
+
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     StatNameStorage prefix_;
@@ -472,6 +476,12 @@ private:
   };
 
   template <class StatFn> bool iterHelper(StatFn fn) const {
+    // Note that any thread can delete a scope at any time, and so another
+    // thread may have initiated destruction when we enter `iterHelper`.
+    // However the first thing that happens is releaseScopeCrossThread, which
+    // takes lock_, and doesn't release it until scopes_.erase(scope) finishes.
+    // thus there is no race risk with iterating over scopes while another
+    // thread deletes them.
     Thread::LockGuard lock(lock_);
     for (ScopeImpl* scope : scopes_) {
       if (!scope->iterate(fn)) {
@@ -480,6 +490,8 @@ private:
     }
     return true;
   }
+
+  StatName prefix() const override { return StatName(); }
 
   std::string getTagsForName(const std::string& name, TagVector& tags) const;
   void clearScopesFromCaches();
@@ -500,6 +512,7 @@ private:
                                  StatNameHashSet* tls_rejected_stats);
   TlsCache& tlsCache() { return **tls_cache_; }
 
+  OptRef<SinkPredicates> sink_predicates_;
   Allocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   using TlsCacheSlot = ThreadLocal::TypedSlotPtr<TlsCache>;

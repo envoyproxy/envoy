@@ -737,6 +737,9 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   EXPECT_CALL(os_sys_calls, setsocketblocking(1, false))
       .WillOnce(Return(Api::SysCallIntResult{1, 0}));
 #endif
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _))
+      .Times(testing::AtLeast(0u))
+      .WillRepeatedly(Return(0));
   EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{1, 0}));
   EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
   EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 101}));

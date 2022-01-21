@@ -5,6 +5,8 @@ load("//bazel:utils.bzl", "json_data")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
+load("@envoy_api//bazel:repository_locations.bzl", API_REPOSITORY_LOCATIONS_SPEC = "REPOSITORY_LOCATIONS_SPEC")
+load("@envoy_api//bazel:repository_locations_utils.bzl", "load_repository_locations_spec", "merge_dicts")
 
 licenses(["notice"])  # Apache 2
 
@@ -371,6 +373,11 @@ config_setting(
 )
 
 config_setting(
+    name = "enable_perf_tracing",
+    values = {"define": "perf_tracing=enabled"},
+)
+
+config_setting(
     name = "force_libcpp",
     values = {"define": "force_libcpp=enabled"},
 )
@@ -596,5 +603,13 @@ alias(
 
 json_data(
     name = "repository_locations",
-    data = REPOSITORY_LOCATIONS_SPEC,
+    data = load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
+)
+
+json_data(
+    name = "all_repository_locations",
+    data = merge_dicts(
+        load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
+        load_repository_locations_spec(API_REPOSITORY_LOCATIONS_SPEC),
+    ),
 )

@@ -9,6 +9,7 @@ Extensions
 
   filter/filter
   accesslog/accesslog
+  accesslog/filters
   rbac/rbac
   health_checker/health_checker
   transport_socket/transport_socket
@@ -29,6 +30,7 @@ Extensions
   request_id/request_id
   http/header_formatters
   http/original_ip_detection
+  http/stateful_session
   stat_sinks/stat_sinks
   quic/quic_extensions
   formatter/formatter

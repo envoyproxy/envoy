@@ -60,14 +60,14 @@ MockOsSysCalls::~MockOsSysCalls() = default;
 
 SysCallIntResult MockOsSysCalls::setsockopt(os_fd_t sockfd, int level, int optname,
                                             const void* optval, socklen_t optlen) {
-  ASSERT(optlen == sizeof(int));
-
   // Allow mocking system call failure.
   if (setsockopt_(sockfd, level, optname, optval, optlen) != 0) {
     return SysCallIntResult{-1, 0};
   }
 
-  boolsockopts_[SockOptKey(sockfd, level, optname)] = !!*reinterpret_cast<const int*>(optval);
+  if (optlen >= sizeof(int)) {
+    boolsockopts_[SockOptKey(sockfd, level, optname)] = !!*reinterpret_cast<const int*>(optval);
+  }
   return SysCallIntResult{0, 0};
 };
 

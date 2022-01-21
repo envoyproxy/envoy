@@ -40,15 +40,22 @@ public:
       headers.addCopy(Http::LowerCaseString("dns_end"),
                       absl::StrCat(toMs(stream_info.downstreamTiming().getValue(dns_end).value())));
     }
-    if (decoder_callbacks_->streamInfo().upstreamSslConnection()) {
-      headers.addCopy(Http::LowerCaseString("alpn"),
-                      decoder_callbacks_->streamInfo().upstreamSslConnection()->alpn());
+    if (decoder_callbacks_->streamInfo().upstreamInfo()) {
+      if (decoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()) {
+        headers.addCopy(
+            Http::LowerCaseString("alpn"),
+            decoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()->alpn());
+      }
+      headers.addCopy(Http::LowerCaseString("num_streams"),
+                      decoder_callbacks_->streamInfo().upstreamInfo()->upstreamNumStreams());
     }
 
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override {
-    StreamInfo::UpstreamTiming& upstream_timing = decoder_callbacks_->streamInfo().upstreamTiming();
+    ASSERT(decoder_callbacks_->streamInfo().upstreamInfo());
+    StreamInfo::UpstreamTiming& upstream_timing =
+        decoder_callbacks_->streamInfo().upstreamInfo()->upstreamTiming();
     // Upstream metrics aren't available until the response is complete.
     if (upstream_timing.upstream_connect_start_.has_value()) {
       trailers.addCopy(

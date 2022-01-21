@@ -46,7 +46,7 @@ std::string toString(Network::Socket::Type socket_type) {
   case Network::Socket::Type::Datagram:
     return "SocketType::Datagram";
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return "";
 }
 
 // Finds and returns the DynamicListener for the name provided from listener_map, creating and
@@ -515,7 +515,7 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   stopListener(*draining_it->listener_, [this, listener_tag]() {
     for (auto& listener : draining_listeners_) {
       if (listener.listener_->listenerTag() == listener_tag) {
-        listener.listener_->listenSocketFactory().closeAllSockets();
+        maybeCloseSocketsForListener(*listener.listener_);
       }
     }
   });
@@ -866,7 +866,7 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
         stats_.listener_stopped_.inc();
         for (auto& listener : active_listeners_) {
           if (listener->listenerTag() == listener_tag) {
-            listener->listenSocketFactory().closeAllSockets();
+            maybeCloseSocketsForListener(*listener);
           }
         }
       });
@@ -961,13 +961,13 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
 void ListenerManagerImpl::setNewOrDrainingSocketFactory(
     const std::string& name, const envoy::config::core::v3::Address& proto_address,
     ListenerImpl& listener) {
-  // Typically we catch address issues when we try to bind to the same address multiple times.
-  // However, for listeners that do not bind we must check to make sure we are not duplicating. This
-  // is an edge case and nothing will explicitly break, but there is no possibility that two
-  // listeners that do not bind will ever be used. Only the first one will be used when searched for
-  // by address. Thus we block it.
-  if (!listener.bindToPort() && (hasListenerWithCompatibleAddress(warming_listeners_, listener) ||
-                                 hasListenerWithCompatibleAddress(active_listeners_, listener))) {
+  // For listeners that do not bind or listeners that do not bind to port 0 we must check to make
+  // sure we are not duplicating the address. This avoids ambiguity about which non-binding
+  // listener is used or even worse for the binding to port != 0 and reuse port case multiple
+  // different listeners receiving connections destined for the same port.
+  if ((!listener.bindToPort() || listener.config().address().socket_address().port_value() != 0) &&
+      (hasListenerWithCompatibleAddress(warming_listeners_, listener) ||
+       hasListenerWithCompatibleAddress(active_listeners_, listener))) {
     const std::string message =
         fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
                     name, listener.address()->asString());
@@ -1034,6 +1034,17 @@ Network::ListenSocketFactoryPtr ListenerManagerImpl::createListenSocketFactory(
               e.what());
     incListenerCreateFailureStat();
     throw e;
+  }
+}
+
+void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
+  if (!listener.udpListenerConfig().has_value() ||
+      listener.udpListenerConfig()->listenerFactory().isTransportConnectionless()) {
+    // Close the listen sockets right away to avoid leaving TCP connections in accept queue
+    // already waiting for long timeout. However, connection-oriented UDP listeners shouldn't
+    // close the socket because they need to receive packets for existing connections via the
+    // listen sockets.
+    listener.listenSocketFactory().closeAllSockets();
   }
 }
 

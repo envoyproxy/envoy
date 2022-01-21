@@ -21,6 +21,7 @@ ASSERTs
 AST
 AWS
 BACKTRACE
+BBR
 BSON
 BPF
 Repick
@@ -402,6 +403,7 @@ absl
 accesslog
 accessor
 accessors
+acked
 ackless
 acks
 acls
@@ -868,6 +870,7 @@ nan
 nanos
 natively
 ndk
+negative
 netblock
 netblocks
 netfilter
@@ -1109,6 +1112,7 @@ siginfo
 signalstack
 siloed
 sim
+sinked
 sizeof
 smatch
 snapshotted
@@ -1167,6 +1171,7 @@ subsetting
 substr
 substring
 substrings
+subtree
 subtrees
 subtype
 subtypes
@@ -1318,3 +1323,4 @@ suri
 transid
 routable
 vhosts
+infos

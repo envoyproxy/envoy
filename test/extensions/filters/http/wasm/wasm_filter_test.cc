@@ -1796,7 +1796,7 @@ TEST_P(WasmHttpFilterTest, Property) {
             key: endpoint
       )EOF"));
   EXPECT_CALL(*host_description, metadata()).WillRepeatedly(Return(metadata));
-  EXPECT_CALL(request_stream_info_, upstreamHost()).WillRepeatedly(Return(host_description));
+  request_stream_info_.upstreamInfo()->setUpstreamHost(host_description);
   filter().log(&request_headers, nullptr, nullptr, log_stream_info);
 }
 
@@ -1826,11 +1826,11 @@ TEST_P(WasmHttpFilterTest, ClusterMetadata) {
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
   EXPECT_CALL(*cluster, metadata()).WillRepeatedly(ReturnRef(*cluster_metadata));
   EXPECT_CALL(*host_description, cluster()).WillRepeatedly(ReturnRef(*cluster));
-  EXPECT_CALL(request_stream_info_, upstreamHost()).WillRepeatedly(Return(host_description));
+  request_stream_info_.upstreamInfo()->setUpstreamHost(host_description);
   filter().log(&request_headers, nullptr, nullptr, log_stream_info);
 
   // If upstream host is empty, fallback to upstream cluster info for cluster metadata.
-  EXPECT_CALL(request_stream_info_, upstreamHost()).WillRepeatedly(Return(nullptr));
+  request_stream_info_.upstreamInfo()->setUpstreamHost(nullptr);
   EXPECT_CALL(request_stream_info_, upstreamClusterInfo()).WillRepeatedly(Return(cluster));
   EXPECT_CALL(filter(),
               log_(spdlog::level::warn, Eq(absl::string_view("cluster metadata: cluster"))));

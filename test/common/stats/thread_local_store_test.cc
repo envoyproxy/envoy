@@ -1,9 +1,11 @@
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/histogram.h"
+#include "envoy/stats/sink.h"
 
 #include "source/common/common/c_smart_ptr.h"
 #include "source/common/event/dispatcher_impl.h"
@@ -33,6 +35,7 @@ using testing::InSequence;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
+using testing::UnorderedElementsAreArray;
 
 namespace Envoy {
 namespace Stats {
@@ -470,6 +473,62 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   store_->histogramFromString("histogram_after_shutdown", Histogram::Unit::Unspecified);
 
   tls_.shutdownThread();
+}
+
+TEST_F(StatsThreadLocalStoreTest, ForEach) {
+  auto collect_scopes = [this]() -> std::vector<std::string> {
+    std::vector<std::string> names;
+    store_->forEachScope([](size_t) {},
+                         [&names](const Scope& scope) {
+                           names.push_back(scope.constSymbolTable().toString(scope.prefix()));
+                         });
+    return names;
+  };
+  auto collect_counters = [this]() -> std::vector<std::string> {
+    std::vector<std::string> names;
+    store_->forEachCounter([](size_t) {},
+                           [&names](Counter& counter) { names.push_back(counter.name()); });
+    return names;
+  };
+  auto collect_gauges = [this]() -> std::vector<std::string> {
+    std::vector<std::string> names;
+    store_->forEachGauge([](size_t) {}, [&names](Gauge& gauge) { names.push_back(gauge.name()); });
+    return names;
+  };
+  auto collect_text_readouts = [this]() -> std::vector<std::string> {
+    std::vector<std::string> names;
+    store_->forEachTextReadout(
+        [](size_t) {},
+        [&names](TextReadout& text_readout) { names.push_back(text_readout.name()); });
+    return names;
+  };
+
+  // TODO(pradeepcrao): add tests for histograms when forEachHistogram is added
+
+  const std::vector<std::string> empty;
+
+  EXPECT_THAT(collect_scopes(), UnorderedElementsAreArray({"", ""}));
+  EXPECT_THAT(collect_counters(), UnorderedElementsAreArray(empty));
+  EXPECT_THAT(collect_gauges(), UnorderedElementsAreArray(empty));
+  EXPECT_THAT(collect_text_readouts(), UnorderedElementsAreArray(empty));
+
+  ScopePtr scope1 = store_->createScope("scope1");
+  scope1->counterFromString("counter1");
+  scope1->gaugeFromString("gauge1", Gauge::ImportMode::Accumulate);
+  scope1->textReadoutFromString("tr1");
+  ScopePtr scope2 = scope1->createScope("scope2");
+  scope2->counterFromString("counter2");
+  scope2->gaugeFromString("gauge2", Gauge::ImportMode::Accumulate);
+  scope2->textReadoutFromString("tr2");
+  ScopePtr scope3 = store_->createScope("scope3");
+  EXPECT_THAT(collect_scopes(),
+              UnorderedElementsAreArray({"", "", "scope1", "scope1.scope2", "scope3"}));
+  EXPECT_THAT(collect_counters(),
+              UnorderedElementsAreArray({"scope1.counter1", "scope1.scope2.counter2"}));
+  EXPECT_THAT(collect_gauges(),
+              UnorderedElementsAreArray({"scope1.gauge1", "scope1.scope2.gauge2"}));
+  EXPECT_THAT(collect_text_readouts(),
+              UnorderedElementsAreArray({"scope1.tr1", "scope1.scope2.tr2"}));
 }
 
 // Validate that we sanitize away bad characters in the stats prefix.
@@ -1564,6 +1623,7 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
             "B3.6e+06(1,1)",
             parent_histogram->bucketSummary());
 }
+
 class ThreadLocalRealThreadsTestBase : public Thread::RealThreadsTestHelper,
                                        public ThreadLocalStoreNoMocksTestBase {
 protected:
@@ -1801,7 +1861,7 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
                                      2 * NumThreads, ") ")));
 
   // Now clear everything, and synchronize the system by calling mergeHistograms().
-  // THere should be no more ParentHistograms or TlsHistograms.
+  // There should be no more ParentHistograms or TlsHistograms.
   scope2.reset();
   histograms.clear();
   mergeHistograms();

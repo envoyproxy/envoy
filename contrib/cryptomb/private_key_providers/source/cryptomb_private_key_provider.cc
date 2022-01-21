@@ -20,7 +20,7 @@ CryptoMbContext::CryptoMbContext(Event::Dispatcher& dispatcher,
     : status_(RequestStatus::Retry), dispatcher_(dispatcher), cb_(cb) {}
 
 void CryptoMbContext::scheduleCallback(enum RequestStatus status) {
-  schedulable_ = dispatcher_.createSchedulableCallback([this, status]() -> void {
+  schedulable_ = dispatcher_.createSchedulableCallback([this, status]() {
     // The status can't be set beforehand, because the callback asserts
     // if someone else races to call doHandshake() and the status goes to
     // HandshakeComplete.
@@ -330,10 +330,10 @@ ssl_private_key_result_t rsaPrivateKeyDecryptForTest(CryptoMbPrivateKeyConnectio
 }
 
 CryptoMbQueue::CryptoMbQueue(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
-                             IppCryptoSharedPtr ipp, Event::Dispatcher& d)
+                             IppCryptoSharedPtr ipp, Event::Dispatcher& d, CryptoMbStats& stats)
     : us_(std::chrono::duration_cast<std::chrono::microseconds>(poll_delay)), type_(type),
-      key_size_(keysize), ipp_(ipp),
-      timer_(d.createTimer([this]() -> void { processRequests(); })) {
+      key_size_(keysize), ipp_(ipp), timer_(d.createTimer([this]() { processRequests(); })),
+      stats_(stats) {
   request_queue_.reserve(MULTIBUFF_BATCH);
 }
 
@@ -359,6 +359,8 @@ void CryptoMbQueue::addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx) 
 
 void CryptoMbQueue::processRequests() {
   if (type_ == KeyType::Rsa) {
+    // Record queue size statistic value for histogram.
+    stats_.rsa_queue_sizes_.recordValue(request_queue_.size());
     processRsaRequests();
   }
   request_queue_.clear();
@@ -481,12 +483,14 @@ void CryptoMbPrivateKeyMethodProvider::unregisterPrivateKeyMethod(SSL* ssl) {
   delete ops;
 }
 
+// The CryptoMbPrivateKeyMethodProvider is created on config.
 CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     const envoy::extensions::private_key_providers::cryptomb::v3alpha::
         CryptoMbPrivateKeyMethodConfig& conf,
     Server::Configuration::TransportSocketFactoryContext& factory_context, IppCryptoSharedPtr ipp)
     : api_(factory_context.api()),
-      tls_(ThreadLocal::TypedSlot<ThreadLocalData>::makeUnique(factory_context.threadLocal())) {
+      tls_(ThreadLocal::TypedSlot<ThreadLocalData>::makeUnique(factory_context.threadLocal())),
+      stats_(generateCryptoMbStats("cryptomb", factory_context.scope())) {
 
   if (!ipp->mbxIsCryptoMbApplicable(0)) {
     throw EnvoyException("Multi-buffer CPU instructions not available.");
@@ -519,7 +523,6 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     method_->complete = privateKeyComplete;
 
     RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
-
     switch (RSA_bits(rsa)) {
     case 1024:
       key_size = 1024;
@@ -542,7 +545,9 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
 
     BIGNUM e_check;
     // const BIGNUMs, memory managed by BoringSSL in RSA key structure.
-    const BIGNUM *e, *n, *d;
+    const BIGNUM* e = nullptr;
+    const BIGNUM* n = nullptr;
+    const BIGNUM* d = nullptr;
     RSA_get0_key(rsa, &n, &e, &d);
     BN_init(&e_check);
     BN_add_word(&e_check, 65537);
@@ -582,9 +587,9 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
   enum KeyType key_type = key_type_;
 
   // Create a single queue for every worker thread to avoid locking.
-  tls_->set([poll_delay, key_type, key_size, ipp](Event::Dispatcher& d) {
+  tls_->set([poll_delay, key_type, key_size, ipp, this](Event::Dispatcher& d) {
     ENVOY_LOG(debug, "Created CryptoMb Queue for thread {}", d.name());
-    return std::make_shared<ThreadLocalData>(poll_delay, key_type, key_size, ipp, d);
+    return std::make_shared<ThreadLocalData>(poll_delay, key_type, key_size, ipp, d, stats_);
   });
 }
 

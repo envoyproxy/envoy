@@ -237,7 +237,7 @@ public:
   using CaseUnorderedSet =
       absl::flat_hash_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>;
 
-  static const char WhitespaceChars[];
+  static constexpr absl::string_view WhitespaceChars = " \t\f\v\n\r";
 
   /**
    * Convert a string to an unsigned long, checking for error.
@@ -440,6 +440,21 @@ public:
    */
   static std::string removeCharacters(const absl::string_view& str,
                                       const IntervalSet<size_t>& remove_characters);
+
+  /**
+   * Check whether a string contains empty characters or space (' ', '\t', '\f', '\v', '\n', '\r').
+   * @param view string.
+   * @return true if string contains ' ', '\t', '\f', '\v', '\n', '\r'.
+   */
+  static bool hasEmptySpace(absl::string_view view);
+
+  /**
+   * Replace all empty characters or space (' ', '\t', '\f', '\v', '\n', '\r') in the string with
+   * '_'.
+   * @param view string.
+   * @return std::string the string after replaced all empty characters or space.
+   */
+  static std::string replaceAllEmptySpace(absl::string_view view);
 };
 
 /**

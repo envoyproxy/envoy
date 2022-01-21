@@ -763,3 +763,6 @@ Supported variable names are:
 %RESPONSE_CODE_DETAILS%
     Response code details provides additional information about the HTTP response code, such as
     who set it (the upstream or envoy) and why.
+
+%VIRTUAL_CLUSTER_NAME%
+  Name of the Virtual Cluster which gets matched (if any).

@@ -2,8 +2,8 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
 )
-load("@rules_pkg//:mappings.bzl", "pkg_filegroup", "pkg_files")
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 
 licenses(["notice"])  # Apache 2
 
@@ -87,14 +87,16 @@ genrule(
 
 genrule(
     name = "external_deps_rst",
-    srcs = [
-        "//bazel:repository_locations.bzl",
-        "@envoy_api//bazel:repository_locations.bzl",
-        "@envoy_api//bazel:repository_locations_utils.bzl",
-    ],
     outs = ["external_deps_rst.tar"],
-    cmd = "$(location //tools/docs:generate_external_deps_rst) $@",
-    tools = ["//tools/docs:generate_external_deps_rst"],
+    cmd = """
+    $(location //tools/docs:generate_external_deps_rst) \
+        $(location //bazel:all_repository_locations) \
+        $@
+    """,
+    tools = [
+        "//bazel:all_repository_locations",
+        "//tools/docs:generate_external_deps_rst",
+    ],
 )
 
 genquery(

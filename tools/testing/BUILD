@@ -22,7 +22,6 @@ envoy_py_binary(
     ],
     deps = [
         requirement("pytest"),
-        requirement("pytest-asyncio"),
         requirement("pytest-cov"),
         requirement("pytest-patches"),
         requirement("envoy.base.runner"),

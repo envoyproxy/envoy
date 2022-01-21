@@ -210,7 +210,6 @@ envoy_cc_library(
         "quiche/http2/platform/api/http2_flag_utils.h",
         "quiche/http2/platform/api/http2_flags.h",
         "quiche/http2/platform/api/http2_logging.h",
-        "quiche/http2/platform/api/http2_macros.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/http2/platform/api/http2_test_helpers.h",
     ],
@@ -218,7 +217,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform",
-        "@envoy//source/common/quic/platform:http2_platform_impl_lib",
     ],
 )
 
@@ -2007,7 +2005,6 @@ envoy_cc_library(
         "quiche/quic/core/crypto/quic_compressed_certs_cache.cc",
         "quiche/quic/core/crypto/quic_crypto_client_config.cc",
         "quiche/quic/core/crypto/quic_crypto_server_config.cc",
-        "quiche/quic/core/crypto/server_proof_verifier.h",
         "quiche/quic/core/crypto/transport_parameters.cc",
     ],
     hdrs = [
