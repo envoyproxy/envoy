@@ -27,6 +27,10 @@ py_binary(
         "//docs:protodoc_manifest.yaml",
         "//docs:v2_mapping.json",
         "//source/extensions:extensions_metadata.yaml",
+        "//tools/type_whisperer:all_protos_with_ext_pb_text.pb_text",
+    ],
+    args = [
+        "$(location //tools/type_whisperer:all_protos_with_ext_pb_text.pb_text)",
     ],
     visibility = ["//visibility:public"],
     deps = [
