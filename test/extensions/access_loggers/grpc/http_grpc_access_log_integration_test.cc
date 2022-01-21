@@ -346,5 +346,100 @@ TEST_P(AccessLogIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
   test_server_->waitForCounterEq("access_logs.grpc_access_log.logs_written", 4);
 }
 
+class AccessLogRetryIntegrationTest : public AccessLogIntegrationTest {
+public:
+  AccessLogRetryIntegrationTest() : AccessLogIntegrationTest() {}
+
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    FakeUpstreamConfig config{timeSystem()};
+    config.upstream_protocol_ = Http::CodecType::HTTP2;
+    config.enable_manual_listen_ = true;
+    fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(0, version_, config));
+  }
+
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      accesslog_cluster->set_name("accesslog");
+      ConfigHelper::setHttp2(*accesslog_cluster);
+    });
+
+    config_helper_.addConfigModifier(
+        [this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          auto* access_log = hcm.add_access_log();
+          access_log->set_name("grpc_accesslog");
+
+          envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config;
+          auto* common_config = config.mutable_common_config();
+          common_config->set_log_name("foo");
+          common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+          setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
+                         fake_upstreams_.back()->localAddress());
+          common_config->mutable_grpc_stream_retry_policy()->mutable_num_retries()->set_value(10);
+          common_config->mutable_grpc_stream_retry_policy()
+              ->mutable_retry_back_off()
+              ->mutable_base_interval()
+              ->set_seconds(1);
+          access_log->mutable_typed_config()->PackFrom(config);
+        });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, AccessLogRetryIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
+
+TEST_P(AccessLogRetryIntegrationTest, BasicFlowWithRetryPolicy) {
+  SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
+  config_helper_.setDefaultHostAndRoute("foo.com", "/found");
+  initialize();
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+  test_server_->waitForCounterEq("cluster.accesslog.upstream_cx_connect_fail", 1);
+  test_server_->waitForCounterEq("cluster.accesslog.upstream_rq_retry", 1);
+  // If the number of retries you configured is small, when you reach here on the Test Thread, the
+  // number of remaining retries may already be 0, which may cause a Flaky Test. Here we have set
+  // the retries to 10 and the interval to 1 second, which is enough to prevent such a problem.
+  fake_upstreams_[1]->startListenAndWait();
+  ASSERT_TRUE(waitForAccessLogConnection());
+  ASSERT_TRUE(waitForAccessLogStream());
+  ASSERT_TRUE(waitForAccessLogRequest(fmt::format(R"EOF(
+identifier:
+  node:
+    id: node_name
+    cluster: cluster_name
+    locality:
+      zone: zone_name
+    user_agent_name: "envoy"
+  log_name: foo
+http_logs:
+  log_entry:
+    common_properties:
+      response_flags:
+        no_route_found: true
+    protocol_version: HTTP11
+    request:
+      scheme: http
+      authority: host
+      path: /notfound
+      request_headers_bytes: 118
+      request_method: GET
+    response:
+      response_code:
+        value: 404
+      response_code_details: "route_not_found"
+      response_headers_bytes: 54
+)EOF")));
+  cleanup();
+}
+
 } // namespace
 } // namespace Envoy

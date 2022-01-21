@@ -1,5 +1,7 @@
 #pragma once
 
+#include <gtest/gtest.h>
+
 #include <cstdint>
 #include <list>
 #include <memory>
@@ -588,6 +590,7 @@ struct FakeUpstreamConfig {
   uint32_t max_request_headers_count_ = Http::DEFAULT_MAX_HEADERS_COUNT;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
+  bool enable_manual_listen_{};
 };
 
 /**
@@ -695,6 +698,8 @@ public:
   const envoy::config::core::v3::Http3ProtocolOptions& http3Options() { return http3_options_; }
 
   Event::DispatcherPtr& dispatcher() { return dispatcher_; }
+
+  testing::AssertionResult startListenAndWait();
 
 protected:
   Stats::IsolatedStoreImpl stats_store_;
@@ -861,6 +866,8 @@ private:
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
+  const bool manual_listen_enabled_{};
+  bool listen_started_{};
 #ifdef ENVOY_ENABLE_QUIC
   Quic::QuicStatNames quic_stat_names_ = Quic::QuicStatNames(stats_store_.symbolTable());
 #endif

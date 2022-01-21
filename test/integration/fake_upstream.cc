@@ -1,5 +1,7 @@
 #include "test/integration/fake_upstream.h"
 
+#include <gtest/gtest.h>
+
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -573,7 +575,8 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       read_disable_on_new_connection_(true), enable_half_close_(config.enable_half_close_),
       listener_(*this, http_type_ == Http::CodecType::HTTP3),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))),
-      stats_scope_(stats_store_.createScope("test_server_scope")) {
+      stats_scope_(stats_store_.createScope("test_server_scope")),
+      manual_listen_enabled_(config.enable_manual_listen_) {
   ENVOY_LOG(info, "starting fake server at {}. UDP={} codec={}", localAddress()->asString(),
             config.udp_fake_upstream_.has_value(), FakeHttpConnection::typeToString(http_type_));
   if (config.udp_fake_upstream_.has_value() &&
@@ -629,7 +632,10 @@ void FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManage
 }
 
 void FakeUpstream::threadRoutine() {
-  socket_factory_->doFinalPreWorkerInit();
+  if (!manual_listen_enabled_ && !listen_started_) {
+    socket_factory_->doFinalPreWorkerInit();
+    listen_started_ = true;
+  }
   handler_->addListener(absl::nullopt, listener_);
   server_initialized_.setReady();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -826,6 +832,15 @@ testing::AssertionResult FakeUpstream::rawWriteConnection(uint32_t index, const 
         connection.write(buffer, end_stream);
       },
       timeout);
+}
+
+testing::AssertionResult FakeUpstream::startListenAndWait() {
+  ASSERT(manual_listen_enabled_ && !listen_started_);
+  return runOnDispatcherThreadAndWait([this] {
+    socket_factory_->doFinalPreWorkerInit();
+    listen_started_ = true;
+    return AssertionSuccess();
+  });
 }
 
 void FakeUpstream::FakeListenSocketFactory::doFinalPreWorkerInit() {
