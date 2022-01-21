@@ -30,7 +30,7 @@ namespace HttpFilters {
 namespace Wasm {
 
 class WasmFilterConfigTest : public Event::TestUsingSimulatedTime,
-                             public testing::TestWithParam<std::string> {
+                             public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   WasmFilterConfigTest() : api_(Api::createApiForTest(stats_store_)) {
     ON_CALL(context_, api()).WillByDefault(ReturnRef(*api_));
@@ -65,22 +65,18 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmFilterConfigTest,
-                         Envoy::Extensions::Common::Wasm::sandbox_runtime_values);
+                         Envoy::Extensions::Common::Wasm::sandbox_runtime_and_cpp_values,
+                         Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmFilterConfigTest);
 
 TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasm) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  const std::string json = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  const std::string json =
+      TestEnvironment::substitute(absl::StrCat(R"EOF(
   {
   "config" : {
   "vm_config": {
     "runtime": "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF(",
+                                               std::get<0>(GetParam()), R"EOF(",
     "configuration": {
        "@type": "type.googleapis.com/google.protobuf.StringValue",
        "value": "some configuration"
@@ -107,17 +103,11 @@ TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasm) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasm) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       configuration:
          "@type": "type.googleapis.com/google.protobuf.StringValue"
          value: "some configuration"
@@ -156,18 +146,12 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasm) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmFailOpenOk) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     fail_open: true
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       configuration:
          "@type": "type.googleapis.com/google.protobuf.StringValue"
          value: "some configuration"
@@ -190,12 +174,6 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmFailOpenOk) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadInlineWasm) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
   EXPECT_FALSE(code.empty());
@@ -203,7 +181,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadInlineWasm) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                        GetParam(), R"EOF("
+                                        std::get<0>(GetParam()), R"EOF("
       code:
         local: { inline_bytes: ")EOF",
                                         Base64::encode(code.data(), code.size()), R"EOF(" }
@@ -226,7 +204,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadInlineBadCode) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                        GetParam(), R"EOF("
+                                        std::get<0>(GetParam()), R"EOF("
       code:
         local:
           inline_string: "bad code"
@@ -240,12 +218,6 @@ TEST_P(WasmFilterConfigTest, YamlLoadInlineBadCode) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
@@ -254,7 +226,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -295,12 +267,6 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
@@ -310,7 +276,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
     vm_config:
       nack_on_code_cache_miss: true
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -367,12 +333,6 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
@@ -382,7 +342,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
     vm_config:
       nack_on_code_cache_miss: true
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -499,12 +459,13 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
 
   // Case 5: flush the stale cache.
   const std::string sha256_2 = sha256 + "new";
-  const std::string yaml2 = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  const std::string yaml2 =
+      TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
       nack_on_code_cache_miss: true
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                     GetParam(), R"EOF("
+                                               std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -514,7 +475,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
           retry_policy:
             num_retries: 0
           sha256: )EOF",
-                                                                     sha256_2));
+                                               sha256_2));
 
   envoy::extensions::filters::http::wasm::v3::Wasm proto_config2;
   TestUtility::loadFromYaml(yaml2, proto_config2);
@@ -565,12 +526,6 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteConnectionReset) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
@@ -579,7 +534,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteConnectionReset) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -613,12 +568,6 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteConnectionReset) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessWith503) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
@@ -627,7 +576,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessWith503) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -664,12 +613,6 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessWith503) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessIncorrectSha256) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
@@ -678,7 +621,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessIncorrectSha256) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -715,12 +658,6 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessIncorrectSha256) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteMultipleRetries) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   initializeForRemote();
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
@@ -730,7 +667,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteMultipleRetries) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -801,7 +738,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcode) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -871,7 +808,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcodeFailOpen) {
     fail_open: true
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:

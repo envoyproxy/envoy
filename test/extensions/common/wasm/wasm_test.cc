@@ -80,7 +80,7 @@ public:
   MOCK_METHOD(void, log_, (spdlog::level::level_enum level, absl::string_view message));
 };
 
-class WasmCommonTest : public testing::TestWithParam<std::string> {
+class WasmCommonTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
   void SetUp() override { // NOLINT(readability-identifier-naming)
     Logger::Registry::getLog(Logger::Id::wasm).set_level(spdlog::level::debug);
@@ -88,7 +88,9 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonTest, Envoy::Extensions::Common::Wasm::runtime_values);
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonTest,
+                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values,
+                         Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 TEST_P(WasmCommonTest, WasmFailState) {
   Stats::IsolatedStoreImpl stats_store;
@@ -166,16 +168,12 @@ TEST_P(WasmCommonTest, Logging) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
   plugin_config.mutable_configuration()->set_value(plugin_configuration);
 
   std::string code;
-  if (GetParam() != "null") {
-#if !defined(__x86_64__)
-    // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-    return;
-#endif
+  if (std::get<0>(GetParam()) != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
   } else {
@@ -221,7 +219,7 @@ TEST_P(WasmCommonTest, Logging) {
 
   auto root_context = static_cast<TestContext*>(wasm_weak.lock()->start(plugin));
   EXPECT_EQ(root_context->getConfiguration(), "logging");
-  if (GetParam() != "null") {
+  if (std::get<0>(GetParam()) != "null") {
     EXPECT_TRUE(root_context->validateConfiguration("", plugin));
   }
   wasm_weak.lock()->configure(root_context, plugin);
@@ -237,13 +235,7 @@ TEST_P(WasmCommonTest, Logging) {
 }
 
 TEST_P(WasmCommonTest, BadSignature) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() != "v8") {
+  if (std::get<0>(GetParam()) != "v8") {
     return;
   }
   Stats::IsolatedStoreImpl stats_store;
@@ -258,7 +250,7 @@ TEST_P(WasmCommonTest, BadSignature) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey("", "", code);
@@ -271,13 +263,7 @@ TEST_P(WasmCommonTest, BadSignature) {
 }
 
 TEST_P(WasmCommonTest, Segv) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() != "v8") {
+  if (std::get<0>(GetParam()) != "v8") {
     return;
   }
   Stats::IsolatedStoreImpl stats_store;
@@ -293,7 +279,7 @@ TEST_P(WasmCommonTest, Segv) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
@@ -320,13 +306,7 @@ TEST_P(WasmCommonTest, Segv) {
 }
 
 TEST_P(WasmCommonTest, DivByZero) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() != "v8") {
+  if (std::get<0>(GetParam()) != "v8") {
     return;
   }
   Stats::IsolatedStoreImpl stats_store;
@@ -339,7 +319,7 @@ TEST_P(WasmCommonTest, DivByZero) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
 
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -374,15 +354,11 @@ TEST_P(WasmCommonTest, IntrinsicGlobals) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
 
   std::string code;
-  if (GetParam() != "null") {
-#if !defined(__x86_64__)
-    // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-    return;
-#endif
+  if (std::get<0>(GetParam()) != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
   } else {
@@ -420,15 +396,11 @@ TEST_P(WasmCommonTest, Utilities) {
   auto vm_configuration = "utilities";
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
 
   std::string code;
-  if (GetParam() != "null") {
-#if !defined(__x86_64__)
-    // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-    return;
-#endif
+  if (std::get<0>(GetParam()) != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
   } else {
@@ -466,7 +438,7 @@ TEST_P(WasmCommonTest, Utilities) {
   const_buffer.set(static_cast<const ::Envoy::Buffer::Instance*>(buffer_impl.get()));
   string_buffer.set("contents");
   std::string data("contents");
-  if (GetParam() != "null") {
+  if (std::get<0>(GetParam()) != "null") {
     EXPECT_EQ(WasmResult::InvalidMemoryAccess,
               buffer.copyTo(wasm.get(), 0, 1 << 30 /* length too long */, 0, 0));
     EXPECT_EQ(WasmResult::InvalidMemoryAccess,
@@ -493,15 +465,11 @@ TEST_P(WasmCommonTest, Stats) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
 
   std::string code;
-  if (GetParam() != "null") {
-#if !defined(__x86_64__)
-    // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-    return;
-#endif
+  if (std::get<0>(GetParam()) != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
   } else {
@@ -544,7 +512,7 @@ TEST_P(WasmCommonTest, Foreign) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
 
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
@@ -553,11 +521,7 @@ TEST_P(WasmCommonTest, Foreign) {
                                                                *api, cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   std::string code;
-  if (GetParam() != "null") {
-#if !defined(__x86_64__)
-    // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-    return;
-#endif
+  if (std::get<0>(GetParam()) != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
   } else {
@@ -588,7 +552,7 @@ TEST_P(WasmCommonTest, OnForeign) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
 
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
@@ -598,11 +562,7 @@ TEST_P(WasmCommonTest, OnForeign) {
                                                                *api, cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   std::string code;
-  if (GetParam() != "null") {
-#if !defined(__x86_64__)
-    // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-    return;
-#endif
+  if (std::get<0>(GetParam()) != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
   } else {
@@ -626,7 +586,7 @@ TEST_P(WasmCommonTest, OnForeign) {
 }
 
 TEST_P(WasmCommonTest, WASI) {
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     // This test has no meaning unless it is invoked by actual Wasm code
     return;
   }
@@ -640,7 +600,7 @@ TEST_P(WasmCommonTest, WASI) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
 
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
@@ -650,11 +610,7 @@ TEST_P(WasmCommonTest, WASI) {
 
   EXPECT_NE(wasm, nullptr);
   std::string code;
-  if (GetParam() != "null") {
-#if !defined(__x86_64__)
-    // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-    return;
-#endif
+  if (std::get<0>(GetParam()) != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
   } else {
@@ -689,7 +645,7 @@ TEST_P(WasmCommonTest, VmCache) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
   plugin_config.mutable_configuration()->set_value(plugin_configuration);
 
@@ -703,16 +659,12 @@ TEST_P(WasmCommonTest, VmCache) {
           }));
 
   auto vm_config = plugin_config.mutable_vm_config();
-  vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
+  vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
   ProtobufWkt::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
   vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
   std::string code;
-  if (GetParam() != "null") {
-#if !defined(__x86_64__)
-    // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-    return;
-#endif
+  if (std::get<0>(GetParam()) != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
   } else {
@@ -775,13 +727,7 @@ TEST_P(WasmCommonTest, VmCache) {
 }
 
 TEST_P(WasmCommonTest, RemoteCode) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   Stats::IsolatedStoreImpl stats_store;
@@ -806,12 +752,12 @@ TEST_P(WasmCommonTest, RemoteCode) {
     // test that the proto_config parameter is released after the factory is created
     envoy::extensions::wasm::v3::PluginConfig plugin_config;
     *plugin_config.mutable_vm_config()->mutable_runtime() =
-        absl::StrCat("envoy.wasm.runtime.", GetParam());
+        absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
     plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
     plugin_config.mutable_configuration()->set_value(plugin_configuration);
 
     auto vm_config = plugin_config.mutable_vm_config();
-    vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
+    vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
     ProtobufWkt::BytesValue vm_configuration_bytes;
     vm_configuration_bytes.set_value(vm_configuration);
     vm_config->mutable_configuration()->PackFrom(vm_configuration_bytes);
@@ -895,13 +841,7 @@ TEST_P(WasmCommonTest, RemoteCode) {
 }
 
 TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   Stats::IsolatedStoreImpl stats_store;
@@ -919,7 +859,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
   plugin_config.mutable_configuration()->set_value(plugin_configuration);
 
@@ -927,7 +867,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
       absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
 
   auto vm_config = plugin_config.mutable_vm_config();
-  vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
+  vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
   ProtobufWkt::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
   vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
@@ -1023,13 +963,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
 
 // test that wasm imports/exports do not work when ABI restriction is enforced
 TEST_P(WasmCommonTest, RestrictCapabilities) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   Stats::IsolatedStoreImpl stats_store;
@@ -1042,7 +976,7 @@ TEST_P(WasmCommonTest, RestrictCapabilities) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
 
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -1083,13 +1017,7 @@ TEST_P(WasmCommonTest, RestrictCapabilities) {
 
 // test with proxy_on_vm_start allowed, but proxy_log restricted
 TEST_P(WasmCommonTest, AllowOnVmStart) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   Stats::IsolatedStoreImpl stats_store;
@@ -1102,7 +1030,7 @@ TEST_P(WasmCommonTest, AllowOnVmStart) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
 
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -1145,13 +1073,7 @@ TEST_P(WasmCommonTest, AllowOnVmStart) {
 
 // test with both proxy_on_vm_start and proxy_log allowed, but WASI restricted
 TEST_P(WasmCommonTest, AllowLog) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   Stats::IsolatedStoreImpl stats_store;
@@ -1164,7 +1086,7 @@ TEST_P(WasmCommonTest, AllowLog) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
 
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -1204,13 +1126,7 @@ TEST_P(WasmCommonTest, AllowLog) {
 
 // test with both proxy_on_vm_start and fd_write allowed, but proxy_log restricted
 TEST_P(WasmCommonTest, AllowWASI) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   Stats::IsolatedStoreImpl stats_store;
@@ -1223,7 +1139,7 @@ TEST_P(WasmCommonTest, AllowWASI) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
 
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -1263,13 +1179,7 @@ TEST_P(WasmCommonTest, AllowWASI) {
 
 // test a different callback besides proxy_on_vm_start
 TEST_P(WasmCommonTest, AllowOnContextCreate) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   Stats::IsolatedStoreImpl stats_store;
@@ -1282,7 +1192,7 @@ TEST_P(WasmCommonTest, AllowOnContextCreate) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
 
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -1324,13 +1234,7 @@ TEST_P(WasmCommonTest, AllowOnContextCreate) {
 
 // test that a copy-constructed thread-local Wasm still enforces the same policy
 TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
-#if !defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   Stats::IsolatedStoreImpl stats_store;
@@ -1343,7 +1247,7 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
 
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -1393,15 +1297,15 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
   thread_local_wasm->start(plugin);
 }
 
-class WasmCommonContextTest
-    : public Common::Wasm::WasmTestBase<testing::TestWithParam<std::string>> {
+class WasmCommonContextTest : public Common::Wasm::WasmTestBase<
+                                  testing::TestWithParam<std::tuple<std::string, std::string>>> {
 public:
   WasmCommonContextTest() = default;
 
   void setup(const std::string& code, std::string vm_configuration, std::string root_id = "") {
     setRootId(root_id);
     setVmConfiguration(vm_configuration);
-    setupBase(GetParam(), code,
+    setupBase(std::get<0>(GetParam()), code,
               [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
                 return new TestContext(wasm, plugin);
               });
@@ -1420,15 +1324,11 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonContextTest,
-                         Envoy::Extensions::Common::Wasm::runtime_values);
+                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values);
 
 TEST_P(WasmCommonContextTest, OnDnsResolve) {
   std::string code;
-  if (GetParam() != "null") {
-#if !defined(__x86_64__)
-    // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-    return;
-#endif
+  if (std::get<0>(GetParam()) != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
         "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
   } else {
@@ -1464,10 +1364,10 @@ TEST_P(WasmCommonContextTest, OnDnsResolve) {
 
   rootContext().onResolveDns(1 /* token */, Envoy::Network::DnsResolver::ResolutionStatus::Failure,
                              {});
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     rootContext().onTick(0);
   }
-  if (GetParam() == "v8") {
+  if (std::get<0>(GetParam()) == "v8") {
     rootContext().onQueueReady(0);
   }
   // Wait till the Wasm is destroyed and then the late callback should do nothing.
@@ -1480,11 +1380,7 @@ TEST_P(WasmCommonContextTest, OnDnsResolve) {
 
 TEST_P(WasmCommonContextTest, EmptyContext) {
   std::string code;
-  if (GetParam() != "null") {
-#if !defined(__x86_64__)
-    // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
-    return;
-#endif
+  if (std::get<0>(GetParam()) != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
         "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
   } else {
