@@ -201,7 +201,8 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 void EnvoyQuicClientStream::OnStreamFrame(const quic::QuicStreamFrame& frame) {
   uint64_t highest_byte_received = frame.data_length + frame.offset;
   if (highest_byte_received > bytesMeter()->wireBytesReceived()) {
-    mutableBytesMeter()->addWireBytesReceived(highest_byte_received - bytesMeter()->wireBytesReceived());
+    mutableBytesMeter()->addWireBytesReceived(highest_byte_received -
+                                              bytesMeter()->wireBytesReceived());
   }
   quic::QuicSpdyClientStream::OnStreamFrame(frame);
 }

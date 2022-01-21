@@ -200,7 +200,7 @@ private:
 
 // Object used for tracking bytes sent on a QuicStream since this object was constructed.
 class IncrementalBytesSentTracker {
- public:
+public:
   IncrementalBytesSentTracker(const quic::QuicStream& stream)
       : stream_(stream), initial__bytes_sent_(totalStreamBytesSent()) {}
 
@@ -210,9 +210,9 @@ class IncrementalBytesSentTracker {
     return totalStreamBytesSent() - initial__bytes_sent_;
   }
 
- private:
+private:
   uint64_t totalStreamBytesSent() const {
-    return  stream_.stream_bytes_written() + stream_.BufferedDataBytes();
+    return stream_.stream_bytes_written() + stream_.BufferedDataBytes();
   }
 
   const quic::QuicStream& stream_;
