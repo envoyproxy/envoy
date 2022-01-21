@@ -1515,12 +1515,14 @@ TEST_F(EdsTest, EndpointLocalityUpdated) {
   }
 }
 
-// Validate that onConfigUpdate() does not update the endpoint locality if fix is
-// disabled
+// Validate that onConfigUpdate() does not update the endpoint locality if fix for the issue,
+// https://github.com/envoyproxy/envoy/issues/12392, is disabled.
+// Unlike EndpointLocalityUpdated, runtime feature flag is disabled this time and then it is
+// verified that locality update does not happen on eds cluster endpoints.
 TEST_F(EdsTest, EndpointLocalityNotUpdatedIfFixDisabled) {
   Runtime::LoaderSingleton::initialize(&runtime_);
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fix_locality_update_for_eds_cluster_endpoints", "false"}});
+      {{"envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints", "false"}});
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   auto* endpoints = cluster_load_assignment.add_endpoints();

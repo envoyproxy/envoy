@@ -1642,7 +1642,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
          *existing_host->second->healthCheckAddress() != *host->healthCheckAddress());
     bool locality_changed = false;
     if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.fix_locality_update_for_eds_cluster_endpoints")) {
+            "envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints")) {
       locality_changed =
           (existing_host_found &&
            (!LocalityEqualTo()(host->locality(), existing_host->second->locality())));
