@@ -1873,5 +1873,58 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
   store_->histogramFromString("histogram_after_shutdown", Histogram::Unit::Unspecified);
 }
 
+// Verify that recording values for histograms that are not sinked does not
+// cause them to grow in memory over time.
+TEST(HistogramTest1, SinkedHistogramMemoryTest) {
+  SymbolTableImpl symbol_table;
+  AllocatorImpl alloc(symbol_table);
+  ThreadLocalStoreImpl store(alloc);
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
+  store.initializeThreading(main_thread_dispatcher, tls);
+
+  StatNamePool pool(store.symbolTable());
+  Stats::StatName stat_name = pool.add("h1");
+
+  Histogram& h1 = store.histogramFromStatName(stat_name, Stats::Histogram::Unit::Unspecified);
+  stat_name = pool.add("h2");
+  Histogram& h2 = store.histogramFromStatName(stat_name, Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("h2", h2.name());
+
+  // Create a random number generator to populate histogram values
+  std::random_device random_d;
+  std::mt19937_64 generator(random_d());
+  std::uniform_int_distribution<uint64_t> distribution(0, 20000000);
+  h1.recordValue(2);
+  h2.recordValue(2);
+
+  size_t memoryUsageSnapshot = Memory::Stats::totalCurrentlyAllocated();
+  std::cout << memoryUsageSnapshot << std::endl;
+  const size_t num_flushes = 10000001;
+  const size_t num_updates = 20;
+  // Outer loop for flushes.
+  size_t idxe = 0;
+  for (size_t idx = 0; idx < num_flushes; ++idx) {
+    // Inner loop to record histogram values.
+    for (size_t idx2 = 0; idx2 < num_updates; ++idx2) {
+      h1.recordValue(distribution(generator));
+      h2.recordValue(distribution(generator));
+    }
+
+    store.mergeHistograms([]() {});
+    if (idx == static_cast<uint64_t>(std::pow(10, idxe))) {
+      std::cout << idx << "  "
+                << static_cast<int64_t>(Memory::Stats::totalCurrentlyAllocated()) -
+                       static_cast<int64_t>(memoryUsageSnapshot)
+                << std::endl;
+      idxe++;
+    }
+  }
+  tls.shutdownGlobalThreading();
+  store.shutdownThreading();
+  tls.shutdownThread();
+}
 } // namespace Stats
 } // namespace Envoy
