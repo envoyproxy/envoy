@@ -51,7 +51,7 @@ void StatName::debugPrint() {
     for (size_t i = 0; i < nbytes; ++i) {
       std::cerr << " " << static_cast<uint64_t>(data()[i]);
     }
-    const SymbolVec encoding = SymbolTableImpl::Encoding::decodeSymbols(data(), dataSize());
+    const SymbolVec encoding = SymbolTableImpl::Encoding::decodeSymbols(*this);
     std::cerr << ", numSymbols=" << encoding.size() << ":";
     for (Symbol symbol : encoding) {
       std::cerr << " " << symbol;
@@ -117,11 +117,11 @@ std::pair<uint64_t, size_t> SymbolTableImpl::Encoding::decodeNumber(const uint8_
   return std::make_pair(number, encoding - start);
 }
 
-SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage array, size_t size) {
+SymbolVec SymbolTableImpl::Encoding::decodeSymbols(StatName stat_name) {
   SymbolVec symbol_vec;
-  symbol_vec.reserve(size);
+  symbol_vec.reserve(stat_name.dataSize());
   decodeTokens(
-      array, size, [&symbol_vec](Symbol symbol) { symbol_vec.push_back(symbol); },
+      stat_name, [&symbol_vec](Symbol symbol) { symbol_vec.push_back(symbol); },
       [](absl::string_view) {});
   return symbol_vec;
 }
@@ -143,7 +143,6 @@ public:
   enum class TokenType { StringView, Symbol, End };
 
   TokenIter(StatName stat_name) : array_(stat_name.data()), size_(stat_name.dataSize()) {}
-  TokenIter(const SymbolTable::Storage array, size_t size) : array_(array), size_(size) {}
 
   /**
    * Parses the next token. The token can then be retrieved by calling
@@ -197,10 +196,9 @@ private:
 };
 
 void SymbolTableImpl::Encoding::decodeTokens(
-    const SymbolTable::Storage array, size_t size,
-    const std::function<void(Symbol)>& symbol_token_fn,
+    StatName stat_name, const std::function<void(Symbol)>& symbol_token_fn,
     const std::function<void(absl::string_view)>& string_view_token_fn) {
-  TokenIter iter(array, size);
+  TokenIter iter(stat_name);
   TokenIter::TokenType type;
   while ((type = iter.next()) != TokenIter::TokenType::End) {
     if (type == TokenIter::TokenType::StringView) {
@@ -214,8 +212,8 @@ void SymbolTableImpl::Encoding::decodeTokens(
 
 bool StatName::startsWith(StatName prefix) const {
   using TokenIter = SymbolTableImpl::Encoding::TokenIter;
-  TokenIter prefix_iter(prefix.data(), prefix.dataSize());
-  TokenIter this_iter(data(), dataSize());
+  TokenIter prefix_iter(prefix);
+  TokenIter this_iter(*this);
   while (true) {
     TokenIter::TokenType prefix_type = prefix_iter.next();
     TokenIter::TokenType this_type = this_iter.next();
@@ -239,12 +237,11 @@ bool StatName::startsWith(StatName prefix) const {
   return true;
 }
 
-std::vector<absl::string_view> SymbolTableImpl::decodeStrings(const SymbolTable::Storage array,
-                                                              size_t size) const {
+std::vector<absl::string_view> SymbolTableImpl::decodeStrings(StatName stat_name) const {
   std::vector<absl::string_view> strings;
   Thread::LockGuard lock(lock_);
   Encoding::decodeTokens(
-      array, size,
+      stat_name,
       [this, &strings](Symbol symbol)
           ABSL_NO_THREAD_SAFETY_ANALYSIS { strings.push_back(fromSymbol(symbol)); },
       [&strings](absl::string_view str) { strings.push_back(str); });
@@ -318,12 +315,12 @@ uint64_t SymbolTableImpl::numSymbols() const {
 }
 
 std::string SymbolTableImpl::toString(const StatName& stat_name) const {
-  return absl::StrJoin(decodeStrings(stat_name.data(), stat_name.dataSize()), ".");
+  return absl::StrJoin(decodeStrings(stat_name), ".");
 }
 
 void SymbolTableImpl::incRefCount(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
-  const SymbolVec symbols = Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
+  const SymbolVec symbols = Encoding::decodeSymbols(stat_name);
 
   Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
@@ -345,7 +342,7 @@ void SymbolTableImpl::incRefCount(const StatName& stat_name) {
 
 void SymbolTableImpl::free(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
-  const SymbolVec symbols = Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
+  const SymbolVec symbols = Encoding::decodeSymbols(stat_name);
 
   Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
@@ -421,7 +418,7 @@ DynamicSpans SymbolTableImpl::getDynamicSpans(StatName stat_name) const {
   // once for each character in the string, and no dynamics will
   // be recorded.
   Encoding::decodeTokens(
-      stat_name.data(), stat_name.dataSize(), [&index](Symbol) { ++index; }, record_dynamic);
+      stat_name, [&index](Symbol) { ++index; }, record_dynamic);
   return dynamic_spans;
 }
 
@@ -500,8 +497,7 @@ bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
 
 bool SymbolTableImpl::lessThanLockHeld(const StatName& a, const StatName& b) const
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
-  Encoding::TokenIter a_iter(a.data(), a.dataSize());
-  Encoding::TokenIter b_iter(b.data(), b.dataSize());
+  Encoding::TokenIter a_iter(a), b_iter(b);
   while (true) {
     Encoding::TokenIter::TokenType a_type = a_iter.next();
     Encoding::TokenIter::TokenType b_type = b_iter.next();

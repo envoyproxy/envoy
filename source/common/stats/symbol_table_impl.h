@@ -92,7 +92,7 @@ public:
     /**
      * Decodes a uint8_t array into a SymbolVec.
      */
-    static SymbolVec decodeSymbols(const SymbolTable::Storage array, size_t size);
+    static SymbolVec decodeSymbols(StatName stat_name);
 
     /**
      * Decodes a uint8_t array into a sequence of symbols and literal strings.
@@ -105,8 +105,7 @@ public:
      * @param symbol_token_fn a function to be called whenever a symbol is encountered in the array.
      * @param string_view_token_fn a function to be called whenever a string literal is encountered.
      */
-    static void decodeTokens(const SymbolTable::Storage array, size_t size,
-                             const std::function<void(Symbol)>& symbol_token_fn,
+    static void decodeTokens(StatName stat_name, const std::function<void(Symbol)>& symbol_token_fn,
                              const std::function<void(absl::string_view)>& string_view_token_fn);
 
     /**
@@ -240,7 +239,7 @@ private:
    * @param size the size of the array in bytes.
    * @return std::string the retrieved stat name.
    */
-  std::vector<absl::string_view> decodeStrings(const Storage array, size_t size) const;
+  std::vector<absl::string_view> decodeStrings(StatName stat_name) const;
 
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
