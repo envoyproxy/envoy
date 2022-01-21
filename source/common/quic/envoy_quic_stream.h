@@ -198,5 +198,26 @@ private:
   http2::adapter::HeaderValidator header_validator_;
 };
 
+// Object used for tracking bytes sent on a QuicStream since this object was constructed.
+class IncrementalBytesSentTracker {
+ public:
+  IncrementalBytesSentTracker(const quic::QuicStream& stream)
+      : stream_(stream), initial__bytes_sent_(totalStreamBytesSent()) {}
+
+  // Returns the number of newly sent bytes since the tracker was constructed.
+  uint64_t incrementalBytesSent() {
+    ASSERT(totalStreamBytesSent() >= initial__bytes_sent_);
+    return totalStreamBytesSent() - initial__bytes_sent_;
+  }
+
+ private:
+  uint64_t totalStreamBytesSent() const {
+    return  stream_.stream_bytes_written() + stream_.BufferedDataBytes();
+  }
+
+  const quic::QuicStream& stream_;
+  uint64_t initial__bytes_sent_;
+};
+
 } // namespace Quic
 } // namespace Envoy
