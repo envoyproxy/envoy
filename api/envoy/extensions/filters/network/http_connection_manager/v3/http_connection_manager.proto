@@ -312,9 +312,9 @@ message HttpConnectionManager {
   // The Proxy-Status header is a string of the form:
   //
   //   "<server_name>; error=<error_type>; details=<details>"
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message ProxyStatusConfig {
-    enum ProxyName {
+    enum PresetProxyName {
       // Use the string "envoy".
       ENVOY_LITERAL = 0;
 
@@ -345,7 +345,13 @@ message HttpConnectionManager {
     // The name of the proxy as it appears at the start of the Proxy-Status
     // header.
     // This value defaults to ENVOY_LITERAL, i.e. `envoy`.
-    ProxyName proxy_name = 5;
+    oneof proxy_name {
+      // This could be some preset value,
+      PresetProxyName preset_proxy_name = 5;
+
+      // or a literal injected via this config.
+      string literal_proxy_name = 6;
+    }
   }
 
   reserved 27, 11;

@@ -68,7 +68,8 @@ class ProxyStatusTest : public ::testing::Test {
 protected:
   void SetUp() override {
     proxy_status_config_.set_remove_details(false);
-    proxy_status_config_.set_proxy_name(HttpConnectionManager::ProxyStatusConfig::ENVOY_LITERAL);
+    proxy_status_config_.set_preset_proxy_name(
+        HttpConnectionManager::ProxyStatusConfig::ENVOY_LITERAL);
 
     ON_CALL(stream_info_, hasAnyResponseFlag()).WillByDefault(Return(true));
     ON_CALL(stream_info_, hasResponseFlag(ResponseFlag::DelayInjected)).WillByDefault(Return(true));
@@ -188,7 +189,8 @@ TEST_F(ProxyStatusTest, ToStringAbsentResponseFlags) {
 }
 
 TEST_F(ProxyStatusTest, ToStringNoServerName) {
-  proxy_status_config_.set_proxy_name(HttpConnectionManager::ProxyStatusConfig::ENVOY_LITERAL);
+  proxy_status_config_.set_preset_proxy_name(
+      HttpConnectionManager::ProxyStatusConfig::ENVOY_LITERAL);
   EXPECT_THAT(ProxyStatusUtils::makeProxyStatusHeader(stream_info_,
                                                       ProxyStatusError::ProxyConfigurationError,
                                                       /*node_id=*/"UNUSED", proxy_status_config_),
@@ -196,11 +198,19 @@ TEST_F(ProxyStatusTest, ToStringNoServerName) {
 }
 
 TEST_F(ProxyStatusTest, ToStringServerName) {
-  proxy_status_config_.set_proxy_name(HttpConnectionManager::ProxyStatusConfig::NODE_ID);
+  proxy_status_config_.set_preset_proxy_name(HttpConnectionManager::ProxyStatusConfig::NODE_ID);
   EXPECT_THAT(ProxyStatusUtils::makeProxyStatusHeader(stream_info_,
                                                       ProxyStatusError::ProxyConfigurationError,
                                                       /*node_id=*/"foo", proxy_status_config_),
               AllOf(HasSubstr("foo"), Not(HasSubstr("envoy"))));
+}
+
+TEST_F(ProxyStatusTest, ToStringLiteral) {
+  proxy_status_config_.set_literal_proxy_name("foo_bar_baz");
+  EXPECT_THAT(ProxyStatusUtils::makeProxyStatusHeader(stream_info_,
+                                                      ProxyStatusError::ProxyConfigurationError,
+                                                      /*node_id=*/"UNUSED", proxy_status_config_),
+              AllOf(HasSubstr("foo_bar_baz"), Not(HasSubstr("envoy")), Not(HasSubstr("UNUSED"))));
 }
 
 TEST(ProxyStatusRecommendedHttpStatusCode, TestAll) {

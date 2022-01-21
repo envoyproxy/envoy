@@ -196,14 +196,32 @@ const std::string ProxyStatusUtils::makeProxyStatusHeader(
         ProxyStatusConfig& proxy_status_config) {
   std::vector<std::string> retval = {};
 
-  switch (proxy_status_config.proxy_name()) {
+  // For the proxy name, the config specified either a preset proxy name or a literal proxy name.
+  switch (proxy_status_config.proxy_name_case()) {
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      ProxyStatusConfig::NODE_ID: {
-    retval.push_back(std::string(node_id));
+      ProxyStatusConfig::ProxyNameCase::kLiteralProxyName: {
+    retval.push_back(std::string(proxy_status_config.literal_proxy_name()));
     break;
   }
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      ProxyStatusConfig::ENVOY_LITERAL:
+      ProxyStatusConfig::ProxyNameCase::kPresetProxyName: {
+    switch (proxy_status_config.preset_proxy_name()) {
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        ProxyStatusConfig::NODE_ID: {
+      retval.push_back(std::string(node_id));
+      break;
+    }
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        ProxyStatusConfig::ENVOY_LITERAL:
+    default: {
+      retval.push_back(Envoy::Http::DefaultServerString::get());
+      break;
+    }
+    }
+    break;
+  }
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      ProxyStatusConfig::ProxyNameCase::PROXY_NAME_NOT_SET:
   default: {
     retval.push_back(Envoy::Http::DefaultServerString::get());
     break;
