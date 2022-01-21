@@ -33,3 +33,25 @@ py_binary(
         requirement("envoy.dependency.pip_check"),
     ],
 )
+
+py_binary(
+    name = "validate",
+    srcs = ["validate.py"],
+    args = [
+        "$(location //bazel:all_repository_locations)",
+        "$(location //source/extensions:extensions_build_config)",
+    ],
+    data = [
+        "//bazel:all_repository_locations",
+        "//source/extensions:extensions_build_config",
+    ],
+    deps = [
+        "//tools/base:bazel_query",
+    ],
+)
+
+py_binary(
+    name = "validate_test",
+    srcs = ["validate_test.py"],
+    deps = [":validate"],
+)
