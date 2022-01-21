@@ -9,6 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Common {
 namespace RateLimit {
+
 class XRateLimitHeaderValues {
 public:
   const Http::LowerCaseString XRateLimitLimit{"x-ratelimit-limit"};
@@ -20,6 +21,7 @@ public:
     const std::string Name{"name"};
   } QuotaPolicyKeys;
 };
+
 using XRateLimitHeaders = ConstSingleton<XRateLimitHeaderValues>;
 } // namespace RateLimit
 } // namespace Common

@@ -23,11 +23,9 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
   }
 
-  RateLimit::TokenBucket default_token_bucket;
-  default_token_bucket.max_tokens_ = max_tokens;
-  default_token_bucket.tokens_per_fill_ = tokens_per_fill;
-  default_token_bucket.fill_interval_ = absl::FromChrono(fill_interval);
-  default_descriptor_.token_bucket_ = default_token_bucket;
+  default_descriptor_.token_bucket_.max_tokens_ = max_tokens;
+  default_descriptor_.token_bucket_.tokens_per_fill_ = tokens_per_fill;
+  default_descriptor_.token_bucket_.fill_interval_ = absl::FromChrono(fill_interval);
   auto default_token_state = std::make_unique<TokenState>();
   default_token_state->tokens_ = max_tokens;
   default_token_state->fill_time_ = time_source_.monotonicTime();

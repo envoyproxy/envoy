@@ -108,7 +108,7 @@ message LocalRateLimit {
   // If unspecified, the default value is false.
   bool local_rate_limit_per_downstream_connection = 11;
 
-  // Defines the standard version to use for X-RateLimit headers emitted by the filter:
+  // Defines the standard version to use for X-RateLimit headers emitted by the filter.
   //
   // Disabled by default.
   common.ratelimit.v3.XRateLimitHeadersRFCVersion enable_x_ratelimit_headers = 12
