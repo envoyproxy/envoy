@@ -90,43 +90,65 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     return handlerPrometheusStats(url, response_headers, response, admin_stream);
   }
 
-  std::map<std::string, uint64_t> all_stats;
-  for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
-    if (shouldShowMetric(*counter, used_only, regex)) {
-      all_stats.emplace(counter->name(), counter->value());
-    }
+  auto iter = context_map_.find(&admin_stream);
+  if (iter == context_map_.end()) {
+    auto insertion = context_map_.emplace(&admin_stream, std::make_unique<Context>(
+        server_, used_only, regex, format_value));
+    iter = insertion.first;
   }
+  Context& context = *iter->second;
 
-  for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
-    if (shouldShowMetric(*gauge, used_only, regex)) {
-      ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
-      all_stats.emplace(gauge->name(), gauge->value());
-    }
-  }
-
-  std::map<std::string, std::string> text_readouts;
-  for (const auto& text_readout : server_.stats().textReadouts()) {
-    if (shouldShowMetric(*text_readout, used_only, regex)) {
-      text_readouts.emplace(text_readout->name(), text_readout->value());
-    }
-  }
-
+  Http::Code code = Http::Code::NotFound;
   if (!format_value.has_value()) {
     // Display plain stats if format query param is not there.
-    statsAsText(all_stats, text_readouts, server_.stats().histograms(), used_only, regex, response);
-    return Http::Code::OK;
+    code = context.statsAsText(response_headers, response);
+  } else if (format_value.value() == "json") {
+    code = context.statsAsJson(response_headers, response, params.find("pretty") != params.end());
+  } else {
+    response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
+    response.add("\n");
+  }
+  if (code != Http::Code::Continue) {
+    context_map_.erase(iter);
   }
 
-  if (format_value.value() == "json") {
-    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-    response.add(
-        statsAsJson(all_stats, text_readouts, server_.stats().histograms(), used_only, regex));
-    return Http::Code::OK;
+  return code;
+}
+
+StatsHandler::Context::Context(Server::Instance& server,
+                               bool used_only, absl::optional<std::regex> regex,
+                               absl::optional<std::string> format_value)
+    : used_only_(used_only), regex_(regex), format_value_(format_value) {
+  for (const Stats::CounterSharedPtr& counter : server.stats().counters()) {
+    if (shouldShowMetric(*counter)) {
+      all_stats_.emplace(counter->name(), counter->value());
+    }
   }
 
-  response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
-  response.add("\n");
-  return Http::Code::NotFound;
+  for (const Stats::GaugeSharedPtr& gauge : server.stats().gauges()) {
+    if (shouldShowMetric(*gauge)) {
+      ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
+      all_stats_.emplace(gauge->name(), gauge->value());
+    }
+  }
+  all_stats_iter_ = all_stats_.begin();
+
+  for (const auto& text_readout : server.stats().textReadouts()) {
+    if (shouldShowMetric(*text_readout)) {
+      text_readouts_.emplace(text_readout->name(), text_readout->value());
+    }
+  }
+  text_readouts_iter_ = text_readouts_.begin();
+
+  histograms_ = server.stats().histograms();
+}
+
+bool StatsHandler::Context::Context::nextChunk() {
+  if (++chunk_index_ == chunk_size_) {
+    chunk_index_= 0;
+    return true;
+  }
+  return false;
 }
 
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
@@ -171,22 +193,26 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
   return Http::Code::OK;
 }
 
-void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
-                               const std::map<std::string, std::string>& text_readouts,
-                               const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                               bool used_only, const absl::optional<std::regex>& regex,
-                               Buffer::Instance& response) {
+Http::Code StatsHandler::Context::statsAsText(Http::ResponseHeaderMap& /*response_headers*/,
+                                              Buffer::Instance& response) {
   // Display plain stats if format query param is not there.
-  for (const auto& text_readout : text_readouts) {
+  for (; text_readouts_iter_ != text_readouts_.end(); ++text_readouts_iter_) {
+    if (nextChunk()) {
+      return Http::Code::Continue;
+    }
     response.addFragments(
-        {text_readout.first, ": \"", Html::Utility::sanitize(text_readout.second), "\"\n"});
+        {text_readouts_iter_->first, ": \"", Html::Utility::sanitize(text_readouts_iter_->second),
+         "\"\n"});
   }
-  for (const auto& stat : all_stats) {
-    response.addFragments({stat.first, ": ", absl::StrCat(stat.second), "\n"});
+  for (; all_stats_iter_ != all_stats_.end(); ++all_stats_iter_) {
+    if (nextChunk()) {
+      return Http::Code::Continue;
+    }
+    response.addFragments({all_stats_iter_->first, ": ", absl::StrCat(all_stats_iter_->second), "\n"});
   }
   std::map<std::string, std::string> all_histograms;
-  for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
-    if (shouldShowMetric(*histogram, used_only, regex)) {
+  for (const Stats::ParentHistogramSharedPtr& histogram : histograms_) {
+    if (shouldShowMetric(*histogram)) {
       auto insert = all_histograms.emplace(histogram->name(), histogram->quantileSummary());
       ASSERT(insert.second); // No duplicates expected.
     }
@@ -194,25 +220,25 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
   for (const auto& histogram : all_histograms) {
     response.addFragments({histogram.first, ": ", histogram.second, "\n"});
   }
+  return Http::Code::OK;
 }
 
-std::string
-StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                          const std::map<std::string, std::string>& text_readouts,
-                          const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                          const bool used_only, const absl::optional<std::regex>& regex,
-                          const bool pretty_print) {
+Http::Code StatsHandler::Context::statsAsJson(Http::ResponseHeaderMap& response_headers,
+                                              Buffer::Instance& response,
+                                              const bool pretty_print) {
+
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
   ProtobufWkt::Struct document;
   std::vector<ProtobufWkt::Value> stats_array;
-  for (const auto& text_readout : text_readouts) {
+  for (const auto& text_readout : text_readouts_) {
     ProtobufWkt::Struct stat_obj;
     auto* stat_obj_fields = stat_obj.mutable_fields();
     (*stat_obj_fields)["name"] = ValueUtil::stringValue(text_readout.first);
     (*stat_obj_fields)["value"] = ValueUtil::stringValue(text_readout.second);
     stats_array.push_back(ValueUtil::structValue(stat_obj));
   }
-  for (const auto& stat : all_stats) {
+  for (const auto& stat : all_stats_) {
     ProtobufWkt::Struct stat_obj;
     auto* stat_obj_fields = stat_obj.mutable_fields();
     (*stat_obj_fields)["name"] = ValueUtil::stringValue(stat.first);
@@ -228,8 +254,8 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   std::vector<ProtobufWkt::Value> computed_quantile_array;
 
   bool found_used_histogram = false;
-  for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
-    if (shouldShowMetric(*histogram, used_only, regex)) {
+  for (const Stats::ParentHistogramSharedPtr& histogram : histograms_) {
+    if (shouldShowMetric(*histogram)) {
       if (!found_used_histogram) {
         // It is not possible for the supported quantiles to differ across histograms, so it is ok
         // to send them once.
@@ -274,7 +300,8 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   auto* document_fields = document.mutable_fields();
   (*document_fields)["stats"] = ValueUtil::listValue(stats_array);
 
-  return MessageUtil::getJsonStringFromMessageOrDie(document, pretty_print, true);
+  response.add(MessageUtil::getJsonStringFromMessageOrDie(document, pretty_print, true));
+  return Http::Code::OK;
 }
 
 } // namespace Server

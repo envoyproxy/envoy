@@ -12,6 +12,7 @@
 #include "source/common/stats/histogram_impl.h"
 #include "source/server/admin/handler_ctx.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -47,6 +48,35 @@ public:
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
 
+  class Context {
+   public:
+    Context(Server::Instance& server,
+            bool used_only, absl::optional<std::regex> regex,
+            absl::optional<std::string> format_value);
+
+    bool nextChunk();
+
+    template<class StatType> bool shouldShowMetric(const StatType& stat) {
+      return StatsHandler::shouldShowMetric(stat, used_only_, regex_);
+    }
+
+    Http::Code statsAsText(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
+    Http::Code statsAsJson(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                           bool pretty);
+
+    const bool used_only_;
+    absl::optional<std::regex> regex_;
+    absl::optional<std::string> format_value_;
+    std::map<std::string, uint64_t> all_stats_;
+    std::map<std::string, uint64_t>::iterator all_stats_iter_;
+    std::map<std::string, std::string> text_readouts_;
+    std::map<std::string, std::string>::iterator text_readouts_iter_;
+    std::vector<Stats::ParentHistogramSharedPtr> histograms_;
+    static constexpr uint32_t chunk_size_ = 10;
+    uint32_t chunk_index_{0};;
+  };
+  using ContextPtr = std::unique_ptr<Context>;
+
 private:
   template <class StatType>
   static bool shouldShowMetric(const StatType& metric, const bool used_only,
@@ -57,17 +87,7 @@ private:
 
   friend class StatsHandlerTest;
 
-  static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                                 const std::map<std::string, std::string>& text_readouts,
-                                 const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                                 bool used_only, const absl::optional<std::regex>& regex,
-                                 bool pretty_print = false);
-
-  void statsAsText(const std::map<std::string, uint64_t>& all_stats,
-                   const std::map<std::string, std::string>& text_readouts,
-                   const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                   bool used_only, const absl::optional<std::regex>& regex,
-                   Buffer::Instance& response);
+  absl::flat_hash_map<AdminStream*, std::unique_ptr<Context>> context_map_;
 };
 
 } // namespace Server
