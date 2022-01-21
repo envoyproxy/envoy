@@ -93,6 +93,7 @@ public:
     spdy_request_headers_[":authority"] = host_;
     spdy_request_headers_[":method"] = "POST";
     spdy_request_headers_[":path"] = "/";
+    spdy_request_headers_[":scheme"] = "https";
   }
 
   void TearDown() override {
@@ -128,6 +129,38 @@ public:
     std::string data = absl::StrCat(spdyHeaderToHttp3StreamPayload(spdy_request_headers_),
                                     bodyToHttp3StreamPayload(payload));
     quic::QuicStreamFrame frame(stream_id_, fin, 0, data);
+    quic_stream_->OnStreamFrame(frame);
+    EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
+    return data.length();
+  }
+
+  size_t receiveRequestHeaders(bool end_stream) {
+    EXPECT_CALL(stream_decoder_, decodeHeaders_(_, end_stream))
+        .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
+          EXPECT_EQ(host_, headers->getHostValue());
+          EXPECT_EQ("/", headers->getPathValue());
+          EXPECT_EQ(Http::Headers::get().MethodValues.Post, headers->getMethodValue());
+        }));
+
+    std::string data = spdyHeaderToHttp3StreamPayload(spdy_request_headers_);
+    quic::QuicStreamFrame frame(stream_id_, end_stream, 0, data);
+    quic_stream_->OnStreamFrame(frame);
+    EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
+    return data.length();
+  }
+
+  size_t receiveRequestBody(size_t offset, const std::string& payload, bool fin,
+                            size_t decoder_buffer_high_watermark) {
+    EXPECT_CALL(stream_decoder_, decodeData(_, _))
+        .WillOnce(Invoke([&](Buffer::Instance& buffer, bool finished_reading) {
+          EXPECT_EQ(payload, buffer.toString());
+          EXPECT_EQ(fin, finished_reading);
+          if (!finished_reading && buffer.length() > decoder_buffer_high_watermark) {
+            quic_stream_->readDisable(true);
+          }
+        }));
+    std::string data = absl::StrCat(bodyToHttp3StreamPayload(payload));
+    quic::QuicStreamFrame frame(stream_id_, fin, offset, data);
     quic_stream_->OnStreamFrame(frame);
     EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
     return data.length();
@@ -196,6 +229,31 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
   receiveRequest(request_body_, true, request_body_.size() * 2);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
   quic_stream_->encodeTrailers(response_trailers_);
+}
+
+TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithAccounting) {
+  EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
+  EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesReceived());
+  EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesReceived());
+  size_t offset = receiveRequestHeaders(false);
+  // Received header bytes do not include the HTTP/3 frame overhead.
+  EXPECT_EQ(quic_stream_->stream_bytes_read() - 2, quic_stream_->bytesMeter()->headerBytesReceived());
+  EXPECT_EQ(quic_stream_->stream_bytes_read(), quic_stream_->bytesMeter()->wireBytesReceived());
+  size_t body_size = receiveRequestBody(offset, request_body_, true, request_body_.size() * 2);
+  EXPECT_EQ(quic_stream_->stream_bytes_read(), quic_stream_->bytesMeter()->wireBytesReceived());
+  EXPECT_EQ(quic_stream_->stream_bytes_read() - 2 - body_size, quic_stream_->bytesMeter()->headerBytesReceived());
+  // Wire bytes received will be slightly larger than the body + headers because of body framing.
+  EXPECT_EQ(4 + request_body_.size() + quic_stream_->bytesMeter()->headerBytesReceived(),
+            quic_stream_->bytesMeter()->wireBytesReceived());
+  EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesSent());
+  EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesSent());
+  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+  EXPECT_GE(27, quic_stream_->bytesMeter()->headerBytesSent());
+  EXPECT_GE(27, quic_stream_->bytesMeter()->wireBytesSent());
+
+  quic_stream_->encodeTrailers(response_trailers_);
+  EXPECT_GE(52, quic_stream_->bytesMeter()->headerBytesSent());
+  EXPECT_GE(52, quic_stream_->bytesMeter()->wireBytesSent());
 }
 
 TEST_F(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {

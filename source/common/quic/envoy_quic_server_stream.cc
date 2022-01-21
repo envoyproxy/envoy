@@ -47,8 +47,11 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   // This is counting not serialized bytes in the send buffer.
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-  size_t header_bytes_sent = WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
-  mutableBytesMeter()->addHeaderBytesSent(header_bytes_sent);
+  uint64_t bytes_written = stream_bytes_written();
+  WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
+  mutableBytesMeter()->addHeaderBytesSent(stream_bytes_written() - bytes_written);
+  mutableBytesMeter()->addWireBytesSent(stream_bytes_written() - bytes_written);
+
   if (local_end_stream_) {
     onLocalEndStream();
   }
@@ -76,7 +79,9 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   }
   absl::Span<quic::QuicMemSlice> span(quic_slices);
   // QUIC stream must take all.
+  uint64_t bytes_written = stream_bytes_written();
   WriteBodySlices(span, end_stream);
+  mutableBytesMeter()->addWireBytesSent(stream_bytes_written() - bytes_written);
   if (data.length() > 0) {
     // Send buffer didn't take all the data, threshold needs to be adjusted.
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
@@ -92,7 +97,11 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
   local_end_stream_ = true;
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
+
+  uint64_t bytes_written = stream_bytes_written();
   WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+  mutableBytesMeter()->addHeaderBytesSent(stream_bytes_written() - bytes_written);
+  mutableBytesMeter()->addWireBytesSent(stream_bytes_written() - bytes_written);
   onLocalEndStream();
 }
 
@@ -134,6 +143,10 @@ void EnvoyQuicServerStream::switchStreamBlockState() {
 
 void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
+  if (stream_bytes_read() > bytesMeter()->wireBytesReceived()) {
+    mutableBytesMeter()->addWireBytesReceived(stream_bytes_read() - bytesMeter()->wireBytesReceived());
+  }
+  mutableBytesMeter()->addHeaderBytesReceived(frame_len);
   // TODO(danzh) Fix in QUICHE. If the stream has been reset in the call stack,
   // OnInitialHeadersComplete() shouldn't be called.
   if (read_side_closed()) {
@@ -167,11 +180,6 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   request_decoder_->decodeHeaders(std::move(headers),
                                   /*end_stream=*/fin);
   ConsumeHeaderList();
-}
-
-void EnvoyQuicServerStream::OnStreamDataConsumed(quic::QuicByteCount bytes_consumed) {
-  mutableBytesMeter()->addWireBytesSent(bytes_consumed);
-  QuicSpdyStream::OnStreamDataConsumed(bytes_consumed);
 }
 
 void EnvoyQuicServerStream::OnBodyAvailable() {
@@ -228,6 +236,10 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
 
 void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
+  if (stream_bytes_read() > bytesMeter()->wireBytesReceived()) {
+    mutableBytesMeter()->addWireBytesReceived(stream_bytes_read() - bytesMeter()->wireBytesReceived());
+  }
+  mutableBytesMeter()->addHeaderBytesReceived(frame_len);
   if (read_side_closed()) {
     return;
   }

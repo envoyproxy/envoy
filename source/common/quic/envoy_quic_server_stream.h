@@ -36,8 +36,6 @@ public:
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
 
-  // quic::QuicStream
-  void OnStreamDataConsumed(quic::QuicByteCount bytes_consumed) override;
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   bool OnStopSending(quic::QuicResetStreamError error) override;
