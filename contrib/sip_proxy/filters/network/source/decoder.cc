@@ -1,5 +1,7 @@
 #include "contrib/sip_proxy/filters/network/source/decoder.h"
 
+#include <utility>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 
@@ -8,6 +10,7 @@
 #include "source/common/common/macros.h"
 
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
+#include "contrib/sip_proxy/filters/network/source/decoder_events.h"
 #include "re2/re2.h"
 
 namespace Envoy {
@@ -67,6 +70,7 @@ State DecoderStateMachine::run() {
 Decoder::Decoder(DecoderCallbacks& callbacks) : callbacks_(callbacks) {}
 
 void Decoder::complete() {
+  ENVOY_LOG(trace, "sip message COMPLETE");
   request_.reset();
   metadata_.reset();
   state_machine_ = nullptr;
@@ -79,10 +83,21 @@ void Decoder::complete() {
   first_route_ = true;
 }
 
-FilterStatus Decoder::onData(Buffer::Instance& data) {
-  ENVOY_LOG(debug, "sip: {} bytes available", data.length());
+FilterStatus Decoder::onData(Buffer::Instance& data, bool continue_handling) {
+  if (continue_handling) {
+    /* means previous handling suspended, continue handling last request,  */
+    State rv = state_machine_->run();
 
-  reassemble(data);
+    if (rv == State::Done) {
+      complete();
+      reassemble(data);
+    }
+  } else {
+    if (start_new_message_) {
+      start_new_message_ = false;
+      reassemble(data);
+    }
+  }
   return FilterStatus::StopIteration;
 }
 
@@ -161,7 +176,7 @@ int Decoder::reassemble(Buffer::Instance& data) {
 }
 
 FilterStatus Decoder::onDataReady(Buffer::Instance& data) {
-  ENVOY_LOG(trace, "onDataReady {}\n{}", data.length(), data.toString());
+  ENVOY_LOG(info, "SIP onDataReady {}\n{}", data.length(), data.toString());
 
   metadata_ = std::make_shared<MessageMetadata>(data.toString());
 
@@ -171,7 +186,7 @@ FilterStatus Decoder::onDataReady(Buffer::Instance& data) {
   state_machine_ = std::make_unique<DecoderStateMachine>(metadata_, request_->handler_);
   State rv = state_machine_->run();
 
-  if (rv == State::Done || rv == State::StopIteration) {
+  if (rv == State::Done) {
     complete();
   }
 
@@ -193,6 +208,7 @@ auto Decoder::sipHeaderType(absl::string_view sip_line) {
       {"Service-Route", HeaderType::SRoute},
       {"WWW-Authenticate", HeaderType::WAuth},
       {"Authorization", HeaderType::Auth},
+      {"P-Nokia-Cookie-IP-Mapping", HeaderType::PCookieIPMap},
       {"", HeaderType::Other}};
 
   auto header_type_str = sip_line.substr(0, sip_line.find_first_of(':'));
@@ -252,6 +268,7 @@ Decoder::HeaderHandler::HeaderHandler(MessageHandler& parent)
                            {HeaderType::SRoute, &HeaderHandler::processServiceRoute},
                            {HeaderType::WAuth, &HeaderHandler::processWwwAuth},
                            {HeaderType::Auth, &HeaderHandler::processAuth},
+                           {HeaderType::PCookieIPMap, &HeaderHandler::processPCookieIPMap},
                        } {}
 
 int Decoder::HeaderHandler::processPath(absl::string_view& header) {
@@ -267,13 +284,7 @@ int Decoder::HeaderHandler::processRoute(absl::string_view& header) {
   }
   setFirstRoute(false);
 
-  if (auto loc = header.find(";ep="); loc != absl::string_view::npos) {
-    // No "" of ep string
-    auto start = loc + strlen(";ep=");
-    if (auto end = header.find_first_of(";>", start); end != absl::string_view::npos) {
-      metadata()->setRouteEP(header.substr(start, end - start));
-    }
-  }
+  Decoder::getParamFromHeader(header, metadata());
 
   metadata()->setTopRoute(header);
   metadata()->setDomain(header, parent_.parent_.getDomainMatchParamName());
@@ -298,21 +309,34 @@ int Decoder::HeaderHandler::processWwwAuth(absl::string_view& header) {
 }
 
 int Decoder::HeaderHandler::processAuth(absl::string_view& header) {
-  auto loc = header.find(", opaque=");
+  auto loc = header.find("opaque=");
   if (loc == absl::string_view::npos) {
     return 0;
   }
   // has ""
-  auto start = loc + strlen(", opaque=\"");
-  auto end = header.find("\"", start);
+  auto start = loc + strlen("opaque=\"");
+  auto end = header.find('\"', start);
   if (end == absl::string_view::npos) {
     return 0;
   }
-
-  metadata()->setRouteOpaque(header.substr(start, end - start - 1));
+  metadata()->addParam("ep", header.substr(start, end - start).data());
   return 0;
 }
 
+int Decoder::HeaderHandler::processPCookieIPMap(absl::string_view& header) {
+  auto loc = header.find('=');
+  if (loc == absl::string_view::npos) {
+    return 0;
+  }
+  auto lskpmc =
+      header.substr(header.find(": ") + strlen(": "), loc - header.find(": ") - strlen(": "));
+  auto ip = header.substr(loc + 1, header.length() - loc - 1);
+
+  metadata()->setPCookieIpMap(std::make_pair(std::string(lskpmc), std::string(ip)));
+  metadata()->setOperation(Operation(OperationType::Delete, rawOffset(),
+                                     DeleteOperationValue(header.length() + strlen("\r\n"))));
+  return 0;
+}
 //
 // 200 OK Header Handler
 //
@@ -377,6 +401,9 @@ void Decoder::REGISTERHandler::parseHeader(HeaderType& type, absl::string_view& 
   case HeaderType::Auth:
     handler_->processAuth(header);
     break;
+  case HeaderType::PCookieIPMap:
+    handler_->processPCookieIPMap(header);
+    break;
   default:
     break;
   }
@@ -395,6 +422,9 @@ void Decoder::INVITEHandler::parseHeader(HeaderType& type, absl::string_view& he
     break;
   case HeaderType::Contact:
     handler_->processContact(header);
+    break;
+  case HeaderType::PCookieIPMap:
+    handler_->processPCookieIPMap(header);
     break;
   default:
     break;
@@ -421,6 +451,9 @@ void Decoder::OK200Handler::parseHeader(HeaderType& type, absl::string_view& hea
   case HeaderType::SRoute:
     handler_->processServiceRoute(header);
     break;
+  case HeaderType::PCookieIPMap:
+    handler_->processPCookieIPMap(header);
+    break;
   default:
     break;
   }
@@ -442,6 +475,9 @@ void Decoder::GeneralHandler::parseHeader(HeaderType& type, absl::string_view& h
     break;
   case HeaderType::RRoute:
     handler_->processRecordRoute(header);
+    break;
+  case HeaderType::PCookieIPMap:
+    handler_->processPCookieIPMap(header);
     break;
   default:
     break;
@@ -465,6 +501,9 @@ void Decoder::SUBSCRIBEHandler::parseHeader(HeaderType& type, absl::string_view&
   case HeaderType::RRoute:
     handler_->processRecordRoute(header);
     break;
+  case HeaderType::PCookieIPMap:
+    handler_->processPCookieIPMap(header);
+    break;
   default:
     break;
   }
@@ -480,6 +519,9 @@ void Decoder::FAILURE4XXHandler::parseHeader(HeaderType& type, absl::string_view
     break;
   case HeaderType::Via:
     handler_->processVia(header);
+    break;
+  case HeaderType::PCookieIPMap:
+    handler_->processPCookieIPMap(header);
     break;
   default:
     break;
@@ -502,6 +544,9 @@ void Decoder::OthersHandler::parseHeader(HeaderType& type, absl::string_view& he
     break;
   case HeaderType::SRoute:
     handler_->processServiceRoute(header);
+    break;
+  case HeaderType::PCookieIPMap:
+    handler_->processPCookieIPMap(header);
     break;
   default:
     break;
@@ -597,15 +642,81 @@ int Decoder::parseTopLine(absl::string_view& top_line) {
     metadata->setRequestURI(top_line);
   }
 
-  if (auto loc = top_line.find(";ep="); loc != absl::string_view::npos) {
-    // Need to exclude the "" of ep string
-    auto start = loc + strlen(";ep=");
+  Decoder::getParamFromHeader(top_line, metadata);
 
-    if (auto end = top_line.find_first_of("; ", start); end != absl::string_view::npos) {
-      metadata->setRouteEP(top_line.substr(start, end - start));
-    }
-  }
   return 0;
+}
+
+absl::string_view Decoder::domain(absl::string_view sip_header, HeaderType header_type) {
+  std::string domain = "";
+  std::string pattern = "";
+
+  switch (header_type) {
+  case HeaderType::TopLine:
+    pattern = ".*sip.*[:@](.*?) .*";
+    break;
+  case HeaderType::Route:
+    pattern = ".*sip.*[:@](.*?)[:;].*";
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
+  re2::RE2::FullMatch(static_cast<std::string>(sip_header), pattern, &domain);
+  return sip_header.substr(sip_header.find(domain), domain.length());
+}
+
+void Decoder::getParamFromHeader(absl::string_view header, MessageMetadataSharedPtr metadata) {
+  std::size_t pos = 0;
+  std::string pattern = "(.*)=(.*?)>*";
+
+  // If have both top line and top route, only keep one
+  metadata->resetParam();
+
+  // Has "SIP/2.0" in top line
+  // Eg: INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0
+  if (std::size_t found = header.find(" SIP"); found != absl::string_view::npos) {
+    header = static_cast<std::string>(header).substr(0, found);
+  }
+
+  ENVOY_LOG(debug, "Parameter in TopRoute/TopLine");
+  while (std::size_t found = header.find_first_of(";", pos)) {
+    std::string str;
+    if (found == absl::string_view::npos) {
+      str = static_cast<std::string>(header).substr(pos);
+    } else {
+      str = static_cast<std::string>(header).substr(pos, found - pos);
+    }
+
+    std::string param = "";
+    std::string value = "";
+    re2::RE2::FullMatch(static_cast<std::string>(str), pattern, &param, &value);
+
+    if (!param.empty() && !value.empty()) {
+      if (value.find("sip:") != absl::string_view::npos) {
+        value = value.substr(std::strlen("sip:"));
+      }
+      if (!value.empty()) {
+        std::size_t comma = value.find(':');
+        if (comma != absl::string_view::npos) {
+          value = value.substr(0, comma);
+        }
+      }
+      if (!value.empty()) {
+        ENVOY_LOG(debug, "{} = {}", param, value);
+        if (param == "opaque") {
+          metadata->addParam("ep", value);
+        } else {
+          metadata->addParam(param, value);
+        }
+      }
+    }
+
+    if (found == absl::string_view::npos) {
+      break;
+    }
+    pos = found + 1;
+  }
 }
 
 } // namespace SipProxy
