@@ -204,20 +204,8 @@ const std::string ProxyStatusUtils::makeProxyStatusHeader(
     break;
   }
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      ProxyStatusConfig::ProxyNameCase::kPresetProxyName: {
-    switch (proxy_status_config.preset_proxy_name()) {
-    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-        ProxyStatusConfig::NODE_ID: {
-      retval.push_back(std::string(node_id));
-      break;
-    }
-    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-        ProxyStatusConfig::ENVOY_LITERAL:
-    default: {
-      retval.push_back(Envoy::Http::DefaultServerString::get());
-      break;
-    }
-    }
+      ProxyStatusConfig::ProxyNameCase::kUseNodeId: {
+    retval.push_back(std::string(node_id));
     break;
   }
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::

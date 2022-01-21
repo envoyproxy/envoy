@@ -314,14 +314,6 @@ message HttpConnectionManager {
   //   "<server_name>; error=<error_type>; details=<details>"
   // [#next-free-field: 7]
   message ProxyStatusConfig {
-    enum PresetProxyName {
-      // Use the string "envoy".
-      ENVOY_LITERAL = 0;
-
-      // Use the node ID.
-      NODE_ID = 1;
-    }
-
     // If true, the details field of the Proxy-Status header is not populated with stream_info.response_code_details.
     // This value defaults to `false`, i.e. the `details` field is populated by default.
     bool remove_details = 1;
@@ -344,12 +336,10 @@ message HttpConnectionManager {
 
     // The name of the proxy as it appears at the start of the Proxy-Status
     // header.
-    // This value defaults to ENVOY_LITERAL, i.e. `envoy`.
+    // If neither of these values are set, defaults to "envoy".
     oneof proxy_name {
-      // This could be some preset value,
-      PresetProxyName preset_proxy_name = 5;
+      bool use_node_id = 5;
 
-      // or a literal injected via this config.
       string literal_proxy_name = 6;
     }
   }

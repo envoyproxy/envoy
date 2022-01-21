@@ -3729,8 +3729,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCodeAndServerNa
   proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
   proxy_status_config_->set_remove_details(false);
   proxy_status_config_->set_set_recommended_response_code(true);
-  proxy_status_config_->set_preset_proxy_name(
-      HttpConnectionManagerProto::ProxyStatusConfig::NODE_ID);
+  proxy_status_config_->set_use_node_id(true);
 
   initialize();
 
@@ -3750,8 +3749,6 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCode) {
   proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
   proxy_status_config_->set_remove_details(false);
   proxy_status_config_->set_set_recommended_response_code(true);
-  proxy_status_config_->set_preset_proxy_name(
-      HttpConnectionManagerProto::ProxyStatusConfig::ENVOY_LITERAL);
 
   initialize();
 
@@ -3773,8 +3770,6 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetails) {
   proxy_status_config_->set_remove_connection_termination_details(false);
   proxy_status_config_->set_remove_response_flags(false);
   proxy_status_config_->set_set_recommended_response_code(false);
-  proxy_status_config_->set_preset_proxy_name(
-      HttpConnectionManagerProto::ProxyStatusConfig::ENVOY_LITERAL);
 
   initialize();
 
@@ -3795,8 +3790,6 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithoutDetails) {
   proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
   proxy_status_config_->set_remove_details(true);
   proxy_status_config_->set_set_recommended_response_code(false);
-  proxy_status_config_->set_preset_proxy_name(
-      HttpConnectionManagerProto::ProxyStatusConfig::ENVOY_LITERAL);
 
   initialize();
 
@@ -3816,8 +3809,6 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithoutDetails) {
 TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
   proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
   proxy_status_config_->set_remove_details(false);
-  proxy_status_config_->set_preset_proxy_name(
-      HttpConnectionManagerProto::ProxyStatusConfig::ENVOY_LITERAL);
 
   initialize();
 
