@@ -773,7 +773,7 @@ public:
    * original values instead.
    */
   virtual Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
-                                                          bool do_formatting = true) const PURE;
+                                                         bool do_formatting = true) const PURE;
 
   /**
    * @return const HashPolicy* the optional hash policy for the route.
