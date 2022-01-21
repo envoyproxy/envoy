@@ -527,7 +527,8 @@ def format_security_options(security_option, field, type_context, edge_config):
         sections.append(indent(4, edge_config.note))
 
     example_dict = json_format.MessageToDict(edge_config.example)
-    validate_fragment.validate_fragment(field.type_name[1:], example_dict)
+    validate_fragment.validate_fragment(
+        field.type_name[1:], example_dict, descriptor_path=sys.argv[1])
     field_name = type_context.name.split('.')[-1]
     example = {field_name: example_dict}
     sections.append(
