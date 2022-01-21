@@ -167,32 +167,45 @@ public:
       string_view_ = absl::string_view(reinterpret_cast<const char*>(array_), length);
       size_ -= length;
       array_ += length;
+#ifndef NDEBUG
+      last_type_ = TokenType::StringView;
+#endif
       return TokenType::StringView;
     }
     std::pair<uint64_t, size_t> symbol_consumed = decodeNumber(array_);
     symbol_ = symbol_consumed.first;
     size_ -= symbol_consumed.second;
     array_ += symbol_consumed.second;
+#ifndef NDEBUG
+    last_type_ = TokenType::Symbol;
+#endif
     return TokenType::Symbol;
   }
 
-  /**
-   * @return the current string_view -- only valid to call if next()==TokenType::StringView
-   *
-   * Note -- this is performance critical code, and adding an absl::optional or
-   * assertion may add unnecessary overhead, so we rely on the above 'only
-   * valid' note instead.
-   */
-  absl::string_view stringView() const { return string_view_; }
+  /** @return the current string_view -- only valid to call if next()==TokenType::StringView */
+  absl::string_view stringView() const {
+#ifndef NDEBUG
+    ASSERT(last_type_ == TokenType::StringView);
+#endif
+    return string_view_;
+  }
 
   /** @return the current symbol -- only valid to call if next()==TokenType::Symbol */
-  Symbol symbol() const { return symbol_; }
+  Symbol symbol() const {
+#ifndef NDEBUG
+    ASSERT(last_type_ == TokenType::Symbol);
+#endif
+    return symbol_;
+  }
 
 private:
   const uint8_t* array_;
   size_t size_;
   absl::string_view string_view_;
   Symbol symbol_;
+#ifndef NDEBUG
+  TokenType last_type_{TokenType::End};
+#endif
 };
 
 void SymbolTableImpl::Encoding::decodeTokens(
