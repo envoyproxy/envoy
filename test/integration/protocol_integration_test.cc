@@ -3596,6 +3596,10 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
 }
 
 TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
+#ifdef WIN32
+  // Debug info for https://github.com/envoyproxy/envoy/issues/19430
+  LogLevelSetter save_levels(spdlog::level::trace);
+#endif
   SocketInterfaceSwap socket_swap;
 
   useAccessLog("%RESPONSE_CODE_DETAILS%");

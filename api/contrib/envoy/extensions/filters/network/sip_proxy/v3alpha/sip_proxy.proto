@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.sip_proxy.v3alpha;
 
+import "contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha/tra.proto";
 import "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/route.proto";
 
 import "google/protobuf/any.proto";
@@ -65,6 +66,8 @@ message SipProxy {
 
     // points to domain match with own_domain
     string domain_match_parameter_name = 3;
+
+    tra.v3alpha.TraServiceConfig tra_service_config = 4;
   }
 
   // The human readable prefix to use when emitting statistics.
@@ -106,4 +109,16 @@ message SipProtocolOptions {
 
   // The Register with Authorization header should go to the same endpoint which send out the 401 Unauthorized.
   bool registration_affinity = 2;
+
+  // Customized affinity
+  repeated CustomizedAffinity customized_affinity = 3;
+}
+
+// For affinity
+message CustomizedAffinity {
+  string key_name = 1;
+
+  bool query = 2;
+
+  bool subscribe = 3;
 }

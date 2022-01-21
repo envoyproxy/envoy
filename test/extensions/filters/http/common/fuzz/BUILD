@@ -49,7 +49,6 @@ envoy_cc_test_library(
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/tracing:http_tracer_lib",
-        "//source/extensions/filters/http/common:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",

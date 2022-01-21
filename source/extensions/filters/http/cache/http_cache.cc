@@ -128,8 +128,8 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
 }
 
 LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
-                                             ResponseMetadata&& metadata,
-                                             uint64_t content_length) const {
+                                             ResponseMetadata&& metadata, uint64_t content_length,
+                                             bool has_trailers) const {
   // TODO(toddmgreer): Implement all HTTP caching semantics.
   ASSERT(response_headers);
   LookupResult result;
@@ -149,7 +149,7 @@ LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& respon
   } else if (!result.response_ranges_.empty()) {
     result.cache_entry_status_ = CacheEntryStatus::SatisfiableRange;
   }
-  result.has_trailers_ = false;
+  result.has_trailers_ = has_trailers;
   return result;
 }
 
