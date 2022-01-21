@@ -149,12 +149,12 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     auto reset = remainingFillInterval(stored_descriptors_.value());
     stored_descriptors_.reset();
 
-    headers.addCopy(HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
-                    limit);
-    headers.addCopy(HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining,
-                    remaining);
-    headers.addCopy(HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
-                    reset);
+    headers.addReferenceKey(
+        HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit, limit);
+    headers.addReferenceKey(
+        HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining, remaining);
+    headers.addReferenceKey(
+        HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset, reset);
   }
 
   return Http::FilterHeadersStatus::Continue;
