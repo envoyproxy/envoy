@@ -16,8 +16,6 @@ from google.protobuf import json_format
 from google.protobuf import message_factory
 from google.protobuf import text_format
 
-from bazel_tools.tools.python.runfiles import runfiles
-
 import argparse
 
 
@@ -65,12 +63,6 @@ def validate_fragment(type_name, fragment, descriptor_path=None):
           fragment.
     """
     json_fragment = json.dumps(fragment, skipkeys=True)
-
-    if not descriptor_path:
-        r = runfiles.Create()
-        descriptor_path = r.Rlocation(
-            'envoy/tools/type_whisperer/all_protos_with_ext_pb_text.pb_text')
-
     file_desc_set = descriptor_pb2.FileDescriptorSet()
     text_format.Parse(
         pathlib.Path(descriptor_path).read_text(), file_desc_set, allow_unknown_extension=True)

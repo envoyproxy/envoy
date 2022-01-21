@@ -33,6 +33,7 @@ py_binary(
         ":manifest_proto_py_proto",
         "//tools/api_proto_plugin",
         "//tools/config_validation:validate_fragment",
+        "@bazel_tools//tools/python/runfiles",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",

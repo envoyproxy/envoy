@@ -8,9 +8,9 @@ py_binary(
     srcs = ["validate_fragment.py"],
     data = ["//tools/type_whisperer:all_protos_with_ext_pb_text.pb_text"],
     visibility = ["//visibility:public"],
+    args = ["--descriptor_path=$(location //tools/type_whisperer:all_protos_with_ext_pb_text.pb_text)"],
     deps = [
         requirement("PyYAML"),
-        "@bazel_tools//tools/python/runfiles",
         "@com_google_protobuf//:protobuf_python",
     ],
 )

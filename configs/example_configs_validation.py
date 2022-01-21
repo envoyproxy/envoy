@@ -10,9 +10,12 @@ from tools.config_validation.validate_fragment import validate_yaml
 
 def main():
     errors = []
-    for arg in sys.argv[1:]:
+    for arg in sys.argv[2:]:
         try:
-            validate_yaml("envoy.config.bootstrap.v3.Bootstrap", pathlib.Path(arg).read_text())
+            validate_yaml(
+                "envoy.config.bootstrap.v3.Bootstrap",
+                pathlib.Path(arg).read_text(),
+                descriptor_path=sys.argv[1])
         except (ParseError, KeyError) as e:
             errors.append(arg)
             print(f"\nERROR (validation failed): {arg}\n{e}\n\n")

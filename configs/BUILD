@@ -80,11 +80,13 @@ py_binary(
     name = "example_configs_validation",
     srcs = ["example_configs_validation.py"],
     args = (
+        "$(location //tools/type_whisperer:all_protos_with_ext_pb_text.pb_text)",
         "$(locations :configs) ",
         "$(locations //examples:configs) ",
         "$(locations //docs:configs) ",
     ),
     data = [
+        "//tools/type_whisperer:all_protos_with_ext_pb_text.pb_text",
         ":configs",
         "//docs:configs",
         "//examples:configs",
