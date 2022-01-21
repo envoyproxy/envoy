@@ -7,7 +7,7 @@ namespace Stats {
 // source/common/stats/symbol_table_impl.h" for the class definitions.
 
 /**
- * A symbolized representation of a hierarchical name.
+ * Runtime representation of an encoded stat name.
  */
 class StatName;
 
