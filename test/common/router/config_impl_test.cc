@@ -1871,7 +1871,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendMostSpecificWins) {
 
 class HeaderTransformsDoFormattingTest : public RouteMatcherTest {
 protected:
-  void RunTest(bool run_request_header_test) {
+  void runTest(bool run_request_header_test) {
     factory_context_.cluster_manager_.initializeClusters({"default"}, {});
     const std::string yaml_template = R"EOF(
   virtual_hosts:
@@ -1926,11 +1926,11 @@ protected:
 };
 
 TEST_F(HeaderTransformsDoFormattingTest, TestRequestHeader) {
-  RunTest(/*run_request_header_test=*/true);
+  runTest(/*run_request_header_test=*/true);
 }
 
 TEST_F(HeaderTransformsDoFormattingTest, TestResponseHeader) {
-  RunTest(/*run_request_header_test=*/false);
+  runTest(/*run_request_header_test=*/false);
 }
 
 TEST_F(RouteMatcherTest, TestAddGlobalResponseHeaderRemoveFromRoute) {
@@ -5302,7 +5302,7 @@ virtual_hosts:
 }
 class WeightedClustersHeaderTransformationsTest : public RouteMatcherTest {
 protected:
-  void RunTest(bool run_request_header_test) {
+  void runTest(bool run_request_header_test) {
     const std::string yaml_template = R"EOF(
   virtual_hosts:
     - name: www2
@@ -5375,11 +5375,11 @@ protected:
 };
 
 TEST_F(WeightedClustersHeaderTransformationsTest, TestRequestHeader) {
-  RunTest(/*run_request_header_test=*/true);
+  runTest(/*run_request_header_test=*/true);
 }
 
 TEST_F(WeightedClustersHeaderTransformationsTest, TestResponseHeader) {
-  RunTest(/*run_request_header_test=*/false);
+  runTest(/*run_request_header_test=*/false);
 }
 
 TEST_F(RouteMatcherTest, ExclusiveWeightedClustersOrClusterConfig) {
