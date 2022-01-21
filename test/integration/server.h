@@ -163,6 +163,7 @@ public:
   bool iterate(const IterateFn<TextReadout>& fn) const override {
     return wrapped_scope_->iterate(fn);
   }
+  StatName prefix() const override { return wrapped_scope_->prefix(); }
 
 private:
   Thread::MutexBasicLockable& lock_;
@@ -294,6 +295,11 @@ public:
     Thread::LockGuard lock(lock_);
     store_.forEachTextReadout(f_size, f_stat);
   }
+  void forEachScope(std::function<void(std::size_t)> f_size,
+                    StatFn<const Scope> f_scope) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachScope(f_size, f_scope);
+  }
   void forEachSinkedCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachSinkedCounter(f_size, f_stat);
@@ -387,6 +393,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.textReadouts();
   }
+  StatName prefix() const override { return store_.prefix(); }
 
   bool iterate(const IterateFn<Counter>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return store_.iterate(fn); }
