@@ -144,7 +144,8 @@ void EnvoyQuicClientStream::switchStreamBlockState() {
 void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
   if (stream_bytes_read() > bytesMeter()->wireBytesReceived()) {
-    mutableBytesMeter()->addWireBytesReceived(stream_bytes_read() - bytesMeter()->wireBytesReceived());
+    mutableBytesMeter()->addWireBytesReceived(stream_bytes_read() -
+                                              bytesMeter()->wireBytesReceived());
   }
   mutableBytesMeter()->addHeaderBytesReceived(frame_len);
   if (read_side_closed()) {
@@ -203,7 +204,8 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 
 void EnvoyQuicClientStream::OnBodyAvailable() {
   if (stream_bytes_read() > bytesMeter()->wireBytesReceived()) {
-    mutableBytesMeter()->addWireBytesReceived(stream_bytes_read() - bytesMeter()->wireBytesReceived());
+    mutableBytesMeter()->addWireBytesReceived(stream_bytes_read() -
+                                              bytesMeter()->wireBytesReceived());
   }
   ASSERT(FinishedReadingHeaders());
   if (read_side_closed()) {
@@ -255,7 +257,8 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
 void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
   if (stream_bytes_read() > bytesMeter()->wireBytesReceived()) {
-    mutableBytesMeter()->addWireBytesReceived(stream_bytes_read() - bytesMeter()->wireBytesReceived());
+    mutableBytesMeter()->addWireBytesReceived(stream_bytes_read() -
+                                              bytesMeter()->wireBytesReceived());
   }
   mutableBytesMeter()->addHeaderBytesReceived(frame_len);
   if (read_side_closed()) {

@@ -144,7 +144,8 @@ void EnvoyQuicServerStream::switchStreamBlockState() {
 void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
   if (stream_bytes_read() > bytesMeter()->wireBytesReceived()) {
-    mutableBytesMeter()->addWireBytesReceived(stream_bytes_read() - bytesMeter()->wireBytesReceived());
+    mutableBytesMeter()->addWireBytesReceived(stream_bytes_read() -
+                                              bytesMeter()->wireBytesReceived());
   }
   mutableBytesMeter()->addHeaderBytesReceived(frame_len);
   // TODO(danzh) Fix in QUICHE. If the stream has been reset in the call stack,
@@ -184,7 +185,8 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 
 void EnvoyQuicServerStream::OnBodyAvailable() {
   if (stream_bytes_read() > bytesMeter()->wireBytesReceived()) {
-    mutableBytesMeter()->addWireBytesReceived(stream_bytes_read() - bytesMeter()->wireBytesReceived());
+    mutableBytesMeter()->addWireBytesReceived(stream_bytes_read() -
+                                              bytesMeter()->wireBytesReceived());
   }
   ASSERT(FinishedReadingHeaders());
   if (read_side_closed()) {
@@ -237,7 +239,8 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
 void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
   if (stream_bytes_read() > bytesMeter()->wireBytesReceived()) {
-    mutableBytesMeter()->addWireBytesReceived(stream_bytes_read() - bytesMeter()->wireBytesReceived());
+    mutableBytesMeter()->addWireBytesReceived(stream_bytes_read() -
+                                              bytesMeter()->wireBytesReceived());
   }
   mutableBytesMeter()->addHeaderBytesReceived(frame_len);
   if (read_side_closed()) {

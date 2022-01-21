@@ -237,11 +237,13 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithAccounting) {
   EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesReceived());
   size_t offset = receiveRequestHeaders(false);
   // Received header bytes do not include the HTTP/3 frame overhead.
-  EXPECT_EQ(quic_stream_->stream_bytes_read() - 2, quic_stream_->bytesMeter()->headerBytesReceived());
+  EXPECT_EQ(quic_stream_->stream_bytes_read() - 2,
+            quic_stream_->bytesMeter()->headerBytesReceived());
   EXPECT_EQ(quic_stream_->stream_bytes_read(), quic_stream_->bytesMeter()->wireBytesReceived());
   size_t body_size = receiveRequestBody(offset, request_body_, true, request_body_.size() * 2);
   EXPECT_EQ(quic_stream_->stream_bytes_read(), quic_stream_->bytesMeter()->wireBytesReceived());
-  EXPECT_EQ(quic_stream_->stream_bytes_read() - 2 - body_size, quic_stream_->bytesMeter()->headerBytesReceived());
+  EXPECT_EQ(quic_stream_->stream_bytes_read() - 2 - body_size,
+            quic_stream_->bytesMeter()->headerBytesReceived());
   // Wire bytes received will be slightly larger than the body + headers because of body framing.
   EXPECT_EQ(4 + request_body_.size() + quic_stream_->bytesMeter()->headerBytesReceived(),
             quic_stream_->bytesMeter()->wireBytesReceived());

@@ -220,17 +220,20 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponseWithAccounting) {
   quic_stream_->encodeData(request_body_, false);
   body_bytes = quic_stream_->stream_bytes_written() - body_bytes;
   EXPECT_EQ(quic_stream_->stream_bytes_written(), quic_stream_->bytesMeter()->wireBytesSent());
-  EXPECT_EQ(quic_stream_->stream_bytes_written() - body_bytes, quic_stream_->bytesMeter()->headerBytesSent());
+  EXPECT_EQ(quic_stream_->stream_bytes_written() - body_bytes,
+            quic_stream_->bytesMeter()->headerBytesSent());
   quic_stream_->encodeTrailers(request_trailers_);
   EXPECT_EQ(quic_stream_->stream_bytes_written(), quic_stream_->bytesMeter()->wireBytesSent());
-  EXPECT_EQ(quic_stream_->stream_bytes_written() - body_bytes, quic_stream_->bytesMeter()->headerBytesSent());
+  EXPECT_EQ(quic_stream_->stream_bytes_written() - body_bytes,
+            quic_stream_->bytesMeter()->headerBytesSent());
 
   EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesReceived());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesReceived());
 
   size_t offset = receiveResponseHeaders(false);
   // Received header bytes do not include the HTTP/3 frame overhead.
-  EXPECT_EQ(quic_stream_->stream_bytes_read() - 2, quic_stream_->bytesMeter()->headerBytesReceived());
+  EXPECT_EQ(quic_stream_->stream_bytes_read() - 2,
+            quic_stream_->bytesMeter()->headerBytesReceived());
   EXPECT_EQ(quic_stream_->stream_bytes_read(), quic_stream_->bytesMeter()->wireBytesReceived());
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_))
       .WillOnce(Invoke([](const Http::ResponseTrailerMapPtr& headers) {
@@ -249,7 +252,9 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponseWithAccounting) {
                                      spdyHeaderToHttp3StreamPayload(spdy_trailers_));
   quic::QuicStreamFrame frame(stream_id_, true, offset, payload);
   quic_stream_->OnStreamFrame(frame);
-  EXPECT_EQ(quic_stream_->stream_bytes_read() - 4 - bodyToHttp3StreamPayload(more_response_body).length(), quic_stream_->bytesMeter()->headerBytesReceived());
+  EXPECT_EQ(quic_stream_->stream_bytes_read() - 4 -
+                bodyToHttp3StreamPayload(more_response_body).length(),
+            quic_stream_->bytesMeter()->headerBytesReceived());
   EXPECT_EQ(quic_stream_->stream_bytes_read(), quic_stream_->bytesMeter()->wireBytesReceived());
 }
 
