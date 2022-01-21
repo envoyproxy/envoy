@@ -437,9 +437,11 @@ message WeightedCluster {
   // <operations_runtime>` for how key names map to the underlying implementation.
   string runtime_key_prefix = 2;
 
-  // Specifies the key to look up the random value that is used in weighted cluster picking algorithm.
-  // This enables providing the random value through configuration.
-  string random_value_key = 4;
+  oneof random_value_specifier {
+    // Specifies the header value to look up the random value that is passed in the request header.
+    // This can be used in weighted cluster picking algorithm for consistent cluster picking.
+    string header_value = 4;
+  }
 }
 
 // [#next-free-field: 14]

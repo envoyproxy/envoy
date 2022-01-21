@@ -459,7 +459,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           vhost_.globalRouteConfig().maxDirectResponseBodySizeBytes())),
       per_filter_configs_(route.typed_per_filter_config(), optional_http_filters, factory_context,
                           validator),
-      route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()) {
+      route_name_(route.name()),
+      time_source_(factory_context.mainThreadDispatcher().timeSource()),
+      random_value_key_(route.route().weighted_clusters().header_value()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -1090,7 +1092,22 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
 RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMap& headers,
                                                             const uint64_t random_value,
                                                             const bool ignore_overflow) const {
-  const uint64_t selected_value = random_value % total_cluster_weight_;
+  uint64_t selected_value = random_value % total_cluster_weight_;
+  // Override the selected value with provide random value if related key is specified.
+  if (!random_value_key_.empty()) {
+    const auto header_value = headers.get(Envoy::Http::LowerCaseString(random_value_key_));
+
+    // Header value should be provided here. Buf if it is not due to some errors, asserts it
+    // and fallback to the random value set by stream id.
+    // ASSERT(!header_value.empty());
+    if (!header_value.empty()) {
+      ASSERT(header_value.size() == 1);
+      selected_value =
+          std::stoll(std::string(header_value[0]->value().getStringView())) % total_cluster_weight_;
+    }
+  }
+
+  // const uint64_t selected_value = random_value % total_cluster_weight_;
   uint64_t begin = 0;
   uint64_t end = 0;
 
