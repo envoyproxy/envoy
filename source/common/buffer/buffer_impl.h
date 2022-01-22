@@ -793,18 +793,10 @@ private:
       }
     }
 
-    void newPlaceholderStorage() { owned_storages_.push_back({}); }
-    RawSlice newStorageForReservation() {
-      owned_storages_.emplace_back(Slice::newStorage(Slice::default_slice_size_));
-      ASSERT(owned_storages_.back().first == Slice::default_slice_size_);
-      return {owned_storages_.back().second.get(), Slice::default_slice_size_};
-    }
-
     absl::Span<Slice::SizedStorage> ownedStorages() override {
       return absl::MakeSpan(owned_storages_);
     }
 
-  private:
     absl::InlinedVector<Slice::SizedStorage, Buffer::Reservation::MAX_SLICES_> owned_storages_;
   };
 
@@ -813,13 +805,6 @@ private:
       return absl::MakeSpan(&owned_storage_, 1);
     }
 
-    RawSlice newStorageForReservation(uint64_t size) {
-      owned_storage_ = Slice::newStorage(size);
-      ASSERT(owned_storage_.first >= size);
-      return {owned_storage_.second.get(), size};
-    }
-
-  private:
     Slice::SizedStorage owned_storage_;
   };
 };

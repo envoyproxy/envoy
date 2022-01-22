@@ -336,13 +336,13 @@ Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
     auto reserve_size = std::min(reservable_size, bytes_remaining);
     auto slice = slices_.back().reserve(reserve_size);
     reservation_slices.push_back(slice);
-    slices_owner->newPlaceholderStorage();
+    slices_owner->owned_storages_.push_back({});
     bytes_remaining -= slice.len_;
     reserved += slice.len_;
   }
 
   while (bytes_remaining != 0 && reservation_slices.size() < reservation.MAX_SLICES_) {
-    const uint64_t size = Slice::default_slice_size_;
+    constexpr uint64_t size = Slice::default_slice_size_;
 
     // If the next slice would go over the desired size, and the amount already reserved is already
     // at least one full slice in size, stop allocating slices. This prevents returning a
@@ -352,13 +352,15 @@ Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
       break;
     }
 
-    const auto raw_slice = slices_owner->newStorageForReservation();
+    Slice::SizedStorage storage = Slice::newStorage(size);
+    const RawSlice raw_slice{storage.second.get(), size};
+    slices_owner->owned_storages_.emplace_back(std::move(storage));
     reservation_slices.push_back(raw_slice);
     bytes_remaining -= std::min<uint64_t>(raw_slice.len_, bytes_remaining);
     reserved += raw_slice.len_;
   }
 
-  ASSERT(reservation_slices.size() == slices_owner->ownedStorages().size());
+  ASSERT(reservation_slices.size() == slices_owner->owned_storages_.size());
   reservation.bufferImplUseOnlySlicesOwner() = std::move(slices_owner);
   reservation.bufferImplUseOnlySetLength(reserved);
 
@@ -385,7 +387,9 @@ ReservationSingleSlice OwnedImpl::reserveSingleSlice(uint64_t length, bool separ
   if (reservable_size >= length) {
     reservation_slice = slices_.back().reserve(length);
   } else {
-    reservation_slice = slice_owner->newStorageForReservation(length);
+    slice_owner->owned_storage_ = Slice::newStorage(length);
+    ASSERT(slice_owner->owned_storage_.first >= length);
+    reservation_slice = {slice_owner->owned_storage_.second.get(), length};
   }
 
   reservation.bufferImplUseOnlySliceOwner() = std::move(slice_owner);
@@ -410,8 +414,7 @@ void OwnedImpl::commit(uint64_t length, absl::Span<RawSlice> slices,
   for (uint32_t i = 0; i < slices.size() && bytes_remaining > 0; i++) {
     slices[i].len_ = std::min<uint64_t>(slices[i].len_, bytes_remaining);
 
-    Slice::SizedStorage& owned_storage = owned_storages[i];
-    if (owned_storage.second != nullptr) {
+    if (auto& owned_storage = owned_storages[i]; owned_storage.second != nullptr) {
       ASSERT(slices[i].len_ <= owned_storage.first);
       slices_.emplace_back(Slice(std::move(owned_storage), slices[i].len_, account_));
     } else {
