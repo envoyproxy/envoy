@@ -43,67 +43,9 @@ public:
    * Storage class for Slice. A Storage is a simple wrapper around length and a contiguous block of
    * bytes. This class is used to help manage backend storage of Slice.
    */
-  class Storage {
-  public:
+  struct Storage {
     uint64_t capacity{};
     RawStoragePtr raw_storage{};
-
-    /**
-     * Create new backend storage with min capacity. This method will create a recommended capacity
-     * which will bigger or equal to the min capacity and create new backend storage based on the
-     * recommended capacity.
-     * @param min_capacity the min capacity of new created backend storage.
-     * @return a backend storage for slice.
-     */
-    static inline Storage newStorage(uint64_t min_capacity) {
-      uint64_t capacity = storageSize(min_capacity);
-
-      Storage storage{capacity, nullptr};
-
-      if (capacity == default_slice_size_ && !free_list_.empty()) {
-        storage.raw_storage = std::move(free_list_.back().raw_storage);
-        ASSERT(storage.raw_storage != nullptr);
-        ASSERT(free_list_.back().raw_storage == nullptr);
-        free_list_.pop_back();
-      } else {
-        storage.raw_storage.reset(new uint8_t[capacity]);
-      }
-
-      return storage;
-    }
-
-    /**
-     * Free unused backend storage.
-     * @param storage backend storage to free.
-     */
-    static inline void freeStorage(Storage storage) {
-      if (storage.raw_storage == nullptr) {
-        return;
-      }
-
-      if (storage.capacity == default_slice_size_) {
-        if (free_list_.size() < free_list_max_) {
-          ASSERT(storage.raw_storage == nullptr);
-          free_list_.emplace_back(std::move(storage));
-          return;
-        }
-      }
-    }
-
-  private:
-    /**
-     * Compute a slice storage size big enough to hold a specified amount of data.
-     * @param data_size the minimum amount of data the slice must be able to store, in bytes.
-     * @return a recommended slice size, in bytes.
-     */
-    static uint64_t storageSize(uint64_t data_size) {
-      static constexpr uint64_t PageSize = 4096;
-      const uint64_t num_pages = (data_size + PageSize - 1) / PageSize;
-      return num_pages * PageSize;
-    }
-
-    static constexpr uint32_t free_list_max_ = 2 * Buffer::Reservation::MAX_SLICES_;
-    static thread_local absl::InlinedVector<Storage, free_list_max_> free_list_;
   };
 
   /**
@@ -119,17 +61,20 @@ public:
    * @param account the account to charge.
    */
   Slice(uint64_t min_capacity, const BufferMemoryAccountSharedPtr& account)
-      : Slice(Storage::newStorage(min_capacity), account) {}
+      : Slice(newStorage(min_capacity), 0, account) {}
 
   /**
    * Create an empty mutable Slice that owns its storage, which it charges to the provided account,
    * if any.
    * @param storage backend storage for the slice.
+   * @param size the size already used in storage.
    * @param account the account to charge.
    */
-  Slice(Storage storage, const BufferMemoryAccountSharedPtr& account)
+  Slice(Storage storage, uint64_t size, const BufferMemoryAccountSharedPtr& account)
       : capacity_(storage.capacity), raw_storage_(std::move(storage.raw_storage)),
-        base_(raw_storage_.get()) {
+        base_(raw_storage_.get()), data_(0), reservable_(size) {
+    ASSERT(reservable_ <= capacity_);
+
     if (account) {
       account->charge(capacity_);
       account_ = account;
@@ -165,7 +110,7 @@ public:
   Slice& operator=(Slice&& rhs) noexcept {
     if (this != &rhs) {
       callAndClearDrainTrackersAndCharges();
-      Storage::freeStorage({capacity_, std::move(raw_storage_)});
+      freeStorage({capacity_, std::move(raw_storage_)});
 
       capacity_ = rhs.capacity_;
       raw_storage_ = std::move(rhs.raw_storage_);
@@ -186,7 +131,7 @@ public:
 
   ~Slice() {
     callAndClearDrainTrackersAndCharges();
-    Storage::freeStorage({capacity_, std::move(raw_storage_)});
+    freeStorage({capacity_, std::move(raw_storage_)});
   }
 
   /**
@@ -404,7 +349,63 @@ public:
     account_ = account;
   }
 
+  /**
+   * Create new backend storage with min capacity. This method will create a recommended capacity
+   * which will bigger or equal to the min capacity and create new backend storage based on the
+   * recommended capacity.
+   * @param min_capacity the min capacity of new created backend storage.
+   * @return a backend storage for slice.
+   */
+  static inline Storage newStorage(uint64_t min_capacity) {
+    uint64_t capacity = sliceSize(min_capacity);
+
+    Storage storage{capacity, nullptr};
+
+    if (capacity == default_slice_size_ && !free_list_.empty()) {
+      storage.raw_storage = std::move(free_list_.back().raw_storage);
+      ASSERT(storage.raw_storage != nullptr);
+      ASSERT(free_list_.back().raw_storage == nullptr);
+      free_list_.pop_back();
+    } else {
+      storage.raw_storage.reset(new uint8_t[capacity]);
+    }
+
+    return storage;
+  }
+
+  /**
+   * Free unused backend storage.
+   * @param storage backend storage to free.
+   */
+  static inline void freeStorage(Storage storage) {
+    if (storage.raw_storage == nullptr) {
+      return;
+    }
+
+    if (storage.capacity == default_slice_size_) {
+      if (free_list_.size() < free_list_max_) {
+        ASSERT(storage.raw_storage == nullptr);
+        free_list_.emplace_back(std::move(storage));
+        return;
+      }
+    }
+  }
+
 protected:
+  /**
+   * Compute a slice storage size big enough to hold a specified amount of data.
+   * @param data_size the minimum amount of data the slice must be able to store, in bytes.
+   * @return a recommended slice size, in bytes.
+   */
+  static uint64_t sliceSize(uint64_t data_size) {
+    static constexpr uint64_t PageSize = 4096;
+    const uint64_t num_pages = (data_size + PageSize - 1) / PageSize;
+    return num_pages * PageSize;
+  }
+
+  static constexpr uint32_t free_list_max_ = 2 * Buffer::Reservation::MAX_SLICES_;
+  static thread_local absl::InlinedVector<Storage, free_list_max_> free_list_;
+
   /** Length of the byte array that base_ points to. This is also the offset in bytes from the start
    * of the slice to the end of the Reservable section. */
   uint64_t capacity_ = 0;

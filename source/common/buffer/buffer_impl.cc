@@ -342,14 +342,17 @@ Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
     reserved += slice.len_;
   }
 
-  uint32_t new_slices_to_reserve =
-      std::min<uint32_t>(bytes_remaining / Slice::default_slice_size_,
-                         Buffer::Reservation::MAX_SLICES_ - reservation_slices.size());
-  if (new_slices_to_reserve == 0) {
-    new_slices_to_reserve++;
-  }
+  while (bytes_remaining != 0 && reservation_slices.size() < reservation.MAX_SLICES_) {
+    const uint64_t size = Slice::default_slice_size_;
 
-  for (uint32_t i = 0; i < new_slices_to_reserve; i++) {
+    // If the next slice would go over the desired size, and the amount already reserved is already
+    // at least one full slice in size, stop allocating slices. This prevents returning a
+    // reservation larger than requested, which could go above the watermark limits for a watermark
+    // buffer, unless the size would be very small (less than 1 full slice).
+    if (size > bytes_remaining && reserved >= size) {
+      break;
+    }
+
     const auto raw_slice = slices_owner->newStorageForReservation();
     reservation_slices.push_back(raw_slice);
     bytes_remaining -= Slice::default_slice_size_;
@@ -406,13 +409,17 @@ void OwnedImpl::commit(uint64_t length, absl::Span<RawSlice> slices,
 
   uint64_t bytes_remaining = length;
   for (uint32_t i = 0; i < slices.size() && bytes_remaining > 0; i++) {
+    slices[i].len_ = std::min<uint64_t>(slices[i].len_, bytes_remaining);
+
     Slice::Storage& owned_storage = owned_storages[i];
     if (owned_storage.raw_storage != nullptr) {
-      slices_.emplace_back(Slice(std::move(owned_storage), account_));
+      ASSERT(slices[i].len_ <= owned_storage.capacity);
+      slices_.emplace_back(Slice(std::move(owned_storage), slices[i].len_, account_));
+    } else {
+      bool success = slices_.back().commit<false>(slices[i]);
+      ASSERT(success);
     }
-    slices[i].len_ = std::min<uint64_t>(slices[i].len_, bytes_remaining);
-    bool success = slices_.back().commit<false>(slices[i]);
-    ASSERT(success);
+
     length_ += slices[i].len_;
     bytes_remaining -= slices[i].len_;
   }
