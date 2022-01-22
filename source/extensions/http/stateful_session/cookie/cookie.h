@@ -38,6 +38,10 @@ public:
   CookieBasedSessionStateFactory(const CookieBasedSessionStateProto& config);
 
   Envoy::Http::SessionStatePtr create(const Envoy::Http::RequestHeaderMap& headers) const override {
+    if (bool request_path_match = requestPathMatch(headers.getPathValue()); !request_path_match) {
+      return nullptr;
+    }
+
     return std::make_unique<SessionStateImpl>(parseAddress(headers), *this);
   }
 
@@ -47,6 +51,10 @@ private:
     std::string address = Envoy::Base64::decode(cookie_value);
 
     return !address.empty() ? absl::make_optional(std::move(address)) : absl::nullopt;
+  }
+
+  bool requestPathMatch(absl::string_view request_path) {
+    return absl::StartsWith(request_path, path_);
   }
 
   std::string makeSetCookie(const std::string& address) const {
