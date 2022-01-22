@@ -853,7 +853,7 @@ TEST_F(OwnedImplTest, ReserveSingleOverCommit) {
       "length <= slice_.len_. Details: commit() length must be <= size of the Reservation");
 }
 
-// Test functionality of the `freelist` (a performance optimization)
+// Test functionality of the `freelist` (a performance optimization).
 TEST_F(OwnedImplTest, SliceFreeList) {
   Buffer::OwnedImpl b1, b2;
   std::vector<void*> slices;
@@ -873,16 +873,17 @@ TEST_F(OwnedImplTest, SliceFreeList) {
     EXPECT_EQ(slices[1], b2.getRawSlices()[0].mem_);
   }
 
+  // Drain and slices()[0] will be released to `free_list_`.
   b1.drain(1);
   EXPECT_EQ(0, b1.getRawSlices().size());
   {
     auto r = b2.reserveForRead();
     // slices()[0] is the partially used slice that is already part of this buffer.
-    EXPECT_EQ(slices[2], r.slices()[1].mem_);
+    EXPECT_EQ(slices[0], r.slices()[1].mem_);
   }
   {
     auto r = b1.reserveForRead();
-    EXPECT_EQ(slices[2], r.slices()[0].mem_);
+    EXPECT_EQ(slices[0], r.slices()[0].mem_);
   }
   {
     // This causes an underflow in the `freelist` on creation, and overflows it on deletion.
