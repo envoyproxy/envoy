@@ -636,10 +636,11 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
   return Http::Code::OK;
 }
 
-std::string StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& counters_and_gauges,
-                                      const std::map<std::string, std::string>& text_readouts,
-                                      const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                                      const bool pretty_print) {
+std::string
+StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& counters_and_gauges,
+                          const std::map<std::string, std::string>& text_readouts,
+                          const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+                          const bool pretty_print) {
   ProtobufWkt::Struct document;
   std::vector<ProtobufWkt::Value> stats_array;
   for (const auto& text_readout : text_readouts) {
@@ -665,7 +666,7 @@ std::string StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& cou
   std::vector<ProtobufWkt::Value> computed_quantile_array;
 
   bool found_used_histogram = false;
-  for (const Stats::HistogramSharedPtr& histogram : all_histograms) {
+  for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
     Stats::ParentHistogram* phist = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
     if (phist != nullptr) {
       if (!found_used_histogram) {

@@ -101,7 +101,7 @@ private:
 
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                  const std::map<std::string, std::string>& text_readouts,
-                                 const std::vector<Stats::HistogramSharedPtr>& all_histograms,
+                                 const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
                                  bool pretty_print);
 
   static absl::string_view typeToString(Type type);
