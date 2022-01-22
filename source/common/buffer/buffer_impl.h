@@ -34,19 +34,9 @@ namespace Buffer {
  */
 class Slice {
 public:
-  static constexpr uint32_t default_slice_size_ = 16384;
-
   using Reservation = RawSlice;
-  using RawStoragePtr = std::unique_ptr<uint8_t[]>;
-
-  /**
-   * Storage class for Slice. A Storage is a simple wrapper around length and a contiguous block of
-   * bytes. This class is used to help manage backend storage of Slice.
-   */
-  struct Storage {
-    uint64_t capacity{};
-    RawStoragePtr raw_storage{};
-  };
+  using StoragePtr = std::unique_ptr<uint8_t[]>;
+  using SizedStorage = std::pair<uint64_t, StoragePtr>;
 
   /**
    * Create an empty Slice with 0 capacity.
@@ -70,9 +60,9 @@ public:
    * @param size the size already used in storage.
    * @param account the account to charge.
    */
-  Slice(Storage storage, uint64_t size, const BufferMemoryAccountSharedPtr& account)
-      : capacity_(storage.capacity), raw_storage_(std::move(storage.raw_storage)),
-        base_(raw_storage_.get()), data_(0), reservable_(size) {
+  Slice(SizedStorage storage, uint64_t size, const BufferMemoryAccountSharedPtr& account)
+      : capacity_(storage.first), storage_(std::move(storage.second)), base_(storage_.get()),
+        data_(0), reservable_(size) {
     ASSERT(reservable_ <= capacity_);
 
     if (account) {
@@ -86,7 +76,7 @@ public:
    * @param fragment provides externally owned immutable data.
    */
   Slice(BufferFragment& fragment)
-      : capacity_(fragment.size()), raw_storage_(nullptr),
+      : capacity_(fragment.size()), storage_(nullptr),
         base_(static_cast<uint8_t*>(const_cast<void*>(fragment.data()))), data_(0),
         reservable_(fragment.size()) {
     addDrainTracker([&fragment]() { fragment.done(); });
@@ -94,7 +84,7 @@ public:
 
   Slice(Slice&& rhs) noexcept {
     capacity_ = rhs.capacity_;
-    raw_storage_ = std::move(rhs.raw_storage_);
+    storage_ = std::move(rhs.storage_);
     base_ = rhs.base_;
     data_ = rhs.data_;
     reservable_ = rhs.reservable_;
@@ -110,10 +100,10 @@ public:
   Slice& operator=(Slice&& rhs) noexcept {
     if (this != &rhs) {
       callAndClearDrainTrackersAndCharges();
-      freeStorage({capacity_, std::move(raw_storage_)});
+      freeStorage({capacity_, std::move(storage_)});
 
       capacity_ = rhs.capacity_;
-      raw_storage_ = std::move(rhs.raw_storage_);
+      storage_ = std::move(rhs.storage_);
       base_ = rhs.base_;
       data_ = rhs.data_;
       reservable_ = rhs.reservable_;
@@ -131,18 +121,18 @@ public:
 
   ~Slice() {
     callAndClearDrainTrackersAndCharges();
-    freeStorage({capacity_, std::move(raw_storage_)});
+    freeStorage({capacity_, std::move(storage_)});
   }
 
   /**
    * @return true if the data in the slice is mutable
    */
-  bool isMutable() const { return raw_storage_ != nullptr; }
+  bool isMutable() const { return storage_ != nullptr; }
 
   /**
    * @return true if content in this Slice can be coalesced into another Slice.
    */
-  bool canCoalesce() const { return raw_storage_ != nullptr; }
+  bool canCoalesce() const { return storage_ != nullptr; }
 
   /**
    * @return a pointer to the start of the usable content.
@@ -342,58 +332,18 @@ public:
    * - the slice owns backing memory
    */
   void maybeChargeAccount(const BufferMemoryAccountSharedPtr& account) {
-    if (account_ != nullptr || raw_storage_ == nullptr || account == nullptr) {
+    if (account_ != nullptr || storage_ == nullptr || account == nullptr) {
       return;
     }
     account->charge(capacity_);
     account_ = account;
   }
 
-  /**
-   * Create new backend storage with min capacity. This method will create a recommended capacity
-   * which will bigger or equal to the min capacity and create new backend storage based on the
-   * recommended capacity.
-   * @param min_capacity the min capacity of new created backend storage.
-   * @return a backend storage for slice.
-   */
-  static inline Storage newStorage(uint64_t min_capacity) {
-    uint64_t capacity = sliceSize(min_capacity);
-
-    Storage storage{capacity, nullptr};
-
-    if (capacity == default_slice_size_ && !free_list_.empty()) {
-      storage.raw_storage = std::move(free_list_.back().raw_storage);
-      ASSERT(storage.raw_storage != nullptr);
-      ASSERT(free_list_.back().raw_storage == nullptr);
-      free_list_.pop_back();
-    } else {
-      storage.raw_storage.reset(new uint8_t[capacity]);
-    }
-
-    return storage;
-  }
-
-  /**
-   * Free unused backend storage.
-   * @param storage backend storage to free.
-   */
-  static inline void freeStorage(Storage storage) {
-    if (storage.raw_storage == nullptr) {
-      return;
-    }
-
-    if (storage.capacity == default_slice_size_) {
-      if (free_list_.size() < free_list_max_) {
-        ASSERT(storage.raw_storage == nullptr);
-        free_list_.emplace_back(std::move(storage));
-        return;
-      }
-    }
-  }
+  static constexpr uint32_t default_slice_size_ = 16384;
 
 protected:
   /**
-   * Compute a slice storage size big enough to hold a specified amount of data.
+   * Compute a slice size big enough to hold a specified amount of data.
    * @param data_size the minimum amount of data the slice must be able to store, in bytes.
    * @return a recommended slice size, in bytes.
    */
@@ -404,15 +354,59 @@ protected:
   }
 
   static constexpr uint32_t free_list_max_ = 2 * Buffer::Reservation::MAX_SLICES_;
-  static thread_local absl::InlinedVector<Storage, free_list_max_> free_list_;
+  static thread_local absl::InlinedVector<StoragePtr, free_list_max_> free_list_;
 
+public:
+  /**
+   * Create new backend storage with min capacity. This method will create a recommended capacity
+   * which will bigger or equal to the min capacity and create new backend storage based on the
+   * recommended capacity.
+   * @param min_capacity the min capacity of new created backend storage.
+   * @return a backend storage for slice.
+   */
+  static inline SizedStorage newStorage(uint64_t min_capacity) {
+    uint64_t capacity = sliceSize(min_capacity);
+
+    SizedStorage storage{capacity, nullptr};
+
+    if (capacity == default_slice_size_ && !free_list_.empty()) {
+      storage.second = std::move(free_list_.back());
+      ASSERT(storage.second != nullptr);
+      ASSERT(free_list_.back() == nullptr);
+      free_list_.pop_back();
+    } else {
+      storage.second.reset(new uint8_t[capacity]);
+    }
+
+    return storage;
+  }
+
+  /**
+   * Free unused backend storage.
+   * @param storage backend storage to free.
+   */
+  static inline void freeStorage(SizedStorage storage) {
+    if (storage.second == nullptr) {
+      return;
+    }
+
+    if (storage.first == default_slice_size_) {
+      if (free_list_.size() < free_list_max_) {
+        ASSERT(storage.second == nullptr);
+        free_list_.emplace_back(storage.second.release());
+        return;
+      }
+    }
+  }
+
+protected:
   /** Length of the byte array that base_ points to. This is also the offset in bytes from the start
    * of the slice to the end of the Reservable section. */
   uint64_t capacity_ = 0;
 
   /** Backing storage for mutable slices which own their own storage. This storage should never be
    * accessed directly; access base_ instead. */
-  RawStoragePtr raw_storage_;
+  StoragePtr storage_;
 
   /** Start of the slice. Points to storage_ if the slice owns its own storage. */
   uint8_t* base_{nullptr};
@@ -789,7 +783,7 @@ private:
   BufferMemoryAccountSharedPtr account_;
 
   struct OwnedImplReservationSlicesOwner : public ReservationSlicesOwner {
-    virtual absl::Span<Slice::Storage> ownedStorages() PURE;
+    virtual absl::Span<Slice::SizedStorage> ownedStorages() PURE;
   };
 
   struct OwnedImplReservationSlicesOwnerMultiple : public OwnedImplReservationSlicesOwner {
@@ -802,29 +796,31 @@ private:
     void newPlaceholderStorage() { owned_storages_.push_back({}); }
     RawSlice newStorageForReservation() {
       owned_storages_.emplace_back(Slice::newStorage(Slice::default_slice_size_));
-      ASSERT(owned_storages_.back().capacity == Slice::default_slice_size_);
-      return {owned_storages_.back().raw_storage.get(), Slice::default_slice_size_};
+      ASSERT(owned_storages_.back().first == Slice::default_slice_size_);
+      return {owned_storages_.back().second.get(), Slice::default_slice_size_};
     }
 
-    absl::Span<Slice::Storage> ownedStorages() override { return absl::MakeSpan(owned_storages_); }
+    absl::Span<Slice::SizedStorage> ownedStorages() override {
+      return absl::MakeSpan(owned_storages_);
+    }
 
   private:
-    absl::InlinedVector<Slice::Storage, Buffer::Reservation::MAX_SLICES_> owned_storages_;
+    absl::InlinedVector<Slice::SizedStorage, Buffer::Reservation::MAX_SLICES_> owned_storages_;
   };
 
   struct OwnedImplReservationSlicesOwnerSingle : public OwnedImplReservationSlicesOwner {
-    absl::Span<Slice::Storage> ownedStorages() override {
+    absl::Span<Slice::SizedStorage> ownedStorages() override {
       return absl::MakeSpan(&owned_storage_, 1);
     }
 
     RawSlice newStorageForReservation(uint64_t size) {
       owned_storage_ = Slice::newStorage(size);
-      ASSERT(owned_storage_.capacity >= size);
-      return {owned_storage_.raw_storage.get(), size};
+      ASSERT(owned_storage_.first >= size);
+      return {owned_storage_.second.get(), size};
     }
 
   private:
-    Slice::Storage owned_storage_;
+    Slice::SizedStorage owned_storage_;
   };
 };
 

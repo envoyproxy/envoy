@@ -19,7 +19,7 @@ namespace {
 constexpr uint64_t CopyThreshold = 512;
 } // namespace
 
-thread_local absl::InlinedVector<Slice::Storage, Slice::free_list_max_> Slice::free_list_;
+thread_local absl::InlinedVector<Slice::StoragePtr, Slice::free_list_max_> Slice::free_list_;
 
 void OwnedImpl::addImpl(const void* data, uint64_t size) {
   const char* src = static_cast<const char*>(data);
@@ -403,16 +403,16 @@ void OwnedImpl::commit(uint64_t length, absl::Span<RawSlice> slices,
   std::unique_ptr<OwnedImplReservationSlicesOwner> slices_owner(
       static_cast<OwnedImplReservationSlicesOwner*>(slices_owner_base.release()));
 
-  absl::Span<Slice::Storage> owned_storages = slices_owner->ownedStorages();
+  absl::Span<Slice::SizedStorage> owned_storages = slices_owner->ownedStorages();
   ASSERT(slices.size() == owned_storages.size());
 
   uint64_t bytes_remaining = length;
   for (uint32_t i = 0; i < slices.size() && bytes_remaining > 0; i++) {
     slices[i].len_ = std::min<uint64_t>(slices[i].len_, bytes_remaining);
 
-    Slice::Storage& owned_storage = owned_storages[i];
-    if (owned_storage.raw_storage != nullptr) {
-      ASSERT(slices[i].len_ <= owned_storage.capacity);
+    Slice::SizedStorage& owned_storage = owned_storages[i];
+    if (owned_storage.second != nullptr) {
+      ASSERT(slices[i].len_ <= owned_storage.first);
       slices_.emplace_back(Slice(std::move(owned_storage), slices[i].len_, account_));
     } else {
       bool success = slices_.back().commit<false>(slices[i]);
