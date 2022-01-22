@@ -48,7 +48,7 @@ class EnvoyPythonChecker:
 
 
 def main(*args) -> int:
-    return EnvoyPythonChecker(*args).run()
+    return EnvoyPythonChecker(*args)()
 
 
 if __name__ == "__main__":
