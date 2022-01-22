@@ -795,13 +795,13 @@ private:
   struct OwnedImplReservationSlicesOwnerMultiple : public OwnedImplReservationSlicesOwner {
     ~OwnedImplReservationSlicesOwnerMultiple() override {
       for (auto r = owned_storages_.rbegin(); r != owned_storages_.rend(); r++) {
-        Slice::Storage::freeStorage(std::move(*r));
+        Slice::freeStorage(std::move(*r));
       }
     }
 
     void newPlaceholderSlice() { owned_storages_.push_back({}); }
     RawSlice newStorageForReservation() {
-      owned_storages_.emplace_back(Slice::Storage::newStorage(Slice::default_slice_size_));
+      owned_storages_.emplace_back(Slice::newStorage(Slice::default_slice_size_));
       ASSERT(owned_storages_.back().capacity == Slice::default_slice_size_);
       return {owned_storages_.back().raw_storage.get(), Slice::default_slice_size_};
     }
@@ -818,7 +818,7 @@ private:
     }
 
     RawSlice newStorageForReservation(uint64_t size) {
-      owned_storage_ = Slice::Storage::newStorage(size);
+      owned_storage_ = Slice::newStorage(size);
       ASSERT(owned_storage_.capacity >= size);
       return {owned_storage_.raw_storage.get(), size};
     }

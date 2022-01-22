@@ -19,8 +19,7 @@ namespace {
 constexpr uint64_t CopyThreshold = 512;
 } // namespace
 
-thread_local absl::InlinedVector<Slice::Storage, Slice::Storage::free_list_max_>
-    Slice::Storage::free_list_;
+thread_local absl::InlinedVector<Slice::Storage, Slice::free_list_max_> Slice::free_list_;
 
 void OwnedImpl::addImpl(const void* data, uint64_t size) {
   const char* src = static_cast<const char*>(data);
