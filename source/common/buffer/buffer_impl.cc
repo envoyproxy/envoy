@@ -336,7 +336,7 @@ Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
     auto reserve_size = std::min(reservable_size, bytes_remaining);
     auto slice = slices_.back().reserve(reserve_size);
     reservation_slices.push_back(slice);
-    slices_owner->newPlaceholderSlice();
+    slices_owner->newPlaceholderStorage();
     bytes_remaining -= slice.len_;
     reserved += slice.len_;
   }
@@ -354,8 +354,8 @@ Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
 
     const auto raw_slice = slices_owner->newStorageForReservation();
     reservation_slices.push_back(raw_slice);
-    bytes_remaining -= Slice::default_slice_size_;
-    reserved += Slice::default_slice_size_;
+    bytes_remaining -= std::min<uint64_t>(raw_slice.len_, bytes_remaining);
+    reserved += raw_slice.len_;
   }
 
   ASSERT(reservation_slices.size() == slices_owner->ownedStorages().size());

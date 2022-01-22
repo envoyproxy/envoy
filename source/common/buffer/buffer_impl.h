@@ -799,7 +799,7 @@ private:
       }
     }
 
-    void newPlaceholderSlice() { owned_storages_.push_back({}); }
+    void newPlaceholderStorage() { owned_storages_.push_back({}); }
     RawSlice newStorageForReservation() {
       owned_storages_.emplace_back(Slice::newStorage(Slice::default_slice_size_));
       ASSERT(owned_storages_.back().capacity == Slice::default_slice_size_);
