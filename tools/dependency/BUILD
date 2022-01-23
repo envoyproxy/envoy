@@ -1,6 +1,8 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("@base_pip3//:requirements.bzl", "requirement")
+load("//tools/base:envoy_python.bzl", "envoy_entry_point")
+load("@envoy_repo//:path.bzl", "PATH")
 
 licenses(["notice"])  # Apache 2
 
@@ -25,13 +27,10 @@ py_binary(
     deps = [requirement("envoy.dependency.cve_scan")],
 )
 
-py_binary(
+envoy_entry_point(
     name = "pip_check",
-    srcs = ["pip_check.py"],
-    deps = [
-        "@envoy_repo",
-        requirement("envoy.dependency.pip_check"),
-    ],
+    args = ["--path=%s" % PATH],
+    pkg = "envoy.dependency.pip_check",
 )
 
 py_binary(
