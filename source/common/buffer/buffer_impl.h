@@ -62,7 +62,7 @@ public:
    */
   Slice(SizedStorage storage, uint64_t size, const BufferMemoryAccountSharedPtr& account)
       : capacity_(storage.first), storage_(std::move(storage.second)), base_(storage_.get()),
-        data_(0), reservable_(size) {
+        reservable_(size) {
     ASSERT(reservable_ <= capacity_);
 
     if (account) {
@@ -77,7 +77,7 @@ public:
    */
   Slice(BufferFragment& fragment)
       : capacity_(fragment.size()), storage_(nullptr),
-        base_(static_cast<uint8_t*>(const_cast<void*>(fragment.data()))), data_(0),
+        base_(static_cast<uint8_t*>(const_cast<void*>(fragment.data()))),
         reservable_(fragment.size()) {
     addDrainTracker([&fragment]() { fragment.done(); });
   }
@@ -392,7 +392,6 @@ public:
 
     if (storage.first == default_slice_size_) {
       if (free_list_.size() < free_list_max_) {
-        ASSERT(storage.second == nullptr);
         free_list_.emplace_back(storage.second.release());
         return;
       }
