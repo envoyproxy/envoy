@@ -126,69 +126,109 @@ SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage ar
   return symbol_vec;
 }
 
+// Iterator for decoding StatName tokens. This is not an STL-compatible
+// iterator; it is used only locally. Using this rather than decodeSymbols makes
+// it easier to early-exit out of a comparison once we know the answer. For
+// example, if you are ordering "a.b.c.d" against "a.x.y.z" you know the order
+// when you get to the "b" vs "x" and do not need to decode "c" vs "y".
+//
+// This is also helpful for prefix-matching.
+//
+// The array-version of decodeSymbols is still a good approach for converting a
+// StatName to a string as the intermediate array of string_view is needed to
+// allocate the right size for the joined string.
+class SymbolTableImpl::Encoding::TokenIter {
+public:
+  // The type of token reached.
+  enum class Type { StringView, Symbol, End };
+
+  TokenIter(const SymbolTable::Storage array, size_t size) : array_(array), size_(size) {}
+
+  /**
+   * Parses the next token. The token can then be retrieved by calling
+   * stringView() or symbol().
+   * @return The type of token, Type::End if we have reached the end of the StatName.
+   */
+  Type next() {
+    if (size_ == 0) {
+      return Type::End;
+    }
+    if (*array_ == LiteralStringIndicator) {
+      // To avoid scanning memory to find the literal size during decode, we
+      // var-length encode the size of the literal string prior to the data.
+      ASSERT(size_ > 1);
+      ++array_;
+      --size_;
+      std::pair<uint64_t, size_t> length_consumed = decodeNumber(array_);
+      uint64_t length = length_consumed.first;
+      array_ += length_consumed.second;
+      size_ -= length_consumed.second;
+      ASSERT(size_ >= length);
+      string_view_ = absl::string_view(reinterpret_cast<const char*>(array_), length);
+      size_ -= length;
+      array_ += length;
+      return Type::StringView;
+    }
+    std::pair<uint64_t, size_t> symbol_consumed = decodeNumber(array_);
+    symbol_ = symbol_consumed.first;
+    size_ -= symbol_consumed.second;
+    array_ += symbol_consumed.second;
+    return Type::Symbol;
+  }
+
+  /** @return the current string_view -- only valid to call if next()==Type::StringView */
+  absl::string_view stringView() const { return string_view_; }
+
+  /** @return the current symbol -- only valid to call if next()==Type::Symbol */
+  Symbol symbol() const { return symbol_; }
+
+private:
+  const uint8_t* array_;
+  size_t size_;
+  absl::string_view string_view_;
+  Symbol symbol_;
+};
+
 void SymbolTableImpl::Encoding::decodeTokens(
     const SymbolTable::Storage array, size_t size,
     const std::function<void(Symbol)>& symbol_token_fn,
     const std::function<void(absl::string_view)>& string_view_token_fn) {
-  while (size > 0) {
-    if (*array == LiteralStringIndicator) {
-      // To avoid scanning memory to find the literal size during decode, we
-      // var-length encode the size of the literal string prior to the data.
-      ASSERT(size > 1);
-      ++array;
-      --size;
-      std::pair<uint64_t, size_t> length_consumed = decodeNumber(array);
-      uint64_t length = length_consumed.first;
-      array += length_consumed.second;
-      size -= length_consumed.second;
-      ASSERT(size >= length);
-      string_view_token_fn(absl::string_view(reinterpret_cast<const char*>(array), length));
-      size -= length;
-      array += length;
+  TokenIter iter(array, size);
+  TokenIter::Type type;
+  while ((type = iter.next()) != TokenIter::Type::End) {
+    if (type == TokenIter::Type::StringView) {
+      string_view_token_fn(iter.stringView());
     } else {
-      std::pair<uint64_t, size_t> symbol_consumed = decodeNumber(array);
-      symbol_token_fn(symbol_consumed.first);
-      size -= symbol_consumed.second;
-      array += symbol_consumed.second;
+      symbol_token_fn(iter.symbol());
     }
   }
 }
 
-bool StatName::startsWith(StatName symbolic_prefix) const {
-  bool ret = true;
-  std::vector<Symbol> prefix_symbols;
-
-  // Decode the prefix as a StatNameVec.
-  SymbolTableImpl::Encoding::decodeTokens(
-      symbolic_prefix.data(), symbolic_prefix.dataSize(),
-      [&prefix_symbols](Symbol symbol) { prefix_symbols.push_back(symbol); },
-      [&ret](absl::string_view) { ret = false; });
-
-  // If there any dynamic components, our string_view lambda will be called, and
-  // then we'll return false for simplicity. We don't have a current need for
-  // prefixes to be expressed dynamically, and handling that case would add
-  // complexity.
-  if (!ret) {
-    return false;
+bool StatName::startsWith(StatName prefix) const {
+  using TokenIter = SymbolTableImpl::Encoding::TokenIter;
+  TokenIter prefix_iter(prefix.data(), prefix.dataSize());
+  TokenIter this_iter(data(), dataSize());
+  while (true) {
+    TokenIter::Type prefix_type = prefix_iter.next();
+    TokenIter::Type this_type = this_iter.next();
+    if (prefix_type == TokenIter::Type::End) {
+      break; // "a.b.c" starts with "a.b" or "a.b.c"
+    }
+    if (this_type == TokenIter::Type::End) {
+      return false; // "a.b" does not start with "a.b.c"
+    }
+    if (prefix_type != TokenIter::Type::Symbol) {
+      // Disallow dynamic components in the prefix. We don't have a current need
+      // for prefixes to be expressed dynamically, and handling that case would
+      // add complexity. In particular we'd need to take locks to decode to
+      // strings.
+      return false;
+    }
+    if (this_type != TokenIter::Type::Symbol || this_iter.symbol() != prefix_iter.symbol()) {
+      return false;
+    }
   }
-
-  // Now decode the StatName, matching against the symbols. It's OK for there to
-  // be dynamic string_view elements after the prefix match.
-  uint32_t index = 0;
-  SymbolTableImpl::Encoding::decodeTokens(
-      data(), dataSize(),
-      [&prefix_symbols, &index, &ret](Symbol symbol) {
-        if (index < prefix_symbols.size() && prefix_symbols[index] != symbol) {
-          ret = false;
-        }
-        ++index;
-      },
-      [&prefix_symbols, &index, &ret](absl::string_view) {
-        if (index < prefix_symbols.size()) {
-          ret = false;
-        }
-      });
-  return ret && index >= prefix_symbols.size();
+  return true;
 }
 
 std::vector<absl::string_view> SymbolTableImpl::decodeStrings(const SymbolTable::Storage array,
@@ -443,20 +483,41 @@ void SymbolTableImpl::newSymbol() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
 }
 
 bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
-  // Constructing two temp vectors during lessThan is not strictly necessary.
-  // If this becomes a performance bottleneck (e.g. during sorting), we could
-  // provide an iterator-like interface for incrementally comparing the tokens
-  // without allocating memory.
-  const std::vector<absl::string_view> av = decodeStrings(a.data(), a.dataSize());
-  const std::vector<absl::string_view> bv = decodeStrings(b.data(), b.dataSize());
+  // Proactively take the table lock in anticipation that we'll need to
+  // convert at least one symbol to a string_view, and it's easier not to
+  // bother to lazily take the lock.
+  Thread::LockGuard lock(lock_);
+  return lessThanLockHeld(a, b);
+}
 
-  for (uint64_t i = 0, n = std::min(av.size(), bv.size()); i < n; ++i) {
-    if (av[i] != bv[i]) {
-      const bool ret = av[i] < bv[i];
-      return ret;
+bool SymbolTableImpl::lessThanLockHeld(const StatName& a, const StatName& b) const
+    ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+  Encoding::TokenIter a_iter(a.data(), a.dataSize());
+  Encoding::TokenIter b_iter(b.data(), b.dataSize());
+  while (true) {
+    Encoding::TokenIter::Type a_type = a_iter.next();
+    Encoding::TokenIter::Type b_type = b_iter.next();
+    if (b_type == Encoding::TokenIter::Type::End) {
+      return false; // "x.y.z" > "x.y", "x.y" == "x.y"
+    }
+    if (a_type == Encoding::TokenIter::Type::End) {
+      return true; // "x.y" < "x.y.z"
+    }
+    if (a_type == b_type && a_type == Encoding::TokenIter::Type::Symbol &&
+        a_iter.symbol() == b_iter.symbol()) {
+      continue; // matching symbols don't need to be decoded to strings
+    }
+
+    absl::string_view a_token = a_type == Encoding::TokenIter::Type::Symbol
+                                    ? fromSymbol(a_iter.symbol())
+                                    : a_iter.stringView();
+    absl::string_view b_token = b_type == Encoding::TokenIter::Type::Symbol
+                                    ? fromSymbol(b_iter.symbol())
+                                    : b_iter.stringView();
+    if (a_token != b_token) {
+      return a_token < b_token;
     }
   }
-  return av.size() < bv.size();
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE

@@ -435,7 +435,10 @@ TEST_F(StatNameTest, Sort) {
   const StatNameVec sorted_names{makeStat("a.b"), makeStat("a.c"),   makeStat("a.c"),
                                  makeStat("d.a"), makeStat("d.a.a"), makeStat("d.e")};
   EXPECT_NE(names, sorted_names);
-  std::sort(names.begin(), names.end(), StatNameLessThan(table_));
+  struct Compare {
+    StatName operator()(const StatName& stat_name) const { return stat_name; }
+  };
+  sortByStatNames<StatName>(table_, names.begin(), names.end(), Compare());
   EXPECT_EQ(names, sorted_names);
 }
 

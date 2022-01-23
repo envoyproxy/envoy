@@ -153,7 +153,8 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
 
 Http::Code StatsHandler::handlerStats(absl::string_view url,
                                       Http::ResponseHeaderMap& response_headers,
-                                      Buffer::Instance& response, AdminStream&) {
+                                      Buffer::Instance& response,
+                                      AdminStream& admin_stream) {
   Params params;
   Http::Code code = params.parse(url, response);
   if (code != Http::Code::OK) {
@@ -173,7 +174,18 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     return Http::Code::OK;
   }
 
-  return stats(params, server_.stats(), response_headers, response);
+  auto iter = context_map_.find(&admin_stream);
+  if (iter == context_map_.end()) {
+    auto insertion = context_map_.emplace(&admin_stream, std::make_unique<Context>(
+        params, server_.stats(), response_headers, response));
+    iter = insertion.first;
+  }
+  Context& context = *iter->second;
+  Http::Code code = context.nextChunk(response);
+  if (code ! Http::Code::Continue) {
+    context_map_.erase(iter);
+  }
+  return code;
 }
 
 class StatsHandler::Render {
@@ -326,174 +338,165 @@ private:
   bool found_used_histogram_{false};
 };
 
-class StatsHandler::Context {
-public:
-#define STRING_SORT 1
-#if STRING_SORT
-  template <class ValueType> using NameValue = std::pair<std::string, ValueType>;
-  template <class ValueType> using NameValueVec = std::vector<NameValue<ValueType>>;
-#else
-  template <class StatType> using StatVec = std::vector<Stats::RefcountPtr<StatType>>;
-#endif
-
-  Context(const Params& params, Render& render, Buffer::Instance& response)
-      : params_(params), render_(render), response_(response) {}
-
-  // Iterates through the various stat types, and renders them.
-  void collectAndEmitStats(const Stats::Store& stats) {
-    uint64_t mem_start = Memory::Stats::totalCurrentlyAllocated();
-#if STRING_SORT
-    NameValueVec<std::string> text_readouts;
-    collect<Stats::TextReadout>(Type::TextReadouts, stats, text_readouts);
-    emit<std::string>(text_readouts);
-
-    // We collect counters and gauges together and co-mingle them before sorting.
-    // Note that the user can use type 'type=' query-param to show only desired
-    // type; the default is All.
-    NameValueVec<uint64_t> counters_and_gauges;
-    collect<Stats::Counter>(Type::Counters, stats, counters_and_gauges);
-    collect<Stats::Gauge>(Type::Gauges, stats, counters_and_gauges);
-    ENVOY_LOG_MISC(error, "Memory Peak: {}", Memory::Stats::totalCurrentlyAllocated() - mem_start);
-    emit<uint64_t>(counters_and_gauges);
-
-    NameValueVec<Stats::ParentHistogramSharedPtr> histograms;
-    collect<Stats::ParentHistogram>(Type::Histograms, stats, histograms);
-    emit<Stats::ParentHistogramSharedPtr>(histograms);
-#else
-    const Stats::SymbolTable& symbol_table = stats.constSymbolTable();
-
-    StatVec<Stats::TextReadout> text_readouts;
-    collect<Stats::TextReadout>(Type::TextReadouts, stats, text_readouts);
-    emit<Stats::TextReadout>(text_readouts, symbol_table);
-
-    // TODO(jmarantz): merge-sort the counter & stats values together.
-    StatVec<Stats::Counter> counters;
-    StatVec<Stats::Gauge> gauges;
-    collect<Stats::Counter>(Type::Counters, stats, counters);
-    collect<Stats::Gauge>(Type::Gauges, stats, gauges);
-    ENVOY_LOG_MISC(error, "Memory Peak: {}", Memory::Stats::totalCurrentlyAllocated() - mem_start);
-
-    emit<Stats::Counter>(counters, symbol_table);
-    emit<Stats::Gauge>(gauges, symbol_table);
-
-    StatVec<Stats::ParentHistogram> histograms;
-    collect<Stats::ParentHistogram>(Type::Histograms, stats, histograms);
-    emit<Stats::ParentHistogram>(histograms, symbol_table);
-#endif
-  }
-
-#if STRING_SORT
-  template <class ValueType> void emit(NameValueVec<ValueType>& name_value_vec) {
-    std::sort(name_value_vec.begin(), name_value_vec.end());
-    for (NameValue<ValueType>& name_value : name_value_vec) {
-      render_.generate(name_value.first, name_value.second);
-      name_value = NameValue<ValueType>(); // free memory after rendering
-    }
-  }
-#else
-  template <class StatType>
-  void emit(StatVec<StatType>& stat_vec, const Stats::SymbolTable& symbol_table) {
-    struct Compare {
-      Compare(const Stats::SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
-      bool operator()(const Stats::RefcountPtr<StatType>& a,
-                      const Stats::RefcountPtr<StatType>& b) {
-        return symbol_table_.lessThan(a->statName(), b->statName());
-      }
-      const Stats::SymbolTable& symbol_table_;
-    };
-
-    std::sort(stat_vec.begin(), stat_vec.end(), Compare(symbol_table));
-    for (Stats::RefcountPtr<StatType>& stat : stat_vec) {
-      render_.generate(stat->name(), saveValue(*stat));
-      stat.reset(); // free memory after rendering
-    }
-  }
-#endif
-
-#if STRING_SORT
-  template <class StatType, class ValueType>
-  void collect(Type type, const Stats::Store& stats, NameValueVec<ValueType>& vec)
-#else
-  template <class StatType>
-  void collect(Type type, const Stats::Store& stats, StatVec<StatType>& vec)
-#endif
-  {
-    // Bail early if the  requested type does not match the current type.
-    if (params_.type_ != Type::All && params_.type_ != type) {
-      return;
-    }
-
-    size_t previous_size = vec.size();
-    collectHelper(stats, [this, &vec](StatType& stat) {
-      if (params_.shouldShowMetric(stat)) {
-#if STRING_SORT
-        vec.emplace_back(std::make_pair(stat.name(), saveValue(stat)));
-#else
-        vec.emplace_back(Stats::RefcountPtr<StatType>(&stat));
-#endif
-      }
-    });
-    if (previous_size == vec.size()) {
-      render_.noStats(type);
-    }
-  }
-
-  std::string saveValue(Stats::TextReadout& text_readout) { return text_readout.value(); }
-  uint64_t saveValue(Stats::Counter& counter) { return counter.value(); }
-  uint64_t saveValue(Stats::Gauge& gauge) { return gauge.value(); }
-  Stats::ParentHistogramSharedPtr saveValue(Stats::ParentHistogram& histogram) {
-    return Stats::ParentHistogramSharedPtr(&histogram);
-  }
-
-  void collectHelper(const Stats::Store& stats, Stats::StatFn<Stats::TextReadout&> fn) {
-    stats.forEachTextReadout(nullptr, fn);
-  }
-
-  void collectHelper(const Stats::Store& stats, Stats::StatFn<Stats::Counter&> fn) {
-    stats.forEachCounter(nullptr, fn);
-  }
-
-  void collectHelper(const Stats::Store& stats, Stats::StatFn<Stats::Gauge&> fn) {
-    stats.forEachGauge(nullptr, fn);
-  }
-
-  void collectHelper(const Stats::Store& stats, Stats::StatFn<Stats::ParentHistogram> fn) {
-    // TODO(jmarantz)): when #19166 lands convert to stats.forEachHistogram(nullptr, fn);
-    for (Stats::ParentHistogramSharedPtr& histogram : stats.histograms()) {
-      fn(*histogram);
-    }
-  }
-
-  const Params& params_;
-  Render& render_;
-  Buffer::Instance& response_;
-};
-
-Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
-                               Http::ResponseHeaderMap& response_headers,
-                               Buffer::Instance& response) {
-  std::unique_ptr<Render> render;
-
+StatsHandler::Context::Context(
+    const Params& params, Stats::Store& store, Http::ResponseHeaderMap& response_headers,
+    Buffer::Instance& response,
+    mem_start_(Memory::Stats::totalCurrentlyAllocated())
+    : params_(params),
+      symbol_table_(store_.symbolTable()) {
   switch (params.format_) {
   case Format::Html:
-    render = std::make_unique<HtmlRender>(response_headers, response, *this, params);
+    render_ = std::make_unique<HtmlRender>(response_headers, response, *this, params);
     break;
   case Format::Json:
-    render = std::make_unique<JsonRender>(response_headers, response, params);
+    render_ = std::make_unique<JsonRender>(response_headers, response, params);
     break;
   case Format::Prometheus:
     ASSERT(false);
     ABSL_FALLTHROUGH_INTENDED;
   case Format::Text:
-    render = std::make_unique<TextRender>(response);
+    render_ = std::make_unique<TextRender>(response);
     break;
   }
+}
 
-  Context context(params, *render, response);
-  context.collectAndEmitStats(stats);
-  render->render();
+// Iterates through the various stat types, and renders them.
+Http::Code StatsHandler::Context::nextChunk(const Stats::Store& stats) {
+#if STRING_SORT
+  NameValueVec<std::string> text_readouts;
+  collect<Stats::TextReadout>(Type::TextReadouts, stats, text_readouts);
+  emit<std::string>(text_readouts);
 
-  return Http::Code::OK;
+  // We collect counters and gauges together and co-mingle them before sorting.
+  // Note that the user can use type 'type=' query-param to show only desired
+  // type; the default is All.
+  NameValueVec<uint64_t> counters_and_gauges;
+  collect<Stats::Counter>(Type::Counters, stats, counters_and_gauges);
+  collect<Stats::Gauge>(Type::Gauges, stats, counters_and_gauges);
+  ENVOY_LOG_MISC(error, "Memory Peak: {}", Memory::Stats::totalCurrentlyAllocated() - mem_start);
+  emit<uint64_t>(counters_and_gauges);
+
+  NameValueVec<Stats::ParentHistogramSharedPtr> histograms;
+  collect<Stats::ParentHistogram>(Type::Histograms, stats, histograms);
+  emit<Stats::ParentHistogramSharedPtr>(histograms);
+#else
+  const Stats::SymbolTable& symbol_table = stats.constSymbolTable();
+
+  if (!emit<Stats::TextReadout>(Type::TextReadouts, text_readouts_, text_readout_index_) ||
+      !emit<Stats::Counter>(Type::Counters, counters_, counter_index_) ||
+      !emit<Stats::Gauge>(Type::Gauges, gauges_, gauge_index_) ||
+      !emit<Stats::ParentHistogram>(Type::Histograms, histograms_, histogram_index_)) {
+    return Http::Code::Continue;
+  }
+
+  // TODO(jmarantz): merge-sort the counter & stats values together.
+  phase_ = Type::Counters;
+  collect<Stats::Counter>(Type::Counters, stats, counters);
+  if (emit<Stats::TextReadout>(Type::Counters, text_readouts_, text_readout_index_)) {
+      phase_ = Type::Counters;
+    }
+
+
+  collect<Stats::Gauge>(Type::Gauges, stats, gauges);
+  ENVOY_LOG_MISC(error, "Memory Peak: {}", Memory::Stats::totalCurrentlyAllocated() - mem_start);
+
+  emit<Stats::Counter>(counters, symbol_table);
+  emit<Stats::Gauge>(gauges, symbol_table);
+
+  StatVec<Stats::ParentHistogram> histograms;
+  collect<Stats::ParentHistogram>(Type::Histograms, stats, histograms);
+  emit<Stats::ParentHistogram>(histograms, symbol_table);
+#endif
+}
+
+#if STRING_SORT
+template <class ValueType> void StatsHandler::Context::emit(NameValueVec<ValueType>& name_value_vec) {
+  std::sort(name_value_vec.begin(), name_value_vec.end());
+  for (NameValue<ValueType>& name_value : name_value_vec) {
+    render_.generate(name_value.first, name_value.second);
+    name_value = NameValue<ValueType>(); // free memory after rendering
+  }
+}
+#else
+template <class StatType> bool StatsHandler::Context::emit(Type type,
+                                                           StatVec<StatType>& stat_vec, uint32_t& index) {
+  if (phase_ != type) {
+    return true;
+  }
+
+  if (stat_vec.empty()) {
+    collect<StatType>(type, stat_vec);
+    if (stat_vec.empty()) {
+      render_.noStats(type);
+      nextPhase();
+      return true;
+    }
+
+    struct Getter {
+      Stats::StatName operator()(const Stats::RefcountPtr<StatType>& a) const {
+        return a->statName();
+      }
+    };
+    Stats::sortByStatNames<Stats::RefcountPtr<StatType>>(
+        symbol_table, stat_vec.begin(), stat_vec.end(), Getter());
+  }
+  for (; index < stat_vec.size(); ++index) {
+    Stats::RefcountPtr<StatType>& stat = stat_vec[index];
+    render_.generate(stat->name(), saveValue(*stat));
+    stat.reset(); // free memory after rendering
+    if ((index % 20) == 0) {
+      return false;
+    }
+  }
+  stat_vec.clear();
+  nextPhase();
+  return true;
+}
+#endif
+
+#if STRING_SORT
+template <class StatType, class ValueType> void StatsHandler::Context::collect(
+    Type type, NameValueVec<ValueType>& vec)
+#else
+template <class StatType> void StatsHandler::Context::collect(Type type, StatVec<StatType>& vec)
+#endif
+{
+  // Bail early if the  requested type does not match the current type.
+  if (params_.type_ != Type::All && params_.type_ != type) {
+    return;
+  }
+
+  size_t previous_size = vec.size();
+
+  collectHelper(stats,
+                [this, &vec](size_t size) {
+                  if (!params_.canRejectStats()) {
+                    vec.reserve(vec.size() + size);
+                  }
+                },
+                [this, &vec](StatType& stat) {
+                  if (params_.shouldShowMetric(stat)) {
+#if STRING_SORT
+                    vec.emplace_back(std::make_pair(stat.name(), saveValue(stat)));
+#else
+                    vec.emplace_back(Stats::RefcountPtr<StatType>(&stat));
+#endif
+                  }
+                });
+  mem_max_ = std::max(mem_max_, Memory::Stats::totalCurrentlyAllocated());
+  if (previous_size == vec.size()) {
+    render_.noStats(type);
+  }
+}
+
+void StatsHandler::Context::collectHelper(const Stats::Store& stats, std::function<void(size_t)> size_fn,
+                   Stats::StatFn<Stats::ParentHistogram> fn) {
+  // TODO(jmarantz)): when #19166 lands convert to stats.forEachHistogram(nullptr, fn);
+  std::vector<Stats::ParentHistogramSharedPtr> histograms = stats.histograms();
+  size_fn(histograms.size());
+  for (Stats::ParentHistogramSharedPtr& histogram : histograms) {
+    fn(*histogram);
+  }
 }
 
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,

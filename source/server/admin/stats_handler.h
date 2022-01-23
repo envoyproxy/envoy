@@ -12,6 +12,7 @@
 #include "source/common/stats/histogram_impl.h"
 #include "source/server/admin/handler_ctx.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -39,6 +40,7 @@ public:
   struct Params {
     Http::Code parse(absl::string_view url, Buffer::Instance& response);
     bool shouldShowMetric(const Stats::Metric& metric) const;
+    bool canRejectStats() const { return filter_.has_value() || used_only_; }
 
     bool used_only_{false};
     bool prometheus_text_readouts_{false};
@@ -95,21 +97,99 @@ public:
    */
   static absl::string_view typeToString(Type type);
 
+  class Render;
+  class Context {
+   public:
+#define STRING_SORT 0
+#if STRING_SORT
+    template <class ValueType> using NameValue = std::pair<std::string, ValueType>;
+    template <class ValueType> using NameValueVec = std::vector<NameValue<ValueType>>;
+#else
+    template <class StatType> using StatVec = std::vector<Stats::RefcountPtr<StatType>>;
+#endif
+
+    Context(const Params& params, Stats::Store& store,
+            Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
+
+    // Iterates through the various stat types, and renders them.
+    void collectAndEmitStats(const Stats::Store& stats);
+#if STRING_SORT
+    template <class ValueType> void emit(NameValueVec<ValueType>& name_value_vec);
+#else
+    template <class StatType>
+        void emit(StatVec<StatType>& stat_vec, const Stats::SymbolTable& symbol_table);
+#endif
+
+#if STRING_SORT
+    template <class StatType, class ValueType>
+        void collect(Type type, const Stats::Store& stats, NameValueVec<ValueType>& vec);
+#else
+    template <class StatType>
+        void collect(Type type, const Stats::Store& stats, StatVec<StatType>& vec);
+#endif
+
+    std::string saveValue(Stats::TextReadout& text_readout) { return text_readout.value(); }
+    uint64_t saveValue(Stats::Counter& counter) { return counter.value(); }
+    uint64_t saveValue(Stats::Gauge& gauge) { return gauge.value(); }
+    Stats::ParentHistogramSharedPtr saveValue(Stats::ParentHistogram& histogram) {
+      return Stats::ParentHistogramSharedPtr(&histogram);
+    }
+
+    void collectHelper(const Stats::Store& stats, std::function<void(size_t)> size_fn,
+                                              Stats::StatFn<Stats::TextReadout&> fn) {
+      stats.forEachTextReadout(size_fn, fn);
+    }
+
+    void collectHelper(const Stats::Store& stats, std::function<void(size_t)> size_fn,
+                                              Stats::StatFn<Stats::Counter&> fn) {
+      stats.forEachCounter(size_fn, fn);
+    }
+
+    void collectHelper(const Stats::Store& stats, std::function<void(size_t)> size_fn,
+                                              Stats::StatFn<Stats::Gauge&> fn) {
+      stats.forEachGauge(size_fn, fn);
+    }
+
+    void collectHelper(const Stats::Store& stats, std::function<void(size_t)> size_fn,
+                       Stats::StatFn<Stats::ParentHistogram> fn);
+
+   private:
+    void nextPhase() { phase_ = static_cast<Type>(static_cast<uint32_t>(phase_) + 1); }
+
+
+    const Params& params_;
+    std::unique_ptr<Render> render_;
+    Stats::Store& store_;
+    Stats::SymbolTable& symbol_table_;
+
+#if !STRING_SORT
+    Type phase_{Type::TextReadouts};
+    StatVec<Stats::TextReadout> text_readouts_;
+    StatVec<Stats::Counter> counters_;
+    StatVec<Stats::Gauge> gauges_;
+    StatVec<Stats::ParentHistogram> histograms_;
+    uint32_t text_readout_index_{0};
+    uint32_t counter_index_{0};
+    uint32_t gauge_index_{0};
+    uint32_t histogram_index_{0};
+#endif
+    const uint64_t mem_start_;
+    uint64_t mem_max_{0};
+  };
+  using ContextPtr = std::unique_ptr<Context>;
+
 private:
-  class Context;
   class HtmlRender;
   class JsonRender;
-  class Render;
   class TextRender;
 
   friend class StatsHandlerTest;
 
-  Http::Code stats(const Params& parmams, Stats::Store& store,
-                   Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
-
   static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
                                     Stats::Store& stats,
                                     Stats::CustomStatNamespaces& custom_namespaces);
+
+  absl::flat_hash_map<AdminStream*, ContextPtr> context_map_;
 };
 
 } // namespace Server
