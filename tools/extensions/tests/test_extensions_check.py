@@ -1,5 +1,4 @@
 import types
-from importlib.machinery import ModuleSpec
 from unittest.mock import patch, PropertyMock, call
 
 import pytest
@@ -13,74 +12,63 @@ def test_extensions_checker_constructor():
     assert checker.extension_categories == extensions_check.EXTENSION_CATEGORIES
 
 
-def test_extensions_checker_all_extensions():
+def test_extensions_checker_all_extensions(patches):
     checker = extensions_check.ExtensionsChecker()
-    exts_mock = patch(
-        "tools.extensions.extensions_check.ExtensionsChecker.configured_extensions",
-        new_callable=PropertyMock)
-    _configured = dict(foo="FOO", bar="BAR")
+    patched = patches(
+        ("ExtensionsChecker.configured_extensions",
+         dict(new_callable=PropertyMock)),
+        ("ExtensionsChecker.configured_contrib_extensions",
+         dict(new_callable=PropertyMock)),
+        prefix="tools.extensions.extensions_check")
+    configured_exts = {f"EXT{i}": f"EXT_DATA{i}" for i in range(0, 5)}
+    contrib_exts = {f"CONTRIB_EXT{i}": f"EXT_DATA{i}" for i in range(0, 3)}
 
-    with exts_mock as m_exts:
-        m_exts.return_value = _configured
+    with patched as (m_exts, m_contrib):
+        m_exts.return_value = configured_exts
+        m_contrib.return_value = contrib_exts
         result = checker.all_extensions
 
     assert (
         result
-        == set(_configured.keys()) | set(extensions_check.BUILTIN_EXTENSIONS) | set(checker.configured_contrib_extensions.keys()))
+        == (set(configured_exts.keys())
+            | set(extensions_check.BUILTIN_EXTENSIONS)
+            | set(contrib_exts.keys())))
     assert "all_extensions" in checker.__dict__
 
 
-@pytest.mark.parametrize("is_module", [True, False])
-@pytest.mark.parametrize("is_loader", [True, False])
-def test_extensions_checker_configured_extensions(patches, is_module, is_loader):
+@pytest.mark.parametrize("exts", ["", "contrib"])
+def test_extensions_checker_configured_extensions(patches, exts):
     checker = extensions_check.ExtensionsChecker()
     patched = patches(
-        "isinstance",
-        "spec_from_loader",
-        "SourceFileLoader",
-        "module_from_spec",
+        "json",
+        "pathlib",
+        ("ExtensionsChecker.args",
+         dict(new_callable=PropertyMock)),
         prefix="tools.extensions.extensions_check")
+    attr = (
+        "configured_%s_extensions" % exts
+        if exts
+        else "configured_extensions")
+    config = (
+        "%s_build_config" % exts
+        if exts
+        else "build_config")
 
-    def _is_instance(obj, types):
-        if types == ModuleSpec:
-            return is_module
-        return is_loader
-
-    with patched as (m_inst, m_spec, m_loader, m_module):
-        m_inst.side_effect = _is_instance
-
-        if is_module and is_loader:
-            assert (
-                checker.configured_extensions
-                == m_module.return_value.EXTENSIONS)
-        else:
-            with pytest.raises(extensions_check.ExtensionsConfigurationError) as e:
-                checker.configured_extensions
+    with patched as (m_json, m_plib, m_args):
+        assert (
+            getattr(checker, attr)
+            == m_json.loads.return_value)
 
     assert (
-        list(m_spec.call_args)
-        == [('extensions_build_config', m_loader.return_value), {}])
+        m_json.loads.call_args
+        == [(m_plib.Path.return_value.read_text.return_value, ), {}])
     assert (
-        list(m_loader.call_args)
-        == [('extensions_build_config', extensions_check.BUILD_CONFIG_PATH), {}])
-
-    if not is_module:
-        assert not m_module.called
-        assert not m_spec.return_value.loader.exec_module.called
-        return
-
+        m_plib.Path.call_args
+        == [(getattr(m_args.return_value, config), ), {}])
     assert (
-        list(m_module.call_args)
-        == [(m_spec.return_value,), {}])
-
-    if not is_loader:
-        assert not m_spec.return_value.loader.exec_module.called
-        return
-
-    assert (
-        list(m_spec.return_value.loader.exec_module.call_args)
-        == [(m_module.return_value,), {}])
-    assert "configured_extensions" in checker.__dict__
+        m_plib.Path.return_value.read_text.call_args
+        == [(), {}])
+    assert attr in checker.__dict__
 
 
 def test_extensions_fuzzed_count(patches):
@@ -413,4 +401,4 @@ def test_extensions_checker_main(command_main):
     command_main(
         extensions_check.main,
         "tools.extensions.extensions_check.ExtensionsChecker",
-        args=())
+        args=("ARGS", ))
