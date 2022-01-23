@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
+#include <chrono>
+
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "source/common/common/assert.h"
@@ -7,7 +9,6 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
-#include <chrono>
 
 namespace Envoy {
 namespace Extensions {
@@ -217,8 +218,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     // Add duration of call to dynamic metadata if applicable
     if (start_time_.has_value()) {
       ProtobufWkt::Value ext_authz_duration_value;
-      auto duration = decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value();
-      ext_authz_duration_value.set_number_value(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+      auto duration =
+          decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value();
+      ext_authz_duration_value.set_number_value(
+          std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
       (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
           ext_authz_duration_value;
     }
