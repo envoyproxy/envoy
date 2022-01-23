@@ -53,7 +53,7 @@ private:
     return !address.empty() ? absl::make_optional(std::move(address)) : absl::nullopt;
   }
 
-  bool requestPathMatch(absl::string_view request_path) {
+  bool requestPathMatch(absl::string_view request_path) const {
     return absl::StartsWith(request_path, path_);
   }
 

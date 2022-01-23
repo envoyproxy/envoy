@@ -59,7 +59,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
 
     // Get upstream address from request headers.
     Envoy::Http::TestRequestHeaderMapImpl request_headers = {
-        {"cookie", "override_host=" + Envoy::Base64::encode("1.2.3.4:80", 10)}};
+        {":path", "/path"}, {"cookie", "override_host=" + Envoy::Base64::encode("1.2.3.4:80", 10)}};
     auto session_state = factory.create(request_headers);
     EXPECT_EQ("1.2.3.4:80", session_state->upstreamAddress().value());
 
@@ -82,6 +82,21 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
               Envoy::Http::Utility::makeSetCookieValue("override_host",
                                                        Envoy::Base64::encode("2.3.4.5:80", 10),
                                                        "/path", std::chrono::seconds(5), true));
+  }
+
+  {
+    CookieBasedSessionStateProto config;
+    config.mutable_cookie()->set_name("override_host");
+    config.mutable_cookie()->set_path("/path");
+    config.mutable_cookie()->mutable_ttl()->set_seconds(5);
+    CookieBasedSessionStateFactory factory(config);
+
+    // Get upstream address from request headers.
+    Envoy::Http::TestRequestHeaderMapImpl request_headers = {
+        {":path", "/not_match_path"},
+        {"cookie", "override_host=" + Envoy::Base64::encode("1.2.3.4:80", 10)}};
+    auto session_state = factory.create(request_headers);
+    EXPECT_EQ(nullptr, session_state);
   }
 }
 

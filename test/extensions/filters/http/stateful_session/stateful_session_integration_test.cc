@@ -125,7 +125,7 @@ TEST_F(StatefulSessionIntegrationTest, NormalStatefulSession) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                 {":path", "/test"},
+                                                 {":path", "/path"},
                                                  {":scheme", "http"},
                                                  {":authority", "stateful.session.com"}};
 
@@ -172,7 +172,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"},
-        {":path", "/test"},
+        {":path", "/path"},
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
         {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
@@ -207,7 +207,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"},
-        {":path", "/test"},
+        {":path", "/path"},
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
         {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
@@ -236,7 +236,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"},
-        {":path", "/test"},
+        {":path", "/path"},
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
         {"cookie", fmt::format("global-session-cookie=\"{}\"",
@@ -284,14 +284,15 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
   const std::string encoded_address =
       Envoy::Base64::encode(address_string.data(), address_string.size());
 
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/path"},
+      {":scheme", "http"},
+      {":authority", "stateful.session.com"},
+      {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
+
   {
     codec_client_ = makeHttpConnection(lookupPort("http"));
-    Http::TestRequestHeaderMapImpl request_headers{
-        {":method", "GET"},
-        {":path", "/test"},
-        {":scheme", "http"},
-        {":authority", "stateful.session.com"},
-        {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
 
     auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
@@ -314,12 +315,6 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
 
   {
     codec_client_ = makeHttpConnection(lookupPort("http"));
-    Http::TestRequestHeaderMapImpl request_headers{
-        {":method", "GET"},
-        {":path", "/test"},
-        {":scheme", "http"},
-        {":authority", "stateful.session.com"},
-        {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
 
     auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
@@ -358,7 +353,7 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverriddenByRoute) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"},
-        {":path", "/test"},
+        {":path", "/path"},
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
         {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
@@ -401,7 +396,7 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverriddenByRoute) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"},
-        {":path", "/test"},
+        {":path", "/path"},
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
         {"cookie", fmt::format("route-session-cookie=\"{}\"", encoded_address)}};
@@ -424,6 +419,77 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverriddenByRoute) {
 
     cleanupUpstreamAndDownstream();
   }
+}
+
+TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionDisabledByRequestPath) {
+  initializeFilterAndRoute(STATEFUL_SESSION_FILTER, "");
+
+  uint64_t first_index = 0;
+  uint64_t second_index = 0;
+
+  envoy::config::endpoint::v3::LbEndpoint endpoint;
+  setUpstreamAddress(1, endpoint);
+  const std::string address_string =
+      fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+  const std::string encoded_address =
+      Envoy::Base64::encode(address_string.data(), address_string.size());
+
+  // Request path is not start with cookie path which means that the stateful session cookie in the
+  // request my not generated by current filter. The stateful session will skip processing this
+  // request.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/not_match_path"},
+      {":scheme", "http"},
+      {":authority", "stateful.session.com"},
+      {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
+
+  {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+    auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+    ASSERT(upstream_index.has_value());
+    first_index = upstream_index.value();
+
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_TRUE(response->complete());
+
+    // No response header to be added.
+    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("set-cookie")).empty());
+
+    cleanupUpstreamAndDownstream();
+  }
+
+  {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+    auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+    ASSERT(upstream_index.has_value());
+    second_index = upstream_index.value();
+
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_TRUE(response->complete());
+
+    // No response header to be added.
+    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("set-cookie")).empty());
+
+    cleanupUpstreamAndDownstream();
+  }
+
+  // Choose different upstream servers by default.
+  EXPECT_NE(first_index, second_index);
 }
 
 } // namespace
