@@ -372,7 +372,7 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
   case Address::IpVersion::v6:
     return std::make_shared<Address::Ipv6Instance>(address.ip()->addressAsString(), port);
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("not handled");
 }
 
 Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
