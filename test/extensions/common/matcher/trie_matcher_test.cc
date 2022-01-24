@@ -450,7 +450,7 @@ matcher_tree:
   input:
     name: input
     typed_config:
-      "@type": type.googleapis.com/envoy.type.matcher.v3.DestinationIPInput
+      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationIPInput
   custom_match:
     name: ip_matcher
     typed_config:

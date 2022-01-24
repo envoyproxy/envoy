@@ -25,6 +25,6 @@ envoy_cc_library(
         "//envoy/network:filter_interface",
         "//envoy/registry",
         "//source/common/network:utility_lib",
-        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
     ],
 )

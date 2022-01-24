@@ -13,7 +13,6 @@ namespace Matching {
 class MatchingDataImpl : public MatchingData {
 public:
   MatchingDataImpl(const ConnectionSocket& socket) : socket_(socket) {}
-  static absl::string_view name() { return "network"; }
   const ConnectionSocket& socket() const override { return socket_; }
 
 private:

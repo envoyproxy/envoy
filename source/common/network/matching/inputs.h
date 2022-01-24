@@ -1,9 +1,9 @@
 #pragma once
 
+#include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.h"
+#include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.validate.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/filter.h"
-#include "envoy/type/matcher/v3/network_inputs.pb.h"
-#include "envoy/type/matcher/v3/network_inputs.pb.validate.h"
 
 namespace Envoy {
 namespace Network {
@@ -35,7 +35,9 @@ public:
 };
 
 class DestinationIPInputFactory
-    : public BaseFactory<DestinationIPInput, envoy::type::matcher::v3::DestinationIPInput> {
+    : public BaseFactory<
+          DestinationIPInput,
+          envoy::extensions::matching::common_inputs::network::v3::DestinationIPInput> {
 public:
   DestinationIPInputFactory() : BaseFactory("destination-ip") {}
 };
@@ -46,7 +48,9 @@ public:
 };
 
 class DestinationPortInputFactory
-    : public BaseFactory<DestinationPortInput, envoy::type::matcher::v3::DestinationPortInput> {
+    : public BaseFactory<
+          DestinationPortInput,
+          envoy::extensions::matching::common_inputs::network::v3::DestinationPortInput> {
 public:
   DestinationPortInputFactory() : BaseFactory("destination-port") {}
 };
@@ -57,7 +61,8 @@ public:
 };
 
 class SourceIPInputFactory
-    : public BaseFactory<SourceIPInput, envoy::type::matcher::v3::SourceIPInput> {
+    : public BaseFactory<SourceIPInput,
+                         envoy::extensions::matching::common_inputs::network::v3::SourceIPInput> {
 public:
   SourceIPInputFactory() : BaseFactory("source-ip") {}
 };
@@ -68,7 +73,8 @@ public:
 };
 
 class SourcePortInputFactory
-    : public BaseFactory<SourcePortInput, envoy::type::matcher::v3::SourcePortInput> {
+    : public BaseFactory<SourcePortInput,
+                         envoy::extensions::matching::common_inputs::network::v3::SourcePortInput> {
 public:
   SourcePortInputFactory() : BaseFactory("source-port") {}
 };
@@ -79,7 +85,9 @@ public:
 };
 
 class DirectSourceIPInputFactory
-    : public BaseFactory<DirectSourceIPInput, envoy::type::matcher::v3::DirectSourceIPInput> {
+    : public BaseFactory<
+          DirectSourceIPInput,
+          envoy::extensions::matching::common_inputs::network::v3::DirectSourceIPInput> {
 public:
   DirectSourceIPInputFactory() : BaseFactory("direct-source-ip") {}
 };
@@ -90,7 +98,8 @@ public:
 };
 
 class SourceTypeInputFactory
-    : public BaseFactory<SourceTypeInput, envoy::type::matcher::v3::SourceTypeInput> {
+    : public BaseFactory<SourceTypeInput,
+                         envoy::extensions::matching::common_inputs::network::v3::SourceTypeInput> {
 public:
   SourceTypeInputFactory() : BaseFactory("source-type") {}
 };
@@ -101,7 +110,8 @@ public:
 };
 
 class ServerNameInputFactory
-    : public BaseFactory<ServerNameInput, envoy::type::matcher::v3::ServerNameInput> {
+    : public BaseFactory<ServerNameInput,
+                         envoy::extensions::matching::common_inputs::network::v3::ServerNameInput> {
 public:
   ServerNameInputFactory() : BaseFactory("server-name") {}
 };
@@ -112,7 +122,9 @@ public:
 };
 
 class TransportProtocolInputFactory
-    : public BaseFactory<TransportProtocolInput, envoy::type::matcher::v3::TransportProtocolInput> {
+    : public BaseFactory<
+          TransportProtocolInput,
+          envoy::extensions::matching::common_inputs::network::v3::TransportProtocolInput> {
 public:
   TransportProtocolInputFactory() : BaseFactory("transport-protocol") {}
 };
@@ -123,8 +135,9 @@ public:
 };
 
 class ApplicationProtocolInputFactory
-    : public BaseFactory<ApplicationProtocolInput,
-                         envoy::type::matcher::v3::ApplicationProtocolInput> {
+    : public BaseFactory<
+          ApplicationProtocolInput,
+          envoy::extensions::matching::common_inputs::network::v3::ApplicationProtocolInput> {
 public:
   ApplicationProtocolInputFactory() : BaseFactory("application-protocol") {}
 };

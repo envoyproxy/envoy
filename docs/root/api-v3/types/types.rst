@@ -24,6 +24,5 @@ Types
   ../type/matcher/v3/struct.proto
   ../type/matcher/v3/value.proto
   ../type/matcher/v3/http_inputs.proto
-  ../type/matcher/v3/network_inputs.proto
   ../type/metadata/v3/metadata.proto
   ../type/tracing/v3/custom_tag.proto
