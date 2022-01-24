@@ -13,6 +13,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/config/subscription_base.h"
+#include "source/common/config/validated_subscription.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/upstream/cds_api_helper.h"
 
@@ -23,12 +24,14 @@ namespace Upstream {
  * CDS API implementation that fetches via Subscription.
  */
 class CdsApiImpl : public CdsApi,
-                   Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster> {
+                   Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>,
+                   Envoy::Config::ValidatedSubscription {
 public:
   static CdsApiPtr create(const envoy::config::core::v3::ConfigSource& cds_config,
                           const xds::core::v3::ResourceLocator* cds_resources_locator,
                           ClusterManager& cm, Stats::Scope& scope,
-                          ProtobufMessage::ValidationVisitor& validation_visitor);
+                          ProtobufMessage::ValidationVisitor& validation_visitor,
+                          Server::Instance& server);
 
   // Upstream::CdsApi
   void initialize() override { subscription_->start({}); }
@@ -48,7 +51,8 @@ private:
                             const EnvoyException* e) override;
   CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
              const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
-             Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
+             Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
+             Server::Instance& server);
   void runInitializeCallbackIfAny();
 
   CdsApiHelper helper_;

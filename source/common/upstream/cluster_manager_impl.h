@@ -48,15 +48,18 @@ namespace Upstream {
  */
 class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
-  ProdClusterManagerFactory(
-      Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
-      ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-      Ssl::ContextManager& ssl_context_manager, Event::Dispatcher& main_thread_dispatcher,
-      const LocalInfo::LocalInfo& local_info, Secret::SecretManager& secret_manager,
-      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
-      AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager,
-      const Server::Options& options, Quic::QuicStatNames& quic_stat_names)
+  ProdClusterManagerFactory(Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
+                            ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
+                            Ssl::ContextManager& ssl_context_manager,
+                            Event::Dispatcher& main_thread_dispatcher,
+                            const LocalInfo::LocalInfo& local_info,
+                            Secret::SecretManager& secret_manager,
+                            ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+                            Http::Context& http_context, Grpc::Context& grpc_context,
+                            Router::Context& router_context,
+                            AccessLog::AccessLogManager& log_manager,
+                            Singleton::Manager& singleton_manager, const Server::Options& options,
+                            Quic::QuicStatNames& quic_stat_names, Server::Instance& server)
       : context_(options, main_thread_dispatcher, api, local_info, admin, runtime,
                  singleton_manager, validation_context.staticValidationVisitor(), stats, tls),
         validation_context_(validation_context), http_context_(http_context),
@@ -65,7 +68,8 @@ public:
         local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
         singleton_manager_(singleton_manager), quic_stat_names_(quic_stat_names),
         alternate_protocols_cache_manager_factory_(singleton_manager, tls_, {context_}),
-        alternate_protocols_cache_manager_(alternate_protocols_cache_manager_factory_.get()) {}
+        alternate_protocols_cache_manager_(alternate_protocols_cache_manager_factory_.get()),
+        server_(server) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
@@ -111,6 +115,7 @@ protected:
   Quic::QuicStatNames& quic_stat_names_;
   Http::AlternateProtocolsCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
   Http::AlternateProtocolsCacheManagerSharedPtr alternate_protocols_cache_manager_;
+  Server::Instance& server_;
 };
 
 // For friend declaration in ClusterManagerInitHelper.
@@ -258,12 +263,12 @@ public:
     init_helper_.setInitializedCb(callback);
   }
 
-  ClusterInfoMaps clusters() override {
+  ClusterInfoMaps clusters() const override {
     ClusterInfoMaps clusters_maps;
-    for (auto& cluster : active_clusters_) {
+    for (const auto& cluster : active_clusters_) {
       clusters_maps.active_clusters_.emplace(cluster.first, *cluster.second->cluster_);
     }
-    for (auto& cluster : warming_clusters_) {
+    for (const auto& cluster : warming_clusters_) {
       clusters_maps.warming_clusters_.emplace(cluster.first, *cluster.second->cluster_);
     }
     return clusters_maps;

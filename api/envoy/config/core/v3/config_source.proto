@@ -4,6 +4,7 @@ package envoy.config.core.v3;
 
 import "envoy/config/core/v3/grpc_service.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -149,9 +150,27 @@ message RateLimitSettings {
 // <arch_overview_service_discovery>` etc. may either be sourced from the
 // filesystem or from an xDS API source. Filesystem configs are watched with
 // inotify for updates.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message ConfigSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.ConfigSource";
+
+  // This is the same as TypedExtensionConfig. However, extensions.proto cannot be
+  // imported as it defines a message (ExtensionConfigSource) that depends on ConfigSource.
+  // [#next-major-version: refactor the file envoy/config/core/v3/extension.proto
+  // to move out ExtensionConfigSource so this proto can import extension.proto.]
+  message ConfigSourceTypedConfig {
+    // The name of an extension. This is not used to select the extension, instead
+    // it serves the role of an opaque identifier.
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+
+    // The typed config for the extension. The type URL will be used to identify
+    // the extension. In the case that the type URL is *xds.type.v3.TypedStruct*
+    // (or, for historical reasons, *udpa.type.v1.TypedStruct*), the inner type
+    // URL of *TypedStruct* will be utilized. See the
+    // :ref:`extension configuration overview
+    // <config_overview_extension_configuration>` for further details.
+    google.protobuf.Any typed_config = 2 [(validate.rules).any = {required: true}];
+  }
 
   // Authorities that this config source may be used for. An authority specified in a xdstp:// URL
   // is resolved to a *ConfigSource* prior to configuration fetch. This field provides the
@@ -211,4 +230,15 @@ message ConfigSource {
   // will request for resources and the resource type that the client will in
   // turn expect to be delivered.
   ApiVersion resource_api_version = 6 [(validate.rules).enum = {defined_only: true}];
+
+  // A list of config validators to execute. The validators will be executed
+  // when an update to the config occurs. If the validator returns false, the
+  // config will be rejected by the client, and a NACK will be sent.
+  // [#extension-category: envoy.config.validators]
+  //
+  // [#next-major-version: This field type should have been TypedExtensionConfig,
+  // however, because the extension.proto file (ExtensionConfigSource) depends
+  // on this file, it causes a circular dependency. This can be refactored in
+  // the next major version.]
+  repeated ConfigSourceTypedConfig config_validators_typed_configs = 8;
 }

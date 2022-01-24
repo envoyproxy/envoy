@@ -434,6 +434,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "validated_subscription_lib",
+    srcs = ["validated_subscription.cc"],
+    hdrs = ["validated_subscription.h"],
+    deps = [
+        ":opaque_resource_decoder_lib",
+        ":resource_name_lib",
+        "//envoy/config:config_validator_interface",
+        "//source/common/config:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "watched_directory_lib",
     srcs = ["watched_directory.cc"],
     hdrs = ["watched_directory.h"],

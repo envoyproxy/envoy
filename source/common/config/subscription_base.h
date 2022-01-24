@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/subscription.h"
+#include "envoy/server/instance.h"
 
 #include "source/common/config/opaque_resource_decoder_impl.h"
 #include "source/common/config/resource_name.h"

@@ -37,6 +37,7 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:cds_api_lib",
         "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/test_common:utility_lib",

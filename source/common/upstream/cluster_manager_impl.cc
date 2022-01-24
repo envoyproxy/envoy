@@ -1898,7 +1898,7 @@ ProdClusterManagerFactory::createCds(const envoy::config::core::v3::ConfigSource
                                      ClusterManager& cm) {
   // TODO(htuch): Differentiate static vs. dynamic validation visitors.
   return CdsApiImpl::create(cds_config, cds_resources_locator, cm, stats_,
-                            validation_context_.dynamicValidationVisitor());
+                            validation_context_.dynamicValidationVisitor(), server_);
 }
 
 } // namespace Upstream

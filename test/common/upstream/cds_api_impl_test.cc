@@ -13,6 +13,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/test_common/printers.h"
@@ -37,7 +38,7 @@ class CdsApiImplTest : public testing::Test {
 protected:
   void setup() {
     envoy::config::core::v3::ConfigSource cds_config;
-    cds_ = CdsApiImpl::create(cds_config, nullptr, cm_, store_, validation_visitor_);
+    cds_ = CdsApiImpl::create(cds_config, nullptr, cm_, store_, validation_visitor_, server_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
     EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
@@ -74,6 +75,7 @@ protected:
   Config::SubscriptionCallbacks* cds_callbacks_{};
   ReadyWatcher initialized_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  NiceMock<Server::MockInstance> server_;
 };
 
 // Regression test against only updating versionInfo() if at least one cluster
