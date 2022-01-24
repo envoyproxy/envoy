@@ -95,7 +95,7 @@ typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState
       cookie:
         name: global-session-cookie
-        path: /path
+        path: /test
         ttl: 120s
 )EOF";
 
@@ -115,7 +115,7 @@ stateful_session:
       "@type": type.googleapis.com/envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState
       cookie:
         name: route-session-cookie
-        path: /path
+        path: /test
         ttl: 120s
 )EOF";
 
@@ -125,7 +125,7 @@ TEST_F(StatefulSessionIntegrationTest, NormalStatefulSession) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                 {":path", "/path"},
+                                                 {":path", "/test"},
                                                  {":scheme", "http"},
                                                  {":authority", "stateful.session.com"}};
 
@@ -172,7 +172,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"},
-        {":path", "/path"},
+        {":path", "/test"},
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
         {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
@@ -207,7 +207,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"},
-        {":path", "/path"},
+        {":path", "/test"},
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
         {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
@@ -236,7 +236,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"},
-        {":path", "/path"},
+        {":path", "/test"},
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
         {"cookie", fmt::format("global-session-cookie=\"{}\"",
@@ -286,7 +286,7 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},
-      {":path", "/path"},
+      {":path", "/test"},
       {":scheme", "http"},
       {":authority", "stateful.session.com"},
       {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
@@ -353,7 +353,7 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverriddenByRoute) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"},
-        {":path", "/path"},
+        {":path", "/test"},
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
         {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
@@ -396,7 +396,7 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverriddenByRoute) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"},
-        {":path", "/path"},
+        {":path", "/test"},
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
         {"cookie", fmt::format("route-session-cookie=\"{}\"", encoded_address)}};
@@ -439,7 +439,7 @@ TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionDisabledByReque
   // request.
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},
-      {":path", "/not_match_path"},
+      {":path", "/path_not_match"},
       {":scheme", "http"},
       {":authority", "stateful.session.com"},
       {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
