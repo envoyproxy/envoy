@@ -170,8 +170,8 @@ TEST_P(WasmTestMatrix, LoggingWithEnvVars) {
 }
 
 TEST_P(WasmTest, BadSignature) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -186,8 +186,8 @@ TEST_P(WasmTest, BadSignature) {
 }
 
 TEST_P(WasmTest, Segv) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -205,8 +205,8 @@ TEST_P(WasmTest, Segv) {
 }
 
 TEST_P(WasmTest, DivByZero) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -224,8 +224,8 @@ TEST_P(WasmTest, DivByZero) {
 }
 
 TEST_P(WasmTest, IntrinsicGlobals) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -249,8 +249,8 @@ TEST_P(WasmTest, IntrinsicGlobals) {
 // change this behavior by providing non-trapping instructions, but in the mean time we support the
 // default Emscripten behavior.
 TEST_P(WasmTest, Asm2Wasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -267,8 +267,8 @@ TEST_P(WasmTest, Asm2Wasm) {
 }
 
 TEST_P(WasmNullTest, Stats) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -292,8 +292,8 @@ TEST_P(WasmNullTest, Stats) {
 }
 
 TEST_P(WasmNullTest, StatsHigherLevel) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }
@@ -323,8 +323,8 @@ TEST_P(WasmNullTest, StatsHigherLevel) {
 }
 
 TEST_P(WasmNullTest, StatsHighLevel) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }

@@ -30,8 +30,8 @@ std::vector<std::string> sandboxRuntimes() {
 
 std::vector<std::string> languages() {
   std::vector<std::string> languages;
-#if !defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   languages.push_back("cpp");
 #endif
   languages.push_back("rust");
