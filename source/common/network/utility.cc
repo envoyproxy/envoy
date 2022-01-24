@@ -346,14 +346,12 @@ Address::InstanceConstSharedPtr Utility::getIpv6LoopbackAddress() {
                          new Address::Ipv6Instance("::1", 0, nullptr));
 }
 
-Address::InstanceConstSharedPtr Utility::getIpv4AnyAddress() {
-  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr,
-                         new Address::Ipv4Instance(static_cast<uint32_t>(0)));
+Address::InstanceConstSharedPtr Utility::getIpv4AnyAddress(uint32_t port) {
+  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr, new Address::Ipv4Instance(port));
 }
 
-Address::InstanceConstSharedPtr Utility::getIpv6AnyAddress() {
-  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr,
-                         new Address::Ipv6Instance(static_cast<uint32_t>(0)));
+Address::InstanceConstSharedPtr Utility::getIpv6AnyAddress(uint32_t port) {
+  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr, new Address::Ipv6Instance(port));
 }
 
 const std::string& Utility::getIpv4CidrCatchAllAddress() {
@@ -715,8 +713,6 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
                                        : num_packets_to_read);
   // Make sure to read at least once.
   num_reads = std::max<size_t>(1, num_reads);
-  bool honor_read_limit =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit");
   do {
     const uint32_t old_packets_dropped = packets_dropped;
     const MonotonicTime receive_time = time_source.monotonicTime();
@@ -744,9 +740,7 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
           delta);
       udp_packet_processor.onDatagramsDropped(delta);
     }
-    if (honor_read_limit) {
-      --num_reads;
-    }
+    --num_reads;
     if (num_reads == 0) {
       return std::move(result.err_);
     }
