@@ -8,10 +8,18 @@ namespace Envoy {
 
 namespace Network {
 
-class DefaultClientConnectionFactory : public Network::ClientConnectionFactory {
+/**
+ * This client connection factory handles the connection if the remote address type is either ip or
+ * pipe.
+ */
+class DefaultClientConnectionFactory : public ClientConnectionFactory {
 public:
   ~DefaultClientConnectionFactory() override = default;
+
+  // Config::UntypedFactory
   std::string name() const override { return "default"; }
+
+  // Network::ClientConnectionFactory
   Network::ClientConnectionPtr
   createClientConnection(Event::Dispatcher& dispatcher,
                          Network::Address::InstanceConstSharedPtr address,

@@ -16,7 +16,7 @@ public:
   ~ClientConnectionFactory() override = default;
 
   // Config::UntypedFactory
-  std::string category() const override { return "network.connection"; }
+  std::string category() const override { return "network.connection.client"; }
 
   /**
    * @param address The target remote address.
