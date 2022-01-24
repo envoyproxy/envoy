@@ -346,6 +346,15 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRando
     // receiving flow control window updates.
     return;
   }
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.defer_processing_backedup_streams")) {
+    // We end up triggering the pause-filter high watermark with the
+    // first-non reset response, but we never end up lowering it as all requests
+    // have been sent. As such, all those streams become read disabled, meaning
+    // the corresponding upstream stream ends up buffering its response from the
+    // upstream, but won't push it through since we never trigger low watermark.
+    return;
+  }
   config_helper_.prependFilter(
       fmt::format(R"EOF(
   name: pause-filter{}
