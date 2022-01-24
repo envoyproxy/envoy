@@ -114,7 +114,8 @@ public:
     ::memcpy(data, this->start() + start, size);
   }
 
-  uint64_t copyOutToSlices(uint64_t length, Buffer::RawSlice* slices, uint64_t num_slices) const override {
+  uint64_t copyOutToSlices(uint64_t length, Buffer::RawSlice* slices,
+                           uint64_t num_slices) const override {
     uint64_t size_copied = 0;
     uint64_t num_slices_copied = 0;
     while (size_copied < length && num_slices_copied < num_slices) {
