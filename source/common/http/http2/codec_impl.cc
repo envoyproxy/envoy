@@ -354,15 +354,14 @@ void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadat
   }
 }
 
-void ConnectionImpl::StreamImpl::processBufferedData(bool stream_being_destroyed) {
+void ConnectionImpl::StreamImpl::processBufferedData() {
   ENVOY_CONN_LOG(debug, "Stream {} processing buffered data.", parent_.connection_, stream_id_);
 
-  // On the response path (upstream -> downstream), we want to flush the
-  // buffered data to the downstream if the stream is being closed.
-  // TODO(kbaichoo): perhaps we can achieve this in another way, e.g. defer the
-  // onStreamClose call.
-  stream_manager_.flush_all_data_ = stream_being_destroyed;
-  bool continue_processing = stream_being_destroyed || !buffersOverrun();
+  // We should stop processing buffered data if either
+  // 1) Buffers become overrun
+  // 2) The stream ends up getting reset
+  // Both of these can end up changing as a result of processing buffered data.
+  bool continue_processing = !buffersOverrun() && !reset_reason_.has_value();
 
   if (stream_manager_.body_buffered_ && continue_processing) {
     if (stream_manager_.data_end_stream_) {
@@ -371,22 +370,21 @@ void ConnectionImpl::StreamImpl::processBufferedData(bool stream_being_destroyed
     decodeData();
   }
 
-  // Sometimes processing the buffered data, means we should abort from
-  // processing buffered data e.g. say if a local reply occured. As such check
-  // if we have been reset...
-  continue_processing = stream_being_destroyed || !buffersOverrun();
-  if (stream_manager_.trailers_buffered_ && continue_processing && !reset_reason_.has_value()) {
+  continue_processing = !buffersOverrun() && !reset_reason_.has_value();
+  if (stream_manager_.trailers_buffered_ && continue_processing) {
     remote_end_stream_ = true; // buffered trailers imply remote_end_stream_.
     decodeTrailers();
   }
 
-  // If we buffered the on stream close, lets unwind
-  // TODO(kbaichoo): if we ended up resetting, in between, does this implictly
-  // get called onStreamClose? Don't think so...
-  if (stream_manager_.buffered_on_stream_close_ && !stream_manager_.trailers_buffered_ &&
-      !stream_manager_.body_buffered_) {
-    // TODO(kbaichoo): we should buffer the error code as well..
-    parent_.onStreamClose(stream_id_, 0);
+  // Activate the buffered onStreamClose if we've drained all the buffered data,
+  // or we've gotten a reset. Getting a reset doesn't guarantee onStreamClose is
+  // called.
+  if (stream_manager_.buffered_on_stream_close_ &&
+      (!stream_manager_.has_buffered_data() || reset_reason_.has_value())) {
+    ENVOY_CONN_LOG(debug, "invoking  onStreamClose for stream: {} via processBufferedData",
+                   parent_.connection_, stream_id_);
+    // We only buffer the onStreamClose if we had no errors.
+    parent_.onStreamClose(this, 0);
   }
 }
 
@@ -447,7 +445,7 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
 void ConnectionImpl::StreamImpl::decodeData() {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.defer_processing_backedup_streams") &&
-      buffersOverrun() && !stream_manager_.flush_all_data_) {
+      buffersOverrun()) {
     ENVOY_CONN_LOG(trace, "Stream {} buffering decodeData() call.", parent_.connection_,
                    stream_id_);
     stream_manager_.body_buffered_ = true;
@@ -500,7 +498,7 @@ bool ConnectionImpl::StreamImpl::maybeDeferDecodeTrailers() {
   //    to avoid losing data.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.defer_processing_backedup_streams") &&
-      (buffersOverrun() || stream_manager_.body_buffered_) && !stream_manager_.flush_all_data_) {
+      (buffersOverrun() || stream_manager_.body_buffered_)) {
     stream_manager_.trailers_buffered_ = true;
     ENVOY_CONN_LOG(trace, "Stream {} buffering decodeTrailers() call.", parent_.connection_,
                    stream_id_);
@@ -752,6 +750,13 @@ void ConnectionImpl::ServerStreamImpl::resetStream(StreamResetReason reason) {
 void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   // Higher layers expect calling resetStream() to immediately raise reset callbacks.
   runResetCallbacks(reason);
+
+  // If we've bufferedOnStreamClose for this stream, we shouldn't propagate this
+  // reset as nghttp2 will have forgotten about the stream...
+  // Either this, or change how getStream() works to include buffered streams.
+  if (stream_manager_.buffered_on_stream_close_) {
+    return;
+  }
 
   // If we submit a reset, nghttp2 will cancel outbound frames that have not yet been sent.
   // We want these frames to go out so we defer the reset until we send all of the frames that
@@ -1353,13 +1358,19 @@ ssize_t ConnectionImpl::onSend(const uint8_t* data, size_t length) {
   return length;
 }
 
-int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
-  StreamImpl* stream = getStream(stream_id);
+int ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
   if (stream) {
-    ENVOY_CONN_LOG(debug, "stream closed: {}", connection_, error_code);
+    const int32_t stream_id = stream->stream_id_;
     // Consume buffered on stream_close.
     stream->stream_manager_.buffered_on_stream_close_ = false;
-    if (!stream->remote_end_stream_ || !stream->local_end_stream_) {
+
+    ENVOY_CONN_LOG(debug, "stream {} closed: {}", connection_, stream_id, error_code);
+
+    if (const bool saw_remote_end_stream =
+            (stream->remote_end_stream_ || stream->stream_manager_.remote_end_stream_buffered());
+        !saw_remote_end_stream || !stream->local_end_stream_) {
+      ENVOY_CONN_LOG(debug, "Claiming reset reason !remote_end_stream:{} !local_end_stream_{}",
+                     connection_, !saw_remote_end_stream, !stream->local_end_stream_);
       StreamResetReason reason;
       if (stream->reset_due_to_messaging_error_) {
         // Unfortunately, the nghttp2 API makes it incredibly difficult to clearly understand
@@ -1388,17 +1399,13 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
       }
 
       stream->runResetCallbacks(reason);
-    } else {
-      if (!stream->reset_reason_.has_value() && stream->stream_manager_.has_buffered_data()) {
-        ASSERT(error_code ==
-               NGHTTP2_NO_ERROR); // If there was an error, we shouldn't be doing this.
-        ENVOY_CONN_LOG(debug, "Processing buffered data for stream: {}", connection_, stream_id);
-        // Buffer the call, rely on the stream->process_buffered_data_callback_
-        // to end up invoking.
-        stream->stream_manager_.buffered_on_stream_close_ = true;
-        // TODO(kbaichoo): is this a sensible value to return?
-        return 0;
-      }
+    } else if (!stream->reset_reason_.has_value() && stream->stream_manager_.has_buffered_data()) {
+      ASSERT(error_code == NGHTTP2_NO_ERROR);
+      ENVOY_CONN_LOG(debug, "buffered onStreamClose for stream: {}", connection_, stream_id);
+      // Buffer the call, rely on the stream->process_buffered_data_callback_
+      // to end up invoking.
+      stream->stream_manager_.buffered_on_stream_close_ = true;
+      return 0;
     }
 
     stream->destroy();
@@ -1421,6 +1428,10 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
   }
 
   return 0;
+}
+
+int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
+  return onStreamClose(getStream(stream_id), error_code);
 }
 
 int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len) {

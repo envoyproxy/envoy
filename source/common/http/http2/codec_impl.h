@@ -315,9 +315,8 @@ protected:
 
     void encodeDataHelper(Buffer::Instance& data, bool end_stream,
                           bool skip_encoding_empty_trailers);
-    // Called from either process_buffered_data_callback_, or when the stream is
-    // being destroyed.
-    void processBufferedData(bool stream_being_destroyed = false);
+    // Called from either process_buffered_data_callback_.
+    void processBufferedData();
 
     const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
     ConnectionImpl& parent_;
@@ -366,18 +365,13 @@ protected:
       // If want to track when we see the end stream in order to determine when
       // to pass it along when buffering it.
       bool data_end_stream_{false};
-      // Set to true when the stream is being deleted. This is used currently in
-      // the Upstream -> Downstream cases to ensure the data gets processed if
-      // the upstream stream is being deleted.
-      // TODO(kbaichoo): perhaps we can achieve this in another way, e.g. defer
-      // the onStreamClose.
-      bool flush_all_data_{false};
 
       // We received a call to onStreamClose for the stream, but deferred it
       // as the stream had pending data to process and the stream was not reset.
       bool buffered_on_stream_close_{false};
 
       bool has_buffered_data() const { return body_buffered_ || trailers_buffered_; }
+      bool remote_end_stream_buffered() const { return data_end_stream_ || trailers_buffered_; }
     };
 
     BufferedStreamManager stream_manager_;
@@ -633,7 +627,11 @@ private:
   int onError(absl::string_view error);
   virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
   int onInvalidFrame(int32_t stream_id, int error_code);
+  // Pass through invoking with the actual stream.
   int onStreamClose(int32_t stream_id, uint32_t error_code);
+  // Should be invoked directly in buffered onStreamClose scenarios
+  // nghttp2, etc. might have already forgotten about the stream.
+  int onStreamClose(StreamImpl* stream, uint32_t error_code);
   int onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len);
   int onMetadataFrameComplete(int32_t stream_id, bool end_metadata);
   // Called iff use_new_codec_wrapper_ is false.

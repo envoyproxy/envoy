@@ -112,6 +112,10 @@ protected:
   std::shared_ptr<Buffer::TrackedWatermarkBufferFactory> buffer_factory_;
 
   bool streamBufferAccounting() { return std::get<1>(GetParam()); }
+  bool deferProcessingBackedUpStreams() {
+    return Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.defer_processing_backedup_streams");
+  }
 
   std::string printAccounts() {
     std::stringstream stream;
@@ -670,8 +674,15 @@ TEST_P(Http2OverloadManagerIntegrationTest, CanResetStreamIfEnvoyLevelStreamEnde
   upstream_request_for_response->encodeData(response_size, true);
 
   if (streamBufferAccounting()) {
-    // Wait for access log to know the Envoy level stream has been deleted.
-    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("200"));
+    if (deferProcessingBackedUpStreams()) {
+      // Wait for an accumulation of data, as we cannot rely on the access log
+      // output since we're deferring the processing of the stream data.
+      EXPECT_TRUE(buffer_factory_->waitUntilTotalBufferedExceeds(10 * 10 * 1024));
+
+    } else {
+      // Wait for access log to know the Envoy level stream has been deleted.
+      EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("200"));
+    }
   }
 
   // Set the pressure so the overload action kills the response if doing stream
