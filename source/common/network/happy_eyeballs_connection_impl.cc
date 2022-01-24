@@ -16,7 +16,7 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
           {source_address, socket_factory, transport_socket_options, options}),
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
   ENVOY_LOG(trace, "New connection.");
-  ENVOY_CONN_LOG_EVENT(debug, "happy_eyeballs_new_cx", "addresses={}", *this, address_list_.size());
+  ENVOY_LOG_EVENT(debug, "happy_eyeballs_new_cx", "[C{}] addresses={}", id_, address_list_.size());
   connections_.push_back(createNextConnection());
 }
 
@@ -426,7 +426,7 @@ ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
       connection_construction_state_.socket_factory_.createTransportSocket(
           connection_construction_state_.transport_socket_options_),
       connection_construction_state_.options_);
-  ENVOY_CONN_LOG_EVENT(debug, "happy_eyeballs_cx_attempt", "address={}", *this, next_address_);
+  ENVOY_LOG_EVENT(debug, "happy_eyeballs_cx_attempt", "C[{}] address={}", id_, next_address_);
   callbacks_wrappers_.push_back(std::make_unique<ConnectionCallbacksWrapper>(*this, *connection));
   connection->addConnectionCallbacks(*callbacks_wrappers_.back());
 
