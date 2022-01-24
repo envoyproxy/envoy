@@ -5016,6 +5016,10 @@ TEST_F(RouterTest, PropagatesUpstreamFilterState) {
   upstream_stream_info_.filterState()->setData(
       "upstream data", std::make_unique<StreamInfo::UInt32AccessorImpl>(123),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+  callbacks_.streamInfo().filterState()->setData(
+      "downstream data", std::make_unique<StreamInfo::UInt32AccessorImpl>(456),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+
   expectResponseTimerCreate();
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke(
@@ -5040,6 +5044,7 @@ TEST_F(RouterTest, PropagatesUpstreamFilterState) {
   EXPECT_TRUE(filter_state_verified);
   EXPECT_TRUE(callbacks_.streamInfo().upstreamInfo()->upstreamFilterState()->hasDataWithName(
       "upstream data"));
+  EXPECT_TRUE(upstream_stream_info_.downstreamFilterState()->hasDataWithName("downstream data"));
 }
 
 TEST_F(RouterTest, UpstreamSSLConnection) {

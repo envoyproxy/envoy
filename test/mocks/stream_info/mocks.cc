@@ -117,6 +117,11 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(Invoke([this](const BytesMeterSharedPtr& downstream_bytes_meter) {
         downstream_bytes_meter_ = downstream_bytes_meter;
       }));
+  ON_CALL(*this, downstreamFilterState()).WillByDefault(ReturnRef(downstream_filter_state_));
+  ON_CALL(*this, setDownstreamFilterState(_))
+      .WillByDefault(Invoke([this](const FilterStateSharedPtr& filter_state) {
+        downstream_filter_state_ = filter_state;
+      }));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

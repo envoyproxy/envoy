@@ -308,6 +308,13 @@ struct StreamInfoImpl : public StreamInfo {
     ASSERT(downstream_bytes_meter_.get() == downstream_bytes_meter.get());
   }
 
+  const FilterStateSharedPtr& downstreamFilterState() const override {
+    return downstream_filter_state_;
+  }
+  void setDownstreamFilterState(const FilterStateSharedPtr& filter_state) override {
+    downstream_filter_state_ = filter_state;
+  }
+
   TimeSource& time_source_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
@@ -360,6 +367,7 @@ private:
   // Default construct the object because upstream stream is not constructed in some cases.
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
   BytesMeterSharedPtr downstream_bytes_meter_;
+  FilterStateSharedPtr downstream_filter_state_;
 };
 
 } // namespace StreamInfo

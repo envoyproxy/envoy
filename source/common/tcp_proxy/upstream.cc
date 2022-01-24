@@ -239,7 +239,7 @@ void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl:
 
 void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
-                               const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol>) {
+                               StreamInfo::StreamInfo& info, absl::optional<Http::Protocol>) {
   upstream_handle_ = nullptr;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());

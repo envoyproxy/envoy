@@ -1073,6 +1073,15 @@ TEST_F(TcpProxyTest, ShareFilterState) {
                 ->upstreamFilterState()
                 ->getDataReadOnly<PerConnectionCluster>("envoy.tcp_proxy.cluster")
                 .value());
+
+  filter_callbacks_.connection_.streamInfo().filterState()->setData(
+      "test_state", std::make_unique<PerConnectionCluster>("test_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  EXPECT_EQ("test_value", upstream_connections_.at(0)
+                              ->streamInfo()
+                              .downstreamFilterState()
+                              ->getDataReadOnly<PerConnectionCluster>("test_state")
+                              .value());
 }
 
 // Tests that filter callback can access downstream and upstream address and ssl properties.

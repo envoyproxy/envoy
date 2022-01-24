@@ -470,6 +470,7 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
   read_callbacks_->continueReading();
   if (info) {
     upstream_info.setUpstreamFilterState(info->filterState());
+    info->setDownstreamFilterState(getStreamInfo().filterState());
   }
 }
 

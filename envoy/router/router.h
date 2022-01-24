@@ -1260,7 +1260,7 @@ public:
   virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                            Upstream::HostDescriptionConstSharedPtr host,
                            const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-                           const StreamInfo::StreamInfo& info,
+                           StreamInfo::StreamInfo& info,
                            absl::optional<Http::Protocol> protocol) PURE;
 
   // @return the UpstreamToDownstream interface for this stream.

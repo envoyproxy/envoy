@@ -63,7 +63,7 @@ public:
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Http::RequestEncoder& request_encoder,
-                   Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
+                   Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
                    absl::optional<Http::Protocol>) override;
 
   class Callbacks {

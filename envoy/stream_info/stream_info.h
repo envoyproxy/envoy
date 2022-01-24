@@ -721,6 +721,15 @@ public:
     downstream_info.setUpstreamBytesMeter(upstream_info.getUpstreamBytesMeter());
     upstream_info.setDownstreamBytesMeter(downstream_info.getDownstreamBytesMeter());
   }
+
+  /**
+   * Filter State object to be shared between upstream and downstream filters.
+   * This is set for upstream connections.
+   * @param pointer to downstream connections filter state.
+   * @return pointer to filter state to be used by downstream connections.
+   */
+  virtual const FilterStateSharedPtr& downstreamFilterState() const PURE;
+  virtual void setDownstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
 };
 
 } // namespace StreamInfo

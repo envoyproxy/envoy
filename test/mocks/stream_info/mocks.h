@@ -89,6 +89,8 @@ public:
   MOCK_METHOD(const BytesMeterSharedPtr&, getDownstreamBytesMeter, (), (const));
   MOCK_METHOD(void, setUpstreamBytesMeter, (const BytesMeterSharedPtr&));
   MOCK_METHOD(void, setDownstreamBytesMeter, (const BytesMeterSharedPtr&));
+  MOCK_METHOD(const FilterStateSharedPtr&, downstreamFilterState, (), (const));
+  MOCK_METHOD(void, setDownstreamFilterState, (const FilterStateSharedPtr&));
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -112,6 +114,7 @@ public:
   absl::optional<uint32_t> attempt_count_;
   absl::optional<std::string> virtual_cluster_name_;
   DownstreamTiming downstream_timing_;
+  FilterStateSharedPtr downstream_filter_state_;
 };
 
 } // namespace StreamInfo

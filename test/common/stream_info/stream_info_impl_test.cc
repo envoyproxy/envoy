@@ -188,6 +188,9 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
                      ->upstreamFilterState()
                      ->getDataReadOnly<TestIntAccessor>("test")
                      .access());
+    stream_info.setDownstreamFilterState(stream_info.filterState());
+    EXPECT_EQ(
+        1, stream_info.downstreamFilterState()->getDataReadOnly<TestIntAccessor>("test").access());
 
     EXPECT_EQ(absl::nullopt, stream_info.upstreamClusterInfo());
     Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());
