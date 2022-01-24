@@ -1,0 +1,126 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.sip_proxy.tra.v3alpha;
+
+import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/grpc_service.proto";
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.sip_proxy.tra.v3alpha";
+option java_outer_classname = "TraProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/sip_proxy/tra/v3alpha";
+option java_generic_services = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: TrafficRoutingAssistant]
+
+service TraService {
+  rpc Create(TraServiceRequest) returns (TraServiceResponse) {
+  }
+
+  rpc Update(TraServiceRequest) returns (TraServiceResponse) {
+  }
+
+  rpc Retrieve(TraServiceRequest) returns (TraServiceResponse) {
+  }
+
+  rpc Delete(TraServiceRequest) returns (TraServiceResponse) {
+  }
+
+  rpc Subscribe(TraServiceRequest) returns (stream TraServiceResponse) {
+  }
+}
+
+message TraServiceConfig {
+  // Specifies the gRPC service that hosts the rate limit service. The client
+  // will connect to this cluster when it needs to make rate limit service
+  // requests.
+  config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+
+  // API version for rate limit transport protocol. This describes the rate limit gRPC endpoint and
+  // version of messages used on the wire.
+  config.core.v3.ApiVersion transport_api_version = 2
+      [(validate.rules).enum = {defined_only: true}];
+
+  google.protobuf.Duration timeout = 3;
+}
+
+// [#next-free-field: 7]
+message TraServiceRequest {
+  string type = 1;
+
+  oneof request {
+    CreateRequest create_request = 2;
+
+    UpdateRequest update_request = 3;
+
+    RetrieveRequest retrieve_request = 4;
+
+    DeleteRequest delete_request = 5;
+
+    SubscribeRequest subscribe_request = 6;
+  }
+}
+
+// [#next-free-field: 9]
+message TraServiceResponse {
+  string type = 1;
+
+  int32 ret = 2;
+
+  string reason = 3;
+
+  oneof response {
+    CreateResponse create_response = 4;
+
+    UpdateResponse update_response = 5;
+
+    RetrieveResponse retrieve_response = 6;
+
+    DeleteResponse delete_response = 7;
+
+    SubscribeResponse subscribe_response = 8;
+  }
+}
+
+message CreateRequest {
+  map<string, string> data = 1;
+}
+
+message CreateResponse {
+}
+
+message UpdateRequest {
+  map<string, string> data = 1;
+}
+
+message UpdateResponse {
+}
+
+message RetrieveRequest {
+  string key = 1;
+}
+
+message RetrieveResponse {
+  map<string, string> data = 1;
+}
+
+message DeleteRequest {
+  string key = 1;
+}
+
+message DeleteResponse {
+}
+
+message SubscribeRequest {
+}
+
+message SubscribeResponse {
+  map<string, string> data = 1;
+}
