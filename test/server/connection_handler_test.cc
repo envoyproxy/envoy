@@ -764,7 +764,7 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
   EXPECT_CALL(*listener1, onDestroy());
 }
 
-// When update a listener in-place, the old listener will be stopped and the new listener will
+// When update a listener, the old listener will be stopped and the new listener will
 // be added into ConnectionHandler before remove the old listener from ConnectionHandler.
 // This test ensure ConnectionHandler can query the correct Listener when balanced the connection
 // through `getBalancedHandlerByAddress`
