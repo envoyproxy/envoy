@@ -459,10 +459,6 @@ filegroup(
 )
 """,
     )
-    native.bind(
-        name = "boost",
-        actual = "@envoy//bazel/foreign_cc:boost",
-    )
 
 # If you're looking for envoy-filter-example / envoy_filter_example
 # the hash is in ci/filter_example_setup.sh
