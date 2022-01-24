@@ -391,6 +391,7 @@ The following command operators are supported:
     * **UPE**: The upstream response had an HTTP protocol error.
     * **UMSDR**: The upstream request reached max stream duration.
     * **OM**: Overload Manager terminated the request.
+    * **DF**: The request was terminated due to DNS resolution failure.
 
 %ROUTE_NAME%
   Name of the route.
