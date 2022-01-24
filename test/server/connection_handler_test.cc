@@ -528,6 +528,7 @@ TEST_F(ConnectionHandlerTest, DisableListener) {
   handler_->disableListeners();
 }
 
+// Envoy doesn't have such case yet, just ensure the code won't break with it.
 TEST_F(ConnectionHandlerTest, StopAndDisableStoppedListener) {
   InSequence s;
 
@@ -763,6 +764,10 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
   EXPECT_CALL(*listener1, onDestroy());
 }
 
+// When update a listener in-place, the old listener will be stopped and the new listener will
+// be added into ConnectionHandler before remove the old listener from ConnectionHandler.
+// This test ensure ConnectionHandler can query the correct Listener when balanced the connection
+// through `getBalancedHandlerByAddress`
 TEST_F(ConnectionHandlerTest, MatchLatestListener) {
   Network::TcpListenerCallbacks* listener_callbacks;
   // The Listener1 will accept the new connection first then balanced to other listener.
@@ -773,7 +778,7 @@ TEST_F(ConnectionHandlerTest, MatchLatestListener) {
       .WillRepeatedly(ReturnRef(local_address_));
   handler_->addListener(absl::nullopt, *test_listener1);
 
-  // Listener2 will be replaced by Listener3
+  // Listener2 will be replaced by Listener3.
   auto listener2 = new NiceMock<Network::MockListener>();
   TestListener* test_listener2 = addListener(2, false, false, "test_listener2", listener2);
   Network::Address::InstanceConstSharedPtr listener2_address(
@@ -790,8 +795,8 @@ TEST_F(ConnectionHandlerTest, MatchLatestListener) {
   EXPECT_CALL(test_listener3->socket_factory_, localAddress())
       .WillRepeatedly(ReturnRef(listener3_address));
 
-  // This emulated the case of update listener in-place. stop the old listener and
-  // add the new listener
+  // This emulated the case of update listener in-place. Stop the old listener and
+  // add the new listener.
   EXPECT_CALL(*listener2, onDestroy());
   handler_->stopListeners(2);
   handler_->addListener(absl::nullopt, *test_listener3);
@@ -810,7 +815,7 @@ TEST_F(ConnectionHandlerTest, MatchLatestListener) {
         }
         return true;
       }));
-  // This is the address of listener2 and listener3
+  // This is the address of listener2 and listener3.
   Network::Address::InstanceConstSharedPtr alt_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 10002, nullptr));
   EXPECT_CALL(*test_filter, onAccept(_))

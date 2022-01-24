@@ -116,7 +116,7 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
                    listener_iter->second->listener_tag_) {
       internal_listener_map_by_address_.erase(address_view);
     }
-    listener_map_by_tag_.erase(listener_tag);
+    listener_map_by_tag_.erase(listener_iter);
   }
 }
 
@@ -248,7 +248,7 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
         listener_it->second->tcpListener().value().get());
   }
 
-  absl::optional<std::reference_wrapper<ConnectionHandlerImpl::ActiveListenerDetails>> details;
+  OptRef<ConnectionHandlerImpl::ActiveListenerDetails> details;
   // Otherwise, we need to look for the wild card match, i.e., 0.0.0.0:[address_port].
   // We do not return stopped listeners.
   // TODO(wattli): consolidate with previous search for more efficiency.
@@ -276,7 +276,7 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
   return (details.has_value())
              ? Network::BalancedConnectionHandlerOptRef(
                    ActiveTcpListenerOptRef(absl::get<std::reference_wrapper<ActiveTcpListener>>(
-                                               details.value().get().typed_listener_))
+                                               details->typed_listener_))
                        .value()
                        .get())
              : absl::nullopt;
