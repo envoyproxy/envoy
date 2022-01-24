@@ -153,6 +153,11 @@ bool DubboProtocolImpl::decodeData(Buffer::Instance& buffer, ContextSharedPtr co
     break;
   }
   case MessageType::Response: {
+    // Non `Ok` response body has no response type info and skip deserialization.
+    if (metadata->responseStatus() != ResponseStatus::Ok) {
+      metadata->setMessageType(MessageType::Exception);
+      break;
+    }
     auto ret = serializer_->deserializeRpcResult(buffer, context);
     if (!ret.second) {
       return false;

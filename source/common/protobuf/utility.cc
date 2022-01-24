@@ -824,10 +824,8 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
     }
     return true;
   }
-
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  return false;
 }
 
 const ProtobufWkt::Value& ValueUtil::nullValue() {

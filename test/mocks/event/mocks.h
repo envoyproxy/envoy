@@ -117,6 +117,9 @@ public:
     if (to_delete) {
       to_delete_.push_back(std::move(to_delete));
     }
+    if (delete_immediately_) {
+      to_delete_.clear();
+    }
   }
 
   SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) override {
@@ -167,6 +170,7 @@ public:
   std::list<DeferredDeletablePtr> to_delete_;
   testing::NiceMock<MockBufferFactory> buffer_factory_;
   bool allow_null_callback_{};
+  bool delete_immediately_{};
 
 private:
   const std::string name_;
