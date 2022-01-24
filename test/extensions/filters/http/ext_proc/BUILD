@@ -217,3 +217,23 @@ envoy_cc_fuzz_test(
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "ext_proc_benchmark_test",
+    srcs = ["ext_proc_benchmark_test.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    deps = [
+        ":test_processor_lib",
+        "//envoy/http:header_map_interface",
+        "//source/common/common:perf_annotation_lib",
+        "//source/common/network:address_lib",
+        "//source/extensions/filters/http/ext_proc:config",
+        "//test/common/http:common_lib",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+        "@com_google_absl//absl/strings",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
