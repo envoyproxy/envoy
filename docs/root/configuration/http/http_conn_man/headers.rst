@@ -587,8 +587,8 @@ Supported variable names are:
       <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
-    Remote address of the downstream connection. If the address is an IP address the output does
-    *not* include port.
+    Remote address of the downstream connection, without any port component.
+    IP addresses are the only address type with a port component.
 
     .. note::
 
@@ -597,8 +597,8 @@ Supported variable names are:
       <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_PORT%
-    Similar to **%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%**, but only extracts
-    the port portion of the **%DOWNSTREAM_REMOTE_ADDRESS%**
+    Remote port of the downstream connection.
+    IP addresses are the only address type with a port component.
 
     .. note::
 
@@ -617,8 +617,8 @@ Supported variable names are:
       or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%
-    The direct remote address of the downstream connection. If the address is an IP address the output does
-    *not* include port.
+    Direct remote address of the downstream connection, without any port component.
+    IP addresses are the only address type with a port component.
 
     .. note::
 
@@ -627,8 +627,8 @@ Supported variable names are:
       or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_DIRECT_REMOTE_PORT%
-    Similar to **%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%**, but only extracts
-    the port portion of the **%DOWNSTREAM_DIRECT_REMOTE_ADDRESS%**
+    Direct remote port of the downstream connection.
+    IP addresses are the only address type with a port component.
 
     .. note::
 
@@ -640,6 +640,7 @@ Supported variable names are:
 %DOWNSTREAM_LOCAL_ADDRESS%
     Local address of the downstream connection. If the address is an IP address it includes both
     address and port.
+
     If the original connection was redirected by iptables REDIRECT, this represents
     the original destination address restored by the
     :ref:`Original Destination Filter <config_listener_filters_original_dst>` using SO_ORIGINAL_DST socket option.
@@ -647,10 +648,12 @@ Supported variable names are:
     option was set to true, this represents the original destination address and port.
 
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
-    Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+    Local address of the downstream connection, without any port component.
+    IP addresses are the only address type with a port component.
 
 %DOWNSTREAM_LOCAL_PORT%
-    Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
+    Local port of the downstream connection.
+    IP addresses are the only address type with a port component.
 
 %DOWNSTREAM_LOCAL_URI_SAN%
   HTTP
@@ -778,22 +781,31 @@ Supported variable names are:
     Local address of the upstream connection. If the address is an IP address it includes both
     address and port.
 
+    The upstream local address cannot be added to request headers as the upstream host
+    hremote as not been selected when custom request headers are generated.
+
 %UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
-    Same as **%UPSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+    Local address of the upstream connection, without any port component.
+    IP addresses are the only address type with a port component.
 
 %UPSTREAM_LOCAL_PORT%
-    Similar to **%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%UPSTREAM_LOCAL_ADDRESS%**
+    Local port of the upstream connection.
+    IP addresses are the only address type with a port component.
 
 %UPSTREAM_REMOTE_ADDRESS%
-    Remote address of the upstream host. If the address is an IP address it includes both address
-    and port. The upstream remote address cannot be added to request headers as the upstream host
+    Remote address of the upstream connection. If the address is an IP address it includes both
+    address and port.
+
+    The upstream remote address cannot be added to request headers as the upstream host
     has not been selected when custom request headers are generated.
 
 %UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
-    Same as **%UPSTREAM_REMOTE_ADDRESS%** excluding port if the address is an IP address.
+    Remote address of the upstream connection, without any port component.
+    IP addresses are the only address type with a port component.
 
 %UPSTREAM_REMOTE_PORT%
-    Similar to **%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%UPSTREAM_REMOTE_ADDRESS%**
+    Remote port of the upstream connection.
+    IP addresses are the only address type with a port component.
 
 %PER_REQUEST_STATE(reverse.dns.data.name)%
     Populates the header with values set on the stream info filterState() object. To be

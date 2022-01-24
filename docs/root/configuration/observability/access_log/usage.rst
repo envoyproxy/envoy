@@ -415,20 +415,24 @@ The following command operators are supported:
   address and port.
 
 %UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
-  Same as **%UPSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+  Local address of the upstream connection, without any port component.
+  IP addresses are the only address type with a port component.
 
 %UPSTREAM_LOCAL_PORT%
-  Similar to **%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%UPSTREAM_LOCAL_ADDRESS%**
+  Local port of the upstream connection.
+  IP addresses are the only address type with a port component.
 
 %UPSTREAM_REMOTE_ADDRESS%
   Remote address of the upstream connection. If the address is an IP address it includes both
   address and port.
 
 %UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
-  Same as **%UPSTREAM_REMOTE_ADDRESS%** excluding port if the address is an IP address.
+  Remote address of the upstream connection, without any port component.
+  IP addresses are the only address type with a port component.
 
 %UPSTREAM_REMOTE_PORT%
-  Similar to **%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%UPSTREAM_REMOTE_ADDRESS%**
+  Remote port of the upstream connection.
+  IP addresses are the only address type with a port component.
 
 .. _config_access_log_format_upstream_transport_failure_reason:
 
@@ -452,8 +456,8 @@ The following command operators are supported:
     <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
-  Remote address of the downstream connection. If the address is an IP address the output does
-  *not* include port.
+  Remote address of the downstream connection, without any port component.
+  IP addresses are the only address type with a port component.
 
   .. note::
 
@@ -462,8 +466,8 @@ The following command operators are supported:
     <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_PORT%
-  Similar to **%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%**, but only extracts
-  the port portion of the **%DOWNSTREAM_REMOTE_ADDRESS%**
+  Remote port of the downstream connection.
+  IP addresses are the only address type with a port component.
 
   .. note::
 
@@ -482,8 +486,8 @@ The following command operators are supported:
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%
-  The direct remote address of the downstream connection. If the address is an IP address the output does
-  *not* include port.
+  Direct remote address of the downstream connection, without any port component.
+  IP addresses are the only address type with a port component.
 
   .. note::
 
@@ -492,8 +496,8 @@ The following command operators are supported:
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_DIRECT_REMOTE_PORT%
-  Similar to **%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%**, but only extracts
-  the port portion of the **%DOWNSTREAM_DIRECT_REMOTE_ADDRESS%**
+  Direct remote port of the downstream connection.
+  IP addresses are the only address type with a port component.
 
   .. note::
 
@@ -504,6 +508,7 @@ The following command operators are supported:
 %DOWNSTREAM_LOCAL_ADDRESS%
   Local address of the downstream connection. If the address is an IP address it includes both
   address and port.
+
   If the original connection was redirected by iptables REDIRECT, this represents
   the original destination address restored by the
   :ref:`Original Destination Filter <config_listener_filters_original_dst>` using SO_ORIGINAL_DST socket option.
@@ -511,10 +516,12 @@ The following command operators are supported:
   option was set to true, this represents the original destination address and port.
 
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
-  Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+  Local address of the downstream connection, without any port component.
+  IP addresses are the only address type with a port component.
 
 %DOWNSTREAM_LOCAL_PORT%
-  Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
+  Local port of the downstream connection.
+  IP addresses are the only address type with a port component.
 
 .. _config_access_log_format_connection_id:
 
