@@ -486,7 +486,7 @@ message Cluster {
   }
 
   // Common configuration for all load balancer implementations.
-  // [#next-free-field: 8]
+  // [#next-free-field: 9]
   message CommonLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.CommonLbConfig";
@@ -595,6 +595,16 @@ message Cluster {
 
     // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
     ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
+
+    // Expected override host statuses. The result of load balancing is allowed to be overwritten
+    // only when the target host status is as expected when stateful session stickiness directly
+    // specifies a target host.
+    //
+    // If this is set and and has no any item then any host from stateful session stickiness will be
+    // ignored.
+    // If this is not set then healthy statuses (``UNKNOWN``, ``HEALTHY`` and ``DEGRADED`` for now)
+    // will be applied by default.
+    core.v3.HealthStatusSet override_host_status = 8;
   }
 
   message RefreshRate {

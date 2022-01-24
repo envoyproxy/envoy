@@ -42,7 +42,8 @@ SubsetLoadBalancer::SubsetLoadBalancer(
       original_local_priority_set_(local_priority_set),
       locality_weight_aware_(subsets.localityWeightAware()),
       scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()),
-      time_source_(time_source) {
+      time_source_(time_source),
+      override_host_status_(LoadBalancerContextBase::createOverrideHostStatus(common_config)) {
   ASSERT(subsets.isEnabled());
 
   if (fallback_policy_ != envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK) {
@@ -283,8 +284,8 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
 }
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
-  HostConstSharedPtr override_host =
-      LoadBalancerContextBase::selectOverrideHost(cross_priority_host_map_.get(), context);
+  HostConstSharedPtr override_host = LoadBalancerContextBase::selectOverrideHost(
+      cross_priority_host_map_.get(), override_host_status_, context);
   if (override_host != nullptr) {
     return override_host;
   }

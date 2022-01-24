@@ -297,6 +297,8 @@ private:
 
   TimeSource& time_source_;
 
+  const uint32_t override_host_status_{};
+
   friend class SubsetLoadBalancerDescribeMetadataTester;
 };
 
