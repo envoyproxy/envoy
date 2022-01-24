@@ -83,9 +83,9 @@ TEST_F(ProxyStatusTest, ToStringAbsentDetails) {
   proxy_status_config_.set_remove_response_flags(false);
   stream_info_.response_code_details_ = absl::nullopt;
   stream_info_.connection_termination_details_ = absl::nullopt;
-  EXPECT_THAT(ProxyStatusUtils::makeProxyStatusHeader(stream_info_,
-                                                      ProxyStatusError::ProxyConfigurationError,
-                                                      /*node_id=*/"UNUSED", proxy_status_config_),
+  EXPECT_THAT(ProxyStatusUtils::makeProxyStatusHeader(
+                  stream_info_, ProxyStatusError::ProxyConfigurationError,
+                  /*proxy_name=*/"UNUSED", proxy_status_config_),
               Not(HasSubstr("details=")));
 }
 
@@ -95,9 +95,9 @@ TEST_F(ProxyStatusTest, ToStringNoDetails) {
   proxy_status_config_.set_remove_response_flags(false);
   stream_info_.response_code_details_ = "some_response_code_details";
   stream_info_.connection_termination_details_ = "some_connection_termination_details";
-  EXPECT_THAT(ProxyStatusUtils::makeProxyStatusHeader(stream_info_,
-                                                      ProxyStatusError::ProxyConfigurationError,
-                                                      /*node_id=*/"UNUSED", proxy_status_config_),
+  EXPECT_THAT(ProxyStatusUtils::makeProxyStatusHeader(
+                  stream_info_, ProxyStatusError::ProxyConfigurationError,
+                  /*proxy_name=*/"UNUSED", proxy_status_config_),
               AllOf(Not(HasSubstr("details=")), Not(HasSubstr("some_response_code_details")),
                     Not(HasSubstr("some_connection_termination_details"))));
 }
@@ -111,7 +111,7 @@ TEST_F(ProxyStatusTest, ToStringWithAllFields) {
   EXPECT_THAT(
       ProxyStatusUtils::makeProxyStatusHeader(stream_info_,
                                               ProxyStatusError::ProxyConfigurationError,
-                                              /*node_id=*/"UNUSED", proxy_status_config_),
+                                              /*proxy_name=*/"UNUSED", proxy_status_config_),
       HasSubstr("details=\"some_response_code_details; some_connection_termination_details; DI\""));
 }
 
@@ -121,9 +121,9 @@ TEST_F(ProxyStatusTest, ToStringWithAllFieldsVerifyStringEscape) {
   proxy_status_config_.set_remove_response_flags(false);
   stream_info_.response_code_details_ = "some \"response\" code details";
   stream_info_.connection_termination_details_ = "some \"connection\" termination details";
-  EXPECT_THAT(ProxyStatusUtils::makeProxyStatusHeader(stream_info_,
-                                                      ProxyStatusError::ProxyConfigurationError,
-                                                      /*node_id=*/"UNUSED", proxy_status_config_),
+  EXPECT_THAT(ProxyStatusUtils::makeProxyStatusHeader(
+                  stream_info_, ProxyStatusError::ProxyConfigurationError,
+                  /*proxy_name=*/"UNUSED", proxy_status_config_),
               HasSubstr("details=\"some \\\"response\\\" code details; some "
                         "\\\"connection\\\" termination details; DI\""));
 }
@@ -134,9 +134,9 @@ TEST_F(ProxyStatusTest, ToStringNoConnectionTerminationDetails) {
   proxy_status_config_.set_remove_response_flags(false);
   stream_info_.response_code_details_ = "some_response_code_details";
   stream_info_.connection_termination_details_ = "some_connection_termination_details";
-  EXPECT_THAT(ProxyStatusUtils::makeProxyStatusHeader(stream_info_,
-                                                      ProxyStatusError::ProxyConfigurationError,
-                                                      /*node_id=*/"UNUSED", proxy_status_config_),
+  EXPECT_THAT(ProxyStatusUtils::makeProxyStatusHeader(
+                  stream_info_, ProxyStatusError::ProxyConfigurationError,
+                  /*proxy_name=*/"UNUSED", proxy_status_config_),
               AllOf(HasSubstr("details=\"some_response_code_details; DI\""),
                     Not(HasSubstr("some_connection_termination_details"))));
 }
@@ -150,7 +150,7 @@ TEST_F(ProxyStatusTest, ToStringAbsentConnectionTerminationDetails) {
   EXPECT_THAT(
       ProxyStatusUtils::makeProxyStatusHeader(stream_info_,
                                               ProxyStatusError::ProxyConfigurationError,
-                                              /*node_id=*/"UNUSED", proxy_status_config_),
+                                              /*proxy_name=*/"UNUSED", proxy_status_config_),
       HasSubstr("details=\"some_response_code_details; DI\"")); // So they shouldn't be printed.
 }
 
@@ -163,7 +163,7 @@ TEST_F(ProxyStatusTest, ToStringNoResponseFlags) {
   EXPECT_THAT(
       ProxyStatusUtils::makeProxyStatusHeader(stream_info_,
                                               ProxyStatusError::ProxyConfigurationError,
-                                              /*node_id=*/"UNUSED", proxy_status_config_),
+                                              /*proxy_name=*/"UNUSED", proxy_status_config_),
       AllOf(
           HasSubstr("details=\"some_response_code_details; some_connection_termination_details\""),
           Not(HasSubstr("DI"))));
@@ -180,32 +180,31 @@ TEST_F(ProxyStatusTest, ToStringAbsentResponseFlags) {
   EXPECT_THAT(
       ProxyStatusUtils::makeProxyStatusHeader(stream_info_,
                                               ProxyStatusError::ProxyConfigurationError,
-                                              /*node_id=*/"UNUSED", proxy_status_config_),
+                                              /*proxy_name=*/"UNUSED", proxy_status_config_),
       AllOf(
           HasSubstr("details=\"some_response_code_details; some_connection_termination_details\""),
           Not(HasSubstr("DI"))));
 }
 
+TEST_F(ProxyStatusTest, ToStringNoConfig) {
+  EXPECT_THAT(ProxyStatusUtils::makeProxyName(/*node_id=*/"UNUSED", nullptr),
+              AllOf(HasSubstr("envoy"), Not(HasSubstr("UNUSED"))));
+}
+
 TEST_F(ProxyStatusTest, ToStringNoServerName) {
-  EXPECT_THAT(ProxyStatusUtils::makeProxyStatusHeader(stream_info_,
-                                                      ProxyStatusError::ProxyConfigurationError,
-                                                      /*node_id=*/"UNUSED", proxy_status_config_),
+  EXPECT_THAT(ProxyStatusUtils::makeProxyName(/*node_id=*/"UNUSED", &proxy_status_config_),
               AllOf(HasSubstr("envoy"), Not(HasSubstr("UNUSED"))));
 }
 
 TEST_F(ProxyStatusTest, ToStringServerName) {
   proxy_status_config_.set_use_node_id(true);
-  EXPECT_THAT(ProxyStatusUtils::makeProxyStatusHeader(stream_info_,
-                                                      ProxyStatusError::ProxyConfigurationError,
-                                                      /*node_id=*/"foo", proxy_status_config_),
+  EXPECT_THAT(ProxyStatusUtils::makeProxyName(/*node_id=*/"foo", &proxy_status_config_),
               AllOf(HasSubstr("foo"), Not(HasSubstr("envoy"))));
 }
 
 TEST_F(ProxyStatusTest, ToStringLiteral) {
   proxy_status_config_.set_literal_proxy_name("foo_bar_baz");
-  EXPECT_THAT(ProxyStatusUtils::makeProxyStatusHeader(stream_info_,
-                                                      ProxyStatusError::ProxyConfigurationError,
-                                                      /*node_id=*/"UNUSED", proxy_status_config_),
+  EXPECT_THAT(ProxyStatusUtils::makeProxyName(/*node_id=*/"foo", &proxy_status_config_),
               AllOf(HasSubstr("foo_bar_baz"), Not(HasSubstr("envoy")), Not(HasSubstr("UNUSED"))));
 }
 

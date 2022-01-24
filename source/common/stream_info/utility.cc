@@ -190,31 +190,38 @@ ProxyStatusUtils::recommendedHttpStatusCode(const ProxyStatusError proxy_status)
   }
 }
 
-const std::string ProxyStatusUtils::makeProxyStatusHeader(
-    const StreamInfo& stream_info, const ProxyStatusError error, absl::string_view node_id,
+const std::string ProxyStatusUtils::makeProxyName(
+    absl::string_view node_id,
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-        ProxyStatusConfig& proxy_status_config) {
-  std::vector<std::string> retval = {};
-
+        ProxyStatusConfig* proxy_status_config) {
+  if (proxy_status_config == nullptr) {
+    return Envoy::Http::DefaultServerString::get();
+  }
   // For the proxy name, the config specified either a preset proxy name or a literal proxy name.
-  switch (proxy_status_config.proxy_name_case()) {
+  switch (proxy_status_config->proxy_name_case()) {
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       ProxyStatusConfig::ProxyNameCase::kLiteralProxyName: {
-    retval.push_back(std::string(proxy_status_config.literal_proxy_name()));
-    break;
+    return std::string(proxy_status_config->literal_proxy_name());
   }
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       ProxyStatusConfig::ProxyNameCase::kUseNodeId: {
-    retval.push_back(std::string(node_id));
-    break;
+    return std::string(node_id);
   }
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       ProxyStatusConfig::ProxyNameCase::PROXY_NAME_NOT_SET:
   default: {
-    retval.push_back(Envoy::Http::DefaultServerString::get());
-    break;
+    return Envoy::Http::DefaultServerString::get();
   }
   }
+}
+
+const std::string ProxyStatusUtils::makeProxyStatusHeader(
+    const StreamInfo& stream_info, const ProxyStatusError error, absl::string_view proxy_name,
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        ProxyStatusConfig& proxy_status_config) {
+  std::vector<std::string> retval = {};
+
+  retval.push_back(std::string(proxy_name));
 
   retval.push_back(absl::StrFormat("error=%s", proxyStatusErrorToString(error)));
 

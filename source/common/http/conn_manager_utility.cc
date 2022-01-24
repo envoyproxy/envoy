@@ -447,10 +447,13 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
   }
 }
 
-void ConnectionManagerUtility::mutateResponseHeaders(
-    ResponseHeaderMap& response_headers, const RequestHeaderMap* request_headers,
-    ConnectionManagerConfig& config, const std::string& via,
-    const StreamInfo::StreamInfo& stream_info, absl::string_view node_id, bool clear_hop_by_hop) {
+void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response_headers,
+                                                     const RequestHeaderMap* request_headers,
+                                                     ConnectionManagerConfig& config,
+                                                     const std::string& via,
+                                                     const StreamInfo::StreamInfo& stream_info,
+                                                     absl::string_view proxy_name,
+                                                     bool clear_hop_by_hop) {
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {
     // As in mutateRequestHeaders, Upgrade responses have special handling.
@@ -488,13 +491,13 @@ void ConnectionManagerUtility::mutateResponseHeaders(
     Utility::appendVia(response_headers, via);
   }
 
-  setProxyStatusHeader(response_headers, config, stream_info, node_id);
+  setProxyStatusHeader(response_headers, config, stream_info, proxy_name);
 }
 
 void ConnectionManagerUtility::setProxyStatusHeader(ResponseHeaderMap& response_headers,
                                                     const ConnectionManagerConfig& config,
                                                     const StreamInfo::StreamInfo& stream_info,
-                                                    absl::string_view node_id) {
+                                                    absl::string_view proxy_name) {
   if (auto* proxy_status_config = config.proxyStatusConfig(); proxy_status_config != nullptr) {
     // Writing the Proxy-Status header is gated on the existence of
     // |proxy_status_config|. The |details| field and other internals are generated in
@@ -503,8 +506,8 @@ void ConnectionManagerUtility::setProxyStatusHeader(ResponseHeaderMap& response_
             StreamInfo::ProxyStatusUtils::fromStreamInfo(stream_info);
         proxy_status.has_value()) {
       response_headers.appendProxyStatus(
-          StreamInfo::ProxyStatusUtils::makeProxyStatusHeader(stream_info, *proxy_status, node_id,
-                                                              *proxy_status_config),
+          StreamInfo::ProxyStatusUtils::makeProxyStatusHeader(stream_info, *proxy_status,
+                                                              proxy_name, *proxy_status_config),
           ", ");
       // Apply the recommended response code, if configured and applicable.
       if (proxy_status_config->set_recommended_response_code()) {

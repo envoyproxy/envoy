@@ -104,8 +104,11 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       overload_disable_keepalive_ref_(
           overload_state_.getState(Server::OverloadActionNames::get().DisableHttpKeepAlive)),
       time_source_(time_source),
-      enable_internal_redirects_with_body_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.internal_redirects_with_body")) {}
+      enable_internal_redirects_with_body_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_redirects_with_body")),
+      proxy_name_(StreamInfo::ProxyStatusUtils::makeProxyName(
+          /*node_id=*/local_info_.node().id(),
+          /*proxy_status_config=*/config_.proxyStatusConfig())) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
   static const auto headers = createHeaderMap<ResponseHeaderMapImpl>(
@@ -1347,8 +1350,7 @@ void ConnectionManagerImpl::ActiveStream::encode1xxHeaders(ResponseHeaderMap& re
   // continuation headers.
   ConnectionManagerUtility::mutateResponseHeaders(
       response_headers, request_headers_.get(), connection_manager_.config_, EMPTY_STRING,
-      filter_manager_.streamInfo(),
-      /*node_id=*/connection_manager_.local_info_.node().id(),
+      filter_manager_.streamInfo(), connection_manager_.proxy_name_,
       connection_manager_.clear_hop_by_hop_response_headers_);
 
   // Count both the 1xx and follow-up response code in stats.
@@ -1380,8 +1382,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   ConnectionManagerUtility::mutateResponseHeaders(
       headers, request_headers_.get(), connection_manager_.config_,
       connection_manager_.config_.via(), filter_manager_.streamInfo(),
-      /*node_id=*/connection_manager_.local_info_.node().id(),
-      connection_manager_.clear_hop_by_hop_response_headers_);
+      connection_manager_.proxy_name_, connection_manager_.clear_hop_by_hop_response_headers_);
 
   bool drain_connection_due_to_overload = false;
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&

@@ -84,7 +84,7 @@ public:
    * @param the configuration for the HCM, which affects request ID headers.
    * @param via the via header to append, if any.
    * @param stream_info a reference to the filter manager stream info.
-   * @param node_id the node ID.
+   * @param proxy_name the proxy name.
    * @param clear_hop_by_hop_headers true if hop by hop headers should be
    *        cleared. This should only ever be false for envoy-mobile.
    */
@@ -92,7 +92,7 @@ public:
                                     const RequestHeaderMap* request_headers,
                                     ConnectionManagerConfig& config, const std::string& via,
                                     const StreamInfo::StreamInfo& stream_info,
-                                    absl::string_view node_id,
+                                    absl::string_view proxy_name,
                                     bool clear_hop_by_hop_headers = true);
 
   /**
@@ -104,12 +104,12 @@ public:
    * @param response_headers the headers to mutate.
    * @param the configuration for the HCM, which affects request ID headers.
    * @param stream_info a reference to the filter manager stream info.
-   * @param node_id the node ID.
+   * @param proxy_name the proxy name.
    */
   static void setProxyStatusHeader(ResponseHeaderMap& response_headers,
                                    const ConnectionManagerConfig& config,
                                    const StreamInfo::StreamInfo& stream_info,
-                                   absl::string_view node_id);
+                                   absl::string_view proxy_name);
 
   enum class NormalizePathAction {
     Continue = 0,

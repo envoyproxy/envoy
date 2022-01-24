@@ -125,6 +125,12 @@ public:
 // Proxy-Status HTTP response header.
 class ProxyStatusUtils {
 public:
+  // Returns a Proxy-Status proxy name string, configured according to |proxy_status_config|.
+  static const std::string
+  makeProxyName(absl::string_view node_id,
+                const envoy::extensions::filters::network::http_connection_manager::v3::
+                    HttpConnectionManager::ProxyStatusConfig* proxy_status_config);
+
   // Returns a Proxy-Status request header string, of the form:
   //
   //     <server_name>; error=<error_type>; details=<details>
@@ -137,7 +143,7 @@ public:
   //                 present only if configured in |proxy_status_config|.
   static const std::string
   makeProxyStatusHeader(const StreamInfo& stream_info, ProxyStatusError error,
-                        absl::string_view node_id,
+                        absl::string_view proxy_name,
                         const envoy::extensions::filters::network::http_connection_manager::v3::
                             HttpConnectionManager::ProxyStatusConfig& proxy_status_config);
 
