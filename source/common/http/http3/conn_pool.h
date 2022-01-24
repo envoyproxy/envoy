@@ -99,11 +99,13 @@ public:
 };
 
 // An interface to propagate H3 handshake result.
+// TODO(danzh) add an API to propagate 0-RTT handshake failure.
 class PoolConnectResultCallback {
 public:
   virtual ~PoolConnectResultCallback() = default;
 
-  // Called when the handshake completes.
+  // Called when the mandatory handshake is complete. This is when a HTTP/3 connection is regarded
+  // as connected and is able to send requests.
   virtual void onHandshakeComplete() PURE;
 };
 
@@ -140,6 +142,7 @@ private:
   // Store quic helpers which can be shared between connections and must live
   // beyond the lifetime of individual connections.
   std::unique_ptr<Quic::PersistentQuicInfoImpl> quic_info_;
+  // If not nullopt, called when the handshake state changes.
   OptRef<PoolConnectResultCallback> connect_callback_;
 };
 
