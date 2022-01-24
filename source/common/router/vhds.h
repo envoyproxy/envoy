@@ -39,7 +39,7 @@ struct VhdsStats {
 class VhdsSubscription : Envoy::Config::SubscriptionBase<envoy::config::route::v3::VirtualHost>,
                          Logger::Loggable<Logger::Id::router> {
 public:
-  VhdsSubscription(RouteConfigUpdateReceiver* config_update_info,
+  VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    const std::string& stat_prefix,
                    absl::optional<Rds::RouteConfigProvider*>& route_config_providers);
@@ -68,7 +68,7 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
 
-  RouteConfigUpdateReceiver* config_update_info_;
+  RouteConfigUpdatePtr& config_update_info_;
   Stats::ScopePtr scope_;
   VhdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;

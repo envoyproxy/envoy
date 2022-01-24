@@ -22,15 +22,11 @@ public:
    * Called on updates via RDS.
    * @param rc supplies the RouteConfiguration.
    * @param version_info supplies RouteConfiguration version.
-   * @return bool whether RouteConfiguration has been updated.
-   * @throw EnvoyException if the new config can't be applied.
+   * @return bool whether the hash of the new config has been different than
+   * the hash of the current one and RouteConfiguration has been updated.
+   * @throw EnvoyException if the new config is invalid and can't be applied.
    */
   virtual bool onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) PURE;
-
-  /**
-   * @return std::string& the version of RouteConfiguration.
-   */
-  virtual const std::string& configVersion() const PURE;
 
   /**
    * @return uint64_t the hash value of RouteConfiguration.
@@ -42,12 +38,12 @@ public:
    * RouteConfigProvider::ConfigInfo if RouteConfiguration has been updated at least once. Otherwise
    * returns an empty absl::optional<RouteConfigProvider::ConfigInfo>.
    */
-  virtual absl::optional<RouteConfigProvider::ConfigInfo> configInfo() const PURE;
+  virtual const absl::optional<RouteConfigProvider::ConfigInfo>& configInfo() const PURE;
 
   /**
-   * @return envoy::config::route::v3::RouteConfiguration& current RouteConfiguration.
+   * @return Protobuf::Message& current RouteConfiguration.
    */
-  virtual const Protobuf::Message& protobufConfiguration() PURE;
+  virtual const Protobuf::Message& protobufConfiguration() const PURE;
 
   /**
    * @return ConfigConstSharedPtr a parsed and validated copy of current RouteConfiguration.

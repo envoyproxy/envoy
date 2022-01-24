@@ -76,11 +76,11 @@ public:
   ~StaticRouteConfigProviderImpl() override;
 
   // Router::RouteConfigProvider
-  Rds::ConfigConstSharedPtr config() override { return base_.config(); }
-  absl::optional<ConfigInfo> configInfo() const override { return base_.configInfo(); }
+  Rds::ConfigConstSharedPtr config() const override { return base_.config(); }
+  const absl::optional<ConfigInfo>& configInfo() const override { return base_.configInfo(); }
   SystemTime lastUpdated() const override { return base_.lastUpdated(); }
   void onConfigUpdate() override { base_.onConfigUpdate(); }
-  ConfigConstSharedPtr configCast() override;
+  ConfigConstSharedPtr configCast() const override;
   void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
                                  std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -105,8 +105,9 @@ public:
       const uint64_t manager_identifier,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
       Rds::RouteConfigProviderManager& route_config_provider_manager);
+  ~RdsRouteConfigSubscription() override;
 
-  RouteConfigUpdateReceiver* routeConfigUpdateCast();
+  RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
   void updateOnDemand(const std::string& aliases);
   void maybeCreateInitManager(const std::string& version_info,
                               std::unique_ptr<Init::ManagerImpl>& init_manager,
@@ -121,6 +122,7 @@ private:
   }
 
   VhdsSubscriptionPtr vhds_subscription_;
+  RouteConfigUpdatePtr config_update_info_;
   Common::CallbackManager<> update_callback_manager_;
 
   // Access to addUpdateCallback
@@ -148,12 +150,12 @@ public:
   RdsRouteConfigSubscription& subscription();
 
   // Router::RouteConfigProvider
-  Rds::ConfigConstSharedPtr config() override { return base_.config(); }
-  absl::optional<ConfigInfo> configInfo() const override { return base_.configInfo(); }
+  Rds::ConfigConstSharedPtr config() const override { return base_.config(); }
+  const absl::optional<ConfigInfo>& configInfo() const override { return base_.configInfo(); }
   SystemTime lastUpdated() const override { return base_.lastUpdated(); }
 
   void onConfigUpdate() override;
-  ConfigConstSharedPtr configCast() override;
+  ConfigConstSharedPtr configCast() const override;
   void requestVirtualHostsUpdate(
       const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
       std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) override;
@@ -161,7 +163,7 @@ public:
 private:
   Rds::RdsRouteConfigProviderImpl base_;
 
-  RouteConfigUpdateReceiver* config_update_info_;
+  RouteConfigUpdatePtr& config_update_info_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   std::list<UpdateOnDemandCallback> config_update_callbacks_;
   // A flag used to determine if this instance of RdsRouteConfigProviderImpl hasn't been
@@ -173,9 +175,13 @@ using RdsRouteConfigProviderImplSharedPtr = std::shared_ptr<RdsRouteConfigProvid
 
 class ProtoTraitsImpl : public Rds::ProtoTraits {
 public:
-  std::string resourceType() const override;
+  ProtoTraitsImpl();
+  const std::string& resourceType() const override { return resource_type_; }
   int resourceNameFieldNumber() const override { return 1; }
   ProtobufTypes::MessagePtr createEmptyProto() const override;
+
+private:
+  const std::string resource_type_;
 };
 
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,

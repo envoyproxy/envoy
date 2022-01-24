@@ -67,7 +67,7 @@ public:
     resource_type_ = Envoy::Config::getResourceName<envoy::config::route::v3::RouteConfiguration>();
   }
 
-  std::string resourceType() const override { return resource_type_; }
+  const std::string& resourceType() const override { return resource_type_; }
   int resourceNameFieldNumber() const override { return resource_name_field_index_; }
   ConfigConstSharedPtr createNullConfig() const override {
     return std::make_shared<const TestConfig>();
@@ -121,14 +121,13 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdate) {
 
   EXPECT_TRUE(config_update_->onRdsUpdate(response1, "1"));
   EXPECT_EQ(nullptr, route("foo"));
-  EXPECT_EQ("1", config_update_->configVersion());
-  EXPECT_EQ(time1, config_update_->lastUpdated());
   EXPECT_TRUE(config_update_->configInfo().has_value());
-  EXPECT_EQ(config_update_->configVersion(), config_update_->configInfo().value().version_);
+  EXPECT_EQ("1", config_update_->configInfo().value().version_);
+  EXPECT_EQ(time1, config_update_->lastUpdated());
 
   EXPECT_FALSE(config_update_->onRdsUpdate(response1, "2"));
   EXPECT_EQ(nullptr, route("foo"));
-  EXPECT_EQ("1", config_update_->configVersion());
+  EXPECT_EQ("1", config_update_->configInfo().value().version_);
 
   std::shared_ptr<const Config> config = config_update_->parsedConfiguration();
   EXPECT_EQ(2, config.use_count());
@@ -155,10 +154,9 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdate) {
 
   EXPECT_TRUE(config_update_->onRdsUpdate(response2, "2"));
   EXPECT_EQ("foo", *route("foo"));
-  EXPECT_EQ("2", config_update_->configVersion());
-  EXPECT_EQ(time2, config_update_->lastUpdated());
   EXPECT_TRUE(config_update_->configInfo().has_value());
-  EXPECT_EQ(config_update_->configVersion(), config_update_->configInfo().value().version_);
+  EXPECT_EQ("2", config_update_->configInfo().value().version_);
+  EXPECT_EQ(time2, config_update_->lastUpdated());
 
   EXPECT_EQ(1, config.use_count());
 }

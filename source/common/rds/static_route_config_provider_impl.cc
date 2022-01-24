@@ -13,14 +13,11 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
           cloneProto(route_config_provider_manager.protoTraits(), route_config_proto)),
       config_(config_traits.createConfig(*route_config_proto_)),
       last_updated_(factory_context.timeSource().systemTime()),
+      config_info_(ConfigInfo{*route_config_proto_, ""}),
       route_config_provider_manager_(route_config_provider_manager) {}
 
 StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
   route_config_provider_manager_.eraseStaticProvider(this);
-}
-
-absl::optional<RouteConfigProvider::ConfigInfo> StaticRouteConfigProviderImpl::configInfo() const {
-  return RouteConfigProvider::ConfigInfo{*route_config_proto_, ""};
 }
 
 } // namespace Rds

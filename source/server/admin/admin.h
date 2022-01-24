@@ -226,17 +226,18 @@ private:
     NullRouteConfigProvider(TimeSource& time_source);
 
     // Router::RouteConfigProvider
-    Rds::ConfigConstSharedPtr config() override { return config_; }
-    absl::optional<ConfigInfo> configInfo() const override { return {}; }
+    Rds::ConfigConstSharedPtr config() const override { return config_; }
+    const absl::optional<ConfigInfo>& configInfo() const override { return config_info_; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
-    Router::ConfigConstSharedPtr configCast() override { return config_; }
+    Router::ConfigConstSharedPtr configCast() const override { return config_; }
     void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
                                    std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
 
     Router::ConfigConstSharedPtr config_;
+    absl::optional<ConfigInfo> config_info_;
     TimeSource& time_source_;
   };
 

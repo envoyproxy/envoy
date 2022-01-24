@@ -13,7 +13,7 @@ namespace Rds {
 /**
  * Traits of the protocol specific route configuration and proto.
  * The generic rds classes will call the methods of this interface
- * to get information which are not visible for them directly.
+ * to get information which is not visible for them directly.
  */
 class ProtoTraits {
 public:
@@ -23,7 +23,7 @@ public:
    * Give the full name of the route configuration proto description.
    * For example 'envoy.config.route.v3.RouteConfiguration'
    */
-  virtual std::string resourceType() const PURE;
+  virtual const std::string& resourceType() const PURE;
 
   /**
    * Gives back the name field tag number of the route configuration proto.

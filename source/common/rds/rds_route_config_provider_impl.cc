@@ -24,7 +24,8 @@ RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
   subscription_->routeConfigProvider().reset();
 }
 
-absl::optional<RouteConfigProvider::ConfigInfo> RdsRouteConfigProviderImpl::configInfo() const {
+const absl::optional<RouteConfigProvider::ConfigInfo>&
+RdsRouteConfigProviderImpl::configInfo() const {
   return config_update_info_->configInfo();
 }
 

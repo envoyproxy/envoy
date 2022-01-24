@@ -21,11 +21,12 @@ namespace Router {
 class RouteConfigUpdateReceiver : public Rds::RouteConfigUpdateReceiver {
 public:
   /**
-   * Same purpose as Rds::RouteConfigUpdateReceiver::protobufConfigurationCast()
+   * Same purpose as Rds::RouteConfigUpdateReceiver::protobufConfiguration()
    * but the return is downcasted to proper type.
    * @return current RouteConfiguration downcasted from Protobuf::Message&
    */
-  virtual const envoy::config::route::v3::RouteConfiguration& protobufConfigurationCast() PURE;
+  virtual const envoy::config::route::v3::RouteConfiguration&
+  protobufConfigurationCast() const PURE;
 
   using VirtualHostRefVector =
       std::vector<std::reference_wrapper<const envoy::config::route::v3::VirtualHost>>;

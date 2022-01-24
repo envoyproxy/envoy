@@ -22,9 +22,8 @@ void RouteConfigUpdateReceiverImpl::updateConfig(
 }
 
 void RouteConfigUpdateReceiverImpl::onUpdateCommon(const std::string& version_info) {
-  last_config_version_ = version_info;
   last_updated_ = time_source_.systemTime();
-  config_info_.emplace(RouteConfigProvider::ConfigInfo{*route_config_proto_, last_config_version_});
+  config_info_.emplace(RouteConfigProvider::ConfigInfo{*route_config_proto_, version_info});
 }
 
 // Rds::RouteConfigUpdateReceiver
@@ -40,7 +39,8 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
   return true;
 }
 
-absl::optional<RouteConfigProvider::ConfigInfo> RouteConfigUpdateReceiverImpl::configInfo() const {
+const absl::optional<RouteConfigProvider::ConfigInfo>&
+RouteConfigUpdateReceiverImpl::configInfo() const {
   return config_info_;
 }
 

@@ -91,8 +91,8 @@ protected:
   // Target which starts the RDS subscription.
   Init::TargetImpl local_init_target_;
   Init::ManagerImpl local_init_manager_;
-  std::string stat_prefix_;
-  std::string rds_type_;
+  const std::string stat_prefix_;
+  const std::string rds_type_;
   RdsStats stats_;
   RouteConfigProviderManager& route_config_provider_manager_;
   const uint64_t manager_identifier_;

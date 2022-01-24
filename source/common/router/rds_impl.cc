@@ -62,7 +62,7 @@ StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
   route_config_provider_manager_.eraseStaticProvider(this);
 }
 
-ConfigConstSharedPtr StaticRouteConfigProviderImpl::configCast() {
+ConfigConstSharedPtr StaticRouteConfigProviderImpl::configCast() const {
   ASSERT(dynamic_cast<const Config*>(StaticRouteConfigProviderImpl::config().get()));
   return std::static_pointer_cast<const Config>(StaticRouteConfigProviderImpl::config());
 }
@@ -78,23 +78,24 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
           RouteConfigUpdatePtr(config_update),
           std::unique_ptr<Envoy::Config::OpaqueResourceDecoder>(resource_decoder),
           rds.config_source(), rds.route_config_name(), manager_identifier, factory_context,
-          stat_prefix + "rds.", "RDS", route_config_provider_manager) {}
+          stat_prefix + "rds.", "RDS", route_config_provider_manager),
+      config_update_info_(config_update) {}
 
-RouteConfigUpdateReceiver* RdsRouteConfigSubscription::routeConfigUpdateCast() {
-  return static_cast<RouteConfigUpdateReceiver*>(config_update_info_.get());
-}
+RdsRouteConfigSubscription::~RdsRouteConfigSubscription() { config_update_info_.release(); }
 
 void RdsRouteConfigSubscription::beforeProviderUpdate() {
-  if (routeConfigUpdateCast()->protobufConfigurationCast().has_vhds() &&
-      routeConfigUpdateCast()->vhdsConfigurationChanged()) {
+  if (config_update_info_->protobufConfigurationCast().has_vhds() &&
+      config_update_info_->vhdsConfigurationChanged()) {
     std::unique_ptr<Init::ManagerImpl> noop_init_manager;
     std::unique_ptr<Cleanup> resume_rds;
     ENVOY_LOG(debug,
               "rds: vhds configuration present/changed, (re)starting vhds: config_name={} hash={}",
-              route_config_name_, routeConfigUpdateCast()->configHash());
-    maybeCreateInitManager(routeConfigUpdateCast()->configVersion(), noop_init_manager, resume_rds);
+              route_config_name_, routeConfigUpdate()->configHash());
+    ASSERT(config_update_info_->configInfo().has_value());
+    maybeCreateInitManager(routeConfigUpdate()->configInfo().value().version_, noop_init_manager,
+                           resume_rds);
     vhds_subscription_ = std::make_unique<VhdsSubscription>(
-        routeConfigUpdateCast(), factory_context_, stat_prefix_, route_config_provider_opt_);
+        config_update_info_, factory_context_, stat_prefix_, route_config_provider_opt_);
     vhds_subscription_->registerInitTargetWithInitManager(
         noop_init_manager == nullptr ? local_init_manager_ : *noop_init_manager);
   }
@@ -102,7 +103,7 @@ void RdsRouteConfigSubscription::beforeProviderUpdate() {
 
 void RdsRouteConfigSubscription::afterProviderUpdate() {
   // RDS update removed VHDS configuration
-  if (!routeConfigUpdateCast()->protobufConfigurationCast().has_vhds()) {
+  if (!config_update_info_->protobufConfigurationCast().has_vhds()) {
     vhds_subscription_.release();
   }
 
@@ -141,8 +142,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     RdsRouteConfigSubscription* subscription,
     Server::Configuration::ServerFactoryContext& factory_context)
     : base_(RdsRouteConfigSubscriptionSharedPtr(subscription), factory_context),
-      config_update_info_(subscription->routeConfigUpdateCast()),
-      factory_context_(factory_context) {
+      config_update_info_(subscription->routeConfigUpdate()), factory_context_(factory_context) {
   // The subscription referenced by the 'base_' and by 'this' is the same.
   // In it the provider is already set by the 'base_' so it points to that.
   // Need to set again to point to 'this'.
@@ -187,7 +187,7 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
   }
 }
 
-ConfigConstSharedPtr RdsRouteConfigProviderImpl::configCast() {
+ConfigConstSharedPtr RdsRouteConfigProviderImpl::configCast() const {
   ASSERT(dynamic_cast<const Config*>(RdsRouteConfigProviderImpl::config().get()));
   return std::static_pointer_cast<const Config>(RdsRouteConfigProviderImpl::config());
 }
@@ -215,9 +215,9 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
   });
 }
 
-std::string ProtoTraitsImpl::resourceType() const {
-  return Envoy::Config::getResourceName<envoy::config::route::v3::RouteConfiguration>();
-}
+ProtoTraitsImpl::ProtoTraitsImpl()
+    : resource_type_(
+          Envoy::Config::getResourceName<envoy::config::route::v3::RouteConfiguration>()) {}
 
 ProtobufTypes::MessagePtr ProtoTraitsImpl::createEmptyProto() const {
   return std::make_unique<envoy::config::route::v3::RouteConfiguration>();

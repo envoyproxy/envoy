@@ -61,13 +61,12 @@ public:
                     const std::set<std::string>& added_resource_ids,
                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                     const std::string& version_info) override;
-  const std::string& configVersion() const override { return base_.configVersion(); }
   uint64_t configHash() const override { return base_.configHash(); }
-  absl::optional<Rds::RouteConfigProvider::ConfigInfo> configInfo() const override {
+  const absl::optional<Rds::RouteConfigProvider::ConfigInfo>& configInfo() const override {
     return base_.configInfo();
   }
   bool vhdsConfigurationChanged() const override { return vhds_configuration_changed_; }
-  const Protobuf::Message& protobufConfiguration() override {
+  const Protobuf::Message& protobufConfiguration() const override {
     return base_.protobufConfiguration();
   }
   Rds::ConfigConstSharedPtr parsedConfiguration() const override {
@@ -77,7 +76,7 @@ public:
   const std::set<std::string>& resourceIdsInLastVhdsUpdate() override {
     return resource_ids_in_last_update_;
   }
-  const envoy::config::route::v3::RouteConfiguration& protobufConfigurationCast() override {
+  const envoy::config::route::v3::RouteConfiguration& protobufConfigurationCast() const override {
     ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(
         &RouteConfigUpdateReceiverImpl::protobufConfiguration()));
     return static_cast<const envoy::config::route::v3::RouteConfiguration&>(
