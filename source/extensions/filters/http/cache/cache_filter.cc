@@ -66,7 +66,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   LookupRequest lookup_request(headers, time_source_.systemTime(), vary_allow_list_);
   request_allows_inserts_ = !lookup_request.requestCacheControl().no_store_;
   is_head_request_ = headers.getMethodValue() == Http::Headers::get().MethodValues.Head;
-  lookup_ = cache_.makeLookupContext(std::move(lookup_request));
+  lookup_ = cache_.makeLookupContext(std::move(lookup_request), *decoder_callbacks_);
 
   ASSERT(lookup_);
   getHeaders(headers);
@@ -105,7 +105,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
   if (request_allows_inserts_ && !is_head_request_ &&
       CacheabilityUtils::isCacheableResponse(headers, vary_allow_list_)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
-    insert_ = cache_.makeInsertContext(std::move(lookup_));
+    insert_ = cache_.makeInsertContext(std::move(lookup_), *encoder_callbacks_);
     // Add metadata associated with the cached response. Right now this is only response_time;
     const ResponseMetadata metadata = {time_source_.systemTime()};
     insert_->insertHeaders(headers, metadata, end_stream);
@@ -130,6 +130,24 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
         data, [](bool) {}, end_stream);
   }
   return Http::FilterDataStatus::Continue;
+}
+
+Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
+  if (filter_state_ == FilterState::DecodeServingFromCache) {
+    // This call was invoked during decoding by decoder_callbacks_->encodeTrailers because a fresh
+    // cached response was found and is being added to the encoding stream -- ignore it.
+    return Http::FilterTrailersStatus::Continue;
+  }
+  if (filter_state_ == FilterState::EncodeServingFromCache) {
+    // Stop the encoding stream until the cached response is fetched & added to the encoding stream.
+    return Http::FilterTrailersStatus::StopIteration;
+  }
+  response_has_trailers_ = !trailers.empty();
+  if (insert_) {
+    ENVOY_STREAM_LOG(debug, "CacheFilter::encodeTrailers inserting trailers", *encoder_callbacks_);
+    insert_->insertTrailers(trailers);
+  }
+  return Http::FilterTrailersStatus::Continue;
 }
 
 void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
@@ -296,7 +314,7 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
 
   filter_state_ == FilterState::DecodeServingFromCache
       ? decoder_callbacks_->encodeData(*body, end_stream)
-      : encoder_callbacks_->addEncodedData(*body, true);
+      : encoder_callbacks_->addEncodedData(*body, !response_has_trailers_);
 
   if (!remaining_ranges_.empty()) {
     getBody();

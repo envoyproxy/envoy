@@ -856,13 +856,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 std::string upstream_cluster_name;
                 if (stream_info.upstreamClusterInfo().has_value() &&
                     stream_info.upstreamClusterInfo().value() != nullptr) {
-                  if (Runtime::runtimeFeatureEnabled(
-                          "envoy.reloadable_features.use_observable_cluster_name")) {
-                    upstream_cluster_name =
-                        stream_info.upstreamClusterInfo().value()->observabilityName();
-                  } else {
-                    upstream_cluster_name = stream_info.upstreamClusterInfo().value()->name();
-                  }
+                  upstream_cluster_name =
+                      stream_info.upstreamClusterInfo().value()->observabilityName();
                 }
 
                 return upstream_cluster_name.empty()
@@ -1273,9 +1268,8 @@ uint64_t HeadersByteSizeFormatter::extractHeadersByteSize(
     return response_headers.byteSize();
   case HeaderType::ResponseTrailers:
     return response_trailers.byteSize();
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 absl::optional<std::string>

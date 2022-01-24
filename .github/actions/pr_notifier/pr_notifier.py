@@ -40,17 +40,17 @@ MAINTAINERS = {
     'davinci26': 'U013608CUDV',
     'rojkov': 'UH5EXLYQK',
     'RyanTheOptimist': 'U01SW3JC8GP',
+    'adisuissa': 'UT17EMMTP',
+    'KBaichoo': 'U016ZPU8KBK',
 }
 
 # First pass reviewers who are not maintainers should get
 # notifications but not result in a PR not getting assigned a
 # maintainer owner.
 FIRST_PASS = {
-    'adisuissa': 'UT17EMMTP',
     'dmitri-d': 'UB1883Q5S',
     'tonya11en': 'U989BG2CW',
     'esmet': 'U01BCGBUUAE',
-    'KBaichoo': 'U016ZPU8KBK',
     'wbpcode': 'U017KF5C0Q6',
     'mathetake': 'UG9TD2FSB',
 }
@@ -211,7 +211,7 @@ def post_to_assignee(client, assignees_and_messages, assignees_map):
             print(assignees_and_messages[key])
             response = client.conversations_open(users=uid, text="hello")
             channel_id = response["channel"]["id"]
-            response = client.chat_postMessage(channel=channel_id, text=message)
+            client.chat_postMessage(channel=channel_id, text=message)
         except SlackApiError as e:
             print("Unexpected error %s", e.response["error"])
 
@@ -219,15 +219,21 @@ def post_to_assignee(client, assignees_and_messages, assignees_map):
 def post_to_oncall(client, unassigned_prs, out_slo_prs):
     # Post updates to #envoy-maintainer-oncall
     unassigned_prs = maintainers_and_messages['unassigned']
-    if unassigned_prs:
-        try:
-            response = client.chat_postMessage(
-                channel='#envoy-maintainer-oncall',
-                text=("*'Unassigned' PRs* (PRs with no maintainer assigned)\n%s" % unassigned_prs))
-            response = client.chat_postMessage(
-                channel='#envoy-maintainer-oncall', text=("*Stalled PRs*\n\n%s" % out_slo_prs))
-        except SlackApiError as e:
-            print("Unexpected error %s", e.response["error"])
+    try:
+        client.chat_postMessage(
+            channel='#envoy-maintainer-oncall',
+            text=("*'Unassigned' PRs* (PRs with no maintainer assigned)\n%s" % unassigned_prs))
+        client.chat_postMessage(
+            channel='#envoy-maintainer-oncall',
+            text=("*Stalled PRs* (PRs with review out-SLO, please address)\n%s" % out_slo_prs))
+        issue_link = "https://github.com/envoyproxy/envoy/issues?q=is%3Aissue+is%3Aopen+label%3Atriage"
+        client.chat_postMessage(
+            channel='#envoy-maintainer-oncall',
+            text=(
+                "*Untriaged Issues* (please tag and cc area experts)\n<%s|%s>" %
+                (issue_link, issue_link)))
+    except SlackApiError as e:
+        print("Unexpected error %s", e.response["error"])
 
 
 if __name__ == '__main__':

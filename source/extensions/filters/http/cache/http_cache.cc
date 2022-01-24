@@ -45,7 +45,11 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   key_.set_cluster_name("cluster_name_goes_here");
   key_.set_host(std::string(request_headers.getHostValue()));
   key_.set_path(std::string(request_headers.getPathValue()));
-  key_.set_clear_http(scheme == scheme_values.Http);
+  if (scheme == scheme_values.Http) {
+    key_.set_scheme(Key::HTTP);
+  } else if (scheme == "https") {
+    key_.set_scheme(Key::HTTPS);
+  }
 }
 
 // Unless this API is still alpha, calls to stableHashKey() must always return
@@ -119,8 +123,8 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
 }
 
 LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
-                                             ResponseMetadata&& metadata,
-                                             uint64_t content_length) const {
+                                             ResponseMetadata&& metadata, uint64_t content_length,
+                                             bool has_trailers) const {
   // TODO(toddmgreer): Implement all HTTP caching semantics.
   ASSERT(response_headers);
   LookupResult result;
@@ -136,7 +140,8 @@ LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& respon
   result.headers_ = std::move(response_headers);
   result.content_length_ = content_length;
   result.range_details_ = RangeUtils::createRangeDetails(requestHeaders(), content_length);
-  result.has_trailers_ = false;
+  result.has_trailers_ = has_trailers;
+
   return result;
 }
 
