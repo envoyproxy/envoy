@@ -57,7 +57,6 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
 // flush.
 size_t stableHashKey(const Key& key) { return MessageUtil::hash(key); }
 
-
 void LookupRequest::initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers) {
   const absl::string_view cache_control =
       request_headers.getInlineValue(CacheCustomHeaders::requestCacheControl());
