@@ -150,7 +150,7 @@ TEST_F(StatefulSessionIntegrationTest, NormalStatefulSession) {
 
   // The selected upstream server address would be selected to the response headers.
   EXPECT_EQ(
-      Envoy::Http::Utility::makeSetCookieValue("global-session-cookie", encoded_address, "/path",
+      Envoy::Http::Utility::makeSetCookieValue("global-session-cookie", encoded_address, "/test",
                                                std::chrono::seconds(120), true),
       response->headers().get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView());
 
@@ -263,7 +263,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
 
     // The selected upstream server address would be selected to the response headers.
     EXPECT_EQ(
-        Envoy::Http::Utility::makeSetCookieValue("global-session-cookie", encoded_address, "/path",
+        Envoy::Http::Utility::makeSetCookieValue("global-session-cookie", encoded_address, "/test",
                                                  std::chrono::seconds(120), true),
         response->headers().get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView());
 
@@ -379,7 +379,7 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverriddenByRoute) {
 
     EXPECT_EQ(
         Envoy::Http::Utility::makeSetCookieValue("route-session-cookie", route_encoded_address,
-                                                 "/path", std::chrono::seconds(120), true),
+                                                 "/test", std::chrono::seconds(120), true),
         response->headers().get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView());
 
     cleanupUpstreamAndDownstream();
