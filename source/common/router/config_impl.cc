@@ -141,7 +141,7 @@ const envoy::config::route::v3::WeightedCluster::ClusterWeight& validateWeighted
 // specifies whether the returned parsers will be sorted from least specific to most specific
 // (global connection manager level header parser, virtual host level header parser and finally
 // route-level parser.) or the reverse.
-std::vector<const HeaderParser*>
+absl::InlinedVector<const HeaderParser*, 3>
 getHeaderParsers(const HeaderParser* global_route_config_header_parser,
                  const HeaderParser* vhost_header_parser, const HeaderParser* route_header_parser,
                  bool specificity_ascend) {
@@ -740,14 +740,14 @@ RouteEntryImplBase::requestHeaderTransforms(const StreamInfo::StreamInfo& stream
   return transforms;
 }
 
-std::vector<const HeaderParser*>
+absl::InlinedVector<const HeaderParser*, 3>
 RouteEntryImplBase::getRequestHeaderParsers(bool specificity_ascend) const {
   return getHeaderParsers(&vhost_.globalRouteConfig().requestHeaderParser(),
                           &vhost_.requestHeaderParser(), request_headers_parser_.get(),
                           specificity_ascend);
 }
 
-std::vector<const HeaderParser*>
+absl::InlinedVector<const HeaderParser*, 3>
 RouteEntryImplBase::getResponseHeaderParsers(bool specificity_ascend) const {
   return getHeaderParsers(&vhost_.globalRouteConfig().responseHeaderParser(),
                           &vhost_.responseHeaderParser(), response_headers_parser_.get(),

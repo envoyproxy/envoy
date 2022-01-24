@@ -860,7 +860,8 @@ private:
    *        level header parser and finally route-level parser.) or the reverse.
    * @return a vector of request header parsers.
    */
-  std::vector<const HeaderParser*> getRequestHeaderParsers(bool specificity_ascend) const;
+  absl::InlinedVector<const HeaderParser*, 3>
+  getRequestHeaderParsers(bool specificity_ascend) const;
 
   /**
    * Returns a vector of response header parsers which applied or will apply header transformations
@@ -870,7 +871,8 @@ private:
    *        level header parser and finally route-level parser.) or the reverse.
    * @return a vector of request header parsers.
    */
-  std::vector<const HeaderParser*> getResponseHeaderParsers(bool specificity_ascend) const;
+  absl::InlinedVector<const HeaderParser*, 3>
+  getResponseHeaderParsers(bool specificity_ascend) const;
 
   absl::optional<RuntimeData> loadRuntimeData(const envoy::config::route::v3::RouteMatch& route);
 
