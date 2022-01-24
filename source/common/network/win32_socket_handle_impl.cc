@@ -18,24 +18,24 @@ namespace Network {
 
 Api::IoCallUint64Result Win32SocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices,
                                                      uint64_t num_slice) {
-  if (peek_buffer_.length() == 0) {
-    auto result = IoSocketHandleImpl::readv(max_length, slices, num_slice);
-    reEnableEventBasedOnIOResult(result, Event::FileReadyType::Read);
-    return result;
+  if (peek_buffer_.length() != 0) {
+    return readvFromPeekBuffer(max_length, slices, num_slice);
   }
 
-  return readvFromPeekBuffer(max_length, slices, num_slice);
+  auto result = IoSocketHandleImpl::readv(max_length, slices, num_slice);
+  reEnableEventBasedOnIOResult(result, Event::FileReadyType::Read);
+  return result;
 }
 
 Api::IoCallUint64Result Win32SocketHandleImpl::read(Buffer::Instance& buffer,
                                                     absl::optional<uint64_t> max_length_opt) {
-  if (peek_buffer_.length() == 0) {
-    auto result = IoSocketHandleImpl::read(buffer, max_length_opt);
-    reEnableEventBasedOnIOResult(result, Event::FileReadyType::Read);
-    return result;
+  if (peek_buffer_.length() != 0) {
+    return readFromPeekBuffer(buffer, max_length_opt.value_or(UINT64_MAX));
   }
 
-  return readFromPeekBuffer(buffer, max_length_opt.value_or(UINT64_MAX));
+  auto result = IoSocketHandleImpl::read(buffer, max_length_opt);
+  reEnableEventBasedOnIOResult(result, Event::FileReadyType::Read);
+  return result;
 }
 
 Api::IoCallUint64Result Win32SocketHandleImpl::writev(const Buffer::RawSlice* slices,
@@ -80,7 +80,7 @@ Api::IoCallUint64Result Win32SocketHandleImpl::recvmmsg(RawSliceArrays& slices, 
 
 Api::IoCallUint64Result Win32SocketHandleImpl::recv(void* buffer, size_t length, int flags) {
   if (flags & MSG_PEEK) {
-    return peek(buffer, length);
+    return emulatePeek(buffer, length);
   }
 
   if (peek_buffer_.length() == 0) {
@@ -92,17 +92,15 @@ Api::IoCallUint64Result Win32SocketHandleImpl::recv(void* buffer, size_t length,
   }
 }
 
-Api::IoCallUint64Result Win32SocketHandleImpl::peek(void* buffer, size_t length) {
-
-  // if the `peek_buffer_` has already enough data we can skip reading
-  // from the wire.
+Api::IoCallUint64Result Win32SocketHandleImpl::emulatePeek(void* buffer, size_t length) {
+  // If there's not enough data in the peek buffer, try reading more.
   if (length > peek_buffer_.length()) {
     // The caller is responsible for calling with the larger size
     // in cases it needs to do so it can't rely on transparent event activation.
-    // So no in this case we should activate read again unless the read blocked.
+    // So in this case we should activate read again unless the read blocked.
     Api::IoCallUint64Result peek_result = drainToPeekBuffer(length);
 
-    //  Some error happened
+    //  Some error happened.
     if (!peek_result.ok()) {
       if (peek_result.wouldBlock() && file_event_) {
         file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
@@ -175,6 +173,7 @@ void Win32SocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
                                                 Event::FileReadyCb cb,
                                                 Event::FileTriggerType trigger, uint32_t events) {
   IoSocketHandleImpl::initializeFileEvent(dispatcher, cb, trigger, events);
+  // Activate the file event directly when we have the data in the peek_buffer_.
   if ((events & Event::FileReadyType::Read) && peek_buffer_.length() > 0) {
     activateFileEvents(Event::FileReadyType::Read);
   }
@@ -182,6 +181,7 @@ void Win32SocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
 
 void Win32SocketHandleImpl::enableFileEvents(uint32_t events) {
   IoSocketHandleImpl::enableFileEvents(events);
+  // Activate the file event directly when we have the data in the peek_buffer_.
   if ((events & Event::FileReadyType::Read) && peek_buffer_.length() > 0) {
     activateFileEvents(Event::FileReadyType::Read);
   }

@@ -55,7 +55,7 @@ private:
   // first from the class buffer and then go to the underlying socket.
 
   // Implement the peek logic of recv for readability purposes
-  Api::IoCallUint64Result peek(void* buffer, size_t length);
+  Api::IoCallUint64Result emulatePeek(void* buffer, size_t length);
 
   /**
    * Drain the socket into `peek_buffer_`.

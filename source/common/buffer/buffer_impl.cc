@@ -124,25 +124,26 @@ uint64_t OwnedImpl::copyOutToSlices(uint64_t size, Buffer::RawSlice* dest_slices
   uint64_t num_bytes_read = 0;
   uint64_t num_dest_slices_read = 0;
   uint64_t num_src_slices_read = 0;
-  uint64_t dest_slice_off = 0;
-  uint64_t src_slice_off = 0;
-  for (; num_dest_slices_read < num_slice && num_bytes_read < total_length_to_read;) {
-    auto& src_slice = slices_[num_src_slices_read];
-    auto& dest_slice = dest_slices[num_dest_slices_read];
-    auto length_to_copy = std::min(
-        src_slice.dataSize() - src_slice_off,
-        std::min(static_cast<uint64_t>(dest_slice.len_), total_length_to_read - num_bytes_read));
-    memcpy(static_cast<uint8_t*>(dest_slice.mem_) + dest_slice_off, // NOLINT(safe-memcpy)
-           src_slice.data() + src_slice_off, length_to_copy);
-    src_slice_off = src_slice_off + length_to_copy;
-    dest_slice_off = dest_slice_off + length_to_copy;
-    if (src_slice_off == src_slice.dataSize()) {
+  uint64_t dest_slice_offset = 0;
+  uint64_t src_slice_offset = 0;
+  while (num_dest_slices_read < num_slice && num_bytes_read < total_length_to_read) {
+    const Slice& src_slice = slices_[num_src_slices_read];
+    const Buffer::RawSlice& dest_slice = dest_slices[num_dest_slices_read];
+    uint64_t left_to_read = total_length_to_read - num_bytes_read;
+    uint64_t left_data_size_in_slice = src_slice.dataSize() - src_slice_offset;
+    uint64_t length_to_copy = std::min(
+        left_data_size_in_slice, std::min(static_cast<uint64_t>(dest_slice.len_), left_to_read));
+    memcpy(static_cast<uint8_t*>(dest_slice.mem_) + dest_slice_offset, // NOLINT(safe-memcpy)
+           src_slice.data() + src_slice_offset, length_to_copy);
+    src_slice_offset = src_slice_offset + length_to_copy;
+    dest_slice_offset = dest_slice_offset + length_to_copy;
+    if (src_slice_offset == src_slice.dataSize()) {
       num_src_slices_read++;
-      src_slice_off = 0;
+      src_slice_offset = 0;
     }
-    if (dest_slice_off == dest_slice.len_) {
+    if (dest_slice_offset == dest_slice.len_) {
       num_dest_slices_read++;
-      dest_slice_off = 0;
+      dest_slice_offset = 0;
     }
     num_bytes_read += length_to_copy;
   }
