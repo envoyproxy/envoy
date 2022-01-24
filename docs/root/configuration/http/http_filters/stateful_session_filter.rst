@@ -70,9 +70,10 @@ So let's take this as an example.
       name: envoy.http.stateful_session.cookie
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState
-        name: global-session-cookie
-        path: /path
-        ttl: 120s
+        cookie:
+          name: global-session-cookie
+          path: /path
+          ttl: 120s
 
 
 In the above configuration, the cookie-based session state obtains the overridden host of the current session

@@ -493,7 +493,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, TestManyResponseHeadersRejected) {
 
   Http::TestResponseHeaderMapImpl many_headers(default_response_headers_);
   for (int i = 0; i < 100; i++) {
-    many_headers.addCopy("many", std::string(1, 'a'));
+    many_headers.addCopy(absl::StrCat("many", i), std::string(1, 'a'));
   }
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();

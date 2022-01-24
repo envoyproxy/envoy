@@ -101,6 +101,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "win32_scm_test",
     srcs = ["win32_scm_test.cc"],
+    coverage = False,
     data = [
         "//source/exe:envoy-static",
         "//test/config/integration:google_com_proxy_port_0",
@@ -121,6 +122,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "win32_outofproc_main_test",
     srcs = ["win32_outofproc_main_test.cc"],
+    coverage = False,
     data = [
         "//source/exe:envoy-static",
         "//test/config/integration:google_com_proxy_port_0",

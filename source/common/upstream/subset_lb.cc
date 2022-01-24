@@ -798,7 +798,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
   case LoadBalancerType::ClusterProvided:
   case LoadBalancerType::LoadBalancingPolicyConfig:
     // These load balancer types can only be created when there is no subset configuration.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 
   triggerCallbacks();
