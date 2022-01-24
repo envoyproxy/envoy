@@ -122,8 +122,7 @@ public:
    * - x-forwarded-proto header if valid
    * - security of downstream connection
    */
-  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure,
-                                bool upstream_secure);
+  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure);
 
   /**
    * Determine whether a request should be shadowed.
