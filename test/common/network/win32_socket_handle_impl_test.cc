@@ -105,6 +105,35 @@ TEST_F(Win32SocketHandleImplTest, RecvWithoutPeekShouldReadFromWire) {
   EXPECT_EQ(rc.return_value_, 10);
 }
 
+TEST_F(Win32SocketHandleImplTest, RecvWithPeekMultipleTimes) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Invoke([&](os_fd_t, const iovec* iov, int num_iovs) {
+    size_t size_to_read = 0;
+    for (auto i = 0; i < num_iovs; i++) {
+      size_to_read += iov[i].iov_len;
+    }
+    EXPECT_EQ(10, size_to_read);
+    return Api::SysCallSizeResult{5, 0};
+  })).WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
+
+  EXPECT_CALL(*file_event_, registerEventIfEmulatedEdge(_));
+  absl::FixedArray<char> buf(10);
+  auto rc = io_handle_.recv(buf.data(), buf.size(), MSG_PEEK);
+  EXPECT_EQ(rc.return_value_, 5);
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .WillOnce(Invoke([&](os_fd_t, const iovec* iov, int num_iovs) {
+    size_t size_to_read = 0;
+    for (auto i = 0; i < num_iovs; i++) {
+      size_to_read += iov[i].iov_len;
+    }
+    EXPECT_EQ(5, size_to_read);
+    return Api::SysCallSizeResult{5, 0};
+  }));
+  auto rc2 = io_handle_.recv(buf.data(), buf.size(), MSG_PEEK);
+  EXPECT_EQ(rc2.return_value_, 10);
+}
+
 TEST_F(Win32SocketHandleImplTest, RecvWithPeekReactivatesReadOnBlock) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);

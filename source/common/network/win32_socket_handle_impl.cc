@@ -130,7 +130,7 @@ Api::IoCallUint64Result Win32SocketHandleImpl::drainToPeekBuffer(size_t length) 
   while (peek_buffer_.length() < length) {
     Buffer::Reservation reservation = peek_buffer_.reserveForRead();
     uint64_t bytes_to_read =
-        std::min<uint64_t>(static_cast<uint64_t>(length - total_bytes_read), reservation.length());
+        std::min<uint64_t>(static_cast<uint64_t>(length - peek_buffer_.length()), reservation.length());
     Api::IoCallUint64Result result =
         IoSocketHandleImpl::readv(bytes_to_read, reservation.slices(), reservation.numSlices());
     uint64_t bytes_to_commit = result.ok() ? result.return_value_ : 0;
