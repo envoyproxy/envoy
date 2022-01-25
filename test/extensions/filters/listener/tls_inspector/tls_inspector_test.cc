@@ -37,7 +37,8 @@ public:
   TlsInspectorTest()
       : cfg_(std::make_shared<Config>(
             store_, envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector())),
-        io_handle_(std::make_unique<Network::IoSocketHandleImpl>(42)) {}
+        io_handle_(
+            Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, absl::nullopt)) {}
 
   void init() {
     filter_ = std::make_unique<Filter>(cfg_);
@@ -91,6 +92,16 @@ TEST_P(TlsInspectorTest, SniRegistered) {
   const std::string servername("example.com");
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
       std::get<0>(GetParam()), std::get<1>(GetParam()), servername, "");
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      .WillOnce(Invoke(
+          [&client_hello](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+            ASSERT(iov->iov_len >= client_hello.size());
+            memcpy(iov->iov_base, client_hello.data(), client_hello.size());
+            return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
+          }))
+      .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+#else
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke(
           [&client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -98,6 +109,7 @@ TEST_P(TlsInspectorTest, SniRegistered) {
             memcpy(buffer, client_hello.data(), client_hello.size());
             return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
           }));
+#endif
   EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
@@ -117,6 +129,16 @@ TEST_P(TlsInspectorTest, AlpnRegistered) {
                                                           Http::Utility::AlpnNames::get().Http11};
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
       std::get<0>(GetParam()), std::get<1>(GetParam()), "", "\x02h2\x08http/1.1");
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      .WillOnce(Invoke(
+          [&client_hello](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+            ASSERT(iov->iov_len >= client_hello.size());
+            memcpy(iov->iov_base, client_hello.data(), client_hello.size());
+            return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
+          }))
+      .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+#else
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke(
           [&client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -124,6 +146,7 @@ TEST_P(TlsInspectorTest, AlpnRegistered) {
             memcpy(buffer, client_hello.data(), client_hello.size());
             return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
           }));
+#endif
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
@@ -143,6 +166,23 @@ TEST_P(TlsInspectorTest, MultipleReads) {
   const std::string servername("example.com");
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
       std::get<0>(GetParam()), std::get<1>(GetParam()), servername, "\x02h2");
+#ifdef WIN32
+  {
+    InSequence s;
+    EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+        .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+    for (size_t i = 0; i < client_hello.size(); i++) {
+      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+          .WillOnce(Invoke([&client_hello, i](os_fd_t fd, const iovec* iov,
+                                              int iovcnt) -> Api::SysCallSizeResult {
+            ASSERT(iov->iov_len >= client_hello.size());
+            memcpy(iov->iov_base, client_hello.data() + i, 1);
+            return Api::SysCallSizeResult{ssize_t(1), 0};
+          }))
+          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+    }
+  }
+#else
   {
     InSequence s;
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
@@ -159,7 +199,7 @@ TEST_P(TlsInspectorTest, MultipleReads) {
           }));
     }
   }
-
+#endif
   bool got_continue = false;
   EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
@@ -182,6 +222,16 @@ TEST_P(TlsInspectorTest, NoExtensions) {
   init();
   std::vector<uint8_t> client_hello =
       Tls::Test::generateClientHello(std::get<0>(GetParam()), std::get<1>(GetParam()), "", "");
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      .WillOnce(Invoke(
+          [&client_hello](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+            ASSERT(iov->iov_len >= client_hello.size());
+            memcpy(iov->iov_base, client_hello.data(), client_hello.size());
+            return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
+          }))
+      .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+#else
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke(
           [&client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -189,6 +239,7 @@ TEST_P(TlsInspectorTest, NoExtensions) {
             memcpy(buffer, client_hello.data(), client_hello.size());
             return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
           }));
+#endif
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
@@ -223,7 +274,15 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
       *io_handle_, dispatcher_, []() {}, []() {}, cfg_->maxClientHelloSize());
 
   filter_->onAccept(cb_);
-
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      .WillOnce(Invoke(
+          [=, &client_hello](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+            ASSERT(iov->iov_len >= max_size);
+            memcpy(iov->iov_base, client_hello.data(), max_size);
+            return Api::SysCallSizeResult{ssize_t(max_size), 0};
+          }));
+#else
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke(
           [=, &client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -231,7 +290,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
             memcpy(buffer, client_hello.data(), length);
             return Api::SysCallSizeResult{ssize_t(length), 0};
           }));
-
+#endif
   // trigger the event to copy the client hello message into buffer
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);
@@ -247,6 +306,16 @@ TEST_P(TlsInspectorTest, ConnectionFingerprint) {
   std::vector<uint8_t> client_hello =
       Tls::Test::generateClientHello(std::get<0>(GetParam()), std::get<1>(GetParam()), "", "");
   init();
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      .WillOnce(Invoke(
+          [&client_hello](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+            ASSERT(iov->iov_len >= client_hello.size());
+            memcpy(iov->iov_base, client_hello.data(), client_hello.size());
+            return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
+          }))
+      .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+#else
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke(
           [&client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -254,6 +323,7 @@ TEST_P(TlsInspectorTest, ConnectionFingerprint) {
             memcpy(buffer, client_hello.data(), client_hello.size());
             return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
           }));
+#endif
   EXPECT_CALL(socket_, setJA3Hash(_));
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
@@ -271,6 +341,16 @@ void TlsInspectorTest::testJA3(const std::string& fingerprint, bool expect_serve
   cfg_ = std::make_shared<Config>(store_, proto_config);
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHelloFromJA3Fingerprint(fingerprint);
   init();
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      .WillOnce(Invoke(
+          [&client_hello](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+            ASSERT(iov->iov_len >= client_hello.size());
+            memcpy(iov->iov_base, client_hello.data(), client_hello.size());
+            return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
+          }))
+      .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+#else
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke(
           [&client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -278,6 +358,7 @@ void TlsInspectorTest::testJA3(const std::string& fingerprint, bool expect_serve
             memcpy(buffer, client_hello.data(), client_hello.size());
             return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
           }));
+#endif
   if (hash.empty()) {
     uint8_t buf[MD5_DIGEST_LENGTH];
     MD5(reinterpret_cast<const uint8_t*>(fingerprint.data()), fingerprint.size(), buf);
@@ -362,7 +443,15 @@ TEST_P(TlsInspectorTest, NotSsl) {
 
   // Use 100 bytes of zeroes. This is not valid as a ClientHello.
   data.resize(100);
-
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      .WillOnce(Invoke([&data](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+        ASSERT(iov->iov_len >= data.size());
+        memcpy(iov->iov_base, data.data(), data.size());
+        return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+      }))
+      .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+#else
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(
           Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -370,6 +459,7 @@ TEST_P(TlsInspectorTest, NotSsl) {
             memcpy(buffer, data.data(), data.size());
             return Api::SysCallSizeResult{ssize_t(data.size()), 0};
           }));
+#endif
   // trigger the event to copy the client hello message into buffer
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);

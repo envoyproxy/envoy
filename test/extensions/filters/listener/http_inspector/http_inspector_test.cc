@@ -31,7 +31,8 @@ class HttpInspectorTest : public testing::Test {
 public:
   HttpInspectorTest()
       : cfg_(std::make_shared<Config>(store_)),
-        io_handle_(std::make_unique<Network::IoSocketHandleImpl>(42)) {}
+        io_handle_(
+            Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, absl::nullopt)) {}
   ~HttpInspectorTest() override { io_handle_->close(); }
 
   void init() {
@@ -56,10 +57,36 @@ public:
     {
       InSequence s;
 
+#ifdef WIN32
+      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+      if (http2) {
+        for (size_t i = 0; i < data.size(); i++) {
+          EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+              .WillOnce(Invoke(
+                  [&data, i](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+                    ASSERT(iov->iov_len >= data.size());
+                    memcpy(iov->iov_base, data.data() + i, 1);
+                    return Api::SysCallSizeResult{ssize_t(1), 0};
+                  }))
+              .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+        }
+      } else {
+        for (size_t i = 0; i < header.size(); i++) {
+          EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+              .WillOnce(Invoke(
+                  [&header, i](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+                    ASSERT(iov->iov_len >= header.size());
+                    memcpy(iov->iov_base, header.data() + i, 1);
+                    return Api::SysCallSizeResult{ssize_t(1), 0};
+                  }))
+              .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+        }
+      }
+#else
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
         return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
       }));
-
       if (http2) {
         for (size_t i = 1; i <= data.size(); i++) {
           EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
@@ -81,8 +108,8 @@ public:
               }));
         }
       }
+#endif
     }
-
     bool got_continue = false;
     EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
     EXPECT_CALL(socket_, close()).WillOnce(InvokeWithoutArgs([&got_continue]() {
@@ -106,6 +133,33 @@ public:
     {
       InSequence s;
 
+#ifdef WIN32
+      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+      if (alpn == Http::Utility::AlpnNames::get().Http2c) {
+        for (size_t i = 0; i < 24; i++) {
+          EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+              .WillOnce(Invoke(
+                  [&data, i](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+                    ASSERT(iov->iov_len >= data.size());
+                    memcpy(iov->iov_base, data.data() + i, 1);
+                    return Api::SysCallSizeResult{ssize_t(1), 0};
+                  }))
+              .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+        }
+      } else {
+        for (size_t i = 0; i < header.size(); i++) {
+          EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+              .WillOnce(Invoke(
+                  [&header, i](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+                    ASSERT(iov->iov_len >= header.size());
+                    memcpy(iov->iov_base, header.data() + i, 1);
+                    return Api::SysCallSizeResult{ssize_t(1), 0};
+                  }))
+              .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+        }
+      }
+#else
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
         return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
       }));
@@ -131,6 +185,7 @@ public:
               }));
         }
       }
+#endif
     }
 
     bool got_continue = false;
@@ -158,6 +213,27 @@ public:
   void testHttpInspectSuccess(absl::string_view header, absl::string_view alpn) {
     init();
     std::vector<uint8_t> data = Hex::decode(std::string(header));
+#ifdef WIN32
+    if (alpn == Http::Utility::AlpnNames::get().Http2c) {
+      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+          .WillOnce(
+              Invoke([&data](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+                ASSERT(iov->iov_len >= data.size());
+                memcpy(iov->iov_base, data.data(), data.size());
+                return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+              }))
+          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+    } else {
+      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+          .WillOnce(
+              Invoke([&header](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+                ASSERT(iov->iov_len >= header.size());
+                memcpy(iov->iov_base, header.data(), header.size());
+                return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+              }))
+          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+    }
+#else
     if (alpn == Http::Utility::AlpnNames::get().Http2c) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(
@@ -175,6 +251,7 @@ public:
                 return Api::SysCallSizeResult{ssize_t(header.size()), 0};
               }));
     }
+#endif
     const std::vector<absl::string_view> alpn_protos{alpn};
 
     EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
@@ -197,6 +274,27 @@ public:
   void testHttpInspectFail(absl::string_view header, bool http2 = false) {
     init();
     std::vector<uint8_t> data = Hex::decode(std::string(header));
+#ifdef WIN32
+    if (http2) {
+      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+          .WillOnce(
+              Invoke([&data](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+                ASSERT(iov->iov_len >= data.size());
+                memcpy(iov->iov_base, data.data(), data.size());
+                return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+              }))
+          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+    } else {
+      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+          .WillOnce(
+              Invoke([&header](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+                ASSERT(iov->iov_len >= header.size());
+                memcpy(iov->iov_base, header.data(), header.size());
+                return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+              }))
+          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+    }
+#else
     if (http2) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(
@@ -214,7 +312,7 @@ public:
                 return Api::SysCallSizeResult{ssize_t(header.size()), 0};
               }));
     }
-
+#endif
     EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
     auto accepted = filter_->onAccept(cb_);
     EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
@@ -333,6 +431,15 @@ TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
 
   const std::string header = "505249202a20485454502f322e300d0a";
   std::vector<uint8_t> data = Hex::decode(std::string(header));
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      .WillOnce(Invoke([&data](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+        ASSERT(iov->iov_len >= data.size());
+        memcpy(iov->iov_base, data.data(), data.size());
+        return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+      }))
+      .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+#else
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(
           Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -340,7 +447,7 @@ TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
             memcpy(buffer, data.data(), data.size());
             return Api::SysCallSizeResult{ssize_t(data.size()), 0};
           }));
-
+#endif
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
@@ -392,10 +499,14 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
   const std::string data = absl::StrCat(method, spaces, http);
   {
     InSequence s;
-
+#ifdef WIN32
+    EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+        .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+#else
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
       return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
     }));
+#endif
 
     uint64_t num_loops = Config::MAX_INSPECT_SIZE;
 #if defined(__has_feature) &&                                                                      \
@@ -403,6 +514,20 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
     num_loops = 2;
 #endif
 
+#ifdef WIN32
+    auto ctr = std::make_shared<size_t>(0);
+    auto copy_len = std::make_shared<size_t>(1);
+    EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+        .Times(num_loops)
+        .WillRepeatedly(
+            Invoke([&data, ctr, copy_len, num_loops](os_fd_t fd, const iovec* iov,
+                                                     int iovcnt) -> Api::SysCallSizeResult {
+              ASSERT(iov->iov_len >= 1);
+              memcpy(iov->iov_base, data.data() + *ctr, 1);
+              *ctr += 1;
+              return Api::SysCallSizeResult{ssize_t(1), 0};
+            }));
+#else
     auto ctr = std::make_shared<size_t>(1);
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
         .Times(num_loops)
@@ -418,6 +543,7 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
           *ctr += 1;
           return Api::SysCallSizeResult{ssize_t(len), 0};
         }));
+#endif
   }
 
   bool got_continue = false;
@@ -444,7 +570,20 @@ TEST_F(HttpInspectorTest, Http1WithLargeHeader) {
 
   {
     InSequence s;
-
+#ifdef WIN32
+    EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+        .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+    for (size_t i = 0; i < 20; i++) {
+      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+          .WillOnce(Invoke(
+              [&data, i](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
+                ASSERT(iov->iov_len >= 20);
+                memcpy(iov->iov_base, data.data() + i, 1);
+                return Api::SysCallSizeResult{ssize_t(1), 0};
+              }))
+          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+    }
+#else
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
       return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
     }));
@@ -458,6 +597,7 @@ TEST_F(HttpInspectorTest, Http1WithLargeHeader) {
                 return Api::SysCallSizeResult{ssize_t(i), 0};
               }));
     }
+#endif
   }
 
   bool got_continue = false;
