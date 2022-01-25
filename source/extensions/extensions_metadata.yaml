@@ -286,7 +286,7 @@ envoy.filters.listener.http_inspector:
 envoy.filters.listener.connect_handler:
   categories:
   - envoy.filters.listener
-  security_posture: robust_to_untrusted_downstream
+  security_posture: requires_trusted_downstream_and_upstream
   status: alpha
 envoy.filters.listener.original_dst:
   categories:

@@ -56,6 +56,7 @@ Removed Config or Runtime
 * http: removed ``envoy.reloadable_features.treat_host_like_authority`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.upstream_http2_flood_checks`` and legacy code paths.
+* listener: added :ref:`Connect handler listener filter <config_listener_filters_connect_handler>`.
 * upstream: removed ``envoy.reloadable_features.upstream_host_weight_change_causes_rebuild`` and legacy code paths.
 
 New Features
