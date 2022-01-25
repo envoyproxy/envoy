@@ -353,7 +353,7 @@ protected:
     return num_pages * PageSize;
   }
 
-  static constexpr uint32_t free_list_max_ = 2 * Buffer::Reservation::MAX_SLICES_;
+  static constexpr uint32_t free_list_max_ = Buffer::Reservation::MAX_SLICES_;
   static thread_local absl::InlinedVector<StoragePtr, free_list_max_> free_list_;
 
 public:
@@ -407,7 +407,7 @@ protected:
    * accessed directly; access base_ instead. */
   StoragePtr storage_;
 
-  /** Start of the slice. Points to storage_ if the slice owns its own storage. */
+  /** Start of the slice. Points to storage_ iff the slice owns its own storage. */
   uint8_t* base_{nullptr};
 
   /** Offset in bytes from the start of the slice to the start of the Data section. */

@@ -302,13 +302,15 @@ BENCHMARK(bufferMovePartial)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 // fully used (and therefore the commit size equals the reservation size).
 static void bufferReserveCommit(benchmark::State& state) {
   Buffer::OwnedImpl buffer;
+  auto size = state.range(0);
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
-    auto size = state.range(0);
-    Buffer::Reservation reservation = buffer.reserveForReadWithLengthForTest(size);
-    reservation.commit(reservation.length());
-    if (buffer.length() >= MaxBufferLength) {
-      buffer.drain(buffer.length());
+    for (size_t i = 0; i < 1024; i++) {
+      Buffer::Reservation reservation = buffer.reserveForReadWithLengthForTest(size);
+      reservation.commit(reservation.length());
+      if (buffer.length() >= MaxBufferLength) {
+        buffer.drain(buffer.length());
+      }
     }
   }
   benchmark::DoNotOptimize(buffer.length());
@@ -324,14 +326,16 @@ BENCHMARK(bufferReserveCommit)
 // only partially used (and therefore the commit size is smaller than the reservation size).
 static void bufferReserveCommitPartial(benchmark::State& state) {
   Buffer::OwnedImpl buffer;
+  auto size = state.range(0);
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
-    auto size = state.range(0);
-    Buffer::Reservation reservation = buffer.reserveForReadWithLengthForTest(size);
-    // Commit one byte from the first slice and nothing from any subsequent slice.
-    reservation.commit(1);
-    if (buffer.length() >= MaxBufferLength) {
-      buffer.drain(buffer.length());
+    for (size_t i = 0; i < 1024; i++) {
+      Buffer::Reservation reservation = buffer.reserveForReadWithLengthForTest(size);
+      // Commit one byte from the first slice and nothing from any subsequent slice.
+      reservation.commit(1);
+      if (buffer.length() >= MaxBufferLength) {
+        buffer.drain(buffer.length());
+      }
     }
   }
   benchmark::DoNotOptimize(buffer.length());
