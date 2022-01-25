@@ -3059,14 +3059,14 @@ TEST_F(RouteMatcherTest, WeightedClusterWithProvidedRandomValue) {
   factory_context_.cluster_manager_.initializeClusters({"cluster1", "cluster2"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
+  // Override the weighted cluster selection by using the weight that is specified in
+  // `random_value_pair` which will be passed to request header.
   std::pair<std::string, std::string> random_value_pair = {"x_random_value", "10"};
   OptionalGenHeadersArg optional_arg;
   optional_arg.random_value_pair = &random_value_pair;
   Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET", optional_arg);
-  // Override the weighted cluster selection by using the weight that is specified in
-  // `random_value_pair` which will be passed to request header. Thus, here we expect `cluster1` is
-  // selected even though random value passed to `route()` function is 60 because the overridden
-  // weight specified in `random_value_pair` is 10.
+  // Here we expect `cluster1` is selected even though random value passed to `route()` function is
+  // 60 because the overridden weight specified in `random_value_pair` is 10.
   EXPECT_EQ("cluster1", config.route(headers, 60)->routeEntry()->clusterName());
 
   headers = genHeaders("www1.lyft.com", "/foo", "GET");
