@@ -46,7 +46,7 @@ public:
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr /*options*/) const override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
   bool implementsSecureTransport() const override { return true; }
   bool usesProxyProtocolOptions() const override { return false; }

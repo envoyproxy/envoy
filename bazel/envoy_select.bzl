@@ -43,9 +43,7 @@ def envoy_select_hot_restart(xs, repository = ""):
 # and the ability to build tests using Proxy-Wasm C++ SDK on the current platform.
 def envoy_select_wasm_cpp_tests(xs):
     return select({
-        "@envoy//bazel:darwin_arm64": [],
-        "@envoy//bazel:linux_aarch64": [],
-        "@envoy//bazel:wasm_none": [],
+        "@envoy//bazel:not_x86_or_wasm_disabled": [],
         "//conditions:default": xs,
     })
 
@@ -53,18 +51,30 @@ def envoy_select_wasm_cpp_tests(xs):
 # and the ability to build tests using Proxy-Wasm Rust SDK on the current platform.
 def envoy_select_wasm_rust_tests(xs):
     return select({
-        "@envoy//bazel:wasm_none": [],
+        "@envoy//bazel:wasm_disabled": [],
         "//conditions:default": xs,
     })
 
 # Selects the given values depending on the Wasm runtimes enabled in the current build.
 def envoy_select_wasm_v8(xs):
     return select({
+        "@envoy//bazel:wasm_v8": xs,
         "@envoy//bazel:wasm_wamr": [],
         "@envoy//bazel:wasm_wasmtime": [],
         "@envoy//bazel:wasm_wavm": [],
-        "@envoy//bazel:wasm_none": [],
-        "//conditions:default": xs,
+        "@envoy//bazel:wasm_disabled": [],
+        "//conditions:default": xs,  # implicit default (v8)
+    })
+
+# Selects True or False depending on the Wasm runtimes enabled in the current build.
+def envoy_select_wasm_v8_bool():
+    return select({
+        "@envoy//bazel:wasm_v8": True,
+        "@envoy//bazel:wasm_wamr": False,
+        "@envoy//bazel:wasm_wasmtime": False,
+        "@envoy//bazel:wasm_wavm": False,
+        "@envoy//bazel:wasm_disabled": False,
+        "//conditions:default": True,  # implicit default (v8)
     })
 
 # Selects the given values depending on the Wasm runtimes enabled in the current build.
