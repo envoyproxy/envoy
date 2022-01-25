@@ -29,9 +29,6 @@ public:
                                   SocketOptionName ipv6_optname, absl::string_view ipv6_value)
       : ipv4_option_(std::make_unique<SocketOptionImpl>(in_state, ipv4_optname, ipv4_value)),
         ipv6_option_(std::make_unique<SocketOptionImpl>(in_state, ipv6_optname, ipv6_value)) {}
-  AddrFamilyAwareSocketOptionImpl(Socket::OptionConstPtr&& ipv4_option,
-                                  Socket::OptionConstPtr&& ipv6_option)
-      : ipv4_option_(std::move(ipv4_option)), ipv6_option_(std::move(ipv6_option)) {}
 
   // Socket::Option
   bool setOption(Socket& socket,
