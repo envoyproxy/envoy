@@ -31,6 +31,18 @@ const std::vector<double>& HistogramStatisticsImpl::supportedQuantiles() const {
                          {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.995, 0.999, 1});
 }
 
+const std::vector<uint64_t> HistogramStatisticsImpl::nonoverlappingComputedBuckets() const {
+  std::vector<uint64_t> buckets;
+  buckets.reserve(computed_buckets_.size());
+  uint64_t previous_computed_bucket = 0;
+  for (size_t i = 0; i < computed_buckets_.size(); ++i) {
+    uint64_t current_computed_bucket = computed_buckets_[i];
+    buckets.push_back(current_computed_bucket - previous_computed_bucket);
+    previous_computed_bucket = current_computed_bucket;
+  }
+  return buckets;
+}
+
 std::string HistogramStatisticsImpl::quantileSummary() const {
   std::vector<std::string> summary;
   const std::vector<double>& supported_quantiles = supportedQuantiles();

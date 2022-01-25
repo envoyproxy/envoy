@@ -60,6 +60,7 @@ public:
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
   ConstSupportedBuckets& supportedBuckets() const override { return supported_buckets_; }
   const std::vector<uint64_t>& computedBuckets() const override { return computed_buckets_; }
+  const std::vector<uint64_t> nonoverlappingComputedBuckets() const override;
   uint64_t sampleCount() const override { return sample_count_; }
   double sampleSum() const override { return sample_sum_; }
 

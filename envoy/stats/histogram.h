@@ -70,6 +70,12 @@ public:
   virtual const std::vector<uint64_t>& computedBuckets() const PURE;
 
   /**
+   * Returns nonoverlapping version of computedBuckets(). This vector is
+   * guaranteed to be the same length as supportedBuckets().
+   */
+  virtual const std::vector<uint64_t> nonoverlappingComputedBuckets() const PURE;
+
+  /**
    * Returns number of values during the period. This number may be an approximation
    * of the number of samples in the histogram, it is not guaranteed that this will be
    * 100% the number of samples observed.
@@ -163,9 +169,9 @@ public:
   virtual const std::string bucketSummary() const PURE;
 
   /**
-   * Returns the bucket summary representation with non-overlapping buckets.
+   * Returns the bucket summary representation with nonoverlapping buckets.
    */
-  virtual const std::string nonOverlappingBucketSummary() const PURE;
+  virtual const std::string nonoverlappingBucketSummary() const PURE;
 };
 
 using ParentHistogramSharedPtr = RefcountPtr<ParentHistogram>;
