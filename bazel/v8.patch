@@ -11,7 +11,7 @@ index d03ca08c52..329d4141cd 100644
  load("@bazel_skylib//lib:selects.bzl", "selects")
  load("@rules_python//python:defs.bzl", "py_binary")
 -load("@v8_python_deps//:requirements.bzl", "requirement")
-+load("@configs_pip3//:requirements.bzl", "requirement")
++load("@base_pip3//:requirements.bzl", "requirement")
  load(
      "@v8//:bazel/defs.bzl",
      "v8_binary",
