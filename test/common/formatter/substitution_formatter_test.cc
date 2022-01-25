@@ -1616,18 +1616,6 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
                                       stream_info, body),
                 ProtoEq(ValueUtil::stringValue("test_value")));
   }
-  // Disable string value unquoting and expect the same result as above but quoted.
-  {
-    TestScopedRuntime scoped_runtime;
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.unquote_log_string_values", "false"}});
-    DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>());
-    EXPECT_EQ("\"test_value\"", formatter.format(request_headers, response_headers,
-                                                 response_trailers, stream_info, body));
-    EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
-                                      stream_info, body),
-                ProtoEq(ValueUtil::stringValue("test_value")));
-  }
   {
     DynamicMetadataFormatter formatter("com.test", {"test_obj"}, absl::optional<size_t>());
     EXPECT_EQ(

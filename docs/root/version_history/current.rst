@@ -26,6 +26,7 @@ Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+* access_log: removed ``envoy.reloadable_features.unquote_log_string_values`` and legacy code paths.
 * grpc_bridge_filter: removed ``envoy.reloadable_features.grpc_bridge_stats_disabled`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.hash_multiple_header_values`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.preserve_downstream_scheme`` and legacy code paths.
