@@ -90,13 +90,14 @@ template <class T> static void addGrpcResponseTags(Span& span, const T& headers)
   if (grpc_status_code.has_value() &&
       grpc_status_code != Grpc::Status::WellKnownGrpcStatus::InvalidCode) {
     const auto& status = grpc_status_code.value();
-    if (status == Grpc::Status::WellKnownGrpcStatus::Unknown ||
-        status == Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded ||
-        status == Grpc::Status::WellKnownGrpcStatus::Unimplemented ||
-        status == Grpc::Status::WellKnownGrpcStatus::Internal ||
-        status == Grpc::Status::WellKnownGrpcStatus::Unavailable ||
-        status == Grpc::Status::WellKnownGrpcStatus::DataLoss ||
-        status == Grpc::Status::WellKnownGrpcStatus::Unauthenticated) {
+    if (status != Grpc::Status::WellKnownGrpcStatus::InvalidCode &&
+        (status == Grpc::Status::WellKnownGrpcStatus::Unknown ||
+         status == Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded ||
+         status == Grpc::Status::WellKnownGrpcStatus::Unimplemented ||
+         status == Grpc::Status::WellKnownGrpcStatus::Internal ||
+         status == Grpc::Status::WellKnownGrpcStatus::Unavailable ||
+         status == Grpc::Status::WellKnownGrpcStatus::DataLoss ||
+         status == Grpc::Status::WellKnownGrpcStatus::Unauthenticated)) {
       span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     }
   }
