@@ -337,7 +337,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBuffe
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
 
-TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
+TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBackup) {
   if (upstreamProtocol() == Http::CodecType::HTTP3 &&
       downstreamProtocol() == Http::CodecType::HTTP2) {
     // This test depends on fragile preconditions.
@@ -352,6 +352,19 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRando
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Empty)EOF",
                   downstreamProtocol() == Http::CodecType::HTTP3 ? "-for-quic" : ""));
+
+  manySimultaneousRequests(1024 * 20, 1024 * 20);
+}
+
+TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
+  // random-pause-filter does not support HTTP3.
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    return;
+  }
+  config_helper_.prependFilter(R"EOF(
+  name: random-pause-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty)EOF");
 
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
