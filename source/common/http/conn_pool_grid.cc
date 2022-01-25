@@ -102,7 +102,7 @@ ConnectivityGrid::StreamCreationResult ConnectivityGrid::WrapperCallbacks::newSt
 
 void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
     ConnectionAttemptCallbacks* attempt, RequestEncoder& encoder,
-    Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
+    Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
     absl::optional<Http::Protocol> protocol) {
   ENVOY_LOG(trace, "{} pool successfully connected to host '{}'.", describePool(attempt->pool()),
             host->hostname());
@@ -137,7 +137,7 @@ void ConnectivityGrid::WrapperCallbacks::maybeMarkHttp3Broken() {
 
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolReady(
     RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
-    const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
+    StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
   cancellable_ = nullptr; // Attempt succeeded and can no longer be cancelled.
   parent_.onConnectionAttemptReady(this, encoder, host, info, protocol);
 }
