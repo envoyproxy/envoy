@@ -1579,6 +1579,7 @@ TEST_F(EdsTest, EndpointLocalityNotUpdatedIfFixDisabled) {
     EXPECT_EQ("hello", locality.zone());
     EXPECT_EQ("world", locality.sub_zone());
   }
+  Runtime::LoaderSingleton::clear();
 }
 
 // Validate that onConfigUpdate() does not propagate locality weights to the host set when
