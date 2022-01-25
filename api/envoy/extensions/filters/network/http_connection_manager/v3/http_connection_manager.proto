@@ -337,14 +337,14 @@ message HttpConnectionManager {
     // The name of the proxy as it appears at the start of the Proxy-Status
     // header.
     //
-    // If neither of these values are set, this value defaults to |server_name|,
+    // If neither of these values are set, this value defaults to `server_name`,
     // which itself defaults to "envoy".
     oneof proxy_name {
-      // If |use_node_id| is set, Proxy-Status headers will use the Envoy's node
+      // If `use_node_id` is set, Proxy-Status headers will use the Envoy's node
       // ID as the name of the proxy.
       bool use_node_id = 5;
 
-      // If |literal_proxy_name| is set, Proxy-Status headers will use this
+      // If `literal_proxy_name` is set, Proxy-Status headers will use this
       // value as the name of the proxy.
       string literal_proxy_name = 6;
     }
