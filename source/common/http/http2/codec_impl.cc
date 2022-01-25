@@ -748,6 +748,8 @@ void ConnectionImpl::ServerStreamImpl::resetStream(StreamResetReason reason) {
 }
 
 void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
+  reset_reason_ = reason;
+
   // Higher layers expect calling resetStream() to immediately raise reset callbacks.
   runResetCallbacks(reason);
 
@@ -763,7 +765,6 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   // end the local stream. However, if we're resetting the stream due to
   // overload, we should reset the stream as soon as possible to free used
   // resources.
-  reset_reason_ = reason;
   if (useDeferredReset() && local_end_stream_ && !local_end_stream_sent_ &&
       reason != StreamResetReason::OverloadManager) {
     ASSERT(parent_.getStream(stream_id_) != nullptr);
