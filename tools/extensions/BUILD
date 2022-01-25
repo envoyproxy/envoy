@@ -1,5 +1,4 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 load("//tools/base:envoy_python.bzl", "envoy_py_binary")
 load("@base_pip3//:requirements.bzl", "requirement")
 
@@ -9,15 +8,21 @@ envoy_package()
 
 envoy_py_binary(
     name = "tools.extensions.extensions_check",
+    args = [
+        "--build_config=$(location //source/extensions:extensions_build_config)",
+        "--contrib_build_config=$(location //contrib:contrib_extensions_build_config)",
+        "--core_extensions=$(location //source/extensions:core_extensions)",
+    ],
     data = [
-        "//contrib:contrib_build_config.bzl",
+        "//contrib:contrib_extensions_build_config",
         "//contrib:extensions_metadata.yaml",
+        "//source/extensions:core_extensions",
+        "//source/extensions:extensions_build_config",
         "//source/extensions:extensions_metadata.yaml",
-        "//source/extensions:extensions_build_config.bzl",
         "//test/extensions/filters/network/common/fuzz:uber_per_readfilter.cc",
-    ] + envoy_all_extensions(),
+    ],
     deps = [
-        requirement("envoy.base.checker"),
+        requirement("aio.run.checker"),
         requirement("envoy.base.utils"),
     ],
 )

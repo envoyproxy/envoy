@@ -218,12 +218,18 @@ public:
    *        and the read only returns two bytes, the caller should set
    *        reservation.len_ = 2 and then call `commit(reservation)`.
    * @return whether the Reservation was successfully committed to the Slice.
+   * @note template parameter `SafeCommit` can be used to disable memory range check.
    */
-  bool commit(const Reservation& reservation) {
-    if (static_cast<const uint8_t*>(reservation.mem_) != base_ + reservable_ ||
-        reservable_ + reservation.len_ > capacity_ || reservable_ >= capacity_) {
-      // The reservation is not from this Slice.
-      return false;
+  template <bool SafeCommit = true> bool commit(const Reservation& reservation) {
+    if constexpr (SafeCommit) {
+      if (static_cast<const uint8_t*>(reservation.mem_) != base_ + reservable_ ||
+          reservable_ + reservation.len_ > capacity_ || reservable_ >= capacity_) {
+        // The reservation is not from this Slice.
+        return false;
+      }
+    } else {
+      ASSERT(static_cast<const uint8_t*>(reservation.mem_) == base_ + reservable_ &&
+             reservable_ + reservation.len_ <= capacity_);
     }
     reservable_ += reservation.len_;
     return true;
@@ -681,6 +687,8 @@ public:
   void prepend(absl::string_view data) override;
   void prepend(Instance& data) override;
   void copyOut(size_t start, uint64_t size, void* data) const override;
+  uint64_t copyOutToSlices(uint64_t size, Buffer::RawSlice* slices,
+                           uint64_t num_slice) const override;
   void drain(uint64_t size) override;
   RawSliceVector getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override;
   RawSlice frontSlice() const override;
@@ -736,6 +744,8 @@ public:
   Reservation reserveForReadWithLengthForTest(uint64_t length) {
     return reserveWithMaxLength(length);
   }
+
+  size_t addFragments(absl::Span<const absl::string_view> fragments) override;
 
 protected:
   static constexpr uint64_t default_read_reservation_size_ =

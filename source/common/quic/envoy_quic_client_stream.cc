@@ -166,12 +166,6 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   const uint64_t status = optional_status.value();
   if (Http::CodeUtility::is1xx(status)) {
-    if (status == enumToInt(Http::Code::SwitchingProtocols)) {
-      // HTTP3 doesn't support the HTTP Upgrade mechanism or 101 (Switching Protocols) status code.
-      Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
-      return;
-    }
-
     // These are Informational 1xx headers, not the actual response headers.
     set_headers_decompressed(false);
   }
