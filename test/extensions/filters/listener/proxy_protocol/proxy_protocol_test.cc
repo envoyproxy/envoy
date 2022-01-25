@@ -62,7 +62,7 @@ public:
         init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
     EXPECT_CALL(socket_factory_, localAddress())
-        .WillOnce(ReturnRef(socket_->connectionInfoProvider().localAddress()));
+        .WillRepeatedly(ReturnRef(socket_->connectionInfoProvider().localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket(_)).WillOnce(Return(socket_));
     connection_handler_->addListener(absl::nullopt, *this);
     conn_ = dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
@@ -1428,7 +1428,7 @@ public:
         init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
     EXPECT_CALL(socket_factory_, localAddress())
-        .WillOnce(ReturnRef(socket_->connectionInfoProvider().localAddress()));
+        .WillRepeatedly(ReturnRef(socket_->connectionInfoProvider().localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket(_)).WillOnce(Return(socket_));
     connection_handler_->addListener(absl::nullopt, *this);
     conn_ = dispatcher_->createClientConnection(local_dst_address_,
@@ -1617,17 +1617,6 @@ TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
 
   // Make sure we actually create the correct type!
   EXPECT_NE(dynamic_cast<ProxyProtocol::Filter*>(added_filter.get()), nullptr);
-}
-
-// Test that the deprecated extension name is disabled by default.
-// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
-TEST(ProxyProtocolConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.listener.proxy_protocol";
-
-  ASSERT_EQ(
-      nullptr,
-      Registry::FactoryRegistry<
-          Server::Configuration::NamedListenerFilterConfigFactory>::getFactory(deprecated_name));
 }
 
 } // namespace

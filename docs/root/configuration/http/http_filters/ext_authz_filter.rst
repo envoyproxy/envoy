@@ -195,3 +195,7 @@ Runtime
 The fraction of requests for which the filter is enabled can be configured via the :ref:`runtime_key
 <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` value of the :ref:`filter_enabled
 <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.filter_enabled>` field.
+
+Tracing
+-------
+The ext_authz span keeps the sampling status of the parent span, i.e. in the tracing backend we will either see both the parent span and the child ext_authz span, or none of them.

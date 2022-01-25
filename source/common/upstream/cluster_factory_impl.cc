@@ -37,6 +37,7 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
 
   if (!cluster.has_cluster_type()) {
     switch (cluster.type()) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::config::cluster::v3::Cluster::STATIC:
       cluster_type = "envoy.cluster.static";
       break;
@@ -52,8 +53,6 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
     case envoy::config::cluster::v3::Cluster::EDS:
       cluster_type = "envoy.cluster.eds";
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   } else {
     cluster_type = cluster.cluster_type().name();

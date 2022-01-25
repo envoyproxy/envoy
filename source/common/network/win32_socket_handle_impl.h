@@ -50,12 +50,11 @@ public:
 private:
   void reEnableEventBasedOnIOResult(const Api::IoCallUint64Result& result, uint32_t event);
 
-  // on Windows we use the MSG_PEEK of recv instead of peeking the socket
+  // On Windows we use the MSG_PEEK on recv instead of peeking the socket
   // we drain the socket to memory. Subsequent read calls need to read
   // first from the class buffer and then go to the underlying socket.
-
   // Implement the peek logic of recv for readability purposes
-  Api::IoCallUint64Result peek(void* buffer, size_t length);
+  Api::IoCallUint64Result emulatePeek(void* buffer, size_t length);
 
   /**
    * Drain the socket into `peek_buffer_`.

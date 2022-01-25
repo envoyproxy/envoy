@@ -5,6 +5,8 @@ load("//bazel:utils.bzl", "json_data")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
+load("@envoy_api//bazel:repository_locations.bzl", API_REPOSITORY_LOCATIONS_SPEC = "REPOSITORY_LOCATIONS_SPEC")
+load("@envoy_api//bazel:repository_locations_utils.bzl", "load_repository_locations_spec", "merge_dicts")
 
 licenses(["notice"])  # Apache 2
 
@@ -424,7 +426,7 @@ config_setting(
 )
 
 config_setting(
-    name = "wasm_none",
+    name = "wasm_disabled",
     values = {"define": "wasm=disabled"},
 )
 
@@ -589,6 +591,30 @@ selects.config_setting_group(
     ],
 )
 
+selects.config_setting_group(
+    name = "not_x86",
+    match_any = [
+        ":darwin_arm64",
+        ":ios_arm64",
+        ":ios_arm64e",
+        ":ios_armv7",
+        ":ios_armv7s",
+        ":ios_i386",
+        ":linux_aarch64",
+        ":linux_mips64",
+        ":linux_ppc",
+        ":linux_s390x",
+    ],
+)
+
+selects.config_setting_group(
+    name = "not_x86_or_wasm_disabled",
+    match_any = [
+        ":not_x86",
+        ":wasm_disabled",
+    ],
+)
+
 alias(
     name = "remote_jdk11",
     actual = "@bazel_tools//tools/jdk:remote_jdk11",
@@ -601,5 +627,13 @@ alias(
 
 json_data(
     name = "repository_locations",
-    data = REPOSITORY_LOCATIONS_SPEC,
+    data = load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
+)
+
+json_data(
+    name = "all_repository_locations",
+    data = merge_dicts(
+        load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
+        load_repository_locations_spec(API_REPOSITORY_LOCATIONS_SPEC),
+    ),
 )

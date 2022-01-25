@@ -391,6 +391,7 @@ The following command operators are supported:
     * **UPE**: The upstream response had an HTTP protocol error.
     * **UMSDR**: The upstream request reached max stream duration.
     * **OM**: Overload Manager terminated the request.
+    * **DF**: The request was terminated due to DNS resolution failure.
 
 %ROUTE_NAME%
   Name of the route.
@@ -406,8 +407,7 @@ The following command operators are supported:
   Upstream host URL (e.g., tcp://ip:port for TCP connections).
 
 %UPSTREAM_CLUSTER%
-  Upstream cluster to which the upstream host belongs to. If runtime feature
-  ``envoy.reloadable_features.use_observable_cluster_name`` is enabled, then :ref:`alt_stat_name
+  Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
   <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` will be used if provided.
 
 %UPSTREAM_LOCAL_ADDRESS%
