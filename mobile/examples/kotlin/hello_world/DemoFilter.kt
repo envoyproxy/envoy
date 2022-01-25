@@ -43,17 +43,16 @@ class DemoFilter : ResponseFilter {
 
   override fun onError(
     error: EnvoyError,
-    streamIntel: StreamIntel,
     finalStreamIntel: FinalStreamIntel
   ) {
     Log.d("DemoFilter", "On error!")
   }
 
-  override fun onCancel(streamIntel: StreamIntel, finalStreamIntel: FinalStreamIntel) {
+  override fun onCancel(finalStreamIntel: FinalStreamIntel) {
     Log.d("DemoFilter", "On cancel!")
   }
 
   @Suppress("EmptyFunctionBlock")
-  override fun onComplete(streamIntel: StreamIntel, finalStreamIntel: FinalStreamIntel) {
+  override fun onComplete(finalStreamIntel: FinalStreamIntel) {
   }
 }

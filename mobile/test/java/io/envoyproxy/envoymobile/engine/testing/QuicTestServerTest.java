@@ -157,17 +157,17 @@ public class QuicTestServerTest {
                           response.get().setTrailers(trailers);
                           return null;
                         })
-                        .setOnError((error, ignored1, ignored2) -> {
+                        .setOnError((error, ignored) -> {
                           response.get().setEnvoyError(error);
                           latch.countDown();
                           return null;
                         })
-                        .setOnCancel((ignored1, ignored2) -> {
+                        .setOnCancel((ignored) -> {
                           response.get().setCancelled();
                           latch.countDown();
                           return null;
                         })
-                        .setOnComplete((ignored1, ignored2) -> {
+                        .setOnComplete((ignored) -> {
                           latch.countDown();
                           return null;
                         })

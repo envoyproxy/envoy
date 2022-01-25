@@ -93,7 +93,7 @@ class SendDataTest {
         responseHeadersEndStream = endStream
         expectation.countDown()
       }
-      .setOnError { _, _, _ ->
+      .setOnError { _, _ ->
         fail("Unexpected error")
       }
       .start()
