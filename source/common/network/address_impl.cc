@@ -117,18 +117,6 @@ addressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len, os_fd_t f
   return *address;
 }
 
-absl::string_view addressType(const Network::Address::InstanceConstSharedPtr& addr) {
-  ASSERT(addr != nullptr);
-  switch (addr->type()) {
-  case Network::Address::Type::Ip:
-  case Network::Address::Type::Pipe:
-    return "default";
-  case Network::Address::Type::EnvoyInternal:
-    return "EnvoyInternal";
-  }
-  NOT_REACHED_GCOVR_EXCL_LINE;
-};
-
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address, const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
   throwOnError(validateProtocolSupported());

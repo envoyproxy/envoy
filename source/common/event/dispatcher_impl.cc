@@ -153,7 +153,7 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
   ASSERT(isThreadSafe());
 
   auto* factory = Config::Utility::getFactoryByName<Network::ClientConnectionFactory>(
-      std::string(Network::Address::addressType(address)));
+      std::string(address->addressType()));
   // The target address is usually offered by EDS and the EDS api should reject the unsupported
   // address.
   // TODO(lambdai): Return a closed connection if the factory is not found. Note that the caller

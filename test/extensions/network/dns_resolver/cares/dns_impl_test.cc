@@ -573,6 +573,8 @@ public:
   }
   const sockaddr* sockAddr() const override { return instance_.sockAddr(); }
   socklen_t sockAddrLen() const override { return instance_.sockAddrLen(); }
+  absl::string_view addressType() const override { PANIC("not implemented"); }
+
   Address::Type type() const override { return instance_.type(); }
   const SocketInterface& socketInterface() const override {
     return SocketInterfaceSingleton::get();

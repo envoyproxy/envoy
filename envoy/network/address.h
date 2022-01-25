@@ -202,6 +202,12 @@ public:
   virtual Type type() const PURE;
 
   /**
+   * Return the address type in string_view. The returned type name is used to find the
+   * ClientConnectionFactory.
+   */
+  virtual absl::string_view addressType() const PURE;
+
+  /**
    * @return SocketInterface to be used with the address.
    */
   virtual const Network::SocketInterface& socketInterface() const PURE;
