@@ -379,7 +379,7 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
   // Activate the buffered onStreamClose if we've drained all the buffered data,
   // or we've gotten a reset.
   if (stream_manager_.buffered_on_stream_close_ &&
-      (!stream_manager_.has_buffered_data() || reset_reason_.has_value())) {
+      (!stream_manager_.hasBufferedData() || reset_reason_.has_value())) {
     ENVOY_CONN_LOG(debug, "invoking  onStreamClose for stream: {} via processBufferedData",
                    parent_.connection_, stream_id_);
     // We only buffer the onStreamClose if we had no errors.
@@ -1372,7 +1372,7 @@ int ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
     ENVOY_CONN_LOG(debug, "stream {} closed: {}", connection_, stream_id, error_code);
 
     if (const bool saw_remote_end_stream =
-            (stream->remote_end_stream_ || stream->stream_manager_.remote_end_stream_buffered());
+            (stream->remote_end_stream_ || stream->stream_manager_.remoteEndStreamBuffered());
         !saw_remote_end_stream || !stream->local_end_stream_) {
       ENVOY_CONN_LOG(debug, "Claiming reset reason !remote_end_stream:{} !local_end_stream_{}",
                      connection_, !saw_remote_end_stream, !stream->local_end_stream_);
@@ -1404,7 +1404,7 @@ int ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
       }
 
       stream->runResetCallbacks(reason);
-    } else if (!stream->reset_reason_.has_value() && stream->stream_manager_.has_buffered_data()) {
+    } else if (!stream->reset_reason_.has_value() && stream->stream_manager_.hasBufferedData()) {
       ASSERT(error_code == NGHTTP2_NO_ERROR);
       ENVOY_CONN_LOG(debug, "buffered onStreamClose for stream: {}", connection_, stream_id);
       // Buffer the call, rely on the stream->process_buffered_data_callback_
