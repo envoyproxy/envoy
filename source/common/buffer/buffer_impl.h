@@ -36,7 +36,11 @@ class Slice {
 public:
   using Reservation = RawSlice;
   using StoragePtr = std::unique_ptr<uint8_t[]>;
-  using SizedStorage = std::pair<uint64_t, StoragePtr>;
+
+  struct SizedStorage {
+    uint64_t len_{};
+    StoragePtr mem_{};
+  };
 
   /**
    * Create an empty Slice with 0 capacity.
@@ -61,7 +65,7 @@ public:
    * @param account the account to charge.
    */
   Slice(SizedStorage storage, uint64_t size, const BufferMemoryAccountSharedPtr& account)
-      : capacity_(storage.first), storage_(std::move(storage.second)), base_(storage_.get()),
+      : capacity_(storage.len_), storage_(std::move(storage.mem_)), base_(storage_.get()),
         reservable_(size) {
     ASSERT(reservable_ <= capacity_);
 
@@ -370,12 +374,12 @@ public:
     SizedStorage storage{capacity, nullptr};
 
     if (capacity == default_slice_size_ && !free_list_.empty()) {
-      storage.second = std::move(free_list_.back());
-      ASSERT(storage.second != nullptr);
+      storage.mem_ = std::move(free_list_.back());
+      ASSERT(storage.mem_ != nullptr);
       ASSERT(free_list_.back() == nullptr);
       free_list_.pop_back();
     } else {
-      storage.second.reset(new uint8_t[capacity]);
+      storage.mem_.reset(new uint8_t[capacity]);
     }
 
     return storage;
@@ -386,13 +390,13 @@ public:
    * @param storage backend storage to free.
    */
   static inline void freeStorage(SizedStorage storage) {
-    if (storage.second == nullptr) {
+    if (storage.mem_ == nullptr) {
       return;
     }
 
-    if (storage.first == default_slice_size_) {
+    if (storage.len_ == default_slice_size_) {
       if (free_list_.size() < free_list_max_) {
-        free_list_.emplace_back(storage.second.release());
+        free_list_.emplace_back(storage.mem_.release());
         return;
       }
     }
