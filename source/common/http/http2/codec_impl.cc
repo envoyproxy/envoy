@@ -377,8 +377,7 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
   }
 
   // Activate the buffered onStreamClose if we've drained all the buffered data,
-  // or we've gotten a reset. Getting a reset doesn't guarantee onStreamClose is
-  // called.
+  // or we've gotten a reset.
   if (stream_manager_.buffered_on_stream_close_ &&
       (!stream_manager_.has_buffered_data() || reset_reason_.has_value())) {
     ENVOY_CONN_LOG(debug, "invoking  onStreamClose for stream: {} via processBufferedData",
@@ -466,6 +465,9 @@ void ConnectionImpl::StreamImpl::decodeData() {
     decoder().decodeData(*pending_recv_data_, send_end_stream);
   }
 
+  // TODO(kbaichoo): If dumping buffered data, we should do so in default read
+  // size chunks rather than dumping the entire buffer, which can have fairness
+  // issues.
   pending_recv_data_->drain(pending_recv_data_->length());
 }
 
@@ -754,9 +756,11 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   runResetCallbacks(reason);
 
   // If we've bufferedOnStreamClose for this stream, we shouldn't propagate this
-  // reset as nghttp2 will have forgotten about the stream...
-  // Either this, or change how getStream() works to include buffered streams.
+  // reset as nghttp2 will have forgotten about the stream.
   if (stream_manager_.buffered_on_stream_close_) {
+    ENVOY_CONN_LOG(
+        trace, "Stopped propagating reset to nghttp2 as we've buffered onStreamClose for stream {}",
+        parent_.connection_, stream_id_);
     return;
   }
 

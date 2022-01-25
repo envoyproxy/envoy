@@ -341,9 +341,8 @@ protected:
     std::unique_ptr<NewMetadataEncoder> metadata_encoder_;
     std::unique_ptr<MetadataEncoder> metadata_encoder_old_;
     absl::optional<StreamResetReason> deferred_reset_;
-    // Just here for now to hold the reset reason if we
-    // ended up getting reset in any form. Useful for comm in buffered data case
-    // e.g. to bail out because we're now reset..
+    // Holds the reset reason for this stream. Useful if we have buffered data
+    // to determine whether we should continue processing that data.
     absl::optional<StreamResetReason> reset_reason_;
     HeaderString cookies_;
     bool local_end_stream_sent_ : 1;
@@ -630,7 +629,7 @@ private:
   // Pass through invoking with the actual stream.
   int onStreamClose(int32_t stream_id, uint32_t error_code);
   // Should be invoked directly in buffered onStreamClose scenarios
-  // nghttp2, etc. might have already forgotten about the stream.
+  // where nghttp2 might have already forgotten about the stream.
   int onStreamClose(StreamImpl* stream, uint32_t error_code);
   int onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len);
   int onMetadataFrameComplete(int32_t stream_id, bool end_metadata);
