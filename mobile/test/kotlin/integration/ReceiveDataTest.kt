@@ -94,7 +94,7 @@ class ReceiveDataTest {
         body = data
         dataExpectation.countDown()
       }
-      .setOnError { _, _, _ -> fail("Unexpected error") }
+      .setOnError { _, _ -> fail("Unexpected error") }
       .start()
       .sendHeaders(requestHeaders, true)
 

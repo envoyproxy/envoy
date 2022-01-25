@@ -302,12 +302,12 @@ public class AndroidEnvoyFlowTest {
                           latch.countDown();
                           return null;
                         })
-                        .setOnError((error, ignored, also_ignored) -> {
+                        .setOnError((error, ignored) -> {
                           response.get().setEnvoyError(error);
                           latch.countDown();
                           return null;
                         })
-                        .setOnCancel((ignored, also_ignored) -> {
+                        .setOnCancel((ignored) -> {
                           response.get().setCancelled();
                           latch.countDown();
                           return null;

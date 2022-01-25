@@ -109,10 +109,10 @@ class CancelStreamTest {
       return FilterTrailersStatus.Continue(trailers)
     }
 
-    override fun onError(error: EnvoyError, streamIntel: StreamIntel, finalStreamIntel: FinalStreamIntel) {}
-    override fun onComplete(streamIntel: StreamIntel, finalStreamIntel: FinalStreamIntel) {}
+    override fun onError(error: EnvoyError, finalStreamIntel: FinalStreamIntel) {}
+    override fun onComplete(finalStreamIntel: FinalStreamIntel) {}
 
-    override fun onCancel(streamIntel: StreamIntel, finalStreamIntel: FinalStreamIntel) {
+    override fun onCancel(finalStreamIntel: FinalStreamIntel) {
       latch.countDown()
     }
   }
@@ -139,7 +139,7 @@ class CancelStreamTest {
       .build()
 
     client.newStreamPrototype()
-      .setOnCancel { _, _ ->
+      .setOnCancel { _ ->
         runExpectation.countDown()
       }
       .start(Executors.newSingleThreadExecutor())

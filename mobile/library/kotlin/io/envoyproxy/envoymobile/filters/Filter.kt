@@ -102,19 +102,19 @@ internal class EnvoyHTTPFilterAdapter(
 
   override fun onError(errorCode: Int, message: String, attemptCount: Int, streamIntel: EnvoyStreamIntel, finalStreamIntel: EnvoyFinalStreamIntel) {
     (filter as? ResponseFilter)?.let { responseFilter ->
-      responseFilter.onError(EnvoyError(errorCode, message, attemptCount), StreamIntel(streamIntel), FinalStreamIntel(finalStreamIntel))
+      responseFilter.onError(EnvoyError(errorCode, message, attemptCount), FinalStreamIntel(streamIntel, finalStreamIntel))
     }
   }
 
   override fun onCancel(streamIntel: EnvoyStreamIntel, finalStreamIntel: EnvoyFinalStreamIntel) {
     (filter as? ResponseFilter)?.let { responseFilter ->
-      responseFilter.onCancel(StreamIntel(streamIntel), FinalStreamIntel(finalStreamIntel))
+      responseFilter.onCancel(FinalStreamIntel(streamIntel, finalStreamIntel))
     }
   }
 
   override fun onComplete(streamIntel: EnvoyStreamIntel, finalStreamIntel: EnvoyFinalStreamIntel) {
     (filter as? ResponseFilter)?.let { responseFilter ->
-      responseFilter.onComplete(StreamIntel(streamIntel), FinalStreamIntel(finalStreamIntel))
+      responseFilter.onComplete(FinalStreamIntel(streamIntel, finalStreamIntel))
     }
   }
 

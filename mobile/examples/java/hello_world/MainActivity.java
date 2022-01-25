@@ -125,7 +125,7 @@ public class MainActivity extends Activity {
           }
           return Unit.INSTANCE;
         })
-        .setOnError((error, ignored, also_ignored) -> {
+        .setOnError((error, ignored) -> {
           String message = "failed with error after " + error.getAttemptCount() +
                            " attempts: " + error.getMessage();
           Log.d("MainActivity", message);

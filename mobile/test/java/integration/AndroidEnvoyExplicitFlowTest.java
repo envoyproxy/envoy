@@ -500,22 +500,22 @@ public class AndroidEnvoyExplicitFlowTest {
               response.get().addStreamIntel(streamIntel);
               return null;
             })
-            .setOnError((error, streamIntel, finalStreamIntel) -> {
+            .setOnError((error, finalStreamIntel) -> {
               response.get().setEnvoyError(error);
-              response.get().addStreamIntel(streamIntel);
+              response.get().addStreamIntel(finalStreamIntel);
               response.get().setFinalStreamIntel(finalStreamIntel);
               latch.countDown();
               return null;
             })
-            .setOnCancel((streamIntel, finalStreamIntel) -> {
+            .setOnCancel((finalStreamIntel) -> {
               response.get().setCancelled();
-              response.get().addStreamIntel(streamIntel);
+              response.get().addStreamIntel(finalStreamIntel);
               response.get().setFinalStreamIntel(finalStreamIntel);
               latch.countDown();
               return null;
             })
-            .setOnComplete((streamIntel, finalStreamIntel) -> {
-              response.get().addStreamIntel(streamIntel);
+            .setOnComplete((finalStreamIntel) -> {
+              response.get().addStreamIntel(finalStreamIntel);
               response.get().setFinalStreamIntel(finalStreamIntel);
               latch.countDown();
               return null;

@@ -132,13 +132,13 @@ class CancelStreamTest {
       return FilterTrailersStatus.StopIteration()
     }
 
-    override fun onError(error: EnvoyError, streamIntel: StreamIntel, finalStreamIntel: FinalStreamIntel) {
+    override fun onError(error: EnvoyError, finalStreamIntel: FinalStreamIntel) {
       assertThat(error.errorCode).isEqualTo(4)
       latch.countDown()
     }
-    override fun onComplete(streamIntel: StreamIntel, finalStreamIntel: FinalStreamIntel) {}
+    override fun onComplete(finalStreamIntel: FinalStreamIntel) {}
 
-    override fun onCancel(streamIntel: StreamIntel, finalStreamIntel: FinalStreamIntel) {
+    override fun onCancel(finalStreamIntel: FinalStreamIntel) {
       fail<CancelStreamTest>("Unexpected call to onCancel filter callback")
     }
   }
@@ -165,7 +165,7 @@ class CancelStreamTest {
       .build()
 
     client.newStreamPrototype()
-      .setOnError { error, _, _ ->
+      .setOnError { error, _ ->
         assertThat(error.errorCode).isEqualTo(4)
         callbackExpectation.countDown()
       }
