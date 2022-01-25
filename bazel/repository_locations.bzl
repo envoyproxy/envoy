@@ -826,7 +826,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # NOTE: Update together with v8 and com_googlesource_chromium_base_trace_event_common.
         version = "fc5cfd78a357d5bb7735a58f383634faaafe706a",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
-        sha256 = "1c56a2f4dd7585b03b5debc3bd453ae225bcf48966c1fc440352f1268214a5a1",
+        sha256 = "695c73750cf6472fc6c926e43952262206f1475157377364142bdbb84a1a5a83",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/chromium-zlib-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
