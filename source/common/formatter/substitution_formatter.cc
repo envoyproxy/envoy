@@ -1412,8 +1412,7 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
   }
 
   std::string str;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unquote_log_string_values") &&
-      value.kind_case() == ProtobufWkt::Value::kStringValue) {
+  if (value.kind_case() == ProtobufWkt::Value::kStringValue) {
     str = value.string_value();
   } else {
     str = MessageUtil::getJsonStringFromMessageOrDie(value, false, true);
