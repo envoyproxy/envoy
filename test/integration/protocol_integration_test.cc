@@ -819,8 +819,7 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   const size_t quic_https_extra_bytes = (downstreamProtocol() == Http::CodecType::HTTP3 ? 2u : 0u);
   expectUpstreamBytesSentAndReceived(
       BytesCountExpectation(2550 + quic_https_extra_bytes, 635, 414 + quic_https_extra_bytes, 54),
-      BytesCountExpectation(2262, 548, 184, 27),
-      BytesCountExpectation(2204, 520, 150, 6));
+      BytesCountExpectation(2262, 548, 184, 27), BytesCountExpectation(2204, 520, 150, 6));
 }
 
 TEST_P(ProtocolIntegrationTest, RetryStreaming) {
@@ -3389,7 +3388,6 @@ TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountUpstream) {
   expectUpstreamBytesSentAndReceived(BytesCountExpectation(248, 120, 196, 67),
                                      BytesCountExpectation(172, 81, 154, 52),
                                      BytesCountExpectation(154, 33, 142, 7));
-
 }
 
 TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountDownstream) {
@@ -3437,7 +3435,6 @@ TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireByt
   expectDownstreamBytesSentAndReceived(BytesCountExpectation(0, 71, 0, 38),
                                        BytesCountExpectation(0, 28, 0, 28),
                                        BytesCountExpectation(0, 8, 0, 6));
-
 }
 
 TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeRequestCompleteWireBytesCountUpstream) {

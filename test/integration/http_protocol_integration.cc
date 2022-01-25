@@ -72,7 +72,8 @@ std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
 }
 
 void HttpProtocolIntegrationTest::expectUpstreamBytesSentAndReceived(
-    BytesCountExpectation h1_expectation, BytesCountExpectation h2_expectation, BytesCountExpectation h3_expectation, const int id) {
+    BytesCountExpectation h1_expectation, BytesCountExpectation h2_expectation,
+    BytesCountExpectation h3_expectation, const int id) {
   auto integer_near = [](int x, int y) -> bool { return std::abs(x - y) <= (x / 20); };
   std::string access_log = waitForAccessLog(access_log_name_, id);
   std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');
@@ -106,7 +107,7 @@ void HttpProtocolIntegrationTest::expectUpstreamBytesSentAndReceived(
         << ", actual: " << header_bytes_received;
     return;
   }
-    case Http::CodecType::HTTP3: {
+  case Http::CodecType::HTTP3: {
     // Because of non-deterministic h2 compression, the same plain text length don't map to the
     // Same number of wire bytes.
     EXPECT_TRUE(integer_near(h3_expectation.wire_bytes_sent_, wire_bytes_sent))
@@ -127,7 +128,8 @@ void HttpProtocolIntegrationTest::expectUpstreamBytesSentAndReceived(
 }
 
 void HttpProtocolIntegrationTest::expectDownstreamBytesSentAndReceived(
-    BytesCountExpectation h1_expectation, BytesCountExpectation h2_expectation, BytesCountExpectation h3_expectation, const int id) {
+    BytesCountExpectation h1_expectation, BytesCountExpectation h2_expectation,
+    BytesCountExpectation h3_expectation, const int id) {
   auto integer_near = [](int x, int y) -> bool { return std::abs(x - y) <= (x / 5); };
   std::string access_log = waitForAccessLog(access_log_name_, id);
   std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');

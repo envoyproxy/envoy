@@ -77,13 +77,11 @@ protected:
 
   void expectUpstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
                                           BytesCountExpectation h2_expectation,
-                                          BytesCountExpectation h3_expectation,
-                                          const int id = 0);
+                                          BytesCountExpectation h3_expectation, const int id = 0);
 
   void expectDownstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
                                             BytesCountExpectation h2_expectation,
-                                            BytesCountExpectation h3_expectation,
-                                            const int id = 0);
+                                            BytesCountExpectation h3_expectation, const int id = 0);
 };
 
 } // namespace Envoy
