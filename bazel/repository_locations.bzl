@@ -829,13 +829,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
         # NOTE: Update together with com_googlesource_chromium_base_trace_event_common and com_googlesource_chromium_zlib.
-        version = "9.9.80",
+        version = "9.9.115.3",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
-        sha256 = "5d3d2678cfb27bcadadebcdace3ffe8aaff354e290204ad821fb3f71a92fa8c9",
+        sha256 = "7f4164bfb5e0a80ee807e3f28e9e43c8b1537480a5ff53924ebbb03888f2e5a2",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/v8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-01-11",
+        release_date = "2022-01-24",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_chromium_base_trace_event_common = dict(
@@ -857,13 +857,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Chromium’s fork of zlib with compression utils",
         project_url = "https://chromium.googlesource.com/chromium/src/third_party/zlib/",
         # NOTE: Update together with v8 and com_googlesource_chromium_base_trace_event_common.
-        version = "efd9399ae01364926be2a38946127fdf463480db",
+        version = "fc5cfd78a357d5bb7735a58f383634faaafe706a",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
-        sha256 = "bbe9b4b8f7e06060933d56931da9cb71a16bba937d6457e2a711baef6e536a1e",
+        sha256 = "1c56a2f4dd7585b03b5debc3bd453ae225bcf48966c1fc440352f1268214a5a1",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/chromium-zlib-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2021-12-02",
+        release_date = "2022-01-12",
         cpe = "N/A",
     ),
     com_github_google_quiche = dict(
