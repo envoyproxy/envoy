@@ -757,6 +757,8 @@ interpretable
 intra
 ints
 invariance
+iov
+iovcnt
 iovec
 iovecs
 ips
