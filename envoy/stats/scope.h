@@ -6,6 +6,10 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
+#define SCOPE_REFCOUNT 1
+#if SCOPE_REFCOUNT
+#include "envoy/stats/refcount_ptr.h"
+#endif
 #include "envoy/stats/symbol_table.h"
 #include "envoy/stats/tag.h"
 
@@ -25,8 +29,14 @@ using CounterOptConstRef = absl::optional<std::reference_wrapper<const Counter>>
 using GaugeOptConstRef = absl::optional<std::reference_wrapper<const Gauge>>;
 using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogram>>;
 using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextReadout>>;
-using ScopePtr = std::unique_ptr<Scope>;
+#if SCOPE_REFCOUNT
+using ConstScopeSharedPtr = RefcountPtr<const Scope>;
+using ScopeSharedPtr = RefcountPtr<Scope>;
+#else
+using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
+#endif
+using ScopePtr = ScopeSharedPtr; // TODO(jmarantz): global s/ShaedPtr/ScopeSharedPtr/ & remove alias
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
 
@@ -34,7 +44,13 @@ template <class StatType> using IterateFn = std::function<bool(const RefcountPtr
  * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
  * (for example to free/delete all of them).
  */
-class Scope {
+class Scope : public
+#if SCOPE_REFCOUNT
+    RefcountInterface
+#else
+    std::enable_shared_from_this<Scope>
+#endif
+{
 public:
   virtual ~Scope() = default;
 

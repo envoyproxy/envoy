@@ -228,6 +228,7 @@ SymbolTableImpl::~SymbolTableImpl() {
   // Note: this could potentially be short-circuited if we decide a fast exit
   // is needed in production. But it would be good to ensure clean up during
   // tests.
+  debugPrint();
   ASSERT(numSymbols() == 0);
 }
 
@@ -470,7 +471,7 @@ void SymbolTableImpl::debugPrint() const {
   for (Symbol symbol : symbols) {
     const InlineString& token = *decode_map_.find(symbol)->second;
     const SharedSymbol& shared_symbol = encode_map_.find(token.toStringView())->second;
-    ENVOY_LOG_MISC(info, "{}: '{}' ({})", symbol, token.toStringView(), shared_symbol.ref_count_);
+    ENVOY_LOG_MISC(error, "{}: '{}' ({})", symbol, token.toStringView(), shared_symbol.ref_count_);
   }
 }
 #endif

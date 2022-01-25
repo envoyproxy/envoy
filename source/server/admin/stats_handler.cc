@@ -86,28 +86,29 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   }
 
   const absl::optional<std::string> format_value = Utility::formatParam(params);
-  if (format_value.has_value() && format_value.value() == "prometheus") {
-    return handlerPrometheusStats(url, response_headers, response, admin_stream);
+  bool json = false;
+  if (format_value.has_value()) {
+    if (format_value.value() == "prometheus") {
+      return handlerPrometheusStats(url, response_headers, response, admin_stream);
+    }
+    if (format_value.value() == "json") {
+      json = true;
+    } else {
+      response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
+      response.add("\n");
+      return Http::Code::BadRequest;
+    }
   }
 
   auto iter = context_map_.find(&admin_stream);
   if (iter == context_map_.end()) {
     auto insertion = context_map_.emplace(&admin_stream, std::make_unique<Context>(
-        server_, used_only, regex, format_value));
+        server_, used_only, regex, json, response_headers, response));
     iter = insertion.first;
   }
   Context& context = *iter->second;
 
-  Http::Code code = Http::Code::NotFound;
-  if (!format_value.has_value()) {
-    // Display plain stats if format query param is not there.
-    code = context.statsAsText(response_headers, response);
-  } else if (format_value.value() == "json") {
-    code = context.statsAsJson(response_headers, response, params.find("pretty") != params.end());
-  } else {
-    response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
-    response.add("\n");
-  }
+  Http::Code code = context.writeChunk(response);
   if (code != Http::Code::Continue) {
     context_map_.erase(iter);
   }
@@ -115,10 +116,213 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   return code;
 }
 
+class StatsHandler::Render {
+public:
+  virtual ~Render() = default;
+  virtual void generate(const std::string& name, uint64_t value) PURE;
+  virtual void generate(const std::string& name, const std::string& value) PURE;
+  virtual void generate(const std::string& name,
+                        const Stats::ParentHistogramSharedPtr& histogram) PURE;
+  virtual void render() PURE;
+};
+
+Http::Code StatsHandler::Context::writeChunk(Buffer::Instance& response) {
+  for (uint32_t start = response.length();
+       stats_and_scopes_index_ < stats_and_scopes_.size() && (response.length() - start) < chunk_size_;
+       ++stats_and_scopes_index_) {
+    const StatOrScope& stat_or_scope = stats_and_scopes_[stats_and_scopes_index_];
+    switch (stat_or_scope.index()) {
+      case 0:
+        //renderScope(absl::get<Stats::ScopeSharedPtr>(stat_or_scope));
+        break;
+      case 1: {
+        auto text_readout = absl::get<Stats::TextReadoutSharedPtr>(stat_or_scope);
+        render_->generate(text_readout->name(), text_readout->value());
+        break;
+      }
+      case 2: {
+        auto counter = absl::get<Stats::CounterSharedPtr>(stat_or_scope);
+        render_->generate(counter->name(), counter->value());
+        break;
+      }
+      case 3: {
+        auto gauge = absl::get<Stats::GaugeSharedPtr>(stat_or_scope);
+        render_->generate(gauge->name(), gauge->value());
+        break;
+      }
+      case 4: {
+        auto histogram = absl::get<Stats::ParentHistogramSharedPtr>(stat_or_scope);
+        render_->generate(histogram->name(), histogram);
+      }
+    }
+  }
+
+  if (stats_and_scopes_index_ < stats_and_scopes_.size()) {
+    return Http::Code::Continue;
+  }
+  return Http::Code::OK;
+
+}
+
+class StatsHandler::TextRender : public StatsHandler::Render {
+public:
+  TextRender(Buffer::Instance& response) : response_(response) {}
+
+  void generate(const std::string& name, uint64_t value) override {
+    response_.addFragments({name, ": ", absl::StrCat(value), "\n"});
+  }
+
+  void generate(const std::string& name, const std::string& value) override {
+    response_.addFragments({name, ": \"", Html::Utility::sanitize(value), "\"\n"});
+  }
+
+  void generate(const std::string& name,
+                const Stats::ParentHistogramSharedPtr& histogram) override {
+    response_.addFragments({name, ": ", histogram->quantileSummary(), "\n"});
+  }
+
+  void render() override {}
+
+protected:
+  Buffer::Instance& response_;
+};
+
+class StatsHandler::JsonRender : public StatsHandler::Render {
+public:
+  JsonRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response)
+      : response_(response) {
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+  }
+
+  void generate(const std::string& name, uint64_t value) override {
+    add(name, ValueUtil::numberValue(value));
+  }
+  void generate(const std::string& name, const std::string& value) override {
+    add(name, ValueUtil::stringValue(value));
+  }
+  void generate(const std::string& name,
+                const Stats::ParentHistogramSharedPtr& histogram) override {
+    if (!found_used_histogram_) {
+      auto* histograms_obj_fields = histograms_obj_.mutable_fields();
+
+      // It is not possible for the supported quantiles to differ across histograms, so it is ok
+      // to send them once.
+      Stats::HistogramStatisticsImpl empty_statistics;
+      std::vector<ProtobufWkt::Value> supported_quantile_array;
+      for (double quantile : empty_statistics.supportedQuantiles()) {
+        supported_quantile_array.push_back(ValueUtil::numberValue(quantile * 100));
+      }
+      (*histograms_obj_fields)["supported_quantiles"] =
+          ValueUtil::listValue(supported_quantile_array);
+      found_used_histogram_ = true;
+    }
+
+    ProtobufWkt::Struct computed_quantile;
+    auto* computed_quantile_fields = computed_quantile.mutable_fields();
+    (*computed_quantile_fields)["name"] = ValueUtil::stringValue(name);
+
+    std::vector<ProtobufWkt::Value> computed_quantile_value_array;
+    for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
+      ProtobufWkt::Struct computed_quantile_value;
+      auto* computed_quantile_value_fields = computed_quantile_value.mutable_fields();
+      const auto& interval = histogram->intervalStatistics().computedQuantiles()[i];
+      const auto& cumulative = histogram->cumulativeStatistics().computedQuantiles()[i];
+      (*computed_quantile_value_fields)["interval"] =
+          std::isnan(interval) ? ValueUtil::nullValue() : ValueUtil::numberValue(interval);
+      (*computed_quantile_value_fields)["cumulative"] =
+          std::isnan(cumulative) ? ValueUtil::nullValue() : ValueUtil::numberValue(cumulative);
+
+      computed_quantile_value_array.push_back(ValueUtil::structValue(computed_quantile_value));
+    }
+    (*computed_quantile_fields)["values"] = ValueUtil::listValue(computed_quantile_value_array);
+    computed_quantile_array_.push_back(ValueUtil::structValue(computed_quantile));
+  }
+
+  void render() override {
+    if (found_used_histogram_) {
+      auto* histograms_obj_fields = histograms_obj_.mutable_fields();
+      (*histograms_obj_fields)["computed_quantiles"] =
+          ValueUtil::listValue(computed_quantile_array_);
+      auto* histograms_obj_container_fields = histograms_obj_container_.mutable_fields();
+      (*histograms_obj_container_fields)["histograms"] = ValueUtil::structValue(histograms_obj_);
+      stats_array_.push_back(ValueUtil::structValue(histograms_obj_container_));
+    }
+
+    auto* document_fields = document_.mutable_fields();
+    (*document_fields)["stats"] = ValueUtil::listValue(stats_array_);
+    response_.add(MessageUtil::getJsonStringFromMessageOrDie(document_, false /* pretty */, true));
+  }
+
+private:
+  template <class Value> void add(const std::string& name, const Value& value) {
+    ProtobufWkt::Struct stat_obj;
+    auto* stat_obj_fields = stat_obj.mutable_fields();
+    (*stat_obj_fields)["name"] = ValueUtil::stringValue(name);
+    (*stat_obj_fields)["value"] = value;
+    stats_array_.push_back(ValueUtil::structValue(stat_obj));
+  }
+
+  Buffer::Instance& response_;
+  ProtobufWkt::Struct document_;
+  std::vector<ProtobufWkt::Value> stats_array_;
+  std::vector<ProtobufWkt::Value> scope_array_;
+  ProtobufWkt::Struct histograms_obj_;
+  ProtobufWkt::Struct histograms_obj_container_;
+  std::vector<ProtobufWkt::Value> computed_quantile_array_;
+  bool found_used_histogram_{false};
+};
+
 StatsHandler::Context::Context(Server::Instance& server,
                                bool used_only, absl::optional<std::regex> regex,
-                               absl::optional<std::string> format_value)
-    : used_only_(used_only), regex_(regex), format_value_(format_value) {
+                               bool json,
+                               Http::ResponseHeaderMap& response_headers,
+                               Buffer::Instance& response)
+    : used_only_(used_only), regex_(regex), stats_(server.stats()) {
+  if (json) {
+    render_ = std::make_unique<JsonRender>(response_headers, response);
+  } else {
+    render_ = std::make_unique<TextRender>(response);
+  }
+
+  // Populate the top-level scopes and the stats underneath any scopes with an empty name.
+  // We will have to de-dup, but we can do that after sorting.
+  stats_.forEachScope(nullptr, [this](const Stats::Scope& scope) {
+    if (scope.prefix().empty()) {
+      Stats::IterateFn<Stats::Counter> fn = [this](const Stats::CounterSharedPtr& counter) -> bool {
+        stats_and_scopes_.emplace_back(counter);
+        return true;
+      };
+      scope.iterate(fn);
+    } else {
+      stats_and_scopes_.emplace_back(Stats::ScopeSharedPtr(const_cast<Stats::Scope*>(&scope)));
+    }
+  });
+
+  struct CompareStatsAndScopes {
+    CompareStatsAndScopes(Stats::SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+    bool operator()(const StatOrScope& a, const StatOrScope& b) const {
+      return symbol_table_.lessThan(name(a), name(b));
+    }
+
+    Stats::StatName name(const StatOrScope& stat_or_scope) const {
+      switch (stat_or_scope.index()) {
+        case 0: return absl::get<Stats::ScopeSharedPtr>(stat_or_scope)->prefix();
+        case 1: return absl::get<Stats::TextReadoutSharedPtr>(stat_or_scope)->statName();
+        case 2: return absl::get<Stats::CounterSharedPtr>(stat_or_scope)->statName();
+        case 3: return absl::get<Stats::GaugeSharedPtr>(stat_or_scope)->statName();
+        case 4: return absl::get<Stats::ParentHistogramSharedPtr>(stat_or_scope)->statName();
+      }
+      return Stats::StatName();
+    }
+
+    Stats::SymbolTable& symbol_table_;
+  };
+
+
+  std::sort(stats_and_scopes_.begin(), stats_and_scopes_.end(), CompareStatsAndScopes(stats_.symbolTable()));
+  std::unique(stats_and_scopes_.begin(), stats_and_scopes_.end());
+
+  /*
   for (const Stats::CounterSharedPtr& counter : server.stats().counters()) {
     if (shouldShowMetric(*counter)) {
       all_stats_.emplace(counter->name(), counter->value());
@@ -141,6 +345,10 @@ StatsHandler::Context::Context(Server::Instance& server,
   text_readouts_iter_ = text_readouts_.begin();
 
   histograms_ = server.stats().histograms();
+  */
+}
+
+StatsHandler::Context::~Context() {
 }
 
 bool StatsHandler::Context::Context::nextChunk() {
@@ -194,7 +402,8 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
 }
 
 Http::Code StatsHandler::Context::statsAsText(Http::ResponseHeaderMap& /*response_headers*/,
-                                              Buffer::Instance& response) {
+                                              Buffer::Instance& /*response*/) {
+  /*
   // Display plain stats if format query param is not there.
   for (; text_readouts_iter_ != text_readouts_.end(); ++text_readouts_iter_) {
     if (nextChunk()) {
@@ -221,12 +430,15 @@ Http::Code StatsHandler::Context::statsAsText(Http::ResponseHeaderMap& /*respons
     response.addFragments({histogram.first, ": ", histogram.second, "\n"});
   }
   return Http::Code::OK;
+  */
+  return Http::Code::OK;
 }
 
-Http::Code StatsHandler::Context::statsAsJson(Http::ResponseHeaderMap& response_headers,
-                                              Buffer::Instance& response,
-                                              const bool pretty_print) {
+Http::Code StatsHandler::Context::statsAsJson(Http::ResponseHeaderMap& /*response_headers*/,
+                                              Buffer::Instance& /*response*/,
+                                              const bool /*pretty_print*/) {
 
+#if 0
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
   ProtobufWkt::Struct document;
@@ -301,6 +513,7 @@ Http::Code StatsHandler::Context::statsAsJson(Http::ResponseHeaderMap& response_
   (*document_fields)["stats"] = ValueUtil::listValue(stats_array);
 
   response.add(MessageUtil::getJsonStringFromMessageOrDie(document, pretty_print, true));
+#endif
   return Http::Code::OK;
 }
 

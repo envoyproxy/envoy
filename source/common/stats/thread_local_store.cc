@@ -46,6 +46,7 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(scopes_to_cleanup_.empty());
   ASSERT(central_cache_entries_to_cleanup_.empty());
   ASSERT(histograms_to_cleanup_.empty());
+  ASSERT(ref_count_ == 0);
 }
 
 void ThreadLocalStoreImpl::setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) {
@@ -150,7 +151,11 @@ ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
 }
 
 ScopePtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
-  auto new_scope = std::make_unique<ScopeImpl>(*this, name);
+#if SCOPE_REFCOUNT
+  RefcountPtr<ScopeImpl> new_scope(new ScopeImpl(*this, name));
+#else
+  auto new_scope = std::make_shared<ScopeImpl>(*this, name);
+#endif
   Thread::LockGuard lock(lock_);
   scopes_.emplace(new_scope.get());
   return new_scope;

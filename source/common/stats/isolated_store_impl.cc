@@ -9,6 +9,8 @@
 #include "source/common/stats/scope_prefixer.h"
 #include "source/common/stats/utility.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -36,13 +38,30 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
       null_counter_(new NullCounterImpl(symbol_table)),
       null_gauge_(new NullGaugeImpl(symbol_table)) {}
 
+IsolatedStoreImpl::~IsolatedStoreImpl() {
+#if SCOPE_REFCOUNT
+  ENVOY_LOG_MISC(error, "ref_count={}", ref_count_);
+  ASSERT(ref_count_ == 0);
+#endif
+}
+
+#if SCOPE_REFCOUNT
 ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
-  return std::make_unique<ScopePrefixer>(name, *this);
+  return ScopeSharedPtr(new ScopePrefixer(name, *this));
 }
 
 ScopePtr IsolatedStoreImpl::scopeFromStatName(StatName name) {
-  return std::make_unique<ScopePrefixer>(name, *this);
+  return ScopeSharedPtr(new ScopePrefixer(name, *this));
 }
+#else
+ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
+  return std::make_shared<ScopePrefixer>(name, *this);
+}
+
+ScopePtr IsolatedStoreImpl::scopeFromStatName(StatName name) {
+  return std::make_shared<ScopePrefixer>(name, *this);
+}
+#endif
 
 } // namespace Stats
 } // namespace Envoy

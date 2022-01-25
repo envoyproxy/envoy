@@ -18,7 +18,7 @@ ScopePrefixer::~ScopePrefixer() { prefix_.free(symbolTable()); }
 
 ScopePtr ScopePrefixer::scopeFromStatName(StatName name) {
   SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
-  return std::make_unique<ScopePrefixer>(StatName(joined.get()), scope_);
+  return ScopeSharedPtr(new ScopePrefixer(StatName(joined.get()), scope_));
 }
 
 ScopePtr ScopePrefixer::createScope(const std::string& name) {

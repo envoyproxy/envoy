@@ -14,6 +14,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Server {
@@ -48,13 +49,20 @@ public:
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
 
+  class JsonRender;
+  class Render;
+  class TextRender;
+
   class Context {
    public:
     Context(Server::Instance& server,
             bool used_only, absl::optional<std::regex> regex,
-            absl::optional<std::string> format_value);
+            bool json, Http::ResponseHeaderMap& response_headers,
+            Buffer::Instance& response);
+    ~Context();
 
     bool nextChunk();
+    Http::Code writeChunk(Buffer::Instance& response);
 
     template<class StatType> bool shouldShowMetric(const StatType& stat) {
       return StatsHandler::shouldShowMetric(stat, used_only_, regex_);
@@ -67,13 +75,22 @@ public:
     const bool used_only_;
     absl::optional<std::regex> regex_;
     absl::optional<std::string> format_value_;
-    std::map<std::string, uint64_t> all_stats_;
-    std::map<std::string, uint64_t>::iterator all_stats_iter_;
-    std::map<std::string, std::string> text_readouts_;
-    std::map<std::string, std::string>::iterator text_readouts_iter_;
-    std::vector<Stats::ParentHistogramSharedPtr> histograms_;
+
+    std::unique_ptr<Render> render_;
+
+    using StatOrScope = absl::variant<
+        Stats::ScopeSharedPtr,
+        Stats::TextReadoutSharedPtr,
+        Stats::CounterSharedPtr,
+        Stats::GaugeSharedPtr,
+        Stats::ParentHistogramSharedPtr>;
+    using StatOrScopeVec = std::vector<StatOrScope>;
+
     static constexpr uint32_t chunk_size_ = 10;
-    uint32_t chunk_index_{0};;
+    Stats::Store& stats_;
+    StatOrScopeVec stats_and_scopes_;
+    uint32_t stats_and_scopes_index_{0};
+    uint32_t chunk_index_{0};
   };
   using ContextPtr = std::unique_ptr<Context>;
 
