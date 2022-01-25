@@ -4540,26 +4540,6 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
                     .value());
 }
 
-TEST_F(RouterTest, InternalRedirectRejectedWithRequestBodyDisabledLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.internal_redirects_with_body", "false"}});
-
-  enableRedirects();
-  sendRequest();
-
-  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("random_fake_data"));
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(body_data.get()));
-  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
-
-  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
-  Buffer::OwnedImpl data("1234567890");
-  response_decoder_->decodeData(data, true);
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_internal_redirect_failed_total")
-                    .value());
-}
-
 TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {
   enableRedirects();
   sendRequest(false);
