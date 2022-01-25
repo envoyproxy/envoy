@@ -337,25 +337,6 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBuffe
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
 
-TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBackup) {
-  if (upstreamProtocol() == Http::CodecType::HTTP3 &&
-      downstreamProtocol() == Http::CodecType::HTTP2) {
-    // This test depends on fragile preconditions.
-    // With HTTP/2 downstream all the requests are processed before the
-    // responses are sent, then the connection read-disable results in not
-    // receiving flow control window updates.
-    return;
-  }
-  config_helper_.prependFilter(
-      fmt::format(R"EOF(
-  name: pause-filter{}
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty)EOF",
-                  downstreamProtocol() == Http::CodecType::HTTP3 ? "-for-quic" : ""));
-
-  manySimultaneousRequests(1024 * 20, 1024 * 20);
-}
-
 TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
   // random-pause-filter does not support HTTP3.
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
