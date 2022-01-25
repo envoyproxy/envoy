@@ -439,9 +439,9 @@ message WeightedCluster {
   string runtime_key_prefix = 2;
 
   oneof random_value_specifier {
-    // Specifies the header value to look up the random value that is passed in the request header.
-    // This can be used in weighted cluster picking algorithm for consistent cluster picking.
-    string header_value = 4;
+    // Specifies the header name that is used to look up the random value passed in the request header.
+    // This ensures consistent cluster picking across multiple proxy levels for weighted traffic.
+    string header_name = 4;
   }
 }
 
