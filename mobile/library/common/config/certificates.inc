@@ -1,5 +1,5 @@
 R"certs(
-  # $OpenBSD: cert.pem,v 1.23 2021/06/11 11:40:35 sthen Exp $
+  # $OpenBSD: cert.pem,v 1.24 2021/09/30 18:16:11 deraadt Exp $
   ### /C=ES/CN=Autoridad de Certificacion Firmaprofesional CIF A62634068
 
   === /C=ES/CN=Autoridad de Certificacion Firmaprofesional CIF A62634068
@@ -1820,49 +1820,6 @@ R"certs(
   r/OSmbaz5mEP0oUA51Aa5BuVnRmhuZyxm7EAHu/QD09CbMkKvO5D+jpxpchNJqU1
   /YldvIViHTLSoCtU7ZpXwdv6EM8Zt4tKG48BtieVU+i2iW1bvGjUI+iLUaJW+fCm
   gKDWHrO8Dw9TdSmq6hN35N6MgSGtBxBHEa2HPQfRdbzP82Z+
-  -----END CERTIFICATE-----
-
-  ### Digital Signature Trust Co.
-
-  === /O=Digital Signature Trust Co./CN=DST Root CA X3
-  Certificate:
-      Data:
-          Version: 3 (0x2)
-          Serial Number:
-              44:af:b0:80:d6:a3:27:ba:89:30:39:86:2e:f8:40:6b
-      Signature Algorithm: sha1WithRSAEncryption
-          Validity
-              Not Before: Sep 30 21:12:19 2000 GMT
-              Not After : Sep 30 14:01:15 2021 GMT
-          Subject: O=Digital Signature Trust Co., CN=DST Root CA X3
-          X509v3 extensions:
-              X509v3 Basic Constraints: critical
-                  CA:TRUE
-              X509v3 Key Usage: critical
-                  Certificate Sign, CRL Sign
-              X509v3 Subject Key Identifier:
-                  C4:A7:B1:A4:7B:2C:71:FA:DB:E1:4B:90:75:FF:C4:15:60:85:89:10
-  SHA1 Fingerprint=DA:C9:02:4F:54:D8:F6:DF:94:93:5F:B1:73:26:38:CA:6A:D7:7C:13
-  SHA256 Fingerprint=06:87:26:03:31:A7:24:03:D9:09:F1:05:E6:9B:CF:0D:32:E1:BD:24:93:FF:C6:D9:20:6D:11:BC:D6:77:07:39
-  -----BEGIN CERTIFICATE-----
-  MIIDSjCCAjKgAwIBAgIQRK+wgNajJ7qJMDmGLvhAazANBgkqhkiG9w0BAQUFADA/
-  MSQwIgYDVQQKExtEaWdpdGFsIFNpZ25hdHVyZSBUcnVzdCBDby4xFzAVBgNVBAMT
-  DkRTVCBSb290IENBIFgzMB4XDTAwMDkzMDIxMTIxOVoXDTIxMDkzMDE0MDExNVow
-  PzEkMCIGA1UEChMbRGlnaXRhbCBTaWduYXR1cmUgVHJ1c3QgQ28uMRcwFQYDVQQD
-  Ew5EU1QgUm9vdCBDQSBYMzCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB
-  AN+v6ZdQCINXtMxiZfaQguzH0yxrMMpb7NnDfcdAwRgUi+DoM3ZJKuM/IUmTrE4O
-  rz5Iy2Xu/NMhD2XSKtkyj4zl93ewEnu1lcCJo6m67XMuegwGMoOifooUMM0RoOEq
-  OLl5CjH9UL2AZd+3UWODyOKIYepLYYHsUmu5ouJLGiifSKOeDNoJjj4XLh7dIN9b
-  xiqKqy69cK3FCxolkHRyxXtqqzTWMIn/5WgTe1QLyNau7Fqckh49ZLOMxt+/yUFw
-  7BZy1SbsOFU5Q9D8/RhcQPGX69Wam40dutolucbY38EVAjqr2m7xPi71XAicPNaD
-  aeQQmxkqtilX4+U9m5/wAl0CAwEAAaNCMEAwDwYDVR0TAQH/BAUwAwEB/zAOBgNV
-  HQ8BAf8EBAMCAQYwHQYDVR0OBBYEFMSnsaR7LHH62+FLkHX/xBVghYkQMA0GCSqG
-  SIb3DQEBBQUAA4IBAQCjGiybFwBcqR7uKGY3Or+Dxz9LwwmglSBd49lZRNI+DT69
-  ikugdB/OEIKcdBodfpga3csTS7MgROSR6cz8faXbauX+5v3gTt23ADq1cEmv8uXr
-  AvHRAosZy5Q6XkjEGB5YGV8eAlrwDPGxrancWYaLbumR9YbK+rlmM6pZW87ipxZz
-  R8srzJmwN0jP41ZL9c8PDHIyh8bwRLtTcm1D9SZImlJnt1ir/md2cXjbDaJWFBM5
-  JDGFoqgCWjBH4d1QB7wCCZAA62RjYJsWvIjJEubSfZGL+T0yjWW06XyxV3bqxbYo
-  Ob8VZRzI9neWagqNdwvYkQsEjgfbKbYK7p2CNTUQ
   -----END CERTIFICATE-----
 
   ### Disig a.s.
