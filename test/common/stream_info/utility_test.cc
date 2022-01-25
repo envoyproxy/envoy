@@ -187,24 +187,28 @@ TEST_F(ProxyStatusTest, ToStringAbsentResponseFlags) {
 }
 
 TEST_F(ProxyStatusTest, ToStringNoConfig) {
-  EXPECT_THAT(ProxyStatusUtils::makeProxyName(/*node_id=*/"UNUSED", nullptr),
-              AllOf(HasSubstr("envoy"), Not(HasSubstr("UNUSED"))));
+  EXPECT_THAT(
+      ProxyStatusUtils::makeProxyName(/*node_id=*/"UNUSED", /*server_name=*/"envoy", nullptr),
+      AllOf(HasSubstr("envoy"), Not(HasSubstr("UNUSED"))));
 }
 
 TEST_F(ProxyStatusTest, ToStringNoServerName) {
-  EXPECT_THAT(ProxyStatusUtils::makeProxyName(/*node_id=*/"UNUSED", &proxy_status_config_),
+  EXPECT_THAT(ProxyStatusUtils::makeProxyName(/*node_id=*/"UNUSED", /*server_name=*/"envoy",
+                                              &proxy_status_config_),
               AllOf(HasSubstr("envoy"), Not(HasSubstr("UNUSED"))));
 }
 
 TEST_F(ProxyStatusTest, ToStringServerName) {
   proxy_status_config_.set_use_node_id(true);
-  EXPECT_THAT(ProxyStatusUtils::makeProxyName(/*node_id=*/"foo", &proxy_status_config_),
+  EXPECT_THAT(ProxyStatusUtils::makeProxyName(/*node_id=*/"foo", /*server_name=*/"envoy",
+                                              &proxy_status_config_),
               AllOf(HasSubstr("foo"), Not(HasSubstr("envoy"))));
 }
 
 TEST_F(ProxyStatusTest, ToStringLiteral) {
   proxy_status_config_.set_literal_proxy_name("foo_bar_baz");
-  EXPECT_THAT(ProxyStatusUtils::makeProxyName(/*node_id=*/"foo", &proxy_status_config_),
+  EXPECT_THAT(ProxyStatusUtils::makeProxyName(/*node_id=*/"foo", /*server_name=*/"envoy",
+                                              &proxy_status_config_),
               AllOf(HasSubstr("foo_bar_baz"), Not(HasSubstr("envoy")), Not(HasSubstr("UNUSED"))));
 }
 

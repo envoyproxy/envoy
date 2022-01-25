@@ -108,6 +108,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_redirects_with_body")),
       proxy_name_(StreamInfo::ProxyStatusUtils::makeProxyName(
           /*node_id=*/local_info_.node().id(),
+          /*server_name=*/config_.serverName(),
           /*proxy_status_config=*/config_.proxyStatusConfig())) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {

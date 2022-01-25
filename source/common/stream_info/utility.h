@@ -126,8 +126,9 @@ public:
 class ProxyStatusUtils {
 public:
   // Returns a Proxy-Status proxy name string, configured according to |proxy_status_config|.
+  // If |proxy_status_config| has not been set, defaults to |server_name|.
   static const std::string
-  makeProxyName(absl::string_view node_id,
+  makeProxyName(absl::string_view node_id, absl::string_view server_name,
                 const envoy::extensions::filters::network::http_connection_manager::v3::
                     HttpConnectionManager::ProxyStatusConfig* proxy_status_config);
 

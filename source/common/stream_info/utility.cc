@@ -191,11 +191,11 @@ ProxyStatusUtils::recommendedHttpStatusCode(const ProxyStatusError proxy_status)
 }
 
 const std::string ProxyStatusUtils::makeProxyName(
-    absl::string_view node_id,
+    absl::string_view node_id, absl::string_view server_name,
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         ProxyStatusConfig* proxy_status_config) {
   if (proxy_status_config == nullptr) {
-    return Envoy::Http::DefaultServerString::get();
+    return std::string(server_name);
   }
   // For the proxy name, the config specified either a preset proxy name or a literal proxy name.
   switch (proxy_status_config->proxy_name_case()) {
@@ -210,7 +210,7 @@ const std::string ProxyStatusUtils::makeProxyName(
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       ProxyStatusConfig::ProxyNameCase::PROXY_NAME_NOT_SET:
   default: {
-    return Envoy::Http::DefaultServerString::get();
+    return std::string(server_name);
   }
   }
 }
