@@ -2305,8 +2305,7 @@ public class CronetUrlRequestTest {
    */
   public void testManyRequests() throws Exception {
     String url = NativeTestServer.getMultiRedirectURL();
-    // Jelly Bean has a 2000 limit on global references, crbug.com/922656.
-    final int numRequests = Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT ? 2000 : 1500;
+    final int numRequests = 1000;
     TestUrlRequestCallback callbacks[] = new TestUrlRequestCallback[numRequests];
     UrlRequest requests[] = new UrlRequest[numRequests];
     for (int i = 0; i < numRequests; i++) {
