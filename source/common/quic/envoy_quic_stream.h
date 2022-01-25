@@ -202,12 +202,12 @@ private:
 class IncrementalBytesSentTracker {
 public:
   IncrementalBytesSentTracker(const quic::QuicStream& stream)
-      : stream_(stream), initial__bytes_sent_(totalStreamBytesSent()) {}
+      : stream_(stream), initial_bytes_sent_(totalStreamBytesSent()) {}
 
   // Returns the number of newly sent bytes since the tracker was constructed.
   uint64_t incrementalBytesSent() {
-    ASSERT(totalStreamBytesSent() >= initial__bytes_sent_);
-    return totalStreamBytesSent() - initial__bytes_sent_;
+    ASSERT(totalStreamBytesSent() >= initial_bytes_sent_);
+    return totalStreamBytesSent() - initial_bytes_sent_;
   }
 
 private:
@@ -216,7 +216,7 @@ private:
   }
 
   const quic::QuicStream& stream_;
-  uint64_t initial__bytes_sent_;
+  uint64_t initial_bytes_sent_;
 };
 
 } // namespace Quic
