@@ -231,7 +231,7 @@ bool StatName::startsWith(StatName prefix) const {
     TokenIter::TokenType prefix_type = prefix_iter.next();
     TokenIter::TokenType this_type = this_iter.next();
     if (prefix_type == TokenIter::TokenType::End) {
-      break; // "a.b.c" starts with "a.b" or "a.b.c"
+      return true; // "a.b.c" starts with "a.b" or "a.b.c"
     }
     if (this_type == TokenIter::TokenType::End) {
       return false; // "a.b" does not start with "a.b.c"
@@ -247,7 +247,7 @@ bool StatName::startsWith(StatName prefix) const {
       return false;
     }
   }
-  return true;
+  return true; // not reached
 }
 
 std::vector<absl::string_view> SymbolTableImpl::decodeStrings(StatName stat_name) const {
