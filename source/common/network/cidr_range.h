@@ -135,7 +135,7 @@ public:
   IpList() = default;
 
   bool contains(const Instance& address) const;
-  int getIpListSize() { return ip_list_.size(); };
+  int getIpListSize() const { return ip_list_.size(); };
 
 private:
   std::vector<CidrRange> ip_list_;

@@ -38,6 +38,7 @@ envoy_cc_library(
     hdrs = ["cidr_range.h"],
     deps = [
         "//envoy/network:address_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

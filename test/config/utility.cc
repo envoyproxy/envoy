@@ -1217,7 +1217,7 @@ void ConfigHelper::initializeTlsKeyLog(
   auto tls_keylog_path = common_tls_context.mutable_tls_keylog()->mutable_tls_keylog_path();
   auto tls_keylog_dst = common_tls_context.mutable_tls_keylog()->mutable_tls_keylog_dst();
   auto new_element = tls_keylog_dst->Add();
-  new_element->set_address_prefix({{"127.0.0.1"}});
+  new_element->set_address_prefix("127.0.0.1");
   new_element->mutable_prefix_len()->set_value(32);
   *tls_keylog_path = std::string("/dev/null");
 }

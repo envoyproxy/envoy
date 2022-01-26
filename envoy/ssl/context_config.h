@@ -6,11 +6,12 @@
 #include <string>
 #include <vector>
 
-#include "source/common/network/cidr_range.h"
 #include "envoy/common/pure.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/tls_certificate_config.h"
+
+#include "source/common/network/cidr_range.h"
 
 #include "absl/types/optional.h"
 

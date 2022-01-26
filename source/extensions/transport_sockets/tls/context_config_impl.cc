@@ -7,10 +7,9 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
-#include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
-#include "source/common/network/utility.h"
 #include "source/common/network/cidr_range.h"
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
@@ -242,6 +241,10 @@ ContextConfigImpl::ContextConfigImpl(
   }
   capabilities_ = handshaker_factory->capabilities();
   sslctx_cb_ = handshaker_factory->sslctxCb(handshaker_factory_context);
+  if (!config.tls_keylog().tls_keylog_path().empty() && tls_keylog_src_.getIpListSize() == 0 &&
+      tls_keylog_dst_.getIpListSize() == 0) {
+    throw EnvoyException(fmt::format("At least one of src or dst should be set for TLS key log"));
+  }
 }
 
 Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(

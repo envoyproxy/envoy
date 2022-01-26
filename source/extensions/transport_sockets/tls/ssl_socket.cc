@@ -492,7 +492,7 @@ bool ServerSslSocketFactory::tlsKeyLogMatch(
       match_dst = true;
     }
   }
-  ENVOY_LOG(trace, "enable_src: {}, enable_dst:{},match_src:{}, match_dst:{}", enable_src,
+  ENVOY_LOG(debug, "enable_src: {}, enable_dst:{}, match_src:{}, match_dst:{}", enable_src,
             enable_dst, match_src, match_dst);
   if (enable_src) {
     if (enable_dst) {
