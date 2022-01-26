@@ -58,7 +58,7 @@ public:
   // If from_cache is true, it is assumed the string was serialized using
   // protocolsToStringForCache and the the ma fields will be parsed as absolute times
   // rather than relative time.
-  static absl::optional<OriginData> originDataFromString(absl::string_view protocols,
+  static absl::optional<OriginData> originDataFromString(absl::string_view origin_data,
                                                          TimeSource& time_source,
                                                          bool from_cache = false);
 
