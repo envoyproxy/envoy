@@ -9,17 +9,15 @@ namespace Grpc {
 
 using BufferedMessageExpirationCallback = std::function<void(uint64_t)>;
 
-// This class is used to manage the lifetime of messages stored in BufferedAsyncClient. Messages
-// whose survival period has expired will be deleted from the Buffer.
-// We can set the ID you want to monitor TTL in the TTL Manager,
-// which will set up a callback to check for expiration.
-// You can set the ID even after the callback has been invoked.
-// When the callback is invoked, the callback given to the constructor will be
-// executed with the TTL-elapsed ID as an argument.
-// After that, if the ID to be monitored is not empty, the callback for expiration check will be set
-// again. The TTL Manager can be given a set of IDs that are expected to expire at the same time.
-// When checking for ID expiration, an expiration callback will be called for each ID
-// belonging to this set of IDs.
+// The TTL Manager can be given a set of IDs that are expected to expire at the same time.
+// When checking for ID expiration, an expiration callback will be called for each ID belonging to
+// this set of IDs. This class is used to manage the lifetime of messages stored in
+// BufferedAsyncClient. Messages whose survival period has expired will be deleted from the Buffer.
+// It allows monitoring a set of IDs for expiration, triggering a callback upon expiration.
+// This class is able to monitor multiple sets of IDs at the same time, even after some of them have
+// expired. When the callback is invoked, the callback given to the constructor will be will be
+// executed for each of the TTL-elapsed IDs. After that, if the IDs to be monitored is not empty,
+// the manager will continue to monitor for expiration again.
 class BufferedMessageTtlManager {
 public:
   BufferedMessageTtlManager(Event::Dispatcher& dispatcher,
