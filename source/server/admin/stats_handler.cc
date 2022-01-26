@@ -191,10 +191,10 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
   for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
     if (shouldShowMetric(*histogram, used_only, regex)) {
       bool success = false;
-      // Display summary of nonoverlapping buckets if histogram_buckets query parameter is found.
+      // Display summary of disjoint buckets if histogram_buckets query parameter is found.
       if (histogram_buckets) {
         success =
-            all_histograms.emplace(histogram->name(), histogram->nonoverlappingBucketSummary())
+            all_histograms.emplace(histogram->name(), histogram->computeDisjointBucketSummary())
                 .second;
       } else {
         success = all_histograms.emplace(histogram->name(), histogram->quantileSummary()).second;

@@ -908,7 +908,7 @@ void ParentHistogramImpl::merge() {
   }
 }
 
-const std::string ParentHistogramImpl::quantileSummary() const {
+std::string ParentHistogramImpl::quantileSummary() const {
   if (used()) {
     std::vector<std::string> summary;
     const std::vector<double>& supported_quantiles_ref = interval_statistics_.supportedQuantiles();
@@ -924,7 +924,7 @@ const std::string ParentHistogramImpl::quantileSummary() const {
   }
 }
 
-const std::string ParentHistogramImpl::bucketSummary() const {
+std::string ParentHistogramImpl::bucketSummary() const {
   if (used()) {
     std::vector<std::string> bucket_summary;
     ConstSupportedBuckets& supported_buckets = interval_statistics_.supportedBuckets();
@@ -940,19 +940,19 @@ const std::string ParentHistogramImpl::bucketSummary() const {
   }
 }
 
-const std::string ParentHistogramImpl::nonoverlappingBucketSummary() const {
+std::string ParentHistogramImpl::computeDisjointBucketSummary() const {
   if (used()) {
     std::vector<std::string> bucket_summary;
     ConstSupportedBuckets& supported_buckets = interval_statistics_.supportedBuckets();
-    const std::vector<uint64_t> nonoverlapping_interval_buckets =
-        interval_statistics_.nonoverlappingComputedBuckets();
-    const std::vector<uint64_t> nonoverlapping_cumulative_buckets =
-        cumulative_statistics_.nonoverlappingComputedBuckets();
+    const std::vector<uint64_t> disjoint_interval_buckets =
+        interval_statistics_.computeDisjointBuckets();
+    const std::vector<uint64_t> disjoint_cumulative_buckets =
+        cumulative_statistics_.computeDisjointBuckets();
     bucket_summary.reserve(supported_buckets.size());
     for (size_t i = 0; i < supported_buckets.size(); ++i) {
       bucket_summary.push_back(fmt::format("B{:g}({},{})", supported_buckets[i],
-                                           nonoverlapping_interval_buckets[i],
-                                           nonoverlapping_cumulative_buckets[i]));
+                                           disjoint_interval_buckets[i],
+                                           disjoint_cumulative_buckets[i]));
     }
     return absl::StrJoin(bucket_summary, " ");
   } else {

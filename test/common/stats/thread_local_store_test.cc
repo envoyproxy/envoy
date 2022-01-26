@@ -1567,14 +1567,14 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
             parent_histogram->bucketSummary());
 }
 
-TEST_F(HistogramTest, ParentHistogramNonoverlappingBucketSummary) {
+TEST_F(HistogramTest, ParentHistogramComputeDisjointBucketSummary) {
   ScopePtr scope1 = store_->createScope("scope1.");
   Histogram& histogram =
       store_->histogramFromString("histogram", Stats::Histogram::Unit::Unspecified);
   store_->mergeHistograms([]() -> void {});
   ASSERT_EQ(1, store_->histograms().size());
   ParentHistogramSharedPtr parent_histogram = store_->histograms()[0];
-  EXPECT_EQ("No recorded values", parent_histogram->nonoverlappingBucketSummary());
+  EXPECT_EQ("No recorded values", parent_histogram->computeDisjointBucketSummary());
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 200));
   histogram.recordValue(200);
@@ -1592,7 +1592,7 @@ TEST_F(HistogramTest, ParentHistogramNonoverlappingBucketSummary) {
   EXPECT_EQ("B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,1) B500(1,2) "
             "B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) B300000(0,0) "
             "B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)",
-            parent_histogram->nonoverlappingBucketSummary());
+            parent_histogram->computeDisjointBucketSummary());
 }
 
 class ThreadLocalRealThreadsTestBase : public Thread::RealThreadsTestHelper,

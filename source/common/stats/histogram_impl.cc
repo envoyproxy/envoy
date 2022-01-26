@@ -31,7 +31,7 @@ const std::vector<double>& HistogramStatisticsImpl::supportedQuantiles() const {
                          {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.995, 0.999, 1});
 }
 
-const std::vector<uint64_t> HistogramStatisticsImpl::nonoverlappingComputedBuckets() const {
+std::vector<uint64_t> HistogramStatisticsImpl::computeDisjointBuckets() const {
   std::vector<uint64_t> buckets;
   buckets.reserve(computed_buckets_.size());
   uint64_t previous_computed_bucket = 0;

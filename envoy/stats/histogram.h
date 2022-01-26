@@ -70,10 +70,10 @@ public:
   virtual const std::vector<uint64_t>& computedBuckets() const PURE;
 
   /**
-   * Returns nonoverlapping version of computedBuckets(). This vector is
+   * Returns version of computedBuckets() with disjoint buckets. This vector is
    * guaranteed to be the same length as supportedBuckets().
    */
-  virtual const std::vector<uint64_t> nonoverlappingComputedBuckets() const PURE;
+  virtual std::vector<uint64_t> computeDisjointBuckets() const PURE;
 
   /**
    * Returns number of values during the period. This number may be an approximation
@@ -161,17 +161,17 @@ public:
   /**
    * Returns the quantile summary representation.
    */
-  virtual const std::string quantileSummary() const PURE;
+  virtual std::string quantileSummary() const PURE;
 
   /**
    * Returns the bucket summary representation.
    */
-  virtual const std::string bucketSummary() const PURE;
+  virtual std::string bucketSummary() const PURE;
 
   /**
-   * Returns the bucket summary representation with nonoverlapping buckets.
+   * Returns the bucket summary representation with disjoint buckets.
    */
-  virtual const std::string nonoverlappingBucketSummary() const PURE;
+  virtual std::string computeDisjointBucketSummary() const PURE;
 };
 
 using ParentHistogramSharedPtr = RefcountPtr<ParentHistogram>;
