@@ -77,7 +77,7 @@ void AdminFilter::onComplete() {
                                         end_stream_on_complete_ && response.length() == 0,
                                         StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
     }
-    if (response.length() > 0) {
+    if (response.length() > 0 || !cont) {
       decoder_callbacks_->encodeData(response, !cont && end_stream_on_complete_);
     }
   }

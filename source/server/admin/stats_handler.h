@@ -54,6 +54,19 @@ public:
   class TextRender;
 
   class Context {
+    using ScopeVec = std::vector<Stats::ScopeSharedPtr>;
+    using StatOrScopes = absl::variant<
+        ScopeVec,
+        Stats::TextReadoutSharedPtr,
+        Stats::CounterSharedPtr,
+        Stats::GaugeSharedPtr,
+        Stats::HistogramSharedPtr>;
+    enum class Phase {
+      TextReadouts,
+      CountersAndGauges,
+      Histograms,
+    };
+
    public:
     Context(Server::Instance& server,
             bool used_only, absl::optional<std::regex> regex,
@@ -61,16 +74,17 @@ public:
             Buffer::Instance& response);
     ~Context();
 
-    bool nextChunk();
+    void startPhase();
     Http::Code writeChunk(Buffer::Instance& response);
 
     template<class StatType> bool shouldShowMetric(const StatType& stat) {
       return StatsHandler::shouldShowMetric(stat, used_only_, regex_);
     }
 
-    Http::Code statsAsText(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
-    Http::Code statsAsJson(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                           bool pretty);
+    void populateStatsForCurrentPhase(const ScopeVec& scope_vec);
+    template<class StatType> void populateStatsFromScopes(const ScopeVec& scope);
+    template<class SharedStatType> void renderStat(
+        Buffer::Instance& response, StatOrScopes& variant);
 
     const bool used_only_;
     absl::optional<std::regex> regex_;
@@ -78,19 +92,15 @@ public:
 
     std::unique_ptr<Render> render_;
 
-    using StatOrScope = absl::variant<
-        Stats::ScopeSharedPtr,
-        Stats::TextReadoutSharedPtr,
-        Stats::CounterSharedPtr,
-        Stats::GaugeSharedPtr,
-        Stats::ParentHistogramSharedPtr>;
-    using StatOrScopeVec = std::vector<StatOrScope>;
-
-    static constexpr uint32_t chunk_size_ = 10;
+    static constexpr uint32_t num_stats_per_chunk_ = 1000;
     Stats::Store& stats_;
-    StatOrScopeVec stats_and_scopes_;
+    ScopeVec scopes_;
+    //StatOrScopeVec stats_and_scopes_;
+    using StatMap = std::map<std::string, StatOrScopes>;
+    StatMap stat_map_;
     uint32_t stats_and_scopes_index_{0};
     uint32_t chunk_index_{0};
+    Phase phase_{Phase::TextReadouts};
   };
   using ContextPtr = std::unique_ptr<Context>;
 

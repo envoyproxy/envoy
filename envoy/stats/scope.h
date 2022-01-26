@@ -6,7 +6,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
-#define SCOPE_REFCOUNT 1
+#define SCOPE_REFCOUNT 0
 #if SCOPE_REFCOUNT
 #include "envoy/stats/refcount_ptr.h"
 #endif
@@ -53,6 +53,12 @@ class Scope : public
 {
 public:
   virtual ~Scope() = default;
+
+#if SCOPE_REFCOUNT
+  ScopeSharedPtr makeShared() { return ScopeSharedPtr(this); }
+#else
+  ScopeSharedPtr makeShared() { return shared_from_this(); }
+#endif
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
