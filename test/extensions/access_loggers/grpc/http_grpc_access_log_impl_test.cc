@@ -134,12 +134,16 @@ common_properties:
       port_value: 0
   downstream_direct_remote_address:
     socket_address:
-      address: "127.0.0.1"
-      port_value: 0
+      address: "127.0.0.3"
+      port_value: 63443
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
       port_value: 0
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
   start_time:
     seconds: 3600
 request:
@@ -208,11 +212,15 @@ common_properties:
       port_value: 0
   downstream_direct_remote_address:
     socket_address:
-      address: "127.0.0.1"
-      port_value: 0
+      address: "127.0.0.3"
+      port_value: 63443
   downstream_local_address:
     pipe:
       path: "/foo"
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
   start_time:
     seconds: 3600
   time_to_last_downstream_tx_byte:
@@ -252,12 +260,16 @@ common_properties:
       port_value: 0
   downstream_direct_remote_address:
     socket_address:
-      address: "127.0.0.1"
-      port_value: 0
+      address: "127.0.0.3"
+      port_value: 63443
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
       port_value: 0
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
   start_time:
     seconds: 3600
   time_to_last_downstream_tx_byte:
@@ -324,12 +336,16 @@ common_properties:
       port_value: 0
   downstream_direct_remote_address:
     socket_address:
-      address: "127.0.0.1"
-      port_value: 0
+      address: "127.0.0.3"
+      port_value: 63443
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
       port_value: 0
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
   start_time:
     seconds: 3600
   time_to_last_rx_byte:
@@ -399,12 +415,16 @@ common_properties:
       port_value: 0
   downstream_direct_remote_address:
     socket_address:
-      address: "127.0.0.1"
-      port_value: 0
+      address: "127.0.0.3"
+      port_value: 63443
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
       port_value: 0
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
   start_time:
     seconds: 3600
   upstream_transport_failure_reason: "TLS error"
@@ -451,12 +471,16 @@ common_properties:
       port_value: 0
   downstream_direct_remote_address:
     socket_address:
-      address: "127.0.0.1"
-      port_value: 0
+      address: "127.0.0.3"
+      port_value: 63443
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
       port_value: 0
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
   start_time:
     seconds: 3600
   tls_properties:
@@ -511,12 +535,16 @@ common_properties:
       port_value: 0
   downstream_direct_remote_address:
     socket_address:
-      address: "127.0.0.1"
-      port_value: 0
+      address: "127.0.0.3"
+      port_value: 63443
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
       port_value: 0
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
   start_time:
     seconds: 3600
   tls_properties:
@@ -561,12 +589,16 @@ common_properties:
       port_value: 0
   downstream_direct_remote_address:
     socket_address:
-      address: "127.0.0.1"
-      port_value: 0
+      address: "127.0.0.3"
+      port_value: 63443
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
       port_value: 0
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
   start_time:
     seconds: 3600
   tls_properties:
@@ -611,12 +643,16 @@ common_properties:
       port_value: 0
   downstream_direct_remote_address:
     socket_address:
-      address: "127.0.0.1"
-      port_value: 0
+      address: "127.0.0.3"
+      port_value: 63443
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
       port_value: 0
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
   start_time:
     seconds: 3600
   tls_properties:
@@ -661,12 +697,16 @@ common_properties:
       port_value: 0
   downstream_direct_remote_address:
     socket_address:
-      address: "127.0.0.1"
-      port_value: 0
+      address: "127.0.0.3"
+      port_value: 63443
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
       port_value: 0
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
   start_time:
     seconds: 3600
   tls_properties:
@@ -738,12 +778,16 @@ common_properties:
       port_value: 0
   downstream_direct_remote_address:
     socket_address:
-      address: "127.0.0.1"
-      port_value: 0
+      address: "127.0.0.3"
+      port_value: 63443
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
       port_value: 0
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
   start_time:
     seconds: 3600
 request:
@@ -808,12 +852,16 @@ common_properties:
       port_value: 0
   downstream_direct_remote_address:
     socket_address:
-      address: "127.0.0.1"
-      port_value: 0
+      address: "127.0.0.3"
+      port_value: 63443
   upstream_remote_address:
     socket_address:
       address: "10.0.0.1"
       port_value: 443
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
   upstream_cluster: "fake_cluster"
   start_time:
     seconds: 3600
@@ -859,6 +907,10 @@ common_properties:
     socket_address:
       address: "10.0.0.1"
       port_value: 443
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
   upstream_cluster: fake_cluster
   downstream_local_address:
     socket_address:
@@ -866,8 +918,8 @@ common_properties:
       port_value: 0
   downstream_direct_remote_address:
     socket_address:
-      address: "127.0.0.1"
-      port_value: 0
+      address: "127.0.0.3"
+      port_value: 63443
   start_time:
     seconds: 3600
   custom_tags:
@@ -909,6 +961,10 @@ common_properties:
     socket_address:
       address: "10.0.0.1"
       port_value: 443
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
   upstream_cluster: fake_cluster
   downstream_local_address:
     socket_address:
@@ -916,8 +972,8 @@ common_properties:
       port_value: 0
   downstream_direct_remote_address:
     socket_address:
-      address: "127.0.0.1"
-      port_value: 0
+      address: "127.0.0.3"
+      port_value: 63443
   start_time:
     seconds: 3600
   custom_tags:
