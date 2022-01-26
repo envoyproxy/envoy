@@ -168,6 +168,15 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenFirstSuccess) {
   EXPECT_FALSE(impl_->connecting());
 }
 
+TEST_F(HappyEyeballsConnectionImplTest, DisallowedFunctions) {
+  startConnect();
+
+  EXPECT_ENVOY_BUG(connection_callbacks_[0]->onAboveWriteBufferHighWatermark(),
+                   "Unexpected data written to happy eyeballs connection");
+  EXPECT_ENVOY_BUG(connection_callbacks_[0]->onBelowWriteBufferLowWatermark(),
+                   "Unexpected data drained from happy eyeballs connection");
+}
+
 TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenSecondSuccess) {
   startConnect();
 
