@@ -282,12 +282,12 @@ public:
 
 protected:
   static Network::ClientConnectionPtr
-  createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
-                   const Network::Address::InstanceConstSharedPtr& address,
-                   const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
+  createConnection(Event::Dispatcher& dispatcher,
+                   HostDescriptionConstSharedPtr& host,
                    Network::TransportSocketFactory& socket_factory,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   Network::TransportSocketOptionsConstSharedPtr transport_socket_options);
+                   Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+                   bool health_check);
 
 private:
   void setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status);

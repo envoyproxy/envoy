@@ -12,6 +12,11 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+
+namespace Upstream {
+class HostDescription;
+}
+
 namespace Network {
 
 class TransportSocketFactory;
@@ -216,6 +221,11 @@ public:
    */
   virtual void hashKey(std::vector<uint8_t>& key,
                        const Network::TransportSocketFactory& factory) const PURE;
+
+  /**
+   * @return optional upstream host description.
+   */
+  virtual std::shared_ptr<const Upstream::HostDescription> host() const PURE;
 };
 
 using TransportSocketOptionsConstSharedPtr = std::shared_ptr<const TransportSocketOptions>;
