@@ -630,6 +630,11 @@ envoy.transport_sockets.alts:
   - envoy.transport_sockets.upstream
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+envoy.transport_sockets.internal_upstream:
+  categories:
+  - envoy.transport_sockets.upstream
+  security_posture: unknown
+  status: wip
 envoy.transport_sockets.raw_buffer:
   categories:
   - envoy.transport_sockets.downstream
