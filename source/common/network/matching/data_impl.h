@@ -12,7 +12,7 @@ namespace Matching {
  */
 class MatchingDataImpl : public MatchingData {
 public:
-  MatchingDataImpl(const ConnectionSocket& socket) : socket_(socket) {}
+  explicit MatchingDataImpl(const ConnectionSocket& socket) : socket_(socket) {}
   const ConnectionSocket& socket() const override { return socket_; }
 
 private:
