@@ -79,6 +79,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.no_chunked_encoding_header_for_304",
     "envoy.reloadable_features.proxy_102_103",
     "envoy.reloadable_features.remove_legacy_json",
+    "envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints",
     "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place",
     "envoy.reloadable_features.update_expected_rq_timeout_on_retry",
     "envoy.reloadable_features.use_dns_ttl",
