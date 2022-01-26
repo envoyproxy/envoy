@@ -193,6 +193,10 @@ typedef struct {
   uint64_t sent_byte_count;
   // The number of bytes received from upstream.
   uint64_t received_byte_count;
+  // The final response flags for the stream. See
+  // https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h
+  // for the ResponseFlag enum.
+  uint64_t response_flags;
 } envoy_final_stream_intel;
 
 #ifdef __cplusplus

@@ -33,6 +33,8 @@ public final class FinalStreamIntel: StreamIntel {
   public let sentByteCount: UInt64
   /// The number of bytes received from upstream.
   public let receivedByteCount: UInt64
+  /// The response flags for the upstream stream.
+  public let responseFlags: UInt64
 
   // NOTE(1): These fields may not be set if socket_reused is false.
 
@@ -53,7 +55,8 @@ public final class FinalStreamIntel: StreamIntel {
     requestEndMs: Int64,
     socketReused: Bool,
     sentByteCount: UInt64,
-    receivedByteCount: UInt64
+    receivedByteCount: UInt64,
+    responseFlags: UInt64
   ) {
     self.requestStartMs = requestStartMs
     self.dnsStartMs = dnsStartMs
@@ -69,6 +72,7 @@ public final class FinalStreamIntel: StreamIntel {
     self.socketReused = socketReused
     self.sentByteCount = sentByteCount
     self.receivedByteCount = receivedByteCount
+    self.responseFlags = responseFlags
     super.init(streamId: streamId, connectionId: connectionId, attemptCount: attemptCount)
   }
 }
@@ -92,7 +96,8 @@ extension FinalStreamIntel {
       requestEndMs: cFinalIntel.request_end_ms,
       socketReused: cFinalIntel.socket_reused != 0,
       sentByteCount: cFinalIntel.sent_byte_count,
-      receivedByteCount: cFinalIntel.received_byte_count
+      receivedByteCount: cFinalIntel.received_byte_count,
+      responseFlags: cFinalIntel.response_flags
     )
   }
 }

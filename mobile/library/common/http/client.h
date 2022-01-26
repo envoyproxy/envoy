@@ -280,8 +280,8 @@ private:
     bool explicit_flow_control_ = false;
     // Latest intel data retrieved from the StreamInfo.
     envoy_stream_intel stream_intel_{-1, -1, 0};
-    envoy_final_stream_intel envoy_final_stream_intel_{-1, -1, -1, -1, -1, -1, -1,
-                                                       -1, -1, -1, -1, 0,  0,  0};
+    envoy_final_stream_intel envoy_final_stream_intel_{-1, -1, -1, -1, -1, -1, -1, -1,
+                                                       -1, -1, -1, 0,  0,  0,  0};
     StreamInfo::BytesMeterSharedPtr bytes_meter_;
   };
 

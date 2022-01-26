@@ -52,6 +52,7 @@ void setFinalStreamIntel(StreamInfo& stream_info, envoy_final_stream_intel& fina
     final_intel.sent_byte_count = stream_info.getUpstreamBytesMeter()->wireBytesSent();
     final_intel.received_byte_count = stream_info.getUpstreamBytesMeter()->wireBytesReceived();
   }
+  final_intel.response_flags = stream_info.responseFlags();
 }
 
 } // namespace StreamInfo
