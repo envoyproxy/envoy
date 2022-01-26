@@ -305,12 +305,10 @@ static void bufferReserveCommit(benchmark::State& state) {
   auto size = state.range(0);
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
-    for (size_t i = 0; i < 1024; i++) {
-      Buffer::Reservation reservation = buffer.reserveForReadWithLengthForTest(size);
-      reservation.commit(reservation.length());
-      if (buffer.length() >= MaxBufferLength) {
-        buffer.drain(buffer.length());
-      }
+    Buffer::Reservation reservation = buffer.reserveForReadWithLengthForTest(size);
+    reservation.commit(reservation.length());
+    if (buffer.length() >= MaxBufferLength) {
+      buffer.drain(buffer.length());
     }
   }
   benchmark::DoNotOptimize(buffer.length());
@@ -329,13 +327,11 @@ static void bufferReserveCommitPartial(benchmark::State& state) {
   auto size = state.range(0);
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
-    for (size_t i = 0; i < 1024; i++) {
-      Buffer::Reservation reservation = buffer.reserveForReadWithLengthForTest(size);
-      // Commit one byte from the first slice and nothing from any subsequent slice.
-      reservation.commit(1);
-      if (buffer.length() >= MaxBufferLength) {
-        buffer.drain(buffer.length());
-      }
+    Buffer::Reservation reservation = buffer.reserveForReadWithLengthForTest(size);
+    // Commit one byte from the first slice and nothing from any subsequent slice.
+    reservation.commit(1);
+    if (buffer.length() >= MaxBufferLength) {
+      buffer.drain(buffer.length());
     }
   }
   benchmark::DoNotOptimize(buffer.length());
