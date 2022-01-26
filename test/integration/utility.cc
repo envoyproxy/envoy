@@ -227,7 +227,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
     local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
   }
   Network::ClientConnectionPtr connection = Quic::createQuicNetworkConnection(
-      *persistent_info, *dispatcher, addr, local_address, quic_stat_names, mock_stats_store);
+      *persistent_info, *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store);
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
   // Quic connection needs to finish handshake.

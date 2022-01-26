@@ -55,7 +55,7 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   PersistentQuicInfoImpl info{dispatcher_, *factory_, simTime(), test_address_, config, 45};
 
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
-      info, dispatcher_, test_address_, test_address_, quic_stat_names_, store_);
+      info, dispatcher_, test_address_, test_address_, quic_stat_names_, {}, store_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
   client_connection->connect();

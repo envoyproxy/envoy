@@ -14,18 +14,27 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
     quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
-    QuicStatNames& quic_stat_names, Stats::Scope& scope)
+    QuicStatNames& quic_stat_names, OptRef<Http::AlternateProtocolsCache> rtt_cache,
+    Stats::Scope& scope)
     : QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
                                       send_buffer_limit,
                                       std::make_shared<QuicSslConnectionInfo>(*this)),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get(), push_promise_index),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
-      quic_stat_names_(quic_stat_names), scope_(scope) {
+      quic_stat_names_(quic_stat_names), rtt_cache_(rtt_cache), scope_(scope) {
   streamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
 }
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
+  if (OneRttKeysAvailable() && rtt_cache_) {
+    const quic::QuicConnectionStats& stats = connection()->GetStats();
+    int64_t srtt = stats.srtt_us;
+    int64_t bytes_per_second = stats.estimated_bandwidth.ToBytesPerSecond();
+    Http::AlternateProtocolsCache::Origin origin("https", server_id().host(), server_id().port());
+    rtt_cache_->setRttBandwidth(origin, srtt, bytes_per_second);
+  }
+  // Pass up connection stats.
   ASSERT(!connection()->connected());
   network_connection_ = nullptr;
 }

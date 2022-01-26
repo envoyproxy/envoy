@@ -36,10 +36,10 @@ AlternateProtocolsCacheImpl::stringToOrigin(const std::string& str) {
   return {};
 }
 
-std::string AlternateProtocolsCacheImpl::protocolsToStringForCache(
-    const std::vector<AlternateProtocol>& protocols, TimeSource& /*time_source*/) {
+std::string AlternateProtocolsCacheImpl::originDataToStringForCache(
+    const std::vector<AlternateProtocol>& protocols, int64_t srtt, int64_t bandwidth) {
   if (protocols.empty()) {
-    return std::string("clear");
+    return std::string("clear|0|0");
   }
   std::string value;
   for (auto& protocol : protocols) {
@@ -55,15 +55,29 @@ std::string AlternateProtocolsCacheImpl::protocolsToStringForCache(
         std::chrono::duration_cast<std::chrono::seconds>(protocol.expiration_.time_since_epoch())
             .count());
   }
+  absl::StrAppend(&value, "|", srtt, "|", bandwidth);
   return value;
 }
 
-absl::optional<std::vector<AlternateProtocolsCache::AlternateProtocol>>
-AlternateProtocolsCacheImpl::protocolsFromString(absl::string_view alt_svc_string,
-                                                 TimeSource& time_source, bool from_cache) {
-  std::vector<AlternateProtocol> protocols;
+absl::optional<AlternateProtocolsCacheImpl::OriginData>
+AlternateProtocolsCacheImpl::originDataFromString(absl::string_view origin_data_string,
+                                                  TimeSource& time_source, bool from_cache) {
+  OriginData data;
+  const std::vector<absl::string_view> parts = absl::StrSplit(origin_data_string, '|');
+  if (parts.size() == 3) {
+    if (!absl::SimpleAtoi(parts[1], &data.srtt) || !absl::SimpleAtoi(parts[2], &data.bandwidth)) {
+      return {};
+    }
+  } else if (parts.size() != 1) {
+    return {};
+  } else {
+    // Handling raw alt-svc with no endpoint info
+    data.srtt = 0;
+    data.bandwidth = 0;
+  }
+
   spdy::SpdyAltSvcWireFormat::AlternativeServiceVector altsvc_vector;
-  if (!spdy::SpdyAltSvcWireFormat::ParseHeaderFieldValue(alt_svc_string, &altsvc_vector)) {
+  if (!spdy::SpdyAltSvcWireFormat::ParseHeaderFieldValue(parts[0], &altsvc_vector)) {
     return {};
   }
   for (const auto& alt_svc : altsvc_vector) {
@@ -82,9 +96,9 @@ AlternateProtocolsCacheImpl::protocolsFromString(absl::string_view alt_svc_strin
     }
     Http::AlternateProtocolsCache::AlternateProtocol protocol(alt_svc.protocol_id, alt_svc.host,
                                                               alt_svc.port, expiration);
-    protocols.push_back(protocol);
+    data.protocols.push_back(protocol);
   }
-  return protocols;
+  return data;
 }
 
 AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
@@ -93,11 +107,11 @@ AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
       max_entries_(max_entries > 0 ? max_entries : 1024) {
   if (key_value_store_) {
     KeyValueStore::ConstIterateCb load = [this](const std::string& key, const std::string& value) {
-      absl::optional<std::vector<AlternateProtocolsCache::AlternateProtocol>> protocols =
-          protocolsFromString(value, time_source_, true);
+      absl::optional<OriginData> origin_data = originDataFromString(value, time_source_, true);
       absl::optional<Origin> origin = stringToOrigin(key);
-      if (protocols.has_value() && origin.has_value()) {
-        setAlternativesImpl(origin.value(), protocols.value());
+      if (origin_data.has_value() && origin.has_value()) {
+        setAlternativesImpl(origin.value(), origin_data.value().protocols);
+        setRttBandwidth(origin.value(), origin_data.value().srtt, origin_data.value().bandwidth);
       } else {
         ENVOY_LOG(warn,
                   fmt::format("Unable to parse cache entry with key: {} value: {}", key, value));
@@ -115,8 +129,21 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
   setAlternativesImpl(origin, protocols);
   if (key_value_store_) {
     key_value_store_->addOrUpdate(originToString(origin),
-                                  protocolsToStringForCache(protocols, time_source_));
+                                  originDataToStringForCache(protocols, 0, 0));
   }
+}
+
+void AlternateProtocolsCacheImpl::setRttBandwidth(const Origin& origin, int64_t srtt,
+                                                  int64_t bytes_per_second) {
+  auto entry_it = protocols_.find(origin);
+  if (entry_it == protocols_.end()) {
+    return;
+  }
+  entry_it->second.srtt = srtt;
+  entry_it->second.bandwidth = bytes_per_second;
+  key_value_store_->addOrUpdate(
+      originToString(origin),
+      originDataToStringForCache(entry_it->second.protocols, srtt, bytes_per_second));
 }
 
 void AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
@@ -131,7 +158,7 @@ void AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
     key_value_store_->remove(originToString(iter->first));
     protocols_.erase(iter);
   }
-  protocols_[origin] = protocols;
+  protocols_[origin] = OriginData{protocols, 0, 0};
 }
 
 OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>>
@@ -140,7 +167,7 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
   if (entry_it == protocols_.end()) {
     return makeOptRefFromPtr<const std::vector<AlternateProtocol>>(nullptr);
   }
-  std::vector<AlternateProtocol>& protocols = entry_it->second;
+  std::vector<AlternateProtocol>& protocols = entry_it->second.protocols;
 
   auto original_size = protocols.size();
   const MonotonicTime now = time_source_.monotonicTime();
@@ -158,8 +185,9 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
     return makeOptRefFromPtr<const std::vector<AlternateProtocol>>(nullptr);
   }
   if (key_value_store_ && original_size != protocols.size()) {
-    key_value_store_->addOrUpdate(originToString(origin),
-                                  protocolsToStringForCache(protocols, time_source_));
+    key_value_store_->addOrUpdate(
+        originToString(origin),
+        originDataToStringForCache(protocols, entry_it->second.srtt, entry_it->second.bandwidth));
   }
 
   return makeOptRef(const_cast<const std::vector<AlternateProtocol>&>(protocols));
