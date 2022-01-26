@@ -124,6 +124,7 @@ class StatsHandler::Render {
   virtual void generate(Buffer::Instance& response, const std::string& name,
                         const Stats::ParentHistogram& histogram) PURE;
   virtual void render(Buffer::Instance& response) PURE;
+  virtual bool nextChunk(Buffer::Instance& response) PURE;
 };
 
 class StatsHandler::TextRender : public StatsHandler::Render {
@@ -143,6 +144,9 @@ class StatsHandler::TextRender : public StatsHandler::Render {
   }
 
   void render(Buffer::Instance&) override {}
+  bool nextChunk(Buffer::Instance& response) override {
+    return response.length() > 2000000;
+  }
 };
 
 #if 0
@@ -269,7 +273,7 @@ void StatsHandler::Context::startPhase() {
   // empty prefix.
   auto iter = stat_map_.find("");
   if (iter != stat_map_.end()) {
-    StatOrScopes variant = iter->second;
+    StatOrScopes variant = std::move(iter->second);
     stat_map_.erase(iter);
     auto& scope_vec = absl::get<ScopeVec>(variant);
     populateStatsForCurrentPhase(scope_vec);
@@ -308,12 +312,27 @@ template<class SharedStatType> void StatsHandler::Context::renderStat(
 }
 
 Http::Code StatsHandler::Context::writeChunk(Buffer::Instance& response) {
-  for (uint32_t i = 0; i < num_stats_per_chunk_ && !stat_map_.empty(); ++i) {
+  while (!render_->nextChunk(response)) {
+    while (stat_map_.empty()) {
+      switch (phase_) {
+        case Phase::TextReadouts:
+          phase_ = Phase::CountersAndGauges;
+          startPhase();
+          break;
+        case Phase::CountersAndGauges:
+          phase_ = Phase::Histograms;
+          startPhase();
+          break;
+        case Phase::Histograms:
+          return Http::Code::OK;
+      }
+    }
+
     auto iter = stat_map_.begin();
-    StatOrScopes variant = iter->second;
+    StatOrScopes variant = std::move(iter->second);
     stat_map_.erase(iter);
     switch (variant.index()) {
-      case 0: populateStatsForCurrentPhase(absl::get<ScopeVec>(variant)); --i; break;
+      case 0: populateStatsForCurrentPhase(absl::get<ScopeVec>(variant)); break;
       case 1: renderStat<Stats::TextReadoutSharedPtr>(response, variant); break;
       case 2: renderStat<Stats::CounterSharedPtr>(response, variant); break;
       case 3: renderStat<Stats::GaugeSharedPtr>(response, variant); break;
@@ -324,20 +343,6 @@ Http::Code StatsHandler::Context::writeChunk(Buffer::Instance& response) {
           render_->generate(response, parent_histogram->name(), *parent_histogram);
         }
       }
-    }
-  }
-  if (stat_map_.empty()) {
-    switch (phase_) {
-      case Phase::TextReadouts:
-        phase_ = Phase::CountersAndGauges;
-        startPhase();
-        break;
-      case Phase::CountersAndGauges:
-        phase_ = Phase::Histograms;
-        startPhase();
-        break;
-      case Phase::Histograms:
-        return Http::Code::OK;
     }
   }
   return Http::Code::Continue;
