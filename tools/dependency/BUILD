@@ -45,7 +45,8 @@ py_binary(
         "//source/extensions:extensions_build_config",
     ],
     deps = [
-        "//tools/base:bazel_query",
+        "@envoy_repo",
+        requirement("aio.api.bazel"),
     ],
 )
 

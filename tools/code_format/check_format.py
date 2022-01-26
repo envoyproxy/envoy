@@ -1186,7 +1186,6 @@ if __name__ == "__main__":
             '@ggreenway',
             '@phlax',
             '@wrowe',
-            '@davinci26',
             '@rojkov',
             '@RyanTheOptimist',
             '@adisuissa',
