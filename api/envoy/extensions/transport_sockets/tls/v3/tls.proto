@@ -131,15 +131,15 @@ message TlsKeyLog {
   // The path to save the TLS key log.
   string tls_keylog_path = 1 [(validate.rules).string = {min_len: 1}];
 
-  // At least one of src or dst must be specified, or no key logs will be saved for any connections.
-  // If port is set to  0, any port will be matched.
-  // The src IP address/port that will be used to filter the connection which should save the TLS key log
-  // If it is not set, any src IP address/port  will be matched.
-  config.core.v3.Address tls_keylog_src = 2;
+  // At least one of src or dst must be specified, or the config will be rejected as invalid.
 
-  // The dst IP address/port  that will be used to filter the connection which should save the TLS key log
-  // If it is not set, any dst IP address/port will be matched.
-  config.core.v3.Address tls_keylog_dst = 3;
+  // The src IP address that will be used to filter the connection which should save the TLS key log
+  // If it is not set, any src IP address  will be matched.
+  repeated config.core.v3.CidrRange tls_keylog_src = 2;
+
+  // The dst IP address that will be used to filter the connection which should save the TLS key log
+  // If it is not set, any dst IP address will be matched.
+  repeated config.core.v3.CidrRange tls_keylog_dst = 3;
 }
 
 // TLS context shared by both client and server TLS contexts.

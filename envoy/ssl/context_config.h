@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "source/common/network/cidr_range.h"
 #include "envoy/common/pure.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/handshaker.h"
@@ -92,9 +93,9 @@ public:
 
   virtual const std::string& getTlsKeyLogPath() const PURE;
 
-  virtual Network::Address::InstanceConstSharedPtr getTlsKeyLogSrc() const PURE;
+  virtual const Network::Address::IpList& getTlsKeyLogSrc() const PURE;
 
-  virtual Network::Address::InstanceConstSharedPtr getTlsKeyLogDst() const PURE;
+  virtual const Network::Address::IpList& getTlsKeyLogDst() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {

@@ -10,6 +10,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
 #include "source/common/network/utility.h"
+#include "source/common/network/cidr_range.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
@@ -185,15 +186,8 @@ ContextConfigImpl::ContextConfigImpl(
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
                                                 default_max_protocol_version)),
       factory_context_(factory_context), tls_keylog_path_(config.tls_keylog().tls_keylog_path()),
-      tls_keylog_src_(nullptr), tls_keylog_dst_(nullptr) {
-  if (config.tls_keylog().has_tls_keylog_src()) {
-    tls_keylog_src_ =
-        Network::Utility::protobufAddressToAddress(config.tls_keylog().tls_keylog_src());
-  }
-  if (config.tls_keylog().has_tls_keylog_dst()) {
-    tls_keylog_dst_ =
-        Network::Utility::protobufAddressToAddress(config.tls_keylog().tls_keylog_dst());
-  }
+      tls_keylog_src_(config.tls_keylog().tls_keylog_src()),
+      tls_keylog_dst_(config.tls_keylog().tls_keylog_dst()) {
   if (certificate_validation_context_provider_ != nullptr) {
     if (default_cvc_) {
       // We need to validate combined certificate validation context.

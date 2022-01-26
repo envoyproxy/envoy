@@ -479,29 +479,21 @@ bool ServerSslSocketFactory::tlsKeyLogMatch(
   bool enable_src = false;
   bool match_dst = false;
   bool enable_dst = false;
-  uint32_t ip_addr_dst = 0, ip_addr_src = 0;
-  uint32_t ip_addr_src_config = 0, ip_addr_dst_config = 0;
 
-  if (local != nullptr && local->ip() != nullptr && local->ip()->ipv4() != nullptr) {
-    ip_addr_dst = local->ip()->ipv4()->address();
-  }
-  if (remote != nullptr && remote->ip() != nullptr && remote->ip()->ipv4() != nullptr) {
-    ip_addr_src = remote->ip()->ipv4()->address();
-  }
-  if (src_ip != nullptr && src_ip->ip() != nullptr && src_ip->ip()->ipv4() != nullptr) {
+  if (src_ip.getIpListSize() > 0) {
     enable_src = true;
-    ip_addr_src_config = src_ip->ip()->ipv4()->address();
-    match_src = (ip_addr_src_config == ip_addr_src) &&
-                (src_ip->ip()->port() == 0 || src_ip->ip()->port() == remote->ip()->port());
+    if (src_ip.contains(*remote)) {
+      match_src = true;
+    }
   }
-  if (dst_ip != nullptr && dst_ip->ip() != nullptr && dst_ip->ip()->ipv4() != nullptr) {
+  if (dst_ip.getIpListSize() > 0) {
     enable_dst = true;
-    ip_addr_dst_config = dst_ip->ip()->ipv4()->address();
-    match_dst = (ip_addr_dst_config == ip_addr_dst) &&
-                (dst_ip->ip()->port() == 0 || dst_ip->ip()->port() == local->ip()->port());
+    if (dst_ip.contains(*local)) {
+      match_dst = true;
+    }
   }
-  ENVOY_LOG(trace, "Packet src ip: {}, dst ip: {}, configured src ip: {}, dst ip: {}", ip_addr_src,
-            ip_addr_dst, ip_addr_src_config, ip_addr_dst_config);
+  ENVOY_LOG(trace, "enable_src: {}, enable_dst:{},match_src:{}, match_dst:{}", enable_src,
+            enable_dst, match_src, match_dst);
   if (enable_src) {
     if (enable_dst) {
       match = match_src && match_dst;

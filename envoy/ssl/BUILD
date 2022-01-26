@@ -31,6 +31,7 @@ envoy_cc_library(
         ":certificate_validation_context_config_interface",
         ":handshaker_interface",
         ":tls_certificate_config_interface",
+        "//source/common/network:cidr_range_interface",
     ],
 )
 

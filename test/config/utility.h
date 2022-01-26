@@ -112,6 +112,8 @@ public:
   initializeTls(const ServerSslOptions& options,
                 envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_context);
 
+  static void initializeTlsKeyLog(
+      envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context);
   using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v3::Bootstrap&)>;
   using HttpModifierFunction = std::function<void(HttpConnectionManager&)>;
 

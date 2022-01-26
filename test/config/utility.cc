@@ -1212,6 +1212,16 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
   return true;
 }
 
+void ConfigHelper::initializeTlsKeyLog(
+    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
+  auto tls_keylog_path = common_tls_context.mutable_tls_keylog()->mutable_tls_keylog_path();
+  auto tls_keylog_dst = common_tls_context.mutable_tls_keylog()->mutable_tls_keylog_dst();
+  auto new_element = tls_keylog_dst->Add();
+  new_element->set_address_prefix({{"127.0.0.1"}});
+  new_element->mutable_prefix_len()->set_value(32);
+  *tls_keylog_path = std::string("/dev/null");
+}
+
 void ConfigHelper::initializeTls(
     const ServerSslOptions& options,
     envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
@@ -1260,14 +1270,7 @@ void ConfigHelper::initializeTls(
     *validation_context->mutable_match_typed_subject_alt_names() = {options.san_matchers_.begin(),
                                                                     options.san_matchers_.end()};
   }
-  auto tls_keylog_path = common_tls_context.mutable_tls_keylog()->mutable_tls_keylog_path();
-  auto tls_keylog_src = common_tls_context.mutable_tls_keylog()->mutable_tls_keylog_src();
-  auto tls_keylog_dst = common_tls_context.mutable_tls_keylog()->mutable_tls_keylog_dst();
-  *tls_keylog_path = std::string("/dev/null");
-  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("127.0.0.1"),
-                                             *tls_keylog_src);
-  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("127.0.0.1"),
-                                             *tls_keylog_dst);
+  initializeTlsKeyLog(common_tls_context);
 }
 
 void ConfigHelper::renameListener(const std::string& name) {
