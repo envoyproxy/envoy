@@ -31,6 +31,7 @@ Removed Config or Runtime
 * access_log: removed ``envoy.reloadable_features.unquote_log_string_values`` and legacy code paths.
 * grpc_bridge_filter: removed ``envoy.reloadable_features.grpc_bridge_stats_disabled`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.hash_multiple_header_values`` and legacy code paths.
+* http: removed ``envoy.reloadable_features.no_chunked_encoding_header_for_304`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.preserve_downstream_scheme`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.require_strict_1xx_and_204_response_headers`` and ``envoy.reloadable_features.send_strict_1xx_and_204_response_headers`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.strip_port_from_connect`` and legacy code paths.
