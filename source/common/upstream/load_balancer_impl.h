@@ -342,9 +342,8 @@ private:
       return HostsSource::SourceType::LocalityHealthyHosts;
     case HostAvailability::Degraded:
       return HostsSource::SourceType::LocalityDegradedHosts;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   static HostsSource::SourceType sourceType(HostAvailability host_availability) {
@@ -353,9 +352,8 @@ private:
       return HostsSource::SourceType::HealthyHosts;
     case HostAvailability::Degraded:
       return HostsSource::SourceType::DegradedHosts;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   // The set of local Envoy instances which are load balancing across priority_set_.

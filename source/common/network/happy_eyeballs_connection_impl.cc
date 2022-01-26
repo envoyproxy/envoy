@@ -15,7 +15,7 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
       connection_construction_state_(
           {source_address, socket_factory, transport_socket_options, options}),
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
-  ENVOY_LOG(trace, "New connection.");
+  ENVOY_LOG_EVENT(debug, "happy_eyeballs_new_cx", "[C{}] addresses={}", id_, address_list_.size());
   connections_.push_back(createNextConnection());
 }
 
@@ -71,7 +71,7 @@ void HappyEyeballsConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
       return;
     }
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("Failed to remove read filter");
 }
 
 bool HappyEyeballsConnectionImpl::initializeReadFilters() {
@@ -306,7 +306,7 @@ void HappyEyeballsConnectionImpl::removeConnectionCallbacks(ConnectionCallbacks&
       return;
     }
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("Failed to remove connection callbacks");
 }
 
 void HappyEyeballsConnectionImpl::close(ConnectionCloseType type) {
@@ -425,6 +425,7 @@ ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
       connection_construction_state_.socket_factory_.createTransportSocket(
           connection_construction_state_.transport_socket_options_),
       connection_construction_state_.options_);
+  ENVOY_LOG_EVENT(debug, "happy_eyeballs_cx_attempt", "C[{}] address={}", id_, next_address_);
   callbacks_wrappers_.push_back(std::make_unique<ConnectionCallbacksWrapper>(*this, *connection));
   connection->addConnectionCallbacks(*callbacks_wrappers_.back());
 
@@ -472,8 +473,11 @@ void HappyEyeballsConnectionImpl::maybeScheduleNextAttempt() {
 
 void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
                                           ConnectionCallbacksWrapper* wrapper) {
-  if (event != ConnectionEvent::Connected) {
-    ENVOY_LOG(trace, "Connection failed to connect");
+  if (event == ConnectionEvent::Connected) {
+    ENVOY_CONN_LOG_EVENT(debug, "happy_eyeballs_cx_ok", "address={}", *this, next_address_);
+  } else {
+    ENVOY_CONN_LOG_EVENT(debug, "happy_eyeballs_cx_attempt_failed", "address={}", *this,
+                         next_address_);
     // This connection attempt has failed. If possible, start another connection attempt
     // immediately, instead of waiting for the timer.
     if (next_address_ < address_list_.size()) {
@@ -490,6 +494,8 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
     ASSERT(connections_.size() == 1);
     // This connection attempt failed but there are no more attempts to be made, so pass
     // the failure up by setting up this connection as the final one.
+    ENVOY_CONN_LOG_EVENT(debug, "happy_eyeballs_cx_failed", "addresses={}", *this,
+                         address_list_.size());
   }
 
   // Close all other connections and configure the final connection.

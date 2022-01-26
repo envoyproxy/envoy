@@ -2611,28 +2611,6 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
   ASSERT_TRUE(response->waitForEndStream());
 }
 
-TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeoutLegacy) {
-  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_response_for_timeout",
-                                    "false");
-  config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-
-  test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
-  ASSERT_TRUE(response->waitForReset());
-  EXPECT_FALSE(response->complete());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("max_duration_timeout"));
-}
-
 TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionReached) {
   config_helper_.setDownstreamMaxRequestsPerConnection(2);
   initialize();
@@ -2718,6 +2696,24 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
     ASSERT_TRUE(response->waitForReset());
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, ExtendedConnectIsBlocked) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "CONNECT"},
+                                                                 {":protocol", "bytestream"},
+                                                                 {":path", "/"},
+                                                                 {":authority", "host.com:80"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 // Make sure that with override_stream_error_on_invalid_http_message true, CONNECT
@@ -3540,7 +3536,7 @@ public:
   bool supportsUdpGso() const override { return false; }
 };
 
-TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
+TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
   // Make sure for HTTP/3 Envoy will use sendmsg, so the write_matcher will work.
   NoUdpGso reject_gso_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&reject_gso_};
@@ -3567,9 +3563,95 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
   socket_swap.write_matcher_->setWriteOverride(nullptr);
+  // Shut down the server and upstreams before os_calls goes out of scope to avoid syscalls
+  // during its removal.
+  test_server_.reset();
+  cleanupUpstreamAndDownstream();
+  fake_upstreams_.clear();
+}
+
+TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
+#ifdef WIN32
+  // Debug info for https://github.com/envoyproxy/envoy/issues/19430
+  LogLevelSetter save_levels(spdlog::level::trace);
+#endif
+  SocketInterfaceSwap socket_swap;
+
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto downstream_request = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Make sure the headers made it through.
+  waitForNextUpstreamConnection(std::vector<uint64_t>{0}, TestUtility::DefaultTimeout,
+                                fake_upstream_connection_);
+  AssertionResult result =
+      fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Makes us have Envoy's writes to upstream return EBADF
+  Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
+  socket_swap.write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  socket_swap.write_matcher_->setWriteOverride(ebadf);
+
+  Buffer::OwnedImpl data("HTTP body content goes here");
+  codec_client_->sendData(*downstream_request, data, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              HasSubstr("upstream_reset_before_response_started{connection_termination}"));
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  socket_swap.write_matcher_->setWriteOverride(nullptr);
   // Shut down the server before os_calls goes out of scope to avoid syscalls
   // during its removal.
   test_server_.reset();
 }
+
+#ifdef NDEBUG
+// These tests send invalid request and response header names which violate ASSERT while creating
+// such request/response headers. So they can only be run in NDEBUG mode.
+TEST_P(DownstreamProtocolIntegrationTest, InvalidReqestHeaderName) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":authority", "host"},
+                                                                 {"foo\nname", "foo_value"}});
+  auto response = std::move(encoder_decoder.second);
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().getStatusValue());
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
+  } else {
+    ASSERT_TRUE(response->waitForReset());
+    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+  }
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, InvalidResponseHeaderName) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"foo\rname", "foo_value"}}, false);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("502", response->headers().getStatusValue());
+  test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
+}
+#endif
 
 } // namespace Envoy

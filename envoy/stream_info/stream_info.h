@@ -89,8 +89,10 @@ enum ResponseFlag {
   NoClusterFound = 0x1000000,
   // Overload Manager terminated the stream.
   OverloadManager = 0x2000000,
+  // DNS resolution failed.
+  DnsResolutionFailed = 0x4000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = OverloadManager,
+  LastFlag = DnsResolutionFailed,
 };
 
 /**
@@ -345,6 +347,17 @@ public:
    * @return the ID of the upstream connection, or absl::nullopt if not available.
    */
   virtual absl::optional<uint64_t> upstreamConnectionId() const PURE;
+
+  /**
+   * @param interface name of the upstream connection's local socket.
+   */
+  virtual void setUpstreamInterfaceName(absl::string_view interface_name) PURE;
+
+  /**
+   * @return interface name of the upstream connection's local socket, or absl::nullopt if not
+   * available.
+   */
+  virtual absl::optional<absl::string_view> upstreamInterfaceName() const PURE;
 
   /**
    * @param connection_info sets the upstream ssl connection.

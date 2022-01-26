@@ -106,6 +106,7 @@ EXTENSIONS = {
     "envoy.filters.http.set_metadata":                  "//source/extensions/filters/http/set_metadata:config",
     "envoy.filters.http.tap":                           "//source/extensions/filters/http/tap:config",
     "envoy.filters.http.wasm":                          "//source/extensions/filters/http/wasm:config",
+    "envoy.filters.http.stateful_session":              "//source/extensions/filters/http/stateful_session:config",
 
     #
     # Listener filters
@@ -281,6 +282,12 @@ EXTENSIONS = {
 
     "envoy.http.original_ip_detection.custom_header":        "//source/extensions/http/original_ip_detection/custom_header:config",
     "envoy.http.original_ip_detection.xff":                  "//source/extensions/http/original_ip_detection/xff:config",
+
+    #
+    # Stateful session
+    #
+
+    "envoy.http.stateful_session.cookie":                "//source/extensions/http/stateful_session/cookie:config",
 
     #
     # Quic extensions

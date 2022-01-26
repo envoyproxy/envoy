@@ -45,6 +45,7 @@ public:
   constexpr static absl::string_view UPSTREAM_PROTOCOL_ERROR = "UPE";
   constexpr static absl::string_view NO_CLUSTER_FOUND = "NC";
   constexpr static absl::string_view OVERLOAD_MANAGER = "OM";
+  constexpr static absl::string_view DNS_FAIL = "DF";
 
   static constexpr std::array ALL_RESPONSE_STRING_FLAGS{
       FlagStringAndEnum{FAILED_LOCAL_HEALTH_CHECK, ResponseFlag::FailedLocalHealthCheck},
