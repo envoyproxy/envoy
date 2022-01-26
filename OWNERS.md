@@ -70,7 +70,7 @@ without further review.
 * William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
 * Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
 * Tim Walsh ([twghu](https://github.com/twghu)) (walsh@redhat.com)
-* ([phlax](https://github.com/phlax))
+* Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
 
 In addition to the permanent Envoy security team, we have additional temporary
 contributors to envoy-setec and relevant Slack channels from:
