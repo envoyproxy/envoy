@@ -271,7 +271,6 @@ public:
   MOCK_METHOD(bool, includeCounter, (const Counter&));
   MOCK_METHOD(bool, includeGauge, (const Gauge&));
   MOCK_METHOD(bool, includeTextReadout, (const TextReadout&));
-  MOCK_METHOD(bool, includeHistogram, (const Histogram&));
 };
 
 class MockStore : public TestUtil::TestStore {
@@ -300,7 +299,6 @@ public:
   MOCK_METHOD(void, forEachGauge, (SizeFn, StatFn<Gauge>), (const));
   MOCK_METHOD(void, forEachTextReadout, (SizeFn, StatFn<TextReadout>), (const));
   MOCK_METHOD(void, forEachHistogram, (SizeFn, StatFn<ParentHistogram>), (const));
-  MOCK_METHOD(void, forEachSinkedHistogram, (SizeFn, StatFn<ParentHistogram>), (const));
 
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));

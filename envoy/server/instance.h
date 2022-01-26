@@ -277,7 +277,7 @@ public:
   virtual bool enableReusePortDefault() PURE;
 
   /**
-   * Set predicates for filtering stats to be flushed to sinks.
+   * Set predicates for filtering counters, gauges and text readouts to be flushed to sinks.
    */
   virtual void
   setSinkPredicates(std::unique_ptr<Envoy::Stats::SinkPredicates>&& sink_predicates) PURE;

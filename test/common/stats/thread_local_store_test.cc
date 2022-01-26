@@ -1656,78 +1656,6 @@ TEST_F(HistogramTest, ForEachHistogram) {
   EXPECT_EQ(deleted_histogram.unit(), Histogram::Unit::Unspecified);
 }
 
-TEST_F(HistogramTest, ForEachSinkedHistogram) {
-  StatNamePool pool(store_->symbolTable());
-
-  std::unique_ptr<TestUtil::TestSinkPredicates> sink_predicates =
-      std::make_unique<TestUtil::TestSinkPredicates>();
-  std::vector<std::reference_wrapper<Histogram>> sinked_histograms;
-  std::vector<std::reference_wrapper<Histogram>> unsinked_histograms;
-
-  const size_t num_stats = 11;
-  // Create some histograms before setting the predicates.
-  for (size_t idx = 0; idx < num_stats / 2; ++idx) {
-    auto name = absl::StrCat("histogram.", idx);
-    StatName stat_name = pool.add(name);
-    //  sink every 3rd stat
-    if ((idx + 1) % 3 == 0) {
-      sink_predicates->sinkedStatNames().insert(stat_name);
-      sinked_histograms.emplace_back(
-          store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
-    } else {
-      unsinked_histograms.emplace_back(
-          store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
-    }
-  }
-
-  store_->setSinkPredicates(std::move(sink_predicates));
-
-  // Create some histograms after setting the predicates.
-  for (size_t idx = num_stats / 2; idx < num_stats; ++idx) {
-    auto name = absl::StrCat("histogram.", idx);
-    StatName stat_name = pool.add(name);
-    // sink every 3rd stat
-    if ((idx + 1) % 3 == 0) {
-      static_cast<TestUtil::TestSinkPredicates*>(store_->sinkPredicates().ptr())
-          ->sinkedStatNames()
-          .insert(stat_name);
-      sinked_histograms.emplace_back(
-          store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
-    } else {
-      unsinked_histograms.emplace_back(
-          store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
-    }
-  }
-
-  EXPECT_EQ(sinked_histograms.size(), 3);
-  EXPECT_EQ(unsinked_histograms.size(), 8);
-
-  size_t num_sinked_histograms = 0;
-  size_t num_iterations = 0;
-  store_->forEachSinkedHistogram(
-      [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
-      [&num_iterations, sink_predicates = static_cast<TestUtil::TestSinkPredicates*>(
-                            store_->sinkPredicates().ptr())](ParentHistogram& histogram) {
-        EXPECT_NE(sink_predicates->sinkedStatNames().find(histogram.statName()),
-                  sink_predicates->sinkedStatNames().end());
-        ++num_iterations;
-      });
-  EXPECT_EQ(num_sinked_histograms, 3);
-  EXPECT_EQ(num_iterations, 3);
-
-  // Verify that rejecting histograms removes them from the sink set.
-  envoy::config::metrics::v3::StatsConfig stats_config_;
-  stats_config_.mutable_stats_matcher()->set_reject_all(true);
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
-  num_sinked_histograms = 0;
-  num_iterations = 0;
-  store_->forEachSinkedHistogram(
-      [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
-      [&num_iterations](ParentHistogram&) { ++num_iterations; });
-  EXPECT_EQ(num_sinked_histograms, 0);
-  EXPECT_EQ(num_iterations, 0);
-}
-
 class ThreadLocalRealThreadsTestBase : public Thread::RealThreadsTestHelper,
                                        public ThreadLocalStoreNoMocksTestBase {
 protected:
@@ -1974,52 +1902,6 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
 
   shutdownThreading();
   store_->histogramFromString("histogram_after_shutdown", Histogram::Unit::Unspecified);
-}
-
-// Verify that histograms that are not flushed to sinks are merged in the call
-// to mergeHistograms
-TEST_F(HistogramTest, UnsinkedHistogramsAreMerged) {
-  StatNamePool pool(store_->symbolTable());
-  store_->setSinkPredicates(std::make_unique<TestUtil::TestSinkPredicates>());
-  auto& sink_predicates =
-      static_cast<TestUtil::TestSinkPredicates&>(store_->sinkPredicates().ref());
-  StatName stat_name = pool.add("h1");
-  sink_predicates.sinkedStatNames().insert(stat_name);
-
-  auto& h1 = static_cast<ParentHistogramImpl&>(
-      store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
-  stat_name = pool.add("h2");
-  auto& h2 = static_cast<ParentHistogramImpl&>(
-      store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
-
-  EXPECT_EQ("h1", h1.name());
-  EXPECT_EQ("h2", h2.name());
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 5));
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 5));
-
-  h1.recordValue(5);
-  h2.recordValue(5);
-
-  EXPECT_THAT(h1.cumulativeStatistics().bucketSummary(), HasSubstr(" B10: 0,"));
-  EXPECT_THAT(h2.cumulativeStatistics().bucketSummary(), HasSubstr(" B10: 0,"));
-
-  store_->mergeHistograms([this, &sink_predicates]() -> void {
-    size_t num_iterations = 0;
-    size_t num_sinked_histograms = 0;
-    store_->forEachSinkedHistogram(
-        [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
-        [&num_iterations, &sink_predicates](ParentHistogram& histogram) {
-          EXPECT_NE(sink_predicates.sinkedStatNames().find(histogram.statName()),
-                    sink_predicates.sinkedStatNames().end());
-          ++num_iterations;
-        });
-    EXPECT_EQ(num_sinked_histograms, 1);
-    EXPECT_EQ(num_iterations, 1);
-  });
-
-  EXPECT_THAT(h1.cumulativeStatistics().bucketSummary(), HasSubstr(" B10: 1,"));
-  EXPECT_THAT(h2.cumulativeStatistics().bucketSummary(), HasSubstr(" B10: 1,"));
-  EXPECT_EQ(h1.cumulativeStatistics().bucketSummary(), h2.cumulativeStatistics().bucketSummary());
 }
 
 } // namespace Stats

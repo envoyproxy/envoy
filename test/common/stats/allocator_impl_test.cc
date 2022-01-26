@@ -6,7 +6,6 @@
 
 #include "source/common/stats/allocator_impl.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/thread_factory_for_test.h"
 
@@ -43,6 +42,26 @@ protected:
   AllocatorImpl alloc_;
   StatNamePool pool_;
   bool are_stats_marked_for_deletion_ = false;
+};
+
+class TestSinkPredicates : public SinkPredicates {
+public:
+  ~TestSinkPredicates() override = default;
+  StatNameHashSet& sinkedStatNames() { return sinked_stat_names_; }
+
+  // SinkPredicates
+  bool includeCounter(const Counter& counter) override {
+    return sinked_stat_names_.find(counter.statName()) != sinked_stat_names_.end();
+  }
+  bool includeGauge(const Gauge& gauge) override {
+    return sinked_stat_names_.find(gauge.statName()) != sinked_stat_names_.end();
+  }
+  bool includeTextReadout(const TextReadout& text_readout) override {
+    return sinked_stat_names_.find(text_readout.statName()) != sinked_stat_names_.end();
+  }
+
+private:
+  StatNameHashSet sinked_stat_names_;
 };
 
 // Allocate 2 counters of the same name, and you'll get the same object.
@@ -415,9 +434,9 @@ TEST_F(AllocatorImplTest, AskForDeletedStat) {
 }
 
 TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
-  std::unique_ptr<Stats::TestUtil::TestSinkPredicates> moved_sink_predicates =
-      std::make_unique<Stats::TestUtil::TestSinkPredicates>();
-  Stats::TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
+  std::unique_ptr<TestSinkPredicates> moved_sink_predicates =
+      std::make_unique<TestSinkPredicates>();
+  TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
   std::vector<CounterSharedPtr> sinked_counters;
   std::vector<CounterSharedPtr> unsinked_counters;
 
@@ -461,9 +480,9 @@ TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
 }
 
 TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
-  std::unique_ptr<Stats::TestUtil::TestSinkPredicates> moved_sink_predicates =
-      std::make_unique<Stats::TestUtil::TestSinkPredicates>();
-  Stats::TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
+  std::unique_ptr<TestSinkPredicates> moved_sink_predicates =
+      std::make_unique<TestSinkPredicates>();
+  TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
   std::vector<GaugeSharedPtr> sinked_gauges;
   std::vector<GaugeSharedPtr> unsinked_gauges;
 
@@ -507,9 +526,9 @@ TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
 }
 
 TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
-  std::unique_ptr<Stats::TestUtil::TestSinkPredicates> moved_sink_predicates =
-      std::make_unique<Stats::TestUtil::TestSinkPredicates>();
-  Stats::TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
+  std::unique_ptr<TestSinkPredicates> moved_sink_predicates =
+      std::make_unique<TestSinkPredicates>();
+  TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
   std::vector<TextReadoutSharedPtr> sinked_text_readouts;
   std::vector<TextReadoutSharedPtr> unsinked_text_readouts;
 

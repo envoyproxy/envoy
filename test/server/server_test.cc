@@ -91,7 +91,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   NiceMock<Stats::MockStore> mock_store;
   Stats::ParentHistogramSharedPtr parent_histogram(new Stats::MockParentHistogram());
   std::vector<Stats::ParentHistogramSharedPtr> parent_histograms = {parent_histogram};
-  ON_CALL(mock_store, forEachSinkedHistogram)
+  ON_CALL(mock_store, forEachHistogram)
       .WillByDefault([&](std::function<void(std::size_t)> f_size,
                          std::function<void(Stats::ParentHistogram&)> f_stat) {
         if (f_size != nullptr) {

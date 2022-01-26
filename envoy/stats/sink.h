@@ -69,11 +69,6 @@ public:
    * @return true if @param text_readout needs to be flushed to sinks.
    */
   virtual bool includeTextReadout(const TextReadout& text_readout) PURE;
-
-  /*
-   * @return true if @param histogram needs to be flushed to sinks.
-   */
-  virtual bool includeHistogram(const Histogram& histogram) PURE;
 };
 
 /**
