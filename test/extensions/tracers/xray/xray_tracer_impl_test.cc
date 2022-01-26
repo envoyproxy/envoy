@@ -82,13 +82,13 @@ TEST_F(XRayDriverTest, XRayTraceHeaderWithoutSamplingDecision) {
   request_headers_.addCopy(XRayTraceHeader, "Root=1-272793;Parent=5398ad8;");
   // sampling rules with default fixed_target = 0 & rate = 0
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", R"EOF(
-	 {
-	   "version": 2,
-	   "default": {
-	     "fixed_target": 0,
-	     "rate": 0
-	   }
-	 }
+{
+  "version": 2,
+  "default": {
+    "fixed_target": 0,
+    "rate": 0
+  }
+}
 	     )EOF" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};
   Driver driver(config, context_);
