@@ -30,9 +30,8 @@ EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   if (OneRttKeysAvailable() && rtt_cache_) {
     const quic::QuicConnectionStats& stats = connection()->GetStats();
     int64_t srtt = stats.srtt_us;
-    int64_t bytes_per_second = stats.estimated_bandwidth.ToBytesPerSecond();
     Http::AlternateProtocolsCache::Origin origin("https", server_id().host(), server_id().port());
-    rtt_cache_->setRttBandwidth(origin, srtt, bytes_per_second);
+    rtt_cache_->setRtt(origin, std::chrono::milliseconds(srtt));
   }
   // Pass up connection stats.
   ASSERT(!connection()->connected());

@@ -12,8 +12,7 @@ public:
 
   MOCK_METHOD(void, setAlternatives,
               (const Origin& origin, std::vector<AlternateProtocol>& protocols));
-  MOCK_METHOD(void, setRttBandwidth,
-              (const Origin& origin, int64_t srtt, int64_t bytes_per_second));
+  MOCK_METHOD(void, setRtt, (const Origin& origin, std::chrono::milliseconds srtt));
   MOCK_METHOD(OptRef<const std::vector<AlternateProtocol>>, findAlternatives,
               (const Origin& origin));
   MOCK_METHOD(size_t, size, (), (const));

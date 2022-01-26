@@ -154,7 +154,7 @@ protected:
     size_t seconds = std::chrono::duration_cast<std::chrono::seconds>(
                          timeSystem().monotonicTime().time_since_epoch())
                          .count();
-    std::string value = absl::StrCat("h3=\":", port, "\"; ma=", 86400 + seconds, "|0|0");
+    std::string value = absl::StrCat("h3=\":", port, "\"; ma=", 86400 + seconds, "|0");
     TestEnvironment::writeStringToFileForTest(
         "alt_svc_cache.txt", absl::StrCat(key.length(), "\n", key, value.length(), "\n", value));
   }

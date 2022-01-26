@@ -100,13 +100,12 @@ public:
                                std::vector<AlternateProtocol>& protocols) PURE;
 
   /**
-   * Sets the bandwidth and rtt estimates for an endpoint, assuming the endpoint
+   * Sets the bandwidth and rtt estimates for an origin, assuming the origin
    * exists in the cache.
    * @param origin The origin to set network characteristics for.
    * @param srtt The smothed round trip time for the origin.
-   * @param bytes_per_second the estimated bandwidth in bytes per second.
    */
-  virtual void setRttBandwidth(const Origin& origin, int64_t srtt, int64_t bytes_per_second) PURE;
+  virtual void setRtt(const Origin& origin, std::chrono::milliseconds srtt) PURE;
 
   /**
    * Returns the possible alternative protocols which can be used to connect to the

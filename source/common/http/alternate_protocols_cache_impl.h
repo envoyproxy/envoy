@@ -22,7 +22,7 @@ namespace Http {
 // See: source/docs/http3_upstream.md
 //
 // The primary purpose of this cache is to cache alternate protocols entries.
-// Secondarily, it maps origins to rtt and bandwidth information, useful for
+// Secondarily, it maps origins to rtt information, useful for
 // tuning 0-rtt timeouts if the alternate protocol is HTTP/3.
 class AlternateProtocolsCacheImpl : public AlternateProtocolsCache,
                                     Logger::Loggable<Logger::Id::alternate_protocols_cache> {
@@ -32,11 +32,10 @@ public:
   ~AlternateProtocolsCacheImpl() override;
 
   // Captures the data tracked per origin; the alternate protocols supported,
-  // and last smoothed round trip time and bandwidth, if available.
+  // and last smoothed round trip time, if available.
   struct OriginData {
     std::vector<AlternateProtocol> protocols;
-    int64_t srtt;
-    int64_t bandwidth;
+    std::chrono::milliseconds srtt;
   };
 
   // Converts an Origin to a string which can be parsed by stringToOrigin.
@@ -50,10 +49,10 @@ public:
   // relative time.
   // This function also does not do standards-required normalization. Entries requiring
   // normalization will simply not be read from cache.
-  // The string format is
-  // rtt|bandwidth|protocols
+  // The string format is:
+  // protocols|rtt
   static std::string originDataToStringForCache(const std::vector<AlternateProtocol>& protocols,
-                                                int64_t srtt, int64_t bandwidth);
+                                                std::chrono::milliseconds srtt);
   // Parse an origin data into structured data, or absl::nullopt
   // if it is empty or invalid.
   // If from_cache is true, it is assumed the string was serialized using
@@ -65,7 +64,7 @@ public:
 
   // AlternateProtocolsCache
   void setAlternatives(const Origin& origin, std::vector<AlternateProtocol>& protocols) override;
-  void setRttBandwidth(const Origin& origin, int64_t srtt, int64_t bytes_per_second) override;
+  void setRtt(const Origin& origin, std::chrono::milliseconds srtt) override;
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) override;
   size_t size() const override;
 
