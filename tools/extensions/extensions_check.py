@@ -9,7 +9,9 @@ import sys
 from functools import cached_property
 from typing import Iterator
 
-from envoy.base import checker, utils
+from aio.run import checker
+
+from envoy.base import utils
 
 BUILTIN_EXTENSIONS = (
     "envoy.request_id.uuid", "envoy.upstreams.tcp.generic", "envoy.transport_sockets.tls",
@@ -124,7 +126,7 @@ class ExtensionsChecker(checker.Checker):
         parser.add_argument("--contrib_build_config")
         parser.add_argument("--core_extensions")
 
-    def check_fuzzed(self) -> None:
+    async def check_fuzzed(self) -> None:
         if self.robust_to_downstream_count == self.fuzzed_count:
             return
         self.error(
@@ -133,13 +135,13 @@ class ExtensionsChecker(checker.Checker):
                 f"downstreams are fuzzed by adding them to filterNames() in {FUZZ_TEST_PATH}"
             ])
 
-    def check_metadata(self) -> None:
+    async def check_metadata(self) -> None:
         for extension in self.metadata:
             errors = self._check_metadata(extension)
             if errors:
                 self.error("metadata", errors)
 
-    def check_registered(self) -> None:
+    async def check_registered(self) -> None:
         only_metadata = set(self.metadata.keys()) - self.all_extensions
         missing_metadata = self.all_extensions - set(self.metadata.keys())
 
@@ -186,7 +188,7 @@ class ExtensionsChecker(checker.Checker):
 
 
 def main(*args) -> int:
-    return ExtensionsChecker(*args).run()
+    return ExtensionsChecker(*args)()
 
 
 if __name__ == "__main__":

@@ -5,15 +5,15 @@ This script verifies that bazel query of the build graph is consistent with
 the use_category metadata in bazel/repository_locations.bzl.
 """
 
+import asyncio
 import json
 import pathlib
 import re
 import sys
-from functools import lru_cache
 
-from envoy.base.utils import BazelQueryError
+from aio.api import bazel
 
-from tools.base.bazel_query import query
+import envoy_repo
 
 BAZEL_QUERY_EXTERNAL_DEP_RE = re.compile('@(\w+)//')
 EXTENSION_LABEL_RE = re.compile('(//source/extensions/.*):')
@@ -46,6 +46,9 @@ def test_only_ignore(dep):
     if '_pip3' in dep:
         return True
     return False
+
+
+query = bazel.BazelEnv(envoy_repo.PATH).query
 
 
 class DependencyError(Exception):
@@ -98,7 +101,7 @@ class BuildGraph:
             for untracked_dep in implied_untracked_deps:
                 self._implied_untracked_deps_revmap[untracked_dep] = dep
 
-    def query_external_deps(self, *targets, exclude=None):
+    async def query_external_deps(self, *targets, exclude=None):
         """Query the build graph for transitive external dependencies.
 
         Args:
@@ -114,22 +117,21 @@ class BuildGraph:
             exclude_query = self._filtered_deps_query(exclude)
             deps_query = f'{deps_query} - {exclude_query}'
         try:
-            deps = self._deps_query(deps_query)
+            deps = await self._deps_query(deps_query)
             if deps and exclude:
                 # although the deps set is pre-filtered to exclude
                 # the excluded deps, we still need to fetch the exclude set
                 # again and remove any further matches, due to rev dep mangling.
                 # The exclude set could be pre-filtered further (ie only members
                 # of the revmap.values) at the cost of some additional complexity.
-                exclude_deps = self._deps_query(exclude_query)
-        except BazelQueryError as e:
+                exclude_deps = await self._deps_query(exclude_query)
+        except bazel.BazelQueryError as e:
             print(f'Bazel query failed with error {e}')
             raise e
         return deps - exclude_deps
 
-    @lru_cache(maxsize=5)
-    def _deps_query(self, query_string):
-        return self._mangle_deps_set(query(query_string))
+    async def _deps_query(self, query_string):
+        return self._mangle_deps_set(await query(query_string))
 
     def _filtered_deps_query(self, targets):
         return f'filter("^@.*//", deps(set({" ".join(targets)})))'
@@ -168,16 +170,16 @@ class Validator(object):
         self._dep_info = dep_info
         self._build_graph = build_graph
 
-    def validate_build_graph_structure(self):
+    async def validate_build_graph_structure(self):
         """Validate basic assumptions about dependency relationship in the build graph.
 
         Raises:
           DependencyError: on a dependency validation error.
         """
         print('Validating build dependency structure...')
-        queried_core_ext_deps = self._build_graph.query_external_deps(
+        queried_core_ext_deps = await self._build_graph.query_external_deps(
             self._core_rule_label, '//source/extensions/...', exclude=['//source/...'])
-        queried_all_deps = self._build_graph.query_external_deps(
+        queried_all_deps = await self._build_graph.query_external_deps(
             '//source/...', exclude=[self._core_rule_label, '//source/extensions/...'])
         if queried_all_deps or queried_core_ext_deps:
             raise DependencyError(
@@ -185,14 +187,14 @@ class Validator(object):
                 'deps(//source/exe:envoy_main_common_with_core_extensions_lib) '
                 'union deps(//source/extensions/...)')
 
-    def validate_test_only_deps(self):
+    async def validate_test_only_deps(self):
         """Validate that test-only dependencies aren't included in //source/...
 
         Raises:
           DependencyError: on a dependency validation error.
         """
         # Validate that //source doesn't depend on test_only
-        queried_source_deps = self._build_graph.query_external_deps('//source/...')
+        queried_source_deps = await self._build_graph.query_external_deps('//source/...')
         expected_test_only_deps = self._dep_info.deps_by_use_category('test_only')
         bad_test_only_deps = expected_test_only_deps.intersection(queried_source_deps)
         if len(bad_test_only_deps) > 0:
@@ -200,7 +202,7 @@ class Validator(object):
                 f'//source depends on test-only dependencies: {bad_test_only_deps}')
         # Validate that //test deps additional to those of //source are captured in
         # test_only.
-        marginal_test_deps = self._build_graph.query_external_deps(
+        marginal_test_deps = await self._build_graph.query_external_deps(
             '//test/...', exclude=['//source/...'])
         bad_test_deps = marginal_test_deps.difference(expected_test_only_deps)
         unknown_bad_test_deps = [dep for dep in bad_test_deps if not test_only_ignore(dep)]
@@ -209,7 +211,7 @@ class Validator(object):
             raise DependencyError(
                 f'Missing deps in test_only "use_category": {unknown_bad_test_deps}')
 
-    def validate_data_plane_core_deps(self):
+    async def validate_data_plane_core_deps(self):
         """Validate dataplane_core dependencies.
 
         Check that we at least tag as dataplane_core dependencies that match some
@@ -221,7 +223,7 @@ class Validator(object):
         # Necessary but not sufficient for dataplane. With some refactoring we could
         # probably have more precise tagging of dataplane/controlplane/other deps in
         # these paths.
-        queried_dataplane_core_min_deps = self._build_graph.query_external_deps(
+        queried_dataplane_core_min_deps = await self._build_graph.query_external_deps(
             '//source/common/api/...', '//source/common/buffer/...', '//source/common/crypto/...',
             '//source/common/conn_pool/...', '//source/common/formatter/...',
             '//source/common/http/...', '//source/common/ssl/...', '//source/common/tcp/...',
@@ -238,7 +240,7 @@ class Validator(object):
                 f'"use_category" implied core deps {expected_dataplane_core_deps}: {bad_dataplane_core_deps} '
                 'are missing')
 
-    def validate_control_plane_deps(self):
+    async def validate_control_plane_deps(self):
         """Validate controlplane dependencies.
 
         Check that we at least tag as controlplane dependencies that match some
@@ -250,7 +252,7 @@ class Validator(object):
         # Necessary but not sufficient for controlplane. With some refactoring we could
         # probably have more precise tagging of dataplane/controlplane/other deps in
         # these paths.
-        queried_controlplane_core_min_deps = self._build_graph.query_external_deps(
+        queried_controlplane_core_min_deps = await self._build_graph.query_external_deps(
             '//source/common/config/...')
         # Controlplane will always depend on API.
         expected_controlplane_core_deps = self._dep_info.deps_by_use_category('controlplane').union(
@@ -264,7 +266,7 @@ class Validator(object):
                 f'by "use_category" implied core deps {expected_controlplane_core_deps}: '
                 f'{bad_controlplane_core_deps} are missing')
 
-    def validate_extension_deps(self, name, target):
+    async def validate_extension_deps(self, name, target):
         """Validate that extensions are correctly declared for dataplane_ext and observability_ext.
 
         Args:
@@ -274,7 +276,7 @@ class Validator(object):
         Raises:
           DependencyError: on a dependency validation error.
         """
-        marginal_deps = self._build_graph.query_external_deps(
+        marginal_deps = await self._build_graph.query_external_deps(
             target, exclude=['//source/exe:envoy_main_common_with_core_extensions_lib'])
         expected_deps = []
         print(f'Validating ({len(marginal_deps)}) {name} extension dependencies...')
@@ -296,20 +298,20 @@ class Validator(object):
                             f'Extension {name} depends on {d} but {d} does not list {name} in its allowlist'
                         )
 
-    def validate_all(self):
+    async def validate_all(self):
         """Collection of all validations.
 
         Raises:
           DependencyError: on a dependency validation error.
         """
-        self.validate_build_graph_structure()
-        self.validate_test_only_deps()
-        self.validate_data_plane_core_deps()
-        self.validate_control_plane_deps()
+        await self.validate_build_graph_structure()
+        await self.validate_test_only_deps()
+        await self.validate_data_plane_core_deps()
+        await self.validate_control_plane_deps()
         # Validate the marginal dependencies introduced for each extension.
         for name, target in sorted(build_graph.list_extensions()):
             target_all = EXTENSION_LABEL_RE.match(target).group(1) + '/...'
-            self.validate_extension_deps(name, target_all)
+            await self.validate_extension_deps(name, target_all)
 
 
 if __name__ == '__main__':
@@ -319,7 +321,7 @@ if __name__ == '__main__':
     build_graph = BuildGraph(extensions_build_config, repository_locations=repository_locations)
     validator = Validator(dep_info, build_graph)
     try:
-        validator.validate_all()
+        asyncio.run(validator.validate_all())
     except DependencyError as e:
         print(
             'Dependency validation failed, please check metadata in bazel/repository_locations.bzl')

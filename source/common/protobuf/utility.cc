@@ -187,16 +187,15 @@ bool evaluateFractionalPercent(envoy::type::v3::FractionalPercent percent, uint6
 uint64_t fractionalPercentDenominatorToInt(
     const envoy::type::v3::FractionalPercent::DenominatorType& denominator) {
   switch (denominator) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::type::v3::FractionalPercent::HUNDRED:
     return 100;
   case envoy::type::v3::FractionalPercent::TEN_THOUSAND:
     return 10000;
   case envoy::type::v3::FractionalPercent::MILLION:
     return 1000000;
-  default:
-    // Checked by schema.
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM
 }
 
 } // namespace ProtobufPercentHelper

@@ -19,7 +19,7 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsConstSharedPtr transpo
     // selected protocol.
     switch (protocol) {
     case Http::Protocol::Http10:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("not imlemented");
     case Http::Protocol::Http11:
       fallbacks.push_back(Http::Utility::AlpnNames::get().Http11);
       break;

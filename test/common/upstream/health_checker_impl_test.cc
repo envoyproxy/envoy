@@ -2673,10 +2673,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
   // GOAWAY with non-NO_ERROR code will result in a healthcheck failure and the
   // connection closing. Status is unchanged because unhealthy_threshold is 2.
   expectChangePending(0);
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
-      .WillOnce(Return(true));
+
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
@@ -2689,10 +2686,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
   // GOAWAY with non-NO_ERROR code will result in a healthcheck failure and the
   // connection closing. This time it goes unhealthy.
   expectUnhealthyTransition(0, false);
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
-      .WillOnce(Return(true));
+
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
   EXPECT_EQ(Host::Health::Unhealthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2714,10 +2708,6 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgress) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
-      .WillOnce(Return(true));
   // GOAWAY with NO_ERROR code during check should be handled gracefully.
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2750,10 +2740,6 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressTimeout) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
-      .WillOnce(Return(true));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
@@ -2788,10 +2774,6 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamReset) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
-      .WillOnce(Return(true));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
@@ -2826,10 +2808,6 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressConnectionClose) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
-      .WillOnce(Return(true));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
@@ -2868,10 +2846,6 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayBetweenChecks) {
   respond(0, "200", false, false, true, false, {}, false);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
-      .WillOnce(Return(true));
   // GOAWAY should cause a new connection to be created but should not affect health status.
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2883,48 +2857,6 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayBetweenChecks) {
 
   // Host should stay healthy.
   expectUnchanged(0);
-  respond(0, "200", false, false, true, false, {}, false);
-  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-}
-
-// Smoke test that receiving GOAWAY (no error) is ignored when GOAWAY handling
-// is disabled via runtime. This is based on the
-// GoAwayProbeInProgressStreamReset test case. A single case gives us sufficient
-// coverage due to the simplicity of the runtime check.
-TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamResetRuntimeDisabled) {
-  setupHCHttp2();
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
-      .WillRepeatedly(Return(false));
-
-  expectSessionCreate();
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  health_checker_->start();
-
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
-      .WillOnce(Return(false));
-
-  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
-  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-
-  // Unhealthy threshold is 1 so the first reset causes the host to go unhealthy.
-  expectUnhealthyTransition(0, true);
-  test_sessions_[0]->request_encoder_.stream_.resetStream(Http::StreamResetReason::RemoteReset);
-  EXPECT_EQ(Host::Health::Unhealthy,
-            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-
-  // The new stream should be created on the same connection (old behavior since
-  // the new behavior is disabled via runtime).
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  test_sessions_[0]->interval_timer_->invokeCallback();
-
-  // Host should go back to healthy after a successful check.
-  expectHealthyTransition(0);
   respond(0, "200", false, false, true, false, {}, false);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
