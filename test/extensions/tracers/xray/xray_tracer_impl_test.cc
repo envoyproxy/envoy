@@ -89,7 +89,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderWithoutSamplingDecision) {
     "rate": 0
   }
 }
-	     )EOF" /*sampling_rules*/,
+        )EOF" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};
   Driver driver(config, context_);
 
