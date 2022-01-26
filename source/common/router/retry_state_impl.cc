@@ -322,7 +322,7 @@ RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& re
 }
 
 RetryStatus RetryStateImpl::shouldRetryReset(Http::StreamResetReason reset_reason,
-                                             AlternateProtocolsUsed alternate_protocols_used,
+                                             Http3Used alternate_protocols_used,
                                              DoRetryResetCallback callback) {
 
   // Following wouldRetryFromReset() may override the value.
@@ -427,7 +427,7 @@ RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_he
 
 RetryState::RetryDecision
 RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
-                                    AlternateProtocolsUsed alternate_protocols_used,
+                                    Http3Used alternate_protocols_used,
                                     bool& disable_alternate_protocols) {
   ASSERT(!disable_alternate_protocols);
   // First check "never retry" conditions so we can short circuit (we never
@@ -440,11 +440,11 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
       "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc");
   if (consider_disable_alt_svc) {
     if (reset_reason == Http::StreamResetReason::ConnectionFailure) {
-      if (alternate_protocols_used != AlternateProtocolsUsed::Unknown) {
+      if (alternate_protocols_used != Http3Used::Unknown) {
         // Already got request encoder, so this must be a 0-RTT handshake failure. Retry
         // immediately.
         // TODO(danzh) consider making the retry configurable.
-        ASSERT(alternate_protocols_used == AlternateProtocolsUsed::Yes,
+        ASSERT(alternate_protocols_used == Http3Used::Yes,
                "0-RTT was attempted on non-Quic connection and failed.");
         return RetryDecision::RetryImmediately;
       }
@@ -452,8 +452,7 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
         // This is a pool failure.
         return RetryDecision::RetryWithBackoff;
       }
-    } else if (alternate_protocols_used == AlternateProtocolsUsed::Yes &&
-               clusterUseGrid(cluster_)) {
+    } else if (alternate_protocols_used == Http3Used::Yes && clusterUseGrid(cluster_)) {
       // Retry any post-handshake failure immediately with alternate protocols disabled if the
       // failed request was sent over Http/3.
       disable_alternate_protocols = true;

@@ -346,7 +346,7 @@ public:
     NoRetry,
   };
 
-  enum class AlternateProtocolsUsed {
+  enum class Http3Used {
     Unknown,
     Yes,
     No,
@@ -420,7 +420,7 @@ public:
    *         called. Calling code should proceed with error handling.
    */
   virtual RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason,
-                                       AlternateProtocolsUsed alternate_protocols_used,
+                                       Http3Used alternate_protocols_used,
                                        DoRetryResetCallback callback) PURE;
 
   /**

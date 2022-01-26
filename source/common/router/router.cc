@@ -1149,16 +1149,15 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
   if (downstream_response_started_ || !retry_state_ || upstream_request.retried()) {
     return false;
   }
-  RetryState::AlternateProtocolsUsed was_using_alternate_protocol =
-      RetryState::AlternateProtocolsUsed::Unknown;
+  RetryState::Http3Used was_using_alternate_protocol = RetryState::Http3Used::Unknown;
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc") &&
       upstream_request.hadUpstream()) {
     was_using_alternate_protocol =
         (upstream_request.streamInfo().protocol().has_value() &&
          upstream_request.streamInfo().protocol().value() == Http::Protocol::Http3)
-            ? RetryState::AlternateProtocolsUsed::Yes
-            : RetryState::AlternateProtocolsUsed::No;
+            ? RetryState::Http3Used::Yes
+            : RetryState::Http3Used::No;
   }
   const RetryStatus retry_status = retry_state_->shouldRetryReset(
       reset_reason, was_using_alternate_protocol,
