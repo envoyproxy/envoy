@@ -35,7 +35,7 @@ public:
   // and last smoothed round trip time, if available.
   struct OriginData {
     std::vector<AlternateProtocol> protocols;
-    std::chrono::milliseconds srtt;
+    std::chrono::microseconds srtt;
   };
 
   // Converts an Origin to a string which can be parsed by stringToOrigin.
@@ -52,7 +52,7 @@ public:
   // The string format is:
   // protocols|rtt
   static std::string originDataToStringForCache(const std::vector<AlternateProtocol>& protocols,
-                                                std::chrono::milliseconds srtt);
+                                                std::chrono::microseconds srtt);
   // Parse an origin data into structured data, or absl::nullopt
   // if it is empty or invalid.
   // If from_cache is true, it is assumed the string was serialized using
@@ -64,7 +64,7 @@ public:
 
   // AlternateProtocolsCache
   void setAlternatives(const Origin& origin, std::vector<AlternateProtocol>& protocols) override;
-  void setRtt(const Origin& origin, std::chrono::milliseconds srtt) override;
+  void setRtt(const Origin& origin, std::chrono::microseconds srtt) override;
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) override;
   size_t size() const override;
 

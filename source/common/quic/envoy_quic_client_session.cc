@@ -29,9 +29,10 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   if (OneRttKeysAvailable() && rtt_cache_) {
     const quic::QuicConnectionStats& stats = connection()->GetStats();
-    int64_t srtt = stats.srtt_us;
-    Http::AlternateProtocolsCache::Origin origin("https", server_id().host(), server_id().port());
-    rtt_cache_->setRtt(origin, std::chrono::milliseconds(srtt));
+    if (stats.srtt_us > 0) {
+      Http::AlternateProtocolsCache::Origin origin("https", server_id().host(), server_id().port());
+      rtt_cache_->setRtt(origin, std::chrono::microseconds(stats.srtt_us));
+    }
   }
   // Pass up connection stats.
   ASSERT(!connection()->connected());

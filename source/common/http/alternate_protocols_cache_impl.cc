@@ -37,7 +37,7 @@ AlternateProtocolsCacheImpl::stringToOrigin(const std::string& str) {
 }
 
 std::string AlternateProtocolsCacheImpl::originDataToStringForCache(
-    const std::vector<AlternateProtocol>& protocols, std::chrono::milliseconds srtt) {
+    const std::vector<AlternateProtocol>& protocols, std::chrono::microseconds srtt) {
   if (protocols.empty()) {
     return std::string("clear|0");
   }
@@ -69,12 +69,12 @@ AlternateProtocolsCacheImpl::originDataFromString(absl::string_view origin_data_
     if (!absl::SimpleAtoi(parts[1], &srtt)) {
       return {};
     }
-    data.srtt = std::chrono::milliseconds(srtt);
+    data.srtt = std::chrono::microseconds(srtt);
   } else if (parts.size() != 1) {
     return {};
   } else {
     // Handling raw alt-svc with no endpoint info
-    data.srtt = std::chrono::milliseconds(0);
+    data.srtt = std::chrono::microseconds(0);
   }
 
   spdy::SpdyAltSvcWireFormat::AlternativeServiceVector altsvc_vector;
@@ -131,11 +131,11 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
   if (key_value_store_) {
     key_value_store_->addOrUpdate(
         originToString(origin),
-        originDataToStringForCache(protocols, std::chrono::milliseconds(0)));
+        originDataToStringForCache(protocols, std::chrono::microseconds(0)));
   }
 }
 
-void AlternateProtocolsCacheImpl::setRtt(const Origin& origin, std::chrono::milliseconds srtt) {
+void AlternateProtocolsCacheImpl::setRtt(const Origin& origin, std::chrono::microseconds srtt) {
   auto entry_it = protocols_.find(origin);
   if (entry_it == protocols_.end()) {
     return;
@@ -157,7 +157,7 @@ void AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
     key_value_store_->remove(originToString(iter->first));
     protocols_.erase(iter);
   }
-  protocols_[origin] = OriginData{protocols, std::chrono::milliseconds(0)};
+  protocols_[origin] = OriginData{protocols, std::chrono::microseconds(0)};
 }
 
 OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>>
