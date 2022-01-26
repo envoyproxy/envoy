@@ -57,10 +57,10 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
       sent_head_request_ = true;
     }
   }
-  IncrementalBytesSentTracker tracker(*this);
-  WriteHeaders(std::move(spdy_headers), end_stream, nullptr);
-  mutableBytesMeter()->addHeaderBytesSent(tracker.incrementalBytesSent());
-  mutableBytesMeter()->addWireBytesSent(tracker.incrementalBytesSent());
+  {
+    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
+    WriteHeaders(std::move(spdy_headers), end_stream, nullptr);
+  }
 
   if (local_end_stream_) {
     onLocalEndStream();
@@ -90,9 +90,10 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
   }
   absl::Span<quic::QuicMemSlice> span(quic_slices);
   // QUIC stream must take all.
-  IncrementalBytesSentTracker tracker(*this);
-  WriteBodySlices(span, end_stream);
-  mutableBytesMeter()->addWireBytesSent(tracker.incrementalBytesSent());
+  {
+    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
+    WriteBodySlices(span, end_stream);
+  }
   if (data.length() > 0) {
     // Send buffer didn't take all the data, threshold needs to be adjusted.
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
@@ -109,10 +110,10 @@ void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& traile
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
   ScopedWatermarkBufferUpdater updater(this, this);
 
-  IncrementalBytesSentTracker tracker(*this);
-  WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
-  mutableBytesMeter()->addHeaderBytesSent(tracker.incrementalBytesSent());
-  mutableBytesMeter()->addWireBytesSent(tracker.incrementalBytesSent());
+  {
+    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
+    WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+  }
 
   onLocalEndStream();
 }

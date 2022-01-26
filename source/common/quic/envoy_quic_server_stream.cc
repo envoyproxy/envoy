@@ -47,10 +47,10 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   // This is counting not serialized bytes in the send buffer.
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-  IncrementalBytesSentTracker tracker(*this);
-  WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
-  mutableBytesMeter()->addHeaderBytesSent(tracker.incrementalBytesSent());
-  mutableBytesMeter()->addWireBytesSent(tracker.incrementalBytesSent());
+  {
+    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
+    WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
+  }
 
   if (local_end_stream_) {
     onLocalEndStream();
@@ -79,9 +79,10 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   }
   absl::Span<quic::QuicMemSlice> span(quic_slices);
   // QUIC stream must take all.
-  IncrementalBytesSentTracker tracker(*this);
-  WriteBodySlices(span, end_stream);
-  mutableBytesMeter()->addWireBytesSent(tracker.incrementalBytesSent());
+  {
+    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
+    WriteBodySlices(span, end_stream);
+  }
   if (data.length() > 0) {
     // Send buffer didn't take all the data, threshold needs to be adjusted.
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
@@ -98,10 +99,10 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
 
-  IncrementalBytesSentTracker tracker(*this);
-  WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
-  mutableBytesMeter()->addHeaderBytesSent(tracker.incrementalBytesSent());
-  mutableBytesMeter()->addWireBytesSent(tracker.incrementalBytesSent());
+  {
+    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
+    WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+  }
   onLocalEndStream();
 }
 
