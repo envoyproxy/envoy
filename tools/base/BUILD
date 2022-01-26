@@ -6,6 +6,10 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+exports_files([
+    "entry_point.py",
+])
+
 py_binary(
     name = "bazel_query",
     srcs = ["bazel_query.py"],

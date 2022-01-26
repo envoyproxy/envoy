@@ -111,9 +111,9 @@ public:
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(std::shared_ptr<Router::TransactionInfos>, transactionInfos, ());
   MOCK_METHOD(std::shared_ptr<SipProxy::SipSettings>, settings, ());
+  MOCK_METHOD(std::shared_ptr<SipProxy::TrafficRoutingAssistantHandler>, traHandler, ());
   MOCK_METHOD(void, onReset, ());
-  MOCK_METHOD(MessageMetadataSharedPtr, responseMetadata, ());
-  MOCK_METHOD(bool, responseSuccess, ());
+  MOCK_METHOD(void, continueHanding, ());
 
   uint64_t stream_id_{1};
   std::string transaction_id_{"test"};
