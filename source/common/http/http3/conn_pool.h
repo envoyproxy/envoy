@@ -110,6 +110,10 @@ public:
                     TimeSource& time_source);
 
   ~Http3ConnPoolImpl() override;
+  ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
+                                         ConnectionPool::Callbacks& callbacks,
+                                         bool can_use_early_data,
+                                         bool can_use_alternate_protocols) override;
 
   // Set relevant fields in quic_config based on the cluster configuration
   // supplied in cluster.
@@ -120,9 +124,6 @@ public:
   // For HTTP/3 the base connection pool does not track stream capacity, rather
   // the HTTP3 active client does.
   bool trackStreamCapacity() override { return false; }
-
-protected:
-  bool isAlternateProtocol() const override { return true; }
 
 private:
   // Store quic helpers which can be shared between connections and must live

@@ -18,6 +18,11 @@
 namespace Envoy {
 namespace Router {
 
+bool clusterUseGrid(const Upstream::ClusterInfo& cluster) {
+  return (cluster.features() & Upstream::ClusterInfo::Features::HTTP3) &&
+         (cluster.features() & Upstream::ClusterInfo::Features::USE_ALPN);
+}
+
 RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
                                      Http::RequestHeaderMap& request_headers,
                                      const Upstream::ClusterInfo& cluster,
@@ -28,7 +33,7 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
 
   // We short circuit here and do not bother with an allocation if there is no chance we will retry.
   if (request_headers.EnvoyRetryOn() || request_headers.EnvoyRetryGrpcOn() ||
-      route_policy.retryOn()) {
+      route_policy.retryOn() || clusterUseGrid(cluster)) {
     ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, vcluster, runtime, random,
                                  dispatcher, time_source, priority));
   }
@@ -183,8 +188,6 @@ std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config)
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.Reset) {
       ret |= RetryPolicy::RETRY_ON_RESET;
-    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.AltProtocolsPostConnectFailure) {
-      ret |= RetryPolicy::RETRY_ON_ALT_PROTOCOLS_POST_CONNECT_FAILURE;
     } else {
       all_fields_valid = false;
     }
@@ -450,9 +453,9 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
         return RetryDecision::RetryWithBackoff;
       }
     } else if (alternate_protocols_used == AlternateProtocolsUsed::Yes &&
-               (retry_on_ & RetryPolicy::RETRY_ON_ALT_PROTOCOLS_POST_CONNECT_FAILURE)) {
-      // Retry any post-handshake failure immediately with no alt_svc if the request was sent over
-      // Http/3.
+               clusterUseGrid(cluster_)) {
+      // Retry any post-handshake failure immediately with alternate protocols disabled if the
+      // failed request was sent over Http/3.
       disable_alternate_protocols = true;
       return RetryDecision::RetryImmediately;
     }

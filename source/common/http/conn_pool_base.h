@@ -91,9 +91,6 @@ public:
 protected:
   friend class ActiveClient;
 
-  // Interface for derived classes to indicate it only supports HTTP/3.
-  virtual bool isAlternateProtocol() const { return false; }
-
   Random::RandomGenerator& random_generator_;
 };
 

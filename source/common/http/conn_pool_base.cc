@@ -59,16 +59,8 @@ HttpConnPoolImplBase::~HttpConnPoolImplBase() { destructAllConnections(); }
 ConnectionPool::Cancellable*
 HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
                                 Http::ConnectionPool::Callbacks& callbacks, bool can_use_early_data,
-                                bool can_use_alternate_protocols) {
+                                bool /*can_use_alternate_protocols*/) {
   HttpAttachContext context({&response_decoder, &callbacks});
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc") &&
-      !can_use_alternate_protocols && isAlternateProtocol()) {
-    ENVOY_LOG(debug, "Unable to create stream without using alternate protocols.");
-    onPoolFailure(nullptr, absl::string_view(), ConnectionPool::PoolFailureReason::NotQualified,
-                  context);
-    return nullptr;
-  }
   return newStreamImpl(context, can_use_early_data);
 }
 

@@ -196,11 +196,6 @@ void RouterImpl::UpstreamRequest::onPoolFailure(Tcp::ConnectionPool::PoolFailure
               host->address()->asString());
     router_.active_message_->onError("timeout");
   } break;
-
-  case Tcp::ConnectionPool::PoolFailureReason::NotQualified: {
-    ENVOY_BUG(false, "Unexpected NotQualified failure");
-    router_.active_message_->onError("not qualified");
-  } break;
   }
 
   // Release resources allocated to this request.
