@@ -200,7 +200,7 @@ EXTENSIONS = {
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
     "envoy.transport_sockets.starttls":                 "//source/extensions/transport_sockets/starttls:config",
     "envoy.transport_sockets.tcp_stats":                "//source/extensions/transport_sockets/tcp_stats:config",
-    "envoy.transport_sockets.internal":                 "//source/extensions/transport_sockets/internal:config",
+    "envoy.transport_sockets.internal_upstream":        "//source/extensions/transport_sockets/internal:config",
 
     #
     # Retry host predicates

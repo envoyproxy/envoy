@@ -282,8 +282,7 @@ public:
 
 protected:
   static Network::ClientConnectionPtr
-  createConnection(Event::Dispatcher& dispatcher,
-                   HostDescriptionConstSharedPtr& host,
+  createConnection(Event::Dispatcher& dispatcher, HostDescriptionConstSharedPtr& host,
                    Network::TransportSocketFactory& socket_factory,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,

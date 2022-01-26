@@ -2,6 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -60,6 +61,16 @@ public:
    * @return true if the pending receive buffer is not empty or read_end is set.
    */
   virtual bool isReadable() const PURE;
+
+  /**
+   * @return user space socket metadata.
+   */
+  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
+
+  /**
+   * Set user space socket metadata by merging the protobuf.
+   */
+  virtual void setMetadata(const envoy::config::core::v3::Metadata& metadata) PURE;
 };
 } // namespace UserSpace
 } // namespace IoSocket

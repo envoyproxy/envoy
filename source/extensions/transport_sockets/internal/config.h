@@ -13,9 +13,10 @@ namespace Internal {
 
 class InternalSocketFactory : public PassthroughFactory {
 public:
-  InternalSocketFactory(Server::Configuration::TransportSocketFactoryContext& context,
-                        const envoy::extensions::transport_sockets::internal::v3::InternalUpstreamTransport& config,
-                        Network::TransportSocketFactoryPtr&& inner_factory);
+  InternalSocketFactory(
+      Server::Configuration::TransportSocketFactoryContext& context,
+      const envoy::extensions::transport_sockets::internal::v3::InternalUpstreamTransport& config,
+      Network::TransportSocketFactoryPtr&& inner_factory);
 
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;

@@ -26,14 +26,16 @@ Network::TransportSocketPtr InternalSocketFactory::createTransportSocket(
   if (inner_socket == nullptr) {
     return nullptr;
   }
-  return std::make_unique<InternalSocket>(config_, std::move(inner_socket));
+  return std::make_unique<InternalSocket>(config_, std::move(inner_socket), options->host());
 }
 
-class InternalConfigFactory : public Server::Configuration::UpstreamTransportSocketConfigFactory {
+class InternalUpstreamConfigFactory
+    : public Server::Configuration::UpstreamTransportSocketConfigFactory {
 public:
-  std::string name() const override { return "envoy.transport_sockets.internal"; }
+  std::string name() const override { return "envoy.transport_sockets.internal_upstream"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::transport_sockets::internal::v3::InternalUpstreamTransport>();
+    return std::make_unique<
+        envoy::extensions::transport_sockets::internal::v3::InternalUpstreamTransport>();
   }
   Network::TransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,
@@ -55,7 +57,7 @@ public:
   }
 };
 
-REGISTER_FACTORY(InternalConfigFactory,
+REGISTER_FACTORY(InternalUpstreamConfigFactory,
                  Server::Configuration::UpstreamTransportSocketConfigFactory);
 
 } // namespace Internal

@@ -45,7 +45,8 @@ class AlpnDecoratingTransportSocketOptions : public BaseWrapperTransportSocketOp
 public:
   AlpnDecoratingTransportSocketOptions(std::vector<std::string>&& alpn,
                                        TransportSocketOptionsConstSharedPtr inner_options)
-      : BaseWrapperTransportSocketOptions(std::move(inner_options)), alpn_fallback_(std::move(alpn)) {}
+      : BaseWrapperTransportSocketOptions(std::move(inner_options)),
+        alpn_fallback_(std::move(alpn)) {}
   const std::vector<std::string>& applicationProtocolFallback() const override {
     return alpn_fallback_;
   }
@@ -62,14 +63,11 @@ public:
   HostDecoratingTransportSocketOptions(std::shared_ptr<const Upstream::HostDescription>& host,
                                        TransportSocketOptionsConstSharedPtr inner_options)
       : BaseWrapperTransportSocketOptions(std::move(inner_options)), host_(host) {}
-  std::shared_ptr<const Upstream::HostDescription> host() const override {
-    return host_;
-  }
+  std::shared_ptr<const Upstream::HostDescription> host() const override { return host_; }
 
 private:
   const std::shared_ptr<const Upstream::HostDescription> host_;
 };
-
 
 class TransportSocketOptionsImpl : public TransportSocketOptions {
 public:
@@ -104,9 +102,7 @@ public:
   void hashKey(std::vector<uint8_t>& key,
                const Network::TransportSocketFactory& factory) const override;
 
-  std::shared_ptr<const Upstream::HostDescription> host() const override {
-    return nullptr;
-  }
+  std::shared_ptr<const Upstream::HostDescription> host() const override { return nullptr; }
 
 private:
   const absl::optional<std::string> override_server_name_;

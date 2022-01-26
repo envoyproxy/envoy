@@ -147,6 +147,10 @@ public:
     ENVOY_LOG(trace, "io handle {} set peer handle to {}.", static_cast<void*>(this),
               static_cast<void*>(writable_peer));
   }
+  const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
+  virtual void setMetadata(const envoy::config::core::v3::Metadata& metadata) override {
+    metadata_.MergeFrom(metadata);
+  }
 
 private:
   friend class IoHandleFactory;
@@ -174,6 +178,9 @@ private:
 
   // The flag whether the peer is valid. Any write attempt must check this flag.
   bool write_shutdown_{false};
+
+  // User space metadata passed through the user space socket pair.
+  envoy::config::core::v3::Metadata metadata_;
 };
 
 using IoHandleImplPtr = std::unique_ptr<IoHandleImpl>;

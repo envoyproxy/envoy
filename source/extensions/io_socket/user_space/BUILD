@@ -24,6 +24,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:empty_string",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
