@@ -192,7 +192,7 @@ message AccessLogCommon {
 }
 
 // Flags indicating occurrences during request/response processing.
-// [#next-free-field: 27]
+// [#next-free-field: 28]
 message ResponseFlags {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.ResponseFlags";
@@ -290,6 +290,9 @@ message ResponseFlags {
 
   // Indicates overload manager terminated the request.
   bool overload_manager = 26;
+
+  // Indicates a DNS resolution failed.
+  bool dns_resolution_failure = 27;
 }
 
 // Properties of a negotiated TLS connection.

@@ -41,6 +41,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, DifferentV4AndV6OptionData) {
   AddrFamilyAwareSocketOptionImpl socket_option{
       envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10),
       "hello", ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), "world"};
+  EXPECT_TRUE(socket_option.isSupported());
   EXPECT_CALL(socket_, ipVersion()).WillRepeatedly(testing::Return(Address::IpVersion::v4));
   EXPECT_EQ(
       "hello",
