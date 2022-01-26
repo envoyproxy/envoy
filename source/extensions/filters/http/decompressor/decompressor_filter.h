@@ -47,6 +47,7 @@ public:
     virtual const std::string& logString() const PURE;
     const DecompressorStats& stats() const { return stats_; }
     bool decompressionEnabled() const { return decompression_enabled_.enabled(); }
+    bool ignoreNoTransformHeader() const { return ignore_no_transform_header_; }
 
   private:
     static DecompressorStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -55,6 +56,7 @@ public:
 
     const DecompressorStats stats_;
     const Runtime::FeatureFlag decompression_enabled_;
+    const bool ignore_no_transform_header_;
   };
 
   class RequestDirectionConfig : public DirectionConfig {
@@ -165,8 +167,11 @@ private:
   maybeInitDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
                       Compression::Decompressor::DecompressorPtr& decompressor,
                       Http::StreamFilterCallbacks& callbacks, HeaderType& headers) {
-    if (direction_config.decompressionEnabled() && !hasCacheControlNoTransform(headers) &&
-        contentEncodingMatches(headers)) {
+    const bool should_decompress =
+        direction_config.decompressionEnabled() &&
+        (!hasCacheControlNoTransform(headers) || direction_config.ignoreNoTransformHeader()) &&
+        contentEncodingMatches(headers);
+    if (should_decompress) {
       direction_config.stats().decompressed_.inc();
       decompressor = config_->makeDecompressor();
 

@@ -1705,7 +1705,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
         std::chrono::milliseconds(300), coptions, quic_stat_names_, stats_);
 #else
     // Should be blocked by configuration checking at an earlier point.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
 #endif
   }
   if (protocols.size() >= 2) {
@@ -1724,11 +1724,11 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #ifdef ENVOY_ENABLE_QUIC
     return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
                                          priority, options, transport_socket_options, state, source,
-                                         quic_stat_names_, stats_);
+                                         quic_stat_names_, stats_, {});
 #else
     UNREFERENCED_PARAMETER(source);
     // Should be blocked by configuration checking at an earlier point.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
 #endif
   }
   ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);

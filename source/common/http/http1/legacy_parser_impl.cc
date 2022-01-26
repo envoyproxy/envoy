@@ -145,8 +145,6 @@ LegacyHttpParserImpl::LegacyHttpParserImpl(MessageType type, ParserCallbacks* da
   case MessageType::Response:
     parser_type = HTTP_RESPONSE;
     break;
-  default:
-    PANIC("not implemented");
   }
 
   impl_ = std::make_unique<Impl>(parser_type, data);
@@ -201,7 +199,7 @@ int LegacyHttpParserImpl::statusToInt(const ParserStatus code) const {
   case ParserStatus::Paused:
     return 31;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 }
 

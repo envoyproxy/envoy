@@ -89,8 +89,10 @@ enum ResponseFlag {
   NoClusterFound = 0x1000000,
   // Overload Manager terminated the stream.
   OverloadManager = 0x2000000,
+  // DNS resolution failed.
+  DnsResolutionFailed = 0x4000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = OverloadManager,
+  LastFlag = DnsResolutionFailed,
 };
 
 /**
