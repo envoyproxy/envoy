@@ -7,6 +7,7 @@ Pending Release
 Bugfixes:
 
 Features:
+- API: added Envoy's response flags to final stream intel (:issue:`#2009 <2009>`)
 
 0.4.5 (January 13, 2022)
 ========================

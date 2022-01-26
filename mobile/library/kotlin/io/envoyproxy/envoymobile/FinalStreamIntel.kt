@@ -27,6 +27,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
  * @param socket_reused True if the upstream socket had been used previously.
  * @param sentByteCount The number of bytes sent upstream.
  * @param receivedByteCount The number of bytes received from upstream.
+ * @param responseFlags The response flags for the stream.
  */
 @Suppress("LongParameterList")
 class FinalStreamIntel constructor(
@@ -46,7 +47,8 @@ class FinalStreamIntel constructor(
   val requestEndMs: Long,
   val socketReused: Boolean,
   val sentByteCount: Long,
-  val receivedByteCount: Long
+  val receivedByteCount: Long,
+  val responseFlags: Long
 ) : StreamIntel(streamId, connectionId, attemptCount) {
   constructor(superBase: EnvoyStreamIntel, base: EnvoyFinalStreamIntel) : this(
     superBase.streamId, superBase.connectionId, superBase.attemptCount,
@@ -57,6 +59,6 @@ class FinalStreamIntel constructor(
     base.sendingEndMs,
     base.responseStartMs, base.requestEndMs,
     base.socketReused, base.sentByteCount,
-    base.receivedByteCount
+    base.receivedByteCount, base.responseFlags
   )
 }

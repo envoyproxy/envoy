@@ -17,6 +17,7 @@ class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
   private boolean socketReused;
   private long sentByteCount;
   private long receivedByteCount;
+  private long responseFlags;
 
   EnvoyFinalStreamIntelImpl(long[] values) {
     requestStartMs = values[0];
@@ -33,6 +34,7 @@ class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
     socketReused = values[11] != 0;
     sentByteCount = values[12];
     receivedByteCount = values[13];
+    responseFlags = values[14];
   }
 
   @Override
@@ -90,5 +92,9 @@ class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
   @Override
   public long getReceivedByteCount() {
     return receivedByteCount;
+  }
+  @Override
+  public long getResponseFlags() {
+    return responseFlags;
   }
 }

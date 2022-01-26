@@ -64,4 +64,10 @@ public interface EnvoyFinalStreamIntel {
    * The number of bytes received from upstream.
    */
   public long getReceivedByteCount();
+  /*
+   * The response flags for the stream. See
+   * https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h#L39
+   * for values.
+   */
+  public long getResponseFlags();
 }
