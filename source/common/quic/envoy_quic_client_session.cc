@@ -27,14 +27,6 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
 }
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
-  if (OneRttKeysAvailable() && rtt_cache_) {
-    const quic::QuicConnectionStats& stats = connection()->GetStats();
-    if (stats.srtt_us > 0) {
-      Http::AlternateProtocolsCache::Origin origin("https", server_id().host(), server_id().port());
-      rtt_cache_->setRtt(origin, std::chrono::microseconds(stats.srtt_us));
-    }
-  }
-  // Pass up connection stats.
   ASSERT(!connection()->connected());
   network_connection_ = nullptr;
 }
@@ -53,6 +45,14 @@ void EnvoyQuicClientSession::connect() {
 
 void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                 quic::ConnectionCloseSource source) {
+  // Latch latest srtt.
+  if (OneRttKeysAvailable() && rtt_cache_) {
+    const quic::QuicConnectionStats& stats = connection()->GetStats();
+    if (stats.srtt_us > 0) {
+      Http::AlternateProtocolsCache::Origin origin("https", server_id().host(), server_id().port());
+      rtt_cache_->setRtt(origin, std::chrono::microseconds(stats.srtt_us));
+    }
+  }
   quic::QuicSpdyClientSession::OnConnectionClosed(frame, source);
   quic_stat_names_.chargeQuicConnectionCloseStats(scope_, frame.quic_error_code, source, true);
   onConnectionCloseEvent(frame, source, version());
