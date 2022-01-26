@@ -148,6 +148,9 @@ public:
               static_cast<void*>(writable_peer));
   }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
+  const envoy::config::core::v3::Metadata* peerMetadata() const override {
+    return peer_ ? &peer_->metadata() : nullptr
+  }
   virtual void setMetadata(const envoy::config::core::v3::Metadata& metadata) override {
     metadata_.MergeFrom(metadata);
   }

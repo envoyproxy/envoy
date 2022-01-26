@@ -68,6 +68,11 @@ public:
   virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
 
   /**
+   * @return peer user space socket metadata if available.
+   */
+  virtual const envoy::config::core::v3::Metadata* peerMetadata() const PURE;
+
+  /**
    * Set user space socket metadata by merging the protobuf.
    */
   virtual void setMetadata(const envoy::config::core::v3::Metadata& metadata) PURE;

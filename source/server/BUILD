@@ -208,6 +208,7 @@ envoy_cc_library(
         "//source/common/network:connection_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/io_socket/user_space:io_handle_lib",
     ],
 )
 

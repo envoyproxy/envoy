@@ -20,6 +20,8 @@ envoy_cc_extension(
 envoy_cc_library(
     name = "io_handle_lib",
     hdrs = ["io_handle.h"],
+    # This is core Envoy config.
+    visibility = ["//visibility:public"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",

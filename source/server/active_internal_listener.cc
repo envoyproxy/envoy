@@ -5,6 +5,7 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/stats/timespan_impl.h"
+#include "source/extensions//io_socket/user_space/io_handle.h"
 
 #include "active_stream_listener_base.h"
 
@@ -53,8 +54,12 @@ void ActiveInternalListener::onAccept(Network::ConnectionSocketPtr&& socket) {
   // connections.
   incNumConnections();
 
+  auto* handle = dynamic_cast<Extensions::IoSocket::UserSpace::IoHandle*>(&socket->ioHandle());
   auto active_socket = std::make_unique<ActiveTcpSocket>(
       *this, std::move(socket), false /* do not hand off at internal listener */);
+  if (handle != nullptr && handle->peerMetadata() != nullptr) {
+    active_socket->dynamicMetadata().MergeFrom(*handle->peerMetadata());
+  }
 
   onSocketAccepted(std::move(active_socket));
 }
