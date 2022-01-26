@@ -165,6 +165,7 @@ public:
   std::string canary_node_{"canary"};
   std::string empty_node_;
   std::string via_;
+  std::string node_id_;
 };
 
 // Tests for ConnectionManagerUtility::determineNextProtocol.
@@ -467,7 +468,7 @@ TEST_F(ConnectionManagerUtilityTest, PreserveHopByHop) {
                                              {"keep-alive", "ads"},
                                              {"proxy-connection", "dsa"}};
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, via_,
-                                                  false);
+                                                  connection_.stream_info_, node_id_, false);
   EXPECT_TRUE(response_headers.has(Headers::get().Connection));
   EXPECT_TRUE(response_headers.has(Headers::get().TransferEncoding));
   EXPECT_TRUE(response_headers.has(Headers::get().Upgrade));
@@ -487,8 +488,8 @@ TEST_F(ConnectionManagerUtilityTest, ViaEmpty) {
   EXPECT_FALSE(request_headers.has(Headers::get().Via));
 
   TestResponseHeaderMapImpl response_headers;
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_,
-                                                  via_);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, via_,
+                                                  connection_.stream_info_, node_id_);
   EXPECT_FALSE(response_headers.has(Headers::get().Via));
 }
 
@@ -506,10 +507,11 @@ TEST_F(ConnectionManagerUtilityTest, ViaAppend) {
 
   TestResponseHeaderMapImpl response_headers;
   // Pretend we're doing a 100-continue transform here.
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "",
+                                                  connection_.stream_info_, node_id_);
   // The actual response header processing.
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_,
-                                                  via_);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, via_,
+                                                  connection_.stream_info_, node_id_);
   EXPECT_EQ("foo", response_headers.get_(Headers::get().Via));
 }
 
@@ -865,7 +867,8 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
       {"connection", "foo"}, {"transfer-encoding", "foo"}, {"custom_header", "custom_value"}};
   TestRequestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
 
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "",
+                                                  connection_.stream_info_, node_id_);
 
   EXPECT_EQ(1UL, response_headers.size());
   EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
@@ -882,7 +885,8 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketRes
                                              {"upgrade", "bar"}};
   EXPECT_TRUE(Utility::isUpgrade(request_headers));
   EXPECT_TRUE(Utility::isUpgrade(response_headers));
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "",
+                                                  connection_.stream_info_, node_id_);
 
   EXPECT_EQ(3UL, response_headers.size()) << response_headers;
   EXPECT_EQ("upgrade", response_headers.get_("connection"));
@@ -897,7 +901,8 @@ TEST_F(ConnectionManagerUtilityTest, DoNotAddConnectionLengthForWebSocket101Resp
       {":status", "101"}, {"connection", "upgrade"}, {"upgrade", "bar"}};
   EXPECT_TRUE(Utility::isUpgrade(request_headers));
   EXPECT_TRUE(Utility::isUpgrade(response_headers));
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "",
+                                                  connection_.stream_info_, node_id_);
 
   EXPECT_EQ(3UL, response_headers.size()) << response_headers;
   EXPECT_EQ("upgrade", response_headers.get_("connection"));
@@ -913,8 +918,8 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
         {"connection", "foo"}, {"transfer-encoding", "bar"}, {"custom_header", "custom_value"}};
     EXPECT_FALSE(Utility::isUpgrade(request_headers));
     EXPECT_FALSE(Utility::isUpgrade(response_headers));
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_,
-                                                    "");
+    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "",
+                                                    connection_.stream_info_, node_id_);
 
     EXPECT_EQ(1UL, response_headers.size()) << response_headers;
     EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
@@ -929,8 +934,8 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
                                                {"custom_header", "custom_value"}};
     EXPECT_FALSE(Utility::isUpgrade(request_headers));
     EXPECT_TRUE(Utility::isUpgrade(response_headers));
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_,
-                                                    "");
+    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "",
+                                                    connection_.stream_info_, node_id_);
 
     EXPECT_EQ(1UL, response_headers.size()) << response_headers;
     EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
@@ -942,8 +947,8 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
     TestResponseHeaderMapImpl response_headers{{"transfer-encoding", "foo"}, {"upgrade", "bar"}};
     EXPECT_TRUE(Utility::isUpgrade(request_headers));
     EXPECT_FALSE(Utility::isUpgrade(response_headers));
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_,
-                                                    "");
+    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "",
+                                                    connection_.stream_info_, node_id_);
 
     EXPECT_EQ(0UL, response_headers.size()) << response_headers;
   }
@@ -957,7 +962,8 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
 
   EXPECT_CALL(*request_id_extension_,
               setInResponse(testing::Ref(response_headers), testing::Ref(request_headers)));
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "",
+                                                  connection_.stream_info_, node_id_);
   EXPECT_EQ("request-id", response_headers.get_("x-request-id"));
 }
 
@@ -969,7 +975,8 @@ TEST_F(ConnectionManagerUtilityTest, SkipMutateResponseHeadersReturnXRequestId) 
   EXPECT_CALL(*request_id_extension_,
               setInResponse(testing::Ref(response_headers), testing::Ref(request_headers)))
       .Times(0);
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "",
+                                                  connection_.stream_info_, node_id_);
   EXPECT_EQ("", response_headers.get_("x-request-id"));
 }
 
@@ -982,7 +989,8 @@ TEST_F(ConnectionManagerUtilityTest, AlwaysMutateResponseHeadersReturnXRequestId
   EXPECT_CALL(*request_id_extension_,
               setInResponse(testing::Ref(response_headers), testing::Ref(request_headers)));
   ON_CALL(config_, alwaysSetRequestIdInResponse()).WillByDefault(Return(true));
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "",
+                                                  connection_.stream_info_, node_id_);
   EXPECT_EQ("request-id", response_headers.get_("x-request-id"));
 }
 
@@ -1475,7 +1483,8 @@ TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
   Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=60"},
                                                    {"proxy-connection", "proxy-header"}};
   EXPECT_CALL(*request_id_extension_, setTraceReason(_, _)).Times(0);
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "",
+                                                  connection_.stream_info_, node_id_);
 
   EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
 
