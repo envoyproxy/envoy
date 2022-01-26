@@ -36,8 +36,6 @@ MAINTAINERS = {
     'junr03': 'U79K0Q431',
     'wrowe': 'UBQR8NGBS',
     'yanavlasov': 'UJHLR5KFS',
-    'asraa': 'UKZKCFRTP',
-    'davinci26': 'U013608CUDV',
     'rojkov': 'UH5EXLYQK',
     'RyanTheOptimist': 'U01SW3JC8GP',
     'adisuissa': 'UT17EMMTP',
