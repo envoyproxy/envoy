@@ -198,11 +198,14 @@ private:
   http2::adapter::HeaderValidator header_validator_;
 };
 
-// Object used for updating a BytesMeter to track bytes sent on a QuicStream since this object was constructed.
+// Object used for updating a BytesMeter to track bytes sent on a QuicStream since this object was
+// constructed.
 class IncrementalBytesSentTracker {
 public:
-  IncrementalBytesSentTracker(const quic::QuicStream& stream, StreamInfo::BytesMeter& bytes_meter, bool update_header_bytes)
-      : stream_(stream), bytes_meter_(bytes_meter), update_header_bytes_(update_header_bytes), initial_bytes_sent_(totalStreamBytesWritten()) {}
+  IncrementalBytesSentTracker(const quic::QuicStream& stream, StreamInfo::BytesMeter& bytes_meter,
+                              bool update_header_bytes)
+      : stream_(stream), bytes_meter_(bytes_meter), update_header_bytes_(update_header_bytes),
+        initial_bytes_sent_(totalStreamBytesWritten()) {}
 
   ~IncrementalBytesSentTracker() {
     if (update_header_bytes_) {
@@ -211,7 +214,7 @@ public:
     bytes_meter_.addWireBytesSent(incrementalBytesWritten());
   }
 
- private:
+private:
   // Returns the number of newly sent bytes since the tracker was constructed.
   uint64_t incrementalBytesWritten() {
     ASSERT(totalStreamBytesWritten() >= initial_bytes_sent_);
