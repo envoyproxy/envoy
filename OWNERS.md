@@ -85,6 +85,7 @@ contributors to envoy-setec and relevant Slack channels from:
 * Roman Dzhabarov ([RomanDzhabarov](https://github.com/RomanDzhabarov)) (rdzhabarov@lyft.com)
 * Bill Gallagher ([wgallagher](https://github.com/wgallagher)) (bgallagher@lyft.com)
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
+* Sotiris Nanopoulos ([davinci26](https://github.com/davinci26)) (Sotiris.Nanopoulos@microsoft.com)
 * Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
 
 # Friends of Envoy
