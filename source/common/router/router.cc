@@ -673,7 +673,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr);
 
   // Ensure an http transport scheme is selected before continuing with decoding.
-  ASSERT(headers.Scheme());
+  if (!headers.Scheme()) {
+    ENVOY_STREAM_LOG(error, "no scheme in headers:\n{}", *callbacks_, headers);
+    return Http::FilterHeadersStatus::StopIteration;
+  }
 
   retry_state_ = createRetryState(
       route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, config_.runtime_,
