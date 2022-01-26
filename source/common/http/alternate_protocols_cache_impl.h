@@ -51,7 +51,7 @@ public:
   // This function also does not do standards-required normalization. Entries requiring
   // normalization will simply not be read from cache.
   // The string format is
-  // srtt|bandwidth|protocols
+  // rtt|bandwidth|protocols
   static std::string originDataToStringForCache(const std::vector<AlternateProtocol>& protocols,
                                                 int64_t srtt, int64_t bandwidth);
   // Parse an origin data into structured data, or absl::nullopt

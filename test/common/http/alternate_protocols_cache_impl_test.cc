@@ -256,11 +256,11 @@ TEST_F(AlternateProtocolsCacheImplTest, InvalidString) {
                    "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|a|2", simTime(), true)
                    .has_value());
 
-  // Standard entry with srtt and bandwidth
+  // Standard entry with rtt and bandwidth
   EXPECT_TRUE(AlternateProtocolsCacheImpl::originDataFromString(
                   "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1|2", simTime(), true)
                   .has_value());
-  // Standard entry without srtt and bandwidth
+  // Standard entry without rtt and bandwidth
   EXPECT_TRUE(AlternateProtocolsCacheImpl::originDataFromString(
                   "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60", simTime(), true)
                   .has_value());
