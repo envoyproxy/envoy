@@ -348,8 +348,6 @@ TEST_P(AccessLogIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
 
 class AccessLogRetryIntegrationTest : public AccessLogIntegrationTest {
 public:
-  AccessLogRetryIntegrationTest() : AccessLogIntegrationTest() {}
-
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     FakeUpstreamConfig config{timeSystem()};
