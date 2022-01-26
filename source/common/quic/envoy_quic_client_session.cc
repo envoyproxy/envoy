@@ -45,7 +45,7 @@ void EnvoyQuicClientSession::connect() {
 
 void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                 quic::ConnectionCloseSource source) {
-  // Latch latest srtt.
+  // Latch latest rtt.
   if (OneRttKeysAvailable() && rtt_cache_) {
     const quic::QuicConnectionStats& stats = connection()->GetStats();
     if (stats.srtt_us > 0) {
