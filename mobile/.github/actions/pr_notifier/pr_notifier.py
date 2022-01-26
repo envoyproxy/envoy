@@ -170,5 +170,5 @@ if __name__ == '__main__':
         sys.exit(1)
 
     client = WebClient(token=SLACK_BOT_TOKEN)
-    post_to_oncall(client, reviewers_and_messages['unassigned'], stalled_prs)
+    post_to_oncall(client, stalled_prs)
     post_to_assignee(client, reviewers_and_messages, REVIEWERS)
