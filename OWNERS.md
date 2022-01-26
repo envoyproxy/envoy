@@ -70,6 +70,7 @@ without further review.
 * William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
 * Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
 * Tim Walsh ([twghu](https://github.com/twghu)) (walsh@redhat.com)
+* ([phlax](https://github.com/phlax))
 
 In addition to the permanent Envoy security team, we have additional temporary
 contributors to envoy-setec and relevant Slack channels from:
@@ -80,7 +81,7 @@ contributors to envoy-setec and relevant Slack channels from:
   * Mike Myers ([mike-myers-tob](https://github.com/mike-myers-tob))
 
 * [Feb 2022 Security Release Contributors]
-  * Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) expiring 2/28/2022
+  * Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) expiring 2/28/2023
 
 # Emeritus maintainers
 
