@@ -79,6 +79,9 @@ contributors to envoy-setec and relevant Slack channels from:
   * Alessandro Gario ([alessandrogario](https://github.com/alessandrogario))
   * Mike Myers ([mike-myers-tob](https://github.com/mike-myers-tob))
 
+* [Feb 2022 Security Release Contributors]
+  * Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) expiring 2/28/2022
+
 # Emeritus maintainers
 
 * Constance Caramanolis ([ccaraman](https://github.com/ccaraman)) (ccaramanolis@lyft.com)
