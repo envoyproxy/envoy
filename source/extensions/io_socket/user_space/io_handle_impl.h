@@ -149,7 +149,7 @@ public:
   }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const envoy::config::core::v3::Metadata* peerMetadata() const override {
-    return peer_handle_ ? &peer_handle_->metadata() : nullptr
+    return peer_handle_ ? &peer_handle_->metadata() : nullptr;
   }
   virtual void setMetadata(const envoy::config::core::v3::Metadata& metadata) override {
     metadata_.MergeFrom(metadata);
