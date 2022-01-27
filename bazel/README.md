@@ -885,7 +885,7 @@ Note that if you run the `check_spelling.py` script you will need to have `aspel
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-20.04/bin/clang-format"
+export CLANG_FORMAT="$HOME/ext/clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
 
