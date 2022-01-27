@@ -164,7 +164,7 @@ TEST_F(OdCdsApiImplTest, NotifierGetsUsed) {
 TEST_F(OdCdsApiImplTest, NotifierNotUsed) {
   InSequence s;
 
-  envoy::config::cluster::v3::Cluster some_cluster;
+  envoy::config::cluster::v3::Cluster cluster;
   cluster.set_name("some_cluster");
   const auto some_cluster_resource = TestUtility::decodeResources({cluster});
   cluster.set_name("some_cluster2");
