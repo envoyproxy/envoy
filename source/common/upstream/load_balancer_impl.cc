@@ -980,7 +980,7 @@ double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host&
     auto time_factor = static_cast<double>(std::max(std::chrono::milliseconds(1).count(),
                                                     host_create_duration.count())) /
                        slow_start_window_.count();
-    return host_weight * std : max(applyAggressionFactor(time_factor), min_weight_percent_);
+    return host_weight * std::max(applyAggressionFactor(time_factor), min_weight_percent_);
   } else {
     return host_weight;
   }
