@@ -296,7 +296,7 @@ public:
     store_.forEachTextReadout(f_size, f_stat);
   }
   void forEachScope(std::function<void(std::size_t)> f_size,
-                    StatFn<const ScopeShaedPtr> f_scope) const override {
+                    StatFn<const ScopeSharedPtr> f_scope) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachScope(f_size, f_scope);
   }
