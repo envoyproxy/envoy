@@ -217,7 +217,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   quic::QuicConfig config;
   std::unique_ptr<Http::PersistentQuicInfo> persistent_info;
   persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher, *transport_socket_factory, time_system, addr, config, 0);
+      *dispatcher, *transport_socket_factory, time_system, addr->ip()->port(), config, 0);
 
   Network::Address::InstanceConstSharedPtr local_address;
   if (addr->ip()->version() == Network::Address::IpVersion::v4) {

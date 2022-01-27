@@ -52,6 +52,7 @@ void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseF
     const quic::QuicConnectionStats& stats = connection()->GetStats();
     if (stats.srtt_us > 0) {
       Http::AlternateProtocolsCache::Origin origin("https", server_id().host(), server_id().port());
+      std::cerr << "Set RTT\n";
       rtt_cache_->setRtt(origin, std::chrono::microseconds(stats.srtt_us));
     }
   }

@@ -137,9 +137,12 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
 
 void AlternateProtocolsCacheImpl::setRtt(const Origin& origin, std::chrono::microseconds srtt) {
   auto entry_it = protocols_.find(origin);
+  std::cerr << "Origin " << originToString(origin);
   if (entry_it == protocols_.end()) {
+    std::cerr << "HERE EARLY RETURN\n";
     return;
   }
+  std::cerr << "HERE< RTT " << srtt.count() << "\n";
   entry_it->second.srtt = srtt;
   key_value_store_->addOrUpdate(originToString(origin),
                                 originDataToStringForCache(entry_it->second.protocols, srtt));

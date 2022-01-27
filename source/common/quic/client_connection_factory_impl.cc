@@ -43,11 +43,11 @@ std::shared_ptr<quic::QuicCryptoClientConfig> PersistentQuicInfoImpl::cryptoConf
 
 PersistentQuicInfoImpl::PersistentQuicInfoImpl(
     Event::Dispatcher& dispatcher, Network::TransportSocketFactory& transport_socket_factory,
-    TimeSource& time_source, Network::Address::InstanceConstSharedPtr server_addr,
-    const quic::QuicConfig& quic_config, uint32_t buffer_limit)
+    TimeSource& time_source, uint32_t remote_port, const quic::QuicConfig& quic_config,
+    uint32_t buffer_limit)
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
       server_id_{getConfig(transport_socket_factory).serverNameIndication(),
-                 static_cast<uint16_t>(server_addr->ip()->port()), false},
+                 static_cast<uint16_t>(remote_port)},
       transport_socket_factory_(transport_socket_factory), time_source_(time_source),
       quic_config_(quic_config), buffer_limit_(buffer_limit) {
   quiche::FlagRegistry::getInstance();

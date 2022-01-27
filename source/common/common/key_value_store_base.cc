@@ -29,9 +29,14 @@ absl::optional<absl::string_view> getToken(absl::string_view& contents, std::str
 } // namespace
 
 KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher,
-                                     std::chrono::seconds flush_interval)
-    : flush_timer_(dispatcher.createTimer([this]() { flush(); })) {
-  flush_timer_->enableTimer(flush_interval);
+                                     std::chrono::milliseconds flush_interval)
+    : flush_timer_(dispatcher.createTimer([this, flush_interval]() {
+        flush();
+        flush_timer_->enableTimer(flush_interval);
+      })) {
+  if (flush_interval.count() > 0) {
+    flush_timer_->enableTimer(flush_interval);
+  }
 }
 
 // Assuming |contents| is in the format
@@ -60,6 +65,9 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents,
 void KeyValueStoreBase::addOrUpdate(absl::string_view key, absl::string_view value) {
   store_.erase(key);
   store_.emplace(key, value);
+  if (!flush_timer_->enabled()) {
+    flush();
+  }
 }
 
 void KeyValueStoreBase::remove(absl::string_view key) { store_.erase(key); }

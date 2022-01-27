@@ -5,6 +5,7 @@
 #include "envoy/extensions/key_value/file_based/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
+#include "source/common/http/alternate_protocols_cache_impl.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
@@ -28,6 +29,7 @@ protected:
     alt_cache.set_name("default_alternate_protocols_cache");
     envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig config;
     config.set_filename(filename);
+    config.mutable_flush_interval()->set_nanos(0);
     envoy::config::common::key_value::v3::KeyValueStoreConfig kv_config;
     kv_config.mutable_config()->set_name("envoy.key_value.file_based");
     kv_config.mutable_config()->mutable_typed_config()->PackFrom(config);
@@ -49,6 +51,8 @@ typed_config:
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig
             filename: {}
+            flush_interval:
+              nanos: 0
 
 )EOF",
                                            filename);
@@ -144,12 +148,22 @@ INSTANTIATE_TEST_SUITE_P(Protocols, FilterIntegrationTest,
 // an HTTP/2 or an HTTP/3 upstream (but not both).
 class MixedUpstreamIntegrationTest : public FilterIntegrationTest {
 protected:
+  void initialize() override {
+    // TODO(alyssawilk) there's no config guarantee that SNI and hostname
+    // match, but alt-svc rtt caching doesn't work unless they do. Fix.
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          auto cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+          auto locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(0);
+          auto endpoint = locality_lb->mutable_lb_endpoints(0)->mutable_endpoint();
+          endpoint->set_hostname("foo.lyft.com");
+        });
+    FilterIntegrationTest::initialize();
+  }
+
   void writeFile() {
-    const std::string filename = TestEnvironment::temporaryPath("alt_svc_cache.txt");
-    // There's no hostname here because we're not doing dynamic forward proxying so we infer the
-    // hostname from the config (which does not set it)
     uint32_t port = fake_upstreams_[0]->localAddress()->ip()->port();
-    std::string key = absl::StrCat("https://:", port);
+    std::string key = absl::StrCat("https://foo.lyft.com:", port);
 
     size_t seconds = std::chrono::duration_cast<std::chrono::seconds>(
                          timeSystem().monotonicTime().time_since_epoch())
@@ -179,10 +193,28 @@ protected:
   bool use_http2_{false};
 };
 
+int getRtt(std::string alt_svc, TimeSource& time_source) {
+  auto data = Http::AlternateProtocolsCacheImpl::originDataFromString(alt_svc, time_source);
+  return data.has_value() ? data.value().srtt.count() : 0;
+}
 // Test auto-config with a pre-populated HTTP/3 alt-svc entry. The upstream request will
 // occur over HTTP/3.
 TEST_P(MixedUpstreamIntegrationTest, BasicRequestAutoWithHttp3) {
   testRouterRequestAndResponseWithBody(0, 0, false);
+  cleanupUpstreamAndDownstream();
+  std::string alt_svc;
+
+  // Make sure the srtt gets updated to a non-zero value.
+  for (int i = 0; i < 5; ++i) {
+    // Make sure that srtt is updated.
+    const std::string filename = TestEnvironment::temporaryPath("alt_svc_cache.txt");
+    alt_svc = TestEnvironment::readFileToStringForTest(filename);
+    if (getRtt(alt_svc, timeSystem()) != 0) {
+      break;
+    }
+    timeSystem().advanceTimeWait(std::chrono::seconds(1));
+  }
+  EXPECT_NE(getRtt(alt_svc, timeSystem()), 0) << alt_svc;
 }
 
 // Test simultaneous requests using auto-config and a pre-populated HTTP/3 alt-svc entry. The

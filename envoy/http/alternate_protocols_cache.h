@@ -100,8 +100,7 @@ public:
                                std::vector<AlternateProtocol>& protocols) PURE;
 
   /**
-   * Sets the bandwidth and rtt estimates for an origin, assuming the origin
-   * exists in the cache.
+   * Sets the rtt estimate for an origin, assuming the origin exists in the cache.
    * @param origin The origin to set network characteristics for.
    * @param srtt The smothed round trip time for the origin.
    */

@@ -19,8 +19,7 @@ namespace Quic {
 struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   PersistentQuicInfoImpl(Event::Dispatcher& dispatcher,
                          Network::TransportSocketFactory& transport_socket_factory,
-                         TimeSource& time_source,
-                         Network::Address::InstanceConstSharedPtr server_addr,
+                         TimeSource& time_source, uint32_t remote_port,
                          const quic::QuicConfig& quic_config, uint32_t buffer_limit);
 
   // Returns the most recent crypto config from transport_socket_factory_;
