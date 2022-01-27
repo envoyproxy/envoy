@@ -352,6 +352,7 @@ protected:
     bool pending_receive_buffer_high_watermark_called_ : 1;
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
+    bool defer_processing_backedup_streams_ : 1;
     absl::string_view details_;
 
     /**
@@ -360,16 +361,11 @@ protected:
     struct BufferedStreamManager {
       bool body_buffered_{false};
       bool trailers_buffered_{false};
-      // We either will get the end stream bit via header, data or trailers.
-      // If want to track when we see the end stream in order to determine when
-      // to pass it along when buffering it.
-      bool data_end_stream_{false};
 
       // We received a call to onStreamClose for the stream, but deferred it
       // as the stream had pending data to process and the stream was not reset.
       bool buffered_on_stream_close_{false};
 
-      bool remoteEndStreamBuffered() const { return data_end_stream_ || trailers_buffered_; }
       bool hasBufferedData() const { return body_buffered_ || trailers_buffered_; }
     };
 
@@ -381,6 +377,18 @@ protected:
     bool hasPendingData() override {
       return pending_send_data_->length() > 0 || pending_trailers_to_encode_ != nullptr;
     }
+    bool continueProcessingBufferedData() const {
+      // We should stop processing buffered data if either
+      // 1) Buffers become overrun
+      // 2) The stream ends up getting reset
+      // Both of these can end up changing as a result of processing buffered data.
+      return !buffersOverrun() && !reset_reason_.has_value();
+    }
+
+    // Avoid inversion in the case where we saw trailers, acquiring the
+    // remote_end_stream_ being set to true, but the trailers ended up being
+    // buffered.
+    bool sendEndStream() const { return remote_end_stream_ && !stream_manager_.trailers_buffered_; }
   };
 
   using StreamImplPtr = std::unique_ptr<StreamImpl>;

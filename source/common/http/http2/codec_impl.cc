@@ -158,7 +158,9 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
       local_end_stream_sent_(false), remote_end_stream_(false), data_deferred_(false),
       received_noninformational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
-      pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false) {
+      pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false),
+      defer_processing_backedup_streams_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.defer_processing_backedup_streams")) {
   parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit);
@@ -167,9 +169,7 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
 
 void ConnectionImpl::StreamImpl::destroy() {
   // Cancel any pending buffered data callback for the stream.
-  if (process_buffered_data_callback_ != nullptr && process_buffered_data_callback_->enabled()) {
-    process_buffered_data_callback_->cancel();
-  }
+  process_buffered_data_callback_.reset();
 
   MultiplexedStreamImplBase::destroy();
   parent_.stats_.streams_active_.dec();
@@ -357,22 +357,11 @@ void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadat
 void ConnectionImpl::StreamImpl::processBufferedData() {
   ENVOY_CONN_LOG(debug, "Stream {} processing buffered data.", parent_.connection_, stream_id_);
 
-  // We should stop processing buffered data if either
-  // 1) Buffers become overrun
-  // 2) The stream ends up getting reset
-  // Both of these can end up changing as a result of processing buffered data.
-  bool continue_processing = !buffersOverrun() && !reset_reason_.has_value();
-
-  if (stream_manager_.body_buffered_ && continue_processing) {
-    if (stream_manager_.data_end_stream_) {
-      remote_end_stream_ = true; // restore the deferred end_stream from the remote.
-    }
+  if (stream_manager_.body_buffered_ && continueProcessingBufferedData()) {
     decodeData();
   }
 
-  continue_processing = !buffersOverrun() && !reset_reason_.has_value();
-  if (stream_manager_.trailers_buffered_ && continue_processing) {
-    remote_end_stream_ = true; // buffered trailers imply remote_end_stream_.
+  if (stream_manager_.trailers_buffered_ && continueProcessingBufferedData()) {
     decodeTrailers();
   }
 
@@ -422,8 +411,9 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
 }
 
 void ConnectionImpl::StreamImpl::pendingRecvBufferHighWatermark() {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.defer_processing_backedup_streams")) {
+  // If defer_processing_backedup_streams_, read disabling here can become
+  // dangerous as it can prevent us from processing buffered data.
+  if (!defer_processing_backedup_streams_) {
     ENVOY_CONN_LOG(debug, "recv buffer over limit ", parent_.connection_);
     ASSERT(!pending_receive_buffer_high_watermark_called_);
     pending_receive_buffer_high_watermark_called_ = true;
@@ -432,8 +422,9 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferHighWatermark() {
 }
 
 void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.defer_processing_backedup_streams")) {
+  // If defer_processing_backedup_streams_, we don't read disable on
+  // high watermark, so we shouldn't read disable here.
+  if (!defer_processing_backedup_streams_) {
     ENVOY_CONN_LOG(debug, "recv buffer under limit ", parent_.connection_);
     ASSERT(pending_receive_buffer_high_watermark_called_);
     pending_receive_buffer_high_watermark_called_ = false;
@@ -442,9 +433,7 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
 }
 
 void ConnectionImpl::StreamImpl::decodeData() {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.defer_processing_backedup_streams") &&
-      buffersOverrun()) {
+  if (defer_processing_backedup_streams_ && buffersOverrun()) {
     ENVOY_CONN_LOG(trace, "Stream {} buffering decodeData() call.", parent_.connection_,
                    stream_id_);
     stream_manager_.body_buffered_ = true;
@@ -454,15 +443,10 @@ void ConnectionImpl::StreamImpl::decodeData() {
   // Any buffered data will be consumed.
   stream_manager_.body_buffered_ = false;
 
-  // Avoid inversion in the case where we saw trailers, acquiring the
-  // remote_end_stream_ being set to true, but the trailers ended up being
-  // buffered.
-  const bool send_end_stream = remote_end_stream_ && !stream_manager_.trailers_buffered_;
-
   // It's possible that we are waiting to send a deferred reset, so only raise data if local
   // is not complete.
   if (!deferred_reset_) {
-    decoder().decodeData(*pending_recv_data_, send_end_stream);
+    decoder().decodeData(*pending_recv_data_, sendEndStream());
   }
 
   // TODO(kbaichoo): If dumping buffered data, we should do so in default read
@@ -488,7 +472,7 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
     ASSERT(!remote_end_stream_);
     response_decoder_.decode1xxHeaders(std::move(headers));
   } else {
-    response_decoder_.decodeHeaders(std::move(headers), remote_end_stream_);
+    response_decoder_.decodeHeaders(std::move(headers), sendEndStream());
   }
 }
 
@@ -498,9 +482,7 @@ bool ConnectionImpl::StreamImpl::maybeDeferDecodeTrailers() {
   // 1) Buffers are overrun
   // 2) There's buffered body which should get processed before these trailers
   //    to avoid losing data.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.defer_processing_backedup_streams") &&
-      (buffersOverrun() || stream_manager_.body_buffered_)) {
+  if (defer_processing_backedup_streams_ && (buffersOverrun() || stream_manager_.body_buffered_)) {
     stream_manager_.trailers_buffered_ = true;
     ENVOY_CONN_LOG(trace, "Stream {} buffering decodeTrailers() call.", parent_.connection_,
                    stream_id_);
@@ -527,7 +509,7 @@ void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
   if (Http::Utility::isH2UpgradeRequest(*headers)) {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
   }
-  request_decoder_->decodeHeaders(std::move(headers), remote_end_stream_);
+  request_decoder_->decodeHeaders(std::move(headers), sendEndStream());
 }
 
 void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
@@ -1198,13 +1180,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     break;
   }
   case NGHTTP2_DATA: {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.defer_processing_backedup_streams") &&
-        stream->buffersOverrun()) {
-      stream->stream_manager_.data_end_stream_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
-    } else {
-      stream->remote_end_stream_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
-    }
+    stream->remote_end_stream_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
     stream->decodeData();
     break;
   }
@@ -1371,11 +1347,7 @@ int ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
 
     ENVOY_CONN_LOG(debug, "stream {} closed: {}", connection_, stream_id, error_code);
 
-    if (const bool saw_remote_end_stream =
-            (stream->remote_end_stream_ || stream->stream_manager_.remoteEndStreamBuffered());
-        !saw_remote_end_stream || !stream->local_end_stream_) {
-      ENVOY_CONN_LOG(debug, "Claiming reset reason !remote_end_stream:{} !local_end_stream_{}",
-                     connection_, !saw_remote_end_stream, !stream->local_end_stream_);
+    if (!stream->remote_end_stream_ || !stream->local_end_stream_) {
       StreamResetReason reason;
       if (stream->reset_due_to_messaging_error_) {
         // Unfortunately, the nghttp2 API makes it incredibly difficult to clearly understand
