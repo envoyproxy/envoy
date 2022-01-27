@@ -443,7 +443,6 @@ void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
-  case ConnectionPool::PoolFailureReason::NotQualified:
     upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
     break;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:

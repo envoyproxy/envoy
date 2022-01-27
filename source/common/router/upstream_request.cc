@@ -403,8 +403,6 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
     reset_reason = Http::StreamResetReason::ConnectionFailure;
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
-    FALLTHRU;
-  case ConnectionPool::PoolFailureReason::NotQualified:
     reset_reason = Http::StreamResetReason::ConnectionFailure;
   }
 
