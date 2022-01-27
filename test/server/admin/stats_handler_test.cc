@@ -262,7 +262,7 @@ TEST_P(AdminStatsTest, HandlerStatsJson) {
   shutdownThreading();
 }
 
-#if 1
+#if 0
 TEST_P(AdminStatsTest, StatsAsJson) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);

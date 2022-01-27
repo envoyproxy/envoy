@@ -6,6 +6,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
+
 #define SCOPE_REFCOUNT 0
 #if SCOPE_REFCOUNT
 #include "envoy/stats/refcount_ptr.h"
@@ -48,10 +49,10 @@ template <class StatType> using IterateFn = std::function<bool(const RefcountPtr
  */
 class Scope : public
 #if SCOPE_REFCOUNT
-    RefcountInterface
+              RefcountInterface
 #else
 #if SCOPE_SHARED_FROM_THIS
-    std::enable_shared_from_this<Scope>
+              std::enable_shared_from_this<Scope>
 #endif
 #endif
 {

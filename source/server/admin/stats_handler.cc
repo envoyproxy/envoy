@@ -104,8 +104,9 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
 
   auto iter = context_map_.find(&admin_stream);
   if (iter == context_map_.end()) {
-    auto insertion = context_map_.emplace(&admin_stream, std::make_unique<Context>(
-        server_, used_only, regex, json, response_headers, response));
+    auto insertion = context_map_.emplace(
+        &admin_stream,
+        std::make_unique<Context>(server_, used_only, regex, json, response_headers, response));
     iter = insertion.first;
   }
   Context& context = *iter->second;
@@ -119,10 +120,11 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
 }
 
 class StatsHandler::Render {
- public:
+public:
   virtual ~Render() = default;
   virtual void generate(Buffer::Instance& response, const std::string& name, uint64_t value) PURE;
-  virtual void generate(Buffer::Instance& response, const std::string& name, const std::string& value) PURE;
+  virtual void generate(Buffer::Instance& response, const std::string& name,
+                        const std::string& value) PURE;
   virtual void generate(Buffer::Instance& response, const std::string& name,
                         const Stats::ParentHistogram& histogram) PURE;
   virtual void render(Buffer::Instance& response) PURE;
@@ -130,13 +132,13 @@ class StatsHandler::Render {
 };
 
 class StatsHandler::TextRender : public StatsHandler::Render {
- public:
+public:
   void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override {
     response.addFragments({name, ": ", absl::StrCat(value), "\n"});
   }
 
-  void generate(Buffer::Instance& response, const std::string& name, const std::string& value)
-      override {
+  void generate(Buffer::Instance& response, const std::string& name,
+                const std::string& value) override {
     response.addFragments({name, ": \"", Html::Utility::sanitize(value), "\"\n"});
   }
 
@@ -146,13 +148,11 @@ class StatsHandler::TextRender : public StatsHandler::Render {
   }
 
   void render(Buffer::Instance&) override {}
-  bool nextChunk(Buffer::Instance& response) override {
-    return response.length() > ChunkSize;
-  }
+  bool nextChunk(Buffer::Instance& response) override { return response.length() > ChunkSize; }
 };
 
 class StatsHandler::JsonRender : public StatsHandler::Render {
- public:
+public:
   JsonRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response) {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
     response.add("{\"stats\":[");
@@ -204,24 +204,25 @@ class StatsHandler::JsonRender : public StatsHandler::Render {
   }
 
   void render(Buffer::Instance& response) override {
-    //emitStats(response);
+    // emitStats(response);
     if (found_used_histogram_) {
       auto* histograms_obj_fields = histograms_obj_.mutable_fields();
       (*histograms_obj_fields)["computed_quantiles"] =
           ValueUtil::listValue(computed_quantile_array_);
       auto* histograms_obj_container_fields = histograms_obj_container_.mutable_fields();
       (*histograms_obj_container_fields)["histograms"] = ValueUtil::structValue(histograms_obj_);
-      auto str = MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::structValue(histograms_obj_container_),
-                                                            false /* pretty */, true);
-      //stats_array_.push_back();
-      //ENVOY_LOG_MISC(error, "histograms: {}", str);
-      //response.addFragments({"  ", str, "\n"});
+      auto str = MessageUtil::getJsonStringFromMessageOrDie(
+          ValueUtil::structValue(histograms_obj_container_), false /* pretty */, true);
+      // stats_array_.push_back();
+      // ENVOY_LOG_MISC(error, "histograms: {}", str);
+      // response.addFragments({"  ", str, "\n"});
       response.add(str);
     }
 
-    //auto* document_fields = document_.mutable_fields();
+    // auto* document_fields = document_.mutable_fields();
     //(*document_fields)["stats"] = ValueUtil::listValue(stats_array_);
-    //response.add(MessageUtil::getJsonStringFromMessageOrDie(document_, false /* pretty */, true));
+    // response.add(MessageUtil::getJsonStringFromMessageOrDie(document_, false /* pretty */,
+    // true));
     response.add("]}");
   }
 
@@ -236,16 +237,17 @@ class StatsHandler::JsonRender : public StatsHandler::Render {
     */
   }
 
- private:
-  template <class Value> void add(Buffer::Instance& response, const std::string& name, const Value& value) {
+private:
+  template <class Value>
+  void add(Buffer::Instance& response, const std::string& name, const Value& value) {
     ProtobufWkt::Struct stat_obj;
     auto* stat_obj_fields = stat_obj.mutable_fields();
     (*stat_obj_fields)["name"] = ValueUtil::stringValue(name);
     (*stat_obj_fields)["value"] = value;
-    //stats_array_.push_back(ValueUtil::structValue(stat_obj));
+    // stats_array_.push_back(ValueUtil::structValue(stat_obj));
     auto str = MessageUtil::getJsonStringFromMessageOrDie(stat_obj, false /* pretty */, true);
     ENVOY_LOG_MISC(error, "emitting: {}", str);
-    //response.addFragments({"  ", str, ",\n"});
+    // response.addFragments({"  ", str, ",\n"});
     response.addFragments({str, ","});
   }
 
@@ -268,9 +270,8 @@ class StatsHandler::JsonRender : public StatsHandler::Render {
   bool found_used_histogram_{false};
 };
 
-StatsHandler::Context::Context(Server::Instance& server,
-                               bool used_only, absl::optional<std::regex> regex,
-                               bool json,
+StatsHandler::Context::Context(Server::Instance& server, bool used_only,
+                               absl::optional<std::regex> regex, bool json,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response)
     : used_only_(used_only), regex_(regex), stats_(server.stats()) {
@@ -285,10 +286,8 @@ StatsHandler::Context::Context(Server::Instance& server,
   //
   // First capture all the scopes and hold onto them with a SharedPtr so they
   // can't be deleted after the initial iteration.
-  stats_.forEachScope([this](size_t s) { scopes_.reserve(s); }, [this](
-      const Stats::ScopeSharedPtr& scope) {
-    scopes_.emplace_back(scope);
-  });
+  stats_.forEachScope([this](size_t s) { scopes_.reserve(s); },
+                      [this](const Stats::ScopeSharedPtr& scope) { scopes_.emplace_back(scope); });
 
   startPhase();
 }
@@ -316,20 +315,21 @@ void StatsHandler::Context::startPhase() {
 
 void StatsHandler::Context::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
   switch (phase_) {
-    case Phase::TextReadouts:
-      populateStatsFromScopes<Stats::TextReadout>(scope_vec);
-      break;
-    case Phase::CountersAndGauges:
-      populateStatsFromScopes<Stats::Counter>(scope_vec);
-      populateStatsFromScopes<Stats::Gauge>(scope_vec);
-      break;
-    case Phase::Histograms:
-      populateStatsFromScopes<Stats::Histogram>(scope_vec);
-      break;
+  case Phase::TextReadouts:
+    populateStatsFromScopes<Stats::TextReadout>(scope_vec);
+    break;
+  case Phase::CountersAndGauges:
+    populateStatsFromScopes<Stats::Counter>(scope_vec);
+    populateStatsFromScopes<Stats::Gauge>(scope_vec);
+    break;
+  case Phase::Histograms:
+    populateStatsFromScopes<Stats::Histogram>(scope_vec);
+    break;
   }
 }
 
-template<class StatType> void StatsHandler::Context::populateStatsFromScopes(const ScopeVec& scope_vec) {
+template <class StatType>
+void StatsHandler::Context::populateStatsFromScopes(const ScopeVec& scope_vec) {
   for (const Stats::ScopeSharedPtr& scope : scope_vec) {
     Stats::IterateFn<StatType> fn = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
       stat_map_[stat->name()] = stat;
@@ -339,8 +339,8 @@ template<class StatType> void StatsHandler::Context::populateStatsFromScopes(con
   }
 }
 
-template<class SharedStatType> void StatsHandler::Context::renderStat(
-    Buffer::Instance& response, StatOrScopes& variant) {
+template <class SharedStatType>
+void StatsHandler::Context::renderStat(Buffer::Instance& response, StatOrScopes& variant) {
   auto stat = absl::get<SharedStatType>(variant);
   render_->generate(response, stat->name(), stat->value());
 }
@@ -349,17 +349,17 @@ Http::Code StatsHandler::Context::writeChunk(Buffer::Instance& response) {
   while (!render_->nextChunk(response)) {
     while (stat_map_.empty()) {
       switch (phase_) {
-        case Phase::TextReadouts:
-          phase_ = Phase::CountersAndGauges;
-          startPhase();
-          break;
-        case Phase::CountersAndGauges:
-          phase_ = Phase::Histograms;
-          startPhase();
-          break;
-        case Phase::Histograms:
-          render_->render(response);
-          return Http::Code::OK;
+      case Phase::TextReadouts:
+        phase_ = Phase::CountersAndGauges;
+        startPhase();
+        break;
+      case Phase::CountersAndGauges:
+        phase_ = Phase::Histograms;
+        startPhase();
+        break;
+      case Phase::Histograms:
+        render_->render(response);
+        return Http::Code::OK;
       }
     }
 
@@ -367,17 +367,25 @@ Http::Code StatsHandler::Context::writeChunk(Buffer::Instance& response) {
     StatOrScopes variant = std::move(iter->second);
     stat_map_.erase(iter);
     switch (variant.index()) {
-      case 0: populateStatsForCurrentPhase(absl::get<ScopeVec>(variant)); break;
-      case 1: renderStat<Stats::TextReadoutSharedPtr>(response, variant); break;
-      case 2: renderStat<Stats::CounterSharedPtr>(response, variant); break;
-      case 3: renderStat<Stats::GaugeSharedPtr>(response, variant); break;
-      case 4: {
-        auto histogram = absl::get<Stats::HistogramSharedPtr>(variant);
-        auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
-        if (parent_histogram != nullptr) {
-          render_->generate(response, parent_histogram->name(), *parent_histogram);
-        }
+    case 0:
+      populateStatsForCurrentPhase(absl::get<ScopeVec>(variant));
+      break;
+    case 1:
+      renderStat<Stats::TextReadoutSharedPtr>(response, variant);
+      break;
+    case 2:
+      renderStat<Stats::CounterSharedPtr>(response, variant);
+      break;
+    case 3:
+      renderStat<Stats::GaugeSharedPtr>(response, variant);
+      break;
+    case 4: {
+      auto histogram = absl::get<Stats::HistogramSharedPtr>(variant);
+      auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
+      if (parent_histogram != nullptr) {
+        render_->generate(response, parent_histogram->name(), *parent_histogram);
       }
+    }
     }
   }
   return Http::Code::Continue;
@@ -403,38 +411,9 @@ struct CompareStatsAndScopes {
 
   Stats::SymbolTable& symbol_table_;
 };
-
-std::sort(stats_and_scopes_.begin(), stats_and_scopes_.end(), CompareStatsAndScopes(stats_.symbolTable()));
-std::unique(stats_and_scopes_.begin(), stats_and_scopes_.end());
-
-/*
-  for (const Stats::CounterSharedPtr& counter : server.stats().counters()) {
-  if (shouldShowMetric(*counter)) {
-  all_stats_.emplace(counter->name(), counter->value());
-  }
-  }
-
-  for (const Stats::GaugeSharedPtr& gauge : server.stats().gauges()) {
-  if (shouldShowMetric(*gauge)) {
-  ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
-  all_stats_.emplace(gauge->name(), gauge->value());
-  }
-  }
-  all_stats_iter_ = all_stats_.begin();
-
-  for (const auto& text_readout : server.stats().textReadouts()) {
-  if (shouldShowMetric(*text_readout)) {
-  text_readouts_.emplace(text_readout->name(), text_readout->value());
-  }
-  }
-  text_readouts_iter_ = text_readouts_.begin();
-
-  histograms_ = server.stats().histograms();
-*/
 #endif
 
-StatsHandler::Context::~Context() {
-}
+StatsHandler::Context::~Context() {}
 
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
                                                 Http::ResponseHeaderMap&,

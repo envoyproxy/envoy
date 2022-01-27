@@ -55,36 +55,31 @@ public:
 
   class Context {
     using ScopeVec = std::vector<Stats::ScopeSharedPtr>;
-    using StatOrScopes = absl::variant<
-        ScopeVec,
-        Stats::TextReadoutSharedPtr,
-        Stats::CounterSharedPtr,
-        Stats::GaugeSharedPtr,
-        Stats::HistogramSharedPtr>;
+    using StatOrScopes =
+        absl::variant<ScopeVec, Stats::TextReadoutSharedPtr, Stats::CounterSharedPtr,
+                      Stats::GaugeSharedPtr, Stats::HistogramSharedPtr>;
     enum class Phase {
       TextReadouts,
       CountersAndGauges,
       Histograms,
     };
 
-   public:
-    Context(Server::Instance& server,
-            bool used_only, absl::optional<std::regex> regex,
-            bool json, Http::ResponseHeaderMap& response_headers,
-            Buffer::Instance& response);
+  public:
+    Context(Server::Instance& server, bool used_only, absl::optional<std::regex> regex, bool json,
+            Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
     ~Context();
 
     void startPhase();
     Http::Code writeChunk(Buffer::Instance& response);
 
-    template<class StatType> bool shouldShowMetric(const StatType& stat) {
+    template <class StatType> bool shouldShowMetric(const StatType& stat) {
       return StatsHandler::shouldShowMetric(stat, used_only_, regex_);
     }
 
     void populateStatsForCurrentPhase(const ScopeVec& scope_vec);
-    template<class StatType> void populateStatsFromScopes(const ScopeVec& scope);
-    template<class SharedStatType> void renderStat(
-        Buffer::Instance& response, StatOrScopes& variant);
+    template <class StatType> void populateStatsFromScopes(const ScopeVec& scope);
+    template <class SharedStatType>
+    void renderStat(Buffer::Instance& response, StatOrScopes& variant);
 
     const bool used_only_;
     absl::optional<std::regex> regex_;
@@ -95,7 +90,7 @@ public:
     static constexpr uint32_t num_stats_per_chunk_ = 1000;
     Stats::Store& stats_;
     ScopeVec scopes_;
-    //StatOrScopeVec stats_and_scopes_;
+    // StatOrScopeVec stats_and_scopes_;
     using StatMap = std::map<std::string, StatOrScopes>;
     StatMap stat_map_;
     uint32_t stats_and_scopes_index_{0};

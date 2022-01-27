@@ -23,12 +23,8 @@ public:
 #if SCOPE_REFCOUNT
   // RefcountInterface
 #if 1
-  void incRefCount() override {
-    ++ref_count_;
-  }
-  bool decRefCount() override {
-    return --ref_count_ == 0;
- }
+  void incRefCount() override { ++ref_count_; }
+  bool decRefCount() override { return --ref_count_ == 0; }
   uint32_t use_count() const override { return ref_count_; }
 #else
   void incRefCount() override { scope_->incRefCount(); }

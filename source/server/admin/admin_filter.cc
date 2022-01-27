@@ -78,7 +78,7 @@ void AdminFilter::onComplete() {
                                         StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
     }
     if (response.length() > 0 || !cont) {
-      //ENVOY_LOG_MISC(error, "Chunking out {} bytes cont={}", response.length(), cont);
+      // ENVOY_LOG_MISC(error, "Chunking out {} bytes cont={}", response.length(), cont);
       decoder_callbacks_->encodeData(response, !cont && end_stream_on_complete_);
     }
   }

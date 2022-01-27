@@ -252,9 +252,7 @@ public:
 #if SCOPE_REFCOUNT
   // RefcountInterface
   void incRefCount() override { ++ref_count_; }
-  bool decRefCount() override {
-    return --ref_count_ == 0;
-  }
+  bool decRefCount() override { return --ref_count_ == 0; }
   uint32_t use_count() const override { return ref_count_; }
 #endif
 
