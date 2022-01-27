@@ -43,8 +43,10 @@ public:
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
   const std::string& getTlsKeyLogPath() const override { return tls_keylog_path_; };
-  const Network::Address::IpList& getTlsKeyLogSrc() const override { return tls_keylog_src_; };
-  const Network::Address::IpList& getTlsKeyLogDst() const override { return tls_keylog_dst_; };
+  const Network::Address::IpList& getTlsKeyLogLocal() const override { return tls_keylog_local_; };
+  const Network::Address::IpList& getTlsKeyLogRemote() const override {
+    return tls_keylog_remote_;
+  };
 
   bool isReady() const override {
     const bool tls_is_ready =
@@ -106,8 +108,8 @@ private:
   Ssl::SslCtxCb sslctx_cb_;
   Server::Configuration::TransportSocketFactoryContext& factory_context_;
   const std::string tls_keylog_path_;
-  const Network::Address::IpList tls_keylog_src_;
-  const Network::Address::IpList tls_keylog_dst_;
+  const Network::Address::IpList tls_keylog_local_;
+  const Network::Address::IpList tls_keylog_remote_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {

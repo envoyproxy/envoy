@@ -92,12 +92,24 @@ public:
    */
   virtual SslCtxCb sslctxCb() const PURE;
 
+  /**
+   * @return the TLS key log path.
+   */
+
   virtual const std::string& getTlsKeyLogPath() const PURE;
 
-  virtual const Network::Address::IpList& getTlsKeyLogSrc() const PURE;
+  /**
+   * @return the TLS key log local filter.
+   */
+  virtual const Network::Address::IpList& getTlsKeyLogLocal() const PURE;
 
-  virtual const Network::Address::IpList& getTlsKeyLogDst() const PURE;
+  /**
+   * @return the TLS key log remote filter.
+   */
+  virtual const Network::Address::IpList& getTlsKeyLogRemote() const PURE;
 };
+
+using ContextConfigPtr = std::shared_ptr<ContextConfig>;
 
 class ClientContextConfig : public virtual ContextConfig {
 public:
@@ -126,7 +138,7 @@ public:
   virtual const std::string& signingAlgorithmsForTest() const PURE;
 };
 
-using ClientContextConfigPtr = std::unique_ptr<ClientContextConfig>;
+using ClientContextConfigPtr = std::shared_ptr<ClientContextConfig>;
 
 class ServerContextConfig : public virtual ContextConfig {
 public:
@@ -172,7 +184,7 @@ public:
   virtual bool disableStatelessSessionResumption() const PURE;
 };
 
-using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;
+using ServerContextConfigPtr = std::shared_ptr<ServerContextConfig>;
 
 } // namespace Ssl
 } // namespace Envoy

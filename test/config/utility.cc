@@ -1215,8 +1215,8 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
 void ConfigHelper::initializeTlsKeyLog(
     envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
   auto tls_keylog_path = common_tls_context.mutable_tls_keylog()->mutable_tls_keylog_path();
-  auto tls_keylog_dst = common_tls_context.mutable_tls_keylog()->mutable_tls_keylog_dst();
-  auto new_element = tls_keylog_dst->Add();
+  auto tls_keylog_remote = common_tls_context.mutable_tls_keylog()->mutable_tls_keylog_remote();
+  auto new_element = tls_keylog_remote->Add();
   new_element->set_address_prefix("127.0.0.1");
   new_element->mutable_prefix_len()->set_value(32);
   *tls_keylog_path = std::string("/dev/null");

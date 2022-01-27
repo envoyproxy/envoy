@@ -133,13 +133,13 @@ message TlsKeyLog {
 
   // At least one of src or dst must be specified, or the config will be rejected as invalid.
 
-  // The src IP address that will be used to filter the connection which should save the TLS key log
-  // If it is not set, any src IP address  will be matched.
-  repeated config.core.v3.CidrRange tls_keylog_src = 2;
+  // The local IP address that will be used to filter the connection which should save the TLS key log
+  // If it is not set, any local IP address  will be matched.
+  repeated config.core.v3.CidrRange tls_keylog_local = 2;
 
-  // The dst IP address that will be used to filter the connection which should save the TLS key log
-  // If it is not set, any dst IP address will be matched.
-  repeated config.core.v3.CidrRange tls_keylog_dst = 3;
+  // The remote IP address that will be used to filter the connection which should save the TLS key log
+  // If it is not set, any remote IP address will be matched.
+  repeated config.core.v3.CidrRange tls_keylog_remote = 3;
 }
 
 // TLS context shared by both client and server TLS contexts.

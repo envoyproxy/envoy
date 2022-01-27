@@ -41,12 +41,8 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
     return;
   }
   stream_info->setFilterChainName(filter_chain->name());
-  auto socket_opt = std::make_shared<Network::TransportSocketOptionsImpl>(
-      "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-      absl::nullopt, socket->connectionInfoProvider().localAddress(),
-      socket->connectionInfoProvider().remoteAddress());
 
-  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(socket_opt);
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto server_conn_ptr = dispatcher().createServerConnection(
       std::move(socket), std::move(transport_socket), *stream_info);
   if (const auto timeout = filter_chain->transportSocketConnectTimeout();

@@ -50,26 +50,18 @@ public:
 int SslSocket::ssl_ex_data_index_ = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
                      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                     Ssl::HandshakerFactoryCb handshaker_factory_cb, bool enable_tls_keylog = false,
-                     const std::string tls_keylog_path = "")
+                     Ssl::HandshakerFactoryCb handshaker_factory_cb, Ssl::ContextConfigPtr config)
     : transport_socket_options_(transport_socket_options),
       ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
       info_(std::dynamic_pointer_cast<SslHandshakerImpl>(
           handshaker_factory_cb(ctx_->newSsl(transport_socket_options_.get()),
                                 ctx_->sslExtendedSocketInfoIndex(), this))),
-      enable_tls_keylog_(enable_tls_keylog), tls_keylog_path_(tls_keylog_path) {
+      config_(config) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(rawSsl());
   } else {
     ASSERT(state == InitialState::Server);
     SSL_set_accept_state(rawSsl());
-  }
-
-  bio_keylog_ = nullptr;
-  if (enable_tls_keylog_) {
-    ENVOY_LOG(debug, "Enable tls key log, log path: {}, index: {}", tls_keylog_path_.c_str(),
-              ssl_ex_data_index_);
-    enableTlsKeyLog();
   }
 } // namespace Tls
 
@@ -86,6 +78,14 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   // Use custom BIO that reads from/writes to IoHandle
   BIO* bio = BIO_new_io_handle(&callbacks_->ioHandle());
   SSL_set_bio(rawSsl(), bio, bio);
+
+  auto match = tlsKeyLogMatch(callbacks_->connection().connectionInfoProvider().localAddress(),
+                              callbacks_->connection().connectionInfoProvider().remoteAddress());
+  if (match) {
+    ENVOY_LOG(debug, "Enable tls key log, log path: {}, index: {}",
+              config_->getTlsKeyLogPath().c_str(), ssl_ex_data_index_);
+    enableTlsKeyLog();
+  }
 }
 
 SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
@@ -330,9 +330,9 @@ void SslSocket::enableTlsKeyLog(void) {
    * Furthermore, this preserves existing key log files which is useful when
    * the tool is run multiple times.
    */
-  bio_keylog_ = BIO_new_file(tls_keylog_path_.c_str(), "a");
+  bio_keylog_ = BIO_new_file(config_->getTlsKeyLogPath().c_str(), "a");
   if (bio_keylog_ == nullptr) {
-    ENVOY_LOG(warn, "Creating BIO file fails, log path: {}", tls_keylog_path_.c_str());
+    ENVOY_LOG(warn, "Creating BIO file fails, log path: {}", config_->getTlsKeyLogPath().c_str());
     return;
   }
 
@@ -431,7 +431,8 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
   if (ssl_ctx) {
     ENVOY_LOG(debug, "Create ClientSslSocket");
     return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Client,
-                                       transport_socket_options, config_->createHandshaker());
+                                       transport_socket_options, config_->createHandshaker(),
+                                       config_);
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.upstream_context_secrets_not_ready_.inc();
@@ -469,40 +470,39 @@ Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {
   return ssl_ctx_;
 }
 
-bool ServerSslSocketFactory::tlsKeyLogMatch(
-    const Network::Address::InstanceConstSharedPtr local,
-    const Network::Address::InstanceConstSharedPtr remote) const {
-  auto src_ip = config_->getTlsKeyLogSrc();
-  auto dst_ip = config_->getTlsKeyLogDst();
+bool SslSocket::tlsKeyLogMatch(const Network::Address::InstanceConstSharedPtr local,
+                               const Network::Address::InstanceConstSharedPtr remote) const {
+  auto local_ip = config_->getTlsKeyLogLocal();
+  auto remote_ip = config_->getTlsKeyLogRemote();
   bool match = false;
-  bool match_src = false;
-  bool enable_src = false;
-  bool match_dst = false;
-  bool enable_dst = false;
+  bool match_local = false;
+  bool enable_local = false;
+  bool match_remote = false;
+  bool enable_remote = false;
 
-  if (src_ip.getIpListSize() > 0) {
-    enable_src = true;
-    if (src_ip.contains(*remote)) {
-      match_src = true;
+  if (local_ip.getIpListSize() > 0) {
+    enable_local = true;
+    if (local_ip.contains(*local)) {
+      match_local = true;
     }
   }
-  if (dst_ip.getIpListSize() > 0) {
-    enable_dst = true;
-    if (dst_ip.contains(*local)) {
-      match_dst = true;
+  if (remote_ip.getIpListSize() > 0) {
+    enable_remote = true;
+    if (remote_ip.contains(*remote)) {
+      match_remote = true;
     }
   }
-  ENVOY_LOG(debug, "enable_src: {}, enable_dst:{}, match_src:{}, match_dst:{}", enable_src,
-            enable_dst, match_src, match_dst);
-  if (enable_src) {
-    if (enable_dst) {
-      match = match_src && match_dst;
+  ENVOY_LOG(debug, "enable_local: {}, enable_remote:{}, match_local:{}, match_remote:{}",
+            enable_local, enable_remote, match_local, match_remote);
+  if (enable_local) {
+    if (enable_remote) {
+      match = match_local && match_remote;
     } else {
-      match = match_src;
+      match = match_local;
     }
   } else {
-    if (enable_dst) {
-      match = match_dst;
+    if (enable_remote) {
+      match = match_remote;
     } else {
       match = false;
     }
@@ -521,16 +521,11 @@ Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket(
     absl::ReaderMutexLock l(&ssl_ctx_mu_);
     ssl_ctx = ssl_ctx_;
   }
-  bool match = false;
-  if (transport_socket_options != nullptr) {
-    match =
-        tlsKeyLogMatch(transport_socket_options->getLocal(), transport_socket_options->getRemote());
-  }
   if (ssl_ctx) {
     ENVOY_LOG(debug, "Create ServerSslSocket");
     return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server,
-                                       transport_socket_options, config_->createHandshaker(), match,
-                                       match ? (config_->getTlsKeyLogPath()) : "");
+                                       transport_socket_options, config_->createHandshaker(),
+                                       config_);
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.downstream_context_secrets_not_ready_.inc();
