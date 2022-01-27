@@ -139,7 +139,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("application/json", ContentType(response));
   validateStatsJson(response->body(), 0);
 
-  EXPECT_EQ("404", request("admin", "GET", "/stats?format=blah", response));
+  EXPECT_EQ("400", request("admin", "GET", "/stats?format=blah", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/stats?format=json", response));

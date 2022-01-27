@@ -79,8 +79,8 @@ public:
     void populateStatsForCurrentPhase(const ScopeVec& scope_vec);
     template <class StatType> void populateStatsFromScopes(const ScopeVec& scope);
     template <class SharedStatType>
-    void renderStat(Buffer::Instance& response, StatOrScopes& variant);
-
+    void renderStat(const std::string& name, Buffer::Instance& response, StatOrScopes& variant);
+    template <class SharedStatType> bool skip(const SharedStatType& stat, const std::string& name);
     const bool used_only_;
     absl::optional<std::regex> regex_;
     absl::optional<std::string> format_value_;

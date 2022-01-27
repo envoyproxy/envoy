@@ -216,7 +216,7 @@ public:
       // stats_array_.push_back();
       // ENVOY_LOG_MISC(error, "histograms: {}", str);
       // response.addFragments({"  ", str, "\n"});
-      response.add(str);
+      addStatJson(response, str);
     }
 
     // auto* document_fields = document_.mutable_fields();
@@ -246,18 +246,27 @@ private:
     (*stat_obj_fields)["value"] = value;
     // stats_array_.push_back(ValueUtil::structValue(stat_obj));
     auto str = MessageUtil::getJsonStringFromMessageOrDie(stat_obj, false /* pretty */, true);
-    ENVOY_LOG_MISC(error, "emitting: {}", str);
+    // ENVOY_LOG_MISC(error, "emitting: {}", str);
     // response.addFragments({"  ", str, ",\n"});
-    response.addFragments({str, ","});
+    addStatJson(response, str);
   }
 
   void emitStats(Buffer::Instance& response) {
     auto str = MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::listValue(stats_array_),
                                                           false /* pretty */, true);
-    ENVOY_LOG_MISC(error, "emitting: {}", str);
+    // ENVOY_LOG_MISC(error, "emitting: {}", str);
     response.add(str);
     chunk_count_ = 0;
     stats_array_.clear();
+  }
+
+  void addStatJson(Buffer::Instance& response, const std::string& json) {
+    if (first_) {
+      response.add(json);
+      first_ = false;
+    } else {
+      response.addFragments({",", json});
+    }
   }
 
   uint32_t chunk_count_{0};
@@ -268,6 +277,7 @@ private:
   ProtobufWkt::Struct histograms_obj_container_;
   std::vector<ProtobufWkt::Value> computed_quantile_array_;
   bool found_used_histogram_{false};
+  bool first_{true};
 };
 
 StatsHandler::Context::Context(Server::Instance& server, bool used_only,
@@ -340,9 +350,24 @@ void StatsHandler::Context::populateStatsFromScopes(const ScopeVec& scope_vec) {
 }
 
 template <class SharedStatType>
-void StatsHandler::Context::renderStat(Buffer::Instance& response, StatOrScopes& variant) {
+void StatsHandler::Context::renderStat(const std::string& name, Buffer::Instance& response,
+                                       StatOrScopes& variant) {
   auto stat = absl::get<SharedStatType>(variant);
-  render_->generate(response, stat->name(), stat->value());
+  if (skip(stat, name)) {
+    return;
+  }
+  render_->generate(response, name, stat->value());
+}
+
+template <class SharedStatType>
+bool StatsHandler::Context::skip(const SharedStatType& stat, const std::string& name) {
+  if (used_only_ && !stat->used()) {
+    return true;
+  }
+  if (regex_.has_value() && !std::regex_search(name, regex_.value())) {
+    return true;
+  }
+  return false;
 }
 
 Http::Code StatsHandler::Context::writeChunk(Buffer::Instance& response) {
@@ -364,29 +389,32 @@ Http::Code StatsHandler::Context::writeChunk(Buffer::Instance& response) {
     }
 
     auto iter = stat_map_.begin();
-    StatOrScopes variant = std::move(iter->second);
-    stat_map_.erase(iter);
+    const std::string& name = iter->first;
+    StatOrScopes& variant = iter->second;
     switch (variant.index()) {
     case 0:
       populateStatsForCurrentPhase(absl::get<ScopeVec>(variant));
       break;
     case 1:
-      renderStat<Stats::TextReadoutSharedPtr>(response, variant);
+      renderStat<Stats::TextReadoutSharedPtr>(name, response, variant);
       break;
     case 2:
-      renderStat<Stats::CounterSharedPtr>(response, variant);
+      renderStat<Stats::CounterSharedPtr>(name, response, variant);
       break;
     case 3:
-      renderStat<Stats::GaugeSharedPtr>(response, variant);
+      renderStat<Stats::GaugeSharedPtr>(name, response, variant);
       break;
     case 4: {
       auto histogram = absl::get<Stats::HistogramSharedPtr>(variant);
-      auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
-      if (parent_histogram != nullptr) {
-        render_->generate(response, parent_histogram->name(), *parent_histogram);
+      if (!skip(histogram, name)) {
+        auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
+        if (parent_histogram != nullptr) {
+          render_->generate(response, name, *parent_histogram);
+        }
       }
     }
     }
+    stat_map_.erase(iter);
   }
   return Http::Code::Continue;
 }

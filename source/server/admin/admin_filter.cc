@@ -71,15 +71,15 @@ void AdminFilter::onComplete() {
   for (bool cont = true, first = true; cont; first = false) {
     Http::Code code = admin_server_callback_func_(path, *header_map, response, *this);
     cont = code == Http::Code::Continue;
+    bool end_stream = end_stream_on_complete_ && !cont;
     if (first) {
       Utility::populateFallbackResponseHeaders(cont ? Http::Code::OK : code, *header_map);
-      decoder_callbacks_->encodeHeaders(std::move(header_map),
-                                        end_stream_on_complete_ && response.length() == 0,
+      decoder_callbacks_->encodeHeaders(std::move(header_map), end_stream && response.length() == 0,
                                         StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
     }
-    if (response.length() > 0 || !cont) {
+    if (response.length() > 0) {
       // ENVOY_LOG_MISC(error, "Chunking out {} bytes cont={}", response.length(), cont);
-      decoder_callbacks_->encodeData(response, !cont && end_stream_on_complete_);
+      decoder_callbacks_->encodeData(response, end_stream);
     }
   }
 }
