@@ -367,6 +367,8 @@ public:
               (Http::RequestHeaderMap & headers, const StreamInfo::StreamInfo& stream_info,
                bool insert_envoy_original_path),
               (const));
+  MOCK_METHOD(Http::HeaderTransforms, requestHeaderTransforms,
+              (const StreamInfo::StreamInfo& stream_info, bool do_formatting), (const));
   MOCK_METHOD(void, finalizeResponseHeaders,
               (Http::ResponseHeaderMap & headers, const StreamInfo::StreamInfo& stream_info),
               (const));
