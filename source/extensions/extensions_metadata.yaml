@@ -278,6 +278,11 @@ envoy.filters.http.wasm:
   - envoy.filters.http
   security_posture: unknown
   status: alpha
+envoy.filters.http.stateful_session:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
 envoy.filters.listener.http_inspector:
   categories:
   - envoy.filters.listener
@@ -733,5 +738,10 @@ envoy.network.dns_resolver.apple:
 envoy.rbac.matchers.upstream_ip_port:
   categories:
   - envoy.rbac.matchers
+  security_posture: unknown
+  status: alpha
+envoy.http.stateful_session.cookie:
+  categories:
+  - envoy.http.stateful_session
   security_posture: unknown
   status: alpha

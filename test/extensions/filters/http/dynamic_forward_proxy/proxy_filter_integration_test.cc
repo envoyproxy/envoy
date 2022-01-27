@@ -9,6 +9,8 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
 
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace {
 
@@ -195,6 +197,7 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
 // Currently if the first DNS resolution fails, the filter will continue with
 // a null address. Make sure this mode fails gracefully.
 TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
   initializeWithArgs();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
@@ -205,6 +208,7 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("dns_resolution_failure"));
 }
 
 // Verify that after we populate the cache and reload the cluster we reattach to the cache with

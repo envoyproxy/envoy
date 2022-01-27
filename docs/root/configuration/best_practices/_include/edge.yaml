@@ -48,6 +48,7 @@ static_resources:
             tls_certificates:
             - certificate_chain: {filename: "certs/servercert.pem"}
               private_key: {filename: "certs/serverkey.pem"}
+            alpn_protocols: ["h2,http/1.1"]
       filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:

@@ -45,15 +45,12 @@
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
-#include "source/extensions/filters/http/common/utility.h"
 
 #include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Router {
 namespace {
-
-const std::string DEPRECATED_ROUTER_NAME = "envoy.router";
 
 constexpr uint32_t DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES = 4096;
 
@@ -138,6 +135,24 @@ const envoy::config::route::v3::WeightedCluster::ClusterWeight& validateWeighted
     throw EnvoyException("At least one of name or cluster_header need to be specified");
   }
   return cluster;
+}
+
+// Returns a vector of header parsers, sorted by specificity. The `specificity_ascend` parameter
+// specifies whether the returned parsers will be sorted from least specific to most specific
+// (global connection manager level header parser, virtual host level header parser and finally
+// route-level parser.) or the reverse.
+absl::InlinedVector<const HeaderParser*, 3>
+getHeaderParsers(const HeaderParser* global_route_config_header_parser,
+                 const HeaderParser* vhost_header_parser, const HeaderParser* route_header_parser,
+                 bool specificity_ascend) {
+  if (specificity_ascend) {
+    // Sorted from least to most specific: global connection manager level headers, virtual host
+    // level headers and finally route-level headers.
+    return {global_route_config_header_parser, vhost_header_parser, route_header_parser};
+  } else {
+    // Sorted from most to least specific.
+    return {route_header_parser, vhost_header_parser, global_route_config_header_parser};
+  }
 }
 
 } // namespace
@@ -648,17 +663,10 @@ const std::string& RouteEntryImplBase::clusterName() const { return cluster_name
 void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool insert_envoy_original_path) const {
-  if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
-    // Append user-specified request headers from most to least specific: route-level headers,
-    // virtual host level headers and finally global connection manager level headers.
-    request_headers_parser_->evaluateHeaders(headers, stream_info);
-    vhost_.requestHeaderParser().evaluateHeaders(headers, stream_info);
-    vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, stream_info);
-  } else {
-    // Most specific mutations take precedence.
-    vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, stream_info);
-    vhost_.requestHeaderParser().evaluateHeaders(headers, stream_info);
-    request_headers_parser_->evaluateHeaders(headers, stream_info);
+  for (const HeaderParser* header_parser : getRequestHeaderParsers(
+           /*specificity_ascend=*/vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins())) {
+    // Later evaluated header parser wins.
+    header_parser->evaluateHeaders(headers, stream_info);
   }
 
   // Restore the port if this was a CONNECT request.
@@ -701,17 +709,10 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
 
 void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info) const {
-  if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
-    // Append user-specified request headers from most to least specific: route-level headers,
-    // virtual host level headers and finally global connection manager level headers.
-    response_headers_parser_->evaluateHeaders(headers, stream_info);
-    vhost_.responseHeaderParser().evaluateHeaders(headers, stream_info);
-    vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, stream_info);
-  } else {
-    // Most specific mutations take precedence.
-    vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, stream_info);
-    vhost_.responseHeaderParser().evaluateHeaders(headers, stream_info);
-    response_headers_parser_->evaluateHeaders(headers, stream_info);
+  for (const HeaderParser* header_parser : getResponseHeaderParsers(
+           /*specificity_ascend=*/vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins())) {
+    // Later evaluated header parser wins.
+    header_parser->evaluateHeaders(headers, stream_info);
   }
 }
 
@@ -719,28 +720,38 @@ Http::HeaderTransforms
 RouteEntryImplBase::responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                              bool do_formatting) const {
   Http::HeaderTransforms transforms;
-  if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
-    // Append user-specified request headers from most to least specific: route-level headers,
-    // virtual host level headers and finally global connection manager level headers.
-    mergeTransforms(transforms,
-                    response_headers_parser_->getHeaderTransforms(stream_info, do_formatting));
-    mergeTransforms(transforms,
-                    vhost_.responseHeaderParser().getHeaderTransforms(stream_info, do_formatting));
-    mergeTransforms(transforms,
-                    vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(
-                        stream_info, do_formatting));
-  } else {
-    // Most specific mutations (route-level) take precedence by being applied
-    // last: if a header is specified at all levels, the last one applied wins.
-    mergeTransforms(transforms,
-                    vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(
-                        stream_info, do_formatting));
-    mergeTransforms(transforms,
-                    vhost_.responseHeaderParser().getHeaderTransforms(stream_info, do_formatting));
-    mergeTransforms(transforms,
-                    response_headers_parser_->getHeaderTransforms(stream_info, do_formatting));
+  for (const HeaderParser* header_parser : getResponseHeaderParsers(
+           /*specificity_ascend=*/vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins())) {
+    // Later evaluated header parser wins.
+    mergeTransforms(transforms, header_parser->getHeaderTransforms(stream_info, do_formatting));
   }
   return transforms;
+}
+
+Http::HeaderTransforms
+RouteEntryImplBase::requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                            bool do_formatting) const {
+  Http::HeaderTransforms transforms;
+  for (const HeaderParser* header_parser : getRequestHeaderParsers(
+           /*specificity_ascend=*/vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins())) {
+    // Later evaluated header parser wins.
+    mergeTransforms(transforms, header_parser->getHeaderTransforms(stream_info, do_formatting));
+  }
+  return transforms;
+}
+
+absl::InlinedVector<const HeaderParser*, 3>
+RouteEntryImplBase::getRequestHeaderParsers(bool specificity_ascend) const {
+  return getHeaderParsers(&vhost_.globalRouteConfig().requestHeaderParser(),
+                          &vhost_.requestHeaderParser(), request_headers_parser_.get(),
+                          specificity_ascend);
+}
+
+absl::InlinedVector<const HeaderParser*, 3>
+RouteEntryImplBase::getResponseHeaderParsers(bool specificity_ascend) const {
+  return getHeaderParsers(&vhost_.globalRouteConfig().responseHeaderParser(),
+                          &vhost_.responseHeaderParser(), response_headers_parser_.get(),
+                          specificity_ascend);
 }
 
 absl::optional<RouteEntryImplBase::RuntimeData>
@@ -925,6 +936,12 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   } else {
     final_path = headers.getPathValue();
   }
+
+  if (!absl::StartsWith(final_path, "/")) {
+    final_path_value = absl::StrCat("/", final_path);
+    final_path = final_path_value;
+  }
+
   if (!path_redirect_has_query_ && strip_query_) {
     const size_t path_end = final_path.find('?');
     if (path_end != absl::string_view::npos) {
@@ -941,14 +958,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& rou
   if (route.has_metadata()) {
     auto filter_metadata = route.metadata().filter_metadata().find("envoy.filters.http.router");
     if (filter_metadata == route.metadata().filter_metadata().end()) {
-      // TODO(zuercher): simply return `ret` when deprecated filter names are removed.
-      filter_metadata = route.metadata().filter_metadata().find(DEPRECATED_ROUTER_NAME);
-      if (filter_metadata == route.metadata().filter_metadata().end()) {
-        return ret;
-      }
-
-      Extensions::Common::Utility::ExtensionNameUtil::checkDeprecatedExtensionName(
-          "http filter", DEPRECATED_ROUTER_NAME, "envoy.filters.http.router");
+      return ret;
     }
     for (const auto& it : filter_metadata->second.fields()) {
       if (it.second.kind_case() == ProtobufWkt::Value::kStringValue) {
@@ -1198,6 +1208,14 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
       }
     }
   }
+}
+
+Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::requestHeaderTransforms(
+    const StreamInfo::StreamInfo& stream_info, bool do_formatting) const {
+  auto transforms = request_headers_parser_->getHeaderTransforms(stream_info, do_formatting);
+  mergeTransforms(transforms,
+                  DynamicRouteEntry::requestHeaderTransforms(stream_info, do_formatting));
+  return transforms;
 }
 
 Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::responseHeaderTransforms(
@@ -1545,9 +1563,10 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     if (match.result_) {
       // The only possible action that can be used within the route matching context
       // is the RouteMatchAction, so this must be true.
-      ASSERT(match.result_->typeUrl() == RouteMatchAction::staticTypeUrl());
-      ASSERT(dynamic_cast<RouteMatchAction*>(match.result_.get()));
-      const RouteMatchAction& route_action = static_cast<const RouteMatchAction&>(*match.result_);
+      const auto result = match.result_();
+      ASSERT(result->typeUrl() == RouteMatchAction::staticTypeUrl());
+      ASSERT(dynamic_cast<RouteMatchAction*>(result.get()));
+      const RouteMatchAction& route_action = static_cast<const RouteMatchAction&>(*result);
 
       if (route_action.route()->matches(headers, stream_info, random_value)) {
         return route_action.route();
@@ -1736,10 +1755,7 @@ PerFilterConfigs::PerFilterConfigs(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
   for (const auto& it : typed_configs) {
-    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
-    const auto& name =
-        Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
-
+    const auto& name = it.first;
     auto object = createRouteSpecificFilterConfig(name, it.second, optional_http_filters,
                                                   factory_context, validator);
     if (object != nullptr) {

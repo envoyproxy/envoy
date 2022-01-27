@@ -6,18 +6,22 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/timespan.h"
+#include "envoy/upstream/upstream.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
+#include "source/common/config/utility.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 #include "absl/types/any.h"
 #include "contrib/sip_proxy/filters/network/source/decoder.h"
 #include "contrib/sip_proxy/filters/network/source/filters/filter.h"
 #include "contrib/sip_proxy/filters/network/source/protocol.h"
 #include "contrib/sip_proxy/filters/network/source/stats.h"
+#include "contrib/sip_proxy/filters/network/source/tra/tra_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,6 +43,26 @@ public:
 };
 
 /**
+ * Customized Affinity
+ */
+class CustomizedAffinity {
+public:
+  CustomizedAffinity(std::string name, bool query, bool subscribe) {
+    name_ = name;
+    query_ = query;
+    subscribe_ = subscribe;
+  };
+  std::string name() const { return name_; }
+  bool query() const { return query_; }
+  bool subscribe() const { return subscribe_; }
+
+private:
+  std::string name_;
+  bool query_;
+  bool subscribe_;
+};
+
+/**
  * Extends Upstream::ProtocolOptionsConfig with Sip-specific cluster options.
  */
 class ProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig {
@@ -47,6 +71,35 @@ public:
 
   virtual bool sessionAffinity() const PURE;
   virtual bool registrationAffinity() const PURE;
+  virtual const std::vector<CustomizedAffinity>& customizedAffinityList() const PURE;
+};
+
+class ConnectionManager;
+class TrafficRoutingAssistantHandler : public TrafficRoutingAssistant::RequestCallbacks,
+                                       public Logger::Loggable<Logger::Id::filter> {
+public:
+  TrafficRoutingAssistantHandler(
+      ConnectionManager& parent,
+      const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig& config,
+      Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info);
+
+  void updateTrafficRoutingAssistant(const std::string& type, const std::string& key,
+                                     const std::string& val);
+  QueryStatus retrieveTrafficRoutingAssistant(const std::string& type, const std::string& key,
+                                              std::string& host);
+  void deleteTrafficRoutingAssistant(const std::string& type, const std::string& key);
+  void subscribeTrafficRoutingAssistant(const std::string& type);
+  void complete(const TrafficRoutingAssistant::ResponseType& type, const std::string& message_type,
+                const absl::any& resp) override;
+  void doSubscribe(std::vector<CustomizedAffinity>& affinity_list);
+
+private:
+  ConnectionManager& parent_;
+  std::shared_ptr<TrafficRoutingAssistantMap> traffic_routing_assistant_map_;
+  TrafficRoutingAssistant::ClientPtr tra_client_;
+  StreamInfo::StreamInfoImpl stream_info_;
+  std::vector<CustomizedAffinity> affinity_list_;
+  std::map<std::string, bool> is_subscribe_map_;
 };
 
 /**
@@ -58,7 +111,7 @@ class ConnectionManager : public Network::ReadFilter,
                           Logger::Loggable<Logger::Id::connection> {
 public:
   ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
-                    TimeSource& time_system,
+                    TimeSource& time_system, Server::Configuration::FactoryContext& context,
                     std::shared_ptr<Router::TransactionInfos> transaction_infos);
   ~ConnectionManager() override;
 
@@ -98,6 +151,11 @@ public:
     return config_.settings()->domainMatchParamName();
   }
 
+  void setDestination(const std::string& data) { this->decoder_->metadata()->setDestination(data); }
+
+  void continueHanding();
+  std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() { return this->tra_handler_; }
+
 private:
   friend class SipConnectionManagerTest;
   struct ActiveTrans;
@@ -135,6 +193,10 @@ private:
       return parent_.parent_.getDomainMatchParamName();
     }
 
+    std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() {
+      return parent_.parent_.tra_handler_;
+    }
+
     ActiveTrans& parent_;
     MessageMetadataSharedPtr metadata_;
   };
@@ -165,7 +227,12 @@ private:
       return parent_.transactionInfos();
     }
     std::shared_ptr<SipSettings> settings() override { return parent_.settings(); }
+    std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
+      return parent_.traHandler();
+    }
     void onReset() override { return parent_.onReset(); }
+
+    void continueHanding() override { return parent_.continueHanding(); }
 
     ActiveTrans& parent_;
     SipFilters::DecoderFilterSharedPtr handle_;
@@ -220,6 +287,10 @@ private:
     }
     std::shared_ptr<SipSettings> settings() override { return parent_.config_.settings(); }
     void onReset() override;
+    std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
+      return parent_.tra_handler_;
+    }
+    void continueHanding() override { return parent_.continueHanding(); }
 
     // Sip::FilterChainFactoryCallbacks
     void addDecoderFilter(SipFilters::DecoderFilterSharedPtr filter) override {
@@ -270,6 +341,9 @@ private:
   Buffer::OwnedImpl request_buffer_;
   Random::RandomGenerator& random_generator_;
   TimeSource& time_source_;
+  Server::Configuration::FactoryContext& context_;
+
+  std::shared_ptr<TrafficRoutingAssistantHandler> tra_handler_;
 
   // This is used in Router, put here to pass to Router
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
