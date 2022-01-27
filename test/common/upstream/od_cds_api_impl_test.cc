@@ -166,10 +166,10 @@ TEST_F(OdCdsApiImplTest, NotifierNotUsed) {
 
   odcds_->updateOnDemand("cluster");
   EXPECT_CALL(notifier_, notifyMissingCluster("cluster")).Times(0);
+  odcds_callbacks_->onConfigUpdate({"some_cluster"}, {}, "");
+  odcds_callbacks_->onConfigUpdate({}, {"another_cluster"}, "");
   odcds_callbacks_->onConfigUpdate({}, {}, "");
-  odcds_callbacks_->onConfigUpdate({}, {}, "");
-  odcds_callbacks_->onConfigUpdate({}, {}, "");
-  odcds_callbacks_->onConfigUpdate({}, {}, "");
+  odcds_callbacks_->onConfigUpdate({"some_cluster2"}, {"another_cluster2"}, "");
 }
 
 } // namespace
