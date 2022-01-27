@@ -41,6 +41,14 @@ const Protobuf::MethodDescriptor& mockMethodDescriptor() {
       "envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs");
 }
 
+OptRef<const envoy::config::core::v3::RetryPolicy> optionalRetryPolicy(
+    const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config) {
+  if (!config.has_grpc_stream_retry_policy()) {
+    return {};
+  }
+  return config.grpc_stream_retry_policy();
+}
+
 // We don't care about the actual log entries, as this logger just adds them to the proto, but we
 // need to use a proto type because the ByteSizeLong() is used to determine the log size, so we use
 // standard Struct and Empty protos.
@@ -56,7 +64,7 @@ public:
       const Protobuf::MethodDescriptor& service_method)
       : GrpcAccessLogger(std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes,
                          dispatcher, scope, access_log_prefix, service_method,
-                         config.grpc_stream_retry_policy()) {}
+                         optionalRetryPolicy(config)) {}
 
   int numInits() const { return num_inits_; }
 
@@ -252,7 +260,8 @@ TEST_F(GrpcAccessLogTest, StreamFailure) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
       .WillOnce(
           Invoke([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
-                    const Http::AsyncClient::StreamOptions&) {
+                    const Http::AsyncClient::StreamOptions& options) {
+            EXPECT_FALSE(options.retry_policy.has_value());
             callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
             return nullptr;
           }));

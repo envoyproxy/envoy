@@ -31,10 +31,19 @@ addUniqueClusters(absl::flat_hash_set<std::string>& clusters,
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::extensions::filters::network::sip_proxy::v3alpha::SipProtocolOptions& config)
     : session_affinity_(config.session_affinity()),
-      registration_affinity_(config.registration_affinity()) {}
+      registration_affinity_(config.registration_affinity()) {
+
+  for (const auto& affinity : config.customized_affinity()) {
+    CustomizedAffinity aff(affinity.key_name(), affinity.query(), affinity.subscribe());
+    customized_affinity_list_.emplace_back(aff);
+  }
+}
 
 bool ProtocolOptionsConfigImpl::sessionAffinity() const { return session_affinity_; }
 bool ProtocolOptionsConfigImpl::registrationAffinity() const { return registration_affinity_; }
+const std::vector<CustomizedAffinity>& ProtocolOptionsConfigImpl::customizedAffinityList() const {
+  return customized_affinity_list_;
+}
 
 Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy& proto_config,
@@ -68,7 +77,7 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
       [filter_config, &context, transaction_infos](Network::FilterManager& filter_manager) -> void {
         filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
             *filter_config, context.api().randomGenerator(),
-            context.mainThreadDispatcher().timeSource(), transaction_infos));
+            context.mainThreadDispatcher().timeSource(), context, transaction_infos));
       };
 }
 
@@ -87,7 +96,8 @@ ConfigImpl::ConfigImpl(
       settings_(std::make_shared<SipSettings>(
           static_cast<std::chrono::milliseconds>(
               PROTOBUF_GET_MS_OR_DEFAULT(config.settings(), transaction_timeout, 32000)),
-          config.settings().own_domain(), config.settings().domain_match_parameter_name())) {
+          config.settings().own_domain(), config.settings().domain_match_parameter_name(),
+          config.settings().tra_service_config())) {
 
   if (config.sip_filters().empty()) {
     ENVOY_LOG(debug, "using default router filter");

@@ -241,7 +241,8 @@ public:
           auto headers =
               fromSanitizedHeaders<TestResponseHeaderMapImpl>(directional_action.headers());
           ConnectionManagerUtility::mutateResponseHeaders(headers, &request_.request_headers_,
-                                                          *context_.conn_manager_config_, "");
+                                                          *context_.conn_manager_config_,
+                                                          /*via=*/"", stream_info_, /*node_id=*/"");
           if (headers.Status() == nullptr) {
             headers.setReferenceKey(Headers::get().Status, "200");
           }
@@ -440,6 +441,7 @@ public:
   int32_t stream_index_{-1};
   StreamResetCallbackFn stream_reset_callback_;
   ConnectionContext context_;
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 // Buffer between client and server H1/H2 codecs. This models each write operation

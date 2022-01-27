@@ -145,7 +145,7 @@ http_logs:
       response_code:
         value: 404
       response_code_details: "route_not_found"
-      response_headers_bytes: 54
+      response_headers_bytes: 131
 )EOF")));
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
@@ -169,7 +169,7 @@ http_logs:
       response_code:
         value: 404
       response_code_details: "route_not_found"
-      response_headers_bytes: 54
+      response_headers_bytes: 131
 )EOF"));
 
   // Send an empty response and end the stream. This should never happen but make sure nothing
@@ -218,7 +218,7 @@ http_logs:
       response_code:
         value: 404
       response_code_details: "route_not_found"
-      response_headers_bytes: 54
+      response_headers_bytes: 131
 )EOF")));
   cleanup();
 }

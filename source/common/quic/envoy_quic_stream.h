@@ -11,6 +11,8 @@
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/quic/send_buffer_monitor.h"
 
+#include "quiche/http2/adapter/header_validator.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -103,7 +105,9 @@ public:
   validateHeader(absl::string_view header_name, absl::string_view header_value) override {
     bool override_stream_error_on_invalid_http_message =
         http3_options_.override_stream_error_on_invalid_http_message().value();
-    if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
+    if (header_validator_.ValidateSingleHeader(header_name, header_value) !=
+        http2::adapter::HeaderValidator::HEADER_OK) {
+      close_connection_upon_invalid_header_ = !override_stream_error_on_invalid_http_message;
       return Http::HeaderUtility::HeaderValidationResult::REJECT;
     }
     if (header_name == "content-length") {
@@ -189,6 +193,7 @@ private:
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
   absl::optional<size_t> content_length_;
   size_t received_content_bytes_{0};
+  http2::adapter::HeaderValidator header_validator_;
 };
 
 } // namespace Quic
