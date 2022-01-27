@@ -132,6 +132,7 @@ envoy_cc_library(
         "//source/common/common:matchers_lib",
         "//source/common/config:datasource_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/network:cidr_range_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/secret:sds_api_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
