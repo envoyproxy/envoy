@@ -335,9 +335,9 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, HostDescriptionConstSh
     connection_options = options;
   }
 
+  static const std::vector<Network::Address::InstanceConstSharedPtr> empty;
   const auto& address = health_check ? host->healthCheckAddress() : host->address();
-  const auto& address_list =
-      health_check ? std::vector<Network::Address::InstanceConstSharedPtr>() : host->addressList();
+  const auto& address_list = health_check ? empty : host->addressList();
 
   ASSERT(!address->envoyInternalAddress() ||
          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address"));
