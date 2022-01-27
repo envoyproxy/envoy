@@ -810,6 +810,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Chromium's trace event headers",
         project_url = "https://chromium.googlesource.com/chromium/src/base/trace_event/common/",
         # NOTE: Update together with v8 and com_googlesource_chromium_zlib.
+        # Use version and sha256 from https://storage.googleapis.com/envoyproxy-wee8/v8-<v8_version>-deps.sha256.
         version = "7f36dbc19d31e2aad895c60261ca8f726442bfbb",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
         sha256 = "4e9f31f393ea87bf3987f9a5e3b1d8314ad45f00e5a79c61cdcc1ef1eed2f05b",
@@ -824,6 +825,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Chromium’s fork of zlib with compression utils",
         project_url = "https://chromium.googlesource.com/chromium/src/third_party/zlib/",
         # NOTE: Update together with v8 and com_googlesource_chromium_base_trace_event_common.
+        # Use version and sha256 from https://storage.googleapis.com/envoyproxy-wee8/v8-<v8_version>-deps.sha256.
         version = "fc5cfd78a357d5bb7735a58f383634faaafe706a",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
         sha256 = "695c73750cf6472fc6c926e43952262206f1475157377364142bdbb84a1a5a83",
