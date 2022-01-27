@@ -112,7 +112,7 @@ AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
       absl::optional<Origin> origin = stringToOrigin(key);
       if (origin_data.has_value() && origin.has_value()) {
         setAlternativesImpl(origin.value(), origin_data.value().protocols);
-        setRtt(origin.value(), origin_data.value().srtt);
+        setSrtt(origin.value(), origin_data.value().srtt);
       } else {
         ENVOY_LOG(warn,
                   fmt::format("Unable to parse cache entry with key: {} value: {}", key, value));
@@ -135,7 +135,7 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
   }
 }
 
-void AlternateProtocolsCacheImpl::setRtt(const Origin& origin, std::chrono::microseconds srtt) {
+void AlternateProtocolsCacheImpl::setSrtt(const Origin& origin, std::chrono::microseconds srtt) {
   auto entry_it = protocols_.find(origin);
   if (entry_it == protocols_.end()) {
     return;

@@ -22,7 +22,7 @@ namespace Http {
 // See: source/docs/http3_upstream.md
 //
 // The primary purpose of this cache is to cache alternate protocols entries.
-// Secondarily, it maps origins to rtt information, useful for
+// Secondarily, it maps origins to srtt information, useful for
 // tuning 0-rtt timeouts if the alternate protocol is HTTP/3.
 class AlternateProtocolsCacheImpl : public AlternateProtocolsCache,
                                     Logger::Loggable<Logger::Id::alternate_protocols_cache> {
@@ -64,7 +64,7 @@ public:
 
   // AlternateProtocolsCache
   void setAlternatives(const Origin& origin, std::vector<AlternateProtocol>& protocols) override;
-  void setRtt(const Origin& origin, std::chrono::microseconds srtt) override;
+  void setSrtt(const Origin& origin, std::chrono::microseconds srtt) override;
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) override;
   size_t size() const override;
 

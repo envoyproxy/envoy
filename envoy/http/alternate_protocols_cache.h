@@ -100,11 +100,11 @@ public:
                                std::vector<AlternateProtocol>& protocols) PURE;
 
   /**
-   * Sets the rtt estimate for an origin, assuming the origin exists in the cache.
+   * Sets the srtt estimate for an origin, assuming the origin exists in the cache.
    * @param origin The origin to set network characteristics for.
    * @param srtt The smothed round trip time for the origin.
    */
-  virtual void setRtt(const Origin& origin, std::chrono::microseconds srtt) PURE;
+  virtual void setSrtt(const Origin& origin, std::chrono::microseconds srtt) PURE;
 
   /**
    * Returns the possible alternative protocols which can be used to connect to the
