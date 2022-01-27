@@ -32,6 +32,8 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
 }
 
 void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
+  ENVOY_LOG(error, "============= onMaxStreamsChanged {}", num_streams);
+
   updateCapacity(num_streams);
   if (state() == ActiveClient::State::BUSY && currentUnusedCapacity() != 0) {
     parent_.transitionActiveClientState(*this, ActiveClient::State::READY);

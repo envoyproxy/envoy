@@ -445,6 +445,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
 
+      if (!client.allows_early_data_) {
+        // Purge pending streams only if this is not a 0-RRT handshake failure.
       ConnectionPool::PoolFailureReason reason;
       if (client.timed_out_) {
         reason = ConnectionPool::PoolFailureReason::Timeout;
@@ -463,6 +465,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       purgePendingStreams(client.real_host_description_, failure_reason, reason);
       // See if we should preconnect based on active connections.
       tryCreateNewConnections();
+      }
     }
 
     // We need to release our resourceManager() resources before checking below for
@@ -515,6 +518,10 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       onUpstreamReady();
     }
     checkForIdleAndCloseIdleConnsIfDraining();
+  } else if (event == Network::ConnectionEvent::ConnectedZeroRtt) {
+    ASSERT(client.state() == ActiveClient::State::CONNECTING);
+    std::cerr << "========== ConnectedZeroRtt\n";
+    client.allows_early_data_ = true;
   }
 }
 
