@@ -159,10 +159,12 @@ void AccessLogFileImpl::flushThreadFunc() {
         const Api::IoCallBoolResult open_result = open();
         if (!open_result.return_value_) {
           stats_.reopen_failed_.inc();
-          return;
         }
       }
       doWrite(about_to_write_buffer_);
+    } else {
+      stats_.write_total_buffered_.sub(about_to_write_buffer_.length());
+      about_to_write_buffer_.drain(about_to_write_buffer_.length());
     }
   }
 }
