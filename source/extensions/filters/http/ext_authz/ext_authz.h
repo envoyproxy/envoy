@@ -264,6 +264,7 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap& trailers) override;
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
+  void setStartTime(absl::optional<MonotonicTime> time) { start_time_ = time; };
 
   // ExtAuthz::RequestCallbacks
   void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;

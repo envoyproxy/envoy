@@ -61,7 +61,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *decoder_callbacks_);
   // Store start time of ext_authz filter call
-  start_time_ = decoder_callbacks_->dispatcher().timeSource().monotonicTime();
+  setStartTime(decoder_callbacks_->dispatcher().timeSource().monotonicTime());
 
   state_ = State::Calling;
   filter_return_ = FilterReturn::StopDecoding; // Don't let the filter chain continue as we are
