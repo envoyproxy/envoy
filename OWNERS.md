@@ -82,6 +82,7 @@ contributors to envoy-setec and relevant Slack channels from:
 
 * [Feb 2022 Security Release Contributors]
   * Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) expiring 2/28/2023
+  * Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) expiring 2/28/2023
 
 # Emeritus maintainers
 
