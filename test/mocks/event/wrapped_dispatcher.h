@@ -123,6 +123,8 @@ public:
 
   void shutdown() override { impl_.shutdown(); }
 
+  bool isShutdown() const override { return impl_.isShutdown(); }
+
 protected:
   Dispatcher& impl_;
 };

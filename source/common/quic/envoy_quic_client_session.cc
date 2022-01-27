@@ -1,5 +1,6 @@
 #include "source/common/quic/envoy_quic_client_session.h"
 
+#include "source/common/event/dispatcher_impl.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
@@ -45,8 +46,9 @@ void EnvoyQuicClientSession::connect() {
 
 void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                 quic::ConnectionCloseSource source) {
-  // Latch latest rtt.
-  if (OneRttKeysAvailable() && rtt_cache_) {
+  // Latch latest rtt. It would be better to do this on shut down as well, but
+  // currently there's no lifetime guarantee that the cache is still around.
+  if (!dispatcher_.isShutdown() && OneRttKeysAvailable() && rtt_cache_) {
     const quic::QuicConnectionStats& stats = connection()->GetStats();
     if (stats.srtt_us > 0) {
       Http::AlternateProtocolsCache::Origin origin("https", server_id().host(), server_id().port());

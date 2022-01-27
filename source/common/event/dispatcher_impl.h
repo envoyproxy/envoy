@@ -93,6 +93,7 @@ public:
   MonotonicTime approximateMonotonicTime() const override;
   void updateApproximateMonotonicTime() override;
   void shutdown() override;
+  bool isShutdown() const override { return shutdown_called_; }
 
   // FatalErrorInterface
   void onFatalError(std::ostream& os) const override;
