@@ -46,13 +46,11 @@ void EnvoyQuicClientSession::connect() {
 
 void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                 quic::ConnectionCloseSource source) {
-  // Latch latest rtt. It would be better to do this on shut down as well, but
-  // currently there's no lifetime guarantee that the cache is still around.
-  if (!dispatcher_.isShutdown() && OneRttKeysAvailable() && rtt_cache_) {
+  // Latch latest rtt.
+  if (OneRttKeysAvailable() && rtt_cache_) {
     const quic::QuicConnectionStats& stats = connection()->GetStats();
     if (stats.srtt_us > 0) {
       Http::AlternateProtocolsCache::Origin origin("https", server_id().host(), server_id().port());
-      std::cerr << "Set RTT\n";
       rtt_cache_->setRtt(origin, std::chrono::microseconds(stats.srtt_us));
     }
   }

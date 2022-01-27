@@ -52,7 +52,7 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   initialize();
 
   quic::QuicConfig config;
-  PersistentQuicInfoImpl info{dispatcher_, *factory_, simTime(), test_address_, config, 45};
+  PersistentQuicInfoImpl info{dispatcher_, *factory_, simTime(), 30, config, 45};
 
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       info, dispatcher_, test_address_, test_address_, quic_stat_names_, {}, store_);

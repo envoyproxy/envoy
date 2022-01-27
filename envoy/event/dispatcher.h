@@ -304,11 +304,6 @@ public:
    * Shutdown the dispatcher by clear dispatcher thread deletable.
    */
   virtual void shutdown() PURE;
-
-  /**
-   * Returns true if the dispatcher has had shutdown() called, false otherwise.
-   */
-  virtual bool isShutdown() const PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;

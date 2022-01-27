@@ -165,7 +165,6 @@ public:
   MOCK_METHOD(MonotonicTime, approximateMonotonicTime, (), (const));
   MOCK_METHOD(void, updateApproximateMonotonicTime, ());
   MOCK_METHOD(void, shutdown, ());
-  MOCK_METHOD(bool, isShutdown, (), (const));
 
   std::unique_ptr<TimeSource> time_system_;
   std::list<DeferredDeletablePtr> to_delete_;

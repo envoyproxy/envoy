@@ -12,7 +12,6 @@ FileBasedKeyValueStore::FileBasedKeyValueStore(Event::Dispatcher& dispatcher,
                                                const std::string& filename)
     : KeyValueStoreBase(dispatcher, flush_interval), file_system_(file_system),
       filename_(filename) {
-  std::cerr << "Setting flush interval to " << flush_interval.count() << "ms\n";
   if (!file_system_.fileExists(filename_)) {
     ENVOY_LOG(info, "File for key value store does not yet exist: {}", filename);
     return;
