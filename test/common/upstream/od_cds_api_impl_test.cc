@@ -164,12 +164,23 @@ TEST_F(OdCdsApiImplTest, NotifierGetsUsed) {
 TEST_F(OdCdsApiImplTest, NotifierNotUsed) {
   InSequence s;
 
+  envoy::config::cluster::v3::Cluster some_cluster;
+  cluster.set_name("some_cluster");
+  const auto some_cluster_resource = TestUtility::decodeResources({cluster});
+  cluster.set_name("some_cluster2");
+  const auto some_cluster2_resource = TestUtility::decodeResources({cluster});
+
+  std::vector<std::string> v{"another_cluster"};
+  Protobuf::RepeatedPtrField<std::string> removed(v.begin(), v.end());
+  std::vector<std::string> v2{"another_cluster2"};
+  Protobuf::RepeatedPtrField<std::string> removed2(v2.begin(), v2.end());
+
   odcds_->updateOnDemand("cluster");
   EXPECT_CALL(notifier_, notifyMissingCluster("cluster")).Times(0);
-  odcds_callbacks_->onConfigUpdate({"some_cluster"}, {}, "");
-  odcds_callbacks_->onConfigUpdate({}, {"another_cluster"}, "");
+  odcds_callbacks_->onConfigUpdate(some_cluster_resource.refvec_, {}, "");
+  odcds_callbacks_->onConfigUpdate({}, removed, "");
   odcds_callbacks_->onConfigUpdate({}, {}, "");
-  odcds_callbacks_->onConfigUpdate({"some_cluster2"}, {"another_cluster2"}, "");
+  odcds_callbacks_->onConfigUpdate(some_cluster2_resource.refvec_, removed2, "");
 }
 
 } // namespace
