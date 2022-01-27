@@ -245,7 +245,7 @@ Ipv6Instance::Ipv6Instance(const std::string& address, const SocketInterface* so
     : Ipv6Instance(address, 0, sockInterfaceOrDefault(sock_interface)) {}
 
 Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port,
-                           const SocketInterface* sock_interface)
+                           const SocketInterface* sock_interface, bool v6only)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
   throwOnError(validateProtocolSupported());
   ip_.ipv6_.address_.sin6_family = AF_INET6;
@@ -260,6 +260,7 @@ Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port,
   // Just in case address is in a non-canonical format, format from network address.
   ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
   friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
+  ip_.ipv6_.v6only_ = v6only;
 }
 
 Ipv6Instance::Ipv6Instance(uint32_t port, const SocketInterface* sock_interface)

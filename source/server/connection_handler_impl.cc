@@ -94,6 +94,14 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           details->typed_listener_)) {
     tcp_listener_map_by_address_.insert_or_assign(
         config.listenSocketFactory().localAddress()->asStringView(), details);
+    auto& address = details->address_;
+    // If the address is IPv6 and isn't v6only, adds an extra ipv4 any-address item to the map.
+    // Then this allows the `getBalancedHandlerByAddress` can match the ipv4 any-address also.
+    if (address->ip()->version() == Network::Address::IpVersion::v6 &&
+        !address->ip()->ipv6()->v6only()) {
+      tcp_listener_map_by_address_.insert_or_assign(
+          Network::Utility::getIpv4AnyAddress(address->ip()->port())->asStringView(), details);
+    }
   } else if (absl::holds_alternative<std::reference_wrapper<ActiveInternalListener>>(
                  details->typed_listener_)) {
     internal_listener_map_by_address_.insert_or_assign(
@@ -106,11 +114,18 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
       listener_iter != listener_map_by_tag_.end()) {
     // listener_map_by_address_ may already update to the new listener. Compare it with the one
     // which find from listener_map_by_tag_, only delete it when it is same listener.
-    auto address_view = listener_iter->second->address_->asStringView();
+    auto& address = listener_iter->second->address_;
+    auto address_view = address->asStringView();
     if (tcp_listener_map_by_address_.contains(address_view) &&
         tcp_listener_map_by_address_[address_view]->listener_tag_ ==
             listener_iter->second->listener_tag_) {
       tcp_listener_map_by_address_.erase(address_view);
+      // If the address is IPv6 and isn't v6only, delete the corresponding ipv4 item from the map.
+      if (address->ip()->version() == Network::Address::IpVersion::v6 &&
+          !address->ip()->ipv6()->v6only()) {
+        tcp_listener_map_by_address_.erase(
+            Network::Utility::getIpv4AnyAddress(address->ip()->port())->asStringView());
+      }
     } else if (internal_listener_map_by_address_.contains(address_view) &&
                internal_listener_map_by_address_[address_view]->listener_tag_ ==
                    listener_iter->second->listener_tag_) {
