@@ -256,12 +256,13 @@ TEST_P(AdminStatsTest, HandlerStatsJson) {
     ]
 })EOF";
 
+  ENVOY_LOG_MISC(error, "json: {}", data.toString());
   EXPECT_THAT(expected_json_old, JsonStringEq(data.toString()));
 
   shutdownThreading();
 }
 
-#if 0
+#if 1
 TEST_P(AdminStatsTest, StatsAsJson) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);

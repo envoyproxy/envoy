@@ -36,7 +36,8 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
         return alloc_.makeTextReadout(name, name, StatNameTagVector{});
       }),
       null_counter_(new NullCounterImpl(symbol_table)),
-      null_gauge_(new NullGaugeImpl(symbol_table)) {}
+      null_gauge_(new NullGaugeImpl(symbol_table)),
+      default_scope_(std::make_shared<ScopePrefixer>("", *this)) {}
 
 IsolatedStoreImpl::~IsolatedStoreImpl() {
 #if SCOPE_REFCOUNT
@@ -47,11 +48,11 @@ IsolatedStoreImpl::~IsolatedStoreImpl() {
 
 #if SCOPE_REFCOUNT
 ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
-  return ScopeSharedPtr(new ScopePrefixer(name, *this));
+  return (new ScopePrefixer(name, *this))->makeShared();
 }
 
 ScopePtr IsolatedStoreImpl::scopeFromStatName(StatName name) {
-  return ScopeSharedPtr(new ScopePrefixer(name, *this));
+  return (new ScopePrefixer(name, *this))->makeShared();
 }
 #else
 ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {

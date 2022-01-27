@@ -335,7 +335,7 @@ public:
   testing::NiceMock<MockCounter> counter_;
   testing::NiceMock<MockGauge> gauge_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
-  std::atomic<uint32_t> ref_count_{0};
+  std::atomic<uint32_t> ref_count_{1};
 };
 
 /**

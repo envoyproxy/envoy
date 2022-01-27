@@ -18,7 +18,11 @@ ScopePrefixer::~ScopePrefixer() { prefix_.free(symbolTable()); }
 
 ScopePtr ScopePrefixer::scopeFromStatName(StatName name) {
   SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
-  return ScopeSharedPtr(new ScopePrefixer(StatName(joined.get()), scope_));
+#if SCOPE_REFCOUNT
+  return (new ScopePrefixer(StatName(joined.get()), scope_))->makeShared();
+#else
+  return std::make_shared<ScopePrefixer>(StatName(joined.get()), scope_);
+#endif
 }
 
 ScopePtr ScopePrefixer::createScope(const std::string& name) {

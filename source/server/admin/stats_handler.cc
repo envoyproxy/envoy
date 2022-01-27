@@ -12,6 +12,8 @@
 #include "source/server/admin/prometheus_stats.h"
 #include "source/server/admin/utils.h"
 
+constexpr uint64_t ChunkSize = 2 * 1000 * 1000;
+
 namespace Envoy {
 namespace Server {
 
@@ -145,25 +147,25 @@ class StatsHandler::TextRender : public StatsHandler::Render {
 
   void render(Buffer::Instance&) override {}
   bool nextChunk(Buffer::Instance& response) override {
-    return response.length() > 2000000;
+    return response.length() > ChunkSize;
   }
 };
 
-#if 0
 class StatsHandler::JsonRender : public StatsHandler::Render {
  public:
-  JsonRender(Http::ResponseHeaderMap& response_headers) {
+  JsonRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response) {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+    response.add("{\"stats\":[");
   }
 
   void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override {
-    add(name, ValueUtil::numberValue(value));
+    add(response, name, ValueUtil::numberValue(value));
   }
   void generate(Buffer::Instance& response, const std::string& name,
                 const std::string& value) override {
-    add(name, ValueUtil::stringValue(value));
+    add(response, name, ValueUtil::stringValue(value));
   }
-  void generate(Buffer::Instance& response, const std::string& name,
+  void generate(Buffer::Instance&, const std::string& name,
                 const Stats::ParentHistogram& histogram) override {
     if (!found_used_histogram_) {
       auto* histograms_obj_fields = histograms_obj_.mutable_fields();
@@ -202,29 +204,61 @@ class StatsHandler::JsonRender : public StatsHandler::Render {
   }
 
   void render(Buffer::Instance& response) override {
+    //emitStats(response);
     if (found_used_histogram_) {
       auto* histograms_obj_fields = histograms_obj_.mutable_fields();
       (*histograms_obj_fields)["computed_quantiles"] =
           ValueUtil::listValue(computed_quantile_array_);
       auto* histograms_obj_container_fields = histograms_obj_container_.mutable_fields();
       (*histograms_obj_container_fields)["histograms"] = ValueUtil::structValue(histograms_obj_);
-      stats_array_.push_back(ValueUtil::structValue(histograms_obj_container_));
+      auto str = MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::structValue(histograms_obj_container_),
+                                                            false /* pretty */, true);
+      //stats_array_.push_back();
+      //ENVOY_LOG_MISC(error, "histograms: {}", str);
+      //response.addFragments({"  ", str, "\n"});
+      response.add(str);
     }
 
-    auto* document_fields = document_.mutable_fields();
-    (*document_fields)["stats"] = ValueUtil::listValue(stats_array_);
-    response.add(MessageUtil::getJsonStringFromMessageOrDie(document_, false /* pretty */, true));
+    //auto* document_fields = document_.mutable_fields();
+    //(*document_fields)["stats"] = ValueUtil::listValue(stats_array_);
+    //response.add(MessageUtil::getJsonStringFromMessageOrDie(document_, false /* pretty */, true));
+    response.add("]}");
+  }
+
+  bool nextChunk(Buffer::Instance& response) override {
+    return response.length() > ChunkSize;
+    /*
+    if (++chunk_count_ == 10000) {
+      emitStats(response);
+      return true;
+    }
+    return false;
+    */
   }
 
  private:
-  template <class Value> void add(const std::string& name, const Value& value) {
+  template <class Value> void add(Buffer::Instance& response, const std::string& name, const Value& value) {
     ProtobufWkt::Struct stat_obj;
     auto* stat_obj_fields = stat_obj.mutable_fields();
     (*stat_obj_fields)["name"] = ValueUtil::stringValue(name);
     (*stat_obj_fields)["value"] = value;
-    stats_array_.push_back(ValueUtil::structValue(stat_obj));
+    //stats_array_.push_back(ValueUtil::structValue(stat_obj));
+    auto str = MessageUtil::getJsonStringFromMessageOrDie(stat_obj, false /* pretty */, true);
+    ENVOY_LOG_MISC(error, "emitting: {}", str);
+    //response.addFragments({"  ", str, ",\n"});
+    response.addFragments({str, ","});
   }
 
+  void emitStats(Buffer::Instance& response) {
+    auto str = MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::listValue(stats_array_),
+                                                          false /* pretty */, true);
+    ENVOY_LOG_MISC(error, "emitting: {}", str);
+    response.add(str);
+    chunk_count_ = 0;
+    stats_array_.clear();
+  }
+
+  uint32_t chunk_count_{0};
   ProtobufWkt::Struct document_;
   std::vector<ProtobufWkt::Value> stats_array_;
   std::vector<ProtobufWkt::Value> scope_array_;
@@ -233,27 +267,27 @@ class StatsHandler::JsonRender : public StatsHandler::Render {
   std::vector<ProtobufWkt::Value> computed_quantile_array_;
   bool found_used_histogram_{false};
 };
-#endif
 
 StatsHandler::Context::Context(Server::Instance& server,
                                bool used_only, absl::optional<std::regex> regex,
-                               bool /*json*/,
-                               Http::ResponseHeaderMap& /*response_headers*/,
-                               Buffer::Instance& /*response*/)
+                               bool json,
+                               Http::ResponseHeaderMap& response_headers,
+                               Buffer::Instance& response)
     : used_only_(used_only), regex_(regex), stats_(server.stats()) {
-  //if (json) {
-  //  render_ = std::make_unique<JsonRender>(response_headers, response);
-  //} else {
-  render_ = std::make_unique<TextRender>();
-  //}
+  if (json) {
+    render_ = std::make_unique<JsonRender>(response_headers, response);
+  } else {
+    render_ = std::make_unique<TextRender>();
+  }
 
   // Populate the top-level scopes and the stats underneath any scopes with an empty name.
   // We will have to de-dup, but we can do that after sorting.
   //
   // First capture all the scopes and hold onto them with a SharedPtr so they
   // can't be deleted after the initial iteration.
-  stats_.forEachScope([this](size_t s) { scopes_.reserve(s); }, [this](const Stats::Scope& scope) {
-    scopes_.emplace_back(const_cast<Stats::Scope&>(scope).makeShared());
+  stats_.forEachScope([this](size_t s) { scopes_.reserve(s); }, [this](
+      const Stats::ScopeSharedPtr& scope) {
+    scopes_.emplace_back(scope);
   });
 
   startPhase();
@@ -324,6 +358,7 @@ Http::Code StatsHandler::Context::writeChunk(Buffer::Instance& response) {
           startPhase();
           break;
         case Phase::Histograms:
+          render_->render(response);
           return Http::Code::OK;
       }
     }

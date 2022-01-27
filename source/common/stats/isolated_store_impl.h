@@ -228,12 +228,11 @@ public:
     text_readouts_.forEachStat(f_size, f_stat);
   }
 
-  void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override {
+  void forEachScope(SizeFn f_size, StatFn<const ScopeSharedPtr> f_stat) const override {
     if (f_size != nullptr) {
       f_size(1);
     }
-    const Scope& scope = *this;
-    f_stat(scope);
+    f_stat(default_scope_);
   }
 
   Stats::StatName prefix() const override { return StatName(); }
@@ -272,8 +271,9 @@ private:
   IsolatedStatsCache<TextReadout> text_readouts_;
   RefcountPtr<NullCounterImpl> null_counter_;
   RefcountPtr<NullGaugeImpl> null_gauge_;
+  ScopeSharedPtr default_scope_;
 #if SCOPE_REFCOUNT
-  std::atomic<uint32_t> ref_count_{0};
+  std::atomic<uint32_t> ref_count_{1};
 #endif
 };
 

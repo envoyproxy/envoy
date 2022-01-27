@@ -479,8 +479,8 @@ TEST_F(StatsThreadLocalStoreTest, ForEach) {
   auto collect_scopes = [this]() -> std::vector<std::string> {
     std::vector<std::string> names;
     store_->forEachScope([](size_t) {},
-                         [&names](const Scope& scope) {
-                           names.push_back(scope.constSymbolTable().toString(scope.prefix()));
+                         [&names](const ScopeSharedPtr& scope) {
+                           names.push_back(scope->constSymbolTable().toString(scope->prefix()));
                          });
     return names;
   };

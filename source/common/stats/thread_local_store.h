@@ -247,7 +247,7 @@ public:
   void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
   void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
   void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
-  void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override;
+  void forEachScope(SizeFn f_size, StatFn<const ScopeSharedPtr> f_stat) const override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }

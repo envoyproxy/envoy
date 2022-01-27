@@ -40,6 +40,8 @@ using ScopePtr = ScopeSharedPtr; // TODO(jmarantz): global s/ShaedPtr/ScopeShare
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
 
+#define SCOPE_SHARED_FROM_THIS 1
+
 /**
  * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
  * (for example to free/delete all of them).
@@ -48,7 +50,9 @@ class Scope : public
 #if SCOPE_REFCOUNT
     RefcountInterface
 #else
+#if SCOPE_SHARED_FROM_THIS
     std::enable_shared_from_this<Scope>
+#endif
 #endif
 {
 public:
