@@ -21,15 +21,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace LocalRateLimitFilter {
 
-class LocalRateLimitTestBase : public testing::Test {
+class LocalRateLimitTestBase : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
-  LocalRateLimitTestBase() {
-    // TODO(zhxie): The GlobalTimeSystem in MockDispatcher will initialize itself into a
-    // TestRealTimeSystem by default which is incompatible with the SimulatedTimeSystem in
-    // MockReadFilterCallbacks. We will no need to change the time system after the switching of
-    // default time system in GlobalTimeSystem.
-    dispatcher_.time_system_ = std::make_unique<Event::SimulatedTimeSystem>();
-  }
   void initialize(const std::string& filter_yaml, bool expect_timer_create = true) {
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config;
     TestUtility::loadFromYamlAndValidate(filter_yaml, proto_config);
