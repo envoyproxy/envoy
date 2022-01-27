@@ -67,6 +67,7 @@ InternalSocket::InternalSocket(ConfigConstSharedPtr config,
       injected_metadata_(config->extractMetadata(host)) {}
 
 void InternalSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
+  transport_socket_->setTransportSocketCallbacks(callbacks);
   // downcast to user space socket
   auto* handle = dynamic_cast<IoSocket::UserSpace::IoHandle*>(&callbacks.ioHandle());
   if (handle != nullptr) {
