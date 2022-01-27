@@ -56,7 +56,7 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
       info_(std::dynamic_pointer_cast<SslHandshakerImpl>(
           handshaker_factory_cb(ctx_->newSsl(transport_socket_options_.get()),
                                 ctx_->sslExtendedSocketInfoIndex(), this))),
-      config_(config) {
+      config_(config), enable_tls_keylog_(false), bio_keylog_(nullptr) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(rawSsl());
   } else {
