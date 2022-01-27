@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package envoy.service.rate_limit_quota.v3;
+
+import "envoy/type/v3/token_bucket.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.service.rate_limit_quota.v3";
+option java_outer_classname = "RlqsProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/rate_limit_quota/v3;rate_limit_quotav3";
+option java_generic_services = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#not-implemented-hide:]
+// [#protodoc-title: Rate Limit Quota Service (RLQS)]
+
+service RateLimitQuotaService {
+  rpc StreamRateLimitQuotas(stream RateLimitQuotaUsageReports)
+      returns (stream RateLimitQuotaAssignments) {
+  }
+}
+
+message RateLimitQuotaUsageReports {
+  // [#next-free-field: 7]
+  message BucketQuotaUsage {
+    // Bucket id for which request quota usage is reported.
+    BucketId bucket_id = 1 [(validate.rules).message = {required: true}];
+
+    // Auto-incrementing number used to deduplicate usage reports.
+    uint64 report_id = 2;
+
+    // Time elapsed since the last report.
+    google.protobuf.Duration time_elapsed = 3;
+
+    // Requests the data plane has allowed through.
+    uint64 num_requests_allowed = 4;
+
+    // Requests throttled.
+    uint64 num_requests_denied = 5;
+
+    // Requests in the queue waiting for the assignment.
+    uint64 num_requests_queued = 6;
+  }
+
+  // All quota requests must specify the domain. This enables sharing the quota
+  // server between different applications without fear of overlap.
+  // E.g., "envoy".
+  // [#comment:TODO(sergiitk): add a note about domain being optional after the first report]
+  string domain = 1;
+
+  // A list of quota usage reports for each bucket.
+  repeated BucketQuotaUsage bucket_quota_usages = 2 [(validate.rules).repeated = {min_items: 1}];
+}
+
+message RateLimitQuotaAssignments {
+  message QuotaAssignment {
+    // Bucket id for which this quota is granted.
+    BucketId bucket_id = 1 [(validate.rules).message = {required: true}];
+
+    // The timestamp at which the server issued the quota.
+    // Assignment with timestamps older than the active assignment
+    // must be discarded.
+    google.protobuf.Timestamp assignment_timestamp = 2;
+
+    // A duration after which the assignment should be considered expired if it
+    // hasn't received a new value.
+    // If unset, the assignment has no expiration date.
+    google.protobuf.Duration assignment_time_to_live = 3;
+
+    // Rate limiter used to allow or deny the requests matched to the bucket.
+    // If unset, no limit.
+    RateLimiter rate_limiter = 4;
+  }
+
+  // An ordered list of assignments to be applied to the quota buckets.
+  // When the quota is different from bucket's active assignment,
+  // the data plane must immediately end the active assignment, and
+  // report the usage. Exceptions:
+  // - There's no active assignment for the bucket.
+  // - Only assignment_timestamp field changes.
+  repeated QuotaAssignment quota_assignment = 1;
+}
+
+message RateLimiter {
+  message Unlimited {
+  }
+
+  message LimitAll {
+  }
+
+  oneof limiter {
+    // Allow infinite requests.
+    Unlimited unlimited = 1;
+
+    // Allow no requests.
+    LimitAll limit_all = 2;
+
+    // Allow the same number of requests as the number of tokens available in
+    // the token bucket.
+    type.v3.TokenBucket token_bucket = 3;
+  }
+}
+
+// The identifier for the bucket. Used to match the bucket on the control
+// plane (RLQS server), and on the data plane (RLQS client).
+message BucketId {
+  map<string, string> bucket = 1;
+}

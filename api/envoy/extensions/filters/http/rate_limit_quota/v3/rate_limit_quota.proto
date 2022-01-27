@@ -1,0 +1,149 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.rate_limit_quota.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/extension.proto";
+
+import "google/protobuf/duration.proto";
+import "google/rpc/status.proto";
+
+import "xds/annotations/v3/status.proto";
+import "xds/type/matcher/v3/matcher.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.rate_limit_quota.v3";
+option java_outer_classname = "RateLimitQuotaProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/rate_limit_quota/v3;rate_limit_quotav3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#not-implemented-hide:]
+// [#protodoc-title: Rate Limit Quota]
+// Rate limit :ref:`configuration overview <config_http_filters_rate_limit_quota>`.
+// [#extension: envoy.filters.http.rate_limit_quota]
+
+message RateLimitQuota {
+  // [#comment:TODO(sergiitk): preview mode matchers]
+
+  // Configuration for the gRPC service that hosts an external rate limit
+  // provider. If not specified, any calls to the rate limit service will
+  // immediately return success.
+  config.core.v3.ConfigSource rlqs_server = 1;
+
+  // The application domain to use when calling the service.
+  string domain = 2;
+
+  // Unified matchers.
+  xds.type.matcher.v3.Matcher bucket_matchers = 3;
+}
+
+message RateLimitQuotaBucketSettings {
+  // [#comment:TODO(sergiitk): finish fallback behavior]
+
+  // How the data plane should treat requests matching this group
+  // without active quota assignment, for example:
+  // - quota server hasn't returned the first quota assignment
+  // - quota assignment has expired, and the server hasn't returned
+  //   the new assignment.
+  message NoAssignmentBehavior {
+    // Allow requests until the bucket is assigned a quota.
+    message Allow {
+    }
+
+    // Deny requests until the bucket is assigned a quota.
+    message Deny {
+    }
+
+    // Queue requests until we receive a quota assignment for the bucket.
+    // The data plane maintains a separate queue for each bucket that has
+    // pending requests.
+    // When the server returns quota assignment, the data plane begins dequeuing
+    // the requests in the FIFO order, and processing them according to
+    // the assignment. No individual request/response matching needed.
+    // To avoid memory exhaust, queue configuration allows to
+    // to impose constraints on the maximum number of pending requests
+    // in the queue.
+    message Queue {
+      // Limit the length of the queue.
+      uint64 max_length = 1;
+
+      // Allows to reverse the order in which requests are discarded when
+      // max_length is reached. When set to true, new requests are discarded.
+      // By default, the oldest requests (at the front of the queue) are
+      // discarded, and new requests are added to the back of the queue.
+      bool queue_spillover_discard_new = 2;
+
+      // Whether to deny the requests discarded due to queue lengths limit,
+      // or allow them.
+      bool deny_discarded_requests = 3;
+    }
+
+    oneof behavior {
+      Allow allow = 1;
+
+      Deny deny = 2;
+
+      Queue queue = 3;
+    }
+  }
+
+  message DenyResponseSettings {
+    // Status code to use to fail requests when quota is exceeded.
+    // [#comment:TODO: figure out the right defaults for these fields!]
+    int32 http_status_code = 1;
+    // For HTTP requests.
+
+    google.rpc.Status deny_grpc_status = 2;
+    // For gRPC requests.
+
+    // A response body to send to the downstream client when the response code
+    // is not OK.
+    bytes http_raw_body = 3;
+
+    // A list of headers to add to the response when the request is throttled.
+    repeated config.core.v3.HeaderValue response_headers_to_add = 4;
+  }
+
+  message BucketIdBuilder {
+    message ValueBuilder {
+      oneof value_specifier {
+        string string_value = 1;
+
+        config.core.v3.TypedExtensionConfig custom_value_builder = 2;
+      }
+    }
+
+    map<string, ValueBuilder> group = 1;
+  }
+
+  // Contains instructions on building the bucket identifier of the quota group.
+  BucketIdBuilder bucket_id_builder = 1;
+
+  // The interval at which the data plane is to report quota usage for
+  // this bucket.
+  // When the first request is matched to a bucket without an active
+  // assignment, the data plane immediately sends RateLimitQuotaUsageReports
+  // to the server, signaling it's subscribed for the quota assignments
+  // in that bucket. After that, the data plane is to submit the report
+  // with the given reporting internal.
+  // [#comment:nanos to seconds = 0.001 seconds]
+  google.protobuf.Duration reporting_interval = 2 [(validate.rules).duration = {
+    required: true
+    gt {nanos: 1000000}
+  }];
+
+  // [#comment:TODO(sergiitk): behavior on unset]
+  DenyResponseSettings deny_response_settings = 3;
+
+  // When unset, use NoAssignmentBehavior.ALLOW.
+  NoAssignmentBehavior no_assignment_behavior = 4;
+}
+
+message RateLimitQuotaPerRoute {
+  // [#comment:TODO(sergiitk): finish]
+}
