@@ -783,6 +783,19 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
           recalculateHostsInSlowStart(hosts_added);
         }
       });
+
+  min_weight_percent_ = 0.1;
+  if (slow_start_config.has_value()) {
+    if (slow_start_config.value().min_weight_percent() > 0.0 &&
+        slow_start_config.value().min_weight_percent() < 100.0) {
+      min_weight_percent_ = slow_start_config.value().min_weight_percent()
+    } else {
+      ENVOY_LOG(warn,
+                "Invalid value {} provided for min_weight_percent parameter, must be in range "
+                "[0.0, 100.0], so use default value 0.1",
+                slow_start_config.value().min_weight_percent());
+    }
+  }
 }
 
 void EdfLoadBalancerBase::initialize() {
@@ -967,7 +980,7 @@ double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host&
     auto time_factor = static_cast<double>(std::max(std::chrono::milliseconds(1).count(),
                                                     host_create_duration.count())) /
                        slow_start_window_.count();
-    return host_weight * applyAggressionFactor(time_factor);
+    return host_weight * std : max(applyAggressionFactor(time_factor), min_weight_percent_);
   } else {
     return host_weight;
   }

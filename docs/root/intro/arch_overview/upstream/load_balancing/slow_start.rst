@@ -15,7 +15,7 @@ During slow start window, load balancing weight of a particular endpoint will be
 
 .. math::
 
-  NewWeight = {Weight*TimeFactor}^\frac{1}{Aggression}
+  NewWeight = {Weight}*{max(MinWeightPercent,{TimeFactor}^\frac{1}{Aggression})}
 
 where,
 
@@ -24,6 +24,8 @@ where,
   TimeFactor = \frac{max(TimeSinceStartInSeconds,1)}{SlowStartWindowInSeconds}
 
 As time progresses, more and more traffic would be sent to endpoint within slow start window.
+
+:ref:`MinWeightPercent parameter<envoy_v3_api_field_config.cluster.v3.Cluster.SlowStartConfig.min_weight_percent>` specifies the minimum percent of origin weight to make sure the ebf scheduler has a reasonable deadline, default is 0.1.
 
 :ref:`Aggression parameter<envoy_v3_api_field_config.cluster.v3.Cluster.SlowStartConfig.aggression>` non-linearly affects endpoint weight and represents the speed of ramp-up.
 By tuning aggression parameter, one could achieve polynomial or exponential speed for traffic increase.
