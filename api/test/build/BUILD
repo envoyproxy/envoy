@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 api_cc_test(
     name = "build_test",
     srcs = ["build_test.cc"],
+    linkstatic = True,
     deps = [
         "//envoy/api/v2:pkg_cc_proto",
         "//envoy/service/accesslog/v2:pkg_cc_proto",
