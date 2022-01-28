@@ -158,6 +158,8 @@ void AccessLogFileImpl::flushThreadFunc() {
                                                  result.err_->getErrorDetails()));
         const Api::IoCallBoolResult open_result = open();
         if (!open_result.return_value_) {
+          // if we failed to reopen file , do not exit flush thread , because we need to drain
+          // about_to_write_buffer_ next flush loop
           stats_.reopen_failed_.inc();
         }
       }
