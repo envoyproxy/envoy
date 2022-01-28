@@ -21,12 +21,22 @@ Envoy::Ssl::CertificateDetailsPtr certificateDetails(X509* cert, const std::stri
                                                      TimeSource& time_source);
 
 /**
- * Determines whether the given name matches 'pattern' which may optionally begin with a wildcard.
+ * Determines whether the given name matches 'pattern' which may optionally begin with a wildcard
+ * or even if names may contain the wildcard in between.
  * @param dns_name the DNS name to match
  * @param pattern the pattern to match against (*.example.com)
  * @return true if the san matches pattern
  */
 bool dnsNameMatch(absl::string_view dns_name, absl::string_view pattern);
+
+/**
+ * Determines whether the given DNS label matches 'pattern' which may contain a wildcard in between.
+ * e.g., "baz*" and "*baz" and "b*z" would match "baz1" and "foobaz" and "buzz", respectively.
+ * @param dns_label the DNS name label to match
+ * @param pattern the pattern to match against
+ * @return true if the dns_label matches pattern
+ */
+bool labelWildcardMatch(absl::string_view dns_label, absl::string_view pattern);
 
 /**
  * Retrieves the serial number of a certificate.

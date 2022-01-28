@@ -29,12 +29,24 @@ TEST(UtilityTest, TestDnsNameMatching) {
   EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "lyft.com"));
   EXPECT_TRUE(Utility::dnsNameMatch("a.lyft.com", "*.lyft.com"));
   EXPECT_TRUE(Utility::dnsNameMatch("a.LYFT.com", "*.lyft.COM"));
+  EXPECT_TRUE(Utility::dnsNameMatch(".lyft.com", "*.lyft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "*yft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("LYFT.com", "*yft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "*lyft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "lyf*.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "lyft*.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "l*ft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "l*ft.co"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "ly?t.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "lf*t.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch(".lyft.com", "*lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "**lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "lyft**.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "ly**ft.com"));
   EXPECT_FALSE(Utility::dnsNameMatch("a.b.lyft.com", "*.lyft.com"));
   EXPECT_FALSE(Utility::dnsNameMatch("foo.test.com", "*.lyft.com"));
   EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "*.lyft.com"));
   EXPECT_FALSE(Utility::dnsNameMatch("alyft.com", "*.lyft.com"));
-  EXPECT_FALSE(Utility::dnsNameMatch("alyft.com", "*lyft.com"));
-  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "*lyft.com"));
   EXPECT_FALSE(Utility::dnsNameMatch("", "*lyft.com"));
   EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", ""));
 }

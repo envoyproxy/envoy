@@ -3,6 +3,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/safe_memcpy.h"
+#include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
 
@@ -71,13 +72,60 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
   return certificate_details;
 }
 
+bool Utility::labelWildcardMatch(absl::string_view dns_label, absl::string_view pattern) {
+  if (pattern.empty()) {
+    return dns_label.empty();
+  }
+
+  // Only valid if wildcard character appear once
+  if (std::count(pattern.begin(), pattern.end(), '*') == 1) {
+    constexpr char glob = '*';
+    // Check the special case of a single * pattern, as it's common.
+    if (pattern.size() == 1 && pattern[0] == glob) {
+      return true;
+    }
+    size_t i = 0, p = 0, i_star = dns_label.size(), p_star = 0;
+    while (i < dns_label.size()) {
+      if (p < pattern.size() &&
+          absl::ascii_tolower(dns_label[i]) == absl::ascii_tolower(pattern[p])) {
+        ++i;
+        ++p;
+      } else if (p < pattern.size() && pattern[p] == glob) {
+        i_star = i;
+        p_star = p++;
+      } else if (i_star != dns_label.size()) {
+        i = ++i_star;
+        p = p_star + 1;
+      } else {
+        return false;
+      }
+    }
+
+    while (p < pattern.size() && pattern[p] == glob) {
+      ++p;
+    }
+
+    return p == pattern.size() && i == dns_label.size();
+  }
+
+  return false;
+}
+
 bool Utility::dnsNameMatch(absl::string_view dns_name, absl::string_view pattern) {
+  // A-label ACE prefix https://www.rfc-editor.org/rfc/rfc5890#section-2.3.2.5
+  constexpr absl::string_view ACE_prefix = "xn--";
   const std::string lower_case_dns_name = absl::AsciiStrToLower(dns_name);
   const std::string lower_case_pattern = absl::AsciiStrToLower(pattern);
   if (lower_case_dns_name == lower_case_pattern) {
     return true;
   }
 
+  // https://www.rfc-editor.org/rfc/rfc6125#section-6.4.3 part #2
+  // If the wildcard character is the only character of the left-most
+  // label in the presented identifier, the client SHOULD NOT compare
+  // against anything but the left-most label of the reference identifier
+  // (e.g., *.example.com would match foo.example.com but
+  //       not bar.foo.example.com or example.com)
   size_t pattern_len = lower_case_pattern.length();
   if (pattern_len > 1 && lower_case_pattern[0] == '*' && lower_case_pattern[1] == '.') {
     if (lower_case_dns_name.length() > pattern_len - 1) {
@@ -86,6 +134,28 @@ bool Utility::dnsNameMatch(absl::string_view dns_name, absl::string_view pattern
              lower_case_dns_name.substr(off, pattern_len - 1) ==
                  lower_case_pattern.substr(1, pattern_len - 1);
     }
+  }
+
+  // https://www.rfc-editor.org/rfc/rfc6125#section-6.4.3 part #3
+  // Match a presented identifier in which the wildcard character is not the only
+  // character of the label and don't match patter if the wildcard character is
+  // embedded within an A-label (A-label always starts with the ACE prefix "xn--")
+  // (e.g., baz*.example.net and *baz.example.net and b*z.example.net would
+  //       be taken to match baz1.example.net and foobaz.example.net and
+  //       buzz.example.net, respectively)
+  size_t pattern_left_label_len = lower_case_pattern.find('.');
+  size_t dns_name_left_label_len = lower_case_dns_name.find('.');
+  // Only the left-most label in the pattern contains wildcard '*' and is not an A-label
+  if ((pattern_left_label_len != std::string::npos) &&
+      (dns_name_left_label_len != std::string::npos) &&
+      (lower_case_pattern.find('*') != std::string::npos) &&
+      (lower_case_pattern.find('*') < pattern_left_label_len) &&
+      (lower_case_pattern.substr(pattern_left_label_len).find('*') == std::string::npos) &&
+      (!absl::StartsWith(lower_case_pattern.substr(0, pattern_left_label_len), ACE_prefix))) {
+    return labelWildcardMatch(lower_case_dns_name.substr(0, dns_name_left_label_len),
+                              lower_case_pattern.substr(0, pattern_left_label_len)) &&
+           (lower_case_dns_name.substr(dns_name_left_label_len) ==
+            lower_case_pattern.substr(pattern_left_label_len));
   }
 
   return false;
