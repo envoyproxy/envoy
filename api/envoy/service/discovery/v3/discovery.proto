@@ -20,9 +20,23 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Specifies a resource to be subscribed to.
 message ResourceLocator {
+  // The resource name to subscribe to.
   string name = 1;
 
+  // A set of dynamic parameters used to match against the dynamic parameter
+  // constraints on the resource. This allows clients to select between
+  // multiple variants of the same resource.
   map<string, string> dynamic_parameters = 2;
+}
+
+// Specifies a concrete resource name.
+message ResourceName {
+  // The name of the resource.
+  string name = 1;
+
+  // Dynamic parameter constraints associated with this resource. To be used by client-side caches
+  // (including xDS proxies) when matching subscribed resource locators.
+  DynamicParameterConstraints dynamic_parameter_constraints = 2;
 }
 
 // A DiscoveryRequest requests a set of versioned resources of the same type for
@@ -247,6 +261,11 @@ message DeltaDiscoveryResponse {
   // Removed resources for missing resources can be ignored.
   repeated string removed_resources = 6;
 
+  // Alternative to removed_resources that allows specifying which variant of
+  // a resource is being removed. This variant must be used for any resource
+  // for which dynamic parameter constraints were sent to the client.
+  repeated ResourceName removed_resource_names = 8;
+
   // The nonce provides a way for DeltaDiscoveryRequests to uniquely
   // reference a DeltaDiscoveryResponse when (N)ACKing. The nonce is required.
   string nonce = 5;
@@ -324,7 +343,14 @@ message Resource {
   }
 
   // The resource's name, to distinguish it from others of the same type of resource.
+  // Only one of *name* or *resource_name* may be set.
   string name = 3;
+
+  // Alternative to the *name* field, to be used when the server supports
+  // multiple variants of the named resource that are differentiated by
+  // dynamic parameter constraints.
+  // Only one of *name* or *resource_name* may be set.
+  ResourceName resource_name = 8;
 
   // The aliases are a list of other names that this resource can go by.
   repeated string aliases = 4;
@@ -354,8 +380,4 @@ message Resource {
   // Cache control properties for the resource.
   // [#not-implemented-hide:]
   CacheControl cache_control = 7;
-
-  // Dynamic parameter constraints associated with this resource. To be used by client-side caches
-  // (including xDS proxies) when matching subscribed resource locators.
-  DynamicParameterConstraints dynamic_parameter_constraints = 8;
 }
