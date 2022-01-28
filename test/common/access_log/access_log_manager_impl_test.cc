@@ -417,6 +417,9 @@ TEST_F(AccessLogManagerImplTest, ReopenThrows) {
   timer->invokeCallback();
 
   waitForCounterEq("filesystem.reopen_failed", 1);
+  EXPECT_EQ(0UL,
+            store_.gauge("filesystem.write_total_buffered", Stats::Gauge::ImportMode::Accumulate)
+                .value());
 }
 
 TEST_F(AccessLogManagerImplTest, BigDataChunkShouldBeFlushedWithoutTimer) {
