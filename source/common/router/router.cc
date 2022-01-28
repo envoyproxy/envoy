@@ -1624,7 +1624,8 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
     return false;
   }
 
-  const auto& route_name = route->routeEntry()->routeName();
+  const auto& route_name = route->directResponseEntry() ? route->directResponseEntry()->routeName()
+                                                        : route->routeEntry()->routeName();
   for (const auto& predicate : policy.predicates()) {
     if (!predicate->acceptTargetRoute(*filter_state, route_name, !scheme_is_http,
                                       !target_is_http)) {

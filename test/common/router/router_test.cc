@@ -55,6 +55,7 @@ using testing::AtLeast;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Property;
@@ -323,7 +324,7 @@ TEST_F(RouterTest, MissingRequiredHeaders) {
       sendLocalReply(Http::Code::ServiceUnavailable,
                      testing::Eq("missing required header: :method"), _, _,
                      "filter_removed_required_request_headers{missing required header: :method}"))
-      .WillOnce(testing::InvokeWithoutArgs([] {}));
+      .WillOnce(InvokeWithoutArgs([] {}));
   router_.decodeHeaders(headers, true);
   router_.onDestroy();
 }
@@ -3775,8 +3776,7 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
   // Normally, sendLocalReply will actually send the reply, but in this case the
   // HCM will detect the headers have already been sent and not route through
   // the encoder again.
-  EXPECT_CALL(callbacks_, sendLocalReply(_, _, _, _, _)).WillOnce(testing::InvokeWithoutArgs([] {
-  }));
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _, _, _, _)).WillOnce(InvokeWithoutArgs([] {}));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   // For normal HTTP, once we have a 200 we consider this a success, even if a
   // later reset occurs.
@@ -4731,6 +4731,33 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   // In production, the HCM recreateStream would have called this.
   router_.onDestroy();
   EXPECT_EQ(3, callbacks_.streamInfo()
+                   .filterState()
+                   ->getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
+                   .value());
+}
+
+TEST_F(RouterTest, HttpInternalRedirectMatchedToDirectResponseSucceeded) {
+  NiceMock<MockDirectResponseEntry> direct_response;
+  std::string route_name("route-test-name");
+  EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
+
+  enableRedirects();
+  sendRequest();
+  EXPECT_CALL(callbacks_, clearRouteCache()).WillOnce(InvokeWithoutArgs([&]() -> void {
+    // Direct message route should be matched after internal redirect
+    EXPECT_CALL(*callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
+    EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+  }));
+  EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+
+  // In production, the HCM recreateStream would have called this.
+  router_.onDestroy();
+  EXPECT_EQ(1, callbacks_.streamInfo()
                    .filterState()
                    ->getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
                    .value());
