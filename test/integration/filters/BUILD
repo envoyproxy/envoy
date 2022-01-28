@@ -515,6 +515,20 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "buffer_continue_filter_lib",
+    srcs = [
+        "buffer_continue_filter.cc",
+    ],
+    deps = [
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "test_socket_interface_lib",
     srcs = [
         "test_socket_interface.cc",

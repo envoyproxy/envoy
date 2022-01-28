@@ -3200,4 +3200,56 @@ TEST_P(ProtocolIntegrationTest, FragmentStrippedFromPathWithOverride) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Test buffering and then continuing after too many response bytes to buffer.
+TEST_P(ProtocolIntegrationTest, BufferContinue) {
+  // Bytes sent is configured for http/2 flow control windows.
+  if (upstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* route_config = hcm.mutable_route_config();
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        auto* header = virtual_host->mutable_response_headers_to_add()->Add()->mutable_header();
+        header->set_key("foo");
+        header->set_value("bar");
+      });
+
+  useAccessLog();
+  config_helper_.addFilter("{ name: buffer-continue-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.setBufferLimits(1024, 1024);
+  initialize();
+
+  // Send the request.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto downstream_request = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  Buffer::OwnedImpl data("HTTP body content goes here");
+  codec_client_->sendData(*downstream_request, data, true);
+  waitForNextUpstreamRequest();
+
+  // Send the response headers.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Now send an overly large response body. At some point, too much data will
+  // be buffered, the stream will be reset, and the connection will disconnect.
+  upstream_request_->encodeData(512, false);
+  upstream_request_->encodeData(1024 * 100, false);
+
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  }
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().getStatusValue());
+}
+
 } // namespace Envoy

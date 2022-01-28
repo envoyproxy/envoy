@@ -197,8 +197,8 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   // here is when Envoy "ends" the stream by calling recreateStream at which point recreateStream
   // explicitly nulls out response_encoder to avoid the downstream being notified of the
   // Envoy-internal stream instance being ended.
-  if (stream.response_encoder_ != nullptr &&
-      (!stream.filter_manager_.remoteComplete() || !stream.state_.codec_saw_local_complete_)) {
+  if (stream.response_encoder_ != nullptr && (!stream.filter_manager_.remoteDecodeComplete() ||
+                                              !stream.state_.codec_saw_local_complete_)) {
     // Indicate local is complete at this point so that if we reset during a continuation, we don't
     // raise further data or trailers.
     ENVOY_STREAM_LOG(debug, "doEndStream() resetting stream", stream);
@@ -1416,7 +1416,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   // If we are destroying a stream before remote is complete and the connection does not support
   // multiplexing, we should disconnect since we don't want to wait around for the request to
   // finish.
-  if (!filter_manager_.remoteComplete()) {
+  if (!filter_manager_.remoteDecodeComplete()) {
     if (connection_manager_.codec_->protocol() < Protocol::Http2) {
       connection_manager_.drain_state_ = DrainState::Closing;
     }
