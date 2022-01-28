@@ -393,6 +393,37 @@ void DefaultCertValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
                               sizeof(std::remove_reference<decltype(hash)>::type::value_type));
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
   }
+
+  rc = EVP_DigestUpdate(md.get(), &verify_trusted_ca_, sizeof(verify_trusted_ca_));
+  RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+
+  if (config_ != nullptr) {
+    for (const auto& matcher : config_->subjectAltNameMatchers()) {
+      size_t hash = MessageUtil::hash(matcher);
+      rc = EVP_DigestUpdate(md.get(), &hash, sizeof(hash));
+      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    }
+
+    const std::string& crl = config_->certificateRevocationList();
+    if (!crl.empty()) {
+      rc = EVP_DigestUpdate(md.get(), crl.data(), crl.length());
+      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    }
+
+    bool allow_expired = config_->allowExpiredCertificate();
+    rc = EVP_DigestUpdate(md.get(), &allow_expired, sizeof(allow_expired));
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+
+    auto trust_chain_verification = config_->trustChainVerification();
+    rc = EVP_DigestUpdate(md.get(), &trust_chain_verification, sizeof(trust_chain_verification));
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+
+    // Back porting note: onlyVerifyLeafCertificateCrl isn't implemented.
+    // Hence we comment these lines here to disable them.
+    // auto only_leaf_crl = config_->onlyVerifyLeafCertificateCrl();
+    // rc = EVP_DigestUpdate(md.get(), &only_leaf_crl, sizeof(only_leaf_crl));
+    // RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+  }
 }
 
 void DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx, bool require_client_cert) {
