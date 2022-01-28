@@ -43,6 +43,8 @@ public:
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
+    time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+    filter_->setStartTime(time_system_.monotonicTime());
     addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
 
     // NOP currently.
@@ -89,6 +91,11 @@ public:
         1U,
         stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
 
+    time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+    double duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                          time_system_.monotonicTime() - filter_->getStartTime().value())
+                          .count();
+
     Filters::Common::ExtAuthz::Response response{};
     response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
     response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
@@ -96,6 +103,7 @@ public:
     auto* fields = response.dynamic_metadata.mutable_fields();
     (*fields)["foo"] = ValueUtil::stringValue("ok");
     (*fields)["bar"] = ValueUtil::numberValue(1);
+    (*fields)["ext_authz_duration"] = ValueUtil::numberValue(duration);
 
     EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
         .WillOnce(Invoke([&response](const std::string& ns,
@@ -103,10 +111,10 @@ public:
           EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
           EXPECT_TRUE(
               returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
-          (*response.dynamic_metadata.mutable_fields())["ext_authz_duration"] =
-              returned_dynamic_metadata.fields().at("ext_authz_duration");
           EXPECT_TRUE(
               TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
+          EXPECT_EQ(response.dynamic_metadata.fields().at("ext_authz_duration").number_value(),
+                    returned_dynamic_metadata.fields().at("ext_authz_duration").number_value());
         }));
 
     EXPECT_CALL(filter_callbacks_, continueReading());
@@ -133,6 +141,7 @@ public:
   std::unique_ptr<Filter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
+  Event::SimulatedTimeSystem time_system_;
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
   const std::string default_yaml_string_ = R"EOF(
 transport_api_version: V3
@@ -380,26 +389,35 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
       addr_);
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       addr_);
+  double duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        time_system_.monotonicTime() - filter_->getStartTime().value())
+                        .count();
   ProtobufWkt::Struct dynamic_metadata;
   (*dynamic_metadata.mutable_fields())["baz"] = ValueUtil::stringValue("hello-ok");
   (*dynamic_metadata.mutable_fields())["x"] = ValueUtil::numberValue(12);
+  (*dynamic_metadata.mutable_fields())["ext_authz_duration"] = ValueUtil::numberValue(duration);
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.dynamic_metadata = dynamic_metadata;
+
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            Filters::Common::ExtAuthz::Response response{};
-            response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-            response.dynamic_metadata = dynamic_metadata;
+            request_callbacks_ = &callbacks;
             callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
           })));
+
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
                                            const ProtobufWkt::Struct& returned_dynamic_metadata) {
+        EXPECT_TRUE(returned_dynamic_metadata.fields().contains("ext_authz_duration"));
+        EXPECT_TRUE(dynamic_metadata.fields().contains("ext_authz_duration"));
         EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
-        EXPECT_TRUE(returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
-        (*dynamic_metadata.mutable_fields())["ext_authz_duration"] =
-            returned_dynamic_metadata.fields().at("ext_authz_duration");
+
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, dynamic_metadata));
+        EXPECT_EQ(dynamic_metadata.fields().at("ext_authz_duration").number_value(),
+                  returned_dynamic_metadata.fields().at("ext_authz_duration").number_value());
       }));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -444,9 +462,8 @@ TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
                                            const ProtobufWkt::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
-        EXPECT_TRUE(returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
-        (*dynamic_metadata.mutable_fields())["ext_authz_duration"] =
-            returned_dynamic_metadata.fields().at("ext_authz_duration");
+        EXPECT_FALSE(returned_dynamic_metadata.fields().contains("ext_authz_duration"));
+        EXPECT_FALSE(dynamic_metadata.fields().contains("ext_authz_duration"));
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, dynamic_metadata));
       }));
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_,

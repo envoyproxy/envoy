@@ -76,6 +76,16 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   switch (response->status) {
   case Filters::Common::ExtAuthz::CheckStatus::OK:
     config_->stats().ok_.inc();
+    // Add duration of call to dynamic metadata if applicable
+    if (getStartTime().has_value()) {
+      ProtobufWkt::Value ext_authz_duration_value;
+      auto duration = filter_callbacks_->connection().dispatcher().timeSource().monotonicTime() -
+                      getStartTime().value();
+      ext_authz_duration_value.set_number_value(
+          std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+      (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
+          ext_authz_duration_value;
+    }
     break;
   case Filters::Common::ExtAuthz::CheckStatus::Error:
     config_->stats().error_.inc();
@@ -86,16 +96,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   }
 
   if (!response->dynamic_metadata.fields().empty()) {
-    // Add duration of call to dynamic metadata if applicable
-    if (getStartTime().has_value()) {
-      ProtobufWkt::Value ext_authz_duration_value;
-      auto duration = filter_callbacks_->connection().dispatcher().timeSource().monotonicTime() -
-                      getStartTime();
-      ext_authz_duration_value.set_number_value(
-          std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
-      (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
-          ext_authz_duration_value;
-    }
+
     filter_callbacks_->connection().streamInfo().setDynamicMetadata(
         NetworkFilterNames::get().ExtAuthorization, response->dynamic_metadata);
   }

@@ -2243,26 +2243,16 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
         request_callbacks_ = &callbacks;
         callbacks.onComplete(std::move(response_ptr));
       }));
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-  double duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-                        time_system_.monotonicTime() - filter_->getStartTime().value())
-                        .count();
-  ProtobufWkt::Value ext_authz_duration_value;
-  ext_authz_duration_value.set_number_value(duration);
-  (*response.dynamic_metadata.mutable_fields())["ext_authz_duration"] = ext_authz_duration_value;
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&response](const std::string& ns,
                                    const ProtobufWkt::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
         // Check timing metadata correctness
-        EXPECT_TRUE(returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
-        (*response.dynamic_metadata.mutable_fields())["ext_authz_duration"] =
-            returned_dynamic_metadata.fields().at("ext_authz_duration");
+        EXPECT_FALSE(returned_dynamic_metadata.fields().contains("ext_authz_duration"));
+        EXPECT_FALSE(response.dynamic_metadata.fields().contains("ext_authz_duration"));
 
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
-        EXPECT_EQ(response.dynamic_metadata.fields().at("ext_authz_duration").number_value(),
-                  returned_dynamic_metadata.fields().at("ext_authz_duration").number_value());
       }));
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
