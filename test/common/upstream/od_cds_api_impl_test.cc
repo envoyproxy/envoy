@@ -176,6 +176,7 @@ TEST_F(OdCdsApiImplTest, NotifierNotUsed) {
   Protobuf::RepeatedPtrField<std::string> removed2(v2.begin(), v2.end());
 
   odcds_->updateOnDemand("cluster");
+  EXPECT_CALL(notifier_, notifyMissingCluster(_)).Times(2);
   EXPECT_CALL(notifier_, notifyMissingCluster("cluster")).Times(0);
   odcds_callbacks_->onConfigUpdate(some_cluster_resource.refvec_, {}, "");
   odcds_callbacks_->onConfigUpdate({}, removed, "");
