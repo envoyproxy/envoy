@@ -126,8 +126,8 @@ public final class CronetUrlRequestContext extends CronetEngineBase {
                 int trafficStatsUid, RequestFinishedInfo.Listener requestFinishedListener,
                 int idempotency) {
     return new CronetUrlRequest(this, callback, executor, url, mUserAgent, allowDirectExecutor,
-                                trafficStatsTagSet, trafficStatsTag, trafficStatsUidSet,
-                                trafficStatsUid);
+                                connectionAnnotations, trafficStatsTagSet, trafficStatsTag,
+                                trafficStatsUidSet, trafficStatsUid, requestFinishedListener);
   }
 
   @Override

@@ -220,7 +220,7 @@ public class CronetUrlRequestTest {
                             "header-value");
 
     UrlResponseInfo expected = createUrlResponseInfo(
-        new String[] {NativeTestServer.getRedirectURL()}, "Found", 302, 73, "Content-Length", "92",
+        new String[] {NativeTestServer.getRedirectURL()}, "Found", 302, 72, "Content-Length", "92",
         "Location", "/success.txt", "redirect-header", "header-value");
     mTestRule.assertResponseEquals(expected, callback.mRedirectResponseInfoList.get(0));
 
@@ -266,9 +266,10 @@ public class CronetUrlRequestTest {
     assertEquals(ResponseStep.ON_SUCCEEDED, callback.mResponseStep);
     assertEquals(NativeTestServer.SUCCESS_BODY, callback.mResponseAsString);
 
+    // Original bytesReceived: 258
     UrlResponseInfo urlResponseInfo = createUrlResponseInfo(
         new String[] {NativeTestServer.getRedirectURL(), NativeTestServer.getSuccessURL()}, "OK",
-        200, 258, "Content-Length", "20", "Content-Type", "text/plain",
+        200, 284, "Content-Length", "20", "Content-Type", "text/plain",
         "Access-Control-Allow-Origin", "*", "header-name", "header-value", "multi-header-name",
         "header-value1", "multi-header-name", "header-value2");
 
@@ -666,17 +667,19 @@ public class CronetUrlRequestTest {
     assertEquals(2, callback.mRedirectResponseInfoList.size());
 
     // Check first redirect (multiredirect.html -> redirect.html)
+    // Original receivedBytes: 76
     UrlResponseInfo firstExpectedResponseInfo = createUrlResponseInfo(
-        new String[] {NativeTestServer.getMultiRedirectURL()}, "Found", 302, 76, "Content-Length",
+        new String[] {NativeTestServer.getMultiRedirectURL()}, "Found", 302, 75, "Content-Length",
         "92", "Location", "/redirect.html", "redirect-header0", "header-value");
     UrlResponseInfo firstRedirectResponseInfo = callback.mRedirectResponseInfoList.get(0);
     mTestRule.assertResponseEquals(firstExpectedResponseInfo, firstRedirectResponseInfo);
 
     // Check second redirect (redirect.html -> success.txt)
+    // Original receivedBytes: 334
     UrlResponseInfo secondExpectedResponseInfo = createUrlResponseInfo(
         new String[] {NativeTestServer.getMultiRedirectURL(), NativeTestServer.getRedirectURL(),
                       NativeTestServer.getSuccessURL()},
-        "OK", 200, 334, "Content-Length", "20", "Content-Type", "text/plain",
+        "OK", 200, 359, "Content-Length", "20", "Content-Type", "text/plain",
         "Access-Control-Allow-Origin", "*", "header-name", "header-value", "multi-header-name",
         "header-value1", "multi-header-name", "header-value2");
 
@@ -693,7 +696,7 @@ public class CronetUrlRequestTest {
     TestUrlRequestCallback callback = startAndWaitForComplete(NativeTestServer.getNotFoundURL());
     UrlResponseInfo expected =
         createUrlResponseInfo(new String[] {NativeTestServer.getNotFoundURL()}, "Not Found", 404,
-                              140, "Content-Length", "96");
+                              142, "Content-Length", "96");
     mTestRule.assertResponseEquals(expected, callback.mResponseInfo);
     assertTrue(callback.mHttpResponseDataLength != 0);
     assertEquals(0, callback.mRedirectCount);
@@ -2137,6 +2140,12 @@ public class CronetUrlRequestTest {
     final ConditionVariable done = new ConditionVariable();
     UrlRequest.Callback callback = new UrlRequest.Callback() {
       @Override
+      public void onSucceeded(UrlRequest request, UrlResponseInfo info) {
+        failedExpectation.set(true);
+        fail();
+      }
+
+      @Override
       public void onRedirectReceived(UrlRequest request, UrlResponseInfo info,
                                      String newLocationUrl) {
         failedExpectation.set(true);
@@ -2151,12 +2160,6 @@ public class CronetUrlRequestTest {
 
       @Override
       public void onReadCompleted(UrlRequest request, UrlResponseInfo info, ByteBuffer byteBuffer) {
-        failedExpectation.set(true);
-        fail();
-      }
-
-      @Override
-      public void onSucceeded(UrlRequest request, UrlResponseInfo info) {
         failedExpectation.set(true);
         fail();
       }

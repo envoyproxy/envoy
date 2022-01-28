@@ -41,23 +41,27 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
 
   ASSERT(http_client_.getStream(direct_stream_.stream_handle_,
                                 GetStreamFilters::ALLOW_FOR_ALL_STREAMS));
-  direct_stream_.saveLatestStreamIntel();
+
+  // Capture some metadata before potentially closing the stream.
+  absl::string_view alpn = "";
+  if (direct_stream_.request_decoder_) {
+    direct_stream_.saveLatestStreamIntel();
+    const auto& info = direct_stream_.request_decoder_->streamInfo();
+    // Set the initial number of bytes consumed for the non terminal callbacks.
+    direct_stream_.stream_intel_.consumed_bytes_from_response =
+        info.getUpstreamBytesMeter() ? info.getUpstreamBytesMeter()->headerBytesReceived() : 0;
+    // Capture the alpn if available.
+    if (info.upstreamInfo() && info.upstreamInfo()->upstreamSslConnection()) {
+      alpn = info.upstreamInfo()->upstreamSslConnection()->alpn();
+    }
+  }
+
   if (end_stream) {
     closeStream();
   }
 
-  absl::string_view alpn = "";
-  uint64_t response_status = Utility::getResponseStatus(headers);
-  if (direct_stream_.request_decoder_ &&
-      direct_stream_.request_decoder_->streamInfo().upstreamInfo() &&
-      direct_stream_.request_decoder_->streamInfo().upstreamInfo()->upstreamSslConnection()) {
-    alpn = direct_stream_.request_decoder_->streamInfo()
-               .upstreamInfo()
-               ->upstreamSslConnection()
-               ->alpn();
-  }
-
   // Track success for later bookkeeping (stream could still be reset).
+  uint64_t response_status = Utility::getResponseStatus(headers);
   success_ = CodeUtility::is2xx(response_status);
 
   ENVOY_LOG(debug, "[S{}] dispatching to platform response headers for stream (end_stream={}):\n{}",
@@ -123,6 +127,8 @@ void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, boo
 
   // Cap by bytes_to_send_ if and only if applying explicit flow control.
   uint32_t bytes_to_send = calculateBytesToSend(data, bytes_to_send_);
+  // Update the number of bytes consumed by this non terminal callback.
+  direct_stream_.stream_intel_.consumed_bytes_from_response += bytes_to_send;
   // Only send end stream if all data is being sent.
   bool send_end_stream = end_stream && (bytes_to_send == data.length());
 

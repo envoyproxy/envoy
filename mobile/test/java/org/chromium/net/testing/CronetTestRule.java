@@ -68,7 +68,7 @@ public final class CronetTestRule implements TestRule {
 
     private static ExperimentalCronetEngine createEngine(Context context) {
       ExperimentalCronetEngine.Builder builder = new ExperimentalCronetEngine.Builder(context);
-      ((CronetEngineBuilderImpl)builder.getBuilderDelegate()).setLogLevel("info");
+      ((CronetEngineBuilderImpl)builder.getBuilderDelegate()).setLogLevel("warning");
       return builder.enableQuic(true).build();
     }
 
@@ -253,8 +253,7 @@ public final class CronetTestRule implements TestRule {
     assertEquals(expected.getUrl(), actual.getUrl());
     // Transferred bytes and proxy server are not supported in pure java
     if (!testingJavaImpl()) {
-      // TODO("https://github.com/envoyproxy/envoy-mobile/issues/1426"): uncomment the assert
-      // assertEquals(expected.getReceivedByteCount(), actual.getReceivedByteCount());
+      assertEquals(expected.getReceivedByteCount(), actual.getReceivedByteCount());
       assertEquals(expected.getProxyServer(), actual.getProxyServer());
       // This is a place where behavior intentionally differs between native and java
       assertEquals(expected.getNegotiatedProtocol(), actual.getNegotiatedProtocol());

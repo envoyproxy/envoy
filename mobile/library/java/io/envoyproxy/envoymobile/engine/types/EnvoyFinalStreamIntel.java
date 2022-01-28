@@ -2,6 +2,8 @@ package io.envoyproxy.envoymobile.engine.types;
 
 /**
  * Exposes internal HTTP stream metrics, context, and other details sent once on stream end.
+ *
+ * Note: a value of -1 means "not present" for any field where the name is suffixed with "Ms".
  */
 public interface EnvoyFinalStreamIntel {
   /*
