@@ -132,11 +132,10 @@ TEST_F(HttpTracerManagerImplTest, ShouldFailIfProviderSpecificConfigIsNotValid) 
 
   ProtobufWkt::Any expected_any_proto;
   expected_any_proto.PackFrom(ValueUtil::stringValue("value"));
-  EXPECT_THROW_WITH_MESSAGE(
-      http_tracer_manager_.getOrCreateHttpTracer(&tracing_config),
-      EnvoyException,
-      fmt::format("Unable to unpack as google.protobuf.Struct: {}",
-                  expected_any_proto.DebugString()));
+  EXPECT_THROW_WITH_MESSAGE(http_tracer_manager_.getOrCreateHttpTracer(&tracing_config),
+                            EnvoyException,
+                            fmt::format("Unable to unpack as google.protobuf.Struct: {}",
+                                        expected_any_proto.DebugString()));
 }
 
 class HttpTracerManagerImplCacheTest : public testing::Test {

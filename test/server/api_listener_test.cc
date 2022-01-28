@@ -123,13 +123,10 @@ api_listener:
   envoy::config::cluster::v3::Cluster expected_cluster_proto;
   expected_cluster_proto.set_name("cluster1");
   expected_cluster_proto.set_type(envoy::config::cluster::v3::Cluster::EDS);
-  expected_cluster_proto.mutable_eds_cluster_config()
-      ->mutable_eds_config()
-      ->set_path("eds path");
+  expected_cluster_proto.mutable_eds_cluster_config()->mutable_eds_config()->set_path("eds path");
   expected_any_proto.PackFrom(expected_cluster_proto);
   EXPECT_THROW_WITH_MESSAGE(
-      HttpApiListener(config, *listener_manager_, config.name()),
-      EnvoyException,
+      HttpApiListener(config, *listener_manager_, config.name()), EnvoyException,
       fmt::format("Unable to unpack as "
                   "envoy.extensions.filters.network.http_connection_manager.v3."
                   "HttpConnectionManager: {}",
