@@ -546,13 +546,13 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     // This could happen, for example, after a header mutation is rejected.
     ENVOY_LOG(debug, "Sending immediate response: {}", processing_status.message());
     stats_.stream_msgs_received_.inc();
+    processing_complete_ = true;
     closeStream();
     cleanUpTimers();
     ImmediateResponse invalid_mutation_response;
     invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
     invalid_mutation_response.set_details(std::string(processing_status.message()));
     sendImmediateResponse(invalid_mutation_response);
-    processing_complete_ = true;
   }
 }
 
