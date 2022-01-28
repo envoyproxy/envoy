@@ -279,6 +279,12 @@ bool ActiveStreamDecoderFilter::canContinue() {
   return !parent_.state_.local_complete_;
 }
 
+bool ActiveStreamEncoderFilter::canContinue() {
+  // As with ActiveStreamDecoderFilter::canContinue() make sure we do not
+  // continue if a local reply has been sent.
+  return !parent_.state_.remote_encode_complete_;
+}
+
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
   auto buffer = dispatcher().getWatermarkFactory().create(
       [this]() -> void { this->requestDataDrained(); },
@@ -292,7 +298,7 @@ Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
   return parent_.buffered_request_data_;
 }
 
-bool ActiveStreamDecoderFilter::complete() { return parent_.state_.remote_complete_; }
+bool ActiveStreamDecoderFilter::complete() { return parent_.state_.remote_decode_complete_; }
 
 void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
   parent_.decodeHeaders(this, *parent_.filter_manager_callbacks_.requestHeaders(), end_stream);
@@ -789,8 +795,8 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
 }
 
 void FilterManager::maybeEndDecode(bool end_stream) {
-  ASSERT(!state_.remote_complete_);
-  state_.remote_complete_ = end_stream;
+  ASSERT(!state_.remote_decode_complete_);
+  state_.remote_decode_complete_ = end_stream;
   if (end_stream) {
     stream_info_.onLastDownstreamRxByteReceived();
     ENVOY_STREAM_LOG(debug, "request end stream", *this);
@@ -1291,6 +1297,8 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
 
 void FilterManager::maybeEndEncode(bool end_stream) {
   if (end_stream) {
+    ASSERT(!state_.remote_encode_complete_);
+    state_.remote_encode_complete_ = true;
     filter_manager_callbacks_.endStream();
   }
 }
@@ -1576,6 +1584,7 @@ Http1StreamEncoderOptionsOptRef ActiveStreamEncoderFilter::http1StreamEncoderOpt
 }
 
 void ActiveStreamEncoderFilter::responseDataTooLarge() {
+  ENVOY_STREAM_LOG(debug, "response data too large watermark exceeded", parent_);
   if (parent_.state_.encoder_filters_streaming_) {
     onEncoderFilterAboveWriteBufferHighWatermark();
   } else {
