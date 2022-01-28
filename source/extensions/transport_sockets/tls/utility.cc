@@ -3,7 +3,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/safe_memcpy.h"
-#include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
 
