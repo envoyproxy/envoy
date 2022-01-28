@@ -36,6 +36,8 @@ typedef struct {
   uint32_t on_complete_calls;
   uint32_t on_error_calls;
   uint32_t on_cancel_calls;
+  uint64_t on_header_consumed_bytes_from_response;
+  uint64_t on_complete_received_byte_count;
   std::string status;
   ConditionalInitializer* terminal_callback;
 } callbacks_called;
@@ -62,12 +64,13 @@ public:
     });
 
     bridge_callbacks_.context = &cc_;
-    bridge_callbacks_.on_headers = [](envoy_headers c_headers, bool, envoy_stream_intel,
+    bridge_callbacks_.on_headers = [](envoy_headers c_headers, bool, envoy_stream_intel intel,
                                       void* context) -> void* {
       Http::ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
       callbacks_called* cc_ = static_cast<callbacks_called*>(context);
       cc_->on_headers_calls++;
       cc_->status = response_headers->Status()->value().getStringView();
+      cc_->on_header_consumed_bytes_from_response = intel.consumed_bytes_from_response;
       return nullptr;
     };
     bridge_callbacks_.on_data = [](envoy_data c_data, bool, envoy_stream_intel,
@@ -77,9 +80,10 @@ public:
       release_envoy_data(c_data);
       return nullptr;
     };
-    bridge_callbacks_.on_complete = [](envoy_stream_intel, envoy_final_stream_intel,
+    bridge_callbacks_.on_complete = [](envoy_stream_intel, envoy_final_stream_intel final_intel,
                                        void* context) -> void* {
       callbacks_called* cc_ = static_cast<callbacks_called*>(context);
+      cc_->on_complete_received_byte_count = final_intel.received_byte_count;
       cc_->on_complete_calls++;
       cc_->terminal_callback->setReady();
       return nullptr;
@@ -143,7 +147,7 @@ api_listener:
   Http::ClientPtr http_client_{};
   envoy_http_callbacks bridge_callbacks_;
   ConditionalInitializer terminal_callback_;
-  callbacks_called cc_ = {0, 0, 0, 0, 0, "", &terminal_callback_};
+  callbacks_called cc_ = {0, 0, 0, 0, 0, 0, 0, "", &terminal_callback_};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
@@ -206,6 +210,8 @@ TEST_P(ClientIntegrationTest, Basic) {
   ASSERT_EQ(cc_.status, "200");
   ASSERT_EQ(cc_.on_data_calls, 2);
   ASSERT_EQ(cc_.on_complete_calls, 1);
+  ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
+  ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
 
   // stream_success gets charged for 2xx status codes.
   test_server_->waitForCounterEq("http.client.stream_success", 1);

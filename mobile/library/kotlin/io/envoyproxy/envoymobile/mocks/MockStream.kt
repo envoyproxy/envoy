@@ -15,6 +15,7 @@ class MockStream internal constructor(underlyingStream: MockEnvoyHTTPStream) : S
     override fun getStreamId(): Long { return 0 }
     override fun getConnectionId(): Long { return 0 }
     override fun getAttemptCount(): Long { return 0 }
+    override fun getConsumedBytesFromResponse(): Long { return 0 }
   }
 
   private val mockFinalStreamIntel = object : EnvoyFinalStreamIntel {
