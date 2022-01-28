@@ -787,12 +787,12 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
   min_weight_percent_ = 0.1;
   if (slow_start_config.has_value()) {
     if (slow_start_config.value().min_weight_percent() > 0.0 &&
-        slow_start_config.value().min_weight_percent() < 100.0) {
+        slow_start_config.value().min_weight_percent() < 1.0) {
       min_weight_percent_ = slow_start_config.value().min_weight_percent();
     } else {
       ENVOY_LOG(warn,
                 "Invalid value {} provided for min_weight_percent parameter, must be in range "
-                "[0.0, 100.0], so use default value 0.1",
+                "(0.0, 1.0), so use default value 0.1",
                 slow_start_config.value().min_weight_percent());
     }
   }

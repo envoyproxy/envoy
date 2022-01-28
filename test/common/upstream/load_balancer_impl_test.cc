@@ -1998,16 +1998,16 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitMinWeightPercent35) {
   // 0.5 factor.
   EXPECT_EQ(hostSet().healthy_hosts_[0],
             lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[1,2]
-  EXPECT_EQ(hostSet().healthy_hosts_[0],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[2,2]
   EXPECT_EQ(hostSet().healthy_hosts_[1],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[3,2]
+            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[2,2]
+  EXPECT_EQ(hostSet().healthy_hosts_[0],
+            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[2,4]
   EXPECT_EQ(hostSet().healthy_hosts_[0],
             lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[3,4]
-  EXPECT_EQ(hostSet().healthy_hosts_[0],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[4,4]
   EXPECT_EQ(hostSet().healthy_hosts_[1],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[5,4]
+            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[4,4]
+  EXPECT_EQ(hostSet().healthy_hosts_[0],
+            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[4,6]
   EXPECT_EQ(hostSet().healthy_hosts_[0],
             lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[5,6]
 
@@ -2445,15 +2445,15 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWaitForPassingHC) {
   EXPECT_EQ(hostSet().healthy_hosts_[0],
             lb_2.chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[175/9, 20]
   EXPECT_EQ(hostSet().healthy_hosts_[1],
-            lb_2.chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[190/9, 20]
+            lb_2.chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[200/9, 20]
   EXPECT_EQ(hostSet().healthy_hosts_[0],
-            lb_2.chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[190/9, 30]
+            lb_2.chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[200/9, 30]
   EXPECT_EQ(hostSet().healthy_hosts_[0],
-            lb_2.chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[215/9, 30]
+            lb_2.chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[225/9, 30]
   EXPECT_EQ(hostSet().healthy_hosts_[0],
-            lb_2.chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[240/9, 30]
-  EXPECT_EQ(hostSet().healthy_hosts_[0],
-            lb_2.chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[265/9, 30]
+            lb_2.chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[250/9, 30]
+  EXPECT_EQ(hostSet().healthy_hosts_[1],
+            lb_2.chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[275/9, 30]
 
   simTime().advanceTimeWait(std::chrono::seconds(3));
   host1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
