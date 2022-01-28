@@ -344,7 +344,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRando
   }
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.defer_processing_backedup_streams")) {
-    // We end up in a state where the filter pauses the stream, but nevers
+    // We end up in a state where the filter pauses the stream, but never
     // unpauses it as we buffer data at the receiving codec.
     return;
   }
