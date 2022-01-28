@@ -88,6 +88,8 @@ public:
 
   ConnectionPool::Callbacks* callbacks(int index = 0) { return callbacks_[index]; }
 
+  bool isHttp3Confirmed() const { return http3_status_tracker_.isHttp3Confirmed(); }
+
   StreamInfo::MockStreamInfo* info_;
   NiceMock<MockRequestEncoder>* encoder_;
   void setDestroying() { destroying_ = true; }
@@ -161,9 +163,10 @@ TEST_F(ConnectivityGridTest, Success) {
 
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_.callbacks(), nullptr);
+  grid_.onHandshakeComplete();
+  EXPECT_TRUE(grid_.isHttp3Confirmed());
   EXPECT_CALL(callbacks_.pool_ready_, ready());
   grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
-  EXPECT_FALSE(grid_.isHttp3Broken());
 }
 
 // Test the first pool successfully connecting under the stack of newStream.
@@ -175,6 +178,7 @@ TEST_F(ConnectivityGridTest, ImmediateSuccess) {
   EXPECT_EQ(grid_.newStream(decoder_, callbacks_), nullptr);
   EXPECT_NE(grid_.first(), nullptr);
   EXPECT_FALSE(grid_.isHttp3Broken());
+  EXPECT_FALSE(grid_.isHttp3Confirmed());
 }
 
 // Test the first pool failing and the second connecting.

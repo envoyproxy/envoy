@@ -157,7 +157,8 @@ def envoy_cc_test(
         local = False,
         size = "medium",
         flaky = False,
-        env = {}):
+        env = {},
+        exec_properties = {}):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
 
     cc_test(
@@ -184,6 +185,7 @@ def envoy_cc_test(
         size = size,
         flaky = flaky,
         env = env,
+        exec_properties = exec_properties,
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified

@@ -21,10 +21,22 @@ MockStreamInfo::MockStreamInfo()
       downstream_connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
           std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2"),
           std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"))) {
+  // downstream:direct_remote
+  auto downstream_direct_remote_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("127.0.0.3", 63443)};
+  downstream_connection_info_provider_->setDirectRemoteAddressForTest(
+      downstream_direct_remote_address);
+  // upstream
   upstream_info_ = std::make_unique<UpstreamInfoImpl>();
+  // upstream:host
   Upstream::HostDescriptionConstSharedPtr host{
       new testing::NiceMock<Upstream::MockHostDescription>()};
   upstream_info_->setUpstreamHost(host);
+  // upstream:local
+  auto upstream_local_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("127.1.2.3", 58443)};
+  upstream_info_->setUpstreamLocalAddress(upstream_local_address);
+
   ON_CALL(*this, setResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag response_flag) {
     response_flags_ |= response_flag;
   }));

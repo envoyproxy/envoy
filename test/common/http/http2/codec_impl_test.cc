@@ -2059,8 +2059,6 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
 
 TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsConsumeError) {
   initialize();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_consume_stream_refused_errors", "true"}});
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
@@ -2081,38 +2079,6 @@ TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsConsumeErr
   EXPECT_EQ(1, TestUtility::findGauge(server_stats_store_, "http2.streams_active")->value());
   // The server codec should not fail since the error is "consumed".
   EXPECT_TRUE(server_wrapper_->status_.ok());
-}
-
-TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsIgnoreError) {
-  expect_buffered_data_on_teardown_ = true;
-  initialize();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_consume_stream_refused_errors", "false"}});
-
-  TestRequestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
-  driveToCompletion();
-
-  // This causes the next stream creation to fail with a "invalid frame: Stream was refused" error.
-  submitSettings(server_, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 1}});
-
-  request_encoder_ = &client_->newStream(response_decoder_);
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
-  driveToCompletion();
-  // The server codec should fail since there are no available streams.
-  EXPECT_FALSE(server_wrapper_->status_.ok());
-  EXPECT_TRUE(isCodecProtocolError(server_wrapper_->status_));
-  EXPECT_EQ(server_wrapper_->status_.message(), "The user callback function failed");
-
-  EXPECT_EQ(0, server_stats_store_.counter("http2.stream_refused_errors").value());
-  EXPECT_EQ(0, server_stats_store_.counter("http2.tx_reset").value());
-
-  // Not verifying the http2.streams_active server/client gauges here as the
-  // test dispatch function doesn't let us fully capture the behavior of the real system.
-  // In the real world, the status returned from dispatch would trigger a connection close which
-  // would result in the active stream gauges to go down to 0.
 }
 
 #define HTTP2SETTINGS_SMALL_WINDOW_COMBINE                                                         \

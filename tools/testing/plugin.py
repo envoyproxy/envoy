@@ -7,35 +7,19 @@ from typing import Callable
 
 import pytest
 
+import nest_asyncio
 
-def _async_command_main(patches, main: Callable, handler: str, args: tuple) -> None:
+nest_asyncio.apply()
+
+
+def _command_main(patches, main: Callable, handler: str, args=("arg0", "arg1", "arg2")) -> None:
     parts = handler.split(".")
-    patched = patches("asyncio.run", parts.pop(), prefix=".".join(parts))
-
-    with patched as (m_run, m_handler):
-        assert main(*args) == m_run.return_value
-
-    assert list(m_run.call_args) == [(m_handler.return_value.run.return_value,), {}]
-    assert list(m_handler.call_args) == [args, {}]
-    assert list(m_handler.return_value.run.call_args) == [(), {}]
-
-
-def _command_main(
-        patches,
-        main: Callable,
-        handler: str,
-        args=("arg0", "arg1", "arg2"),
-        async_run: bool = False) -> None:
-    if async_run:
-        return _async_command_main(patches, main, handler, args=args)
-
-    patched = patches(handler)
+    patched = patches(parts.pop(), prefix=".".join(parts))
 
     with patched as (m_handler,):
-        assert main(*args) == m_handler.return_value.run.return_value
-
-    assert list(m_handler.call_args) == [args, {}]
-    assert list(m_handler.return_value.run.call_args) == [(), {}]
+        assert main(*args) == m_handler.return_value.return_value
+    assert m_handler.call_args == [args, {}]
+    assert m_handler.return_value.call_args == [(), {}]
 
 
 @pytest.fixture
