@@ -1,3 +1,4 @@
+#include <chrono>
 #include <memory>
 #include <string>
 #include <vector>
@@ -60,6 +61,8 @@ public:
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+    time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+    filter_->setStartTime(time_system_.monotonicTime());
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
   }
@@ -128,6 +131,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
+  Event::SimulatedTimeSystem time_system_;
   Http::ContextImpl http_context_;
 };
 
@@ -2165,14 +2169,23 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  double duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        time_system_.monotonicTime() - filter_->getStartTime().value())
+                        .count();
+  ProtobufWkt::Value ext_authz_duration_value;
+  ext_authz_duration_value.set_number_value(duration);
+
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+  (*response.dynamic_metadata.mutable_fields())["ext_authz_duration"] = ext_authz_duration_value;
 
   initializeMetadata(response);
 
@@ -2182,10 +2195,10 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
         EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
         // Check timing metadata correctness
         EXPECT_TRUE(returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
-        (*response.dynamic_metadata.mutable_fields())["ext_authz_duration"] =
-            returned_dynamic_metadata.fields().at("ext_authz_duration");
 
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
+        EXPECT_EQ(response.dynamic_metadata.fields().at("ext_authz_duration").number_value(),
+                  returned_dynamic_metadata.fields().at("ext_authz_duration").number_value());
       }));
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
@@ -2214,7 +2227,6 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
   )EOF");
 
   prepareCheck();
-
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
@@ -2228,8 +2240,16 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                            const StreamInfo::StreamInfo&) -> void {
+        request_callbacks_ = &callbacks;
         callbacks.onComplete(std::move(response_ptr));
       }));
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  double duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        time_system_.monotonicTime() - filter_->getStartTime().value())
+                        .count();
+  ProtobufWkt::Value ext_authz_duration_value;
+  ext_authz_duration_value.set_number_value(duration);
+  (*response.dynamic_metadata.mutable_fields())["ext_authz_duration"] = ext_authz_duration_value;
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&response](const std::string& ns,
@@ -2241,6 +2261,8 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
             returned_dynamic_metadata.fields().at("ext_authz_duration");
 
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
+        EXPECT_EQ(response.dynamic_metadata.fields().at("ext_authz_duration").number_value(),
+                  returned_dynamic_metadata.fields().at("ext_authz_duration").number_value());
       }));
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
