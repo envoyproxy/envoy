@@ -543,14 +543,16 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     processing_complete_ = true;
   } else {
     // Any other error results in an immediate response with an error message.
+    // This could happen, for example, after a header mutation is rejected.
     ENVOY_LOG(debug, "Sending immediate response: {}", processing_status.message());
-    processing_complete_ = true;
+    stats_.stream_msgs_received_.inc();
     closeStream();
     cleanUpTimers();
     ImmediateResponse invalid_mutation_response;
     invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
     invalid_mutation_response.set_details(std::string(processing_status.message()));
     sendImmediateResponse(invalid_mutation_response);
+    processing_complete_ = true;
   }
 }
 
