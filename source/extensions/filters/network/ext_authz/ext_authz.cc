@@ -26,7 +26,7 @@ void Filter::callCheck() {
                                                                config_->includePeerCertificate(),
                                                                config_->destinationLabels());
   // Store start time of ext_authz filter call
-  start_time_ = filter_callbacks_->connection().dispatcher().timeSource().monotonicTime();
+  setStartTime(filter_callbacks_->connection().dispatcher().timeSource().monotonicTime());
   status_ = Status::Calling;
   config_->stats().active_.inc();
   config_->stats().total_.inc();
@@ -87,10 +87,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
   if (!response->dynamic_metadata.fields().empty()) {
     // Add duration of call to dynamic metadata if applicable
-    if (start_time_.has_value()) {
+    if (getStartTime().has_value()) {
       ProtobufWkt::Value ext_authz_duration_value;
       auto duration = filter_callbacks_->connection().dispatcher().timeSource().monotonicTime() -
-                      start_time_.value();
+                      getStartTime();
       ext_authz_duration_value.set_number_value(
           std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
       (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
