@@ -1339,8 +1339,12 @@ ssize_t ConnectionImpl::onSend(const uint8_t* data, size_t length) {
 int ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
   if (stream) {
     const int32_t stream_id = stream->stream_id_;
+
     // Consume buffered on stream_close.
-    stream->stream_manager_.buffered_on_stream_close_ = false;
+    if (stream->stream_manager_.buffered_on_stream_close_) {
+      stream->stream_manager_.buffered_on_stream_close_ = false;
+      stats_.deferred_stream_close_.dec();
+    }
 
     ENVOY_CONN_LOG(debug, "stream {} closed: {}", connection_, stream_id, error_code);
 
@@ -1379,6 +1383,7 @@ int ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
       // Buffer the call, rely on the stream->process_buffered_data_callback_
       // to end up invoking.
       stream->stream_manager_.buffered_on_stream_close_ = true;
+      stats_.deferred_stream_close_.inc();
       return 0;
     }
 
