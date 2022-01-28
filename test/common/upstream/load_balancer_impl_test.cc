@@ -1599,9 +1599,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithDefaultParams) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithMinWeightPercent) {
-  round_robin_lb_config_.mutable_slow_start_config()
-      ->mutable_slow_start_window()
-      ->set_min_weight_percent(0.3);
+  round_robin_lb_config_.mutable_slow_start_config()->set_min_weight_percent(0.3);
   init(false);
   const auto slow_start_window =
       EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(*lb_));
@@ -1618,9 +1616,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithMinWeightPercent) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithMinWeightPercentBeyond1) {
-  round_robin_lb_config_.mutable_slow_start_config()
-      ->mutable_slow_start_window()
-      ->set_min_weight_percent(1.1);
+  round_robin_lb_config_.mutable_slow_start_config()->set_min_weight_percent(1.1);
   init(false);
   const auto slow_start_window =
       EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(*lb_));
@@ -1637,9 +1633,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithMinWeightPercentBeyond1) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithMinWeightPercentBelow0) {
-  round_robin_lb_config_.mutable_slow_start_config()
-      ->mutable_slow_start_window()
-      ->set_min_weight_percent(-1.1);
+  round_robin_lb_config_.mutable_slow_start_config()->set_min_weight_percent(-1.1);
   init(false);
   const auto slow_start_window =
       EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(*lb_));
