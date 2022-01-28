@@ -132,7 +132,7 @@ class IsolatedStoreImpl : public StoreImpl {
 public:
   IsolatedStoreImpl();
   explicit IsolatedStoreImpl(SymbolTable& symbol_table);
-  ~IsolatedStoreImpl();
+  ~IsolatedStoreImpl() override;
 
   // Stats::Scope
   Counter& counterFromStatNameWithTags(const StatName& name,

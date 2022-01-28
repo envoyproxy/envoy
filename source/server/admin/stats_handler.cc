@@ -441,7 +441,7 @@ struct CompareStatsAndScopes {
 };
 #endif
 
-StatsHandler::Context::~Context() {}
+StatsHandler::Context::~Context() = default;
 
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
                                                 Http::ResponseHeaderMap&,

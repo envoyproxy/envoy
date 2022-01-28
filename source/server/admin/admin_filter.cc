@@ -76,6 +76,7 @@ void AdminFilter::onComplete() {
       Utility::populateFallbackResponseHeaders(cont ? Http::Code::OK : code, *header_map);
       decoder_callbacks_->encodeHeaders(std::move(header_map), end_stream && response.length() == 0,
                                         StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
+      first = false;
     }
     if (response.length() > 0) {
       // ENVOY_LOG_MISC(error, "Chunking out {} bytes cont={}", response.length(), cont);

@@ -39,12 +39,14 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
       null_gauge_(new NullGaugeImpl(symbol_table)),
       default_scope_(std::make_shared<ScopePrefixer>("", *this)) {}
 
-IsolatedStoreImpl::~IsolatedStoreImpl() {
 #if SCOPE_REFCOUNT
+IsolatedStoreImpl::~IsolatedStoreImpl() {
   ENVOY_LOG_MISC(error, "ref_count={}", ref_count_);
   ASSERT(ref_count_ == 0);
-#endif
 }
+#else
+IsolatedStoreImpl::~IsolatedStoreImpl() = default;
+#endif
 
 #if SCOPE_REFCOUNT
 ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
