@@ -13,6 +13,8 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 
+#include "absl/status/status.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -113,9 +115,10 @@ public:
   virtual void requestWatermark() PURE;
   virtual void clearWatermark() PURE;
 
-  bool handleHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response);
-  bool handleBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response);
-  bool handleTrailersResponse(const envoy::service::ext_proc::v3::TrailersResponse& response);
+  absl::Status handleHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response);
+  absl::Status handleBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response);
+  absl::Status
+  handleTrailersResponse(const envoy::service::ext_proc::v3::TrailersResponse& response);
 
   virtual const Buffer::Instance* bufferedData() const PURE;
   bool hasBufferedData() const { return bufferedData() != nullptr && bufferedData()->length() > 0; }

@@ -21,6 +21,7 @@ Common messages
   ../config/core/v3/udp_socket_config.proto
   ../config/core/v3/substitution_format_string.proto
   ../config/common/key_value/v3/config.proto
+  ../config/common/mutation_rules/v3/mutation_rules.proto
   ../extensions/common/ratelimit/v3/ratelimit.proto
   ../extensions/filters/common/fault/v3/fault.proto
   ../extensions/network/socket_interface/v3/default_socket_interface.proto
