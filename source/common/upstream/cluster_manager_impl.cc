@@ -1359,7 +1359,14 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
                          parent.parent_.local_info_, parent.parent_, parent.parent_.runtime_,
                          parent.parent_.random_,
                          Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)},
-                         parent_.parent_.http_context_, parent_.parent_.router_context_) {
+                         parent_.parent_.http_context_, parent_.parent_.router_context_),
+      tls_session_cache_(
+#ifdef ENVOY_ENABLE_QUIC
+          std::make_unique<Http::Http3::EnvoyQuicSessionCacheImpl>()
+#else
+          std::make_unique<EnvoyTlsSessionCache>()
+#endif
+      ) {
   priority_set_.getOrCreateHostSet(0);
 
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
@@ -1542,7 +1549,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
             parent_.thread_local_dispatcher_, host, priority, upstream_protocols,
             alternate_protocol_options, !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
-            parent_.parent_.time_source_, parent_.cluster_manager_state_);
+            parent_.parent_.time_source_, parent_.cluster_manager_state_, *tls_session_cache_);
 
         pool->addIdleCallback([&parent = parent_, host, priority, hash_key]() {
           parent.httpConnPoolIsIdle(host, priority, hash_key);
@@ -1688,7 +1695,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
         alternate_protocol_options,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-    TimeSource& source, ClusterConnectivityState& state) {
+    TimeSource& source, ClusterConnectivityState& state, EnvoyTlsSessionCache& session_cache) {
   if (protocols.size() == 3 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
     ASSERT(contains(protocols,
@@ -1702,7 +1709,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
         transport_socket_options, state, source, alternate_protocols_cache,
-        std::chrono::milliseconds(300), coptions, quic_stat_names_, stats_);
+        std::chrono::milliseconds(300), coptions, quic_stat_names_, stats_, session_cache);
 #else
     // Should be blocked by configuration checking at an earlier point.
     PANIC("unexpected");
@@ -1724,7 +1731,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #ifdef ENVOY_ENABLE_QUIC
     return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
                                          priority, options, transport_socket_options, state, source,
-                                         quic_stat_names_, stats_, {});
+                                         quic_stat_names_, stats_, {}, session_cache);
 #else
     UNREFERENCED_PARAMETER(source);
     // Should be blocked by configuration checking at an earlier point.

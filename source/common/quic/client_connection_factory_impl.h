@@ -21,7 +21,8 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
                          Network::TransportSocketFactory& transport_socket_factory,
                          TimeSource& time_source,
                          Network::Address::InstanceConstSharedPtr server_addr,
-                         const quic::QuicConfig& quic_config, uint32_t buffer_limit);
+                         const quic::QuicConfig& quic_config, uint32_t buffer_limit,
+                         quic::SessionCache& session_cache);
 
   // Returns the most recent crypto config from transport_socket_factory_;
   std::shared_ptr<quic::QuicCryptoClientConfig> cryptoConfig();
@@ -48,6 +49,7 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   quic::QuicClientPushPromiseIndex push_promise_index_;
   // Hard code with the default crypto stream as there's no pluggable crypto for upstream Envoy.
   EnvoyQuicCryptoClientStreamFactoryImpl crypto_stream_factory_;
+  quic::SessionCache& session_cache_;
 };
 
 std::unique_ptr<Network::ClientConnection>

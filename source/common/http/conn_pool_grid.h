@@ -138,7 +138,7 @@ public:
                    AlternateProtocolsCacheSharedPtr alternate_protocols,
                    std::chrono::milliseconds next_attempt_duration,
                    ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
-                   Stats::Scope& scope);
+                   Stats::Scope& scope, Upstream::EnvoyTlsSessionCache& quic_session_cache);
   ~ConnectivityGrid() override;
 
   // Event::DeferredDeletable
@@ -232,6 +232,7 @@ private:
 
   Quic::QuicStatNames& quic_stat_names_;
   Stats::Scope& scope_;
+  Upstream::EnvoyTlsSessionCache& quic_session_cache_;
 };
 
 } // namespace Http

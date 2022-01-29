@@ -653,17 +653,15 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ZeroRtt) {
   upstream_request_.reset();
 
   ASSERT_TRUE(fake_upstream_connection_->close());
-   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
 
   default_request_headers_.addCopy("second_request", "1");
- auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response2->waitForEndStream());
-
-
 }
 
 } // namespace Envoy

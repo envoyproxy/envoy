@@ -357,6 +357,12 @@ public:
 
 using CdsApiPtr = std::unique_ptr<CdsApi>;
 
+// A place holder to store the shared TLS session tickets.
+class EnvoyTlsSessionCache {
+public:
+  virtual ~EnvoyTlsSessionCache() = default;
+};
+
 /**
  * Factory for objects needed during cluster manager operation.
  */
@@ -381,7 +387,8 @@ public:
                        alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                   TimeSource& time_source, ClusterConnectivityState& state) PURE;
+                   TimeSource& time_source, ClusterConnectivityState& state,
+                   EnvoyTlsSessionCache& quic_session_cache) PURE;
 
   /**
    * Allocate a TCP connection pool for the host. Pools are separated by 'priority' and

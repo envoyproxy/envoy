@@ -819,8 +819,8 @@ void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::millise
 
 void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
   switch (event) {
-    case ConnectionEvent::ConnectedZeroRtt:
-      break;
+  case ConnectionEvent::ConnectedZeroRtt:
+    break;
   case ConnectionEvent::Connected:
   case ConnectionEvent::RemoteClose:
   case ConnectionEvent::LocalClose:

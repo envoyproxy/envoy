@@ -13,6 +13,8 @@
 #include "test/integration/utility.h"
 #include "test/test_common/printers.h"
 
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
+
 namespace Envoy {
 
 using ::Envoy::Http::Http2::Http2Frame;
@@ -295,6 +297,7 @@ protected:
   testing::NiceMock<Random::MockRandomGenerator> random_;
   Quic::QuicStatNames quic_stat_names_;
   std::string san_to_match_{"spiffe://lyft.com/backend-team"};
+  quic::QuicClientSessionCache quic_session_cache_;
 };
 
 // Helper class for integration tests using raw HTTP/2 frames

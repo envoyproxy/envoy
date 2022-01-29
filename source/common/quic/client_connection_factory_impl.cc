@@ -7,6 +7,43 @@
 namespace Envoy {
 namespace Quic {
 
+class QuicSessionCacheDelegate : public quic::SessionCache {
+public:
+  QuicSessionCacheDelegate(quic::SessionCache& cache) : cache_(cache) {}
+
+  void Insert(const quic::QuicServerId& server_id, bssl::UniquePtr<SSL_SESSION> session,
+              const quic::TransportParameters& params,
+              const quic::ApplicationState* application_state) override {
+    std::cerr << "======== Insert on cache " << &cache_ << "server_id " << server_id.host() << ":"
+              << server_id.port() << "\n";
+    cache_.Insert(server_id, std::move(session), params, application_state);
+  }
+
+  std::unique_ptr<quic::QuicResumptionState>
+  Lookup(const quic::QuicServerId& server_id, quic::QuicWallTime now, const SSL_CTX* ctx) override {
+    auto state = cache_.Lookup(server_id, now, ctx);
+    std::cerr << "======== Lookup on cache " << &cache_ << (state == nullptr ? " not " : "")
+              << "found\n";
+    return state;
+  }
+
+  void ClearEarlyData(const quic::QuicServerId& server_id) override {
+    std::cerr << "======== ClearEarlyData on cache " << &cache_ << "\n";
+    cache_.ClearEarlyData(server_id);
+  }
+
+  void OnNewTokenReceived(const quic::QuicServerId& server_id, absl::string_view token) override {
+    cache_.OnNewTokenReceived(server_id, token);
+  }
+
+  void RemoveExpiredEntries(quic::QuicWallTime now) override { cache_.RemoveExpiredEntries(now); }
+
+  void Clear() override { cache_.Clear(); }
+
+private:
+  quic::SessionCache& cache_;
+};
+
 const Envoy::Ssl::ClientContextConfig&
 getConfig(Network::TransportSocketFactory& transport_socket_factory) {
   auto* quic_socket_factory =
@@ -35,7 +72,7 @@ std::shared_ptr<quic::QuicCryptoClientConfig> PersistentQuicInfoImpl::cryptoConf
     client_context_ = context;
     client_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
         std::make_unique<EnvoyQuicProofVerifier>(getContext(transport_socket_factory_)),
-        std::make_unique<quic::QuicClientSessionCache>());
+        std::make_unique<QuicSessionCacheDelegate>(session_cache_));
   }
   // Return the latest client config.
   return client_config_;
@@ -44,12 +81,12 @@ std::shared_ptr<quic::QuicCryptoClientConfig> PersistentQuicInfoImpl::cryptoConf
 PersistentQuicInfoImpl::PersistentQuicInfoImpl(
     Event::Dispatcher& dispatcher, Network::TransportSocketFactory& transport_socket_factory,
     TimeSource& time_source, Network::Address::InstanceConstSharedPtr server_addr,
-    const quic::QuicConfig& quic_config, uint32_t buffer_limit)
+    const quic::QuicConfig& quic_config, uint32_t buffer_limit, quic::SessionCache& session_cache)
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
       server_id_{getConfig(transport_socket_factory).serverNameIndication(),
                  static_cast<uint16_t>(server_addr->ip()->port()), false},
       transport_socket_factory_(transport_socket_factory), time_source_(time_source),
-      quic_config_(quic_config), buffer_limit_(buffer_limit) {
+      quic_config_(quic_config), buffer_limit_(buffer_limit), session_cache_(session_cache) {
   quiche::FlagRegistry::getInstance();
 }
 

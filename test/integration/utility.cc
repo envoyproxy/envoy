@@ -25,6 +25,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 #endif
 
 #include "test/common/upstream/utility.h"
@@ -215,9 +216,9 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       createQuicUpstreamTransportSocketFactory(api, mock_stats_store, manager,
                                                "spiffe://lyft.com/backend-team");
   quic::QuicConfig config;
-  std::unique_ptr<Http::PersistentQuicInfo> persistent_info;
-  persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher, *transport_socket_factory, time_system, addr, config, 0);
+  quic::QuicClientSessionCache session_cache;
+  auto persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
+      *dispatcher, *transport_socket_factory, time_system, addr, config, 0, session_cache);
 
   Network::Address::InstanceConstSharedPtr local_address;
   if (addr->ip()->version() == Network::Address::IpVersion::v4) {

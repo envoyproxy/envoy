@@ -12,6 +12,7 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 #else
 #error "http3 conn pool should not be built with QUIC disabled"
 #endif
@@ -36,6 +37,8 @@ public:
     return MultiplexedActiveClientBase::newStreamEncoder(response_decoder);
   }
 
+  // ConnectionPool::ActiveClient
+  void getReady() override;
   uint32_t effectiveConcurrentStreamLimit() const override {
     return std::min<int64_t>(MultiplexedActiveClientBase::effectiveConcurrentStreamLimit(),
                              quiche_capacity_);
@@ -98,6 +101,9 @@ public:
   uint64_t quiche_capacity_ = 100;
 };
 
+class EnvoyQuicSessionCacheImpl : public Upstream::EnvoyTlsSessionCache,
+                                  public quic::QuicClientSessionCache {};
+
 // An interface to propagate H3 handshake result.
 // TODO(danzh) add an API to propagate 0-RTT handshake failure.
 class PoolConnectResultCallback {
@@ -119,7 +125,8 @@ public:
                     Random::RandomGenerator& random_generator,
                     Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
                     CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
-                    TimeSource& time_source, OptRef<PoolConnectResultCallback> connect_callback);
+                    TimeSource& time_source, OptRef<PoolConnectResultCallback> connect_callback,
+                    Upstream::EnvoyTlsSessionCache& session_cache);
 
   ~Http3ConnPoolImpl() override;
 
@@ -153,7 +160,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, TimeSource& time_source,
                  Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope,
-                 OptRef<PoolConnectResultCallback> connect_callback);
+                 OptRef<PoolConnectResultCallback> connect_callback,
+                 Upstream::EnvoyTlsSessionCache& session_cache);
 
 } // namespace Http3
 } // namespace Http

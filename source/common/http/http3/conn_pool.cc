@@ -31,6 +31,13 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                                   parent.host()->cluster().stats().upstream_cx_http3_total_, data) {
 }
 
+void ActiveClient::getReady() {
+  std::cerr << "======== h3 client getReady\n";
+  MultiplexedActiveClientBase::getReady();
+  ASSERT(codec_client_);
+  codec_client_->connect();
+}
+
 void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
   ENVOY_LOG(error, "============= onMaxStreamsChanged {}", num_streams);
 
@@ -59,7 +66,8 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
     CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
-    TimeSource& time_source, OptRef<PoolConnectResultCallback> connect_callback)
+    TimeSource& time_source, OptRef<PoolConnectResultCallback> connect_callback,
+    Upstream::EnvoyTlsSessionCache& session_cache)
     : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
                             random_generator, state, client_fn, codec_fn, protocol),
       connect_callback_(connect_callback) {
@@ -73,7 +81,8 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
   setQuicConfigFromClusterConfig(host_->cluster(), quic_config);
   quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
       dispatcher, transport_socket_factory, time_source, source_address, quic_config,
-      host->cluster().perConnectionBufferLimitBytes());
+      host->cluster().perConnectionBufferLimitBytes(),
+      static_cast<EnvoyQuicSessionCacheImpl&>(session_cache));
 }
 
 void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
@@ -92,7 +101,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, TimeSource& time_source,
                  Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope,
-                 OptRef<PoolConnectResultCallback> connect_callback) {
+                 OptRef<PoolConnectResultCallback> connect_callback,
+                 Upstream::EnvoyTlsSessionCache& quic_session_cache) {
   return std::make_unique<Http3ConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
       [&quic_stat_names,
@@ -135,12 +145,12 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         return client;
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
-        CodecClientPtr codec{new CodecClientProd(CodecType::HTTP3, std::move(data.connection_),
-                                                 data.host_description_, pool->dispatcher(),
-                                                 pool->randomGenerator())};
+        CodecClientPtr codec{new NoConnectCodecClientProd(
+            CodecType::HTTP3, std::move(data.connection_), data.host_description_,
+            pool->dispatcher(), pool->randomGenerator())};
         return codec;
       },
-      std::vector<Protocol>{Protocol::Http3}, time_source, connect_callback);
+      std::vector<Protocol>{Protocol::Http3}, time_source, connect_callback, quic_session_cache);
 }
 
 } // namespace Http3

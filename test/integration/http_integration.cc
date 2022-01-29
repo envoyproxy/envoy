@@ -352,7 +352,8 @@ void HttpIntegrationTest::initialize() {
   // Needs to outlive all QUIC connections.
   quic::QuicConfig config;
   auto quic_connection_persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher_, *quic_transport_socket_factory_, timeSystem(), server_addr, config, 0);
+      *dispatcher_, *quic_transport_socket_factory_, timeSystem(), server_addr, config, 0,
+      quic_session_cache_);
   // Config IETF QUIC flow control window.
   quic_connection_persistent_info->quic_config_
       .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(
