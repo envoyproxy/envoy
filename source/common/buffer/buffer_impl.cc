@@ -19,7 +19,9 @@ namespace {
 constexpr uint64_t CopyThreshold = 512;
 } // namespace
 
-thread_local absl::InlinedVector<Slice::StoragePtr, Slice::free_list_max_> Slice::free_list_;
+thread_local absl::InlinedVector<Slice::StoragePtr,
+                                 OwnedImpl::OwnedImplReservationSlicesOwnerMultiple::free_list_max_>
+    OwnedImpl::OwnedImplReservationSlicesOwnerMultiple::free_list_;
 
 void OwnedImpl::addImpl(const void* data, uint64_t size) {
   const char* src = static_cast<const char*>(data);
@@ -352,7 +354,8 @@ Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
       break;
     }
 
-    Slice::SizedStorage storage = Slice::newStorage(size);
+    Slice::SizedStorage storage = slices_owner->newStorage();
+    ASSERT(storage.len_ == size);
     const RawSlice raw_slice{storage.mem_.get(), size};
     slices_owner->owned_storages_.emplace_back(std::move(storage));
     reservation_slices.push_back(raw_slice);

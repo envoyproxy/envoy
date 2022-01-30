@@ -38,8 +38,8 @@ public:
   using StoragePtr = std::unique_ptr<uint8_t[]>;
 
   struct SizedStorage {
-    uint64_t len_{};
     StoragePtr mem_{};
+    size_t len_{};
   };
 
   /**
@@ -104,7 +104,6 @@ public:
   Slice& operator=(Slice&& rhs) noexcept {
     if (this != &rhs) {
       callAndClearDrainTrackersAndCharges();
-      freeStorage({capacity_, std::move(storage_)});
 
       capacity_ = rhs.capacity_;
       storage_ = std::move(rhs.storage_);
@@ -123,10 +122,7 @@ public:
     return *this;
   }
 
-  ~Slice() {
-    callAndClearDrainTrackersAndCharges();
-    freeStorage({capacity_, std::move(storage_)});
-  }
+  ~Slice() { callAndClearDrainTrackersAndCharges(); }
 
   /**
    * @return true if the data in the slice is mutable
@@ -357,9 +353,6 @@ protected:
     return num_pages * PageSize;
   }
 
-  static constexpr uint32_t free_list_max_ = Buffer::Reservation::MAX_SLICES_;
-  static thread_local absl::InlinedVector<StoragePtr, free_list_max_> free_list_;
-
 public:
   /**
    * Create new backend storage with min capacity. This method will create a recommended capacity
@@ -369,37 +362,9 @@ public:
    * @return a backend storage for slice.
    */
   static inline SizedStorage newStorage(uint64_t min_capacity) {
-    uint64_t capacity = sliceSize(min_capacity);
-
-    SizedStorage storage{capacity, nullptr};
-
-    if (capacity == default_slice_size_ && !free_list_.empty()) {
-      storage.mem_ = std::move(free_list_.back());
-      ASSERT(storage.mem_ != nullptr);
-      ASSERT(free_list_.back() == nullptr);
-      free_list_.pop_back();
-    } else {
-      storage.mem_.reset(new uint8_t[capacity]);
-    }
-
+    SizedStorage storage{nullptr, sliceSize(min_capacity)};
+    storage.mem_.reset(new uint8_t[storage.len_]);
     return storage;
-  }
-
-  /**
-   * Free unused backend storage.
-   * @param storage backend storage to free.
-   */
-  static inline void freeStorage(SizedStorage storage) {
-    if (storage.mem_ == nullptr) {
-      return;
-    }
-
-    if (storage.len_ == default_slice_size_) {
-      if (free_list_.size() < free_list_max_) {
-        free_list_.emplace_back(storage.mem_.release());
-        return;
-      }
-    }
   }
 
 protected:
@@ -790,10 +755,32 @@ private:
   };
 
   struct OwnedImplReservationSlicesOwnerMultiple : public OwnedImplReservationSlicesOwner {
+  public:
+    static constexpr uint32_t free_list_max_ = Buffer::Reservation::MAX_SLICES_;
+
+    OwnedImplReservationSlicesOwnerMultiple() : free_list_ref_(free_list_) {}
     ~OwnedImplReservationSlicesOwnerMultiple() override {
       for (auto r = owned_storages_.rbegin(); r != owned_storages_.rend(); r++) {
-        Slice::freeStorage(std::move(*r));
+        if (r->mem_ != nullptr) {
+          ASSERT(r->len_ == Slice::default_slice_size_);
+          if (free_list_ref_.size() < free_list_max_) {
+            free_list_ref_.push_back(std::move(r->mem_));
+          }
+        }
       }
+    }
+
+    Slice::SizedStorage newStorage() {
+      Slice::SizedStorage storage{nullptr, Slice::default_slice_size_};
+      if (!free_list_ref_.empty()) {
+        storage.mem_ = std::move(free_list_ref_.back());
+        free_list_ref_.pop_back();
+      } else {
+        storage = Slice::newStorage(Slice::default_slice_size_);
+        ASSERT(owned_storages_.back().len_ == Slice::default_slice_size_);
+      }
+
+      return storage;
     }
 
     absl::Span<Slice::SizedStorage> ownedStorages() override {
@@ -801,6 +788,16 @@ private:
     }
 
     absl::InlinedVector<Slice::SizedStorage, Buffer::Reservation::MAX_SLICES_> owned_storages_;
+
+  private:
+    // Thread local resolving introduces additional overhead. Initialize this reference once when
+    // constructing the owner to reduce thread local resolving to improve performance.
+    absl::InlinedVector<Slice::StoragePtr, free_list_max_>& free_list_ref_;
+
+    // Simple thread local cache to reduce unnecessary memory allocation and release. This cache
+    // is currently only used for multiple slices reservation because of the additional overhead
+    // that thread local resolving would introduce.
+    static thread_local absl::InlinedVector<Slice::StoragePtr, free_list_max_> free_list_;
   };
 
   struct OwnedImplReservationSlicesOwnerSingle : public OwnedImplReservationSlicesOwner {
