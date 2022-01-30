@@ -55,7 +55,13 @@ public:
    * @param account the account to charge.
    */
   Slice(uint64_t min_capacity, const BufferMemoryAccountSharedPtr& account)
-      : Slice(newStorage(min_capacity), 0, account) {}
+      : capacity_(sliceSize(min_capacity)), storage_(new uint8_t[capacity_]),
+        base_(storage_.get()) {
+    if (account) {
+      account->charge(capacity_);
+      account_ = account;
+    }
+  }
 
   /**
    * Create an empty mutable Slice that owns its storage, which it charges to the provided account,
@@ -67,6 +73,7 @@ public:
   Slice(SizedStorage storage, uint64_t size, const BufferMemoryAccountSharedPtr& account)
       : capacity_(storage.len_), storage_(std::move(storage.mem_)), base_(storage_.get()),
         reservable_(size) {
+    ASSERT(sliceSize(capacity_) == capacity_);
     ASSERT(reservable_ <= capacity_);
 
     if (account) {
@@ -341,7 +348,7 @@ public:
 
   static constexpr uint32_t default_slice_size_ = 16384;
 
-protected:
+public:
   /**
    * Compute a slice size big enough to hold a specified amount of data.
    * @param data_size the minimum amount of data the slice must be able to store, in bytes.
@@ -353,7 +360,6 @@ protected:
     return num_pages * PageSize;
   }
 
-public:
   /**
    * Create new backend storage with min capacity. This method will create a recommended capacity
    * which will bigger or equal to the min capacity and create new backend storage based on the
@@ -771,13 +777,14 @@ private:
     }
 
     Slice::SizedStorage newStorage() {
+      ASSERT(Slice::sliceSize(Slice::default_slice_size_) == Slice::default_slice_size_);
+
       Slice::SizedStorage storage{nullptr, Slice::default_slice_size_};
       if (!free_list_ref_.empty()) {
         storage.mem_ = std::move(free_list_ref_.back());
         free_list_ref_.pop_back();
       } else {
-        storage = Slice::newStorage(Slice::default_slice_size_);
-        ASSERT(owned_storages_.back().len_ == Slice::default_slice_size_);
+        storage.mem_.reset(new uint8_t[Slice::default_slice_size_]);
       }
 
       return storage;

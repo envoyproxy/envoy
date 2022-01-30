@@ -335,8 +335,8 @@ Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
   // Check whether there are any empty slices with reservable space at the end of the buffer.
   uint64_t reservable_size = slices_.empty() ? 0 : slices_.back().reservableSize();
   if (reservable_size >= max_length || reservable_size >= (Slice::default_slice_size_ / 8)) {
-    auto reserve_size = std::min(reservable_size, bytes_remaining);
-    auto slice = slices_.back().reserve(reserve_size);
+    uint64_t reserve_size = std::min(reservable_size, bytes_remaining);
+    RawSlice slice = slices_.back().reserve(reserve_size);
     reservation_slices.push_back(slice);
     slices_owner->owned_storages_.push_back({});
     bytes_remaining -= slice.len_;
