@@ -19,7 +19,3 @@ envoy_dependencies_extra()
 load("//bazel:dependency_imports.bzl", "envoy_dependency_imports")
 
 envoy_dependency_imports()
-
-load("@bazel_skylib//lib:versions.bzl", "versions")
-
-versions.check(minimum_bazel_version = "5.0")
