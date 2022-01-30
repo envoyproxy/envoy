@@ -147,7 +147,6 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     auto limit = maxTokens(stored_descriptors_.value());
     auto remaining = remainingTokens(stored_descriptors_.value());
     auto reset = remainingFillInterval(stored_descriptors_.value());
-    stored_descriptors_.reset();
 
     headers.addReferenceKey(
         HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit, limit);
