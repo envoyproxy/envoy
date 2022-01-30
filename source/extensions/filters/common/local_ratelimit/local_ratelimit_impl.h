@@ -7,7 +7,6 @@
 #include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 #include "envoy/ratelimit/ratelimit.h"
 
-#include "source/common/common/statusor.h"
 #include "source/common/common/thread_synchronizer.h"
 #include "source/common/protobuf/protobuf.h"
 
@@ -66,7 +65,7 @@ private:
   void onFillTimer();
   void onFillTimerHelper(TokenState& state, const RateLimit::TokenBucket& bucket);
   void onFillTimerDescriptorHelper();
-  StatusOr<std::reference_wrapper<const LocalDescriptorImpl>>
+  OptRef<const LocalDescriptorImpl>
   descriptorHelper(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   bool requestAllowedHelper(const TokenState& tokens) const;
 
