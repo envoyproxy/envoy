@@ -52,7 +52,7 @@ DEFINE_PROTO_FUZZER(
   static NiceMock<Event::MockDispatcher> dispatcher;
   // TODO(zhxie): The GlobalTimeSystem in MockDispatcher will initialize itself into a
   // TestRealTimeSystem by default which is incompatible with the SimulatedTimeSystem in
-  // MockReadFilterCallbacks. We will no need to change the time system after the switching of
+  // MockReadFilterCallbacks. We will not need to change the time system after the switching of
   // default time system in GlobalTimeSystem.
   dispatcher.time_system_ = std::make_unique<Event::SimulatedTimeSystem>();
   Stats::IsolatedStoreImpl stats_store;
