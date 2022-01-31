@@ -188,11 +188,11 @@ message ExtProcOverrides {
 
   // [#not-implemented-hide:]
   // Set different optional attributes than the default setting of the
-  // *request_attributes* field.
+  // ``request_attributes`` field.
   repeated string request_attributes = 3;
 
   // [#not-implemented-hide:]
   // Set different optional properties than the default setting of the
-  // *response_attributes* field.
+  // ``response_attributes`` field.
   repeated string response_attributes = 4;
 }
