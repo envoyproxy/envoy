@@ -795,13 +795,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
         # NOTE: Update together with com_googlesource_chromium_base_trace_event_common and com_googlesource_chromium_zlib.
-        version = "9.9.115.3",
+        version = "9.9.115.5",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
-        sha256 = "7f4164bfb5e0a80ee807e3f28e9e43c8b1537480a5ff53924ebbb03888f2e5a2",
+        sha256 = "60a6759069350571b24b65eb88c2c1908afed2b938dae6a92b305924f3b64e84",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/v8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-01-24",
+        release_date = "2022-01-31",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_chromium_base_trace_event_common = dict(
