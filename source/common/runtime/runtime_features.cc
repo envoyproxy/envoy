@@ -61,6 +61,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.conn_pool_delete_when_idle",
     "envoy.reloadable_features.correct_scheme_and_xfp",
     "envoy.reloadable_features.correctly_validate_alpn",
+    "envoy.reloadable_features.disable_local_interface_name_for_upstream_connection",
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.enable_grpc_async_client_cache",
     "envoy.reloadable_features.fix_added_trailers",

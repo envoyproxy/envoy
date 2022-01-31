@@ -265,6 +265,7 @@ private:
   void onConnected() override;
 
   StreamInfo::StreamInfoImpl stream_info_;
+  const bool disable_local_interface_name_for_upstream_connection_{};
 };
 
 } // namespace Network

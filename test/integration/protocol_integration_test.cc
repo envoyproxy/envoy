@@ -3493,6 +3493,59 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
   test_server_.reset();
 }
 
+TEST_P(ProtocolIntegrationTest, NoLocalInterfaceNameForUpstreamConnection) {
+  config_helper_.prependFilter(R"EOF(
+  name: stream-info-to-headers-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send a headers only request.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Make sure that the body was injected to the request.
+  EXPECT_TRUE(upstream_request_->complete());
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Make sure that the local interface name was not populated. This is the runtime default.
+  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("local-interface-name")).empty());
+}
+
+TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.disable_local_interface_name_for_upstream_connection", "false");
+
+  config_helper_.prependFilter(R"EOF(
+  name: stream-info-to-headers-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send a headers only request.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Make sure that the body was injected to the request.
+  EXPECT_TRUE(upstream_request_->complete());
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Make sure that the local interface name was populated due to runtime override.
+  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("local-interface-name")).empty());
+}
+
 #ifdef NDEBUG
 // These tests send invalid request and response header names which violate ASSERT while creating
 // such request/response headers. So they can only be run in NDEBUG mode.
