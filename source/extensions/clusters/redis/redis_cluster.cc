@@ -313,54 +313,48 @@ void RedisCluster::RedisDiscoverySession::updateDnsStats(
   }
 }
 
-void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(ClusterSlotsPtr&& slots) {
-  std::shared_ptr<ClusterSlotsPtr> s = std::make_shared<ClusterSlotsPtr>(std::move(slots));
-  resolveHostname(s, 0);
-}
-
 /**
- * Resolve the primary cluster entry hostname in the slot. If the primary is already resolved,
- * proceed to resolve replicas. Additionally, if the primary is successfully resolved, we proceed to
- * resolve replicas.
+ * Resolve the primary cluster entry hostname in each slot.
+ * If the primary is successfully resolved, we proceed to resolve replicas.
  *
  * @param slots the list of slots which may need DNS resolution
- * @param index the specific index into `slots` whose primary cluster entry needs to be resolved
  */
-void RedisCluster::RedisDiscoverySession::resolveHostname(std::shared_ptr<ClusterSlotsPtr> slots,
-                                                          std::size_t index) {
-  if (index >= (**slots).size()) {
-    finishClusterHostnameResolution(std::move(slots));
-    return;
-  }
-  auto& slot = (**slots)[index];
-  if (slot.primary() == nullptr) {
-    ENVOY_LOG(trace,
-              "starting async DNS resolution for primary slot address {} at index location {}",
-              slot.primary_hostname_, index);
-    parent_.dns_resolver_->resolve(
-        slot.primary_hostname_, parent_.dns_lookup_family_,
-        [this, index,
-         slots = std::move(slots)](Network::DnsResolver::ResolutionStatus status,
-                                   std::list<Network::DnsResponse>&& response) -> void {
-          auto& slot = (**slots)[index];
-          ENVOY_LOG(trace, "async DNS resolution complete for {}", slot.primary_hostname_);
-          updateDnsStats(status, response.empty());
-          // If DNS resolution for a primary fails, we stop resolution for remaining, and reset the
-          // timer.
-          if (status != Network::DnsResolver::ResolutionStatus::Success) {
-            ENVOY_LOG(error, "Unable to resolve cluster slot primary hostname {}",
-                      slot.primary_hostname_);
-            resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
-            return;
-          }
-          // Primary slot address resolved
-          slot.setPrimary(Network::Utility::getAddressWithPort(
-              *response.front().addrInfo().address_, slot.primary_port_));
-          // Continue on to resolve replicas
-          resolveReplicas(std::move(slots), index);
-        });
-  } else {
-    resolveReplicas(std::move(slots), index);
+void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(ClusterSlotsPtr&& slots) {
+  std::shared_ptr<ClusterSlotsPtr> slots_shared_ptr =
+      std::make_shared<ClusterSlotsPtr>(std::move(slots));
+  std::size_t slot_idx = 0;
+  while (slot_idx < (**slots_shared_ptr).size()) {
+    ENVOY_LOG(trace, "PRIMARY SLOT INDEX: {}", slot_idx);
+    auto& slot = (**slots_shared_ptr)[slot_idx];
+    if (slot.primary() == nullptr) {
+      ENVOY_LOG(trace,
+                "starting async DNS resolution for primary slot address {} at index location {}",
+                slot.primary_hostname_, index);
+      parent_.dns_resolver_->resolve(
+          slot.primary_hostname_, parent_.dns_lookup_family_,
+          [this, slot_idx, slots_shared_ptr](Network::DnsResolver::ResolutionStatus status,
+                                             std::list<Network::DnsResponse>&& response) -> void {
+            auto& slot = (**slots_shared_ptr)[slot_idx];
+            ENVOY_LOG(trace, "async DNS resolution complete for {}", slot.primary_hostname_);
+            updateDnsStats(status, response.empty());
+            // If DNS resolution for a primary fails, we stop resolution for remaining, and reset
+            // the timer.
+            if (status != Network::DnsResolver::ResolutionStatus::Success) {
+              ENVOY_LOG(error, "Unable to resolve cluster slot primary hostname {}",
+                        slot.primary_hostname_);
+              resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
+              return;
+            }
+            // Primary slot address resolved
+            slot.setPrimary(Network::Utility::getAddressWithPort(
+                *response.front().addrInfo().address_, slot.primary_port_));
+            // Continue on to resolve replicas
+            resolveReplicas(std::move(slots_shared_ptr), slot_idx);
+          });
+    } else {
+      resolveReplicas(std::move(slots_shared_ptr), slot_idx);
+    }
+    slot_idx++;
   }
 }
 
@@ -375,12 +369,15 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(std::shared_ptr<Cluste
                                                           std::size_t index) {
   auto& slot = (**slots)[index];
   if (slot.replicas_to_resolve_.empty()) {
-    resolveHostname(std::move(slots), index + 1);
+    if (index == (**slots).size() - 1) {
+      finishClusterHostnameResolution(std::move(slots));
+    }
     return;
   }
 
   std::size_t replica_idx = 0;
   while (replica_idx < slot.replicas_to_resolve_.size()) {
+    ENVOY_LOG(trace, "REPLICA SLOT INDEX: {}", replica_idx);
     auto replica = slot.replicas_to_resolve_[replica_idx];
     ENVOY_LOG(trace, "starting async DNS resolution for replica address {}", replica.first);
     parent_.dns_resolver_->resolve(
@@ -400,10 +397,11 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(std::shared_ptr<Cluste
             slot.addReplica(Network::Utility::getAddressWithPort(
                 *response.front().addrInfo().address_, replica.second));
           }
-          // eventually call into the resolveHostname recursion once the last replica in the list is
-          // resolved.
-          if (replica_idx == slot.replicas_to_resolve_.size() - 1) {
-            resolveHostname(std::move(slots), index + 1);
+          // finish resolution if it's the last primary and last replica of that primary being
+          // resolved
+          if (index == (**slots).size() - 1 &&
+              replica_idx == slot.replicas_to_resolve_.size() - 1) {
+            finishClusterHostnameResolution(std::move(slots));
           }
         });
     replica_idx++;

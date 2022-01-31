@@ -245,7 +245,6 @@ private:
     ipAddressFromClusterEntry(const std::vector<NetworkFilters::Common::Redis::RespValue>& value);
     bool validateCluster(const NetworkFilters::Common::Redis::RespValue& value);
     void resolveClusterHostnames(ClusterSlotsPtr&& slots);
-    void resolveHostname(std::shared_ptr<ClusterSlotsPtr> slots, std::size_t index);
     void resolveReplicas(std::shared_ptr<ClusterSlotsPtr> slots, std::size_t index);
     void finishClusterHostnameResolution(std::shared_ptr<ClusterSlotsPtr> slots);
     void updateDnsStats(Network::DnsResolver::ResolutionStatus status, bool empty_response);
