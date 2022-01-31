@@ -35,10 +35,9 @@ std::vector<uint64_t> HistogramStatisticsImpl::computeDisjointBuckets() const {
   std::vector<uint64_t> buckets;
   buckets.reserve(computed_buckets_.size());
   uint64_t previous_computed_bucket = 0;
-  for (size_t i = 0; i < computed_buckets_.size(); ++i) {
-    uint64_t current_computed_bucket = computed_buckets_[i];
-    buckets.push_back(current_computed_bucket - previous_computed_bucket);
-    previous_computed_bucket = current_computed_bucket;
+  for (uint64_t computed_bucket : computed_buckets_) {
+    buckets.push_back(computed_bucket - previous_computed_bucket);
+    previous_computed_bucket = computed_bucket;
   }
   return buckets;
 }
