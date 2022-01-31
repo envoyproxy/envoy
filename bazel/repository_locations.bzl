@@ -49,11 +49,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Fuzzing Rules for Bazel",
         project_desc = "Bazel rules for fuzz tests",
         project_url = "https://github.com/bazelbuild/rules_fuzzing",
-        version = "0.2.0",
-        sha256 = "9b688a77b930e1842312d37b00fbb796b96323a2eb8362b2cfb68e7d6e74f860",
+        version = "0.3.1",
+        sha256 = "4965ff7341f4759f07c83b146f603d6e8cfc35ef99fee3ef39bf61ffa96b1f8b",
         strip_prefix = "rules_fuzzing-{version}",
         urls = ["https://github.com/bazelbuild/rules_fuzzing/archive/v{version}.tar.gz"],
-        release_date = "2021-07-12",
+        release_date = "2022-01-24",
         use_category = ["test_only"],
         implied_untracked_deps = [
             # This is a repository rule generated to define an OSS-Fuzz fuzzing
