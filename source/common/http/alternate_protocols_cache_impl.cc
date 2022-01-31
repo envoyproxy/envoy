@@ -141,8 +141,10 @@ void AlternateProtocolsCacheImpl::setSrtt(const Origin& origin, std::chrono::mic
     return;
   }
   entry_it->second.srtt = srtt;
-  key_value_store_->addOrUpdate(originToString(origin),
-                                originDataToStringForCache(entry_it->second.protocols, srtt));
+  if (key_value_store_) {
+    key_value_store_->addOrUpdate(originToString(origin),
+                                  originDataToStringForCache(entry_it->second.protocols, srtt));
+  }
 }
 
 void AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
