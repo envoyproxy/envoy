@@ -37,7 +37,7 @@ public:
 
 private:
   uint32_t read_buffer_size_;
-  std::unique_ptr<const Io::IoUringFactory> io_uring_factory_;
+  const Io::IoUringFactory* io_uring_factory_;
 };
 
 DECLARE_FACTORY(SocketInterfaceImpl);
