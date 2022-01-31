@@ -680,12 +680,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Packaging rules for Bazel",
         project_desc = "Bazel rules for the packaging distributions",
         project_url = "https://github.com/bazelbuild/rules_pkg",
-        version = "e30c2506560d415f1c297b5e8a58b4758797e982",
-        sha256 = "a411945dacd9fe0e342aabcce6872a16d8efc2d68755177e1558c1a83774ed2b",
+        version = "62b1443f4f92cb2bfd81c47ed155e86cc6854786",
+        sha256 = "f9b0592eb1d4c0c7505f00f457a3e913fd483cc08bcca4c47cc7080c0894684a",
         strip_prefix = "rules_pkg-{version}",
         urls = ["https://github.com/bazelbuild/rules_pkg/archive/{version}.tar.gz"],
         use_category = ["build"],
-        release_date = "2021-12-10",
+        release_date = "2022-01-29",
     ),
     org_llvm_llvm = dict(
         # When changing this, you must re-generate the list of llvm libs
