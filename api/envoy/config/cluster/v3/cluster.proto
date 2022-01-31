@@ -596,12 +596,10 @@ message Cluster {
     // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
     ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
 
-    // Expected override host statuses. The result of load balancing is allowed to be overwritten
-    // only when the target host status is as expected when stateful session stickiness directly
-    // specifies a target host.
+    // Expected override host statuses. This configuration only makes sense if the L4/L7 extensions
+    // specify an :ref:`override host <arch_overview_load_balancing_override_host>`.
     //
-    // If this is set and and has no any item then any host from stateful session stickiness will be
-    // ignored.
+    // If this is set and and has no any item then the override host will be ignored.
     // If this is not set then healthy statuses (``UNKNOWN``, ``HEALTHY`` and ``DEGRADED`` for now)
     // will be applied by default.
     core.v3.HealthStatusSet override_host_status = 8;
