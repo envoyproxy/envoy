@@ -193,7 +193,7 @@ protected:
   bool use_http2_{false};
 };
 
-int getRtt(std::string alt_svc, TimeSource& time_source) {
+int getSrtt(std::string alt_svc, TimeSource& time_source) {
   auto data = Http::AlternateProtocolsCacheImpl::originDataFromString(alt_svc, time_source);
   return data.has_value() ? data.value().srtt.count() : 0;
 }
@@ -209,12 +209,12 @@ TEST_P(MixedUpstreamIntegrationTest, BasicRequestAutoWithHttp3) {
     // Make sure that srtt is updated.
     const std::string filename = TestEnvironment::temporaryPath("alt_svc_cache.txt");
     alt_svc = TestEnvironment::readFileToStringForTest(filename);
-    if (getRtt(alt_svc, timeSystem()) != 0) {
+    if (getSrtt(alt_svc, timeSystem()) != 0) {
       break;
     }
-    timeSystem().advanceTimeWait(std::chrono::seconds(1));
+    timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
   }
-  EXPECT_NE(getRtt(alt_svc, timeSystem()), 0) << alt_svc;
+  EXPECT_NE(getSrtt(alt_svc, timeSystem()), 0) << alt_svc;
 }
 
 // Test simultaneous requests using auto-config and a pre-populated HTTP/3 alt-svc entry. The

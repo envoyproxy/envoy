@@ -72,6 +72,11 @@ TEST_F(KeyValueStoreTest, Persist) {
   store_->addOrUpdate("baz", "eep");
   createStore();
   EXPECT_TRUE(store_->get("baz").has_value());
+
+  // This will flush due to 0ms flush interval
+  store_->remove("bar");
+  createStore();
+  EXPECT_FALSE(store_->get("bar").has_value());
 }
 
 TEST_F(KeyValueStoreTest, Iterate) {

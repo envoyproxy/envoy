@@ -70,7 +70,12 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key, absl::string_view val
   }
 }
 
-void KeyValueStoreBase::remove(absl::string_view key) { store_.erase(key); }
+void KeyValueStoreBase::remove(absl::string_view key) {
+  store_.erase(key);
+  if (!flush_timer_->enabled()) {
+    flush();
+  }
+}
 
 absl::optional<absl::string_view> KeyValueStoreBase::get(absl::string_view key) {
   auto it = store_.find(key);

@@ -183,6 +183,7 @@ TEST_F(Http3ConnPoolImplTest, CreationWithConfig) {
             options->max_concurrent_streams().value());
   EXPECT_EQ(info.quic_config_.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend(),
             options->initial_stream_window_size().value());
+  EXPECT_EQ(3000, info.server_id_.port());
 }
 
 } // namespace Http3
