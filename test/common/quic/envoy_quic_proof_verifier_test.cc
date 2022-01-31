@@ -74,7 +74,8 @@ protected:
   const std::string path_string_{"some_path"};
   const std::string alpn_{"h2,http/1.1"};
   const std::string sig_algs_{"rsa_pss_rsae_sha256"};
-  const std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers_;
+  const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
+      san_matchers_;
   const std::string empty_string_;
   const std::vector<std::string> empty_string_list_;
   const std::string cert_chain_{quic::test::kTestCertificateChainPem};

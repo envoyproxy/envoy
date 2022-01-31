@@ -923,8 +923,10 @@ TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
             private_key:
               filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"
           validation_context:
-            match_subject_alt_names:
-              exact : "spiffe://lyft.com/testclient"
+            match_typed_subject_alt_names:
+            - san_type: URI
+              matcher:
+                exact: "spiffe://lyft.com/testclient"
 )EOF";
   EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException,
                             "SAN-based verification of peer certificates without trusted CA "
@@ -1767,6 +1769,35 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureBothKeyAndMethod)
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
       "Certificate configuration can't have both private_key and private_key_provider");
+}
+
+// Test that we don't allow specification of both typed and untyped matchers for
+// sans.
+TEST_F(ServerContextConfigImplTest, DeprecatedSanMatcher) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  NiceMock<Ssl::MockContextManager> context_manager;
+  NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
+  auto private_key_method_provider_ptr =
+      std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
+  const std::string yaml =
+      R"EOF(
+      common_tls_context:
+        validation_context:
+          trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
+          allow_expired_certificate: true
+          match_typed_subject_alt_names:
+          - san_type: DNS
+            matcher:
+              exact: "foo.example"
+          match_subject_alt_names:
+            exact: "foo.example"
+      )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
+      "SAN-based verification using both match_typed_subject_alt_names and "
+      "the deprecated match_subject_alt_names is not allowed");
 }
 
 // Subclass ContextImpl so we can instantiate directly from tests, despite the

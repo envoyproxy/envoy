@@ -53,6 +53,26 @@ void SslSPIFFECertValidatorIntegrationTest::checkVerifyErrorCouter(uint64_t valu
   counter->reset();
 }
 
+void SslSPIFFECertValidatorIntegrationTest::addStringMatcher(
+    const envoy::type::matcher::v3::StringMatcher& matcher) {
+  san_matchers_.emplace_back();
+  *san_matchers_.back().mutable_matcher() = matcher;
+  san_matchers_.back().set_san_type(
+      envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
+  san_matchers_.emplace_back();
+  *san_matchers_.back().mutable_matcher() = matcher;
+  san_matchers_.back().set_san_type(
+      envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
+  san_matchers_.emplace_back();
+  *san_matchers_.back().mutable_matcher() = matcher;
+  san_matchers_.back().set_san_type(
+      envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL);
+  san_matchers_.emplace_back();
+  *san_matchers_.back().mutable_matcher() = matcher;
+  san_matchers_.back().set_san_type(
+      envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS);
+}
+
 INSTANTIATE_TEST_SUITE_P(
     IpVersionsClientVersions, SslSPIFFECertValidatorIntegrationTest,
     testing::Combine(
@@ -124,7 +144,7 @@ typed_config:
 
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_prefix("spiffe://lyft.com/");
-  san_matchers_ = {matcher};
+  addStringMatcher(matcher);
 
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
@@ -152,7 +172,7 @@ typed_config:
   matcher.set_prefix("spiffe://example.com/");
   // The cert has "DNS.1 = lyft.com" but SPIFFE validator must ignore SAN types other than URI.
   matcher.set_prefix("www.lyft.com");
-  san_matchers_ = {matcher};
+  addStringMatcher(matcher);
   initialize();
   auto conn = makeSslClientConnection({});
   if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2) {
@@ -223,8 +243,8 @@ typed_config:
   checkVerifyErrorCouter(1);
 }
 
-// clientcert.pem's san is "spiffe://lyft.com/frontend-team" but the corresponding trust bundle does
-// not match with the client cert. So this should also be rejected.
+// clientcert.pem's san is "spiffe://lyft.com/frontend-team" but the corresponding trust bundle
+// does not match with the client cert. So this should also be rejected.
 TEST_P(SslSPIFFECertValidatorIntegrationTest, ServerRsaSPIFFEValidatorRejected2) {
   auto typed_conf = new envoy::config::core::v3::TypedExtensionConfig();
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(

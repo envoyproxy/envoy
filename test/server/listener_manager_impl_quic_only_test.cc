@@ -60,9 +60,13 @@ filter_chains:
           validation_context:
             trusted_ca:
               filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-            match_subject_alt_names:
-            - exact: localhost
-            - exact: 127.0.0.1
+            match_typed_subject_alt_names:
+            - matcher:
+                exact: localhost
+              san_type: URI
+            - matcher:
+                exact: 127.0.0.1
+              san_type: IP_ADDRESS
 udp_listener_config:
   quic_options: {}
   )EOF",
@@ -161,9 +165,13 @@ filter_chains:
         validation_context:
           trusted_ca:
             filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-          match_subject_alt_names:
-          - exact: localhost
-          - exact: 127.0.0.1
+          match_typed_subject_alt_names:
+          - matcher:
+              exact: localhost
+            san_type: URI
+          - matcher:
+              exact: 127.0.0.1
+            san_type: IP_ADDRESS
 udp_listener_config:
   quic_options: {}
   )EOF",
@@ -205,9 +213,13 @@ filter_chains:
           validation_context:
             trusted_ca:
               filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-            match_subject_alt_names:
-            - exact: localhost
-            - exact: 127.0.0.1
+            match_typed_subject_alt_names:
+            - matcher:
+                exact: localhost
+              san_type: URI
+            - matcher:
+                exact: 127.0.0.1
+              san_type: IP_ADDRESS
 udp_listener_config:
   quic_options: {}
   )EOF",
@@ -259,9 +271,13 @@ filter_chains:
           validation_context:
             trusted_ca:
               filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-            match_subject_alt_names:
-            - exact: localhost
-            - exact: 127.0.0.1
+            match_typed_subject_alt_names:
+            - matcher:
+                exact: localhost
+              san_type: URI
+            - matcher:
+                exact: 127.0.0.1
+              san_type: IP_ADDRESS
 udp_listener_config:
   quic_options: {}
 connection_balance_config:

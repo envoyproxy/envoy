@@ -1073,8 +1073,10 @@ TEST_P(SslSocketTest, GetUriWithUriSan) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-      match_subject_alt_names:
-        exact: "spiffe://lyft.com/test-team"
+      match_typed_subject_alt_names:
+      - san_type: URI
+        matcher:
+          exact: "spiffe://lyft.com/test-team"
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
@@ -1089,8 +1091,10 @@ TEST_P(SslSocketTest, Ipv4San) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem"
-      match_subject_alt_names:
-        exact: "127.0.0.1"
+      match_typed_subject_alt_names:
+      - san_type: IP_ADDRESS
+        matcher:
+          exact: "127.0.0.1"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1113,8 +1117,10 @@ TEST_P(SslSocketTest, Ipv6San) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem"
-      match_subject_alt_names:
-        exact: "::1"
+      match_typed_subject_alt_names:
+      - san_type: IP_ADDRESS
+        matcher:
+          exact: "::1"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1516,8 +1522,10 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerificationNoClientCert) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-      match_subject_alt_names:
-        exact: "example.com"
+      match_typed_subject_alt_names:
+      - san_type: DNS
+        matcher:
+          exact: "example.com"
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
@@ -1544,8 +1552,10 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerification) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-      match_subject_alt_names:
-        exact: "example.com"
+      match_typed_subject_alt_names:
+      - san_type: DNS
+        matcher:
+          exact: "example.com"
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
