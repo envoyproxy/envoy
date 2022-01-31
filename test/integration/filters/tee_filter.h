@@ -26,6 +26,9 @@ struct StreamTee {
   Http::RequestTrailerMapPtr request_trailers_ ABSL_GUARDED_BY(mutex_){nullptr};
   Http::ResponseHeaderMapPtr response_headers_ ABSL_GUARDED_BY(mutex_){nullptr};
   Http::ResponseTrailerMapPtr response_trailers_ ABSL_GUARDED_BY(mutex_){nullptr};
+
+  std::function<Http::FilterDataStatus(StreamTee&, Http::StreamEncoderFilterCallbacks* encoder_cbs)>
+      on_encode_data_ ABSL_GUARDED_BY(mutex_){nullptr};
 };
 
 using StreamTeeSharedPtr = std::shared_ptr<StreamTee>;
@@ -39,6 +42,10 @@ public:
   Http::FilterFactoryCb createFilter(const std::string&,
                                      Server::Configuration::FactoryContext&) override;
   bool inspectStreamTee(int /*stream_number*/, std::function<void(const StreamTee&)> inspector);
+  bool setEncodeDataCallback(int /*stream_number*/,
+                             std::function<Http::FilterDataStatus(
+                                 StreamTee&, Http::StreamEncoderFilterCallbacks* encoder_cbs)>
+                                 cb);
 
 private:
   // TODO(kbaichoo): support multiple streams.

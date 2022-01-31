@@ -411,7 +411,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
 }
 
 void ConnectionImpl::StreamImpl::pendingRecvBufferHighWatermark() {
-  // If defer_processing_backedup_streams_, read disabling here can become
+  // If `defer_processing_backedup_streams_`, read disabling here can become
   // dangerous as it can prevent us from processing buffered data.
   if (!defer_processing_backedup_streams_) {
     ENVOY_CONN_LOG(debug, "recv buffer over limit ", parent_.connection_);
@@ -422,7 +422,7 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferHighWatermark() {
 }
 
 void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
-  // If defer_processing_backedup_streams_, we don't read disable on
+  // If `defer_processing_backedup_streams_`, we don't read disable on
   // high watermark, so we shouldn't read disable here.
   if (!defer_processing_backedup_streams_) {
     ENVOY_CONN_LOG(debug, "recv buffer under limit ", parent_.connection_);
@@ -743,6 +743,9 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
     ENVOY_CONN_LOG(
         trace, "Stopped propagating reset to nghttp2 as we've buffered onStreamClose for stream {}",
         parent_.connection_, stream_id_);
+    // The stream didn't originally have an NGHTTP2 error, since we buffered
+    // its stream close.
+    parent_.onStreamClose(this, 0);
     return;
   }
 

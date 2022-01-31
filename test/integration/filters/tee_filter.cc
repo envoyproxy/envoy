@@ -31,6 +31,9 @@ public:
     absl::MutexLock l{&mutex_};
     response_body_.add(buffer);
     encode_end_stream_ = end_stream;
+    if (on_encode_data_) {
+      return on_encode_data_(*this, encoder_callbacks_);
+    }
     return Http::FilterDataStatus::Continue;
   }
 
@@ -61,6 +64,21 @@ bool StreamTeeFilterConfig::inspectStreamTee(int /*stream_number*/,
 
   // TODO(kbaichoo): support multiple streams.
   inspector(*current_tee_);
+  return true;
+}
+
+bool StreamTeeFilterConfig::setEncodeDataCallback(
+    int /*stream_number*/,
+    std::function<Http::FilterDataStatus(StreamTee&,
+                                         Http::StreamEncoderFilterCallbacks* encoder_cbs)>
+        cb) {
+  if (!current_tee_) {
+    ENVOY_LOG_MISC(warn, "No current stream_tee!");
+    return false;
+  }
+
+  absl::MutexLock l{&current_tee_->mutex_};
+  current_tee_->on_encode_data_ = cb;
   return true;
 }
 
