@@ -949,7 +949,10 @@ std::string ParentHistogramImpl::computeDisjointBucketSummary() const {
     const std::vector<uint64_t> disjoint_cumulative_buckets =
         cumulative_statistics_.computeDisjointBuckets();
     bucket_summary.reserve(supported_buckets.size());
-    for (size_t i = 0; i < supported_buckets.size(); ++i) {
+    // Make sure all vectors are the same size.
+    ASSERT(disjoint_interval_buckets.size() == disjoint_cumulative_buckets.size() && disjoint_cumulative_buckets.size() == supported_buckets.size());
+    std::vector<uint64_t>::size_type min_size = std::min({disjoint_interval_buckets.size(), disjoint_cumulative_buckets.size(), supported_buckets.size()});
+    for (std::vector<uint64_t>::size_type i = 0; i < min_size; ++i) {
       bucket_summary.push_back(fmt::format("B{:g}({},{})", supported_buckets[i],
                                            disjoint_interval_buckets[i],
                                            disjoint_cumulative_buckets[i]));
