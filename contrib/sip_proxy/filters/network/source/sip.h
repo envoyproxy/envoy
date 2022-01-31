@@ -20,6 +20,7 @@ enum class HeaderType {
   SRoute,
   WAuth,
   Auth,
+  PCookieIPMap,
   Other,
   InvalidFormat
 };

@@ -4,11 +4,11 @@ import sys
 from functools import cached_property
 from typing import Iterator, List, Pattern
 
-from envoy.base import checker
+from aio.run import checker
 
 INVALID_REFLINK = r".* ref:.*"
 REF_WITH_PUNCTUATION_REGEX = r".*\. <[^<]*>`\s*"
-VERSION_HISTORY_NEW_LINE_REGEX = r"\* ([a-z \-_]+): ([a-z:`]+)"
+VERSION_HISTORY_NEW_LINE_REGEX = r"\* ([0-9a-z \-_]+): ([a-z:`]+)"
 VERSION_HISTORY_SECTION_NAME = r"^[A-Z][A-Za-z ]*$"
 # Make sure backticks come in pairs.
 # Exceptions: reflinks (ref:`` where the backtick won't be preceded by a space
@@ -141,7 +141,7 @@ class CurrentVersionFile:
 class RSTChecker(checker.Checker):
     checks = ("current_version",)
 
-    def check_current_version(self) -> None:
+    async def check_current_version(self) -> None:
         errors = list(
             CurrentVersionFile(pathlib.Path("docs/root/version_history/current.rst")).run_checks())
         if errors:
@@ -149,7 +149,7 @@ class RSTChecker(checker.Checker):
 
 
 def main(*args: str) -> int:
-    return RSTChecker(*args).run()
+    return RSTChecker(*args)()
 
 
 if __name__ == "__main__":

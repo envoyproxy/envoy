@@ -76,6 +76,9 @@ public:
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                               const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
+  Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                 bool do_formatting = true) const override;
+
   const Http::HashPolicy* hashPolicy() const override;
   const HedgePolicy& hedgePolicy() const override;
   Upstream::ResourcePriority priority() const override;

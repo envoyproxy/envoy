@@ -7,16 +7,6 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/configs"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/test/extensions/filters/network/thrift_proxy"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
   directory: "/examples/grpc-bridge/client"
   schedule:
     interval: "daily"

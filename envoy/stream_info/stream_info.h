@@ -89,8 +89,10 @@ enum ResponseFlag {
   NoClusterFound = 0x1000000,
   // Overload Manager terminated the stream.
   OverloadManager = 0x2000000,
+  // DNS resolution failed.
+  DnsResolutionFailed = 0x4000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = OverloadManager,
+  LastFlag = DnsResolutionFailed,
 };
 
 /**
@@ -719,6 +721,44 @@ public:
     downstream_info.setUpstreamBytesMeter(upstream_info.getUpstreamBytesMeter());
     upstream_info.setDownstreamBytesMeter(downstream_info.getDownstreamBytesMeter());
   }
+};
+
+// An enum representation of the Proxy-Status error space.
+enum class ProxyStatusError {
+  DnsTimeout,
+  DnsError,
+  DestinationNotFound,
+  DestinationUnavailable,
+  DestinationIpProhibited,
+  DestinationIpUnroutable,
+  ConnectionRefused,
+  ConnectionTerminated,
+  ConnectionTimeout,
+  ConnectionReadTimeout,
+  ConnectionWriteTimeout,
+  ConnectionLimitReached,
+  TlsProtocolError,
+  TlsCertificateError,
+  TlsAlertReceived,
+  HttpRequestError,
+  HttpRequestDenied,
+  HttpResponseIncomplete,
+  HttpResponseHeaderSectionSize,
+  HttpResponseHeaderSize,
+  HttpResponseBodySize,
+  HttpResponseTrailerSectionSize,
+  HttpResponseTrailerSize,
+  HttpResponseTransferCoding,
+  HttpResponseContentCoding,
+  HttpResponseTimeout,
+  HttpUpgradeFailed,
+  HttpProtocolError,
+  ProxyInternalResponse,
+  ProxyInternalError,
+  ProxyConfigurationError,
+  ProxyLoopDetected,
+  // ATTENTION: MAKE SURE THAT THIS REMAINS EQUAL TO THE LAST FLAG.
+  LastProxyStatus = ProxyLoopDetected,
 };
 
 } // namespace StreamInfo

@@ -207,12 +207,24 @@ TEST_F(QuicPlatformTest, QuicThread) {
 
     ~AdderThread() override = default;
 
+    void waitForRun() {
+      // Wait for Run() to finish.
+      absl::MutexLock lk(&m_);
+      cv_.Wait(&m_);
+    }
+
   protected:
-    void Run() override { *value_ += increment_; }
+    void Run() override {
+      absl::MutexLock lk(&m_);
+      *value_ += increment_;
+      cv_.Signal();
+    }
 
   private:
     int* value_;
     int increment_;
+    absl::Mutex m_;
+    absl::CondVar cv_;
   };
 
   int value = 0;
@@ -230,8 +242,13 @@ TEST_F(QuicPlatformTest, QuicThread) {
   EXPECT_EQ(1, value);
 
   // QuicThread will panic if it's started but not joined.
-  EXPECT_DEATH({ AdderThread(&value, 2).Start(); },
-               "QuicThread should be joined before destruction");
+  EXPECT_DEATH(
+      {
+        AdderThread t3(&value, 2);
+        t3.Start();
+        t3.waitForRun();
+      },
+      "QuicThread should be joined before destruction");
 }
 
 TEST_F(QuicPlatformTest, QuicLog) {
@@ -387,7 +404,7 @@ TEST_F(QuicPlatformTest, QuicNotReached) {
 #ifdef NDEBUG
   QUIC_NOTREACHED(); // Expect no-op.
 #else
-  EXPECT_DEATH(QUIC_NOTREACHED(), "not reached");
+  EXPECT_DEATH(QUIC_NOTREACHED(), "reached unexpected code");
 #endif
 }
 
@@ -498,6 +515,7 @@ TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
 
 TEST_F(QuicPlatformTest, QuicFlags) {
   auto& flag_registry = quiche::FlagRegistry::getInstance();
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_default_to_bbr));
   flag_registry.resetFlags();
 
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));

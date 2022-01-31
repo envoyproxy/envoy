@@ -460,6 +460,7 @@ private:
   bool clear_hop_by_hop_response_headers_{true};
   // The number of requests accumulated on the current connection.
   uint64_t accumulated_requests_{};
+  const std::string proxy_name_; // for Proxy-Status.
 };
 
 } // namespace Http
