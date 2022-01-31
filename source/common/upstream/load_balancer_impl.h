@@ -340,9 +340,9 @@ private:
   localitySourceType(HostAvailability host_availability) {
     switch (host_availability) {
     case HostAvailability::Healthy:
-      return absl::optional<HostsSource::SourceType>(HostsSource::SourceType::LocalityHealthyHosts);
+      return absl::make_optional<HostsSource::SourceType>(HostsSource::SourceType::LocalityHealthyHosts);
     case HostAvailability::Degraded:
-      return absl::optional<HostsSource::SourceType>(
+      return absl::make_optional<HostsSource::SourceType>(
           HostsSource::SourceType::LocalityDegradedHosts);
     }
     IS_ENVOY_BUG("unexpected locality source type enum");
@@ -352,9 +352,9 @@ private:
   static absl::optional<HostsSource::SourceType> sourceType(HostAvailability host_availability) {
     switch (host_availability) {
     case HostAvailability::Healthy:
-      return absl::optional<HostsSource::SourceType>(HostsSource::SourceType::HealthyHosts);
+      return absl::make_optional<HostsSource::SourceType>(HostsSource::SourceType::HealthyHosts);
     case HostAvailability::Degraded:
-      return absl::optional<HostsSource::SourceType>(HostsSource::SourceType::DegradedHosts);
+      return absl::make_optional<HostsSource::SourceType>(HostsSource::SourceType::DegradedHosts);
     }
 
     IS_ENVOY_BUG("unexpected source type enum");
