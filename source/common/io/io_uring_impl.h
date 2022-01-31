@@ -7,14 +7,34 @@
 namespace Envoy {
 namespace Io {
 
-class IoUringFactoryImpl : public IoUringFactory {
+class IoUringFactory;
+
+class IoUringExtension : public Server::BootstrapExtension {
 public:
-  IoUringFactoryImpl(uint32_t io_uring_size, bool use_submission_queue_polling);
+  IoUringExtension(IoUringFactory& factory) : factory_(factory) {}
+
+  // Server::BootstrapExtension
+  void onServerInitialized() override {}
+
+protected:
+  IoUringFactory& factory_;
+};
+
+class IoUringFactoryImpl : public IoUringFactoryBase {
+public:
+  IoUringFactoryImpl();
   IoUring& getOrCreate() const override;
 
+  // Server::Configuration::BootstrapExtensionFactory
+  Server::BootstrapExtensionPtr
+  createBootstrapExtension(const Protobuf::Message& config,
+                           Server::Configuration::ServerFactoryContext& context) override;
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+  std::string name() const override { return "envoy.extensions.io.io_uring"; };
+
 private:
-  const uint32_t io_uring_size_;
-  const bool use_submission_queue_polling_;
+  uint32_t io_uring_size_{};
+  bool use_submission_queue_polling_{};
 
   static thread_local bool is_instantiated_;
 };
@@ -45,6 +65,8 @@ private:
   std::vector<struct io_uring_cqe*> cqes_;
   os_fd_t event_fd_{INVALID_SOCKET};
 };
+
+DECLARE_FACTORY(IoUringFactoryImpl);
 
 } // namespace Io
 } // namespace Envoy

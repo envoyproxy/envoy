@@ -1,6 +1,8 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/bootstrap_extension_config.h"
 
 #include "source/common/network/address_impl.h"
 
@@ -106,6 +108,15 @@ public:
 
   virtual IoUring& getOrCreate() const PURE;
 };
+
+class IoUringFactoryBase : public IoUringFactory,
+                           public Server::Configuration::BootstrapExtensionFactory {};
+
+static inline const IoUringFactory* ioUringFactory(std::string name) {
+  auto factory =
+      Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::getFactory(name);
+  return dynamic_cast<IoUringFactory*>(factory);
+}
 
 } // namespace Io
 } // namespace Envoy
