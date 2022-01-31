@@ -27,5 +27,6 @@ envoy_cc_library(
     deps = [
         ":io_uring_interface",
         "//source/common/network:address_lib",
+        "@envoy_api//envoy/extensions/io/io_uring/v3:pkg_cc_proto",
     ],
 )

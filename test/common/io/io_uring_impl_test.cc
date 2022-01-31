@@ -1,5 +1,8 @@
+#include "envoy/extensions/io/io_uring/v3/io_uring.pb.h"
+
 #include "source/common/io/io_uring_impl.h"
 
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -11,20 +14,27 @@ namespace {
 
 class IoUringBaseTest : public ::testing::Test {
 public:
-  IoUringBaseTest() : api_(Api::createApiForTest()) {}
+  IoUringBaseTest()
+      : factory_(const_cast<IoUringFactory*>(ioUringFactory("envoy.extensions.io.io_uring"))),
+        api_(Api::createApiForTest()) {
+    envoy::extensions::io::io_uring::v3::IoUring config;
+    config.mutable_io_uring_size()->set_value(2);
+    extension_ =
+        dynamic_cast<IoUringFactoryBase*>(factory_)->createBootstrapExtension(config, context_);
+  }
 
   void TearDown() override {
-    auto& uring = factory_.getOrCreate();
+    auto& uring = factory_->getOrCreate();
     if (uring.isEventfdRegistered()) {
       uring.unregisterEventfd();
     }
   }
 
-  static const IoUringFactoryImpl factory_;
+  IoUringFactory* factory_;
   Api::ApiPtr api_;
+  Server::BootstrapExtensionPtr extension_;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 };
-
-const IoUringFactoryImpl IoUringBaseTest::factory_(2, false);
 
 class IoUringImplParamTest
     : public IoUringBaseTest,
@@ -56,7 +66,7 @@ TEST_P(IoUringImplParamTest, InvalidParams) {
   SET_SOCKET_INVALID(fd);
   auto dispatcher = api_->allocateDispatcher("test_thread");
 
-  auto& uring = factory_.getOrCreate();
+  auto& uring = factory_->getOrCreate();
 
   os_fd_t event_fd = uring.registerEventfd();
   const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
@@ -100,18 +110,25 @@ protected:
 };
 
 TEST_F(IoUringImplTest, Instantiate) {
-  auto& uring1 = factory_.getOrCreate();
-  auto& uring2 = factory_.getOrCreate();
+  auto& uring1 = factory_->getOrCreate();
+  auto& uring2 = factory_->getOrCreate();
   EXPECT_EQ(&uring1, &uring2);
 
-  EXPECT_DEATH(IoUringFactoryImpl factory2(10, false),
-               "only one io_uring per thread is supported now");
-  EXPECT_DEATH(IoUringFactoryImpl factory3(20, true),
-               "only one io_uring per thread is supported now");
+  EXPECT_DEATH(IoUringFactoryImpl factory2, "only one io_uring per thread is supported now");
+}
+
+TEST_F(IoUringImplTest, EmptyConfig) {
+  auto factory =
+      dynamic_cast<const IoUringFactoryBase*>(ioUringFactory("envoy.extensions.io.io_uring"));
+  ASSERT_NE(factory, nullptr);
+
+  ProtobufTypes::MessagePtr config =
+      const_cast<IoUringFactoryBase*>(factory)->createEmptyConfigProto();
+  EXPECT_NE(dynamic_cast<envoy::extensions::io::io_uring::v3::IoUring*>(config.get()), nullptr);
 }
 
 TEST_F(IoUringImplTest, RegisterEventfd) {
-  auto& uring = factory_.getOrCreate();
+  auto& uring = factory_->getOrCreate();
 
   EXPECT_FALSE(uring.isEventfdRegistered());
   uring.registerEventfd();
@@ -134,7 +151,7 @@ TEST_F(IoUringImplTest, PrepareReadvAllDataFitsOneChunk) {
   iov.iov_base = buffer;
   iov.iov_len = 4096;
 
-  auto& uring = factory_.getOrCreate();
+  auto& uring = factory_->getOrCreate();
   os_fd_t event_fd = uring.registerEventfd();
 
   const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
@@ -182,7 +199,7 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   iov3.iov_base = buffer3;
   iov3.iov_len = 2;
 
-  auto& uring = factory_.getOrCreate();
+  auto& uring = factory_->getOrCreate();
 
   os_fd_t event_fd = uring.registerEventfd();
   const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;

@@ -14,7 +14,9 @@ envoy_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/io:io_uring_impl_lib",
+        "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/io/io_uring/v3:pkg_cc_proto",
     ],
 )
