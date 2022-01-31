@@ -243,6 +243,7 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
 }
 
 TEST_F(AlternateProtocolsCacheImplTest, InvalidString) {
+  initialize();
   // Too many numbers
   EXPECT_FALSE(AlternateProtocolsCacheImpl::originDataFromString(
                    "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1|2|3", simTime(), true)
