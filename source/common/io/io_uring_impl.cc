@@ -28,8 +28,7 @@ IoUringFactoryImpl::IoUringFactoryImpl() {
 }
 
 IoUring& IoUringFactoryImpl::getOrCreate() const {
-  static thread_local IoUringImpl uring(io_uring_size_, use_submission_queue_polling_);
-  return uring;
+  return tls_->getTyped<IoUringImpl>();
 }
 
 Server::BootstrapExtensionPtr
@@ -38,8 +37,14 @@ IoUringFactoryImpl::createBootstrapExtension(const Protobuf::Message& config,
   auto typed_config =
       MessageUtil::downcastAndValidate<const envoy::extensions::io::io_uring::v3::IoUring&>(
           config, context.messageValidationContext().staticValidationVisitor());
-  io_uring_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(typed_config, io_uring_size, DefaultIoUringSize);
-  use_submission_queue_polling_ = typed_config.use_submission_queue_polling();
+  uint32_t io_uring_size =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(typed_config, io_uring_size, DefaultIoUringSize);
+  bool use_submission_queue_polling = typed_config.use_submission_queue_polling();
+
+  tls_ = context.threadLocal().allocateSlot();
+  tls_->set([io_uring_size, use_submission_queue_polling](Event::Dispatcher&) {
+    return std::make_shared<IoUringImpl>(io_uring_size, use_submission_queue_polling);
+  });
   return std::make_unique<IoUringExtension>(*this);
 }
 

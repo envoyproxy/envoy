@@ -33,13 +33,12 @@ public:
   std::string name() const override { return "envoy.extensions.io.io_uring"; };
 
 private:
-  uint32_t io_uring_size_{};
-  bool use_submission_queue_polling_{};
+  ThreadLocal::SlotPtr tls_;
 
   static thread_local bool is_instantiated_;
 };
 
-class IoUringImpl : public IoUring {
+class IoUringImpl : public IoUring, public ThreadLocal::ThreadLocalObject {
 public:
   IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling);
   ~IoUringImpl() override;
