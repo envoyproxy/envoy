@@ -158,11 +158,12 @@ TEST_F(IoUringImplTest, PrepareReadvAllDataFitsOneChunk) {
   int32_t completions_nr = 0;
   auto file_event = dispatcher->createFileEvent(
       event_fd,
-      [&uring, &completions_nr](uint32_t) {
+      [&uring, &completions_nr, d = dispatcher.get()](uint32_t) {
         uring.forEveryCompletion([&completions_nr](void*, int32_t res) {
           completions_nr++;
           EXPECT_EQ(res, strlen("test text"));
         });
+        d->exit();
       },
       trigger, Event::FileReadyType::Read);
 
@@ -170,7 +171,7 @@ TEST_F(IoUringImplTest, PrepareReadvAllDataFitsOneChunk) {
   EXPECT_STREQ(static_cast<char*>(iov.iov_base), "");
   uring.submit();
 
-  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher->run(Event::Dispatcher::RunType::Block);
 
   // Check that the completion callback has been actually called.
   EXPECT_EQ(completions_nr, 1);
