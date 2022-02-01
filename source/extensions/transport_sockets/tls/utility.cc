@@ -85,8 +85,7 @@ bool Utility::labelWildcardMatch(absl::string_view dns_label, absl::string_view 
     }
     size_t i = 0, p = 0, i_star = dns_label.size(), p_star = 0;
     while (i < dns_label.size()) {
-      if (p < pattern.size() &&
-          absl::ascii_tolower(dns_label[i]) == absl::ascii_tolower(pattern[p])) {
+      if (p < pattern.size() && dns_label[i] == pattern[p]) {
         ++i;
         ++p;
       } else if (p < pattern.size() && pattern[p] == glob) {
@@ -119,42 +118,21 @@ bool Utility::dnsNameMatch(absl::string_view dns_name, absl::string_view pattern
     return true;
   }
 
-  // https://www.rfc-editor.org/rfc/rfc6125#section-6.4.3 part #2
-  // If the wildcard character is the only character of the left-most
-  // label in the presented identifier, the client SHOULD NOT compare
-  // against anything but the left-most label of the reference identifier
-  // (e.g., *.example.com would match foo.example.com but
-  //       not bar.foo.example.com or example.com)
-  size_t pattern_len = lower_case_pattern.length();
-  if (pattern_len > 1 && lower_case_pattern[0] == '*' && lower_case_pattern[1] == '.') {
-    if (lower_case_dns_name.length() > pattern_len - 1) {
-      const size_t off = lower_case_dns_name.length() - pattern_len + 1;
-      return lower_case_dns_name.substr(0, off).find('.') == std::string::npos &&
-             lower_case_dns_name.substr(off, pattern_len - 1) ==
-                 lower_case_pattern.substr(1, pattern_len - 1);
-    }
-  }
+  std::vector<absl::string_view> split_pattern =
+      absl::StrSplit(lower_case_pattern, absl::MaxSplits('.', 1));
+  std::vector<absl::string_view> split_dns_name =
+      absl::StrSplit(lower_case_dns_name, absl::MaxSplits('.', 1));
 
-  // https://www.rfc-editor.org/rfc/rfc6125#section-6.4.3 part #3
-  // Match a presented identifier in which the wildcard character is not the only
-  // character of the label and don't match patter if the wildcard character is
-  // embedded within an A-label (A-label always starts with the ACE prefix "xn--")
-  // (e.g., baz*.example.net and *baz.example.net and b*z.example.net would
-  //       be taken to match baz1.example.net and foobaz.example.net and
-  //       buzz.example.net, respectively)
-  size_t pattern_left_label_len = lower_case_pattern.find('.');
-  size_t dns_name_left_label_len = lower_case_dns_name.find('.');
+  // dns name and pattern should contain more than 1 label to match
+  if (split_pattern.size() < 2 || split_dns_name.size() < 2) {
+    return false;
+  }
   // Only the left-most label in the pattern contains wildcard '*' and is not an A-label
-  if ((pattern_left_label_len != std::string::npos) &&
-      (dns_name_left_label_len != std::string::npos) &&
-      (lower_case_pattern.find('*') != std::string::npos) &&
-      (lower_case_pattern.find('*') < pattern_left_label_len) &&
-      (lower_case_pattern.substr(pattern_left_label_len).find('*') == std::string::npos) &&
-      (!absl::StartsWith(lower_case_pattern.substr(0, pattern_left_label_len), ACE_prefix))) {
-    return labelWildcardMatch(lower_case_dns_name.substr(0, dns_name_left_label_len),
-                              lower_case_pattern.substr(0, pattern_left_label_len)) &&
-           (lower_case_dns_name.substr(dns_name_left_label_len) ==
-            lower_case_pattern.substr(pattern_left_label_len));
+  if ((split_pattern[0].find('*') != std::string::npos) &&
+      (split_pattern[1].find('*') == std::string::npos) &&
+      (!absl::StartsWith(split_pattern[0], ACE_prefix))) {
+    return labelWildcardMatch(split_dns_name[0], split_pattern[0]) &&
+           (split_dns_name[1] == split_pattern[1]);
   }
 
   return false;
