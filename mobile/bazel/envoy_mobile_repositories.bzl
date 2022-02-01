@@ -69,18 +69,6 @@ def upstream_envoy_overrides():
         urls = ["https://github.com/bazelbuild/rules_python/archive/6f37aa9966f53e063c41b7509a386d53a9f156c3.tar.gz"],
     )
 
-    http_archive(
-        name = "com_github_nlohmann_json",
-        # 3.10.4 introduced incompatible changes with Envoy Mobile. Until Envoy Mobile updates it's
-        # minimum iOS version to 13+ this dependency needs to be patched.
-        patches = ["@envoy_mobile//bazel:json.patch"],
-        patch_args = ["-p1"],
-        sha256 = "1155fd1a83049767360e9a120c43c578145db3204d2b309eba49fbbedd0f4ed3",
-        strip_prefix = "json-3.10.4",
-        urls = ["https://github.com/nlohmann/json/archive/v3.10.4.tar.gz"],
-        build_file = "@envoy//bazel/external:json.BUILD",
-    )
-
 def swift_repos():
     http_archive(
         name = "build_bazel_rules_apple",
