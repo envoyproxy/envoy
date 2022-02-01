@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("@base_pip3//:requirements.bzl", base_entry_point = "entry_point")
 
 def envoy_py_test(name, package, visibility, envoy_prefix = "@envoy"):
@@ -29,27 +29,6 @@ def envoy_py_test(name, package, visibility, envoy_prefix = "@envoy"):
         deps = test_deps,
         visibility = visibility,
     )
-
-def envoy_py_library(
-        name = None,
-        deps = [],
-        data = [],
-        visibility = ["//visibility:public"],
-        envoy_prefix = "",
-        test = True):
-    _parts = name.split(".")
-    package = ".".join(_parts[:-1])
-    name = _parts[-1]
-
-    py_library(
-        name = name,
-        srcs = ["%s.py" % name],
-        deps = deps,
-        data = data,
-        visibility = visibility,
-    )
-    if test:
-        envoy_py_test(name, package, visibility, envoy_prefix = envoy_prefix)
 
 def envoy_py_binary(
         name = None,

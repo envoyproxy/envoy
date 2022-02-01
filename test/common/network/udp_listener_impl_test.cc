@@ -167,9 +167,6 @@ TEST_P(UdpListenerImplTest, LargeDatagramRecvmmsg) {
 
 TEST_P(UdpListenerImplTest, LimitNumberOfReadsPerLoop) {
   setup();
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
-    return;
-  }
   const uint64_t num_packets_per_read =
       Api::OsSysCallsSingleton::get().supportsMmsg() ? NUM_DATAGRAMS_PER_RECEIVE : 1u;
 
@@ -417,11 +414,7 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
   // Inject mocked OsSysCalls implementation to mock a read failure.
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, supportsMmsg())
-      .Times(
-          (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")
-               ? 2u
-               : 1u));
+  EXPECT_CALL(os_sys_calls, supportsMmsg()).Times((2u));
   EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOT_SUP}));
 

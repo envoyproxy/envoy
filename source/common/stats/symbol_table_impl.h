@@ -121,7 +121,7 @@ public:
     /**
      * Decodes a uint8_t array into a SymbolVec.
      */
-    static SymbolVec decodeSymbols(const SymbolTable::Storage array, size_t size);
+    static SymbolVec decodeSymbols(StatName stat_name);
 
     /**
      * Decodes a uint8_t array into a sequence of symbols and literal strings.
@@ -134,8 +134,7 @@ public:
      * @param symbol_token_fn a function to be called whenever a symbol is encountered in the array.
      * @param string_view_token_fn a function to be called whenever a string literal is encountered.
      */
-    static void decodeTokens(const SymbolTable::Storage array, size_t size,
-                             const std::function<void(Symbol)>& symbol_token_fn,
+    static void decodeTokens(StatName stat_name, const std::function<void(Symbol)>& symbol_token_fn,
                              const std::function<void(absl::string_view)>& string_view_token_fn);
 
     /**
@@ -198,6 +197,10 @@ public:
     static std::pair<uint64_t, size_t> decodeNumber(const uint8_t* encoding);
 
   private:
+    friend class StatName;
+    friend class SymbolTable;
+    class TokenIter;
+
     size_t data_bytes_required_{0};
     MemBlockBuilder<uint8_t> mem_block_;
   };
@@ -322,6 +325,42 @@ public:
    */
   DynamicSpans getDynamicSpans(StatName stat_name) const;
 
+  bool lessThanLockHeld(const StatName& a, const StatName& b) const;
+
+  template <class GetStatName, class Obj> struct StatNameCompare {
+    StatNameCompare(const SymbolTable& symbol_table, GetStatName getter)
+        : symbol_table_(symbol_table), getter_(getter) {}
+
+    bool operator()(const Obj& a, const Obj& b) const;
+
+    const SymbolTable& symbol_table_;
+    GetStatName getter_;
+  };
+
+  /**
+   * Sorts a range by StatName. This API is more efficient than
+   * calling std::sort directly as it takes a single lock for the
+   * entire sort, rather than locking on each comparison.
+   *
+   * This is a free function rather than a method of SymbolTable because
+   * SymbolTable is an abstract class and it's hard to make a virtual template
+   * function.
+   *
+   * @param symbol_table the symbol table that owns the StatNames.
+   * @param begin the beginning of the range to sort
+   * @param end the end of the range to sort
+   * @param get_stat_name a functor that takes an Obj and returns a StatName.
+   */
+  template <class Obj, class Iter, class GetStatName>
+  void sortByStatNames(Iter begin, Iter end, GetStatName get_stat_name) const {
+
+    // Grab the lock once before sorting begins, so we don't have to re-take
+    // it on every comparison.
+    Thread::LockGuard lock(lock_);
+    StatNameCompare<GetStatName, Obj> compare(*this, get_stat_name);
+    std::sort(begin, end, compare);
+  }
+
 private:
   friend class StatName;
   friend class StatNameTest;
@@ -386,7 +425,7 @@ private:
    * @param size the size of the array in bytes.
    * @return std::string the retrieved stat name.
    */
-  std::vector<absl::string_view> decodeStrings(const Storage array, size_t size) const;
+  std::vector<absl::string_view> decodeStrings(StatName stat_name) const;
 
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
@@ -1018,6 +1057,13 @@ private:
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;
 };
+
+template <class GetStatName, class Obj>
+bool SymbolTable::StatNameCompare<GetStatName, Obj>::operator()(const Obj& a, const Obj& b) const {
+  StatName a_stat_name = getter_(a);
+  StatName b_stat_name = getter_(b);
+  return symbol_table_.lessThanLockHeld(a_stat_name, b_stat_name);
+}
 
 using SymbolTablePtr = std::unique_ptr<SymbolTable>;
 

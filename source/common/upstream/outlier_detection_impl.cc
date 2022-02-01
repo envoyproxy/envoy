@@ -368,6 +368,7 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
 
 bool DetectorImpl::enforceEjection(envoy::data::cluster::v3::OutlierEjectionType type) {
   switch (type) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::data::cluster::v3::CONSECUTIVE_5XX:
     return runtime_.snapshot().featureEnabled(EnforcingConsecutive5xxRuntime,
                                               config_.enforcingConsecutive5xx());
@@ -389,17 +390,15 @@ bool DetectorImpl::enforceEjection(envoy::data::cluster::v3::OutlierEjectionType
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     return runtime_.snapshot().featureEnabled(EnforcingFailurePercentageLocalOriginRuntime,
                                               config_.enforcingFailurePercentageLocalOrigin());
-  default:
-    // Checked by schema.
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void DetectorImpl::updateEnforcedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type) {
   stats_.ejections_enforced_total_.inc();
   switch (type) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::data::cluster::v3::SUCCESS_RATE:
     stats_.ejections_enforced_success_rate_.inc();
     break;
@@ -421,14 +420,12 @@ void DetectorImpl::updateEnforcedEjectionStats(envoy::data::cluster::v3::Outlier
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     stats_.ejections_enforced_local_origin_failure_percentage_.inc();
     break;
-  default:
-    // Checked by schema.
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
 void DetectorImpl::updateDetectedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type) {
   switch (type) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::data::cluster::v3::SUCCESS_RATE:
     stats_.ejections_detected_success_rate_.inc();
     break;
@@ -450,9 +447,6 @@ void DetectorImpl::updateDetectedEjectionStats(envoy::data::cluster::v3::Outlier
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     stats_.ejections_detected_local_origin_failure_percentage_.inc();
     break;
-  default:
-    // Checked by schema.
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -554,6 +548,16 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host,
 
   // reset counters
   switch (type) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::data::cluster::v3::SUCCESS_RATE:
+    FALLTHRU;
+  case envoy::data::cluster::v3::SUCCESS_RATE_LOCAL_ORIGIN:
+    FALLTHRU;
+  case envoy::data::cluster::v3::FAILURE_PERCENTAGE:
+    FALLTHRU;
+  case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
+    IS_ENVOY_BUG("unexpected non-consecutive errorr");
+    return;
   case envoy::data::cluster::v3::CONSECUTIVE_5XX:
     stats_.ejections_consecutive_5xx_.inc(); // Deprecated
     host_monitors_[host]->resetConsecutive5xx();
@@ -564,9 +568,6 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host,
   case envoy::data::cluster::v3::CONSECUTIVE_LOCAL_ORIGIN_FAILURE:
     host_monitors_[host]->resetConsecutiveLocalOriginFailure();
     break;
-  default:
-    // Checked by schema.
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
