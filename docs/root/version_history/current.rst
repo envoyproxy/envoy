@@ -16,6 +16,7 @@ Bug Fixes
 
 * data plane: fix crash when internal redirect selects a route configured with direct response or redirect actions.
 * jwt_authn: fixed the crash when a CONNECT request is sent to JWT filter configured with regex match on the Host header.
+* upstream: fix stack overflow when a cluster with large number of idle connections is removed.
 
 Removed Config or Runtime
 -------------------------

@@ -441,6 +441,34 @@ envoy::config::cluster::v3::Cluster ConfigHelper::buildStaticCluster(const std::
                   name, name, address, port, lb_policy));
 }
 
+envoy::config::cluster::v3::Cluster ConfigHelper::buildH1ClusterWithHighCircuitBreakersLimits(
+    const std::string& name, int port, const std::string& address, const std::string& lb_policy) {
+  return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(
+      fmt::format(R"EOF(
+      name: {}
+      connect_timeout: 50s
+      type: STATIC
+      circuit_breakers:
+        thresholds:
+        - priority: DEFAULT
+          max_connections: 10000
+          max_pending_requests: 10000
+          max_requests: 10000
+          max_retries: 10000
+      load_assignment:
+        cluster_name: {}
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: {}
+                  port_value: {}
+      lb_policy: {}
+    )EOF",
+                  name, name, address, port, lb_policy));
+}
+
 envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name,
                                                                const std::string& lb_policy) {
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
