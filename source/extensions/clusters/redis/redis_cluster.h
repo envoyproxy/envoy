@@ -126,7 +126,7 @@ private:
   void updateAllHosts(const Upstream::HostVector& hosts_added,
                       const Upstream::HostVector& hosts_removed, uint32_t priority);
 
-  void onClusterSlotUpdate(ClusterSlotsPtr&&);
+  void onClusterSlotUpdate(ClusterSlotsSharedPtr&&);
 
   void reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) override;
 
@@ -244,9 +244,9 @@ private:
     Network::Address::InstanceConstSharedPtr
     ipAddressFromClusterEntry(const std::vector<NetworkFilters::Common::Redis::RespValue>& value);
     bool validateCluster(const NetworkFilters::Common::Redis::RespValue& value);
-    void resolveClusterHostnames(ClusterSlotsPtr&& slots);
-    void resolveReplicas(std::shared_ptr<ClusterSlotsPtr> slots, std::size_t index);
-    void finishClusterHostnameResolution(std::shared_ptr<ClusterSlotsPtr> slots);
+    void resolveClusterHostnames(ClusterSlotsSharedPtr&& slots);
+    void resolveReplicas(ClusterSlotsSharedPtr slots, std::size_t index);
+    void finishClusterHostnameResolution(ClusterSlotsSharedPtr slots);
     void updateDnsStats(Network::DnsResolver::ResolutionStatus status, bool empty_response);
 
     RedisCluster& parent_;

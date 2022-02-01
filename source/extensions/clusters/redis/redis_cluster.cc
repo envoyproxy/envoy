@@ -92,7 +92,7 @@ void RedisCluster::updateAllHosts(const Upstream::HostVector& hosts_added,
       hosts_added, hosts_removed, absl::nullopt);
 }
 
-void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
+void RedisCluster::onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots) {
   Upstream::HostVector new_hosts;
   absl::flat_hash_set<std::string> all_new_hosts;
 
@@ -319,21 +319,19 @@ void RedisCluster::RedisDiscoverySession::updateDnsStats(
  *
  * @param slots the list of slots which may need DNS resolution
  */
-void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(ClusterSlotsPtr&& slots) {
-  std::shared_ptr<ClusterSlotsPtr> slots_shared_ptr =
-      std::make_shared<ClusterSlotsPtr>(std::move(slots));
+void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(ClusterSlotsSharedPtr&& slots) {
   std::size_t slot_idx = 0;
-  while (slot_idx < (**slots_shared_ptr).size()) {
-    auto& slot = (**slots_shared_ptr)[slot_idx];
+  while (slot_idx < (*slots).size()) {
+    auto& slot = (*slots)[slot_idx];
     if (slot.primary() == nullptr) {
       ENVOY_LOG(trace,
                 "starting async DNS resolution for primary slot address {} at index location {}",
                 slot.primary_hostname_, slot_idx);
       parent_.dns_resolver_->resolve(
           slot.primary_hostname_, parent_.dns_lookup_family_,
-          [this, slot_idx, slots_shared_ptr](Network::DnsResolver::ResolutionStatus status,
-                                             std::list<Network::DnsResponse>&& response) -> void {
-            auto& slot = (**slots_shared_ptr)[slot_idx];
+          [this, slot_idx, slots](Network::DnsResolver::ResolutionStatus status,
+                                  std::list<Network::DnsResponse>&& response) -> void {
+            auto& slot = (*slots)[slot_idx];
             ENVOY_LOG(trace, "async DNS resolution complete for {}", slot.primary_hostname_);
             updateDnsStats(status, response.empty());
             // If DNS resolution for a primary fails, we stop resolution for remaining, and reset
@@ -348,10 +346,10 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(ClusterSlotsPt
             slot.setPrimary(Network::Utility::getAddressWithPort(
                 *response.front().addrInfo().address_, slot.primary_port_));
             // Continue on to resolve replicas
-            resolveReplicas(std::move(slots_shared_ptr), slot_idx);
+            resolveReplicas(slots, slot_idx);
           });
     } else {
-      resolveReplicas(slots_shared_ptr, slot_idx);
+      resolveReplicas(slots, slot_idx);
     }
     slot_idx++;
   }
@@ -364,12 +362,12 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(ClusterSlotsPt
  * @param slots the list of slots which may need DNS resolution
  * @param index the specific index into `slots` whose replicas need to be resolved
  */
-void RedisCluster::RedisDiscoverySession::resolveReplicas(std::shared_ptr<ClusterSlotsPtr> slots,
+void RedisCluster::RedisDiscoverySession::resolveReplicas(ClusterSlotsSharedPtr slots,
                                                           std::size_t index) {
-  auto& slot = (**slots)[index];
+  auto& slot = (*slots)[index];
   if (slot.replicas_to_resolve_.empty()) {
-    if (index == (**slots).size() - 1) {
-      finishClusterHostnameResolution(std::move(slots));
+    if (index == (*slots).size() - 1) {
+      finishClusterHostnameResolution(slots);
     }
     return;
   }
@@ -382,7 +380,7 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(std::shared_ptr<Cluste
         replica.first, parent_.dns_lookup_family_,
         [this, index, slots, replica_idx](Network::DnsResolver::ResolutionStatus status,
                                           std::list<Network::DnsResponse>&& response) -> void {
-          auto& slot = (**slots)[index];
+          auto& slot = (*slots)[index];
           auto& replica = slot.replicas_to_resolve_[replica_idx];
           ENVOY_LOG(trace, "async DNS resolution complete for {}", replica.first);
           updateDnsStats(status, response.empty());
@@ -397,9 +395,8 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(std::shared_ptr<Cluste
           }
           // finish resolution if it's the last primary and last replica of that primary being
           // resolved
-          if (index == (**slots).size() - 1 &&
-              replica_idx == slot.replicas_to_resolve_.size() - 1) {
-            finishClusterHostnameResolution(std::move(slots));
+          if (index == (*slots).size() - 1 && replica_idx == slot.replicas_to_resolve_.size() - 1) {
+            finishClusterHostnameResolution(slots);
           }
         });
     replica_idx++;
@@ -407,8 +404,8 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(std::shared_ptr<Cluste
 }
 
 void RedisCluster::RedisDiscoverySession::finishClusterHostnameResolution(
-    std::shared_ptr<ClusterSlotsPtr> slots) {
-  parent_.onClusterSlotUpdate(std::move(*slots));
+    ClusterSlotsSharedPtr slots) {
+  parent_.onClusterSlotUpdate(std::move(slots));
   resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
 }
 
@@ -427,7 +424,7 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     return;
   }
 
-  auto cluster_slots = std::make_unique<std::vector<ClusterSlot>>();
+  auto cluster_slots = std::make_shared<std::vector<ClusterSlot>>();
 
   // https://redis.io/commands/cluster-slots
   // CLUSTER SLOTS represents nested array of redis instances, like this:
