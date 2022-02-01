@@ -353,7 +353,7 @@ TEST_P(ProxyFilterIntegrationTest, DNSCacheHostOverflow) {
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_overflow")->value());
 }
 
-// Verify that DFP works without TLS.
+// Verify that the filter works without TLS.
 TEST_P(ProxyFilterIntegrationTest, UpstreamCleartext) {
   upstream_tls_ = true;
   initializeWithArgs();
