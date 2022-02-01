@@ -99,6 +99,7 @@ public:
    * @return bool true if a lexically precedes b.
    */
   virtual bool lessThan(const StatName& a, const StatName& b) const PURE;
+  virtual bool lessThanLockHeld(const StatName& a, const StatName& b) const PURE;
 
   /**
    * Joins two or more StatNames. For example if we have StatNames for {"a.b",
@@ -182,6 +183,19 @@ public:
    * @return the array of pairs indicating the bounds.
    */
   virtual DynamicSpans getDynamicSpans(StatName stat_name) const PURE;
+
+  /**
+   * Calls a function with the symbol table's lock held. This is needed
+   * for sortByStatName to avoid taking a lock on each comparison.
+   *
+   * TODO(jmarantz): This indirection can likely be removed once SymbolTable
+   * is changed from an interface to a concrete implementation. The interface
+   * was only longer needed during construction to allow for a fake symbol
+   * table implementation to be used by default and controlled by flag.
+   *
+   * @param fn a function to be called once the lock ahs been acquired.
+   */
+  virtual void withLockHeld(std::function<void()> fn) const PURE;
 
 private:
   friend struct HeapStatData;
