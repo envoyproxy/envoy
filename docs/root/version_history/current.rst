@@ -15,6 +15,7 @@ Bug Fixes
 
 * data plane: fix crash when internal redirect selects a route configured with direct response or redirect actions.
 * jwt_authn: fixed the crash when a CONNECT request is sent to JWT filter configured with regex match on the Host header.
+* tcp_proxy: fix a crash that occurs when configured for :ref:`upstream tunneling <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.tunneling_config>` and the downstream connection disconnects while the the upstream connection or http/2 stream is still being established.
 
 Removed Config or Runtime
 -------------------------

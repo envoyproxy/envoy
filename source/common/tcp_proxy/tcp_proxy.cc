@@ -531,6 +531,11 @@ Network::FilterStatus Filter::onNewConnection() {
 }
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
+    downstream_closed_ = true;
+  }
+
   if (upstream_) {
     Tcp::ConnectionPool::ConnectionDataPtr conn_data(upstream_->onDownstreamEvent(event));
     if (conn_data != nullptr &&
@@ -579,7 +584,9 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
             Upstream::Outlier::Result::LocalOriginConnectFailed);
       }
 
-      initializeUpstreamConnection();
+      if (!downstream_closed_) {
+        initializeUpstreamConnection();
+      }
     } else {
       if (read_callbacks_->connection().state() == Network::Connection::State::Open) {
         read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
