@@ -1088,16 +1088,18 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
 RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMap& headers,
                                                             const uint64_t random_value,
                                                             const bool ignore_overflow) const {
-  uint64_t selected_value = random_value % total_cluster_weight_;
-  // Override the selected value with provided random value if related name is specified in the
-  // header.
+  absl::optional<uint64_t> random_value_from_header;
+  // Retrieve the random value from the header if corresponding header name is specified.
   if (!random_value_name_.empty()) {
     const auto header_value = headers.get(Envoy::Http::LowerCaseString(random_value_name_));
     if (!header_value.empty()) {
+      // We expect single-valued header here, otherwise it will potentially cause inconsistent
+      // weighted cluster picking throughout the process because different values are used to
+      // compute the selected value. Asserts it here and always use the first entry in the header.
       ASSERT(header_value.size() == 1);
-      uint64_t random_value_from_header = 0;
-      if (absl::SimpleAtoi(header_value[0]->value().getStringView(), &random_value_from_header)) {
-        selected_value = random_value_from_header % total_cluster_weight_;
+      uint64_t random_value = 0;
+      if (absl::SimpleAtoi(header_value[0]->value().getStringView(), &random_value)) {
+        random_value_from_header = random_value;
       }
     } else {
       // Random value should be found here. But if it is not found due to some errors, log the
@@ -1107,6 +1109,9 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
     }
   }
 
+  const uint64_t selected_value =
+      (random_value_from_header.has_value() ? random_value_from_header.value() : random_value) %
+      total_cluster_weight_;
   uint64_t begin = 0;
   uint64_t end = 0;
 

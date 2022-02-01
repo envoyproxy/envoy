@@ -125,7 +125,7 @@ Http::TestRequestHeaderMapImpl genPathlessHeaders(const std::string& host,
 Http::TestRequestHeaderMapImpl
 genHeaders(const std::string& host, const std::string& path, const std::string& method,
            const std::string& scheme,
-           const std::pair<std::string, std::string>* random_value_pair) {
+           absl::optional<std::pair<std::string, std::string>> random_value_pair) {
   auto hdrs =
       Http::TestRequestHeaderMapImpl{{":authority", host},         {":path", path},
                                      {":method", method},          {"x-safe", "safe"},
@@ -137,16 +137,16 @@ genHeaders(const std::string& host, const std::string& path, const std::string& 
     hdrs.remove(":scheme");
   }
 
-  if (random_value_pair != nullptr) {
-    hdrs.setByKey(Envoy::Http::LowerCaseString(random_value_pair->first),
-                  random_value_pair->second);
+  if (random_value_pair.has_value()) {
+    hdrs.setByKey(Envoy::Http::LowerCaseString(random_value_pair.value().first),
+                  random_value_pair.value().second);
   }
   return hdrs;
 }
 
 struct OptionalGenHeadersArg {
   std::string scheme = "http";
-  const std::pair<std::string, std::string>* random_value_pair = nullptr;
+  absl::optional<std::pair<std::string, std::string>> random_value_pair;
 };
 
 Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
@@ -3063,7 +3063,7 @@ TEST_F(RouteMatcherTest, WeightedClusterWithProvidedRandomValue) {
   // `random_value_pair` which will be passed to request header.
   std::pair<std::string, std::string> random_value_pair = {"x_random_value", "10"};
   OptionalGenHeadersArg optional_arg;
-  optional_arg.random_value_pair = &random_value_pair;
+  optional_arg.random_value_pair = random_value_pair;
   Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET", optional_arg);
   // Here we expect `cluster1` is selected even though random value passed to `route()` function is
   // 60 because the overridden weight specified in `random_value_pair` is 10.
