@@ -193,6 +193,33 @@ protected:
     pool_callbacks_->onFailure();
   }
 
+  NetworkFilters::Common::Redis::RespValuePtr singleSlotPrimary(const std::string& primary,
+                                                                int64_t port) const {
+    std::vector<NetworkFilters::Common::Redis::RespValue> primary_1(2);
+    primary_1[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+    primary_1[0].asString() = primary;
+    primary_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    primary_1[1].asInteger() = port;
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slot_1(3);
+    slot_1[0].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slot_1[0].asInteger() = 0;
+    slot_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slot_1[1].asInteger() = 16383;
+    slot_1[2].type(NetworkFilters::Common::Redis::RespType::Array);
+    slot_1[2].asArray().swap(primary_1);
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slots(1);
+    slots[0].type(NetworkFilters::Common::Redis::RespType::Array);
+    slots[0].asArray().swap(slot_1);
+
+    NetworkFilters::Common::Redis::RespValuePtr response(
+        new NetworkFilters::Common::Redis::RespValue());
+    response->type(NetworkFilters::Common::Redis::RespType::Array);
+    response->asArray().swap(slots);
+    return response;
+  }
+
   NetworkFilters::Common::Redis::RespValuePtr singleSlotPrimaryReplica(const std::string& primary,
                                                                        const std::string& replica,
                                                                        int64_t port) const {
@@ -722,8 +749,31 @@ TEST_F(RedisClusterTest, AddressAsHostname) {
   EXPECT_CALL(initialized_, ready());
   cluster_->initialize([&]() -> void { initialized_.ready(); });
 
+  // 1. Single slot with primary and replica
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
   expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22120));
+  expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.2:22120"}));
+  EXPECT_EQ(0U, cluster_->info()->stats().update_failure_.value());
+
+  // 2. Single slot with just the primary hostname
+  expectRedisResolve(true);
+  EXPECT_CALL(membership_updated_, ready());
+  resolve_timer_->invokeCallback();
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com",
+                         primary_resolved_addresses);
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  expectClusterSlotResponse(singleSlotPrimary("primary.com", 22120));
+  expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120"}));
+  EXPECT_EQ(0U, cluster_->info()->stats().update_failure_.value());
+
+  // 2. Single slot with just the primary IP address and replica hostname
+  expectRedisResolve();
+  EXPECT_CALL(membership_updated_, ready());
+  resolve_timer_->invokeCallback();
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "replica.org",
+                         replica_resolved_addresses);
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  expectClusterSlotResponse(singleSlotPrimaryReplica("127.0.1.1", "replica.org", 22120));
   expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.2:22120"}));
   EXPECT_EQ(0U, cluster_->info()->stats().update_failure_.value());
 }
