@@ -145,6 +145,7 @@ typed_config:
                                                              "\n", cache_file_value_contents_));
     }
   }
+
   void testConnectionTiming(IntegrationStreamDecoderPtr& response, bool cached_dns,
                             int64_t original_usec);
 
@@ -178,9 +179,6 @@ void ProxyFilterIntegrationTest::testConnectionTiming(IntegrationStreamDecoderPt
   int64_t response_begin = getHeaderValue(response->headers(), "response_begin");
   Event::DispatcherImpl dispatcher("foo", *api_, timeSystem());
 
-  auto time = timeSystem().monotonicTime();
-  int64_t now = time.time_since_epoch().count();
-
   ASSERT_LT(original_usec, dns_start);
   ASSERT_LE(dns_start, dns_end);
   if (cached_dns) {
@@ -193,7 +191,6 @@ void ProxyFilterIntegrationTest::testConnectionTiming(IntegrationStreamDecoderPt
   ASSERT_LE(handshake_end, request_send_end);
   ASSERT_LE(request_send_end, response_begin);
   ASSERT_LT(handshake_end, timeSystem().monotonicTime().time_since_epoch().count());
-  ASSERT_EQ(now, time.time_since_epoch().count());
 }
 
 class ProxyFilterWithSimtimeIntegrationTest : public Event::TestUsingSimulatedTime,
