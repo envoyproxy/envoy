@@ -6,6 +6,7 @@
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/common/debug_recursion_checker.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/linked_object.h"
 
@@ -201,6 +202,9 @@ public:
   void onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                          Network::ConnectionEvent event);
 
+  // Check if the pool has gone idle and invoke idle notification callbacks.
+  void checkForIdleAndNotify();
+
   // See if the pool has gone idle. If we're draining, this will also close idle connections.
   void checkForIdleAndCloseIdleConnsIfDraining();
 
@@ -345,6 +349,7 @@ private:
 
   void onUpstreamReady();
   Event::SchedulableCallbackPtr upstream_ready_cb_;
+  Common::DebugRecursionChecker recursion_checker_;
 };
 
 } // namespace ConnectionPool

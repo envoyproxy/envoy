@@ -1,6 +1,7 @@
 #include "source/common/conn_pool/conn_pool_base.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/debug_recursion_checker.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
@@ -333,6 +334,8 @@ void ConnPoolImplBase::transitionActiveClientState(ActiveClient& client,
 void ConnPoolImplBase::addIdleCallbackImpl(Instance::IdleCb cb) { idle_callbacks_.push_back(cb); }
 
 void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
+  Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
+
   // Create a separate list of elements to close to avoid mutate-while-iterating problems.
   std::list<ActiveClient*> to_close;
 
@@ -387,11 +390,7 @@ bool ConnPoolImplBase::isIdleImpl() const {
          connecting_clients_.empty();
 }
 
-void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
-  if (is_draining_for_deletion_) {
-    closeIdleConnectionsForDrainingPool();
-  }
-
+void ConnPoolImplBase::checkForIdleAndNotify() {
   if (isIdleImpl()) {
     ENVOY_LOG(debug, "invoking idle callbacks - is_draining_for_deletion_={}",
               is_draining_for_deletion_);
@@ -399,6 +398,14 @@ void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
       cb();
     }
   }
+}
+
+void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
+  if (is_draining_for_deletion_) {
+    closeIdleConnectionsForDrainingPool();
+  }
+
+  checkForIdleAndNotify();
 }
 
 void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
@@ -459,7 +466,15 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
 
     dispatcher_.deferredDelete(client.removeFromList(owningList(client.state())));
 
-    checkForIdleAndCloseIdleConnsIfDraining();
+    // Check if the pool transitioned to idle state after removing closed client
+    // from one of the client tracking lists.
+    // There is no need to check if other connections are idle in a draining pool
+    // because the pool will close all idle connection when it is starting to
+    // drain.
+    // Trying to close other connections here can lead to deep recursion when
+    // a large number idle connections are closed at the start of pool drain.
+    // See CdsIntegrationTest.CdsClusterDownWithLotsOfIdleConnections for an example.
+    checkForIdleAndNotify();
 
     client.setState(ActiveClient::State::CLOSED);
 
