@@ -161,7 +161,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quiche_common_platform_impl_lib",
     hdrs = [
-        "quiche_flag_utils_impl.h",
         "quiche_logging_impl.h",
     ],
     external_deps = [
