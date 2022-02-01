@@ -75,9 +75,11 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
 Http::Code StatsHandler::handlerStats(absl::string_view url,
                                       Http::ResponseHeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream& admin_stream) {
+#if 0
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
+#endif
 
   const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(url);
 
