@@ -130,9 +130,12 @@ uint64_t OwnedImpl::copyOutToSlices(uint64_t size, Buffer::RawSlice* dest_slices
     const Slice& src_slice = slices_[num_src_slices_read];
     const Buffer::RawSlice& dest_slice = dest_slices[num_dest_slices_read];
     uint64_t left_to_read = total_length_to_read - num_bytes_read;
-    uint64_t left_data_size_in_slice = src_slice.dataSize() - src_slice_offset;
-    uint64_t length_to_copy = std::min(
-        left_data_size_in_slice, std::min(static_cast<uint64_t>(dest_slice.len_), left_to_read));
+    uint64_t left_data_size_in_dst_slice = dest_slice.len_ - dest_slice_offset;
+    uint64_t left_data_size_in_src_slice = src_slice.dataSize() - src_slice_offset;
+    // The length to copy should be size of smallest in the source slice available size and
+    // the dest slice available size.
+    uint64_t length_to_copy =
+        std::min(left_data_size_in_src_slice, std::min(left_data_size_in_dst_slice, left_to_read));
     memcpy(static_cast<uint8_t*>(dest_slice.mem_) + dest_slice_offset, // NOLINT(safe-memcpy)
            src_slice.data() + src_slice_offset, length_to_copy);
     src_slice_offset = src_slice_offset + length_to_copy;
@@ -145,6 +148,8 @@ uint64_t OwnedImpl::copyOutToSlices(uint64_t size, Buffer::RawSlice* dest_slices
       num_dest_slices_read++;
       dest_slice_offset = 0;
     }
+    ASSERT(src_slice_offset <= src_slice.dataSize());
+    ASSERT(dest_slice_offset <= dest_slice.len_);
     num_bytes_read += length_to_copy;
   }
   return num_bytes_read;

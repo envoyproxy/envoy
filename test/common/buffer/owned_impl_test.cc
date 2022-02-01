@@ -1174,6 +1174,31 @@ TEST_F(OwnedImplTest, CopyOutToSlicesTests) {
     reservation.commit(data.size());
     EXPECT_EQ(data, dest_buf.toString());
   }
+  {
+    Buffer::OwnedImpl src_buffer;
+    // Create a slice with a small amount of data.
+    const uint32_t small_data_size = 10;
+    std::string small_data = std::string(small_data_size, 'a');
+    src_buffer.prepend(small_data);
+
+    // Add another slice with a large amount of data.
+    const uint32_t large_data_size = 16384;
+    std::string large_data = std::string(large_data_size, 'b');
+    BufferFragmentImpl frag(large_data.data(), large_data.size(), nullptr);
+    src_buffer.addBufferFragment(frag);
+    EXPECT_EQ(small_data_size + large_data_size, src_buffer.length());
+
+    // Copy-out from the buffer.
+    Buffer::OwnedImpl dest_buf;
+    auto reservation = dest_buf.reserveForRead();
+    EXPECT_EQ(small_data_size + large_data_size,
+              src_buffer.copyOutToSlices(small_data_size + large_data_size, reservation.slices(),
+                                         reservation.numSlices()));
+    reservation.commit(small_data_size + large_data_size);
+    EXPECT_EQ(absl::StrCat(small_data, large_data), dest_buf.toString());
+
+    src_buffer.drain(small_data_size + large_data_size);
+  }
 }
 
 // Slice size large enough to prevent slice content from being coalesced into an existing slice
