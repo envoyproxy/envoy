@@ -207,6 +207,9 @@ public:
     };
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
+  const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
+    return proxy_status_config_.get();
+  }
 
 private:
   /**
@@ -232,9 +235,7 @@ private:
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
     void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
-                                   std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
+                                   std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {}
 
     Router::ConfigConstSharedPtr config_;
     TimeSource& time_source_;
@@ -294,7 +295,7 @@ private:
 
     bool registerForAction(const std::string&, Event::Dispatcher&, OverloadActionCb) override {
       // This method shouldn't be called by the admin listener
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      IS_ENVOY_BUG("Unexpected function call");
       return false;
     }
 
@@ -462,6 +463,7 @@ private:
   const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
   const absl::optional<std::string> scheme_{};
   const bool ignore_global_conn_limit_;
+  std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
 };
 
 } // namespace Server

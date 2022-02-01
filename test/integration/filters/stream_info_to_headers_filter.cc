@@ -40,11 +40,14 @@ public:
       headers.addCopy(Http::LowerCaseString("dns_end"),
                       absl::StrCat(toMs(stream_info.downstreamTiming().getValue(dns_end).value())));
     }
-    if (decoder_callbacks_->streamInfo().upstreamInfo() &&
-        decoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()) {
-      headers.addCopy(
-          Http::LowerCaseString("alpn"),
-          decoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()->alpn());
+    if (decoder_callbacks_->streamInfo().upstreamInfo()) {
+      if (decoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()) {
+        headers.addCopy(
+            Http::LowerCaseString("alpn"),
+            decoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()->alpn());
+      }
+      headers.addCopy(Http::LowerCaseString("num_streams"),
+                      decoder_callbacks_->streamInfo().upstreamInfo()->upstreamNumStreams());
     }
 
     return Http::FilterHeadersStatus::Continue;

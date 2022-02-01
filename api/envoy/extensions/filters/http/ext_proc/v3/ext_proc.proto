@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ext_proc.v3;
 
+import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 
@@ -31,7 +32,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // * Request and response attributes are not sent and not processed.
 // * Dynamic metadata in responses from the external processor is ignored.
 // * "async mode" is not implemented
-// * Per-route configuration is not implemented
 
 // The filter communicates with an external gRPC service called an "external processor"
 // that can do a variety of things with the request and response:
@@ -95,7 +95,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // messages, and the server must reply with
 // :ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>`.
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message ExternalProcessor {
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
@@ -151,6 +151,14 @@ message ExternalProcessor {
   // Optional additional prefix to use when emitting statistics. This allows to distinguish
   // emitted statistics between configured *ext_proc* filters in an HTTP filter chain.
   string stat_prefix = 8;
+
+  // Rules that determine what modifications an external processing server may
+  // make to message headers. If not set, all headers may be modified except
+  // for "host", ":authority", ":scheme", ":method", and headers that start
+  // with the header prefix set via
+  // :ref:`header_prefix <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.header_prefix>`
+  // (which is usually "x-envoy").
+  config.common.mutation_rules.v3.HeaderMutationRules mutation_rules = 9;
 }
 
 // Extra settings that may be added to per-route configuration for a

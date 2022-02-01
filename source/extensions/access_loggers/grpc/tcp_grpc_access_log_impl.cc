@@ -32,13 +32,14 @@ TcpGrpcAccessLog::TcpGrpcAccessLog(AccessLog::FilterPtr&& filter,
       });
 }
 
-void TcpGrpcAccessLog::emitLog(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                               const Http::ResponseTrailerMap&,
+void TcpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_header,
+                               const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
                                const StreamInfo::StreamInfo& stream_info) {
   // Common log properties.
   envoy::data::accesslog::v3::TCPAccessLogEntry log_entry;
   GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),
-                                                        stream_info, config_->common_config());
+                                                        request_header, stream_info,
+                                                        config_->common_config());
 
   envoy::data::accesslog::v3::ConnectionProperties& connection_properties =
       *log_entry.mutable_connection_properties();

@@ -8,6 +8,8 @@
 
 #include "source/common/protobuf/protobuf.h"
 
+#include "xds/core/v3/cidr.pb.h"
+
 namespace Envoy {
 namespace Network {
 namespace Address {
@@ -96,6 +98,12 @@ public:
    * TODO(ccaraman): Update CidrRange::create to support only constructing valid ranges.
    */
   static CidrRange create(const envoy::config::core::v3::CidrRange& cidr);
+
+  /**
+   * Constructs a CidrRange from xds::core::v3::CidrRange.
+   * TODO(ccaraman): Update CidrRange::create to support only constructing valid ranges.
+   */
+  static CidrRange create(const xds::core::v3::CidrRange& cidr);
 
   /**
    * Given an IP address and a length of high order bits to keep, returns an address

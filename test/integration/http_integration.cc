@@ -391,6 +391,14 @@ ConfigHelper::ConfigModifierFunction HttpIntegrationTest::setEnableUpstreamTrail
   };
 }
 
+ConfigHelper::HttpModifierFunction HttpIntegrationTest::configureProxyStatus() {
+  return [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+    auto* psc = hcm.mutable_proxy_status_config();
+    psc->set_set_recommended_response_code(false);
+  };
+}
+
 IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
     const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
     const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
@@ -617,22 +625,28 @@ void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
 // Change the default route to be restrictive, and send a request to an alternate route.
 void HttpIntegrationTest::testRouterNotFound() {
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
+  config_helper_.addConfigModifier(configureProxyStatus());
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
+  EXPECT_EQ(response->headers().getProxyStatusValue(),
+            "envoy; error=destination_not_found; details=\"route_not_found; NR\"");
 }
 
 // Change the default route to be restrictive, and send a POST to an alternate route.
 void HttpIntegrationTest::testRouterNotFoundWithBody() {
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
+  config_helper_.addConfigModifier(configureProxyStatus());
   initialize();
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "POST", "/notfound", "foo", downstream_protocol_, version_);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
+  EXPECT_EQ(response->headers().getProxyStatusValue(),
+            "envoy; error=destination_not_found; details=\"route_not_found; NR\"");
 }
 
 // Make sure virtual cluster stats are charged to the appropriate virtual cluster.
@@ -681,6 +695,7 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
+  config_helper_.addConfigModifier(configureProxyStatus());
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -706,6 +721,9 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(response->headers().getProxyStatusValue(),
+            "envoy; error=connection_terminated; "
+            "details=\"upstream_reset_before_response_started{connection_termination}; UC\"");
   EXPECT_EQ("upstream connect error or disconnect/reset before headers. reset reason: connection "
             "termination",
             response->body());
@@ -1426,6 +1444,11 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecType admin_request_type) {
 
 void HttpIntegrationTest::simultaneousRequest(uint32_t request1_bytes, uint32_t request2_bytes,
                                               uint32_t response1_bytes, uint32_t response2_bytes) {
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty)EOF"));
+
   FakeStreamPtr upstream_request1;
   FakeStreamPtr upstream_request2;
   initialize();
@@ -1479,6 +1502,15 @@ void HttpIntegrationTest::simultaneousRequest(uint32_t request1_bytes, uint32_t 
   EXPECT_TRUE(response1->complete());
   EXPECT_EQ("200", response1->headers().getStatusValue());
   EXPECT_EQ(response1_bytes, response1->body().size());
+
+  ASSERT_FALSE(response1->headers().get(Http::LowerCaseString("num_streams")).empty());
+  ASSERT_FALSE(response2->headers().get(Http::LowerCaseString("num_streams")).empty());
+  EXPECT_EQ(
+      response1->headers().get(Http::LowerCaseString("num_streams"))[0]->value().getStringView(),
+      "1");
+  EXPECT_EQ(
+      response2->headers().get(Http::LowerCaseString("num_streams"))[0]->value().getStringView(),
+      upstreamProtocol() == Http::CodecType::HTTP1 ? "1" : "2");
 }
 
 std::string HttpIntegrationTest::downstreamProtocolStatsRoot() const {

@@ -118,6 +118,38 @@ void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
   ASSERT(size == 0);
 }
 
+uint64_t OwnedImpl::copyOutToSlices(uint64_t size, Buffer::RawSlice* dest_slices,
+                                    uint64_t num_slice) const {
+  uint64_t total_length_to_read = std::min(size, this->length());
+  uint64_t num_bytes_read = 0;
+  uint64_t num_dest_slices_read = 0;
+  uint64_t num_src_slices_read = 0;
+  uint64_t dest_slice_offset = 0;
+  uint64_t src_slice_offset = 0;
+  while (num_dest_slices_read < num_slice && num_bytes_read < total_length_to_read) {
+    const Slice& src_slice = slices_[num_src_slices_read];
+    const Buffer::RawSlice& dest_slice = dest_slices[num_dest_slices_read];
+    uint64_t left_to_read = total_length_to_read - num_bytes_read;
+    uint64_t left_data_size_in_slice = src_slice.dataSize() - src_slice_offset;
+    uint64_t length_to_copy = std::min(
+        left_data_size_in_slice, std::min(static_cast<uint64_t>(dest_slice.len_), left_to_read));
+    memcpy(static_cast<uint8_t*>(dest_slice.mem_) + dest_slice_offset, // NOLINT(safe-memcpy)
+           src_slice.data() + src_slice_offset, length_to_copy);
+    src_slice_offset = src_slice_offset + length_to_copy;
+    dest_slice_offset = dest_slice_offset + length_to_copy;
+    if (src_slice_offset == src_slice.dataSize()) {
+      num_src_slices_read++;
+      src_slice_offset = 0;
+    }
+    if (dest_slice_offset == dest_slice.len_) {
+      num_dest_slices_read++;
+      dest_slice_offset = 0;
+    }
+    num_bytes_read += length_to_copy;
+  }
+  return num_bytes_read;
+}
+
 void OwnedImpl::drain(uint64_t size) { drainImpl(size); }
 
 void OwnedImpl::drainImpl(uint64_t size) {
@@ -545,7 +577,8 @@ bool OwnedImpl::startsWith(absl::string_view data) const {
   }
 
   // Less data in slices than length() reported.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("unexpected data in slices");
+  return false;
 }
 
 OwnedImpl::OwnedImpl() = default;
@@ -586,6 +619,42 @@ std::vector<Slice::SliceRepresentation> OwnedImpl::describeSlicesForTest() const
     slices.push_back(slice.describeSliceForTest());
   }
   return slices;
+}
+
+size_t OwnedImpl::addFragments(absl::Span<const absl::string_view> fragments) {
+  size_t total_size_to_copy = 0;
+
+  for (const auto& fragment : fragments) {
+    total_size_to_copy += fragment.size();
+  }
+
+  if (slices_.empty()) {
+    slices_.emplace_back(Slice(total_size_to_copy, account_));
+  }
+
+  Slice& back = slices_.back();
+  Slice::Reservation reservation = back.reserve(total_size_to_copy);
+  uint8_t* mem = static_cast<uint8_t*>(reservation.mem_);
+  if (reservation.len_ == total_size_to_copy) {
+    // Enough continuous memory for all fragments in the back slice then copy
+    // all fragments directly for performance improvement.
+    for (const auto& fragment : fragments) {
+      memcpy(mem, fragment.data(), fragment.size()); // NOLINT(safe-memcpy)
+      mem += fragment.size();
+    }
+    back.commit<false>(reservation);
+    length_ += total_size_to_copy;
+  } else {
+    // Downgrade to using `addImpl` if not enough memory in the back slice.
+    // TODO(wbpcode): Fill the remaining memory space in the back slice then
+    // allocate enough contiguous memory for the remaining unwritten fragments
+    // and copy them directly. This may result in better performance.
+    for (const auto& fragment : fragments) {
+      addImpl(fragment.data(), fragment.size());
+    }
+  }
+
+  return total_size_to_copy;
 }
 
 } // namespace Buffer

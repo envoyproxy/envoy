@@ -28,6 +28,14 @@ struct UpstreamInfoImpl : public UpstreamInfo {
 
   absl::optional<uint64_t> upstreamConnectionId() const override { return upstream_connection_id_; }
 
+  void setUpstreamInterfaceName(absl::string_view interface_name) override {
+    upstream_connection_interface_name_ = std::string(interface_name);
+  }
+
+  absl::optional<absl::string_view> upstreamInterfaceName() const override {
+    return upstream_connection_interface_name_;
+  }
+
   void
   setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
     upstream_ssl_info_ = ssl_connection_info;
@@ -68,14 +76,18 @@ struct UpstreamInfoImpl : public UpstreamInfo {
     os << spaces << "UpstreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(upstream_connection_id_)
        << "\n";
   }
+  void setUpstreamNumStreams(uint64_t num_streams) override { num_streams_ = num_streams; }
+  uint64_t upstreamNumStreams() const override { return num_streams_; }
 
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   UpstreamTiming upstream_timing_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   absl::optional<uint64_t> upstream_connection_id_;
+  absl::optional<std::string> upstream_connection_interface_name_;
   std::string upstream_transport_failure_reason_;
   FilterStateSharedPtr upstream_filter_state_;
+  size_t num_streams_{};
 };
 
 struct StreamInfoImpl : public StreamInfo {

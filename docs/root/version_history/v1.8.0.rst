@@ -73,7 +73,7 @@ Changes
   upstream cluster specified by the SNI value presented by the client during a TLS handshake.
 * proxy_protocol: added support for HAProxy Proxy Protocol v2 (AF_INET/AF_INET6 only).
 * ratelimit: added support for :repo:`api/envoy/service/ratelimit/v2/rls.proto`.
-  Lyft's reference implementation of the `ratelimit <https://github.com/lyft/ratelimit>`_ service also supports the data-plane-api proto as of v1.1.0.
+  Lyft's reference implementation of the `ratelimit <https://github.com/envoyproxy/ratelimit>`_ service also supports the data-plane-api proto as of v1.1.0.
   Envoy can use either proto to send client requests to a ratelimit server with the use of the
   ``use_data_plane_proto`` boolean flag in the ratelimit configuration.
   Support for the legacy proto ``source/common/ratelimit/ratelimit.proto`` is deprecated and will be removed at the start of the 1.9.0 release cycle.

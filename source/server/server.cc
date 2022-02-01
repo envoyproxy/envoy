@@ -339,7 +339,7 @@ void registerCustomInlineHeadersFromBootstrap(
           Http::ResponseTrailerMap::header_map_type>(lower_case_name);
       break;
     default:
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      PANIC("not implemented");
     }
   }
 }
@@ -1010,7 +1010,7 @@ bool InstanceImpl::enableReusePortDefault() {
         "envoy.reloadable_features.listener_reuse_port_default_enabled");
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return false; // for gcc
 }
 
 } // namespace Server

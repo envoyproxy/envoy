@@ -18,6 +18,8 @@
 #    https://github.com/envoyproxy/pytooling
 #
 
+import json
+import pathlib
 import sys
 from functools import cached_property
 from typing import Type
@@ -25,8 +27,6 @@ from typing import Type
 import abstracts
 
 from envoy.dependency import cve_scan
-
-import tools.dependency.utils as dep_utils
 
 
 @abstracts.implementer(cve_scan.ACVE)
@@ -68,11 +68,15 @@ class EnvoyCVEChecker:
 
     @cached_property
     def dependency_metadata(self):
-        return dep_utils.repository_locations()
+        return json.loads(pathlib.Path(self.args.repository_locations).read_text())
 
     @cached_property
     def ignored_cves(self):
         return super().ignored_cves
+
+    def add_arguments(self, parser):
+        super().add_arguments(parser)
+        parser.add_argument("--repository_locations")
 
 
 @abstracts.implementer(cve_scan.ACVEVersionMatcher)

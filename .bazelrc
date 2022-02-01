@@ -16,8 +16,9 @@ build --color=yes
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --incompatible_strict_action_env
 build --host_force_python=PY3
-build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
-build --javabase=@bazel_tools//tools/jdk:remote_jdk11
+build --java_runtime_version=remotejdk_11
+build --tool_java_runtime_version=remotejdk_11
+
 build --enable_platform_specific_config
 
 # Allow tags to influence execution requirements
@@ -26,6 +27,7 @@ common --experimental_allow_tags_propagation
 # Enable position independent code (this is the default on macOS and Windows)
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
 build:linux --copt=-fPIC
+build:linux --copt=-Wno-deprecated-declarations
 build:linux --cxxopt=-std=c++17
 build:linux --conlyopt=-fexceptions
 build:linux --fission=dbg,opt

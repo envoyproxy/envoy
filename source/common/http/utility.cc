@@ -822,7 +822,7 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
     return Headers::get().ProtocolStrings.Http3String;
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return EMPTY_STRING;
 }
 
 absl::string_view Utility::getScheme(const RequestHeaderMap& headers) {
@@ -932,7 +932,7 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "overload manager reset";
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return "";
 }
 
 void Utility::transformUpgradeRequestFromH1toH2(RequestHeaderMap& headers) {

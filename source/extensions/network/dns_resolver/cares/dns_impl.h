@@ -12,6 +12,7 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 
 #include "absl/container/node_hash_map.h"
 #include "ares.h"
@@ -27,9 +28,10 @@ class DnsResolverImplPeer;
  */
 class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
-  DnsResolverImpl(Event::Dispatcher& dispatcher,
-                  const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                  const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options);
+  DnsResolverImpl(
+      const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
+      Event::Dispatcher& dispatcher,
+      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
   ~DnsResolverImpl() override;
 
   // Network::DnsResolver
@@ -40,11 +42,12 @@ private:
   friend class DnsResolverImplPeer;
   class PendingResolution : public ActiveDnsQuery {
   public:
-    void cancel(CancelReason) override {
+    void cancel(CancelReason reason) override {
       // c-ares only supports channel-wide cancellation, so we just allow the
       // network events to continue but don't invoke the callback on completion.
       // TODO(mattklein123): Potentially use timeout to destroy and recreate the channel.
       cancelled_ = true;
+      cancel_reason_ = reason;
     }
     // Does the object own itself? Resource reclamation occurs via self-deleting
     // on query completion or error.
@@ -70,6 +73,7 @@ private:
     bool cancelled_ = false;
     const ares_channel channel_;
     const std::string dns_name_;
+    CancelReason cancel_reason_;
 
     // Small wrapping struct to accumulate addresses from firings of the
     // onAresGetAddrInfoCallback callback.
@@ -107,6 +111,16 @@ private:
   private:
     void startResolutionImpl(int family);
 
+    // Holds the availability of non-loopback network interfaces for the system.
+    struct AvailableInterfaces {
+      bool v4_available_;
+      bool v6_available_;
+    };
+
+    // Return the currently available network interfaces.
+    // Note: this call uses syscalls.
+    static AvailableInterfaces availableInterfaces();
+
     // Perform a second resolution under certain conditions. If dns_lookup_family_ is V4Preferred
     // or Auto: perform a second resolution if the first one fails. If dns_lookup_family_ is All:
     // perform resolutions on both families concurrently.
@@ -115,6 +129,8 @@ private:
     bool lookup_all_ = false;
     int family_ = AF_INET;
     const DnsLookupFamily dns_lookup_family_;
+    // Queried for at construction time.
+    const AvailableInterfaces available_interfaces_;
   };
 
   struct AresOptions {
@@ -132,6 +148,8 @@ private:
   void onAresSocketStateChange(os_fd_t fd, int read, int write);
   // Initialize the channel.
   void initializeChannel(ares_options* options, int optmask);
+  // Check if the only nameserver available is the c-ares default.
+  bool isCaresDefaultTheOnlyNameserver();
   // Update timer for c-ares timeouts.
   void updateAresTimer();
   // Return default AresOptions.
@@ -144,7 +162,9 @@ private:
   envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
 
   absl::node_hash_map<int, Event::FileEventPtr> events_;
+  const bool use_resolvers_as_fallback_;
   const absl::optional<std::string> resolvers_csv_;
+  const bool filter_unroutable_families_;
 };
 
 DECLARE_FACTORY(CaresDnsResolverFactory);

@@ -34,6 +34,7 @@
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/scoped_rds.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_manager_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
 
@@ -332,7 +333,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)),
       strip_trailing_host_dot_(config.strip_trailing_host_dot()),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config.common_http_protocol_options(), max_requests_per_connection, 0)) {
+          config.common_http_protocol_options(), max_requests_per_connection, 0)),
+      proxy_status_config_(config.has_proxy_status_config()
+                               ? std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>(
+                                     config.proxy_status_config())
+                               : nullptr) {
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
@@ -495,7 +500,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     Tracing::CustomTagMap custom_tags;
     for (const auto& tag : tracing_config.custom_tags()) {
-      custom_tags.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
+      custom_tags.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
     }
 
     envoy::type::v3::FractionalPercent client_sampling;

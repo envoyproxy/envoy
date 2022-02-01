@@ -202,6 +202,16 @@ public:
   virtual void copyOut(size_t start, uint64_t size, void* data) const PURE;
 
   /**
+   * Copy out a section of the buffer to  dynamic array of slices.
+   * @param size supplies the size of the data that will be copied.
+   * @param slices supplies the output slices to fill.
+   * @param num_slice supplies the number of slices to fill.
+   * @return the number of bytes copied.
+   */
+  virtual uint64_t copyOutToSlices(uint64_t size, Buffer::RawSlice* slices,
+                                   uint64_t num_slice) const PURE;
+
+  /**
    * Drain data from the buffer.
    * @param size supplies the length of data to drain.
    */
@@ -457,6 +467,13 @@ public:
   template <typename T, size_t Size = sizeof(T)> void writeBEInt(T value) {
     writeInt<ByteOrder::BigEndian, T, Size>(value);
   }
+
+  /**
+   * Copy multiple string type fragments to the buffer.
+   * @param fragments A sequence of string views with variable length.
+   * @return The total size of the data copied to the buffer.
+   */
+  virtual size_t addFragments(absl::Span<const absl::string_view> fragments) PURE;
 
   /**
    * Set the buffer's high watermark. The buffer's low watermark is implicitly set to half the high

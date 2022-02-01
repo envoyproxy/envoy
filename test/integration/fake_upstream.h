@@ -463,8 +463,7 @@ public:
   // Should only be called for HTTP2 or above, sends a GOAWAY frame with ENHANCE_YOUR_CALM.
   void encodeProtocolError();
 
-  // Update the maximum number of concurrent streams. This is currently only
-  // supported for HTTP/3
+  // Update the maximum number of concurrent streams.
   void updateConcurrentStreams(uint64_t max_streams);
 
 private:
@@ -733,7 +732,7 @@ private:
       return parent_.onRecvDatagram(data);
     }
     Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      PANIC("not implemented");
     }
 
   private:

@@ -142,13 +142,6 @@ TEST_P(DogStatsdConfigLoopbackTest, WithCustomPrefix) {
   EXPECT_EQ(udp_sink->getPrefix(), customPrefix);
 }
 
-// Test that the deprecated extension name is disabled by default.
-// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
-TEST(DogStatsdConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  ASSERT_EQ(nullptr, Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
-                         "envoy.dog_statsd"));
-}
-
 } // namespace
 } // namespace DogStatsd
 } // namespace StatSinks

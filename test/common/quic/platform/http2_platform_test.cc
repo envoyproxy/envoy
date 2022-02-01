@@ -15,7 +15,6 @@
 #include "quiche/http2/platform/api/http2_bug_tracker.h"
 #include "quiche/http2/platform/api/http2_flags.h"
 #include "quiche/http2/platform/api/http2_logging.h"
-#include "quiche/http2/platform/api/http2_macros.h"
 #include "quiche/http2/test_tools/http2_random.h"
 
 // Basic tests to validate functioning of the QUICHE http2 platform
@@ -52,11 +51,6 @@ TEST(Http2PlatformTest, Http2Log) {
 
   HTTP2_DVLOG_IF(3, true) << "DVLOG_IF(3, true)";
   HTTP2_DVLOG_IF(4, false) << "DVLOG_IF(4, false)";
-}
-
-TEST(Http2PlatformTest, Http2Macro) {
-  EXPECT_DEBUG_DEATH(HTTP2_UNREACHABLE(), "");
-  EXPECT_DEATH(HTTP2_DIE_IF_NULL(nullptr), "");
 }
 
 TEST(Http2PlatformTest, Http2Flags) {

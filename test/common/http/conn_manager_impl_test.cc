@@ -7,6 +7,7 @@ using testing::An;
 using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Eq;
+using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -3685,6 +3686,141 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   EXPECT_EQ(1U, listener_stats_.downstream_rq_3xx_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_rq_completed_.value());
   EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
+}
+
+// Tests for the presence/absence and contents of the synthesized Proxy-Status
+// HTTP response header. NB: proxy_status_config_ persists in the test base.
+class ProxyStatusTest : public HttpConnectionManagerImplTest {
+public:
+  void initialize() {
+    setup(/*ssl=*/false, servername_, /*tracing=*/false);
+    setUpEncoderAndDecoder(/*request_with_data_and_trailers=*/false,
+                           /*decode_headers_stop_all=*/false);
+    sendRequestHeadersAndData();
+  }
+  const ResponseHeaderMap*
+  sendRequestWith(int status, StreamInfo::ResponseFlag response_flag, std::string details,
+                  absl::optional<std::string> proxy_status = absl::nullopt) {
+    auto response_headers = new TestResponseHeaderMapImpl{{":status", std::to_string(status)}};
+    if (proxy_status.has_value()) {
+      response_headers->setProxyStatus(proxy_status.value());
+    }
+    return sendResponseHeaders(ResponseHeaderMapPtr{response_headers}, response_flag, details);
+  }
+  void TearDown() override { doRemoteClose(); }
+
+protected:
+  const std::string servername_{"custom_server_name"};
+};
+
+TEST_F(ProxyStatusTest, NoPopulateProxyStatus) {
+  proxy_status_config_ = nullptr;
+
+  initialize();
+
+  const ResponseHeaderMap* altered_headers =
+      sendRequestWith(403, StreamInfo::ResponseFlag::FailedLocalHealthCheck, "foo");
+  ASSERT_TRUE(altered_headers);
+  ASSERT_FALSE(altered_headers->ProxyStatus());
+  EXPECT_EQ(altered_headers->getStatusValue(), "403"); // unchanged from request.
+}
+
+TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCodeAndServerName) {
+  proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
+  proxy_status_config_->set_remove_details(false);
+  proxy_status_config_->set_set_recommended_response_code(true);
+  proxy_status_config_->set_use_node_id(true);
+
+  initialize();
+
+  const ResponseHeaderMap* altered_headers =
+      sendRequestWith(403, StreamInfo::ResponseFlag::FailedLocalHealthCheck, /*details=*/"foo");
+
+  ASSERT_TRUE(altered_headers);
+  ASSERT_TRUE(altered_headers->ProxyStatus());
+  EXPECT_EQ(altered_headers->getProxyStatusValue(),
+            "node_name; error=destination_unavailable; details=\"foo; LH\"");
+  // Changed from request, since set_recommended_response_code is true. Here,
+  // 503 is the recommended response code for FailedLocalHealthCheck.
+  EXPECT_EQ(altered_headers->getStatusValue(), "503");
+}
+
+TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCode) {
+  proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
+  proxy_status_config_->set_remove_details(false);
+  proxy_status_config_->set_set_recommended_response_code(true);
+
+  initialize();
+
+  const ResponseHeaderMap* altered_headers =
+      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"bar");
+
+  ASSERT_TRUE(altered_headers);
+  ASSERT_TRUE(altered_headers->ProxyStatus());
+  EXPECT_EQ(altered_headers->getProxyStatusValue(),
+            "custom_server_name; error=connection_timeout; details=\"bar; UT\"");
+  // Changed from request, since set_recommended_response_code is true. Here,
+  // 504 is the recommended response code for UpstreamRequestTimeout.
+  EXPECT_EQ(altered_headers->getStatusValue(), "504");
+}
+
+TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetails) {
+  proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
+  proxy_status_config_->set_remove_details(false);
+  proxy_status_config_->set_remove_connection_termination_details(false);
+  proxy_status_config_->set_remove_response_flags(false);
+  proxy_status_config_->set_set_recommended_response_code(false);
+
+  initialize();
+
+  const ResponseHeaderMap* altered_headers =
+      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"bar");
+
+  ASSERT_TRUE(altered_headers);
+  ASSERT_TRUE(altered_headers->ProxyStatus());
+  EXPECT_EQ(altered_headers->getProxyStatusValue(),
+            "custom_server_name; error=connection_timeout; details=\"bar; UT\"");
+  // Unchanged from request, since set_recommended_response_code is false. Here,
+  // 504 would be the recommended response code for UpstreamRequestTimeout,
+  EXPECT_NE(altered_headers->getStatusValue(), "504");
+  EXPECT_EQ(altered_headers->getStatusValue(), "403");
+}
+
+TEST_F(ProxyStatusTest, PopulateProxyStatusWithoutDetails) {
+  proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
+  proxy_status_config_->set_remove_details(true);
+  proxy_status_config_->set_set_recommended_response_code(false);
+
+  initialize();
+
+  const ResponseHeaderMap* altered_headers =
+      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"baz");
+
+  ASSERT_TRUE(altered_headers);
+  ASSERT_TRUE(altered_headers->ProxyStatus());
+  EXPECT_EQ(altered_headers->getProxyStatusValue(), "custom_server_name; error=connection_timeout");
+  // Unchanged.
+  EXPECT_EQ(altered_headers->getStatusValue(), "403");
+  // Since remove_details=true, we should not have "baz", the value of
+  // response_code_details, in the Proxy-Status header.
+  EXPECT_THAT(altered_headers->getProxyStatusValue(), Not(HasSubstr("baz")));
+}
+
+TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
+  proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
+  proxy_status_config_->set_remove_details(false);
+
+  initialize();
+
+  const ResponseHeaderMap* altered_headers =
+      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"baz",
+                      /*proxy_status=*/"SomeCDN");
+
+  ASSERT_TRUE(altered_headers);
+  ASSERT_TRUE(altered_headers->ProxyStatus());
+  // Expect to see the appended previous value: "SomeCDN; custom_server_name; ...".
+  EXPECT_EQ(altered_headers->getProxyStatusValue(),
+            "SomeCDN, custom_server_name; error=connection_timeout; details=\"baz; UT\"");
 }
 
 } // namespace Http
