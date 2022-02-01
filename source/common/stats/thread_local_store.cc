@@ -966,7 +966,7 @@ void ThreadLocalStoreImpl::forEachHistogram(SizeFn f_size, StatFn<ParentHistogra
   if (f_size != nullptr) {
     f_size(histogram_set_.size());
   }
-  for (auto histogram : histogram_set_) {
+  for (ParentHistogramImpl* histogram : histogram_set_) {
     f_stat(*histogram);
   }
 }
