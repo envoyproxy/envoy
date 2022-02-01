@@ -324,12 +324,11 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(ClusterSlotsPt
       std::make_shared<ClusterSlotsPtr>(std::move(slots));
   std::size_t slot_idx = 0;
   while (slot_idx < (**slots_shared_ptr).size()) {
-    ENVOY_LOG(trace, "PRIMARY SLOT INDEX: {}", slot_idx);
     auto& slot = (**slots_shared_ptr)[slot_idx];
     if (slot.primary() == nullptr) {
       ENVOY_LOG(trace,
                 "starting async DNS resolution for primary slot address {} at index location {}",
-                slot.primary_hostname_, index);
+                slot.primary_hostname_, slot_idx);
       parent_.dns_resolver_->resolve(
           slot.primary_hostname_, parent_.dns_lookup_family_,
           [this, slot_idx, slots_shared_ptr](Network::DnsResolver::ResolutionStatus status,
@@ -352,7 +351,7 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(ClusterSlotsPt
             resolveReplicas(std::move(slots_shared_ptr), slot_idx);
           });
     } else {
-      resolveReplicas(std::move(slots_shared_ptr), slot_idx);
+      resolveReplicas(slots_shared_ptr, slot_idx);
     }
     slot_idx++;
   }
@@ -377,7 +376,6 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(std::shared_ptr<Cluste
 
   std::size_t replica_idx = 0;
   while (replica_idx < slot.replicas_to_resolve_.size()) {
-    ENVOY_LOG(trace, "REPLICA SLOT INDEX: {}", replica_idx);
     auto replica = slot.replicas_to_resolve_[replica_idx];
     ENVOY_LOG(trace, "starting async DNS resolution for replica address {}", replica.first);
     parent_.dns_resolver_->resolve(
