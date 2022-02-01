@@ -110,10 +110,12 @@ envoy_proto_library(
 
 envoy_cc_test(
     name = "cds_integration_test",
+    size = "large",
     srcs = ["cds_integration_test.cc"],
     data = [
         "//test/config/integration/certs",
     ],
+    shard_count = 4,
     deps = [
         ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
