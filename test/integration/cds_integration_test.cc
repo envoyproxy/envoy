@@ -182,6 +182,31 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   cleanupUpstreamAndDownstream();
 }
 
+// Make sure that clusters won't create new connections on teardown.
+TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
+  initialize();
+  test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+
+  // Make the usptreams stop working, to ensure the connection was not
+  // established.
+  fake_upstreams_[1]->dispatcher()->exit();
+  fake_upstreams_[2]->dispatcher()->exit();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/cluster1"}, {":scheme", "http"}, {":authority", "host"}});
+
+  // Tell Envoy that cluster_1 is gone.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                             {ClusterName1}, "42");
+  // We can continue the test once we're sure that Envoy's ClusterManager has made use of
+  // the DiscoveryResponse that says cluster_1 is gone.
+  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  cleanupUpstreamAndDownstream();
+  // Make sure there was only one connection attempt.
+  EXPECT_LE(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+}
+
 // Test the fast addition and removal of clusters when they use ThreadAwareLb.
 TEST_P(CdsIntegrationTest, CdsClusterWithThreadAwareLbCycleUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.

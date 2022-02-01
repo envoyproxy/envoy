@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("@base_pip3//:requirements.bzl", base_entry_point = "entry_point")
 
 def envoy_py_test(name, package, visibility, envoy_prefix = "@envoy"):

@@ -106,6 +106,7 @@ float ConnPoolImplBase::perUpstreamPreconnectRatio() const {
 }
 
 ConnPoolImplBase::ConnectionResult ConnPoolImplBase::tryCreateNewConnections() {
+  ASSERT(!is_draining_for_deletion_);
   ConnPoolImplBase::ConnectionResult result;
   // Somewhat arbitrarily cap the number of connections preconnected due to new
   // incoming connections. The preconnect ratio is capped at 3, so in steady
@@ -462,7 +463,9 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       //       if retry logic submits a new stream to the pool, we don't fail it inline.
       purgePendingStreams(client.real_host_description_, failure_reason, reason);
       // See if we should preconnect based on active connections.
-      tryCreateNewConnections();
+      if (!is_draining_for_deletion_) {
+        tryCreateNewConnections();
+      }
     }
 
     // We need to release our resourceManager() resources before checking below for
