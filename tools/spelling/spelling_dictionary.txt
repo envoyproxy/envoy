@@ -522,7 +522,6 @@ cloneable
 cloneability
 cmd
 cmsghdr
-cncf
 codebase
 codec
 codecs

@@ -121,31 +121,27 @@ message Listener {
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
 
-  // A filter chain matcher resolving the filter chain name based on the connection properties.
-  // The following inputs are supported by the matcher:
-  //
-  // 1. :ref:`DestinationPort <envoy_v3_api_msg_config.listener.v3.DestinationPortInput>`.
-  // 2. :ref:`DestinationIP <envoy_v3_api_msg_config.listener.v3.DestinationIPInput>`.
-  // 3. :ref:`SNI <envoy_v3_api_msg_config.listener.v3.SNIInput>`.
-  // 4. :ref:`TransportProtocol <envoy_v3_api_msg_config.listener.v3.TransportProtocolInput>`.
-  // 5. :ref:`ApplicationProtocol <envoy_v3_api_msg_config.listener.v3.ApplicationProtocolInput>`.
-  // 6. :ref:`DirectSourceIP <envoy_v3_api_msg_config.listener.v3.DirectSourceIPInput>`.
-  // 7. :ref:`SourceType <envoy_v3_api_msg_config.listener.v3.SourceTypeInput>`.
-  // 8. :ref:`SourceIP <envoy_v3_api_msg_config.listener.v3.SourceIPInput>`.
-  // 9. :ref:`SourcePort <envoy_v3_api_msg_config.listener.v3.SourcePortInput>`.
-  //
+  // Unified matcher resolving the filter chain name from the network properties. This matcher is used as a replacement
+  // for the per-filter chain match condition
+  // `filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChain.filter_chain_match>`.
   // If specified, all :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.filter_chains>` must
-  // have a non-empty :ref:`name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` and empty :ref:`filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChain.filter_chain_match>`.
+  // have non-empty and unique :ref:`name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` fields and omit
+  // `filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChain.filter_chain_match>` field.
   //
-  // Example 1: Match port 80 for chain "http", port 443 and SNI "*.server.com" for chain "server" or SNI "*.com" for chain "https".
-
+  // Example 1: The following matcher selects three filter chains as follows:
+  //
+  // * if the destination port is 80, then the filter chain "http" is selected;
+  // * if the destination port is 443 and the source IP is in the range 192.0.0.0/2, then the filter chain "internal" is selected;
+  // * otherwise, if the destination port is 443, then the filter chain "https" is selected;
+  // * otherwise, the default filter chain is selected (or the connection is rejected without the default filter chain).
+  //
   // .. code-block:: yaml
   //
   //  filter_chain_matcher:
   //    matcher_tree:
   //      input:
   //        typed_config:
-  //          "@type": type.googleapis.com/envoy.config.listener.v3.DestinationPortInput
+  //          "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
   //      exact_match_map:
   //        map:
   //          "80":
@@ -156,21 +152,31 @@ message Listener {
   //              matcher_tree:
   //                input:
   //                  typed_config:
-  //                    "@type": type.googleapis.com/envoy.config.listener.v3.SNIInput
+  //                    "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
   //                custom_match:
   //                  typed_config:
-  //                    "@type": type.googleapis.com/envoy.config.listener.v3.ServerNameMatcher
-  //                    domain_matchers:
-  //                    - server_names: ["*.server.com"]
+  //                    "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+  //                    range_matchers:
+  //                    - ranges:
+  //                      - address_prefix: 192.0.0.0
+  //                        prefix_len: 2
   //                      on_match:
   //                        action:
-  //                          name: server
-  //                    - server_names: ["*.com"]
+  //                          name: internal
+  //                    - ranges:
+  //                      - address_prefix: 0.0.0.0
   //                      on_match:
   //                        action:
   //                          name: https
   //
-  // The example above requires that filter chains named "http", "server", and "https" are present in :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.filter_chains>` field.
+  //
+  // .. note::
+  //
+  //  Once matched, each connection is permanently bound to its filter chain.
+  //  If the matcher changes but the filter chain remains the same, the
+  //  connections bound to the filter chain are not drained. If, however, the
+  //  filter chain is removed or structurally modified, then the drain for its
+  //  connections is initiated.
   //
   // [#not-implemented-hide:]
   repeated xds.type.matcher.v3.Matcher filter_chain_matcher = 32;
