@@ -421,8 +421,8 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
           std::make_unique<RtdsSubscription>(*this, layer.rtds_layer(), store, validation_visitor));
       init_manager_.add(subscriptions_.back()->init_target_);
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::LAYER_SPECIFIER_NOT_SET:
+      throw EnvoyException("layer specifier not set");
     }
   }
 

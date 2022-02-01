@@ -426,7 +426,7 @@ config_setting(
 )
 
 config_setting(
-    name = "wasm_none",
+    name = "wasm_disabled",
     values = {"define": "wasm=disabled"},
 )
 
@@ -588,6 +588,30 @@ selects.config_setting_group(
         ":ios_x86_64",
         ":linux_x86_64",
         ":windows_x86_64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "not_x86",
+    match_any = [
+        ":darwin_arm64",
+        ":ios_arm64",
+        ":ios_arm64e",
+        ":ios_armv7",
+        ":ios_armv7s",
+        ":ios_i386",
+        ":linux_aarch64",
+        ":linux_mips64",
+        ":linux_ppc",
+        ":linux_s390x",
+    ],
+)
+
+selects.config_setting_group(
+    name = "not_x86_or_wasm_disabled",
+    match_any = [
+        ":not_x86",
+        ":wasm_disabled",
     ],
 )
 

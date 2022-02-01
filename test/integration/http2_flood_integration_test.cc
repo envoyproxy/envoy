@@ -54,6 +54,7 @@ public:
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
+    config_helper_.addConfigModifier(configureProxyStatus());
     const bool enable_new_wrapper = std::get<1>(GetParam());
     config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
                                       enable_new_wrapper ? "true" : "false");
@@ -169,6 +170,9 @@ void Http2FloodMitigationTest::floodClient(const Http2Frame& frame, uint32_t num
   // Downstream client should receive 502 since upstream did not send response headers yet
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("502", response->headers().getStatusValue());
+  EXPECT_EQ(response->headers().getProxyStatusValue(),
+            "envoy; error=http_protocol_error; "
+            "details=\"upstream_reset_before_response_started{protocol_error}; UPE\"");
   if (!flood_stat.empty()) {
     EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
   }

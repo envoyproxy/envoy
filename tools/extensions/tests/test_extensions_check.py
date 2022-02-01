@@ -162,7 +162,7 @@ def test_extensions_robust_to_downstream_count():
 
 
 @pytest.mark.parametrize("robust", ["FUZZED_COUNT", "NOT_FUZZED_COUNT"])
-def test_extensions_check_fuzzed(patches, robust):
+async def test_extensions_check_fuzzed(patches, robust):
     checker = extensions_check.ExtensionsChecker()
     patched = patches(
         ("ExtensionsChecker.robust_to_downstream_count", dict(new_callable=PropertyMock)),
@@ -173,7 +173,7 @@ def test_extensions_check_fuzzed(patches, robust):
     with patched as (m_robust, m_fuzzed, m_error):
         m_fuzzed.return_value = "FUZZED_COUNT"
         m_robust.return_value = robust
-        checker.check_fuzzed()
+        assert not await checker.check_fuzzed()
 
     ERR_MESSAGE = (
         "Check that all network filters robust against untrusted downstreams are fuzzed "
@@ -191,7 +191,7 @@ def test_extensions_check_fuzzed(patches, robust):
     "meta_errors",
     [dict(foo=True, bar=False, baz=True),
      dict(foo=False, bar=False, baz=False)])
-def test_extensions_check_metadata(patches, meta_errors):
+async def test_extensions_check_metadata(patches, meta_errors):
     checker = extensions_check.ExtensionsChecker()
     patched = patches(
         ("ExtensionsChecker.metadata", dict(new_callable=PropertyMock)),
@@ -206,7 +206,7 @@ def test_extensions_check_metadata(patches, meta_errors):
     with patched as (m_meta, m_check, m_error):
         m_meta.return_value = meta_errors
         m_check.side_effect = _check
-        checker.check_metadata()
+        assert not await checker.check_metadata()
 
     assert (
         list(list(c) for c in m_check.call_args_list)
@@ -229,7 +229,7 @@ def test_extensions_check_metadata(patches, meta_errors):
     [("A", "B", "C", "D"),
      ("A", "B"),
      ("B", "C", "D")])
-def test_extensions_registered(patches, all_ext, metadata):
+async def test_extensions_check_registered(patches, all_ext, metadata):
     checker = extensions_check.ExtensionsChecker()
     patched = patches(
         ("ExtensionsChecker.metadata", dict(new_callable=PropertyMock)),
@@ -240,7 +240,7 @@ def test_extensions_registered(patches, all_ext, metadata):
     with patched as (m_meta, m_all, m_error):
         m_meta.return_value = {k: k for k in metadata}
         m_all.return_value = set(all_ext)
-        checker.check_registered()
+        assert not await checker.check_registered()
 
     if set(all_ext) == set(metadata):
         assert not m_error.called
