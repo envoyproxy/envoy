@@ -33,7 +33,7 @@ Removed Config or Runtime
 New Features
 ------------
 * http3: downstream HTTP/3 support is now GA! Upstream HTTP/3 also GA for specific deployments. See :ref:`here <arch_overview_http3>` for details.
-* xds: re-introduced unified delta and sotw xDS multiplexers that share most of the implementation. Added a new runtime config ``envoy.reloadable_features.unified_mux`` (disabled by default) that when enabled, switches xDS to use unified multiplexers.
+* matching: the matching API can now express a match tree that will always match by omitting a matcher at the top level.
 
 
 Deprecated
