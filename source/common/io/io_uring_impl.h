@@ -7,8 +7,6 @@
 namespace Envoy {
 namespace Io {
 
-class IoUringFactory;
-
 class IoUringExtension : public Server::BootstrapExtension {
 public:
   IoUringExtension(IoUringFactory& factory) : factory_(factory) {}
@@ -23,6 +21,8 @@ protected:
 class IoUringFactoryImpl : public IoUringFactoryBase {
 public:
   IoUringFactoryImpl();
+
+  // IoUringFactory
   IoUring& getOrCreate() const override;
 
   // Server::Configuration::BootstrapExtensionFactory
