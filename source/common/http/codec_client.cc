@@ -199,7 +199,7 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
     break;
 #else
     // Should be blocked by configuration checking at an earlier point.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
 #endif
   }
   }

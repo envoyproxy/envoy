@@ -87,14 +87,16 @@ genrule(
 
 genrule(
     name = "external_deps_rst",
-    srcs = [
-        "//bazel:repository_locations.bzl",
-        "@envoy_api//bazel:repository_locations.bzl",
-        "@envoy_api//bazel:repository_locations_utils.bzl",
-    ],
     outs = ["external_deps_rst.tar"],
-    cmd = "$(location //tools/docs:generate_external_deps_rst) $@",
-    tools = ["//tools/docs:generate_external_deps_rst"],
+    cmd = """
+    $(location //tools/docs:generate_external_deps_rst) \
+        $(location //bazel:all_repository_locations) \
+        $@
+    """,
+    tools = [
+        "//bazel:all_repository_locations",
+        "//tools/docs:generate_external_deps_rst",
+    ],
 )
 
 genquery(

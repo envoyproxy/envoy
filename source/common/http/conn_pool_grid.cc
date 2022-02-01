@@ -1,6 +1,5 @@
 #include "source/common/http/conn_pool_grid.h"
 
-#include "source/common/http/http3/conn_pool.h"
 #include "source/common/http/mixed_conn_pool.h"
 
 #include "quiche/quic/core/quic_versions.h"
@@ -110,9 +109,6 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
   if (!grid_.isPoolHttp3(attempt->pool())) {
     tcp_attempt_succeeded_ = true;
     maybeMarkHttp3Broken();
-  } else {
-    ENVOY_LOG(trace, "Marking HTTP/3 confirmed for host '{}'.", grid_.host_->hostname());
-    grid_.markHttp3Confirmed();
   }
 
   auto delete_this_on_return = attempt->removeFromList(connection_attempts_);
@@ -232,9 +228,10 @@ absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool(
   // HTTP/3 is hard-coded as higher priority, H2 as secondary.
   ConnectionPool::InstancePtr pool;
   if (pools_.empty()) {
-    pool = Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_, options_,
-                                   transport_socket_options_, state_, time_source_,
-                                   quic_stat_names_, scope_);
+    pool =
+        Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_, options_,
+                                transport_socket_options_, state_, time_source_, quic_stat_names_,
+                                scope_, makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this));
   } else {
     pool = std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
                                                    options_, transport_socket_options_, state_);
@@ -403,6 +400,11 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
 
   ENVOY_LOG(trace, "HTTP/3 is not available to host '{}', skipping.", host_->hostname());
   return false;
+}
+
+void ConnectivityGrid::onHandshakeComplete() {
+  ENVOY_LOG(trace, "Marking HTTP/3 confirmed for host '{}'.", host_->hostname());
+  markHttp3Confirmed();
 }
 
 } // namespace Http
