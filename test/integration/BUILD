@@ -507,6 +507,7 @@ envoy_cc_test_library(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
         "//test/common/http/http2:http2_frame",
+        "//test/integration/filters:buffer_continue_filter_lib",
         "//test/integration/filters:continue_after_local_reply_filter_lib",
         "//test/integration/filters:continue_headers_only_inject_body",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
