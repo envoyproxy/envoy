@@ -323,7 +323,7 @@ std::list<ActiveClientPtr>& ConnPoolImplBase::owningList(ActiveClient::State sta
   case ActiveClient::State::DRAINING:
     return busy_clients_;
   case ActiveClient::State::CLOSED:
-    PANIC("unexpected");
+    break; // Fall through to PANIC.
   }
   PANIC("unexpected");
 }
