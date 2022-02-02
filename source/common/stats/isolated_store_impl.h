@@ -228,7 +228,12 @@ public:
     text_readouts_.forEachStat(f_size, f_stat);
   }
 
-  void forEachScope(SizeFn f_size, StatFn<const ScopeSharedPtr> f_stat) const override {
+  void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
+    UNREFERENCED_PARAMETER(f_size);
+    UNREFERENCED_PARAMETER(f_stat);
+  }
+
+  void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override {
     if (f_size != nullptr) {
       f_size(1);
     }

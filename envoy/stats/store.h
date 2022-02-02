@@ -67,7 +67,8 @@ public:
   virtual void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const PURE;
   virtual void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const PURE;
   virtual void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
-  virtual void forEachScope(SizeFn f_size, StatFn<const ScopeSharedPtr> f_stat) const PURE;
+  virtual void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const PURE;
+  virtual void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const PURE;
 
   /**
    * Iterate over all stats that need to be flushed to sinks. Note, that implementations can

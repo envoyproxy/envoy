@@ -295,6 +295,10 @@ public:
     Thread::LockGuard lock(lock_);
     store_.forEachTextReadout(f_size, f_stat);
   }
+  void forEachHistogram(Stats::SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachHistogram(f_size, f_stat);
+  }
   void forEachScope(std::function<void(std::size_t)> f_size,
                     StatFn<const ScopeSharedPtr> f_scope) const override {
     Thread::LockGuard lock(lock_);

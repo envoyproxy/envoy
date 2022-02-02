@@ -184,14 +184,10 @@ std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
 
 std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   std::vector<ParentHistogramSharedPtr> ret;
-  Thread::LockGuard lock(hist_mutex_);
-  {
-    ret.reserve(histogram_set_.size());
-    for (const auto& histogram_ptr : histogram_set_) {
-      ret.emplace_back(histogram_ptr);
-    }
-  }
-
+  forEachHistogram([&ret](std::size_t size) mutable { ret.reserve(size); },
+                   [&ret](ParentHistogram& histogram) mutable {
+                     ret.emplace_back(ParentHistogramSharedPtr(&histogram));
+                   });
   return ret;
 }
 
@@ -246,9 +242,7 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
 
 void ThreadLocalStoreImpl::mergeInternal(PostMergeCb merge_complete_cb) {
   if (!shutting_down_) {
-    for (const ParentHistogramSharedPtr& histogram : histograms()) {
-      histogram->merge();
-    }
+    forEachHistogram(nullptr, [](ParentHistogram& histogram) { histogram.merge(); });
     merge_complete_cb();
     merge_in_progress_ = false;
   }
@@ -970,6 +964,16 @@ void ThreadLocalStoreImpl::forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) con
 
 void ThreadLocalStoreImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const {
   alloc_.forEachTextReadout(f_size, f_stat);
+}
+
+void ThreadLocalStoreImpl::forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const {
+  Thread::LockGuard lock(hist_mutex_);
+  if (f_size != nullptr) {
+    f_size(histogram_set_.size());
+  }
+  for (ParentHistogramImpl* histogram : histogram_set_) {
+    f_stat(*histogram);
+  }
 }
 
 void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,

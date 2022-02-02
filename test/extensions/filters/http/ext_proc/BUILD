@@ -90,8 +90,11 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.ext_proc"],
     deps = [
         ":utils_lib",
+        "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "//source/extensions/filters/http/ext_proc:mutation_utils_lib",
+        "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
     ],
 )
 

@@ -25,13 +25,21 @@ void ProcessorState::startMessageTimer(Event::TimerCb cb, std::chrono::milliseco
   message_timer_->enableTimer(timeout);
 }
 
-bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
+absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
   if (callback_state_ == CallbackState::HeadersCallback) {
     ENVOY_LOG(debug, "applying headers response. body mode = {}",
               ProcessingMode::BodySendMode_Name(body_mode_));
     const auto& common_response = response.response();
-    MutationUtils::applyCommonHeaderResponse(response, *headers_);
-    if (response.response().clear_route_cache()) {
+    if (common_response.has_header_mutation()) {
+      const auto mut_status = MutationUtils::applyHeaderMutations(
+          common_response.header_mutation(), *headers_,
+          common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
+          filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
+      if (!mut_status.ok()) {
+        return mut_status;
+      }
+    }
+    if (common_response.clear_route_cache()) {
       filter_callbacks_->clearRouteCache();
     }
     callback_state_ = CallbackState::Idle;
@@ -73,13 +81,13 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
         ENVOY_LOG(debug, "Sending buffered request body message");
         filter_.sendBufferedData(*this, ProcessorState::CallbackState::BufferedBodyCallback, true);
         clearWatermark();
-        return true;
+        return absl::OkStatus();
       } else if (body_mode_ == ProcessingMode::BUFFERED) {
         // Here, we're not ready to continue processing because then
         // we won't be able to modify the headers any more, so do nothing and
         // let the doData callback handle body chunks until the end is reached.
         clearWatermark();
-        return true;
+        return absl::OkStatus();
       } else if (body_mode_ == ProcessingMode::STREAMED) {
         if (hasBufferedData()) {
           // We now know that we need to process what we have buffered in streaming mode.
@@ -97,7 +105,7 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
           clearWatermark();
         }
         continueIfNecessary();
-        return true;
+        return absl::OkStatus();
       } else if (body_mode_ == ProcessingMode::BUFFERED_PARTIAL) {
         if (hasBufferedData()) {
           // Put the data buffered so far into the buffer queue. When more data comes in
@@ -120,14 +128,14 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
           clearWatermark();
           continueIfNecessary();
         }
-        return true;
+        return absl::OkStatus();
       }
       if (send_trailers_ && trailers_available_) {
         // Trailers came in while we were waiting for this response, and the server
         // is not interested in the body, so send them now.
         filter_.sendTrailers(*this, *trailers_);
         clearWatermark();
-        return true;
+        return absl::OkStatus();
       }
     }
 
@@ -136,23 +144,40 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
     headers_ = nullptr;
     continueIfNecessary();
     clearWatermark();
-    return true;
+    return absl::OkStatus();
   }
-  return false;
+  return absl::FailedPreconditionError("spurious message");
 }
 
-bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
+absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
   bool should_continue = false;
+  const auto& common_response = response.response();
   if (callback_state_ == CallbackState::BufferedBodyCallback ||
       callback_state_ == CallbackState::StreamedBodyCallback ||
       callback_state_ == CallbackState::StreamedBodyCallbackFinishing ||
       callback_state_ == CallbackState::BufferedPartialBodyCallback) {
     ENVOY_LOG(debug, "Processing body response");
     if (callback_state_ == CallbackState::BufferedBodyCallback) {
-      ENVOY_LOG(debug, "Applying body response to buffered data. State = {}", callback_state_);
-      modifyBufferedData([this, &response](Buffer::Instance& data) {
-        MutationUtils::applyCommonBodyResponse(response, headers_, data);
-      });
+      if (common_response.has_header_mutation() && headers_ != nullptr) {
+        ENVOY_LOG(debug, "Applying header mutations to buffered body message");
+        const auto mut_status = MutationUtils::applyHeaderMutations(
+            common_response.header_mutation(), *headers_,
+            common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
+            filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
+        if (!mut_status.ok()) {
+          return mut_status;
+        }
+      }
+      if (common_response.has_body_mutation()) {
+        ENVOY_LOG(debug, "Applying body response to buffered data. State = {}", callback_state_);
+        if (headers_ != nullptr) {
+          // Always reset the content length here to prevent later problems.
+          headers_->removeContentLength();
+        }
+        modifyBufferedData([&common_response](Buffer::Instance& data) {
+          MutationUtils::applyBodyMutations(common_response.body_mutation(), data);
+        });
+      }
       clearWatermark();
       callback_state_ = CallbackState::Idle;
       should_continue = true;
@@ -164,9 +189,11 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
         // delivered because the processing mode changed.
         auto chunk = std::move(*queued_chunk);
         if (chunk->delivered) {
-          ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}",
-                    chunk->data.length());
-          MutationUtils::applyCommonBodyResponse(response, nullptr, chunk->data);
+          if (common_response.has_body_mutation()) {
+            ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}",
+                      chunk->data.length());
+            MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk->data);
+          }
           delivered_one = true;
           // After we have delivered one chunk, don't process anything
           // more from the queue unless it was never sent to the server.
@@ -188,7 +215,9 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
       auto queued_chunk = dequeueStreamingChunk(false);
       ENVOY_BUG(queued_chunk, "Bad partial body callback state");
       auto chunk = std::move(*queued_chunk);
-      MutationUtils::applyCommonBodyResponse(response, nullptr, chunk->data);
+      if (common_response.has_body_mutation()) {
+        MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk->data);
+      }
       if (chunk->data.length() > 0) {
         ENVOY_LOG(trace, "Injecting {} bytes of processed data to filter stream",
                   chunk->data.length());
@@ -220,31 +249,36 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
       // Trailers came in while we were waiting for this response, and the server
       // asked to see them -- send them now.
       filter_.sendTrailers(*this, *trailers_);
-      return true;
+      return absl::OkStatus();
     }
 
     if (should_continue) {
       continueIfNecessary();
     }
-    return true;
+    return absl::OkStatus();
   }
 
-  return false;
+  return absl::FailedPreconditionError("spurious message");
 }
 
-bool ProcessorState::handleTrailersResponse(const TrailersResponse& response) {
+absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& response) {
   if (callback_state_ == CallbackState::TrailersCallback) {
     ENVOY_LOG(debug, "Applying response to buffered trailers");
     if (response.has_header_mutation()) {
-      MutationUtils::applyHeaderMutations(response.header_mutation(), *trailers_, false);
+      auto mut_status = MutationUtils::applyHeaderMutations(
+          response.header_mutation(), *trailers_, false, filter_.config().mutationChecker(),
+          filter_.stats().rejected_header_mutations_);
+      if (!mut_status.ok()) {
+        return mut_status;
+      }
     }
     trailers_ = nullptr;
     callback_state_ = CallbackState::Idle;
     message_timer_->disableTimer();
     continueIfNecessary();
-    return true;
+    return absl::OkStatus();
   }
-  return false;
+  return absl::FailedPreconditionError("spurious message");
 }
 
 void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stream,
