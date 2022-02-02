@@ -40,8 +40,7 @@ public:
                            public LinkedObject<WrapperCallbacks> {
   public:
     WrapperCallbacks(ConnectivityGrid& grid, Http::ResponseDecoder& decoder, PoolIterator pool_it,
-                     ConnectionPool::Callbacks& callbacks, bool can_use_early_data,
-                     bool can_use_alternate_protocols);
+                     ConnectionPool::Callbacks& callbacks, const Instance::StreamOptions& options);
 
     // This holds state for a single connection attempt to a specific pool.
     class ConnectionAttemptCallbacks : public ConnectionPool::Callbacks,
@@ -128,11 +127,7 @@ public:
     bool http3_attempt_failed_{};
     // True if the TCP attempt succeeded.
     bool tcp_attempt_succeeded_{};
-    // True if the request can be sent as early data.
-    bool can_use_early_data_{};
-    // True if the request can be sent via alternative service. If this is
-    // false, http3_attempt_failed_ must be true.
-    bool can_use_alternate_protocols_{};
+    Instance::StreamOptions stream_options_{};
   };
   using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;
 
@@ -154,8 +149,7 @@ public:
   bool hasActiveConnections() const override;
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks,
-                                         bool can_use_early_data,
-                                         bool can_use_alternate_protocols) override;
+                                         const Instance::StreamOptions& options) override;
   void addIdleCallback(IdleCb cb) override;
   bool isIdle() const override;
   void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override;

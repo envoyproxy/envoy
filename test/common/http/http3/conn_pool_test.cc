@@ -160,7 +160,9 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
 
-  ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks);
+  ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks,
+                                                              {/*can_use_early_data_=*/false,
+                                                               /*can_use_http3_=*/true});
   EXPECT_NE(nullptr, cancellable);
   std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
       Http3ConnPoolImplPeer::connectingClients(*pool_);
@@ -195,10 +197,10 @@ TEST_F(Http3ConnPoolImplTest, NewStreamFail) {
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
 
-  EXPECT_CALL(callbacks.pool_failure_, ready());
-  EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks, /*can_use_early_data=*/false,
-                                      /*can_use_alternate_protocols=*/false));
-  EXPECT_EQ(callbacks.reason_, ConnectionPool::PoolFailureReason::NotQualified);
+  EXPECT_ENVOY_BUG(pool_->newStream(decoder, callbacks,
+                                    {/*can_use_early_data_=*/false,
+                                     /*can_use_http3_=*/false}),
+                   "Trying to send request over h3 while alternate protocols is disabled.");
 }
 
 } // namespace Http3

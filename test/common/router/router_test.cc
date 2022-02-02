@@ -89,10 +89,13 @@ public:
     NiceMock<Http::MockRequestEncoder> encoder;
     Http::ResponseDecoder* response_decoder = nullptr;
 
-    EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, false, true))
+    EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
         .WillOnce(
             Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                       bool, bool) -> Http::ConnectionPool::Cancellable* {
+                       const Http::ConnectionPool::Instance::StreamOptions& options)
+                       -> Http::ConnectionPool::Cancellable* {
+              EXPECT_FALSE(options.can_use_early_data_);
+              EXPECT_TRUE(options.can_use_http3_);
               response_decoder = &decoder;
               callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
                                     upstream_stream_info_, Http::Protocol::Http10);
@@ -166,7 +169,7 @@ public:
         .WillByDefault(ReturnRef(dummy_option));
     ON_CALL(callbacks_.stream_info_, filterState())
         .WillByDefault(ReturnRef(stream_info.filterState()));
-    EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, true))
+    EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
         .WillOnce(Return(&cancellable_));
     stream_info.filterState()->setData(Network::UpstreamServerName::key(),
                                        std::make_unique<Network::UpstreamServerName>("dummy"),
@@ -340,9 +343,10 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
       .WillByDefault(Return(Upstream::ResourcePriority::High));
   EXPECT_CALL(cm_.thread_local_cluster_,
               httpConnPool(Upstream::ResourcePriority::High, _, &router_));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks, bool,
-                           bool) -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks,
+                           const Http::ConnectionPool::Instance::StreamOptions&)
+                           -> Http::ConnectionPool::Cancellable* {
         callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure,
                                 "tls version mismatch", cm_.thread_local_cluster_.conn_pool_.host_);
         return nullptr;
@@ -371,9 +375,10 @@ TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
       .WillByDefault(Return(Upstream::ResourcePriority::High));
   EXPECT_CALL(cm_.thread_local_cluster_,
               httpConnPool(Upstream::ResourcePriority::High, _, &router_));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks, bool,
-                           bool) -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks,
+                           const Http::ConnectionPool::Instance::StreamOptions&)
+                           -> Http::ConnectionPool::Cancellable* {
         callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Timeout, "connect_timeout",
                                 cm_.thread_local_cluster_.conn_pool_.host_);
         return nullptr;
@@ -399,7 +404,7 @@ TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
 
 TEST_F(RouterTest, Http1Upstream) {
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, absl::optional<Http::Protocol>(), _));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -420,7 +425,7 @@ TEST_F(RouterTest, Http1Upstream) {
 
 TEST_F(RouterTest, Http2Upstream) {
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, absl::optional<Http::Protocol>(), _));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -448,7 +453,7 @@ TEST_F(RouterTest, HashPolicy) {
         EXPECT_EQ(10UL, context->computeHashKey().value());
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -475,7 +480,7 @@ TEST_F(RouterTest, HashPolicyNoHash) {
         EXPECT_FALSE(context->computeHashKey());
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -642,7 +647,7 @@ TEST_F(RouterTest, MetadataMatchCriteria) {
                   &callbacks_.route_->route_entry_.metadata_matches_criteria_);
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -671,7 +676,7 @@ TEST_F(RouterTest, NoMetadataMatchCriteria) {
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -685,7 +690,7 @@ TEST_F(RouterTest, NoMetadataMatchCriteria) {
 }
 
 TEST_F(RouterTest, CancelBeforeBoundToPool) {
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -916,9 +921,10 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseNotOverwritten) {
 TEST_F(RouterTest, EnvoyAttemptCountInResponsePresentWithLocalReply) {
   setIncludeAttemptCountInResponse(true);
 
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks, bool,
-                           bool) -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks,
+                           const Http::ConnectionPool::Instance::StreamOptions&)
+                           -> Http::ConnectionPool::Cancellable* {
         callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure,
                                 absl::string_view(), cm_.thread_local_cluster_.conn_pool_.host_);
         return nullptr;
@@ -1696,10 +1702,11 @@ TEST_F(RouterTest, UpstreamPerTryIdleTimeout) {
   Http::ResponseDecoder* response_decoder = nullptr;
   Http::ConnectionPool::Callbacks* pool_callbacks;
 
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             pool_callbacks = &callbacks;
             return nullptr;
@@ -1758,10 +1765,11 @@ TEST_F(RouterTest, UpstreamPerTryIdleTimeoutSuccess) {
   Http::ResponseDecoder* response_decoder = nullptr;
   Http::ConnectionPool::Callbacks* pool_callbacks;
 
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             pool_callbacks = &callbacks;
             return nullptr;
@@ -1846,10 +1854,11 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutDelayedPoolReady) {
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
   Http::ConnectionPool::Callbacks* pool_callbacks;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             pool_callbacks = &callbacks;
             return nullptr;
@@ -1899,10 +1908,11 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
   Http::ResponseDecoder* response_decoder = nullptr;
   Http::ConnectionPool::Callbacks* pool_callbacks;
 
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             pool_callbacks = &callbacks;
             return nullptr;
@@ -1960,10 +1970,11 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder1 = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
@@ -1992,10 +2003,11 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
   EXPECT_CALL(*retry_options_predicate, updateOptions(_));
   per_try_timeout_->invokeCallback();
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
@@ -2047,10 +2059,11 @@ TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder1 = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
@@ -2079,10 +2092,11 @@ TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
   per_try_timeout_->invokeCallback();
 
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
@@ -2156,10 +2170,11 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder1 = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             upstream_stream_info_.downstream_connection_info_provider_->setConnectionID(111);
@@ -2195,10 +2210,11 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
 
   NiceMock<Http::MockRequestEncoder> encoder2;
   Http::ResponseDecoder* response_decoder2 = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             upstream_stream_info_.downstream_connection_info_provider_->setConnectionID(222);
@@ -2220,10 +2236,11 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
       putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
   NiceMock<Http::MockRequestEncoder> encoder3;
   Http::ResponseDecoder* response_decoder3 = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder3 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             upstream_stream_info_.downstream_connection_info_provider_->setConnectionID(333);
@@ -2272,10 +2289,11 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder1 = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
@@ -2303,10 +2321,11 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
 
   NiceMock<Http::MockRequestEncoder> encoder2;
   Http::ResponseDecoder* response_decoder2 = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
@@ -2344,10 +2363,11 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder1 = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
@@ -2391,10 +2411,11 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
   // Now trigger the retry for the per try timeout earlier.
   NiceMock<Http::MockRequestEncoder> encoder2;
   Http::ResponseDecoder* response_decoder2 = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
@@ -2721,10 +2742,11 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder1 = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
@@ -2754,10 +2776,11 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
 
   NiceMock<Http::MockRequestEncoder> encoder2;
   Http::ResponseDecoder* response_decoder2 = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
@@ -2795,10 +2818,11 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder1 = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
@@ -2827,10 +2851,11 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   NiceMock<Http::MockRequestEncoder> encoder2;
   Http::ResponseDecoder* response_decoder2 = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
@@ -2986,9 +3011,11 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
 
   NiceMock<Http::MockRequestEncoder> encoder2;
   // Per-timeout retry wouldn't enable 0-RTT.
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, /*has_early_data=*/false, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks, bool,
-                           bool) -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks,
+                           const Http::ConnectionPool::Instance::StreamOptions& options)
+                           -> Http::ConnectionPool::Cancellable* {
+        EXPECT_FALSE(options.can_use_early_data_);
         EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
         EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
                     putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
@@ -3086,11 +3113,12 @@ TEST_F(RouterTest, RetryUpstreamReset) {
 
   // We expect this reset to kick off a new request.
   NiceMock<Http::MockRequestEncoder> encoder2;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_,
-              newStream(_, _, _, /*can_use_alternate_protocols=*/true))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions& options)
+                     -> Http::ConnectionPool::Cancellable* {
+            EXPECT_TRUE(options.can_use_http3_);
             response_decoder = &decoder;
             EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
                         putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
@@ -3146,11 +3174,13 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
 
   // We expect this reset to kick off a new request.
   NiceMock<Http::MockRequestEncoder> encoder2;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_,
-              newStream(_, _, /*has_early_data=*/true, /*use_alt_svc=*/false))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions& options)
+                     -> Http::ConnectionPool::Cancellable* {
+            EXPECT_TRUE(options.can_use_early_data_);
+            EXPECT_FALSE(options.can_use_http3_);
             response_decoder = &decoder;
             EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
                         putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
@@ -3204,10 +3234,11 @@ TEST_F(RouterTest, NoRetryWithBodyLimit) {
 TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
@@ -3235,10 +3266,11 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   // We expect this reset to kick off a new request.
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
                         putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
@@ -3268,9 +3300,10 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
 // a way that no host is present.
 TEST_F(RouterTest, RetryUpstreamConnectionFailure) {
   Http::ConnectionPool::Callbacks* conn_pool_callbacks;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks, bool,
-                           bool) -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks,
+                           const Http::ConnectionPool::Instance::StreamOptions&)
+                           -> Http::ConnectionPool::Cancellable* {
         conn_pool_callbacks = &callbacks;
         return nullptr;
       }));
@@ -3293,10 +3326,11 @@ TEST_F(RouterTest, RetryUpstreamConnectionFailure) {
   Http::ResponseDecoder* response_decoder = nullptr;
   // We expect this reset to kick off a new request.
   NiceMock<Http::MockRequestEncoder> encoder2;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
@@ -3672,9 +3706,10 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
   Envoy::ConnectionPool::MockCancellable cancellable;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
-      .WillOnce(Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks&, bool,
-                           bool) -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks&,
+                           const Http::ConnectionPool::Instance::StreamOptions&)
+                           -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         return &cancellable;
       }));
@@ -3724,9 +3759,10 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHostAltRespo
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
   Envoy::ConnectionPool::MockCancellable cancellable;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
-      .WillOnce(Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks&, bool,
-                           bool) -> Http::ConnectionPool::Cancellable* {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks&,
+                           const Http::ConnectionPool::Instance::StreamOptions&)
+                           -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         return &cancellable;
       }));
@@ -5514,7 +5550,7 @@ TEST_F(RouterTest, ApplicationProtocols) {
         EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[1], "bar");
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
 
   expectResponseTimerCreate();
@@ -5573,10 +5609,11 @@ TEST_F(RouterTest, InvalidUpstream) {
 
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
-  ON_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  ON_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillByDefault(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
@@ -5982,10 +6019,13 @@ TEST_F(RouterTest, HasEarlyDataAndRetryUpon425) {
   router_.retry_425_response_ = true;
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder1 = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, /*has_early_data=*/true, true))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions& options)
+                     -> Http::ConnectionPool::Cancellable* {
+            EXPECT_TRUE(options.can_use_http3_);
+            EXPECT_TRUE(options.can_use_early_data_);
             response_decoder1 = &decoder;
             callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
@@ -6010,10 +6050,13 @@ TEST_F(RouterTest, HasEarlyDataAndRetryUpon425) {
   // Expect retry upon 425 response.
   NiceMock<Http::MockRequestEncoder> encoder2;
   Http::ResponseDecoder* response_decoder2 = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, /*has_early_data=*/false, true))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                     bool, bool) -> Http::ConnectionPool::Cancellable* {
+                     const Http::ConnectionPool::Instance::StreamOptions& options)
+                     -> Http::ConnectionPool::Cancellable* {
+            EXPECT_FALSE(options.can_use_early_data_);
+            EXPECT_TRUE(options.can_use_http3_);
             response_decoder2 = &decoder;
             callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
@@ -6034,10 +6077,11 @@ TEST_F(RouterTest, HasEarlyDataAndRetryUpon425) {
 TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
   NiceMock<Http::MockRequestEncoder> encoder_for_first_reqeust;
   Http::ResponseDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
-                           Http::ConnectionPool::Callbacks& callbacks, bool,
-                           bool) -> Http::ConnectionPool::Cancellable* {
+                           Http::ConnectionPool::Callbacks& callbacks,
+                           const Http::ConnectionPool::Instance::StreamOptions&)
+                           -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder_for_first_reqeust, cm_.thread_local_cluster_.conn_pool_.host_,
                               upstream_stream_info_, Http::Protocol::Http10);
@@ -6071,10 +6115,11 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
 
   // Kick off a new request.
   NiceMock<Http::MockRequestEncoder> encoder_for_retry_request;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
-                           Http::ConnectionPool::Callbacks& callbacks, bool,
-                           bool) -> Http::ConnectionPool::Cancellable* {
+                           Http::ConnectionPool::Callbacks& callbacks,
+                           const Http::ConnectionPool::Instance::StreamOptions&)
+                           -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         callbacks.onPoolReady(encoder_for_retry_request, cm_.thread_local_cluster_.conn_pool_.host_,
                               upstream_stream_info_, Http::Protocol::Http10);

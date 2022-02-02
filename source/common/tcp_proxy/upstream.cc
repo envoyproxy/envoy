@@ -224,9 +224,10 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   } else {
     upstream_ = std::make_unique<Http2Upstream>(upstream_callbacks_, config_, downstream_info_);
   }
-  Tcp::ConnectionPool::Cancellable* handle = conn_pool_data_.value().newStream(
-      upstream_->responseDecoder(), *this, /*can_use_early_data=*/false,
-      /*can_use_alternate_protocols=*/true);
+  Tcp::ConnectionPool::Cancellable* handle =
+      conn_pool_data_.value().newStream(upstream_->responseDecoder(), *this,
+                                        {/*can_use_early_data_=*/false,
+                                         /*can_use_http3_=*/true});
   if (handle != nullptr) {
     upstream_handle_ = handle;
   }

@@ -45,12 +45,10 @@ void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
 
 ConnectionPool::Cancellable* Http3ConnPoolImpl::newStream(Http::ResponseDecoder& response_decoder,
                                                           ConnectionPool::Callbacks& callbacks,
-                                                          bool can_use_early_data,
-                                                          bool can_use_alternate_protocols) {
-  ENVOY_BUG(can_use_alternate_protocols,
+                                                          const Instance::StreamOptions& options) {
+  ENVOY_BUG(options.can_use_http3_,
             "Trying to send request over h3 while alternate protocols is disabled.");
-  return FixedHttpConnPoolImpl::newStream(response_decoder, callbacks, can_use_early_data,
-                                          can_use_alternate_protocols);
+  return FixedHttpConnPoolImpl::newStream(response_decoder, callbacks, options);
 }
 
 void Http3ConnPoolImpl::setQuicConfigFromClusterConfig(const Upstream::ClusterInfo& cluster,

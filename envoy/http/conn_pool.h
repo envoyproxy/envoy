@@ -80,6 +80,14 @@ public:
  */
 class Instance : public Envoy::ConnectionPool::Instance, public Event::DeferredDeletable {
 public:
+  struct StreamOptions {
+
+    // True if the request can be sent as early data.
+    bool can_use_early_data_;
+    // True if the request can be sent over HTTP/3.
+    bool can_use_http3_;
+  };
+
   ~Instance() override = default;
 
   /**
@@ -103,13 +111,13 @@ public:
    * @param can_use_early_data whether the new stream can be sent as early data or not. If true,
    * the connection might be ready immediately.
    * @param can_use_alternate_protocols whether to attempt the advertised alternate protocols or not
-   * for this new stream if the pool supports. If false and the pool only suppports alt-svc,
+   * for this new stream if the pool allows.
    * callback will be invoked with an immediate failure.
    * @warning Do not call cancel() from the callbacks, as the request is implicitly canceled when
    *          the callbacks are called.
    */
   virtual Cancellable* newStream(Http::ResponseDecoder& response_decoder, Callbacks& callbacks,
-                                 bool can_use_early_data, bool can_use_alternate_protocols) PURE;
+                                 const StreamOptions& options) PURE;
 
   /**
    * Returns a user-friendly protocol description for logging.

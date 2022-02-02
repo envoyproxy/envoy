@@ -72,8 +72,11 @@ public:
   // UpstreamToDownstream
   const RouteEntry& routeEntry() const override;
   const Network::Connection& connection() const override;
-  bool canUseEarlyData() const override { return can_use_early_data_; }
-  bool canUseAlternateProtocols() const override { return can_use_alternate_protocols_; }
+
+  // UpstreamToDownstream
+  const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
+    return stream_options_;
+  }
 
   void disableDataFromDownstreamForFlowControl();
   void enableDataFromDownstreamForFlowControl();
@@ -189,9 +192,8 @@ private:
   bool record_timeout_budget_ : 1;
   // Track if one time clean up has been performed.
   bool cleaned_up_ : 1;
-  bool can_use_early_data_ : 1;
-  bool can_use_alternate_protocols_ : 1;
   bool had_upstream_ : 1;
+  Http::ConnectionPool::Instance::StreamOptions stream_options_;
   Event::TimerPtr max_stream_duration_timer_;
 };
 

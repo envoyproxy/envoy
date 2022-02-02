@@ -131,7 +131,7 @@ void RouterTestBase::verifyMetadataMatchCriteriaFromRequest(bool route_entry_has
 
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -149,7 +149,7 @@ void RouterTestBase::verifyAttemptCountInRequestBasic(bool set_include_attempt_c
                                                       int expected_count) {
   setIncludeAttemptCountInRequest(set_include_attempt_count_in_request);
 
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -387,11 +387,12 @@ void RouterTestBase::testDoNotForward(
 void RouterTestBase::expectNewStreamWithImmediateEncoder(Http::RequestEncoder& encoder,
                                                          Http::ResponseDecoder** response_decoder,
                                                          Http::Protocol protocol) {
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Invoke([this, &encoder, response_decoder,
                         protocol](Http::ResponseDecoder& decoder,
-                                  Http::ConnectionPool::Callbacks& callbacks, bool,
-                                  bool) -> Http::ConnectionPool::Cancellable* {
+                                  Http::ConnectionPool::Callbacks& callbacks,
+                                  const Http::ConnectionPool::Instance::StreamOptions&)
+                           -> Http::ConnectionPool::Cancellable* {
         *response_decoder = &decoder;
         callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
                               upstream_stream_info_, protocol);

@@ -124,8 +124,7 @@ public:
   ~Http3ConnPoolImpl() override;
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks,
-                                         bool can_use_early_data,
-                                         bool can_use_alternate_protocols) override;
+                                         const Instance::StreamOptions& options) override;
 
   // Set relevant fields in quic_config based on the cluster configuration
   // supplied in cluster.

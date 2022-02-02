@@ -52,8 +52,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
-      cleaned_up_(false), can_use_early_data_(can_use_early_data),
-      can_use_alternate_protocols_(can_use_alternate_protocols), had_upstream_(false) {
+      cleaned_up_(false), had_upstream_(false),
+      stream_options_({can_use_early_data, can_use_alternate_protocols}) {
   if (parent_.config().start_child_span_) {
     span_ = parent_.callbacks()->activeSpan().spawnChild(
         parent_.callbacks()->tracingConfig(), "router " + parent.cluster()->name() + " egress",

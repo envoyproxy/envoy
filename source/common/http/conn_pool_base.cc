@@ -58,10 +58,10 @@ HttpConnPoolImplBase::~HttpConnPoolImplBase() { destructAllConnections(); }
 
 ConnectionPool::Cancellable*
 HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
-                                Http::ConnectionPool::Callbacks& callbacks, bool can_use_early_data,
-                                bool /*can_use_alternate_protocols*/) {
+                                Http::ConnectionPool::Callbacks& callbacks,
+                                const Instance::StreamOptions& options) {
   HttpAttachContext context({&response_decoder, &callbacks});
-  return newStreamImpl(context, can_use_early_data);
+  return newStreamImpl(context, options.can_use_early_data_);
 }
 
 bool HttpConnPoolImplBase::hasActiveConnections() const {

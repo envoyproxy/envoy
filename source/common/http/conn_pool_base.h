@@ -68,8 +68,7 @@ public:
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          Http::ConnectionPool::Callbacks& callbacks,
-                                         bool can_use_early_data,
-                                         bool can_use_alternate_protocols) override;
+                                         const Instance::StreamOptions& options) override;
   bool maybePreconnect(float ratio) override { return maybePreconnectImpl(ratio); }
   bool hasActiveConnections() const override;
 

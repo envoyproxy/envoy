@@ -1250,12 +1250,7 @@ public:
   /**
    * @return returns true if the downstream request could be sent as early data.
    */
-  virtual bool canUseEarlyData() const PURE;
-  /**
-   * @return returns true if the downstream request can be sent to upstream using
-   * protocols advertised in Alt-Svc by the upstream.
-   */
-  virtual bool canUseAlternateProtocols() const PURE;
+  virtual const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const PURE;
 };
 
 /**
