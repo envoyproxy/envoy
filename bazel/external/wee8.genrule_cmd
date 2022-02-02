@@ -103,6 +103,8 @@ WEE8_BUILD_ARGS+=" v8_use_external_startup_data=false"
 # Disable read-only heap, since it's leaky and HEAPCHECK complains about it.
 # TODO(PiotrSikora): remove when fixed upstream.
 WEE8_BUILD_ARGS+=" v8_enable_shared_ro_heap=false"
+# Disable pointer compression (limits the maximum number of WasmVMs).
+WEE8_BUILD_ARGS+=" v8_enable_pointer_compression=false"
 
 # Set target architecture.
 if [[ $${ARCH} == "x86_64" ]]; then
