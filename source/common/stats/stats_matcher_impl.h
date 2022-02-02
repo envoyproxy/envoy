@@ -8,7 +8,7 @@
 
 #include "source/common/common/matchers.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "absl/strings/string_view.h"
 

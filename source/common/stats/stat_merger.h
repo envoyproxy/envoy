@@ -3,7 +3,7 @@
 #include "envoy/stats/store.h"
 
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 

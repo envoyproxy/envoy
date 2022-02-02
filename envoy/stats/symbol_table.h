@@ -18,7 +18,7 @@ namespace Stats {
  * the interface without abstract methods, because (a) the underlying class
  * representation is common to both implementations of SymbolTable, and (b)
  * we do not want or need the overhead of a vptr per StatName. The common
- * declaration for StatName is in source/common/stats/symbol_table.h
+ * declaration for StatName is in source/common/stats/symbol_table_impl.h
  */
 class StatName;
 using StatNameVec = absl::InlinedVector<StatName, 8>;

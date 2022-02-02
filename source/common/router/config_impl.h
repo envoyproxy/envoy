@@ -31,7 +31,7 @@
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/router_ratelimit.h"
 #include "source/common/router/tls_context_match_criteria_impl.h"
-#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"

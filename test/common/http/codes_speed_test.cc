@@ -10,7 +10,7 @@
 
 #include "source/common/http/codes.h"
 #include "source/common/stats/isolated_store_impl.h"
-#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "benchmark/benchmark.h"
 

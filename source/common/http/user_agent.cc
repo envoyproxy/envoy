@@ -9,7 +9,7 @@
 #include "envoy/stats/timespan.h"
 
 #include "source/common/http/headers.h"
-#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/symbol_table_impl.h"
 #include "source/common/stats/utility.h"
 
 namespace Envoy {

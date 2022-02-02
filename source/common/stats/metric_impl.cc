@@ -2,7 +2,7 @@
 
 #include "envoy/stats/tag.h"
 
-#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Stats {

@@ -143,8 +143,8 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "symbol_table_test",
-    srcs = ["symbol_table_test.cc"],
+    name = "symbol_table_impl_test",
+    srcs = ["symbol_table_impl_test.cc"],
     external_deps = ["abseil_hash_testing"],
     deps = [
         ":stat_test_utility_lib",

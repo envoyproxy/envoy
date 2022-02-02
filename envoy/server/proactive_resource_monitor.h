@@ -7,7 +7,7 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Server {

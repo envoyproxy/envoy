@@ -16,7 +16,7 @@
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/token_bucket_impl.h"
 #include "source/common/http/header_utility.h"
-#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/symbol_table_impl.h"
 #include "source/extensions/filters/common/fault/fault_config.h"
 #include "source/extensions/filters/http/common/stream_rate_limiter.h"
 

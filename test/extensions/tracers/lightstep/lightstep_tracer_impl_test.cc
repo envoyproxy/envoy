@@ -11,7 +11,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/runtime/runtime_impl.h"
-#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/symbol_table_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/tracers/lightstep/lightstep_tracer_impl.h"
 

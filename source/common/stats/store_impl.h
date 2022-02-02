@@ -3,7 +3,7 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 
-#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Stats {

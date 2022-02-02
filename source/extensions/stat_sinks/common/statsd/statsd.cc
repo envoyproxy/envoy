@@ -19,7 +19,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/utility.h"
-#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "absl/strings/str_join.h"
 

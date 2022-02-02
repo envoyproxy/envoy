@@ -3,7 +3,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/memory/stats.h"
-#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
