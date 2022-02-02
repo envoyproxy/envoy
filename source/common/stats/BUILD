@@ -195,7 +195,6 @@ envoy_cc_library(
     ],
     deps = [
         ":recent_lookups_lib",
-        "//envoy/stats:symbol_table_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:mem_block_builder_lib",
         "//source/common/common:minimal_logger_lib",
