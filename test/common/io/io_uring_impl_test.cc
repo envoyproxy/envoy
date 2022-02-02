@@ -21,6 +21,7 @@ public:
     config.mutable_io_uring_size()->set_value(2);
     extension_ =
         dynamic_cast<IoUringFactoryBase*>(factory_)->createBootstrapExtension(config, context_);
+    extension_->onServerInitialized();
   }
 
   void TearDown() override {
