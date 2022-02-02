@@ -544,7 +544,6 @@ typed_config:
 
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), HttpStatusIs("200"));
-    codec_client_->close();
   }
 
   auto second_codec = makeHttpConnection(lookupPort("http"));
