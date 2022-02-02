@@ -586,16 +586,16 @@ SymbolTable::StoragePtr SymbolTable::makeDynamicStorage(absl::string_view name) 
 
   // payload_bytes is the total number of bytes needed to represent the
   // characters in name, plus their encoded size, plus the literal indicator.
-  const size_t payload_bytes = SymbolTable::Encoding::totalSizeBytes(name.size()) + 1;
+  const size_t payload_bytes = Encoding::totalSizeBytes(name.size()) + 1;
 
   // total_bytes includes the payload_bytes, plus the LiteralStringIndicator, and
   // the length of those.
-  const size_t total_bytes = SymbolTable::Encoding::totalSizeBytes(payload_bytes);
+  const size_t total_bytes = Encoding::totalSizeBytes(payload_bytes);
   MemBlockBuilder<uint8_t> mem_block(total_bytes);
 
-  SymbolTable::Encoding::appendEncoding(payload_bytes, mem_block);
+  Encoding::appendEncoding(payload_bytes, mem_block);
   mem_block.appendOne(LiteralStringIndicator);
-  SymbolTable::Encoding::appendEncoding(name.size(), mem_block);
+  Encoding::appendEncoding(name.size(), mem_block);
   mem_block.appendData(absl::MakeSpan(reinterpret_cast<const uint8_t*>(name.data()), name.size()));
   ASSERT(mem_block.capacityRemaining() == 0);
   return mem_block.release();
