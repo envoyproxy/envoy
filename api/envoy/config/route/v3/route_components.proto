@@ -441,6 +441,7 @@ message WeightedCluster {
   oneof random_value_specifier {
     // Specifies the header name that is used to look up the random value passed in the request header.
     // This is used to ensure consistent cluster picking across multiple proxy levels for weighted traffic.
+    // Signal-valued header is expected here as we only want to have one value throughout the process for the consistency.
     string header_name = 4;
   }
 }

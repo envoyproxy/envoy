@@ -1104,8 +1104,8 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
     } else {
       // Random value should be found here. But if it is not found due to some errors, log the
       // information and fallback to the random value that is set by stream id.
-      ENVOY_LOG(warn, "The random value can not be found from the header and it will fall back to "
-                      "the value that is set by stream id");
+      ENVOY_LOG(debug, "The random value can not be found from the header and it will fall back to "
+                       "the value that is set by stream id");
     }
   }
 
