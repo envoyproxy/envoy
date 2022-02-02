@@ -696,30 +696,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
 
-  bool can_use_early_data{false};
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
-    absl::string_view method = downstream_headers_->getMethodValue();
-    // According to safe methods defined in https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1
-    const bool is_safe_method = (method == Http::Headers::get().MethodValues.Get ||
-                                 method == Http::Headers::get().MethodValues.Head ||
-                                 method == Http::Headers::get().MethodValues.Options ||
-                                 method == Http::Headers::get().MethodValues.Trace);
-
-    if (retry_state_ == nullptr) {
-      ENVOY_LOG_EVERY_POW_2(
-          warn, "No retry policy is configured. There won't be any fallback for alternate "
-                "protocol failure.");
-    }
-    // TODO(danzh) Right now whether to try early data or not depends on retry policy on retry on
-    // 425 response. In addition to this, the decisions should also depend on reset retry policies.
-    const bool can_handle_too_early_response =
-        retry_state_ != nullptr &&
-        retry_state_->wouldRetryFromRetriableStatusCode(Http::Code::TooEarly);
-    // The request should only be sent as early data iff the policy will retry on 425 and it has
-    // safe method.
-    can_use_early_data = is_safe_method && can_handle_too_early_response;
-  }
+  conn_pool_new_stream_with_early_data_and_alt_svc_ = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc");
+  const bool can_use_early_data = conn_pool_new_stream_with_early_data_and_alt_svc_ &&
+                                  Http::Utility::isZeroRttSafeRequest(*downstream_headers_);
 
   UpstreamRequestPtr upstream_request =
       std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_use_early_data,
@@ -1150,9 +1130,7 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
     return false;
   }
   RetryState::Http3Used was_using_alternate_protocol = RetryState::Http3Used::Unknown;
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc") &&
-      upstream_request.hadUpstream()) {
+  if (conn_pool_new_stream_with_early_data_and_alt_svc_ && upstream_request.hadUpstream()) {
     was_using_alternate_protocol =
         (upstream_request.streamInfo().protocol().has_value() &&
          upstream_request.streamInfo().protocol().value() == Http::Protocol::Http3)

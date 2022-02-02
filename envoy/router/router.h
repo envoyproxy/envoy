@@ -185,20 +185,21 @@ using ResetHeaderParserSharedPtr = std::shared_ptr<ResetHeaderParser>;
 class RetryPolicy {
 public:
   // clang-format off
-  static constexpr uint32_t RETRY_ON_5XX                     = 0x1;
-  static constexpr uint32_t RETRY_ON_GATEWAY_ERROR           = 0x2;
-  static constexpr uint32_t RETRY_ON_CONNECT_FAILURE         = 0x4;
-  static constexpr uint32_t RETRY_ON_RETRIABLE_4XX           = 0x8;
-  static constexpr uint32_t RETRY_ON_REFUSED_STREAM          = 0x10;
-  static constexpr uint32_t RETRY_ON_GRPC_CANCELLED          = 0x20;
-  static constexpr uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x40;
-  static constexpr uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x80;
-  static constexpr uint32_t RETRY_ON_GRPC_UNAVAILABLE        = 0x100;
-  static constexpr uint32_t RETRY_ON_GRPC_INTERNAL           = 0x200;
-  static constexpr uint32_t RETRY_ON_RETRIABLE_STATUS_CODES  = 0x400;
-  static constexpr uint32_t RETRY_ON_RESET                   = 0x800;
-  static constexpr uint32_t RETRY_ON_RETRIABLE_HEADERS       = 0x1000;
-  static constexpr uint32_t RETRY_ON_ENVOY_RATE_LIMITED      = 0x2000;
+  static constexpr uint32_t RETRY_ON_5XX                                = 0x1;
+  static constexpr uint32_t RETRY_ON_GATEWAY_ERROR                      = 0x2;
+  static constexpr uint32_t RETRY_ON_CONNECT_FAILURE                    = 0x4;
+  static constexpr uint32_t RETRY_ON_RETRIABLE_4XX                      = 0x8;
+  static constexpr uint32_t RETRY_ON_REFUSED_STREAM                     = 0x10;
+  static constexpr uint32_t RETRY_ON_GRPC_CANCELLED                     = 0x20;
+  static constexpr uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED             = 0x40;
+  static constexpr uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED            = 0x80;
+  static constexpr uint32_t RETRY_ON_GRPC_UNAVAILABLE                   = 0x100;
+  static constexpr uint32_t RETRY_ON_GRPC_INTERNAL                      = 0x200;
+  static constexpr uint32_t RETRY_ON_RETRIABLE_STATUS_CODES             = 0x400;
+  static constexpr uint32_t RETRY_ON_RESET                              = 0x800;
+  static constexpr uint32_t RETRY_ON_RETRIABLE_HEADERS                  = 0x1000;
+  static constexpr uint32_t RETRY_ON_ENVOY_RATE_LIMITED                 = 0x2000;
+  static constexpr uint32_t RETRY_ON_ALT_PROTOCOLS_POST_CONNECT_FAILURE = 0x4000;
   // clang-format on
 
   virtual ~RetryPolicy() = default;
@@ -400,17 +401,9 @@ public:
                                               bool& retry_as_early_data) PURE;
 
   /**
-   * Determines whether given response status code would be retried by the retry policy, assuming
-   * sufficient retry budget and circuit breaker headroom.
-   * @param code the received response status code.
-   * @return bool true if the given status code can be retried according to the current config.
-   */
-  virtual bool wouldRetryFromRetriableStatusCode(Http::Code code) const PURE;
-
-  /**
    * Determine whether a request should be retried after a reset based on the reason for the reset.
    * @param reset_reason supplies the reset reason.
-   * @param alternate_protocols_used whether the reset request was sent over alternate protocol or
+   * @param http3_used whether the reset request was sent over http3 as alternate protocol or
    * not. nullopt means it wasn't sent at all before getting reset.
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. It takes a bool to indicate whether the
@@ -419,8 +412,7 @@ public:
    *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.
    */
-  virtual RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason,
-                                       Http3Used alternate_protocols_used,
+  virtual RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason, Http3Used http3_used,
                                        DoRetryResetCallback callback) PURE;
 
   /**

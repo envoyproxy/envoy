@@ -2997,8 +2997,7 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
         return nullptr;
       }));
   EXPECT_CALL(*router_.retry_state_,
-              shouldRetryReset(
-                  _, /*alternate_protocols_used=*/RetryState::AlternateProtocolsUsed::Unknown, _))
+              shouldRetryReset(_, /*alternate_protocols_used=*/RetryState::Http3Used::Unknown, _))
       .WillOnce(Return(RetryStatus::NoRetryLimitExceeded));
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
   router_.retry_state_->callback_();
@@ -3075,9 +3074,9 @@ TEST_F(RouterTest, RetryUpstreamReset) {
 
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(Http::StreamResetReason::RemoteReset, _, _))
       .WillOnce(Invoke([this](const Http::StreamResetReason,
-                              RetryState::AlternateProtocolsUsed alternate_protocols_used,
+                              RetryState::Http3Used alternate_protocols_used,
                               RetryState::DoRetryResetCallback callback) {
-        EXPECT_EQ(RetryState::AlternateProtocolsUsed::No, alternate_protocols_used);
+        EXPECT_EQ(RetryState::Http3Used::No, alternate_protocols_used);
         router_.retry_state_->callback_ = [callback]() { callback(/*disable_alt_svc=*/false); };
         return RetryStatus::Yes;
       }));
@@ -3134,9 +3133,9 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(Http::StreamResetReason::RemoteReset, _, _))
       .WillOnce(Invoke([this](const Http::StreamResetReason,
-                              RetryState::AlternateProtocolsUsed alternate_protocols_used,
+                              RetryState::Http3Used alternate_protocols_used,
                               RetryState::DoRetryResetCallback callback) {
-        EXPECT_EQ(RetryState::AlternateProtocolsUsed::Yes, alternate_protocols_used);
+        EXPECT_EQ(RetryState::Http3Used::Yes, alternate_protocols_used);
         router_.retry_state_->callback_ = [callback]() { callback(/*disable_alt_svc=*/true); };
         return RetryStatus::Yes;
       }));

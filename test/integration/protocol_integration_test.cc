@@ -2073,9 +2073,13 @@ name: passthrough-filter
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // Sends a request with headers and data.
-  changeHeadersForStopAllTests(default_request_headers_, false);
-  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  // Sends a POST request with headers and data.
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  changeHeadersForStopAllTests(request_headers, false);
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
   for (int i = 0; i < count_ - 1; i++) {
@@ -2093,7 +2097,7 @@ name: passthrough-filter
   EXPECT_EQ(true, upstream_request_->complete());
 
   // Sends a request with headers, data, and trailers.
-  auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
+  auto encoder_decoder_2 = codec_client_->startRequest(request_headers);
   request_encoder_ = &encoder_decoder_2.first;
   response = std::move(encoder_decoder_2.second);
   for (int i = 0; i < count_; i++) {
@@ -2129,9 +2133,13 @@ name: passthrough-filter
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // Sends a request with headers and data.
-  changeHeadersForStopAllTests(default_request_headers_, true);
-  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  // Sends a POST request with headers and data.
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  changeHeadersForStopAllTests(request_headers, true);
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
   for (int i = 0; i < count_ - 1; i++) {
@@ -2149,7 +2157,7 @@ name: passthrough-filter
   EXPECT_EQ(true, upstream_request_->complete());
 
   // Sends a request with headers, data, and trailers.
-  auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
+  auto encoder_decoder_2 = codec_client_->startRequest(request_headers);
   request_encoder_ = &encoder_decoder_2.first;
   response = std::move(encoder_decoder_2.second);
   for (int i = 0; i < count_ - 1; i++) {
@@ -2182,9 +2190,13 @@ name: passthrough-filter
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // Sends a request with headers and data.
-  changeHeadersForStopAllTests(default_request_headers_, false);
-  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  // Sends a POST request with headers and data.
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  changeHeadersForStopAllTests(request_headers, false);
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
   for (int i = 0; i < count_ - 1; i++) {
@@ -2200,7 +2212,7 @@ name: passthrough-filter
   EXPECT_EQ(true, upstream_request_->complete());
 
   // Sends a request with headers, data, and trailers.
-  auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
+  auto encoder_decoder_2 = codec_client_->startRequest(request_headers);
   request_encoder_ = &encoder_decoder_2.first;
   response = std::move(encoder_decoder_2.second);
   for (int i = 0; i < count_; i++) {

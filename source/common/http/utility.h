@@ -132,6 +132,7 @@ envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
                              const Protobuf::BoolValue& hcm_stream_error);
+
 } // namespace Utility
 } // namespace Http3
 namespace Http {
@@ -621,6 +622,9 @@ AuthorityAttributes parseAuthority(absl::string_view host);
 envoy::config::route::v3::RetryPolicy
 convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy,
                               const std::string& retry_on);
+
+bool isZeroRttSafeRequest(Http::RequestHeaderMap& request_headers);
+
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy

@@ -63,9 +63,8 @@ public:
   RetryDecision wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers,
                                       const Http::RequestHeaderMap& original_request,
                                       bool& disable_early_data) override;
-  bool wouldRetryFromRetriableStatusCode(Http::Code code) const override;
-  RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason,
-                               Http3Used alternate_protocols_used,
+  void setRetryFromRetriableStatusCode(Http::Code code) const;
+  RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason, Http3Used http3_used,
                                DoRetryResetCallback callback) override;
   RetryStatus shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) override;
 
@@ -101,7 +100,8 @@ private:
                  const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
                  Runtime::Loader& runtime, Random::RandomGenerator& random,
                  Event::Dispatcher& dispatcher, TimeSource& time_source,
-                 Upstream::ResourcePriority priority);
+                 Upstream::ResourcePriority priority,
+                 bool conn_pool_new_stream_with_early_data_and_alt_svc);
 
   void enableBackoffTimer();
   void resetRetry();
@@ -110,8 +110,7 @@ private:
   // disable_alternate_protocols: populated to tell the caller whether to disable alt svc or not
   // when the return value indicates retry.
   RetryDecision wouldRetryFromReset(const Http::StreamResetReason reset_reason,
-                                    Http3Used alternate_protocols_used,
-                                    bool& disable_alternate_protocols);
+                                    Http3Used http3_used, bool& disable_alternate_protocols);
   RetryStatus shouldRetry(RetryDecision would_retry, DoRetryCallback callback);
 
   const Upstream::ClusterInfo& cluster_;
@@ -135,6 +134,7 @@ private:
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
   std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
   std::chrono::milliseconds reset_max_interval_{};
+  bool conn_pool_new_stream_with_early_data_and_alt_svc_{};
 };
 
 } // namespace Router

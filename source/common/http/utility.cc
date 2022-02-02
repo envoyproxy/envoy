@@ -1126,5 +1126,14 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
   return route_retry_policy;
 }
 
+bool Utility::isZeroRttSafeRequest(Http::RequestHeaderMap& request_headers) {
+  absl::string_view method = request_headers.getMethodValue();
+  // According to safe methods defined in https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1
+  return method == Http::Headers::get().MethodValues.Get ||
+         method == Http::Headers::get().MethodValues.Head ||
+         method == Http::Headers::get().MethodValues.Options ||
+         method == Http::Headers::get().MethodValues.Trace;
+}
+
 } // namespace Http
 } // namespace Envoy
