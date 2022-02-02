@@ -187,7 +187,7 @@ TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
   initialize();
   test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
 
-  // Make the usptreams stop working, to ensure the connection was not
+  // Make the upstreams stop working, to ensure the connection was not
   // established.
   fake_upstreams_[1]->dispatcher()->exit();
   fake_upstreams_[2]->dispatcher()->exit();
