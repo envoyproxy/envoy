@@ -9,8 +9,6 @@
 #include "source/common/stats/scope_prefixer.h"
 #include "source/common/stats/utility.h"
 
-#include "absl/strings/str_cat.h"
-
 namespace Envoy {
 namespace Stats {
 

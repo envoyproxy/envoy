@@ -318,7 +318,6 @@ bool OsSysCallsImpl::supportsGetifaddrs() const {
 }
 
 SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) {
-  return {0, 0};
   if (alternate_getifaddrs_.has_value()) {
     return alternate_getifaddrs_.value()(interfaces);
   }
