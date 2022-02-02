@@ -6,11 +6,6 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
-
-#define SCOPE_REFCOUNT 0
-#if SCOPE_REFCOUNT
-#include "envoy/stats/refcount_ptr.h"
-#endif
 #include "envoy/stats/symbol_table.h"
 #include "envoy/stats/tag.h"
 
@@ -30,40 +25,36 @@ using CounterOptConstRef = absl::optional<std::reference_wrapper<const Counter>>
 using GaugeOptConstRef = absl::optional<std::reference_wrapper<const Gauge>>;
 using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogram>>;
 using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextReadout>>;
-#if SCOPE_REFCOUNT
-using ConstScopeSharedPtr = RefcountPtr<const Scope>;
-using ScopeSharedPtr = RefcountPtr<Scope>;
-#else
 using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
-#endif
-using ScopePtr = ScopeSharedPtr; // TODO(jmarantz): global s/ShaedPtr/ScopeSharedPtr/ & remove alias
+using ScopePtr = ScopeSharedPtr; // TODO(jmarantz): global s/ScopePtr/ScopeSharedPtr/ & remove alias
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
-
-#define SCOPE_SHARED_FROM_THIS 1
 
 /**
  * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
  * (for example to free/delete all of them).
+ *
+ * We enable use of shared pointers for Scopes to make it possible for the admin
+ * stats handler to safely capture all the scope references and remain robust to
+ * other threads deleting those scopes while rendering an admin stats page.
+ *
+ * We use std::shared_ptr rather than Stats::RefcountPtr, which we use for other
+ * stats, because:
+ *  * existing uses of shared_ptr<Scope> exist in the Wasm extension and would need
+ *    to be rewritten to allow for RefcountPtr<Scope>.
+ *  * the main advantage of RefcountPtr is it's smaller per instance by (IIRC) 16
+ *    bytes, but there are not typically enough scopes that the extra per-scope
+ *    overhead would matter.
+ *  * It's a little less coding to use enable_shared_from_this compared to adding
+ *    a ref_count to the scope object, for each of its implementations.
  */
-class Scope : public
-#if SCOPE_REFCOUNT
-              RefcountInterface
-#else
-#if SCOPE_SHARED_FROM_THIS
-              std::enable_shared_from_this<Scope>
-#endif
-#endif
-{
+class Scope : public std::enable_shared_from_this<Scope> {
 public:
   virtual ~Scope() = default;
 
-#if SCOPE_REFCOUNT
-  ScopeSharedPtr makeShared() { return ScopeSharedPtr(this); }
-#else
   ScopeSharedPtr makeShared() { return shared_from_this(); }
-#endif
+  ConstScopeSharedPtr makeConstShared() const { return shared_from_this(); }
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes

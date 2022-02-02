@@ -237,7 +237,6 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
     }
 
     connection_.buffer().move(data);
-    ASSERT(data.length() == 0);
 
     if (chunk_encoding_) {
       connection_.buffer().add(CRLF);

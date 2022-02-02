@@ -300,7 +300,7 @@ StatsHandler::Context::Context(Server::Instance& server, bool used_only,
   // can't be deleted after the initial iteration.
   stats_.forEachScope(
       [this](size_t s) { scopes_.reserve(s); },
-      [this](const Stats::Scope& scope) { scopes_.emplace_back(scope.shared_from_this()); });
+      [this](const Stats::Scope& scope) { scopes_.emplace_back(scope.makeConstShared()); });
 
   startPhase();
 }

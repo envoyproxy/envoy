@@ -278,13 +278,6 @@ public:
   MockStore();
   ~MockStore() override;
 
-#if SCOPE_REFCOUNT
-  // RefcountInterface
-  void incRefCount() override { ++ref_count_; }
-  bool decRefCount() override { return --ref_count_ == 0; }
-  uint32_t use_count() const override { return ref_count_; }
-#endif
-
   ScopePtr createScope(const std::string& name) override { return ScopePtr{createScope_(name)}; }
   ScopePtr scopeFromStatName(StatName name) override {
     return createScope(symbolTable().toString(name));
@@ -336,7 +329,6 @@ public:
   testing::NiceMock<MockCounter> counter_;
   testing::NiceMock<MockGauge> gauge_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
-  std::atomic<uint32_t> ref_count_{1};
 };
 
 /**

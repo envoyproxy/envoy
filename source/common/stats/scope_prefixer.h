@@ -11,27 +11,9 @@ namespace Stats {
 // prior to creation.
 class ScopePrefixer : public Scope {
 public:
-#if 0
-  ScopePrefixer(absl::string_view prefix, const ScopeSharedPtr& scope);
-  ScopePrefixer(StatName prefix, const ScopeSharedPtr& scope);
-#else
   ScopePrefixer(absl::string_view prefix, Scope& scope);
   ScopePrefixer(StatName prefix, Scope& scope);
-#endif
   ~ScopePrefixer() override;
-
-#if SCOPE_REFCOUNT
-  // RefcountInterface
-#if 1
-  void incRefCount() override { ++ref_count_; }
-  bool decRefCount() override { return --ref_count_ == 0; }
-  uint32_t use_count() const override { return ref_count_; }
-#else
-  void incRefCount() override { scope_->incRefCount(); }
-  bool decRefCount() override { return scope_->decRefCount(); }
-  uint32_t use_count() const override { return scope_->use_count(); }
-#endif
-#endif
 
   // Scope
   ScopePtr createScope(const std::string& name) override;
@@ -81,9 +63,6 @@ public:
   StatName prefix() const override { return prefix_.statName(); }
 
 private:
-  ScopePrefixer(const ScopePrefixer&) = delete;
-  ScopePrefixer& operator=(const ScopePrefixer&) = delete;
-
   template <class StatType> bool iterHelper(const IterateFn<StatType>& fn) const {
     // We determine here what's in the scope by looking at name
     // prefixes. Strictly speaking this is not correct, as a stat name can be in
@@ -106,15 +85,8 @@ private:
     return scope_.iterate(filter_scope);
   }
 
-#if 0
-  ScopeSharedPtr scope_;
-#else
   Scope& scope_;
-#endif
   StatNameStorage prefix_;
-#if SCOPE_REFCOUNT
-  std::atomic<uint32_t> ref_count_{0};
-#endif
 };
 
 } // namespace Stats

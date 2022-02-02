@@ -283,13 +283,6 @@ public:
   bool decHistogramRefCount(ParentHistogramImpl& histogram, std::atomic<uint32_t>& ref_count);
   void releaseHistogramCrossThread(uint64_t histogram_id);
 
-#if SCOPE_REFCOUNT
-  // RefcountInterface
-  void incRefCount() override { ++ref_count_; }
-  bool decRefCount() override { return --ref_count_ == 0; }
-  uint32_t use_count() const override { return ref_count_; }
-#endif
-
 private:
   friend class ThreadLocalStoreTestingPeer;
 
@@ -344,12 +337,6 @@ private:
     ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix);
     ~ScopeImpl() override;
 
-#if SCOPE_REFCOUNT
-    // RefcountInterface
-    void incRefCount() override { ++ref_count_; }
-    bool decRefCount() override { return --ref_count_ == 0; }
-    uint32_t use_count() const override { return ref_count_; }
-#endif
     // Stats::Scope
     Counter& counterFromStatNameWithTags(const StatName& name,
                                          StatNameTagVectorOptConstRef tags) override;
@@ -469,9 +456,6 @@ private:
     ThreadLocalStoreImpl& parent_;
     StatNameStorage prefix_;
     mutable CentralCacheEntrySharedPtr central_cache_;
-#if SCOPE_REFCOUNT
-    std::atomic<uint32_t> ref_count_{0};
-#endif
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
@@ -583,8 +567,6 @@ private:
   // (e.g. when a scope is deleted), it is likely more efficient to batch their
   // cleanup, which would otherwise entail a post() per histogram per thread.
   std::vector<uint64_t> histograms_to_cleanup_ ABSL_GUARDED_BY(hist_mutex_);
-
-  std::atomic<uint32_t> ref_count_{0};
 };
 
 using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;

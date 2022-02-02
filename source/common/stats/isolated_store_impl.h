@@ -254,17 +254,8 @@ public:
     forEachTextReadout(f_size, f_stat);
   }
 
-#if SCOPE_REFCOUNT
-  // RefcountInterface
-  void incRefCount() override { ++ref_count_; }
-  bool decRefCount() override { return --ref_count_ == 0; }
-  uint32_t use_count() const override { return ref_count_; }
-#endif
-
 private:
   IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
-  IsolatedStoreImpl(const IsolatedStoreImpl&) = delete;
-  IsolatedStoreImpl& operator=(const IsolatedStoreImpl&) = delete;
 
   SymbolTablePtr symbol_table_storage_;
   AllocatorImpl alloc_;
@@ -275,9 +266,6 @@ private:
   RefcountPtr<NullCounterImpl> null_counter_;
   RefcountPtr<NullGaugeImpl> null_gauge_;
   ScopeSharedPtr default_scope_;
-#if SCOPE_REFCOUNT
-  std::atomic<uint32_t> ref_count_{1};
-#endif
 };
 
 } // namespace Stats

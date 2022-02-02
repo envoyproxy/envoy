@@ -186,7 +186,6 @@ TEST_P(StatsUtilityTest, Counters) {
   Counter& ctags =
       Utility::counterFromElements(*scope, {DynamicName("x"), token, DynamicName("y")}, tags_);
   EXPECT_EQ("scope.x.token.y.tag1.value1.tag2.value2", ctags.name());
-  scope.reset();
 }
 
 TEST_P(StatsUtilityTest, Gauges) {
