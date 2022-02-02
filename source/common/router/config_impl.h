@@ -531,6 +531,8 @@ public:
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                               const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
+  Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                 bool do_formatting = true) const override;
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                const StreamInfo::StreamInfo& stream_info) const override;
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
@@ -672,6 +674,10 @@ private:
                                 bool insert_envoy_original_path) const override {
       return parent_->finalizeRequestHeaders(headers, stream_info, insert_envoy_original_path);
     }
+    Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                   bool do_formatting = true) const override {
+      return parent_->requestHeaderTransforms(stream_info, do_formatting);
+    }
     void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                  const StreamInfo::StreamInfo& stream_info) const override {
       return parent_->finalizeResponseHeaders(headers, stream_info);
@@ -810,6 +816,8 @@ private:
       }
       DynamicRouteEntry::finalizeRequestHeaders(headers, stream_info, insert_envoy_original_path);
     }
+    Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                   bool do_formatting = true) const override;
     void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                  const StreamInfo::StreamInfo& stream_info) const override {
       response_headers_parser_->evaluateHeaders(headers, stream_info);
@@ -843,6 +851,28 @@ private:
   };
 
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
+
+  /**
+   * Returns a vector of request header parsers which applied or will apply header transformations
+   * to the request in this route.
+   * @param specificity_ascend specifies whether the returned parsers will be sorted from least
+   *        specific to most specific (global connection manager level header parser, virtual host
+   *        level header parser and finally route-level parser.) or the reverse.
+   * @return a vector of request header parsers.
+   */
+  absl::InlinedVector<const HeaderParser*, 3>
+  getRequestHeaderParsers(bool specificity_ascend) const;
+
+  /**
+   * Returns a vector of response header parsers which applied or will apply header transformations
+   * to the response in this route.
+   * @param specificity_ascend specifies whether the returned parsers will be sorted from least
+   *        specific to most specific (global connection manager level header parser, virtual host
+   *        level header parser and finally route-level parser.) or the reverse.
+   * @return a vector of request header parsers.
+   */
+  absl::InlinedVector<const HeaderParser*, 3>
+  getResponseHeaderParsers(bool specificity_ascend) const;
 
   absl::optional<RuntimeData> loadRuntimeData(const envoy::config::route::v3::RouteMatch& route);
 

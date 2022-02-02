@@ -1495,55 +1495,6 @@ TEST_F(Http1ServerConnectionImplTest,
   EXPECT_EQ("HTTP/1.1 304 Not Modified\r\netag: \"1234567890\"\r\n\r\n", output);
 }
 
-// Upstream response 304 without content-length header
-// The legacy behavior returns different headers for GET and HEAD requests
-// For GET, it adds "content-length: 0"
-// For HEAD, it adds "transfer-encoding: chunked"
-TEST_F(Http1ServerConnectionImplTest,
-       304ResponseTransferEncodingContentLengthNotAddedWhenContentLengthNotPresentLegacy) {
-  // Testing old behavior with no_chunked_encoding_header_for_304 turned off
-  // GET and HEAD returns different headers
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.no_chunked_encoding_header_for_304", "false"}});
-  initialize();
-
-  NiceMock<MockRequestDecoder> decoder;
-  Http::ResponseEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_, _))
-      .Times(2)
-      .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
-        response_encoder = &encoder;
-        return decoder;
-      }));
-
-  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nif-none-match: \"1234567890\"\r\n\r\n");
-  auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(status.ok());
-  EXPECT_EQ(0U, buffer.length());
-
-  std::string output;
-  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
-
-  TestResponseHeaderMapImpl headers{{":status", "304"}, {"etag", "\"1234567890\""}};
-  response_encoder->encodeHeaders(headers, true);
-  EXPECT_EQ("HTTP/1.1 304 Not Modified\r\netag: \"1234567890\"\r\ncontent-length: 0\r\n\r\n",
-            output);
-
-  buffer.add("HEAD / HTTP/1.1\r\nif-none-match: \"1234567890\"\r\n\r\n");
-  status = codec_->dispatch(buffer);
-  EXPECT_TRUE(status.ok());
-  EXPECT_EQ(0U, buffer.length());
-
-  output.clear();
-  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
-
-  response_encoder->encodeHeaders(headers, true);
-  EXPECT_EQ(
-      "HTTP/1.1 304 Not Modified\r\netag: \"1234567890\"\r\ntransfer-encoding: chunked\r\n\r\n",
-      output);
-}
-
 TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseWith204) {
   initialize();
 

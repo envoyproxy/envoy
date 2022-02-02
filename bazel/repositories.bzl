@@ -80,6 +80,7 @@ def _envoy_repo_impl(repository_ctx):
     repo_path = repository_ctx.path(repository_ctx.attr.envoy_root).dirname
     version = repository_ctx.read(repo_path.get_child("VERSION")).strip()
     repository_ctx.file("version.bzl", "VERSION = '%s'" % version)
+    repository_ctx.file("path.bzl", "PATH = '%s'" % repo_path)
     repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'" % (repo_path, version))
     repository_ctx.file("WORKSPACE", "")
     repository_ctx.file("BUILD", """
@@ -208,11 +209,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
-    external_http_archive(
-        name = "envoy_build_tools",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/external:envoy_build_tools.patch"],
-    )
+    external_http_archive("envoy_build_tools")
     external_http_archive("rules_cc")
     external_http_archive("rules_pkg")
     _com_github_fdio_vpp_vcl()
@@ -930,7 +927,7 @@ def _emscripten_toolchain():
             ".emscripten_sanity",
         ]),
         patch_cmds = [
-            "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 2.0.7 && ./emsdk activate --embedded 2.0.7; fi",
+            "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 3.1.1 && ./emsdk activate --embedded 3.1.1; fi",
         ],
     )
 
