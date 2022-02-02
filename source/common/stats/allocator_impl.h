@@ -6,6 +6,7 @@
 #include "envoy/stats/allocator.h"
 #include "envoy/stats/sink.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stats/symbol_table.h"
 
 #include "source/common/common/thread_synchronizer.h"
 #include "source/common/stats/metric_impl.h"
