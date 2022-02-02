@@ -5,7 +5,6 @@
 
 #include "envoy/stats/sink.h"
 #include "envoy/stats/stats.h"
-#include "envoy/stats/symbol_table.h"
 
 #include "source/common/common/hash.h"
 #include "source/common/common/lock_guard.h"
