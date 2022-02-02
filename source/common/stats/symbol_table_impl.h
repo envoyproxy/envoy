@@ -342,18 +342,12 @@ public:
    * calling std::sort directly as it takes a single lock for the
    * entire sort, rather than locking on each comparison.
    *
-   * This is a free function rather than a method of SymbolTable because
-   * SymbolTable is an abstract class and it's hard to make a virtual template
-   * function.
-   *
-   * @param symbol_table the symbol table that owns the StatNames.
    * @param begin the beginning of the range to sort
    * @param end the end of the range to sort
    * @param get_stat_name a functor that takes an Obj and returns a StatName.
    */
   template <class Obj, class Iter, class GetStatName>
   void sortByStatNames(Iter begin, Iter end, GetStatName get_stat_name) const {
-
     // Grab the lock once before sorting begins, so we don't have to re-take
     // it on every comparison.
     Thread::LockGuard lock(lock_);
