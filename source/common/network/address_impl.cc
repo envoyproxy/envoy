@@ -46,18 +46,16 @@ InstanceConstSharedPtr throwOnError(StatusOr<InstanceConstSharedPtr> address) {
 
 } // namespace
 
-struct sockaddr_in ipv6ToIpv4CompatibleAddress(const struct sockaddr_in6* sin6) {
+void ipv6ToIpv4CompatibleAddress(const struct sockaddr_in6* sin6, struct sockaddr_in* sin) {
 #if defined(__APPLE__)
-  struct sockaddr_in sin = {
-      {}, AF_INET, sin6->sin6_port, {sin6->sin6_addr.__u6_addr.__u6_addr32[3]}, {}};
+  *sin = {{}, AF_INET, sin6->sin6_port, {sin6->sin6_addr.__u6_addr.__u6_addr32[3]}, {}};
 #elif defined(WIN32)
   struct in_addr in_v4 = {};
   in_v4.S_un.S_addr = reinterpret_cast<const uint32_t*>(sin6->sin6_addr.u.Byte)[3];
-  struct sockaddr_in sin = {AF_INET, sin6->sin6_port, in_v4, {}};
+  *sin = {AF_INET, sin6->sin6_port, in_v4, {}};
 #else
-  struct sockaddr_in sin = {AF_INET, sin6->sin6_port, {sin6->sin6_addr.s6_addr32[3]}, {}};
+  *sin = {AF_INET, sin6->sin6_port, {sin6->sin6_addr.s6_addr32[3]}, {}};
 #endif
-  return sin;
 }
 
 StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_storage& ss,
@@ -75,7 +73,8 @@ StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_sto
     const struct sockaddr_in6* sin6 = reinterpret_cast<const struct sockaddr_in6*>(&ss);
     ASSERT(AF_INET6 == sin6->sin6_family);
     if (!v6only && IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-      struct sockaddr_in sin = ipv6ToIpv4CompatibleAddress(sin6);
+      struct sockaddr_in sin;
+      ipv6ToIpv4CompatibleAddress(sin6, &sin);
       return Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sin);
     } else {
       return Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(*sin6, v6only);
@@ -240,7 +239,8 @@ std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress() const {
 }
 StatusOr<InstanceConstSharedPtr> Ipv6Instance::Ipv6Helper::v4CompatibleAddress() const {
   if (!v6only_ && IN6_IS_ADDR_V4MAPPED(&address_.sin6_addr)) {
-    struct sockaddr_in sin = ipv6ToIpv4CompatibleAddress(&address_);
+    struct sockaddr_in sin;
+    ipv6ToIpv4CompatibleAddress(&address_, &sin);
     return Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sin);
   }
   return absl::InvalidArgumentError(fmt::format("It isn't v4 compatible address"));
