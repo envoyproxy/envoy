@@ -96,13 +96,25 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         config.listenSocketFactory().localAddress()->asStringView(), details);
 
     auto& address = details->address_;
-    // If the address is IPv6 and isn't v6only, adds an extra ipv4 any-address item to the map.
-    // Then this allows the `getBalancedHandlerByAddress` can match the ipv4 any-address also.
+    // If the address is IPv6 and isn't v6only, parse out the ipv4 compatible address from the ipv6
+    // address and put an item to the map. Then this allows the `getBalancedHandlerByAddress`
+    // can match the ipv4 any-address also.
     if (address->type() == Network::Address::Type::Ip &&
         address->ip()->version() == Network::Address::IpVersion::v6 &&
         !address->ip()->ipv6()->v6only()) {
-      tcp_listener_map_by_address_.insert_or_assign(
-          Network::Utility::getIpv4AnyAddress(address->ip()->port())->asStringView(), details);
+      if (address->ip()->isAnyAddress()) {
+        tcp_listener_map_by_address_.insert_or_assign(
+            Network::Utility::getIpv4AnyAddress(address->ip()->port())->asStringView(), details);
+      } else {
+        auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
+        if (!v4_compatible_addr.ok() && !v4_compatible_addr.status().ok()) {
+          throw EnvoyException(fmt::format("Can't get v4 compatible address for {}: {}",
+                                           address->asStringView(),
+                                           v4_compatible_addr.status().ToString()));
+        }
+        tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr.value()->asStringView(),
+                                                      details);
+      }
     }
   } else if (absl::holds_alternative<std::reference_wrapper<ActiveInternalListener>>(
                  details->typed_listener_)) {
@@ -127,8 +139,14 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
       if (address->type() == Network::Address::Type::Ip &&
           address->ip()->version() == Network::Address::IpVersion::v6 &&
           !address->ip()->ipv6()->v6only()) {
-        tcp_listener_map_by_address_.erase(
-            Network::Utility::getIpv4AnyAddress(address->ip()->port())->asStringView());
+        if (address->ip()->isAnyAddress()) {
+          tcp_listener_map_by_address_.erase(
+              Network::Utility::getIpv4AnyAddress(address->ip()->port())->asStringView());
+        } else {
+          auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
+          ASSERT(v4_compatible_addr.ok());
+          tcp_listener_map_by_address_.erase(v4_compatible_addr.value()->asStringView());
+        }
       }
     } else if (internal_listener_map_by_address_.contains(address_view) &&
                internal_listener_map_by_address_[address_view]->listener_tag_ ==
