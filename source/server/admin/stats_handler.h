@@ -54,7 +54,7 @@ public:
   class TextRender;
 
   class Context {
-    using ScopeVec = std::vector<Stats::ScopeSharedPtr>;
+    using ScopeVec = std::vector<Stats::ConstScopeSharedPtr>;
     using StatOrScopes =
         absl::variant<ScopeVec, Stats::TextReadoutSharedPtr, Stats::CounterSharedPtr,
                       Stats::GaugeSharedPtr, Stats::HistogramSharedPtr>;

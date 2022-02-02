@@ -299,14 +299,15 @@ StatsHandler::Context::Context(Server::Instance& server, bool used_only,
   // First capture all the scopes and hold onto them with a SharedPtr so they
   // can't be deleted after the initial iteration.
   stats_.forEachScope([this](size_t s) { scopes_.reserve(s); },
-                      [this](const Stats::ScopeSharedPtr& scope) { scopes_.emplace_back(scope); });
+                      [this](const Stats::Scope& scope) {
+                        scopes_.emplace_back(scope.shared_from_this()); });
 
   startPhase();
 }
 
 void StatsHandler::Context::startPhase() {
   ASSERT(stat_map_.empty());
-  for (const Stats::ScopeSharedPtr& scope : scopes_) {
+  for (const Stats::ConstScopeSharedPtr& scope : scopes_) {
     StatOrScopes& variant = stat_map_[stats_.symbolTable().toString(scope->prefix())];
     if (variant.index() == absl::variant_npos) {
       variant = ScopeVec();
@@ -342,7 +343,7 @@ void StatsHandler::Context::populateStatsForCurrentPhase(const ScopeVec& scope_v
 
 template <class StatType>
 void StatsHandler::Context::populateStatsFromScopes(const ScopeVec& scope_vec) {
-  for (const Stats::ScopeSharedPtr& scope : scope_vec) {
+  for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
     Stats::IterateFn<StatType> fn = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
       stat_map_[stat->name()] = stat;
       return true;
@@ -430,7 +431,7 @@ struct CompareStatsAndScopes {
 
   Stats::StatName name(const StatOrScope& stat_or_scope) const {
     switch (stat_or_scope.index()) {
-      case 0: return absl::get<Stats::ScopeSharedPtr>(stat_or_scope)->prefix();
+      case 0: return absl::get<Stats::ConstScopeSharedPtr>(stat_or_scope)->prefix();
       case 1: return absl::get<Stats::TextReadoutSharedPtr>(stat_or_scope)->statName();
       case 2: return absl::get<Stats::CounterSharedPtr>(stat_or_scope)->statName();
       case 3: return absl::get<Stats::GaugeSharedPtr>(stat_or_scope)->statName();

@@ -237,7 +237,7 @@ public:
     if (f_size != nullptr) {
       f_size(1);
     }
-    f_stat(default_scope_);
+    f_stat(*default_scope_);
   }
 
   Stats::StatName prefix() const override { return StatName(); }
