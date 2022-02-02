@@ -76,6 +76,8 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
                                       Http::ResponseHeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream& admin_stream) {
   if (server_.statsConfig().flushOnAdmin()) {
+    ENVOY_LOG_MISC(error, "flushing on admin");
+    abort();
     server_.flushStats();
   }
 

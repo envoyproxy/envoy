@@ -68,7 +68,7 @@ void AdminFilter::onComplete() {
   Buffer::OwnedImpl response;
   auto header_map = Http::ResponseHeaderMapImpl::create();
   RELEASE_ASSERT(request_headers_, "");
-  for (bool cont = true, first = true; cont; first = false) {
+  for (bool cont = true, first = true; cont;) {
     // TODO(jmarantz): admin_server-callback_func_ is only going to access
     // header_map on the first iteration. This clang-tidy suppression can be
     // cleaned up once the handler mechanism provides a separate "nextChunk"
@@ -81,6 +81,7 @@ void AdminFilter::onComplete() {
       Utility::populateFallbackResponseHeaders(cont ? Http::Code::OK : code, *header_map);
       decoder_callbacks_->encodeHeaders(std::move(header_map), end_stream && response.length() == 0,
                                         StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
+      first = false;
     }
     if (response.length() > 0) {
       // ENVOY_LOG_MISC(error, "Chunking out {} bytes cont={}", response.length(), cont);
