@@ -37,6 +37,7 @@ TEST(UtilityTest, TestDnsNameMatching) {
   EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "lyft*.com"));
   EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "l*ft.com"));
   EXPECT_TRUE(Utility::dnsNameMatch("test.lyft.com", "t*.lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("t.lyft.com", "t*t.lyft.com"));
   EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "l*ft.co"));
   EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "ly?t.com"));
   EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "lf*t.com"));
