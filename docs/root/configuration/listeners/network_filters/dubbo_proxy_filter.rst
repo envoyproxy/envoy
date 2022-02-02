@@ -61,7 +61,7 @@ the second step is to add your configuration, configuration method refer to the 
     - name: envoy.filters.network.dubbo_proxy
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.network.dubbo_proxy.v3.DubboProxy
-        stat_prefix: dubbo_incomming_stats
+        stat_prefix: dubbo_incoming_stats
         protocol_type: Dubbo
         serialization_type: Hessian2
         route_config:

@@ -10,7 +10,7 @@ Minor Behavior Changes
 *Changes that may cause incompatibilities for some users, but should not for most*
 
 * http: disable the integration between :ref:`ExtensionWithMatcher <v1.18:envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
-  and HTTP filters by default to reflects its experimental status. This feature can be enabled by seting
+  and HTTP filters by default to reflects its experimental status. This feature can be enabled by setting
   `envoy.reloadable_features.experimental_matching_api` to true.
 * http: reject requests with #fragment in the URI path. The fragment is not allowed to be part of request
   URI according to RFC3986 (3.5), RFC7230 (5.1) and RFC 7540 (8.1.2.3). Rejection of requests can be changed

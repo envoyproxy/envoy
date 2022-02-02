@@ -33,16 +33,16 @@ use BPF on Linux by default if multiple worker threads are configured, but may r
 sudo-with-permissions (e.g. sudo setcap cap_bpf+ep). If multiple worker threads are configured, Envoy will
 log a warning on start-up if BPF is unsupported on the platform, or is attempted and fails.
 
-It is recommanded to monitor some UDP listener and QUIC connection stats:
-* :repo:`UDP listener downstream_rx_datagram_dropped </docs/root/configuration/listeners/stats.rst#udp-statistics>`: non-zero means kernel's UDP listen socket's receive buffer isn't large enough. In Linux, it can be configured via listener :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` by setting prebinding socket option SO_RCVBUF at SOL_SOCKET level.
+It is recommended to monitor some UDP listener and QUIC connection stats:
+* :repo:`UDP listener downstream_rx_datagram_dropped </docs/root/configuration/listeners/stats.rst#udp-statistics>`: non-zero means the kernel's UDP listen socket's receive buffer isn't large enough. In Linux, it can be configured via the listener :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` by setting the prebinding socket option SO_RCVBUF at the SOL_SOCKET level.
 * :repo:`QUIC connection error codes and stream reset error codes </docs/root/configuration/http/http_conn_man/stats.rst#http3-per-listener-statistics>`: please refer to `quic_error_codes.h <https://github.com/google/quiche/blob/main/quic/core/quic_error_codes.h>` for the meaning of each error codes.
 
 HTTP3 upstream
 --------------
 
 HTTP/3 upstream support is implemented, but is missing some key features. The code is now covered by Envoy's
-security policy, and is fine to use in production environments the network is under the deployer's control
-(e.g. will not randomly black-hole connections). It is not reccomended for use on the open internet
+security policy, and is fine to use in production environments where the network is under the deployer's control
+(e.g. will not randomly black-hole connections). It is not recommended for use on the open internet
 until blackhole detection and fail-over to TCP is implemented. There are also a number of major latency
 improvements underway such as upstream support for 0-rtt handshakes: see open issues for upstream HTTP/3
 `here <https://github.com/envoyproxy/envoy/labels/quic-upstream-mvp>`_

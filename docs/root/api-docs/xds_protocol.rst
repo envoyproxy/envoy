@@ -440,7 +440,7 @@ non-empty :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v
 field), the server should treat that identically to how it would treat the client having
 explicitly subscribed to "*". However, once the client does explicitly subscribe to a resource
 name (whether it be "*" or any other name), then this legacy semantic is no longer available; at
-that point, clearing the list of subscribed resources is interpretted as an unsubscription (see
+that point, clearing the list of subscribed resources is interpreted as an unsubscription (see
 :ref:`Unsubscribing From Resources<xds_protocol_unsubscribing>`) rather than as a subscription
 to "*".
 

@@ -832,7 +832,7 @@ peerCertificateValidated()
 .. code-block:: lua
 
   if downstreamSslConnection:peerCertificateVaidated() then
-    print("peer certificate is valiedated")
+    print("peer certificate is validated")
   end
 
 Returns bool whether the peer certificate was validated.

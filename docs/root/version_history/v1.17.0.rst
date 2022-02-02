@@ -15,7 +15,7 @@ Minor Behavior Changes
 * decompressor: set the default value of window_bits of the decompressor to 15 to be able to decompress responses compressed by a compressor with any window size.
 * expr filter: added ``connection.termination_details`` property support.
 * formatter: the :ref:`text_format <v1.17:envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format>` field no longer requires at least one byte, and may now be the empty string. It has also become :ref:`deprecated <v1.17:1_17_deprecated>`.
-* grpc_web filter: if a ``grpc-accept-encoding`` header is present it's passed as-is to the upstream and if it isn't ``grpc-accept-encoding:identity`` is sent instead. The header was always overwriten with ``grpc-accept-encoding:identity,deflate,gzip`` before.
+* grpc_web filter: if a ``grpc-accept-encoding`` header is present it's passed as-is to the upstream and if it isn't ``grpc-accept-encoding:identity`` is sent instead. The header was always overwritten with ``grpc-accept-encoding:identity,deflate,gzip`` before.
 * http: upstream protocol will now only be logged if an upstream stream was established.
 * jwt_authn filter: added support of JWT time constraint verification with a clock skew (default to 60 seconds) and added a filter config field :ref:`clock_skew_seconds <v1.17:envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.clock_skew_seconds>` to configure it.
 * listener: injection of the :ref:`TLS inspector <v1.17:config_listener_filters_tls_inspector>` has been disabled by default. This feature is controlled by the runtime guard ``envoy.reloadable_features.disable_tls_inspector_injection``.
@@ -84,7 +84,7 @@ New Features
 * log: added a new custom flag ``%_`` to the log pattern to print the actual message to log, but with escaped newlines.
 * lua: added `downstreamDirectRemoteAddress()` and `downstreamLocalAddress()` APIs to :ref:`streamInfo() <v1.17:config_http_filters_lua_stream_info_wrapper>`.
 * mongo_proxy: the list of commands to produce metrics for is now :ref:`configurable <v1.17:envoy_v3_api_field_extensions.filters.network.mongo_proxy.v3.MongoProxy.commands>`.
-* network: added a :ref:`transport_socket_connect_timeout config field <v1.17:envoy_v3_api_field_config.listener.v3.FilterChain.transport_socket_connect_timeout>` for incoming connections completing transport-level negotiation, including TLS and ALTS hanshakes.
+* network: added a :ref:`transport_socket_connect_timeout config field <v1.17:envoy_v3_api_field_config.listener.v3.FilterChain.transport_socket_connect_timeout>` for incoming connections completing transport-level negotiation, including TLS and ALTS handshakes.
 * overload: added :ref:`envoy.overload_actions.reduce_timeouts <v1.17:config_overload_manager_overload_actions>` overload action to enable scaling timeouts down with load. Scaling support :ref:`is limited <v1.17:envoy_v3_api_enum_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType>` to the HTTP connection and stream idle timeouts.
 * ratelimit: added support for use of various :ref:`metadata <v1.17:envoy_v3_api_field_config.route.v3.RateLimit.Action.metadata>` as a ratelimit action.
 * ratelimit: added :ref:`disable_x_envoy_ratelimited_header <v1.17:envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimit>` option to disable `X-Envoy-RateLimited` header.

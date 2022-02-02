@@ -7,7 +7,7 @@ Windows based Front proxy
 
 To get a flavor of what Envoy has to offer on Windows, we are releasing a
 `docker compose <https://docs.docker.com/compose/>`_ sandbox that deploys a front Envoy and a
-couple of services (simple Flask apps) colocated with a running service Envoy.
+couple of services (simple Flask apps) collocated with a running service Envoy.
 
 The three containers will be deployed inside a virtual network called ``envoymesh``.
 

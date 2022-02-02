@@ -110,7 +110,7 @@ following are the command line options that Envoy supports.
    set, a default format string ``"[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v"`` is used.
 
    When used in conjunction with :option:`--log-format-escaped`, the logger can be configured
-   to log in a format that is parsable by log viewers. Known integrations are documented
+   to log in a format that is parseable by log viewers. Known integrations are documented
    in the :ref:`application logging configuration <config_application_logs>` section.
 
    The supported format flags are (with example output):

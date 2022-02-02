@@ -52,10 +52,10 @@ request. The router filter supports the following features:
 Route Scope
 -----------
 
-Scoped routing enables Envoy to put constraints on search space of domains and route rules.
+Scoped routing enables Envoy to put constraints on the search space of domains and route rules.
 A :ref:`Route Scope <envoy_v3_api_msg_config.route.v3.scopedrouteconfiguration>` associates a key with a :ref:`route table <arch_overview_http_routing_route_table>`.
 For each request, a scope key is computed dynamically by the HTTP connection manager to pick the :ref:`route table <envoy_v3_api_msg_config.route.v3.routeconfiguration>`.
-RouteConfiguration associated with scope can be loaded on demand with :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` configured and on demand filed in protobuf set to true.
+RouteConfiguration associated with scope can be loaded on demand with :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` configured and the on demand field in the protobuf set to true.
 
 The Scoped RDS (SRDS) API contains a set of :ref:`Scopes <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>` resources, each defining independent routing configuration,
 along with a :ref:`ScopeKeyBuilder <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.ScopeKeyBuilder>`
@@ -79,7 +79,7 @@ If the "addr" header value is "foo=1;x-foo-key=127.0.0.1;x-bar-key=1.1.1.1", the
 
 For a key to match a :ref:`ScopedRouteConfiguration<envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>`, the number of fragments in the computed key has to match that of
 the :ref:`ScopedRouteConfiguration<envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>`.
-Then fragments are matched in order. A missing fragment(treated as NULL) in the built key makes the request unable to match any scope,
+Then fragments are matched in order. A missing fragment (treated as NULL) in the built key makes the request unable to match any scope,
 i.e. no route entry can be found for the request.
 
 Route table
@@ -196,7 +196,7 @@ Envoy will include the specified headers in the direct HTTP response.
 Routing Via Generic Matching
 ----------------------------
 
-Envoy recently added support for utilzing a :ref:`generic match tree <arch_overview_matching_api>` to
+Envoy recently added support for utilizing a :ref:`generic match tree <arch_overview_matching_api>` to
 specify the route table. This is a more expressive matching engine than the original one, allowing
 for sublinear matching on arbitrary headers (unlike the original matching engine which could only
 do this for :authority in some cases).

@@ -356,7 +356,7 @@ as described in the previous section.
 xDS TTL
 ^^^^^^^
 
-When using xDS, users might find themself wanting to temporarily update certain xDS resources. In order to do
+When using xDS, users might find themselves wanting to temporarily update certain xDS resources. In order to do
 safely, xDS TTLs can be used to make sure that if the control plane becomes unavailable and is unable to revert
 the xDS change, Envoy will remove the resource after a TTL specified by the server. See the
 :ref:`protocol documentation <xds_protocol_ttl>` for more information.

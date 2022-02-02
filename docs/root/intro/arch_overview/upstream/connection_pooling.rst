@@ -57,7 +57,7 @@ Automatic protocol selection
 
 For Envoy acting as a forward proxy, the preferred configuration is the
 :ref:`AutoHttpConfig <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig>`
-, configued via
+, configured via
 :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`.
 By default it will use TCP and ALPN to select the best available protocol of HTTP/2 and HTTP/1.1.
 
@@ -84,7 +84,7 @@ It is not uncommon for network devices to block UDP traffic, and hence block HTT
 means that upstream HTTP/3 connection attempts might be blocked by the network and will fall
 back to using HTTP/2 or HTTP/1.  This path is alpha and rapidly undergoing improvements with the goal of having
 the default behavior result in optimal latency for internet environments, so please be patient and follow along with Envoy release notes
-to stay aprised of the latest and greatest changes.
+to stay apprised of the latest and greatest changes.
 
 
 .. _arch_overview_conn_pool_how_many:

@@ -61,7 +61,7 @@ Changes
 * router: added ability to set attempt count in downstream response, see :ref:`virtual host's include response
   attempt count config <v1.14:envoy_api_field_route.VirtualHost.include_attempt_count_in_response>`.
 * router: added additional stats for :ref:`virtual clusters <v1.14:config_http_filters_router_vcluster_stats>`.
-* router: added :ref:`auto_san_validation <v1.14:envoy_api_field_core.UpstreamHttpProtocolOptions.auto_san_validation>` to support overrriding SAN validation to transport socket for new upstream connections based on the downstream HTTP host/authority header.
+* router: added :ref:`auto_san_validation <v1.14:envoy_api_field_core.UpstreamHttpProtocolOptions.auto_san_validation>` to support overriding SAN validation to transport socket for new upstream connections based on the downstream HTTP host/authority header.
 * router: added the ability to match a route based on whether a downstream TLS connection certificate has been
   :ref:`validated <v1.14:envoy_api_field_route.RouteMatch.TlsContextMatchOptions.validated>`.
 * router: added support for :ref:`regex_rewrite

@@ -30,7 +30,7 @@ Minor Behavior Changes
 * http: added :ref:`contains <v1.16:envoy_api_msg_route.HeaderMatcher>`, a new header matcher type which matches if the value of the header has the substring mentioned in contains matcher.
 * http: added :ref:`headers_to_add <v1.16:envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.headers_to_add>` to :ref:`local reply mapper <v1.16:config_http_conn_man_local_reply>` to allow its users to add/append/override response HTTP headers to local replies.
 * http: added HCM level configuration of :ref:`error handling on invalid messaging <v1.16:envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>` which substantially changes Envoy's behavior when encountering invalid HTTP/1.1 defaulting to closing the connection instead of allowing reuse. This can temporarily be reverted by setting ``envoy.reloadable_features.hcm_stream_error_on_invalid_message`` to false, or permanently reverted by setting the HTTP/1 configuration :ref:`override_stream_error_on_invalid_http_message <v1.16:envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.override_stream_error_on_invalid_http_message>` to true to restore prior HTTP/1.1 behavior (i.e. connection isn't terminated) and to retain prior HTTP/2 behavior (i.e. connection is terminated).
-* http: added HCM level configuration of :ref:`error handling on invalid messaging <v1.16:envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>` which substantially changes Envoy's behavior when encountering invalid HTTP/1.1 defaulting to closing the connection instead of allowing reuse. This can temporarily be reverted by setting ``envoy.reloadable_features.hcm_stream_error_on_invalid_message`` to false, or permanently reverted by setting the :ref:`HCM option <v1.16:envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>` to true to restore prior HTTP/1.1 beavior and setting the *new* HTTP/2 configuration :ref:`override_stream_error_on_invalid_http_message <v1.16:envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.override_stream_error_on_invalid_http_message>` to false to retain prior HTTP/2 behavior.
+* http: added HCM level configuration of :ref:`error handling on invalid messaging <v1.16:envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>` which substantially changes Envoy's behavior when encountering invalid HTTP/1.1 defaulting to closing the connection instead of allowing reuse. This can temporarily be reverted by setting ``envoy.reloadable_features.hcm_stream_error_on_invalid_message`` to false, or permanently reverted by setting the :ref:`HCM option <v1.16:envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>` to true to restore prior HTTP/1.1 behavior and setting the *new* HTTP/2 configuration :ref:`override_stream_error_on_invalid_http_message <v1.16:envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.override_stream_error_on_invalid_http_message>` to false to retain prior HTTP/2 behavior.
 * http: applying route level header modifications to local replies sent on that route. This behavior may be temporarily reverted by setting ``envoy.reloadable_features.always_apply_route_header_rules`` to false.
 * http: changed Envoy to send GOAWAY to HTTP2 downstreams when the :ref:`disable_keepalive <v1.16:config_overload_manager_overload_actions>` overload action is active. This behavior may be temporarily reverted by setting ``envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2`` to false.
 * http: changed Envoy to send error headers and body when possible. This behavior may be temporarily reverted by setting ``envoy.reloadable_features.allow_response_for_timeout`` to false.
@@ -50,7 +50,7 @@ Minor Behavior Changes
 * postgres: changed log format to tokenize fields of Postgres messages.
 * router: added transport failure reason to response body when upstream reset happens. After this change, the response body will be of the form ``upstream connect error or disconnect/reset before headers. reset reason:{}, transport failure reason:{}``.This behavior may be reverted by setting runtime feature ``envoy.reloadable_features.http_transport_failure_reason_in_body`` to false.
 * router: now consumes all retry related headers to prevent them from being propagated to the upstream. This behavior may be reverted by setting runtime feature ``envoy.reloadable_features.consume_all_retry_headers`` to false.
-* stats: the fake symbol table implemention has been removed from the binary, and the option ``--use-fake-symbol-table`` is now a no-op with a warning.
+* stats: the fake symbol table implementation has been removed from the binary, and the option ``--use-fake-symbol-table`` is now a no-op with a warning.
 * thrift_proxy: special characters {'\0', '\r', '\n'} will be stripped from thrift headers.
 * watchdog: replaced single watchdog with separate watchdog configuration for worker threads and for the main thread configured via :ref:`Watchdogs <v1.16:envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdogs>`. It works with :ref:`watchdog <v1.16:envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdog>` by having the worker thread and main thread watchdogs have same config.
 
@@ -67,7 +67,7 @@ Bug Fixes
 * http: fixed bugs in datadog and squash filter's handling of responses with no bodies.
 * http: made the HeaderValues::prefix() method const.
 * jwt_authn: supports jwt payload without "iss" field.
-* listener: fixed crash at listener inplace update when connection load balancer is set.
+* listener: fixed crash at listener in-place update when connection load balancer is set.
 * rocketmq_proxy: fixed an issue involving incorrect header lengths. In debug mode it causes crash and in release mode it causes underflow.
 * thrift_proxy: fixed crashing bug on request overflow.
 * udp_proxy: fixed a crash due to UDP packets being processed after listener removal.
@@ -76,10 +76,10 @@ Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <v1.16:deprecated>`
 
-* http: removed legacy header sanitization and the runtime guard ``envoy.reloadable_features.strict_header_validation``.
+* http: removed legacy header sanitizing and the runtime guard ``envoy.reloadable_features.strict_header_validation``.
 * http: removed legacy transfer-encoding enforcement and runtime guard ``envoy.reloadable_features.reject_unsupported_transfer_encodings``.
 * http: removed configurable strict host validation and runtime guard ``envoy.reloadable_features.strict_authority_validation``.
-* http: removed the connection header sanitization runtime guard ``envoy.reloadable_features.connection_header_sanitization``.
+* http: removed the connection header sanitizing runtime guard ``envoy.reloadable_features.connection_header_sanitization``.
 
 New Features
 ------------
@@ -156,7 +156,7 @@ New Features
 * tracing: added ability to set some :ref:`optional segment fields <v1.16:envoy_v3_api_field_config.trace.v3.XRayConfig.segment_fields>` in the AWS  X-Ray tracer.
 * udp_proxy: added :ref:`hash_policies <v1.16:envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>` to support hash based routing.
 * udp_proxy: added :ref:`use_original_src_ip <v1.16:envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>` option to replicate the downstream remote address of the packets on the upstream side of Envoy. It is similar to :ref:`original source filter <v1.16:envoy_v3_api_msg_extensions.filters.listener.original_src.v3.OriginalSrc>`.
-* watchdog: support randomizing the watchdog's kill timeout to prevent synchronized kills via a maximium jitter parameter :ref:`max_kill_timeout_jitter <v1.16:envoy_v3_api_field_config.bootstrap.v3.Watchdog.max_kill_timeout_jitter>`.
+* watchdog: support randomizing the watchdog's kill timeout to prevent synchronized kills via a maximum jitter parameter :ref:`max_kill_timeout_jitter <v1.16:envoy_v3_api_field_config.bootstrap.v3.Watchdog.max_kill_timeout_jitter>`.
 * watchdog: supports an extension point where actions can be registered to fire on watchdog events such as miss, megamiss, kill and multikill. See :ref:`watchdog actions <v1.16:envoy_v3_api_field_config.bootstrap.v3.Watchdog.actions>`.
 * watchdog: watchdog action extension that does cpu profiling. See :ref:`Profile Action <v1.16:envoy_v3_api_file_envoy/extensions/watchdog/profile_action/v3alpha/profile_action.proto>`.
 * watchdog: watchdog action extension that sends SIGABRT to the stuck thread to terminate the process. See :ref:`Abort Action <v1.16:envoy_v3_api_msg_extensions.watchdog.abort_action.v3alpha.abortactionconfig>`.

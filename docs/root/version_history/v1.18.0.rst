@@ -17,7 +17,7 @@ Minor Behavior Changes
 *Changes that may cause incompatibilities for some users, but should not for most*
 
 * access_logs: change command operator %UPSTREAM_CLUSTER% to resolve to :ref:`alt_stat_name <v1.18:envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` if provided. This behavior can be reverted by disabling the runtime feature ``envoy.reloadable_features.use_observable_cluster_name``.
-* access_logs: fix substition formatter to recognize commands ending with an integer such as DOWNSTREAM_PEER_FINGERPRINT_256.
+* access_logs: fix substitution formatter to recognize commands ending with an integer such as DOWNSTREAM_PEER_FINGERPRINT_256.
 * access_logs: set the error flag ``NC`` for ``no cluster found`` instead of ``NR`` if the route is found but the corresponding cluster is not available.
 * admin: added :ref:`observability_name <v1.18:envoy_v3_api_field_admin.v3.ClusterStatus.observability_name>` information to GET /clusters?format=json :ref:`cluster status <v1.18:envoy_v3_api_msg_admin.v3.ClusterStatus>`.
 * dns: both the :ref:`strict DNS <v1.18:arch_overview_service_discovery_types_strict_dns>` and
@@ -55,7 +55,7 @@ Minor Behavior Changes
   revert to the legacy path canonicalizer, enable the runtime flag
   ``envoy.reloadable_features.remove_forked_chromium_url``.
 * http: upstream flood and abuse checks now increment the count of opened HTTP/2 streams when Envoy sends
-  initial HEADERS frame for the new stream. Before the counter was incrementred when Envoy received
+  initial HEADERS frame for the new stream. Before the counter was incremented when Envoy received
   response HEADERS frame with the END_HEADERS flag set from upstream server.
 * lua: added function ``timestamp`` to provide millisecond resolution timestamps by passing in ``EnvoyTimestampResolution.MILLISECOND``.
 * oauth filter: added the optional parameter :ref:`auth_scopes <v1.18:envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.auth_scopes>` with default value of 'user' if not provided. This allows this value to be overridden in the Authorization request to the OAuth provider.
@@ -87,7 +87,7 @@ Bug Fixes
 * filter_chain: fix filter chain matching with the server name as the case-insensitive way.
 * grpc-web: fix local reply and non-proto-encoded gRPC response handling for small response bodies. This fix can be temporarily reverted by setting ``envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling`` to false.
 * grpc_http_bridge: the downstream HTTP status is now correctly set for trailers-only responses from the upstream.
-* header map: pick the right delimiter to append multiple header values to the same key. Previouly header with multiple values were coalesced with ",", after this fix cookie headers should be coalesced with " ;". This doesn't affect Http1 or Http2 requests because these 2 codecs coalesce cookie headers before adding it to header map. To revert to the old behavior, set the runtime feature ``envoy.reloadable_features.header_map_correctly_coalesce_cookies`` to false.
+* header map: pick the right delimiter to append multiple header values to the same key. Previously header with multiple values were coalesced with ",", after this fix cookie headers should be coalesced with " ;". This doesn't affect Http1 or Http2 requests because these 2 codecs coalesce cookie headers before adding it to header map. To revert to the old behavior, set the runtime feature ``envoy.reloadable_features.header_map_correctly_coalesce_cookies`` to false.
 * http: avoid grpc-status overwrite on when sending local replies if that field has already been set.
 * http: disallowing "host:" in request_headers_to_add for behavioral consistency with rejecting :authority header. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.treat_host_like_authority`` to false.
 * http: fixed an issue where Envoy did not handle peer stream limits correctly, and queued streams in nghttp2 rather than establish new connections. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.improved_stream_limit_handling`` to false.
@@ -117,7 +117,7 @@ Removed Config or Runtime
 * http: removed legacy connect behavior and runtime guard ``envoy.reloadable_features.stop_faking_paths``.
 * http: removed legacy connection close behavior and runtime guard ``envoy.reloadable_features.fixed_connection_close``.
 * http: removed legacy HTTP/1.1 error reporting path and runtime guard ``envoy.reloadable_features.early_errors_via_hcm``.
-* http: removed legacy sanitization path for upgrade response headers and runtime guard ``envoy.reloadable_features.fix_upgrade_response``.
+* http: removed legacy sanitizing path for upgrade response headers and runtime guard ``envoy.reloadable_features.fix_upgrade_response``.
 * http: removed legacy date header overwriting logic and runtime guard ``envoy.reloadable_features.preserve_upstream_date deprecation``.
 * http: removed legacy ALPN handling and runtime guard ``envoy.reloadable_features.http_default_alpn``.
 * listener: removed legacy runtime guard ``envoy.reloadable_features.listener_in_place_filterchain_update``.
@@ -134,7 +134,7 @@ New Features
 * access log: support command operator: %FILTER_CHAIN_NAME% for the downstream tcp and http request.
 * access log: support command operator: %REQUEST_HEADERS_BYTES%, %RESPONSE_HEADERS_BYTES%, and %RESPONSE_TRAILERS_BYTES%.
 * admin: added support for :ref:`access loggers <v1.18:envoy_v3_api_msg_config.accesslog.v3.AccessLog>` to the admin interface.
-* composite filter: added new :ref:`composite filter <v1.18:config_http_filters_composite>` that can be used to instantiate different filter configuratios based on matching incoming data.
+* composite filter: added new :ref:`composite filter <v1.18:config_http_filters_composite>` that can be used to instantiate different filter configurations based on matching incoming data.
 * compression: add brotli :ref:`compressor <v1.18:envoy_v3_api_msg_extensions.compression.brotli.compressor.v3.Brotli>` and :ref:`decompressor <v1.18:envoy_v3_api_msg_extensions.compression.brotli.decompressor.v3.Brotli>`.
 * compression: extended the compression allow compressing when the content length header is not present. This behavior may be temporarily reverted by setting ``envoy.reloadable_features.enable_compression_without_content_length_header`` to false.
 * config: add ``envoy.features.fail_on_any_deprecated_feature`` runtime key, which matches the behaviour of compile-time flag ``ENVOY_DISABLE_DEPRECATED_FEATURES``, i.e. use of deprecated fields will cause a crash.
@@ -152,7 +152,7 @@ New Features
 * http: change frame flood and abuse checks to the upstream HTTP/2 codec to ON by default. It can be disabled by setting the ``envoy.reloadable_features.upstream_http2_flood_checks`` runtime key to false.
 * http: hash multiple header values instead of only hash the first header value. It can be disabled by setting the ``envoy.reloadable_features.hash_multiple_header_values`` runtime key to false. See the :ref:`HashPolicy's Header configuration <v1.18:envoy_v3_api_msg_config.route.v3.RouteAction.HashPolicy.Header>` for more information.
 * json: introduced new JSON parser (https://github.com/nlohmann/json) to replace RapidJSON. The new parser is disabled by default. To test the new RapidJSON parser, enable the runtime feature ``envoy.reloadable_features.remove_legacy_json``.
-* kill_request: :ref:`Kill Request <v1.18:config_http_filters_kill_request>` now supports bidirection killing.
+* kill_request: :ref:`Kill Request <v1.18:config_http_filters_kill_request>` now supports bidirectional killing.
 * listener: added an optional :ref:`stat_prefix <v1.18:envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>`.
 * loadbalancer: added the ability to specify the hash_key for a host when using a consistent hashing loadbalancer (ringhash, maglev) using the :ref:`LbEndpoint.Metadata <v1.18:envoy_api_field_endpoint.LbEndpoint.metadata>` e.g.: ``"envoy.lb": {"hash_key": "..."}``.
 * log: added a new custom flag ``%j`` to the log pattern to print the actual message to log as JSON escaped string.
@@ -167,7 +167,7 @@ New Features
 * server: added :option:`--enable-core-dump` flag to enable core dumps via prctl (Linux-based systems only).
 * tcp_proxy: add support for converting raw TCP streams into HTTP/1.1 CONNECT requests. See :ref:`upgrade documentation <v1.18:tunneling-tcp-over-http>` for details.
 * tcp_proxy: added a :ref:`use_post field <v1.18:envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.use_post>` for using HTTP POST to proxy TCP streams.
-* tcp_proxy: added a :ref:`headers_to_add field <v1.18:envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.headers_to_add>` for setting additional headers to the HTTP requests for TCP proxing.
+* tcp_proxy: added a :ref:`headers_to_add field <v1.18:envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.headers_to_add>` for setting additional headers to the HTTP requests for TCP proxying.
 * thrift_proxy: added a :ref:`max_requests_per_connection field <v1.18:envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.max_requests_per_connection>` for setting maximum requests for per downstream connection.
 * thrift_proxy: added per upstream metrics within the :ref:`thrift router <v1.18:envoy_v3_api_msg_extensions.filters.network.thrift_proxy.router.v3.Router>` for messagetype counters in request/response.
 * thrift_proxy: added per upstream metrics within the :ref:`thrift router <v1.18:envoy_v3_api_msg_extensions.filters.network.thrift_proxy.router.v3.Router>` for request time histograms.

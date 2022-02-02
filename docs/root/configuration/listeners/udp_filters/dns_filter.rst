@@ -116,7 +116,7 @@ each cluster endpoint.
 Each service record's protocol can be defined by a name or number. As configured in the example,
 the filter will successfully respond to SRV record requests for "_sip._tcp.voip.domain5.com". If a
 numerical value is specified, Envoy will attempt to resolve the number to a name. String values for
-protocols are used as they appear. An underscore is prepended to both the service and protocol to
+protocols are used as they appear. An underscore is pre-pended to both the service and protocol to
 adhere to the convention outlined in the RFC.
 
 The filter can also consume its domain configuration from an external DNS table. The same entities

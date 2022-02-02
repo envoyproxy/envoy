@@ -66,7 +66,7 @@ The SXG filter outputs statistics in the *<stat_prefix>.sxg.* namespace.
   :widths: 1, 1, 2
 
   total_client_can_accept_sxg, Counter, Total requests where client passes valid Accept header for SXG documents.
-  total_should_sign, Counter, Total requests where downstream passes back header indicating Envoy should encocde document.
+  total_should_sign, Counter, Total requests where downstream passes back header indicating Envoy should encode document.
   total_exceeded_max_payload_size, Counter, Total requests where response from downstream is to large.
   total_signed_attempts, Counter, Total requests where SXG encoding is attempted.
   total_signed_succeeded, Counter, Total requests where SXG encoding succeeds.

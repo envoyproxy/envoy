@@ -4,9 +4,9 @@ xDS configuration API overview
 ==============================
 
 Envoy is architected such that different types of configuration management approaches are possible.
-The approach taken in a deployment will be dependent on the needs of the implementor. Simple
+The approach taken in a deployment will be dependent on the needs of the implementer. Simple
 deployments are possible with a fully static configuration. More complicated deployments can
-incrementally add more complex dynamic configuration, the downside being that the implementor must
+incrementally add more complex dynamic configuration, the downside being that the implementer must
 provide one or more external gRPC/REST based configuration provider APIs. These APIs are
 collectively known as :ref:`"xDS" <xds_protocol>` (* discovery service). This document gives an
 overview of the options currently available.
@@ -19,7 +19,7 @@ overview of the options currently available.
 Fully static
 ------------
 
-In a fully static configuration, the implementor provides a set of :ref:`listeners
+In a fully static configuration, the implementer provides a set of :ref:`listeners
 <config_listeners>` (and :ref:`filter chains <envoy_v3_api_msg_config.listener.v3.Filter>`), :ref:`clusters
 <config_cluster_manager>`, etc. Dynamic host discovery is only possible via DNS based
 :ref:`service discovery <arch_overview_service_discovery>`. Configuration reloads must take place
@@ -46,10 +46,10 @@ CDS
 
 The :ref:`Cluster Discovery Service (CDS) API <config_cluster_manager_cds>` layers on a mechanism by
 which Envoy can discover upstream clusters used during routing. Envoy will gracefully add, update,
-and remove clusters as specified by the API. This API allows implementors to build a topology in
+and remove clusters as specified by the API. This API allows implements to build a topology in
 which Envoy does not need to be aware of all upstream clusters at initial configuration time.
 Typically, when doing HTTP routing along with CDS (but without route discovery service),
-implementors will make use of the router's ability to forward requests to a cluster specified in an
+implements will make use of the router's ability to forward requests to a cluster specified in an
 :ref:`HTTP request header <envoy_v3_api_field_config.route.v3.RouteAction.cluster_header>`.
 
 Although it is possible to use CDS without EDS by specifying fully static clusters, we recommend
@@ -66,7 +66,7 @@ RDS
 The :ref:`Route Discovery Service (RDS) API <config_http_conn_man_rds>` layers on a mechanism by
 which Envoy can discover the entire route configuration for an HTTP connection manager filter at
 runtime. The route configuration will be gracefully swapped in without affecting existing requests.
-This API, when used alongside EDS and CDS, allows implementors to build a complex routing topology
+This API, when used alongside EDS and CDS, allows implements to build a complex routing topology
 (:ref:`traffic shifting <config_http_conn_man_route_table_traffic_splitting>`, blue/green
 deployment, etc).
 

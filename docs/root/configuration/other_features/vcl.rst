@@ -66,7 +66,7 @@ For information on how to build and/or install VPP see the getting started guide
   }
 
   buffers {
-    # Default is 16384 (8192 if running unpriviledged)
+    # Default is 16384 (8192 if running unprivileged)
     buffers-per-numa 16384
   }
 
@@ -75,7 +75,7 @@ For information on how to build and/or install VPP see the getting started guide
     # - Assuming only one NIC is used
     # - The PCI address is an example, the actual one should be found using something like dpdk_devbind
     #    https://github.com/DPDK/dpdk/blob/main/usertools/dpdk-devbind.py
-    # - Number of rx queues (num-rx-queus) should be number of workers
+    # - Number of rx queues (num-rx-queues) should be number of workers
     dev 0000:18:00.0 {
       num-tx-desc 256
       num-rx-desc 256

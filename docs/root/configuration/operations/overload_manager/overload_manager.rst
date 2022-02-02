@@ -246,7 +246,7 @@ no streams will be reset.  When heap usage is at or above 85%, we start to
 reset buckets according to the strategy described below. When the heap
 usage is at 95% all streams using >= 1MiB memory are eligible for reset.
 This overload action will reset up to 50 streams (this is a hardcoded limit)
-per worker everytime the action is invoked. This is both to reduce the amount
+per worker every time the action is invoked. This is both to reduce the amount
 of streams that end up getting reset and to prevent the worker thread from
 locking up and triggering the Watchdog system.
 
@@ -255,7 +255,7 @@ Given that there are only 8 buckets, we partition the space with a gradation of
 heap usage we reset streams in the last bucket e.g. those using `>= 128MiB`. At
 :math:`85% + 1 * gradation` heap usage we reset streams in the last two buckets
 e.g. those using `>= 64MiB`, prioritizing the streams in the last bucket since
-there's a hard limit on the number of streams we can reset per invokation.
+there's a hard limit on the number of streams we can reset per invocation.
 At :math:`85% + 2 * gradation` heap usage we reset streams in the last three
 buckets e.g. those using `>= 32MiB`. And so forth as the heap usage is higher.
 

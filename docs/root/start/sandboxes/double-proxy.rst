@@ -74,7 +74,7 @@ For the purpose of this example, the defaults should be sufficient.
    Country Name (2 letter code) [AU]:
    State or Province Name (full name) [Some-State]:
    Locality Name (eg, city) []:
-   Organization Name (eg, company) [Internet Widgits Pty Ltd]:
+   Organization Name (eg, company) [Internet Widgets Pty Ltd]:
    Organizational Unit Name (eg, section) []:
    Common Name (e.g. server FQDN or YOUR name) []:
    Email Address []:

@@ -5,8 +5,8 @@ Section One
 -----------------------------
 *Some doc text*
 
-* zzzzz: this should be alphabatized after a.
-* aaaaa: this should be alphabatized before z.
+* zzzzz: this should be alphabetized after a.
+* aaaaa: this should be alphabetized before z.
 * aaaaa: aaaa is before 'this'.
 * access log: Added should be added not Added.
 

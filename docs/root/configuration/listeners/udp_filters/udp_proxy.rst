@@ -20,7 +20,7 @@ Each session is index by the 4-tuple consisting of source IP/port and local IP/p
 datagram is received on. Sessions last until the :ref:`idle timeout
 <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.idle_timeout>` is reached.
 
-Above *session stickness* could be disabled by setting :ref:`use_per_packet_load_balancing
+Above *session stickiness* could be disabled by setting :ref:`use_per_packet_load_balancing
 <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.use_per_packet_load_balancing>` to true.
 In that case, *per packet load balancing* is enabled. It means that upstream host is selected on every single data chunk
 received by udp proxy using currently used load balancing policy.

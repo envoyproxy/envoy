@@ -76,7 +76,7 @@ All http1 details are rooted at *http1.*
    http1.connection_header_rejected, The Connection header was malformed or overly long.
    http1.content_length_and_chunked_not_allowed, A request was sent with both Transfer-Encoding: chunked and a Content-Length header when disallowed by configuration.
    http1.content_length_not_allowed, A content length was sent on a response it was disallowed on.
-   http1.headers_too_large, The overall byte size of rquest headers was larger than the configured limits.
+   http1.headers_too_large, The overall byte size of request headers was larger than the configured limits.
    http1.invalid_characters, The headers contained illegal characters.
    http1.invalid_transfer_encoding, The Transfer-Encoding header was not valid.
    http1.invalid_url, The request URL was not valid.

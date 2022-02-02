@@ -89,7 +89,7 @@ Every configured Postgres proxy filter has statistics rooted at postgres.<stat_p
   notices, Counter, Total number of NOTICE messages
   notices_notice, Counter, Number of NOTICE messages with NOTICE subtype
   notices_log, Counter, Number of NOTICE messages with LOG subtype
-  notices_warning, Counter, Number ofr NOTICE messags with WARNING severity
+  notices_warning, Counter, Number of NOTICE messages with WARNING severity
   notices_debug, Counter, Number of NOTICE messages with DEBUG severity
   notices_info, Counter, Number of NOTICE messages with INFO severity
   notices_unknown, Counter, Number of NOTICE messages which could not be recognized

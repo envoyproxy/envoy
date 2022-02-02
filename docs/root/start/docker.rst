@@ -95,7 +95,7 @@ can be viewed in the container log.
 
 If you send application, admin or access logs to a file output, the ``envoy`` user will require the
 necessary permissions to write to this file. This can be achieved by setting the ``ENVOY_UID`` and/or
-by making the file writeable by the envoy user.
+by making the file writable by the envoy user.
 
 For example, to mount a log folder from the host and make it writable, you can:
 
