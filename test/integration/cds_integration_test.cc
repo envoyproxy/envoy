@@ -192,7 +192,7 @@ TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
   fake_upstreams_[1]->dispatcher()->exit();
   fake_upstreams_[2]->dispatcher()->exit();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"}, {":path", "/cluster1"}, {":scheme", "http"}, {":authority", "host"}});
 
   // Tell Envoy that cluster_1 is gone.
@@ -202,6 +202,7 @@ TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse that says cluster_1 is gone.
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  codec_client_->sendReset(encoder_decoder.first);
   cleanupUpstreamAndDownstream();
   // Make sure there was only one connection attempt.
   EXPECT_LE(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
