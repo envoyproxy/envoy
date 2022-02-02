@@ -72,16 +72,13 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
 }
 
 bool Utility::labelWildcardMatch(absl::string_view dns_label, absl::string_view pattern) {
-  if (pattern.empty()) {
-    return dns_label.empty();
+  constexpr char glob = '*';
+  if (pattern.size() == 1 && pattern[0] == glob) {
+    return true;
   }
   // Only valid if wildcard character appear once
-  if (std::count(pattern.begin(), pattern.end(), '*') == 1) {
-    constexpr char glob = '*';
+  if (std::count(pattern.begin(), pattern.end(), glob) == 1) {
     // Check the special case of a single * pattern, as it's common.
-    if (pattern.size() == 1 && pattern[0] == glob) {
-      return true;
-    }
     std::vector<absl::string_view> split_pattern = absl::StrSplit(pattern, glob);
     return (pattern.size() <= dns_label.size() + 1) &&
            absl::StartsWith(dns_label, split_pattern[0]) &&
@@ -109,8 +106,8 @@ bool Utility::dnsNameMatch(absl::string_view dns_name, absl::string_view pattern
     return false;
   }
   // Only the left-most label in the pattern contains wildcard '*' and is not an A-label
-  if ((split_pattern[0].find('*') != std::string::npos) &&
-      (split_pattern[1].find('*') == std::string::npos) &&
+  if ((split_pattern[0].find('*') != absl::string_view::npos) &&
+      (split_pattern[1].find('*') == absl::string_view::npos) &&
       (!absl::StartsWith(split_pattern[0], ACE_prefix))) {
     return (split_dns_name[1] == split_pattern[1]) &&
            labelWildcardMatch(split_dns_name[0], split_pattern[0]);
