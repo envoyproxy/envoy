@@ -15,7 +15,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/stats/metric_impl.h"
 #include "source/common/stats/stat_merger.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "absl/container/flat_hash_set.h"
 
