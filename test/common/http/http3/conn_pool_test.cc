@@ -187,22 +187,6 @@ TEST_F(Http3ConnPoolImplTest, CreationWithConfig) {
             options->initial_stream_window_size().value());
 }
 
-TEST_F(Http3ConnPoolImplTest, NewStreamFail) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
-    return;
-  }
-
-  initialize();
-  MockResponseDecoder decoder;
-  ConnPoolCallbacks callbacks;
-
-  EXPECT_ENVOY_BUG(pool_->newStream(decoder, callbacks,
-                                    {/*can_use_early_data_=*/false,
-                                     /*can_use_http3_=*/false}),
-                   "Trying to send request over h3 while alternate protocols is disabled.");
-}
-
 } // namespace Http3
 } // namespace Http
 } // namespace Envoy
