@@ -1,3 +1,4 @@
+#include <chrono>
 #include <memory>
 #include <string>
 #include <vector>
@@ -43,8 +44,6 @@ public:
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
-    time_system_.setMonotonicTime(std::chrono::milliseconds(0));
-    filter_->setStartTime(time_system_.monotonicTime());
     addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
 
     // NOP currently.
@@ -91,10 +90,8 @@ public:
         1U,
         stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
 
-    time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-    double duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-                          time_system_.monotonicTime() - filter_->getStartTime().value())
-                          .count();
+    filter_callbacks_.connection_.dispatcher_.globalTimeSystem().advanceTimeWait(
+        std::chrono::milliseconds(10));
 
     Filters::Common::ExtAuthz::Response response{};
     response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
@@ -103,7 +100,7 @@ public:
     auto* fields = response.dynamic_metadata.mutable_fields();
     (*fields)["foo"] = ValueUtil::stringValue("ok");
     (*fields)["bar"] = ValueUtil::numberValue(1);
-    (*fields)["ext_authz_duration"] = ValueUtil::numberValue(duration);
+    (*fields)["ext_authz_duration"] = ValueUtil::numberValue(10);
 
     EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
         .WillOnce(Invoke([&response](const std::string& ns,
@@ -141,7 +138,6 @@ public:
   std::unique_ptr<Filter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
-  Event::SimulatedTimeSystem time_system_;
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
   const std::string default_yaml_string_ = R"EOF(
 transport_api_version: V3
@@ -389,13 +385,13 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
       addr_);
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       addr_);
-  double duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-                        time_system_.monotonicTime() - filter_->getStartTime().value())
-                        .count();
+  filter_callbacks_.connection_.dispatcher_.globalTimeSystem().advanceTimeWait(
+      std::chrono::milliseconds(5));
   ProtobufWkt::Struct dynamic_metadata;
   (*dynamic_metadata.mutable_fields())["baz"] = ValueUtil::stringValue("hello-ok");
   (*dynamic_metadata.mutable_fields())["x"] = ValueUtil::numberValue(12);
-  (*dynamic_metadata.mutable_fields())["ext_authz_duration"] = ValueUtil::numberValue(duration);
+  // Since this is a stack response, duration should be 0;
+  (*dynamic_metadata.mutable_fields())["ext_authz_duration"] = ValueUtil::numberValue(0);
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.dynamic_metadata = dynamic_metadata;

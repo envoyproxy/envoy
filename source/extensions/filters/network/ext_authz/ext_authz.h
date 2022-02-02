@@ -120,9 +120,6 @@ public:
   // ExtAuthz::RequestCallbacks
   void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;
 
-  void setStartTime(absl::optional<MonotonicTime> time) { start_time_ = time; };
-  absl::optional<MonotonicTime> getStartTime() { return start_time_; };
-
 private:
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling

@@ -61,8 +61,6 @@ public:
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
-    time_system_.setMonotonicTime(std::chrono::milliseconds(0));
-    filter_->setStartTime(time_system_.monotonicTime());
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
   }
@@ -131,7 +129,6 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
-  Event::SimulatedTimeSystem time_system_;
   Http::ContextImpl http_context_;
 };
 
@@ -155,7 +152,7 @@ public:
 };
 
 template <bool failure_mode_allow_value, bool http_client>
-envoy::extensions::filters::http::ext_authz::v3::ExtAuthz GetFilterConfig() {
+envoy::extensions::filters::http::ext_authz::v3::ExtAuthz getFilterConfig() {
   const std::string http_config = R"EOF(
   http_service:
     server_uri:
@@ -179,8 +176,8 @@ envoy::extensions::filters::http::ext_authz::v3::ExtAuthz GetFilterConfig() {
 }
 
 INSTANTIATE_TEST_SUITE_P(ParameterizedFilterConfig, HttpFilterTestParam,
-                         Values(&GetFilterConfig<true, true>, &GetFilterConfig<false, false>,
-                                &GetFilterConfig<true, false>, &GetFilterConfig<false, true>));
+                         Values(&getFilterConfig<true, true>, &getFilterConfig<false, false>,
+                                &getFilterConfig<true, false>, &getFilterConfig<false, true>));
 
 // Test that the per route config is properly merged: more specific keys override previous keys.
 TEST_F(HttpFilterTest, MergeConfig) {
@@ -2175,12 +2172,10 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-  double duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-                        time_system_.monotonicTime() - filter_->getStartTime().value())
-                        .count();
+  decoder_filter_callbacks_.dispatcher_.globalTimeSystem().advanceTimeWait(
+      std::chrono::milliseconds(10));
   ProtobufWkt::Value ext_authz_duration_value;
-  ext_authz_duration_value.set_number_value(duration);
+  ext_authz_duration_value.set_number_value(10);
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;

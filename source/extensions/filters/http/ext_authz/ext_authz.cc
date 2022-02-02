@@ -61,7 +61,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *decoder_callbacks_);
   // Store start time of ext_authz filter call
-  setStartTime(decoder_callbacks_->dispatcher().timeSource().monotonicTime());
+  start_time_ = decoder_callbacks_->dispatcher().timeSource().monotonicTime();
 
   state_ = State::Calling;
   filter_return_ = FilterReturn::StopDecoding; // Don't let the filter chain continue as we are
@@ -216,10 +216,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
   if (!response->dynamic_metadata.fields().empty()) {
     // Add duration of call to dynamic metadata if applicable
-    if (getStartTime().has_value() && response->status == CheckStatus::OK) {
+    if (start_time_.has_value() && response->status == CheckStatus::OK) {
       ProtobufWkt::Value ext_authz_duration_value;
       auto duration =
-          decoder_callbacks_->dispatcher().timeSource().monotonicTime() - getStartTime().value();
+          decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value();
       ext_authz_duration_value.set_number_value(
           std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
       (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
