@@ -911,24 +911,11 @@ envoy_cc_library(
         ":http2_platform",
         ":quiche_common_platform",
         ":spdy_core_alt_svc_wire_format_lib",
-        ":spdy_core_frame_reader_lib",
         ":spdy_core_header_block_lib",
         ":spdy_core_headers_handler_interface_lib",
         ":spdy_core_hpack_hpack_lib",
         ":spdy_core_protocol_lib",
         ":spdy_core_zero_copy_output_buffer_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "spdy_core_frame_reader_lib",
-    srcs = ["quiche/spdy/core/spdy_frame_reader.cc"],
-    hdrs = ["quiche/spdy/core/spdy_frame_reader.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":quiche_common_platform",
-        ":spdy_core_protocol_lib",
     ],
 )
 
@@ -2255,6 +2242,14 @@ envoy_cc_library(
         ":quic_core_types_lib",
         ":quic_platform_base",
     ],
+)
+
+envoy_cc_library(
+    name = "quiche_flag_utils_impl_lib",
+    hdrs = ["quiche/common/platform/default/quiche_platform_impl/quiche_flag_utils_impl.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
 )
 
 envoy_cc_library(
@@ -4155,6 +4150,7 @@ envoy_cc_library(
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_containers_impl.h",
         "quiche/common/platform/default/quiche_platform_impl/quiche_export_impl.h",
+        "quiche/common/platform/default/quiche_platform_impl/quiche_flag_utils_impl.h",
         "quiche/common/platform/default/quiche_platform_impl/quiche_thread_local_impl.h",
     ],
     repository = "@envoy",

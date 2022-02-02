@@ -15,7 +15,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-class MutationUtils : public Logger::Loggable<Logger::Id::filter> {
+class MutationUtils : public Logger::Loggable<Logger::Id::ext_proc> {
 public:
   // Convert a header map until a protobuf
   static void headersToProto(const Http::HeaderMap& headers_in,
