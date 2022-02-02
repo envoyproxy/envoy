@@ -28,7 +28,7 @@ public:
   enum Operation {
     // Open a file for reading.
     Read,
-    // Open a file for writing.
+    // Open a file for writing. The file will be truncated if Append is not set.
     Write,
     // Create the file if it does not already exist
     Create,
