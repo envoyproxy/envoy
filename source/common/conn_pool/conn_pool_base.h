@@ -143,6 +143,7 @@ public:
   virtual AttachContext& context() PURE;
 
   ConnPoolImplBase& parent_;
+  // The request can be sent as early data.
   bool can_use_early_data_;
 };
 

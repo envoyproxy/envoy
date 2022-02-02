@@ -344,6 +344,7 @@ public:
     RetryImmediately,
     // Retry the request with timed backoff delay.
     RetryWithBackoff,
+    // Do not retry.
     NoRetry,
   };
 
