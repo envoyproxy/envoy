@@ -36,6 +36,7 @@ EXCLUDED_PREFIXES = (
     "./test/extensions/access_loggers/wasm/test_data",
     "./source/extensions/common/wasm/ext",
     "./examples/wasm-cc",
+    "./bazel/external/http_parser/"
 )
 SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".mm", ".proto")
 PROTO_SUFFIX = (".proto")
