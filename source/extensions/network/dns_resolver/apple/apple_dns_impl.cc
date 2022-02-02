@@ -218,7 +218,7 @@ std::list<DnsResponse>& AppleDnsResolverImpl::PendingResolution::finalAddressLis
                                             pending_response_.v6_responses_.end());
     return pending_response_.all_responses_;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void AppleDnsResolverImpl::PendingResolution::finishResolve() {
