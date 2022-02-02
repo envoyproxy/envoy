@@ -247,6 +247,7 @@ public:
   void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
   void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
   void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
+  void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override;
   void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override;
 
   // Stats::StoreRoot
