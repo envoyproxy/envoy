@@ -153,8 +153,7 @@ static void bmSortByStatNames(benchmark::State& state) {
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     std::vector<Envoy::Stats::StatName> sort = names;
-    Envoy::Stats::sortByStatNames<Envoy::Stats::StatName>(symbol_table, sort.begin(), sort.end(),
-                                                          getter);
+    symbol_table.sortByStatNames<Envoy::Stats::StatName>(sort.begin(), sort.end(), getter);
   }
 }
 BENCHMARK(bmSortByStatNames);
