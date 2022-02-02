@@ -458,7 +458,6 @@ typed_config:
 
   initialize();
 
-
   {
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
