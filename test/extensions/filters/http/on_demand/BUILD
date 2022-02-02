@@ -35,6 +35,7 @@ envoy_extension_cc_test(
         "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",
         "//test/integration:scoped_rds_lib",
+        "//test/integration:vhds_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

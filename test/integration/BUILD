@@ -223,6 +223,15 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
+        ":vhds_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "vhds_lib",
+    srcs = ["vhds.h"],
+    deps = [
         ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",
