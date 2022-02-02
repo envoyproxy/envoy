@@ -244,8 +244,10 @@ private:
     Network::Address::InstanceConstSharedPtr
     ipAddressFromClusterEntry(const std::vector<NetworkFilters::Common::Redis::RespValue>& value);
     bool validateCluster(const NetworkFilters::Common::Redis::RespValue& value);
-    void resolveClusterHostnames(ClusterSlotsSharedPtr&& slots);
-    void resolveReplicas(ClusterSlotsSharedPtr slots, std::size_t index);
+    void resolveClusterHostnames(ClusterSlotsSharedPtr&& slots,
+                                 uint64_t& hostname_resolution_required_cnt);
+    void resolveReplicas(ClusterSlotsSharedPtr slots, std::size_t index,
+                         uint64_t& hostname_resolution_required_cnt);
     void finishClusterHostnameResolution(ClusterSlotsSharedPtr slots);
     void updateDnsStats(Network::DnsResolver::ResolutionStatus status, bool empty_response);
 
