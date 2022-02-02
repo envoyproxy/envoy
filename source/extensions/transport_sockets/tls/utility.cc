@@ -73,12 +73,12 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
 
 bool Utility::labelWildcardMatch(absl::string_view dns_label, absl::string_view pattern) {
   constexpr char glob = '*';
+  // Check the special case of a single * pattern, as it's common.
   if (pattern.size() == 1 && pattern[0] == glob) {
     return true;
   }
   // Only valid if wildcard character appear once
   if (std::count(pattern.begin(), pattern.end(), glob) == 1) {
-    // Check the special case of a single * pattern, as it's common.
     std::vector<absl::string_view> split_pattern = absl::StrSplit(pattern, glob);
     return (pattern.size() <= dns_label.size() + 1) &&
            absl::StartsWith(dns_label, split_pattern[0]) &&
