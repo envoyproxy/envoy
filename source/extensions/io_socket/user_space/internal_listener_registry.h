@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
+#include "envoy/extensions/io_socket/user_space/v3/bootstrap.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 
@@ -46,7 +47,8 @@ public:
   createBootstrapExtension(const Protobuf::Message& config,
                            Server::Configuration::ServerFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<
+        envoy::extensions::io_socket::user_space::v3::InternalConnectionRegistry>();
   }
   std::string name() const override { return "envoy.bootstrap.internal_listener_registry"; };
 };

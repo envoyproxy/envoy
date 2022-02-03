@@ -152,6 +152,7 @@ proto_library(
         "//envoy/extensions/internal_redirect/allow_listed_routes/v3:pkg",
         "//envoy/extensions/internal_redirect/previous_routes/v3:pkg",
         "//envoy/extensions/internal_redirect/safe_cross_scheme/v3:pkg",
+        "//envoy/extensions/io_socket/user_space/v3:pkg",
         "//envoy/extensions/key_value/file_based/v3:pkg",
         "//envoy/extensions/matching/common_inputs/environment_variable/v3:pkg",
         "//envoy/extensions/matching/input_matchers/consistent_hashing/v3:pkg",

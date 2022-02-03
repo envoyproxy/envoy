@@ -35,7 +35,7 @@ public:
     config_helper_.addBootstrapExtension(R"EOF(
 name: envoy.bootstrap.internal_listener_registry
 typed_config:
-  "@type": "type.googleapis.com/google.protobuf.Struct"
+  "@type": "type.googleapis.com/envoy.extensions.io_socket.user_space.v3.InternalConnectionRegistry"
 )EOF");
     BaseIntegrationTest::initialize();
   }

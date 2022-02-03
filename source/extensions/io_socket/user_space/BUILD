@@ -92,6 +92,7 @@ envoy_cc_library(
     deps = [
         ":thread_local_registry",
         "//envoy/server:bootstrap_extension_config_interface",
+        "@envoy_api//envoy/extensions/io_socket/user_space/v3:pkg_cc_proto",
     ],
 )
 

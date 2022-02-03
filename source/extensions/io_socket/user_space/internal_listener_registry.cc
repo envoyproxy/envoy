@@ -44,7 +44,8 @@ void InternalListenerExtension::onServerInitialized() {
 }
 
 Server::BootstrapExtensionPtr InternalListenerRegistryFactory::createBootstrapExtension(
-    const Protobuf::Message&, Server::Configuration::ServerFactoryContext& context) {
+    [[maybe_unused]] const Protobuf::Message& config,
+    Server::Configuration::ServerFactoryContext& context) {
   return std::make_unique<InternalListenerExtension>(context);
 }
 
