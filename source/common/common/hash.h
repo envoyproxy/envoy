@@ -10,7 +10,7 @@
 #include "absl/strings/ascii.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
-#include "xxhash.h"
+#include "xxhash.h" // NOLINT(clang-diagnostic-error) -- clang-tidy can't find this file.
 
 namespace Envoy {
 
