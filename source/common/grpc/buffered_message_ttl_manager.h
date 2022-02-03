@@ -9,15 +9,15 @@ namespace Grpc {
 
 using BufferedMessageExpirationCallback = std::function<void(uint64_t)>;
 
-// The TTL Manager can be given a set of IDs that are expected to expire at the same time.
-// When checking for ID expiration, an expiration callback will be called for each ID belonging to
-// this set of IDs. This class is used to manage the lifetime of messages stored in
-// BufferedAsyncClient. Messages whose survival period has expired will be deleted from the Buffer.
-// It allows monitoring a set of IDs for expiration, triggering a callback upon expiration.
-// This class is able to monitor multiple sets of IDs at the same time, even after some of them have
-// expired. When the callback is invoked, the callback given to the constructor will be will be
-// executed for each of the TTL-elapsed IDs. After that, if the IDs to be monitored is not empty,
-// the manager will continue to monitor for expiration again.
+// This class is used to manage the TTL for pending uploads within a BufferedAsyncClient. Multiple
+// IDs can be inserted into the TTL manager at once, all with the same TTL (specified in the
+// constructor). Upon expiry, the TTL manager will invoke the provided expiry callback for each ID.
+// Note that there is no way to disable the expiration, and so it's up to the recipient of the
+// callback to handle this. BufferedAsyncClient will do the right thing here: if the expired ID is
+// still in flight it will be returned to the buffer, otherwise it does nothing. The TTL manager is
+// designed to handle multiple sets of IDs inserted at various times, backing this with a single
+// Timer. This allows us to track a large amount of IDs inserted at different times without using a
+// lot of different timers, which could put undue pressure on the event loop.
 class BufferedMessageTtlManager {
 public:
   BufferedMessageTtlManager(Event::Dispatcher& dispatcher,
