@@ -42,6 +42,30 @@ typedef struct {
   ConditionalInitializer* terminal_callback;
 } callbacks_called;
 
+void validateStreamIntel(const envoy_final_stream_intel& final_intel) {
+  // This test doesn't do DNS lookup
+  EXPECT_EQ(-1, final_intel.dns_start_ms);
+  EXPECT_EQ(-1, final_intel.dns_end_ms);
+  // This test doesn't do TLS.
+  EXPECT_EQ(-1, final_intel.ssl_start_ms);
+  EXPECT_EQ(-1, final_intel.ssl_end_ms);
+
+  ASSERT_NE(-1, final_intel.request_start_ms);
+  ASSERT_NE(-1, final_intel.connect_start_ms);
+  ASSERT_NE(-1, final_intel.connect_end_ms);
+  ASSERT_NE(-1, final_intel.sending_start_ms);
+  ASSERT_NE(-1, final_intel.sending_end_ms);
+  ASSERT_NE(-1, final_intel.response_start_ms);
+  ASSERT_NE(-1, final_intel.request_end_ms);
+
+  ASSERT_LE(final_intel.request_start_ms, final_intel.connect_start_ms);
+  ASSERT_LE(final_intel.connect_start_ms, final_intel.connect_end_ms);
+  ASSERT_LE(final_intel.connect_end_ms, final_intel.sending_start_ms);
+  ASSERT_LE(final_intel.sending_start_ms, final_intel.sending_end_ms);
+  ASSERT_LE(final_intel.request_end_ms, final_intel.response_start_ms);
+  ASSERT_LE(final_intel.request_end_ms, final_intel.sending_end_ms);
+}
+
 // TODO(junr03): move this to derive from the ApiListenerIntegrationTest after moving that class
 // into a test lib.
 class ClientIntegrationTest : public BaseIntegrationTest,
@@ -82,6 +106,7 @@ public:
     };
     bridge_callbacks_.on_complete = [](envoy_stream_intel, envoy_final_stream_intel final_intel,
                                        void* context) -> void* {
+      validateStreamIntel(final_intel);
       callbacks_called* cc_ = static_cast<callbacks_called*>(context);
       cc_->on_complete_received_byte_count = final_intel.received_byte_count;
       cc_->on_complete_calls++;

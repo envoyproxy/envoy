@@ -34,7 +34,9 @@ void setFinalStreamIntel(StreamInfo& stream_info, envoy_final_stream_intel& fina
     setFromOptional(final_intel.response_start_ms, timing.first_upstream_rx_byte_received_);
     setFromOptional(final_intel.connect_start_ms, timing.upstream_connect_start_);
     setFromOptional(final_intel.connect_end_ms, timing.upstream_connect_complete_);
-    setFromOptional(final_intel.ssl_start_ms, timing.upstream_connect_complete_);
+    if (timing.upstream_handshake_complete_.has_value()) {
+      setFromOptional(final_intel.ssl_start_ms, timing.upstream_connect_complete_);
+    }
     setFromOptional(final_intel.ssl_end_ms, timing.upstream_handshake_complete_);
     final_intel.socket_reused = upstream_info->upstreamNumStreams() > 1;
   }
