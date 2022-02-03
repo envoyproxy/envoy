@@ -623,6 +623,10 @@ envoy::config::route::v3::RetryPolicy
 convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy,
                               const std::string& retry_on);
 
+/**
+ * @param request_headers the request header to be looked into.
+ * @return true if the request method is 0-RTT safe.
+ */
 bool isZeroRttSafeRequest(Http::RequestHeaderMap& request_headers);
 
 } // namespace Utility

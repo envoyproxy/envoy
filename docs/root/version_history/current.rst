@@ -45,6 +45,7 @@ Removed Config or Runtime
 New Features
 ------------
 * http3: downstream HTTP/3 support is now GA! Upstream HTTP/3 also GA for specific deployments. See :ref:`here <arch_overview_http3>` for details.
+* http3: supports upstream HTTP/3 retries. Automatically retry 0-RTT safe requests if they are rejected because they are sent too early. And automatically retry 0-RTT safe requests if connect attempt fails later on and the cluster is configured with TCP fallback. Add retry on ``alt-protocols-post-connect-failure`` policy which allows retry of failed HTTP/3 requests with TCP fallback even after handshake if the cluster is configured with TCP fallback.
 
 
 Deprecated

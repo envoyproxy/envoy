@@ -34,6 +34,9 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
   const bool conn_pool_new_stream_with_early_data_and_alt_svc = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc");
   // We short circuit here and do not bother with an allocation if there is no chance we will retry.
+  // But for HTTP/3 0-RTT safe requests, which can be rejected because they are sent too early(425
+  // response code), we want to give them a chance to retry as normal requests even though the retry
+  // policy doesn't specify it. So always allocate retry state object.
   if (request_headers.EnvoyRetryOn() || request_headers.EnvoyRetryGrpcOn() ||
       route_policy.retryOn() ||
       (conn_pool_new_stream_with_early_data_and_alt_svc &&
@@ -77,8 +80,11 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
   if (conn_pool_new_stream_with_early_data_and_alt_svc_ &&
       (cluster.features() & Upstream::ClusterInfo::Features::HTTP3) &&
       Http::Utility::isZeroRttSafeRequest(request_headers)) {
-    // Always retry potential 0-RTT requests if they are rejected.
-    // This will also enable retry if they are reset during connect.
+    // Because 0-RTT requests could be rejected because they are sent too early, and such requests
+    // should always be retried, setup retry policy for 425 response code for all potential 0-RTT
+    // requests even though the retry policy isn't configured to do so. Since 0-RTT safe requests
+    // traditionally shouldn't have body, automatically retrying them will not cause extra
+    // buffering. This will also enable retry if they are reset during connect.
     retry_on_ |= RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
     retriable_status_codes_.push_back(static_cast<uint32_t>(Http::Code::TooEarly));
   }

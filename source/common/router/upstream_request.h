@@ -38,7 +38,7 @@ class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public Event::DeferredDeletable {
 public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
-                  bool can_use_early_data, bool can_use_alternate_protocols);
+                  bool can_use_early_data, bool can_use_http3);
   ~UpstreamRequest() override;
 
   // To be called from the destructor, or prior to deferred delete.

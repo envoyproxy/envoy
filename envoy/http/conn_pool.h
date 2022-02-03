@@ -81,7 +81,6 @@ public:
 class Instance : public Envoy::ConnectionPool::Instance, public Event::DeferredDeletable {
 public:
   struct StreamOptions {
-
     // True if the request can be sent as early data.
     bool can_use_early_data_;
     // True if the request can be sent over HTTP/3.
@@ -108,11 +107,7 @@ public:
    *                      callbacks is called and the routine returns nullptr. NOTE: Once a callback
    *                      is called, the handle is no longer valid and any further cancellation
    *                      should be done by resetting the stream.
-   * @param can_use_early_data whether the new stream can be sent as early data or not. If true,
-   * the connection might be ready immediately.
-   * @param can_use_alternate_protocols whether to attempt the advertised alternate protocols or not
-   * for this new stream if the pool allows.
-   * callback will be invoked with an immediate failure.
+   * @param options specifies how to create the requested stream.
    * @warning Do not call cancel() from the callbacks, as the request is implicitly canceled when
    *          the callbacks are called.
    */

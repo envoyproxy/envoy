@@ -1249,7 +1249,7 @@ public:
    */
   virtual const Network::Connection& connection() const PURE;
   /**
-   * @return returns true if the downstream request could be sent as early data.
+   * @return returns the options to be consulted with for upstream stream creation.
    */
   virtual const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const PURE;
 };
