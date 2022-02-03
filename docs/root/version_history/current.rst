@@ -49,7 +49,7 @@ New Features
 * http: added support for :ref:`proxy_status_config <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.proxy_status_config>` for configuring `Proxy-Status <https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-proxy-status-08>`_ HTTP response header fields.
 * http: make consistent custom header format fields ``%(DOWN|DIRECT_DOWN|UP)STREAM_(LOCAL|REMOTE)_*%`` to provide all combinations of local & remote addresses for upstream & downstream connections.
 * http3: downstream HTTP/3 support is now GA! Upstream HTTP/3 also GA for specific deployments. See :ref:`here <arch_overview_http3>` for details.
-* http3: supports upstream HTTP/3 retries. Automatically retry 0-RTT safe requests if they are rejected because they are sent too early. And automatically retry 0-RTT safe requests if connect attempt fails later on and the cluster is configured with TCP fallback. Add retry on ``alt-protocols-post-connect-failure`` policy which allows retry of failed HTTP/3 requests with TCP fallback even after handshake if the cluster is configured with TCP fallback.
+* http3: supports upstream HTTP/3 retries. Automatically retry 0-RTT safe requests if they are rejected because they are sent too early. And automatically retry 0-RTT safe requests if connect attempt fails later on and the cluster is configured with TCP fallback. And add retry on ``alt-protocols-post-connect-failure`` policy which allows retry of failed HTTP/3 requests with TCP fallback even after handshake if the cluster is configured with TCP fallback.
 * matching: the matching API can now express a match tree that will always match by omitting a matcher at the top level.
 
 
