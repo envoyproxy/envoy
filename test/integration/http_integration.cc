@@ -548,6 +548,11 @@ void HttpIntegrationTest::checkSimpleRequestSuccess(uint64_t expected_request_si
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
     uint64_t request_size, uint64_t response_size, bool big_header, bool set_content_length_header,
     ConnectionCreationFunction* create_connection, std::chrono::milliseconds timeout) {
+#if defined(ENVOY_CONFIG_COVERAGE)
+  // https://github.com/envoyproxy/envoy/issues/19595
+  ENVOY_LOG_MISC(warn, "manually lowering logs to error");
+  LogLevelSetter save_levels(spdlog::level::err);
+#endif
   initialize();
   codec_client_ = makeHttpConnection(
       create_connection ? ((*create_connection)()) : makeClientConnection((lookupPort("http"))));

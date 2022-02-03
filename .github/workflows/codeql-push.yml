@@ -12,6 +12,7 @@ jobs:
 
     # CodeQL runs on ubuntu-latest and windows-latest
     runs-on: ubuntu-latest
+    if: github.repository == 'envoyproxy/envoy'
 
     steps:
     - name: Checkout repository
