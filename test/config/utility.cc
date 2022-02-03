@@ -172,7 +172,7 @@ std::string ConfigHelper::httpProxyConfig(bool downstream_use_quic) {
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           delayed_close_timeout:
-            nanos: 100
+            nanos: 10000000
           http_filters:
             name: envoy.filters.http.router
           codec_type: HTTP1

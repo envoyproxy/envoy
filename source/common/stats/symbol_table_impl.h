@@ -1,14 +1,10 @@
 #pragma once
 
 #include <algorithm>
-#include <cstring>
 #include <memory>
 #include <stack>
 #include <string>
 #include <vector>
-
-#include "envoy/common/exception.h"
-#include "envoy/stats/symbol_table.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/hash.h"
@@ -21,11 +17,26 @@
 
 #include "absl/container/fixed_array.h"
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 
 namespace Envoy {
 namespace Stats {
+
+class StatName;
+using StatNameVec = absl::InlinedVector<StatName, 8>;
+class StatNameList;
+class StatNameSet;
+using StatNameSetPtr = std::unique_ptr<StatNameSet>;
+
+/**
+ * Holds a range of indexes indicating which parts of a stat-name are
+ * dynamic. This is used to transfer stats from hot-restart parent to child,
+ * retaining the same name structure.
+ */
+using DynamicSpan = std::pair<uint32_t, uint32_t>;
+using DynamicSpans = std::vector<DynamicSpan>;
 
 /** A Symbol represents a string-token with a small index. */
 using Symbol = uint32_t;
@@ -63,8 +74,26 @@ using SymbolVec = std::vector<Symbol>;
  * same string is re-encoded, it may or may not encode to the same underlying
  * symbol.
  */
-class SymbolTableImpl : public SymbolTable {
+class SymbolTable final {
 public:
+  /**
+   * Efficient byte-encoded storage of an array of tokens. The most common
+   * tokens are typically < 127, and are represented directly. tokens >= 128
+   * spill into the next byte, allowing for tokens of arbitrary numeric value to
+   * be stored. As long as the most common tokens are low-valued, the
+   * representation is space-efficient. This scheme is similar to UTF-8. The
+   * token ordering is dependent on the order in which stat-names are encoded
+   * into the SymbolTable, which will not be optimal, but in practice appears
+   * to be pretty good.
+   *
+   * This is exposed in the interface for the benefit of join(), which is
+   * used in the hot-path to append two stat-names into a temp without taking
+   * locks. This is used then in thread-local cache lookup, so that once warm,
+   * no locks are taken when looking up stats.
+   */
+  using Storage = uint8_t[];
+  using StoragePtr = std::unique_ptr<Storage>;
+
   /**
    * Intermediate representation for a stat-name. This helps store multiple
    * names in a single packed allocation. First we encode each desired name,
@@ -92,7 +121,7 @@ public:
     /**
      * Decodes a uint8_t array into a SymbolVec.
      */
-    static SymbolVec decodeSymbols(const SymbolTable::Storage array, size_t size);
+    static SymbolVec decodeSymbols(StatName stat_name);
 
     /**
      * Decodes a uint8_t array into a sequence of symbols and literal strings.
@@ -105,8 +134,7 @@ public:
      * @param symbol_token_fn a function to be called whenever a symbol is encountered in the array.
      * @param string_view_token_fn a function to be called whenever a string literal is encountered.
      */
-    static void decodeTokens(const SymbolTable::Storage array, size_t size,
-                             const std::function<void(Symbol)>& symbol_token_fn,
+    static void decodeTokens(StatName stat_name, const std::function<void(Symbol)>& symbol_token_fn,
                              const std::function<void(absl::string_view)>& string_view_token_fn);
 
     /**
@@ -169,39 +197,204 @@ public:
     static std::pair<uint64_t, size_t> decodeNumber(const uint8_t* encoding);
 
   private:
+    friend class StatName;
+    friend class SymbolTable;
+    class TokenIter;
+
     size_t data_bytes_required_{0};
     MemBlockBuilder<uint8_t> mem_block_;
   };
 
-  SymbolTableImpl();
-  ~SymbolTableImpl() override;
+  SymbolTable();
+  ~SymbolTable();
 
-  // SymbolTable
-  std::string toString(const StatName& stat_name) const override;
-  uint64_t numSymbols() const override;
-  bool lessThan(const StatName& a, const StatName& b) const override;
-  void free(const StatName& stat_name) override;
-  void incRefCount(const StatName& stat_name) override;
-  StoragePtr join(const StatNameVec& stat_names) const override;
-  void populateList(const StatName* names, uint32_t num_names, StatNameList& list) override;
-  StoragePtr encode(absl::string_view name) override;
-  StoragePtr makeDynamicStorage(absl::string_view name) override;
+  /**
+   * Decodes a vector of symbols back into its period-delimited stat name. If
+   * decoding fails on any part of the symbol_vec, we release_assert and crash,
+   * since this should never happen, and we don't want to continue running
+   * with a corrupt stats set.
+   *
+   * @param stat_name the stat name.
+   * @return std::string stringified stat_name.
+   */
+  std::string toString(const StatName& stat_name) const;
+
+  /**
+   * @return uint64_t the number of symbols in the symbol table.
+   */
+  uint64_t numSymbols() const;
+
+  /**
+   * Determines whether one StatName lexically precedes another. Note that
+   * the lexical order may not exactly match the lexical order of the
+   * elaborated strings. For example, stat-name of "-.-" would lexically
+   * sort after "---" but when encoded as a StatName would come lexically
+   * earlier. In practice this is unlikely to matter as those are not
+   * reasonable names for Envoy stats.
+   *
+   * Note that this operation has to be performed with the context of the
+   * SymbolTable so that the individual Symbol objects can be converted
+   * into strings for lexical comparison.
+   *
+   * @param a the first stat name
+   * @param b the second stat name
+   * @return bool true if a lexically precedes b.
+   */
+  bool lessThan(const StatName& a, const StatName& b) const;
+
+  /**
+   * Joins two or more StatNames. For example if we have StatNames for {"a.b",
+   * "c.d", "e.f"} then the joined stat-name matches "a.b.c.d.e.f". The
+   * advantage of using this representation is that it avoids having to
+   * decode/encode into the elaborated form, and does not require locking the
+   * SymbolTable.
+   *
+   * Note that this method does not bump reference counts on the referenced
+   * Symbols in the SymbolTable, so it's only valid as long for the lifetime of
+   * the joined StatNames.
+   *
+   * This is intended for use doing cached name lookups of scoped stats, where
+   * the scope prefix and the names to combine it with are already in StatName
+   * form. Using this class, they can be combined without accessing the
+   * SymbolTable or, in particular, taking its lock.
+   *
+   * @param stat_names the names to join.
+   * @return Storage allocated for the joined name.
+   */
+  StoragePtr join(const StatNameVec& stat_names) const;
+
+  /**
+   * Populates a StatNameList from a list of encodings. This is not done at
+   * construction time to enable StatNameList to be instantiated directly in
+   * a class that doesn't have a live SymbolTable when it is constructed.
+   *
+   * @param names A pointer to the first name in an array, allocated by the caller.
+   * @param num_names The number of names.
+   * @param list The StatNameList representing the stat names.
+   */
+  void populateList(const StatName* names, uint32_t num_names, StatNameList& list);
 
 #ifndef ENVOY_CONFIG_COVERAGE
-  void debugPrint() const override;
+  void debugPrint() const;
 #endif
 
-  StatNameSetPtr makeSet(absl::string_view name) override;
-  uint64_t getRecentLookups(const RecentLookupsFn&) const override;
-  void clearRecentLookups() override;
-  void setRecentLookupCapacity(uint64_t capacity) override;
-  uint64_t recentLookupCapacity() const override;
-  DynamicSpans getDynamicSpans(StatName stat_name) const override;
+  /**
+   * Creates a StatNameSet.
+   *
+   * @param name the name of the set.
+   * @return the set.
+   */
+  StatNameSetPtr makeSet(absl::string_view name);
+
+  using RecentLookupsFn = std::function<void(absl::string_view, uint64_t)>;
+
+  /**
+   * Calls the provided function with the name of the most recently looked-up
+   * symbols, including lookups on any StatNameSets, and with a count of
+   * the recent lookups on that symbol.
+   *
+   * @param iter the function to call for every recent item.
+   */
+  uint64_t getRecentLookups(const RecentLookupsFn&) const;
+
+  /**
+   * Clears the recent-lookups structures.
+   */
+  void clearRecentLookups();
+
+  /**
+   * Sets the recent-lookup capacity.
+   */
+  void setRecentLookupCapacity(uint64_t capacity);
+
+  /**
+   * @return The configured recent-lookup tracking capacity.
+   */
+  uint64_t recentLookupCapacity() const;
+
+  /**
+   * Identifies the dynamic components of a stat_name into an array of integer
+   * pairs, indicating the begin/end of spans of tokens in the stat-name that
+   * are created from StatNameDynamicStore or StatNameDynamicPool.
+   *
+   * This can be used to reconstruct the same exact StatNames in
+   * StatNames::mergeStats(), to enable stat continuity across hot-restart.
+   *
+   * @param stat_name the input stat name.
+   * @return the array of pairs indicating the bounds.
+   */
+  DynamicSpans getDynamicSpans(StatName stat_name) const;
+
+  bool lessThanLockHeld(const StatName& a, const StatName& b) const;
+
+  template <class GetStatName, class Obj> struct StatNameCompare {
+    StatNameCompare(const SymbolTable& symbol_table, GetStatName getter)
+        : symbol_table_(symbol_table), getter_(getter) {}
+
+    bool operator()(const Obj& a, const Obj& b) const;
+
+    const SymbolTable& symbol_table_;
+    GetStatName getter_;
+  };
+
+  /**
+   * Sorts a range by StatName. This API is more efficient than
+   * calling std::sort directly as it takes a single lock for the
+   * entire sort, rather than locking on each comparison.
+   *
+   * @param begin the beginning of the range to sort
+   * @param end the end of the range to sort
+   * @param get_stat_name a functor that takes an Obj and returns a StatName.
+   */
+  template <class Obj, class Iter, class GetStatName>
+  void sortByStatNames(Iter begin, Iter end, GetStatName get_stat_name) const {
+    // Grab the lock once before sorting begins, so we don't have to re-take
+    // it on every comparison.
+    Thread::LockGuard lock(lock_);
+    StatNameCompare<GetStatName, Obj> compare(*this, get_stat_name);
+    std::sort(begin, end, compare);
+  }
 
 private:
   friend class StatName;
   friend class StatNameTest;
   friend class StatNameDeathTest;
+  friend class StatNameDynamicStorage;
+  friend class StatNameList;
+  friend class StatNameStorage;
+
+  /**
+   * Encodes 'name' into the symbol table. Bumps reference counts for referenced
+   * symbols. The caller must manage the storage, and is responsible for calling
+   * SymbolTable::free() to release the reference counts.
+   *
+   * @param name The name to encode.
+   * @return The encoded name, transferring ownership to the caller.
+   *
+   */
+  StoragePtr encode(absl::string_view name);
+  StoragePtr makeDynamicStorage(absl::string_view name);
+
+  /**
+   * Since SymbolTable does manual reference counting, a client of SymbolTable
+   * must manually call free(symbol_vec) when it is freeing the backing store
+   * for a StatName. This way, the symbol table will grow and shrink
+   * dynamically, instead of being write-only.
+   *
+   * @param stat_name the stat name.
+   */
+  void free(const StatName& stat_name);
+
+  /**
+   * StatName backing-store can be managed by callers in a variety of ways
+   * to minimize overhead. But any persistent reference to a StatName needs
+   * to hold onto its own reference-counts for all symbols. This method
+   * helps callers ensure the symbol-storage is maintained for the lifetime
+   * of a reference.
+   *
+   * @param stat_name the stat name.
+   */
+  void incRefCount(const StatName& stat_name);
 
   struct SharedSymbol {
     SharedSymbol(Symbol symbol) : symbol_(symbol), ref_count_(1) {}
@@ -226,7 +419,7 @@ private:
    * @param size the size of the array in bytes.
    * @return std::string the retrieved stat name.
    */
-  std::vector<absl::string_view> decodeStrings(const Storage array, size_t size) const;
+  std::vector<absl::string_view> decodeStrings(StatName stat_name) const;
 
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
@@ -409,7 +602,7 @@ public:
    * @return size_t the number of bytes in the symbol array, including the
    *                  overhead for the size itself.
    */
-  size_t size() const { return SymbolTableImpl::Encoding::totalSizeBytes(dataSize()); }
+  size_t size() const { return SymbolTable::Encoding::totalSizeBytes(dataSize()); }
 
   /**
    * Copies the entire StatName representation into a MemBlockBuilder, including
@@ -446,7 +639,7 @@ public:
     if (size_and_data_ == nullptr) {
       return nullptr;
     }
-    return size_and_data_ + SymbolTableImpl::Encoding::encodingSizeBytes(dataSize());
+    return size_and_data_ + SymbolTable::Encoding::encodingSizeBytes(dataSize());
   }
 
   const uint8_t* dataIncludingSize() const { return size_and_data_; }
@@ -523,9 +716,9 @@ private:
  */
 class StatNameDynamicStorage : public StatNameStorageBase {
 public:
-  // Basic constructor based on a name. Note the table is used for
-  // a virtual-function call to encode the name, but no locks are taken
-  // in either implementation of the SymbolTable api.
+  // Basic constructor based on a name. Note the table is used for a call to
+  // encode the name, but no locks are taken in either implementation of the
+  // SymbolTable api.
   StatNameDynamicStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorageBase(table.makeDynamicStorage(name)) {}
   // Move constructor.
@@ -662,7 +855,7 @@ public:
   void clear(SymbolTable& symbol_table);
 
 private:
-  friend class SymbolTableImpl;
+  friend class SymbolTable;
 
   /**
    * Moves the specified storage into the list. The storage format is an
@@ -675,8 +868,8 @@ private:
    * ...
    *
    *
-   * For SymbolTableImpl, each symbol is 1 or more bytes, in a variable-length
-   * encoding. See SymbolTableImpl::Encoding::addSymbol for details.
+   * For SymbolTable, each symbol is 1 or more bytes, in a variable-length
+   * encoding. See SymbolTable::Encoding::addSymbol for details.
    */
   void moveStorageIntoList(SymbolTable::StoragePtr&& storage) { storage_ = std::move(storage); }
 
@@ -848,7 +1041,7 @@ public:
   }
 
 private:
-  friend class SymbolTableImpl;
+  friend class SymbolTable;
 
   StatNameSet(SymbolTable& symbol_table, absl::string_view name);
 
@@ -858,6 +1051,19 @@ private:
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;
 };
+
+template <class GetStatName, class Obj>
+bool SymbolTable::StatNameCompare<GetStatName, Obj>::operator()(const Obj& a, const Obj& b) const {
+  StatName a_stat_name = getter_(a);
+  StatName b_stat_name = getter_(b);
+  return symbol_table_.lessThanLockHeld(a_stat_name, b_stat_name);
+}
+
+using SymbolTablePtr = std::unique_ptr<SymbolTable>;
+
+// TODO(jmarantz): rename all remaining ~47 occurrences of SymbolTableImpl in
+// the codebase to SymbolTable, and drop this alias.
+using SymbolTableImpl = SymbolTable;
 
 } // namespace Stats
 } // namespace Envoy
