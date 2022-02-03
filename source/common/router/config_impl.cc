@@ -1106,11 +1106,11 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
   // Retrieve the random value from the header if corresponding header name is specified.
   if (!random_value_name_.empty()) {
     const auto header_value = headers.get(Envoy::Http::LowerCaseString(random_value_name_));
-    if (!header_value.empty()) {
+    if (!header_value.empty() && header_value.size() == 1) {
       // We expect single-valued header here, otherwise it will potentially cause inconsistent
       // weighted cluster picking throughout the process because different values are used to
-      // compute the selected value. Asserts it here and always use the first entry in the header.
-      ASSERT(header_value.size() == 1);
+      // compute the selected value. So, we treat multi-valued header as invalid input and fall back
+      // to use internally generated random number.
       uint64_t random_value = 0;
       if (absl::SimpleAtoi(header_value[0]->value().getStringView(), &random_value)) {
         random_value_from_header = random_value;
