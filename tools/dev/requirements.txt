@@ -17,3 +17,5 @@ remote-pdb
 #
 # `cachebust` can be used to signify change to bazel.
 #
+
+-e git+https://github.com/envoyproxy/pytooling@771fda0f38a4a731b2d8199874179cc36ed9bfc8#egg=envoy.gpg.sign&subdirectory=envoy.gpg.sign

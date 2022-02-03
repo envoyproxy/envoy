@@ -1,5 +1,6 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_entry_point")
+load("@dev_pip3//:requirements.bzl", dev_entry_point = "entry_point")
 
 licenses(["notice"])  # Apache 2
 
@@ -16,6 +17,7 @@ envoy_entry_point(
 
 envoy_entry_point(
     name = "sign",
+    entry_point = dev_entry_point,
     pkg = "envoy.gpg.sign",
 )
 
