@@ -34,16 +34,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-11-30",
         use_category = ["build"],
     ),
-    build_bazel_rules_apple = dict(
-        project_name = "Apple Rules for Bazel",
-        project_desc = "Bazel rules for Apple platforms",
-        project_url = "https://github.com/bazelbuild/rules_apple",
-        version = "0.32.0",
-        sha256 = "77e8bf6fda706f420a55874ae6ee4df0c9d95da6c7838228b26910fc82eea5a2",
-        urls = ["https://github.com/bazelbuild/rules_apple/releases/download/{version}/rules_apple.{version}.tar.gz"],
-        release_date = "2021-10-29",
-        use_category = ["build"],
-    ),
     rules_fuzzing = dict(
         project_name = "Fuzzing Rules for Bazel",
         project_desc = "Bazel rules for fuzz tests",
