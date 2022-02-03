@@ -23,7 +23,7 @@ Envoy::Ssl::CertificateDetailsPtr certificateDetails(X509* cert, const std::stri
 /**
  * Determines whether the given name matches 'pattern' which may optionally begin with a wildcard
  * or contain a wildcard inside the pattern's first label.
- * https://www.rfc-editor.org/rfc/rfc6125#section-6.4.3
+ * See: https://www.rfc-editor.org/rfc/rfc6125#section-6.4.3.
  * @param dns_name the DNS name to match
  * @param pattern the pattern to match against (*.example.com) or (test*.example.com)
  * @return true if the san matches pattern

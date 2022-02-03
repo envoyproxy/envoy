@@ -77,7 +77,7 @@ bool Utility::labelWildcardMatch(absl::string_view dns_label, absl::string_view 
   if (pattern.size() == 1 && pattern[0] == glob) {
     return true;
   }
-  // Only valid if wildcard character appear once
+  // Only valid if wildcard character appear once.
   if (std::count(pattern.begin(), pattern.end(), glob) == 1) {
     std::vector<absl::string_view> split_pattern = absl::StrSplit(pattern, glob);
     return (pattern.size() <= dns_label.size() + 1) &&
@@ -88,7 +88,7 @@ bool Utility::labelWildcardMatch(absl::string_view dns_label, absl::string_view 
 }
 
 bool Utility::dnsNameMatch(absl::string_view dns_name, absl::string_view pattern) {
-  // A-label ACE prefix https://www.rfc-editor.org/rfc/rfc5890#section-2.3.2.5
+  // A-label ACE prefix https://www.rfc-editor.org/rfc/rfc5890#section-2.3.2.5.
   constexpr absl::string_view ACE_prefix = "xn--";
   const std::string lower_case_dns_name = absl::AsciiStrToLower(dns_name);
   const std::string lower_case_pattern = absl::AsciiStrToLower(pattern);
@@ -101,11 +101,11 @@ bool Utility::dnsNameMatch(absl::string_view dns_name, absl::string_view pattern
   std::vector<absl::string_view> split_dns_name =
       absl::StrSplit(lower_case_dns_name, absl::MaxSplits('.', 1));
 
-  // dns name and pattern should contain more than 1 label to match
+  // dns name and pattern should contain more than 1 label to match.
   if (split_pattern.size() < 2 || split_dns_name.size() < 2) {
     return false;
   }
-  // Only the left-most label in the pattern contains wildcard '*' and is not an A-label
+  // Only the left-most label in the pattern contains wildcard '*' and is not an A-label.
   if ((split_pattern[0].find('*') != absl::string_view::npos) &&
       (split_pattern[1].find('*') == absl::string_view::npos) &&
       (!absl::StartsWith(split_pattern[0], ACE_prefix))) {
