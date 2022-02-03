@@ -204,7 +204,7 @@ private:
   Init::SharedTargetImpl init_target_;
   bool started_{false};
 
-  Stats::ScopeSharedPtr scope_;
+  Stats::ScopePtr scope_;
   const std::string stat_prefix_;
   ExtensionConfigDiscoveryStats stats_;
 

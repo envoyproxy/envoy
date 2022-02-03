@@ -227,7 +227,7 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
   const std::string name_;
   // Stats must outlive subscription.
-  Stats::ScopeSharedPtr scope_;
+  Stats::ScopePtr scope_;
   ScopedRdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
   const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::

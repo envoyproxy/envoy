@@ -207,7 +207,7 @@ public:
   envoy::config::core::v3::Metadata metadata_;
   std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
-  Stats::ScopeSharedPtr stats_scope_;
+  Stats::ScopePtr stats_scope_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;

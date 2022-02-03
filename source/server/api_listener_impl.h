@@ -179,8 +179,8 @@ protected:
   ListenerManagerImpl& parent_;
   const std::string name_;
   Network::Address::InstanceConstSharedPtr address_;
-  Stats::ScopeSharedPtr global_scope_;
-  Stats::ScopeSharedPtr listener_scope_;
+  Stats::ScopePtr global_scope_;
+  Stats::ScopePtr listener_scope_;
   FactoryContextImpl factory_context_;
   SyntheticReadCallbacks read_callbacks_;
 };

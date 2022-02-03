@@ -66,7 +66,7 @@ private:
                             const EnvoyException* e) override;
 
   RouteConfigUpdatePtr& config_update_info_;
-  Stats::ScopeSharedPtr scope_;
+  Stats::ScopePtr scope_;
   VhdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
   Init::TargetImpl init_target_;

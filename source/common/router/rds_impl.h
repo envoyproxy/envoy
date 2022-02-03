@@ -150,7 +150,7 @@ private:
 
   const std::string route_config_name_;
   // This scope must outlive the subscription_ below as the subscription has derived stats.
-  Stats::ScopeSharedPtr scope_;
+  Stats::ScopePtr scope_;
   Envoy::Config::SubscriptionPtr subscription_;
   Server::Configuration::ServerFactoryContext& factory_context_;
 

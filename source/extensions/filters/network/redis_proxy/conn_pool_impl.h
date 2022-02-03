@@ -59,7 +59,7 @@ public:
       Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings&
           config,
-      Api::Api& api, Stats::ScopeSharedPtr&& stats_scope,
+      Api::Api& api, Stats::ScopePtr&& stats_scope,
       const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
       Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager);
   // RedisProxy::ConnPool::Instance

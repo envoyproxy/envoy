@@ -857,7 +857,7 @@ private:
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
   std::list<Network::UdpRecvData> received_datagrams_ ABSL_GUARDED_BY(lock_);
-  Stats::ScopeSharedPtr stats_scope_;
+  Stats::ScopePtr stats_scope_;
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;

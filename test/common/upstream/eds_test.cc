@@ -121,7 +121,7 @@ public:
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
-    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+    Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
         "cluster.{}.",
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(

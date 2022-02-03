@@ -26,7 +26,7 @@ class CustomStaticCluster : public Upstream::ClusterImplBase {
 public:
   CustomStaticCluster(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                       Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                      Stats::ScopeSharedPtr&& stats_scope, bool added_via_api, uint32_t priority,
+                      Stats::ScopePtr&& stats_scope, bool added_via_api, uint32_t priority,
                       std::string address, uint32_t port)
       : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api,
                         factory_context.mainThreadDispatcher().timeSource()),
@@ -63,7 +63,7 @@ private:
       const test::integration::clusters::CustomStaticConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopeSharedPtr&& stats_scope) override {
+      Stats::ScopePtr&& stats_scope) override {
     auto new_cluster = std::make_shared<CustomStaticCluster>(
         cluster, context.runtime(), socket_factory_context, std::move(stats_scope),
         context.addedViaApi(), proto_config.priority(), proto_config.address(),

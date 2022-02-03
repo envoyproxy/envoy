@@ -32,7 +32,7 @@ public:
                const std::string& address_out_path,
                Network::Address::InstanceConstSharedPtr address,
                const Network::Socket::OptionsSharedPtr& socket_options,
-               Stats::ScopeSharedPtr&& listener_scope));
+               Stats::ScopePtr&& listener_scope));
   MOCK_METHOD(Http::Code, request,
               (absl::string_view path_and_query, absl::string_view method,
                Http::ResponseHeaderMap& response_headers, std::string& body));
