@@ -57,5 +57,10 @@ void setFinalStreamIntel(StreamInfo& stream_info, envoy_final_stream_intel& fina
   final_intel.response_flags = stream_info.responseFlags();
 }
 
+bool isStreamIdleTimeout(const StreamInfo& stream_info) {
+  return stream_info.responseCodeDetails().has_value() &&
+         stream_info.responseCodeDetails().value() == ResponseCodeDetails::get().StreamIdleTimeout;
+}
+
 } // namespace StreamInfo
 } // namespace Envoy

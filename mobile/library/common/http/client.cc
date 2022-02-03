@@ -320,6 +320,8 @@ envoy_error Client::DirectStreamCallbacks::streamError() {
   if (info.responseCode().has_value()) {
     error.error_code = Bridge::Utility::errorCodeFromLocalStatus(
         static_cast<Http::Code>(info.responseCode().value()));
+  } else if (StreamInfo::isStreamIdleTimeout(info)) {
+    error.error_code = ENVOY_REQUEST_TIMEOUT;
   } else {
     error.error_code = ENVOY_STREAM_RESET;
   }
