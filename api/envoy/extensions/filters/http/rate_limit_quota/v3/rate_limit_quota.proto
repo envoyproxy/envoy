@@ -5,6 +5,7 @@ package envoy.extensions.filters.http.rate_limit_quota.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
+import "envoy/type/v3/ratelimit_strategy.proto";
 
 import "google/protobuf/duration.proto";
 import "google/rpc/status.proto";
@@ -42,53 +43,50 @@ message RateLimitQuota {
   xds.type.matcher.v3.Matcher bucket_matchers = 3;
 }
 
+// [#next-free-field: 7]
 message RateLimitQuotaBucketSettings {
-  // [#comment:TODO(sergiitk): finish fallback behavior]
-
-  // How the data plane should treat requests matching this group
-  // without active quota assignment, for example:
-  // - quota server hasn't returned the first quota assignment
-  // - quota assignment has expired, and the server hasn't returned
-  //   the new assignment.
+  // Configures the behavior when the first request has been matched to
+  // the bucket, and the data plane is waiting for the RLQS to return the
+  // first quota assignment.
   message NoAssignmentBehavior {
-    // Allow requests until the bucket is assigned a quota.
-    message Allow {
+    oneof behavior {
+      option (validate.required) = true;
+
+      // Allow or Deny the requests until the bucket is assigned a quota.
+      type.v3.RateLimitStrategy.BooleanChoice process_requests = 1;
+
+      // Queue the requests until the bucket is assigned a quota.
+      // The data plane maintains a separate queue for each bucket that has
+      // pending requests.
+      // When the server returns quota assignment, the data plane begins
+      // dequeuing the requests in the FIFO order, and processing them according
+      // to the assignment. No individual request/response matching needed.
+      //
+      // .. note::
+      // To avoid memory exhaust, queue configuration allows to
+      // to impose constraints on the maximum number of pending requests
+      // in the queue, and choose what to do with the request over the limit.
+      type.v3.RateLimitStrategyQueue queue_requests = 2;
     }
+  }
 
-    // Deny requests until the bucket is assigned a quota.
-    message Deny {
-    }
-
-    // Queue requests until we receive a quota assignment for the bucket.
-    // The data plane maintains a separate queue for each bucket that has
-    // pending requests.
-    // When the server returns quota assignment, the data plane begins dequeuing
-    // the requests in the FIFO order, and processing them according to
-    // the assignment. No individual request/response matching needed.
-    // To avoid memory exhaust, queue configuration allows to
-    // to impose constraints on the maximum number of pending requests
-    // in the queue.
-    message Queue {
-      // Limit the length of the queue.
-      uint64 max_length = 1;
-
-      // Allows to reverse the order in which requests are discarded when
-      // max_length is reached. When set to true, new requests are discarded.
-      // By default, the oldest requests (at the front of the queue) are
-      // discarded, and new requests are added to the back of the queue.
-      bool queue_spillover_discard_new = 2;
-
-      // Whether to deny the requests discarded due to queue lengths limit,
-      // or allow them.
-      bool deny_discarded_requests = 3;
+  // Specifies the behavior when the bucket's assignment has expired, and
+  // hasn't been refreshed due to server's unavailability.
+  message FallbackBehavior {
+    message FallbackLastAssignment {
+      // Limit the time the last assignment is used as a fallback.
+      // [#comment:TODO(sergiitk): what to do after that?]
+      google.protobuf.Duration time_to_live = 1;
     }
 
     oneof behavior {
-      Allow allow = 1;
+      option (validate.required) = true;
 
-      Deny deny = 2;
+      // Pre-configured local rate limit strategy.
+      type.v3.RateLimitStrategy fallback_rate_limit = 1;
 
-      Queue queue = 3;
+      // Reuse last quota assignment associated to the bucket.
+      FallbackLastAssignment fallback_last_assignment = 2;
     }
   }
 
@@ -118,11 +116,11 @@ message RateLimitQuotaBucketSettings {
       }
     }
 
-    map<string, ValueBuilder> group = 1;
+    map<string, ValueBuilder> bucket_id_builder = 1;
   }
 
-  // Contains instructions on building the bucket identifier of the quota group.
-  BucketIdBuilder bucket_id_builder = 1;
+  // Contains the instructions for building bucket_id.
+  BucketIdBuilder bucket_id_builder = 1 [(validate.rules).message = {required: true}];
 
   // The interval at which the data plane is to report quota usage for
   // this bucket.
@@ -140,8 +138,20 @@ message RateLimitQuotaBucketSettings {
   // [#comment:TODO(sergiitk): behavior on unset]
   DenyResponseSettings deny_response_settings = 3;
 
-  // When unset, use NoAssignmentBehavior.ALLOW.
+  // How the data plane should treat requests matched into this bucket
+  // while waiting for the first assignment returned by the RLQS server.
+  // When unset, the default behavior is to allow all requests.
   NoAssignmentBehavior no_assignment_behavior = 4;
+
+  // Specifies a behavior when the bucket's assignment has expired, and
+  // hasn't been refresh due to server's unavailability.
+  FallbackBehavior fallback_behavior = 5;
+
+  // A duration after which, if no requests are matched to the bucket,
+  // the bucket is considered inactive. The client is to send a message to
+  // the server indicating it's no longer tracking the bucket.
+  google.protobuf.Duration bucket_inactivity_timeout = 6
+      [(validate.rules).duration = {required: true}];
 }
 
 message RateLimitQuotaPerRoute {

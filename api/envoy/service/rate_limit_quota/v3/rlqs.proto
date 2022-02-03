@@ -56,6 +56,7 @@ message RateLimitQuotaUsageReports {
   // server between different applications without fear of overlap.
   // E.g., "envoy".
   // [#comment:TODO(sergiitk): add a note about domain being optional after the first report]
+  // [#comment:TODO(sergiitk): add a note about closing a stream on domain change.]
   string domain = 1;
 
   // A list of quota usage reports for each bucket.
@@ -77,9 +78,10 @@ message RateLimitQuotaAssignments {
     // If unset, the assignment has no expiration date.
     google.protobuf.Duration assignment_time_to_live = 3;
 
-    // Rate limiter used to allow or deny the requests matched to the bucket.
+    // Rate limiter strategy determines the implementation details for when to
+    // allow and deny the requests matched to the bucket.
     // If unset, no limit.
-    RateLimiter rate_limiter = 4;
+    RateLimitStrategy rate_limit_strategy = 4;
   }
 
   // An ordered list of assignments to be applied to the quota buckets.
@@ -91,14 +93,21 @@ message RateLimitQuotaAssignments {
   repeated QuotaAssignment quota_assignment = 1;
 }
 
-message RateLimiter {
+message RateLimitStrategy {
   message Unlimited {
   }
 
   message LimitAll {
   }
 
-  oneof limiter {
+  message QpsLimiter {
+    // The number of queries per second to allow.
+    // Request over the limit are denied.
+    // Setting this field to zero is equivalent to the LimitAll strategy.
+    uint64 queries_per_second = 1;
+  }
+
+  oneof strategy {
     // Allow infinite requests.
     Unlimited unlimited = 1;
 
@@ -108,6 +117,9 @@ message RateLimiter {
     // Allow the same number of requests as the number of tokens available in
     // the token bucket.
     type.v3.TokenBucket token_bucket = 3;
+
+    // Limit the number of queries per second.
+    QpsLimiter queries_per_second = 4;
   }
 }
 

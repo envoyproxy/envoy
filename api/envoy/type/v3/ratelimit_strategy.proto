@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package envoy.type.v3;
+
+import "envoy/type/v3/ratelimit_unit.proto";
+import "envoy/type/v3/token_bucket.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.type.v3";
+option java_outer_classname = "RatelimitStrategyProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/v3;typev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#not-implemented-hide:]
+// [#protodoc-title: Rate Limit Strategies]
+
+message RateLimitStrategy {
+  // Choose between allow all and deny all.
+  enum BooleanChoice {
+    DENY_ALL = 0;
+    ALLOW_ALL = 1;
+  }
+
+  // Limit the number of requests per second.
+  message RequestsPerTimeUnit {
+    // The number of requests per unit of time to allow. Requests over the limit
+    // are denied.
+    // If set to 0, deny all (equivalent to RateLimitStrategyDenyAll).
+    uint64 requests_per_time_unit = 1;
+
+    // The unit of time.
+    RateLimitUnit time_unit = 2 [(validate.rules).enum = {defined_only: true}];
+  }
+
+  oneof strategy {
+    // Allow or Deny the requests.
+    BooleanChoice boolean_choice = 1;
+
+    // A number of requests per time unit, f.e. requests per second.
+    RequestsPerTimeUnit requests_per_time_unit = 2;
+
+    // Limit the requests by consuming tokens from the Token Bucket.
+    // Allow the same number of requests as the number of tokens available in
+    // the token bucket.
+    TokenBucket token_bucket = 3;
+  }
+}
+
+// Queue all requests. Useful as an intermediate strategy while loading actual
+// rate limiting assignment asynchronously (f.e. from a remote service).
+// To avoid memory exhaust, queue configuration allows to
+// to impose constraints on the maximum number of pending requests
+// in the queue.
+message RateLimitStrategyQueue {
+  // Controls the order in which requests are discarded when the queue length
+  // is reached.
+  enum QueueSpillover {
+    // When the queue limit is reached, discard requests from the front of the
+    // queue (the oldest requests).
+    // The new requests are added to the back of the queue as usual.
+    DISCARD_OLD = 0;
+
+    // When the queue limit is reached, discard new requests.
+    DISCARD_NEW = 1;
+  }
+
+  // Limit the length of the queue.
+  uint32 max_length = 1 [(validate.rules).uint32 = {gte: 1}];
+
+  // When the length is reached, whether discard old requests or new requests.
+  QueueSpillover spillover_order = 2;
+
+  // Whether to deny the requests discarded due to queue lengths limit,
+  // or allow them.
+  RateLimitStrategy.BooleanChoice spillover_discard_strategy = 3;
+}
