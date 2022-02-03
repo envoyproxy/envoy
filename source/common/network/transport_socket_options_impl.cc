@@ -58,50 +58,44 @@ void TransportSocketOptionsImpl::hashKey(std::vector<uint8_t>& key,
   commonHashKey(*this, key, factory);
 }
 
-TransportSocketOptionsConstSharedPtr
-TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& filter_state) {
+TransportSocketOptionsConstSharedPtr TransportSocketOptionsUtility::fromFilterState(
+    const StreamInfo::FilterStateSharedPtr& filter_state) {
+  if (!filter_state) {
+    return nullptr;
+  }
   absl::string_view server_name;
   std::vector<std::string> application_protocols;
   std::vector<std::string> subject_alt_names;
   std::vector<std::string> alpn_fallback;
   absl::optional<Network::ProxyProtocolData> proxy_protocol_options;
 
-  bool needs_transport_socket_options = false;
-  if (filter_state.hasData<UpstreamServerName>(UpstreamServerName::key())) {
+  if (filter_state->hasData<UpstreamServerName>(UpstreamServerName::key())) {
     const auto& upstream_server_name =
-        filter_state.getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
+        filter_state->getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
     server_name = upstream_server_name.value();
-    needs_transport_socket_options = true;
   }
 
-  if (filter_state.hasData<Network::ApplicationProtocols>(Network::ApplicationProtocols::key())) {
-    const auto& alpn = filter_state.getDataReadOnly<Network::ApplicationProtocols>(
+  if (filter_state->hasData<Network::ApplicationProtocols>(Network::ApplicationProtocols::key())) {
+    const auto& alpn = filter_state->getDataReadOnly<Network::ApplicationProtocols>(
         Network::ApplicationProtocols::key());
     application_protocols = alpn.value();
-    needs_transport_socket_options = true;
   }
 
-  if (filter_state.hasData<UpstreamSubjectAltNames>(UpstreamSubjectAltNames::key())) {
+  if (filter_state->hasData<UpstreamSubjectAltNames>(UpstreamSubjectAltNames::key())) {
     const auto& upstream_subject_alt_names =
-        filter_state.getDataReadOnly<UpstreamSubjectAltNames>(UpstreamSubjectAltNames::key());
+        filter_state->getDataReadOnly<UpstreamSubjectAltNames>(UpstreamSubjectAltNames::key());
     subject_alt_names = upstream_subject_alt_names.value();
-    needs_transport_socket_options = true;
   }
 
-  if (filter_state.hasData<ProxyProtocolFilterState>(ProxyProtocolFilterState::key())) {
+  if (filter_state->hasData<ProxyProtocolFilterState>(ProxyProtocolFilterState::key())) {
     const auto& proxy_protocol_filter_state =
-        filter_state.getDataReadOnly<ProxyProtocolFilterState>(ProxyProtocolFilterState::key());
+        filter_state->getDataReadOnly<ProxyProtocolFilterState>(ProxyProtocolFilterState::key());
     proxy_protocol_options.emplace(proxy_protocol_filter_state.value());
-    needs_transport_socket_options = true;
   }
 
-  if (needs_transport_socket_options) {
-    return std::make_shared<Network::TransportSocketOptionsImpl>(
-        server_name, std::move(subject_alt_names), std::move(application_protocols),
-        std::move(alpn_fallback), proxy_protocol_options);
-  } else {
-    return nullptr;
-  }
+  return std::make_shared<Network::TransportSocketOptionsImpl>(
+      server_name, std::move(subject_alt_names), std::move(application_protocols),
+      std::move(alpn_fallback), proxy_protocol_options, filter_state);
 }
 
 } // namespace Network

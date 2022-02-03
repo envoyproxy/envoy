@@ -8,6 +8,7 @@
 #include "envoy/network/post_io_action.h"
 #include "envoy/network/proxy_protocol.h"
 #include "envoy/ssl/connection.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "absl/types/optional.h"
 
@@ -207,6 +208,11 @@ public:
    * @return optional PROXY protocol address information.
    */
   virtual absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const PURE;
+
+  /**
+   * @return filter state from the downstream request or connection.
+   */
+  virtual const StreamInfo::FilterStateSharedPtr& filterState() const PURE;
 
   /**
    * @param key supplies a vector of bytes to which the option should append hash key data that will

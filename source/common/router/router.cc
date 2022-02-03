@@ -565,7 +565,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-      *callbacks_->streamInfo().filterState());
+      callbacks_->streamInfo().filterState());
 
   auto has_options_from_downstream =
       downstreamConnection() && downstreamConnection()

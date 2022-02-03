@@ -31,6 +31,9 @@ public:
   }
   void hashKey(std::vector<uint8_t>& key,
                const Network::TransportSocketFactory& factory) const override;
+  const StreamInfo::FilterStateSharedPtr& filterState() const override {
+    return inner_options_->filterState();
+  }
 
 private:
   const std::vector<std::string> alpn_fallback_;
@@ -43,13 +46,14 @@ public:
       absl::string_view override_server_name = "",
       std::vector<std::string>&& override_verify_san_list = {},
       std::vector<std::string>&& override_alpn = {}, std::vector<std::string>&& fallback_alpn = {},
-      absl::optional<Network::ProxyProtocolData> proxy_proto_options = absl::nullopt)
+      absl::optional<Network::ProxyProtocolData> proxy_proto_options = absl::nullopt,
+      const StreamInfo::FilterStateSharedPtr filter_state = nullptr)
       : override_server_name_(override_server_name.empty()
                                   ? absl::nullopt
                                   : absl::optional<std::string>(override_server_name)),
         override_verify_san_list_{std::move(override_verify_san_list)},
         override_alpn_list_{std::move(override_alpn)}, alpn_fallback_{std::move(fallback_alpn)},
-        proxy_protocol_options_(proxy_proto_options) {}
+        proxy_protocol_options_(proxy_proto_options), filter_state_(filter_state) {}
 
   // Network::TransportSocketOptions
   const absl::optional<std::string>& serverNameOverride() const override {
@@ -69,6 +73,7 @@ public:
   }
   void hashKey(std::vector<uint8_t>& key,
                const Network::TransportSocketFactory& factory) const override;
+  const StreamInfo::FilterStateSharedPtr& filterState() const override { return filter_state_; }
 
 private:
   const absl::optional<std::string> override_server_name_;
@@ -76,6 +81,7 @@ private:
   const std::vector<std::string> override_alpn_list_;
   const std::vector<std::string> alpn_fallback_;
   const absl::optional<Network::ProxyProtocolData> proxy_protocol_options_;
+  const StreamInfo::FilterStateSharedPtr filter_state_;
 };
 
 class TransportSocketOptionsUtility {
@@ -87,7 +93,7 @@ public:
    * nullptr if nothing is in the filter state.
    */
   static TransportSocketOptionsConstSharedPtr
-  fromFilterState(const StreamInfo::FilterState& stream_info);
+  fromFilterState(const StreamInfo::FilterStateSharedPtr& stream_info);
 };
 
 } // namespace Network

@@ -378,7 +378,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
           StreamInfo::FilterState::LifeSpan::Connection);
     }
     transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-        downstreamConnection()->streamInfo().filterState());
+        read_callbacks_->connection().streamInfo().filterState());
 
     auto has_options_from_downstream =
         downstreamConnection() && downstreamConnection()
