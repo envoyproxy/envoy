@@ -652,6 +652,7 @@ TEST_F(AsyncClientImplTest, MultipleStreams) {
 
   // Finish stream 2.
   ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "503"}});
+  ASSERT(response_decoder2);
   response_decoder2->decodeHeaders(std::move(response_headers2), true);
 
   // Finish stream 1.
