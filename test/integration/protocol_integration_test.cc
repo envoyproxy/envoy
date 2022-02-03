@@ -178,6 +178,45 @@ TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
   EXPECT_EQ("600", response->headers().getStatusValue());
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, AddInvalidDecodedData) {
+  EXPECT_ENVOY_BUG(
+      {
+        useAccessLog("%RESPONSE_CODE_DETAILS%");
+        config_helper_.prependFilter(R"EOF(
+  name: add-invalid-data-filter
+  )EOF");
+        initialize();
+        codec_client_ = makeHttpConnection(lookupPort("http"));
+        auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+        waitForNextUpstreamRequest();
+        upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+        ASSERT_TRUE(response->waitForEndStream());
+        EXPECT_EQ("502", response->headers().getStatusValue());
+        EXPECT_THAT(waitForAccessLog(access_log_name_),
+                    HasSubstr("filter_added_invalid_request_data"));
+      },
+      "Invalid request data");
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, AddInvalidEncodedData) {
+  EXPECT_ENVOY_BUG(
+      {
+        useAccessLog("%RESPONSE_CODE_DETAILS%");
+        config_helper_.prependFilter(R"EOF(
+  name: add-invalid-data-filter
+  )EOF");
+        initialize();
+        codec_client_ = makeHttpConnection(lookupPort("http"));
+        default_request_headers_.setCopy(Envoy::Http::LowerCaseString("invalid-encode"), "yes");
+        auto response = std::move((codec_client_->startRequest(default_request_headers_)).second);
+        ASSERT_TRUE(response->waitForEndStream());
+        EXPECT_EQ("502", response->headers().getStatusValue());
+        EXPECT_THAT(waitForAccessLog(access_log_name_),
+                    HasSubstr("filter_added_invalid_response_data"));
+      },
+      "Invalid response data");
+}
+
 // Verifies behavior for https://github.com/envoyproxy/envoy/pull/11248
 TEST_P(ProtocolIntegrationTest, AddBodyToRequestAndWaitForIt) {
   config_helper_.prependFilter(R"EOF(
