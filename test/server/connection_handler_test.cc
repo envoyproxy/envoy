@@ -766,11 +766,11 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
 
 // When update a listener, the old listener will be stopped and the new listener will
 // be added into ConnectionHandler before remove the old listener from ConnectionHandler.
-// This test ensure ConnectionHandler can query the correct Listener when balanced the connection
+// This test ensure ConnectionHandler can query the correct Listener when redirect the connection
 // through `getBalancedHandlerByAddress`
 TEST_F(ConnectionHandlerTest, MatchLatestListener) {
   Network::TcpListenerCallbacks* listener_callbacks;
-  // The Listener1 will accept the new connection first then balanced to other listener.
+  // The Listener1 will accept the new connection first then redirect to other listener.
   auto listener1 = new NiceMock<Network::MockListener>();
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks);
@@ -853,7 +853,7 @@ TEST_F(ConnectionHandlerTest, MatchLatestListener) {
 
 TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedListener) {
   Network::TcpListenerCallbacks* listener_callbacks;
-  // The Listener1 will accept the new connection first then balanced to other listener.
+  // The Listener1 will accept the new connection first then redirect to other listener.
   auto listener1 = new NiceMock<Network::MockListener>();
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks);
@@ -917,7 +917,7 @@ TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedListener) {
 
 TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedAnyAddressListener) {
   Network::TcpListenerCallbacks* listener_callbacks;
-  // The Listener1 will accept the new connection first then balanced to other listener.
+  // The Listener1 will accept the new connection first then redirect to other listener.
   auto listener1 = new NiceMock<Network::MockListener>();
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks);
