@@ -7,7 +7,6 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/utility.h"
-#include "source/common/http/http3/quic_client_connection_factory.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
@@ -52,12 +51,13 @@ void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
   }
 }
 
-void Http3ConnPoolImpl::setQuicConfigFromClusterConfig(const Upstream::ClusterInfo& cluster,
-                                                       quic::QuicConfig& quic_config) {
-  Quic::convertQuicConfig(cluster.http3Options().quic_protocol_options(), quic_config);
-  quic::QuicTime::Delta crypto_timeout =
-      quic::QuicTime::Delta::FromMilliseconds(cluster.connectTimeout().count());
-  quic_config.set_max_time_before_crypto_handshake(crypto_timeout);
+
+const Envoy::Ssl::ClientContextConfig&
+getConfig(Network::TransportSocketFactory& transport_socket_factory) {
+  auto* quic_socket_factory =
+      dynamic_cast<Quic::QuicClientTransportSocketFactory*>(&transport_socket_factory);
+  ASSERT(quic_socket_factory != nullptr);
+  return quic_socket_factory->clientContextConfig();
 }
 
 Http3ConnPoolImpl::Http3ConnPoolImpl(
@@ -66,23 +66,14 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
     CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
-    TimeSource& time_source, OptRef<PoolConnectResultCallback> connect_callback,
-    Upstream::EnvoyTlsSessionCache& session_cache)
+     OptRef<PoolConnectResultCallback> connect_callback,
+   Http::PersistentQuicInfo& quic_info)
     : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
                             random_generator, state, client_fn, codec_fn, protocol),
-      connect_callback_(connect_callback) {
-  auto source_address = host_->cluster().sourceAddress();
-  if (!source_address.get()) {
-    auto host_address = host->address();
-    source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
-  }
-  Network::TransportSocketFactory& transport_socket_factory = host->transportSocketFactory();
-  quic::QuicConfig quic_config;
-  setQuicConfigFromClusterConfig(host_->cluster(), quic_config);
-  quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      dispatcher, transport_socket_factory, time_source, source_address, quic_config,
-      host->cluster().perConnectionBufferLimitBytes(),
-      static_cast<EnvoyQuicSessionCacheImpl&>(session_cache));
+  quic_info_(dynamic_cast<Quic::PersistentQuicInfoImpl&>(quic_info)),
+    server_id_(getConfig(host_->transportSocketFactory()).serverNameIndication(),
+                 static_cast<uint16_t>(host_->address()->ip()->port()), false),
+    connect_callback_(connect_callback) {
 }
 
 void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
@@ -94,15 +85,50 @@ void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
 // Make sure all connections are torn down before quic_info_ is deleted.
 Http3ConnPoolImpl::~Http3ConnPoolImpl() { destructAllConnections(); }
 
+std::shared_ptr<quic::QuicCryptoClientConfig> Http3ConnPoolImpl::cryptoConfig() {
+    auto* quic_socket_factory =
+      dynamic_cast<Quic::QuicClientTransportSocketFactory*>(&host_->transportSocketFactory());
+  ASSERT(quic_socket_factory != nullptr);
+  auto context = quic_socket_factory->sslCtx();
+  // If the secrets haven't been loaded, there is no crypto config.
+  if (context == nullptr) {
+    return nullptr;
+  }
+
+  // If the secret has been updated, update the proof source.
+  if (context.get() != client_context_.get()) {
+    client_context_ = context;
+    crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
+        std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context)),
+        quic_info_.getQuicSessionCacheDelegate());
+  }
+  // Return the latest client config.
+  return crypto_config_;
+}
+
+std::unique_ptr<Network::ClientConnection>
+Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names, Stats::Scope&
+                       scope) {
+  auto source_address = host()->cluster().sourceAddress();
+  if (!source_address.get()) {
+    auto host_address = host()->address();
+    source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
+  }
+  return Quic::createQuicNetworkConnection(quic_info_,
+                                            cryptoConfig(), server_id_, dispatcher(),
+                                            host()->address(), source_address,
+                                           quic_stat_names, scope);
+}
+
 std::unique_ptr<Http3ConnPoolImpl>
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                 Upstream::ClusterConnectivityState& state, TimeSource& time_source,
+                 Upstream::ClusterConnectivityState& state,
                  Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope,
                  OptRef<PoolConnectResultCallback> connect_callback,
-                 Upstream::EnvoyTlsSessionCache& quic_session_cache) {
+                 Http::PersistentQuicInfo& quic_info) {
   return std::make_unique<Http3ConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
       [&quic_stat_names,
@@ -122,14 +148,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         Http3ConnPoolImpl* h3_pool = reinterpret_cast<Http3ConnPoolImpl*>(pool);
         Upstream::Host::CreateConnectionData data{};
         data.host_description_ = pool->host();
-        auto host_address = data.host_description_->address();
-        auto source_address = data.host_description_->cluster().sourceAddress();
-        if (!source_address.get()) {
-          source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
-        }
-        data.connection_ =
-            Quic::createQuicNetworkConnection(h3_pool->quicInfo(), pool->dispatcher(), host_address,
-                                              source_address, quic_stat_names, scope);
+        data.connection_ = h3_pool->createClientConnection(quic_stat_names,
+                                                                scope);
         if (data.connection_ == nullptr) {
           ENVOY_LOG_EVERY_POW_2_TO_LOGGER(
               Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool), warn,
@@ -150,7 +170,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
             pool->dispatcher(), pool->randomGenerator())};
         return codec;
       },
-      std::vector<Protocol>{Protocol::Http3}, time_source, connect_callback, quic_session_cache);
+      std::vector<Protocol>{Protocol::Http3},  connect_callback,
+      quic_info);
 }
 
 } // namespace Http3

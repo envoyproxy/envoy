@@ -166,7 +166,7 @@ envoy_cc_library(
         ":envoy_quic_utils_lib",
         "//envoy/http:codec_interface",
         "//envoy/registry",
-        "//source/common/http/http3:quic_client_connection_factory_lib",
+        "//envoy/http:persist_quic_info_interface",
         "//source/extensions/quic/crypto_stream:envoy_quic_crypto_client_stream_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",

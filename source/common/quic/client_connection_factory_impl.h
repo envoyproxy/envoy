@@ -1,6 +1,5 @@
 #pragma once
 
-#include "source/common/http/http3/quic_client_connection_factory.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
@@ -9,38 +8,25 @@
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_client_stream.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
+#include "envoy/http/persist_quic_info.h"
+
 #include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
+#include <memory>
 
 namespace Envoy {
 namespace Quic {
 
 // Information which can be shared across connections, though not across threads.
 struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
-  PersistentQuicInfoImpl(Event::Dispatcher& dispatcher,
-                         Network::TransportSocketFactory& transport_socket_factory,
-                         TimeSource& time_source,
-                         Network::Address::InstanceConstSharedPtr server_addr,
-                         const quic::QuicConfig& quic_config, uint32_t buffer_limit,
-                         quic::SessionCache& session_cache);
+  PersistentQuicInfoImpl(Event::Dispatcher& dispatcher, uint32_t buffer_limit);
 
-  // Returns the most recent crypto config from transport_socket_factory_;
-  std::shared_ptr<quic::QuicCryptoClientConfig> cryptoConfig();
+  // Get a delegate to access the quic session cache.
+  std::unique_ptr<quic::SessionCache> getQuicSessionCacheDelegate();
 
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
-  // server-id can change over the lifetime of Envoy but will be consistent for a
-  // given connection pool.
-  quic::QuicServerId server_id_;
-  // Latch the transport socket factory, to get the latest crypto config and the
-  // time source to create it.
-  Network::TransportSocketFactory& transport_socket_factory_;
-  TimeSource& time_source_;
-  // Latch the latest crypto config, to determine if it has updated since last
-  // checked.
-  Envoy::Ssl::ClientContextSharedPtr client_context_;
-  // If client context changes, client config will be updated as well.
-  std::shared_ptr<quic::QuicCryptoClientConfig> client_config_;
   quic::QuicConfig quic_config_;
   // The cluster buffer limits.
   const uint32_t buffer_limit_;
@@ -49,11 +35,11 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   quic::QuicClientPushPromiseIndex push_promise_index_;
   // Hard code with the default crypto stream as there's no pluggable crypto for upstream Envoy.
   EnvoyQuicCryptoClientStreamFactoryImpl crypto_stream_factory_;
-  quic::SessionCache& session_cache_;
+  quic::QuicClientSessionCache session_cache_;
 };
 
 std::unique_ptr<Network::ClientConnection>
-createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& dispatcher,
+createQuicNetworkConnection(Http::PersistentQuicInfo& info, std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,  const quic::QuicServerId& server_id,  Event::Dispatcher& dispatcher,
                             Network::Address::InstanceConstSharedPtr server_addr,
                             Network::Address::InstanceConstSharedPtr local_addr,
                             QuicStatNames& quic_stat_names, Stats::Scope& scope);

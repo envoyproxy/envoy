@@ -32,7 +32,7 @@ public:
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                TimeSource& source, ClusterConnectivityState& state,
-               EnvoyTlsSessionCache& session_cache));
+               Http::PersistentQuicInfo& quic_info));
 
   MOCK_METHOD(Tcp::ConnectionPool::InstancePtr, allocateTcpConnPool,
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,

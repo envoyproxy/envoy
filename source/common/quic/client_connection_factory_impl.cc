@@ -7,28 +7,24 @@
 namespace Envoy {
 namespace Quic {
 
+// A wrapper class for quic::SessionCache.
 class QuicSessionCacheDelegate : public quic::SessionCache {
 public:
-  QuicSessionCacheDelegate(quic::SessionCache& cache) : cache_(cache) {}
+  explicit QuicSessionCacheDelegate(quic::SessionCache& cache) : cache_(cache) {}
 
   void Insert(const quic::QuicServerId& server_id, bssl::UniquePtr<SSL_SESSION> session,
               const quic::TransportParameters& params,
               const quic::ApplicationState* application_state) override {
-    std::cerr << "======== Insert on cache " << &cache_ << "server_id " << server_id.host() << ":"
-              << server_id.port() << "\n";
     cache_.Insert(server_id, std::move(session), params, application_state);
   }
 
   std::unique_ptr<quic::QuicResumptionState>
   Lookup(const quic::QuicServerId& server_id, quic::QuicWallTime now, const SSL_CTX* ctx) override {
     auto state = cache_.Lookup(server_id, now, ctx);
-    std::cerr << "======== Lookup on cache " << &cache_ << (state == nullptr ? " not " : "")
-              << "found\n";
     return state;
   }
 
   void ClearEarlyData(const quic::QuicServerId& server_id) override {
-    std::cerr << "======== ClearEarlyData on cache " << &cache_ << "\n";
     cache_.ClearEarlyData(server_id);
   }
 
@@ -44,63 +40,25 @@ private:
   quic::SessionCache& cache_;
 };
 
-const Envoy::Ssl::ClientContextConfig&
-getConfig(Network::TransportSocketFactory& transport_socket_factory) {
-  auto* quic_socket_factory =
-      dynamic_cast<QuicClientTransportSocketFactory*>(&transport_socket_factory);
-  ASSERT(quic_socket_factory != nullptr);
-  return quic_socket_factory->clientContextConfig();
-}
-
-Envoy::Ssl::ClientContextSharedPtr
-getContext(Network::TransportSocketFactory& transport_socket_factory) {
-  auto* quic_socket_factory =
-      dynamic_cast<QuicClientTransportSocketFactory*>(&transport_socket_factory);
-  ASSERT(quic_socket_factory != nullptr);
-  return quic_socket_factory->sslCtx();
-}
-
-std::shared_ptr<quic::QuicCryptoClientConfig> PersistentQuicInfoImpl::cryptoConfig() {
-  auto context = getContext(transport_socket_factory_);
-  // If the secrets haven't been loaded, there is no crypto config.
-  if (context == nullptr) {
-    return nullptr;
-  }
-
-  // If the secret has been updated, update the proof source.
-  if (context.get() != client_context_.get()) {
-    client_context_ = context;
-    client_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
-        std::make_unique<EnvoyQuicProofVerifier>(getContext(transport_socket_factory_)),
-        std::make_unique<QuicSessionCacheDelegate>(session_cache_));
-  }
-  // Return the latest client config.
-  return client_config_;
-}
-
 PersistentQuicInfoImpl::PersistentQuicInfoImpl(
-    Event::Dispatcher& dispatcher, Network::TransportSocketFactory& transport_socket_factory,
-    TimeSource& time_source, Network::Address::InstanceConstSharedPtr server_addr,
-    const quic::QuicConfig& quic_config, uint32_t buffer_limit, quic::SessionCache& session_cache)
+    Event::Dispatcher& dispatcher, uint32_t buffer_limit)
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
-      server_id_{getConfig(transport_socket_factory).serverNameIndication(),
-                 static_cast<uint16_t>(server_addr->ip()->port()), false},
-      transport_socket_factory_(transport_socket_factory), time_source_(time_source),
-      quic_config_(quic_config), buffer_limit_(buffer_limit), session_cache_(session_cache) {
+    buffer_limit_(buffer_limit) {
   quiche::FlagRegistry::getInstance();
 }
 
+std::unique_ptr<quic::SessionCache> PersistentQuicInfoImpl::getQuicSessionCacheDelegate() {
+  return std::make_unique<QuicSessionCacheDelegate>(session_cache_);
+}
+
 std::unique_ptr<Network::ClientConnection>
-createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& dispatcher,
+createQuicNetworkConnection(Http::PersistentQuicInfo& info, std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config, const quic::QuicServerId& server_id, Event::Dispatcher& dispatcher,
                             Network::Address::InstanceConstSharedPtr server_addr,
                             Network::Address::InstanceConstSharedPtr local_addr,
                             QuicStatNames& quic_stat_names, Stats::Scope& scope) {
   ASSERT(GetQuicReloadableFlag(quic_single_ack_in_packet2));
+  ASSERT(crypto_config != nullptr);
   PersistentQuicInfoImpl* info_impl = reinterpret_cast<PersistentQuicInfoImpl*>(&info);
-  auto config = info_impl->cryptoConfig();
-  if (config == nullptr) {
-    return nullptr; // no secrets available yet.
-  }
   quic::ParsedQuicVersionVector quic_versions = quic::CurrentSupportedHttp3Versions();
   ASSERT(!quic_versions.empty());
   auto connection = std::make_unique<EnvoyQuicClientConnection>(
@@ -109,8 +67,8 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
 
   // QUICHE client session always use the 1st version to start handshake.
   auto ret = std::make_unique<EnvoyQuicClientSession>(
-      info_impl->quic_config_, quic_versions, std::move(connection), info_impl->server_id_,
-      std::move(config), &info_impl->push_promise_index_, dispatcher, info_impl->buffer_limit_,
+      info_impl->quic_config_, quic_versions, std::move(connection), server_id,
+      std::move(crypto_config), &info_impl->push_promise_index_, dispatcher, info_impl->buffer_limit_,
       info_impl->crypto_stream_factory_, quic_stat_names, scope);
   return ret;
 }

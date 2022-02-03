@@ -13,18 +13,13 @@ envoy_cc_library(
     srcs = ["conn_pool.cc"],
     hdrs = ["conn_pool.h"],
     deps = [
-        ":quic_client_connection_factory_lib",
         "//envoy/event:dispatcher_interface",
+        "//envoy/http:persist_quic_info_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/http:codec_client_lib",
         "//source/common/http:conn_pool_base_lib",
         "//source/common/quic:client_connection_factory_lib",
     ],
-)
-
-envoy_cc_library(
-    name = "quic_client_connection_factory_lib",
-    hdrs = ["quic_client_connection_factory.h"],
 )
 
 envoy_cc_library(

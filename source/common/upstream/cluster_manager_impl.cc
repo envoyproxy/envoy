@@ -48,6 +48,7 @@
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/http/conn_pool_grid.h"
 #include "source/common/http/http3/conn_pool.h"
+#include "source/common/quic/client_connection_factory_impl.h"
 #endif
 
 namespace Envoy {
@@ -1360,11 +1361,18 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
                          parent.parent_.random_,
                          Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)},
                          parent_.parent_.http_context_, parent_.parent_.router_context_),
-      tls_session_cache_(
+      quic_info_(
 #ifdef ENVOY_ENABLE_QUIC
-          std::make_unique<Http::Http3::EnvoyQuicSessionCacheImpl>()
+          [&cluster, &parent](){
+          auto quic_info = std::make_unique<Quic::PersistentQuicInfoImpl>(parent.thread_local_dispatcher_, cluster->perConnectionBufferLimitBytes());
+  Quic::convertQuicConfig(cluster->http3Options().quic_protocol_options(), quic_info->quic_config_);
+  quic::QuicTime::Delta crypto_timeout =
+      quic::QuicTime::Delta::FromMilliseconds(cluster->connectTimeout().count());
+  quic_info->quic_config_.set_max_time_before_crypto_handshake(crypto_timeout);
+return quic_info;
+          }()
 #else
-          std::make_unique<EnvoyTlsSessionCache>()
+          std::make_unique<Http::PersistentQuicInfo>()
 #endif
       ) {
   priority_set_.getOrCreateHostSet(0);
@@ -1549,7 +1557,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
             parent_.thread_local_dispatcher_, host, priority, upstream_protocols,
             alternate_protocol_options, !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
-            parent_.parent_.time_source_, parent_.cluster_manager_state_, *tls_session_cache_);
+            parent_.parent_.time_source_, parent_.cluster_manager_state_, *quic_info_);
 
         pool->addIdleCallback([&parent = parent_, host, priority, hash_key]() {
           parent.httpConnPoolIsIdle(host, priority, hash_key);
@@ -1695,7 +1703,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
         alternate_protocol_options,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-    TimeSource& source, ClusterConnectivityState& state, EnvoyTlsSessionCache& session_cache) {
+    TimeSource& source, ClusterConnectivityState& state, Http::PersistentQuicInfo& quic_info) {
   if (protocols.size() == 3 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
     ASSERT(contains(protocols,
@@ -1709,7 +1717,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
         transport_socket_options, state, source, alternate_protocols_cache,
-        std::chrono::milliseconds(300), coptions, quic_stat_names_, stats_, session_cache);
+        std::chrono::milliseconds(300), coptions, quic_stat_names_, stats_, quic_info);
 #else
     // Should be blocked by configuration checking at an earlier point.
     PANIC("unexpected");
@@ -1730,8 +1738,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
 #ifdef ENVOY_ENABLE_QUIC
     return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
-                                         priority, options, transport_socket_options, state, source,
-                                         quic_stat_names_, stats_, {}, session_cache);
+                                         priority, options, transport_socket_options, state, 
+                                         quic_stat_names_, stats_, {}, quic_info);
 #else
     UNREFERENCED_PARAMETER(source);
     // Should be blocked by configuration checking at an earlier point.

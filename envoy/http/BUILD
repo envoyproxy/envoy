@@ -194,3 +194,8 @@ envoy_cc_library(
         "//envoy/upstream:upstream_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "persist_quic_info_interface",
+    hdrs = ["persist_quic_info.h"],
+)

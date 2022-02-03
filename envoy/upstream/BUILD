@@ -25,6 +25,7 @@ envoy_cc_library(
         "//envoy/config:subscription_factory_interface",
         "//envoy/grpc:async_client_manager_interface",
         "//envoy/http:async_client_interface",
+        "//envoy/http:persist_quic_info_interface",
         "//envoy/http:conn_pool_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/runtime:runtime_interface",
