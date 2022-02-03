@@ -1341,7 +1341,7 @@ TEST_P(MultiplexedIntegrationTest, DelayedCloseDisabled) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Needs HTTP/3 "bad frame" equivalent.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(0); });
+             hcm) { hcm.mutable_delayed_close_timeout()->set_nanos(0); });
   initialize();
   std::string response;
   auto connection = createConnectionDriver(
