@@ -1,9 +1,19 @@
 ARG BUILD_OS=ubuntu
 ARG BUILD_TAG=18.04
 
-# Final stage
-FROM $BUILD_OS:$BUILD_TAG
+
+FROM scratch as binary
+
 ARG TARGETPLATFORM
+ARG ENVOY_BINARY=envoy
+ARG ENVOY_BINARY_SUFFIX=_stripped
+ADD ${TARGETPLATFORM}/build_${ENVOY_BINARY}_release${ENVOY_BINARY_SUFFIX}/* /usr/local/bin/
+ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
+COPY --chown=root:root ${TARGETPLATFORM}/build_${ENVOY_BINARY}_release/su-exec /usr/local/bin/
+COPY ci/docker-entrypoint.sh /
+
+
+FROM ${BUILD_OS}:${BUILD_TAG} as envoy
 
 RUN apt-get update && apt-get upgrade -y \
     && apt-get install --no-install-recommends -y ca-certificates \
@@ -13,16 +23,69 @@ RUN apt-get update && apt-get upgrade -y \
 
 RUN mkdir -p /etc/envoy
 
-ARG ENVOY_BINARY=envoy
-ARG ENVOY_BINARY_SUFFIX=_stripped
-ADD ${TARGETPLATFORM}/build_${ENVOY_BINARY}_release${ENVOY_BINARY_SUFFIX}/* /usr/local/bin/
-ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
+COPY --from=binary /usr/local/bin/* /usr/local/bin/
+COPY --from=binary /etc/envoy/envoy.yaml /etc/envoy/envoy.yaml
+COPY --from=binary /docker-entrypoint.sh /
 
-ADD ${TARGETPLATFORM}/build_${ENVOY_BINARY}_release/su-exec /usr/local/bin/
-RUN chown root:root /usr/local/bin/su-exec && adduser --group --system envoy
+RUN adduser --group --system envoy
+
+EXPOSE 10000
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["envoy", "-c", "/etc/envoy/envoy.yaml"]
+
+
+FROM gcr.io/distroless/base-debian11:nonroot as envoy-distroless
+
+COPY --from=binary /usr/local/bin/* /usr/local/bin/
+COPY --from=binary /etc/envoy/envoy.yaml /etc/envoy/envoy.yaml
+
+EXPOSE 10000
+
+ENTRYPOINT ["/usr/local/bin/envoy"]
+CMD ["-c", "/etc/envoy/envoy.yaml"]
+
+
+# TODO(https://github.com/envoyproxy/envoy/issues/19781): Deprecate and remove this image
+FROM frolvlad/alpine-glibc:alpine-3.14_glibc-2.33 AS envoy-alpine
+
+RUN mkdir -p /etc/envoy
+
+COPY --from=binary /usr/local/bin/envoy /usr/local/bin/
+COPY --from=binary /etc/envoy/envoy.yaml /etc/envoy/envoy.yaml
+
+RUN apk add --no-cache shadow su-exec \
+    && addgroup -S envoy && adduser --no-create-home -S envoy -G envoy
 
 EXPOSE 10000
 
 COPY ci/docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["envoy", "-c", "/etc/envoy/envoy.yaml"]
+
+
+FROM envoy AS envoy-google-vrp
+
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y libc++1 supervisor gdb strace tshark \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /tmp/* /var/tmp/* \
+    && rm -rf /var/lib/apt/lists/*
+
+ADD configs/google-vrp/envoy-edge.yaml /etc/envoy/envoy-edge.yaml
+ADD configs/google-vrp/envoy-origin.yaml /etc/envoy/envoy-origin.yaml
+ADD configs/google-vrp/launch_envoy.sh /usr/local/bin/launch_envoy.sh
+ADD configs/google-vrp/supervisor.conf /etc/supervisor.conf
+ADD test/config/integration/certs/serverkey.pem /etc/envoy/certs/serverkey.pem
+ADD test/config/integration/certs/servercert.pem /etc/envoy/certs/servercert.pem
+# ADD %local envoy bin% /usr/local/bin/envoy
+RUN chmod 777 /var/log/supervisor
+RUN chmod a+r /etc/supervisor.conf /etc/envoy/* /etc/envoy/certs/*
+RUN chmod a+rx /usr/local/bin/launch_envoy.sh
+
+EXPOSE 10000
+EXPOSE 10001
+
+CMD ["supervisord", "-c", "/etc/supervisor.conf"]

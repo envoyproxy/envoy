@@ -158,18 +158,17 @@ function run_process_test_result() {
 
 function run_ci_verify () {
   echo "verify examples..."
-  docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
-  _images=$(docker image list --format "{{.Repository}}")
-  while read -r line; do images+=("$line"); done \
-      <<< "$_images"
-  _tags=$(docker image list --format "{{.Tag}}")
-  while read -r line; do tags+=("$line"); done \
-      <<< "$_tags"
-  for i in "${!images[@]}"; do
-      if [[ "${images[i]}" =~ "envoy" ]]; then
-          docker tag "${images[$i]}:${tags[$i]}" "${images[$i]}:latest"
-      fi
-  done
+  OCI_TEMP_DIR="${ENVOY_DOCKER_BUILD_DIR}/image"
+  mkdir -p "${OCI_TEMP_DIR}"
+  
+  tar xvf docker/envoy.tar -C "${OCI_TEMP_DIR}"
+  skopeo copy "oci:$OCI_TEMP_DIR" "docker-daemon:envoyproxy/envoy-dev:latest"
+  rm -rf "${OCI_TEMP_DIR}/*"
+
+  tar xvf docker/envoy-alpine.tar -C "${OCI_TEMP_DIR}"
+  skopeo copy "oci:$OCI_TEMP_DIR" "docker-daemon:envoyproxy/envoy-alpine-dev:latest"
+  rm -rf "${OCI_TEMP_DIR}"
+
   docker images
   sudo apt-get update -y
   sudo apt-get install -y -qq --no-install-recommends expect redis-tools
