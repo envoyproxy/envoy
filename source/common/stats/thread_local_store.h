@@ -158,8 +158,8 @@ public:
   Counter& counterFromString(const std::string& name) override {
     return default_scope_->counterFromString(name);
   }
-  ScopePtr createScope(const std::string& name) override;
-  ScopePtr scopeFromStatName(StatName name) override;
+  ScopeSharedPtr createScope(const std::string& name) override;
+  ScopeSharedPtr scopeFromStatName(StatName name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
@@ -348,10 +348,10 @@ private:
                                              Histogram::Unit unit) override;
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
-    ScopePtr createScope(const std::string& name) override {
+    ScopeSharedPtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
     }
-    ScopePtr scopeFromStatName(StatName name) override {
+    ScopeSharedPtr scopeFromStatName(StatName name) override {
       SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
       return parent_.scopeFromStatName(StatName(joined.get()));
     }
@@ -520,7 +520,7 @@ private:
   ThreadLocal::TypedSlotPtr<TlsCache> tls_cache_;
   mutable Thread::MutexBasicLockable lock_;
   absl::flat_hash_set<ScopeImpl*> scopes_ ABSL_GUARDED_BY(lock_);
-  ScopePtr default_scope_;
+  ScopeSharedPtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
   StatsMatcherPtr stats_matcher_;

@@ -46,7 +46,7 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
   Api::ApiPtr api = Api::createApiForTest(stats_store);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  Stats::ScopeSharedPtr scope = stats_store.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;

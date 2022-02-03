@@ -34,14 +34,17 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
         return alloc_.makeTextReadout(name, name, StatNameTagVector{});
       }),
       null_counter_(new NullCounterImpl(symbol_table)),
-      null_gauge_(new NullGaugeImpl(symbol_table)) {}
+      null_gauge_(new NullGaugeImpl(symbol_table)),
+      default_scope_(std::make_shared<ScopePrefixer>("", *this)) {}
 
-ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
-  return std::make_unique<ScopePrefixer>(name, *this);
+IsolatedStoreImpl::~IsolatedStoreImpl() = default;
+
+ScopeSharedPtr IsolatedStoreImpl::createScope(const std::string& name) {
+  return std::make_shared<ScopePrefixer>(name, *this);
 }
 
-ScopePtr IsolatedStoreImpl::scopeFromStatName(StatName name) {
-  return std::make_unique<ScopePrefixer>(name, *this);
+ScopeSharedPtr IsolatedStoreImpl::scopeFromStatName(StatName name) {
+  return std::make_shared<ScopePrefixer>(name, *this);
 }
 
 } // namespace Stats

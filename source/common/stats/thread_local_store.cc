@@ -144,12 +144,12 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   return ret;
 }
 
-ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
+ScopeSharedPtr ThreadLocalStoreImpl::createScope(const std::string& name) {
   StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), alloc_.symbolTable());
   return scopeFromStatName(stat_name_storage.statName());
 }
 
-ScopePtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
+ScopeSharedPtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
   auto new_scope = std::make_unique<ScopeImpl>(*this, name);
   Thread::LockGuard lock(lock_);
   scopes_.emplace(new_scope.get());

@@ -28,7 +28,7 @@ void bmWasmSpeedTest(benchmark::State& state) {
   Envoy::Api::ApiPtr api = Envoy::Api::createApiForTest(stats_store);
   Envoy::Upstream::MockClusterManager cluster_manager;
   Envoy::Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Envoy::Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  Envoy::Stats::ScopeSharedPtr scope = stats_store.createScope("wasm.");
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;

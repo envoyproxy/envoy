@@ -31,7 +31,7 @@ protected:
 };
 
 TEST_F(StatsIsolatedStoreImplTest, All) {
-  ScopePtr scope1 = store_->createScope("scope1.");
+  ScopeSharedPtr scope1 = store_->createScope("scope1.");
   Counter& c1 = store_->counterFromString("c1");
   Counter& c2 = scope1->counterFromString("c2");
   EXPECT_EQ("c1", c1.name());
@@ -108,11 +108,11 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   ASSERT_TRUE(found_histogram.has_value());
   EXPECT_EQ(&h1, &found_histogram->get());
 
-  ScopePtr scope2 = scope1->scopeFromStatName(makeStatName("foo."));
+  ScopeSharedPtr scope2 = scope1->scopeFromStatName(makeStatName("foo."));
   EXPECT_EQ("scope1.foo.bar", scope2->counterFromString("bar").name());
 
   // Validate that we sanitize away bad characters in the stats prefix.
-  ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
+  ScopeSharedPtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
   EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
 
   EXPECT_EQ(4UL, store_->counters().size());
@@ -125,14 +125,14 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
 }
 
 TEST_F(StatsIsolatedStoreImplTest, PrefixIsStatName) {
-  ScopePtr scope1 = store_->createScope("scope1");
-  ScopePtr scope2 = scope1->scopeFromStatName(makeStatName("scope2"));
+  ScopeSharedPtr scope1 = store_->createScope("scope1");
+  ScopeSharedPtr scope2 = scope1->scopeFromStatName(makeStatName("scope2"));
   Counter& c1 = scope2->counterFromString("c1");
   EXPECT_EQ("scope1.scope2.c1", c1.name());
 }
 
 TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
-  ScopePtr scope1 = store_->createScope("scope1.");
+  ScopeSharedPtr scope1 = store_->createScope("scope1.");
   Counter& c1 = store_->counterFromStatName(makeStatName("c1"));
   Counter& c2 = scope1->counterFromStatName(makeStatName("c2"));
   EXPECT_EQ("c1", c1.name());
@@ -174,11 +174,11 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   h1.recordValue(200);
   h2.recordValue(200);
 
-  ScopePtr scope2 = scope1->createScope("foo.");
+  ScopeSharedPtr scope2 = scope1->createScope("foo.");
   EXPECT_EQ("scope1.foo.bar", scope2->counterFromStatName(makeStatName("bar")).name());
 
   // Validate that we sanitize away bad characters in the stats prefix.
-  ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
+  ScopeSharedPtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
   EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
 
   EXPECT_EQ(4UL, store_->counters().size());
@@ -187,7 +187,7 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
 }
 
 TEST_F(StatsIsolatedStoreImplTest, ConstSymtabAccessor) {
-  ScopePtr scope = store_->createScope("scope.");
+  ScopeSharedPtr scope = store_->createScope("scope.");
   const Scope& cscope = *scope;
   const SymbolTable& const_symbol_table = cscope.constSymbolTable();
   SymbolTable& symbol_table = scope->symbolTable();
@@ -197,7 +197,7 @@ TEST_F(StatsIsolatedStoreImplTest, ConstSymtabAccessor) {
 TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
   const std::string long_string(128, 'A');
 
-  ScopePtr scope = store_->createScope("scope.");
+  ScopeSharedPtr scope = store_->createScope("scope.");
   Counter& counter = scope->counterFromString(long_string);
   EXPECT_EQ(absl::StrCat("scope.", long_string), counter.name());
 }
@@ -250,8 +250,8 @@ TEST_F(StatsIsolatedStoreImplTest, StatNamesStruct) {
   MAKE_STAT_NAMES_STRUCT(StatNames, ALL_TEST_STATS);
   StatNames stat_names(store_->symbolTable());
   EXPECT_EQ("prefix", store_->symbolTable().toString(stat_names.prefix_));
-  ScopePtr scope1 = store_->createScope("scope1.");
-  ScopePtr scope2 = store_->createScope("scope2.");
+  ScopeSharedPtr scope1 = store_->createScope("scope1.");
+  ScopeSharedPtr scope2 = store_->createScope("scope2.");
   MAKE_STATS_STRUCT(Stats, StatNames, ALL_TEST_STATS);
   Stats stats1(stat_names, *scope1);
   EXPECT_EQ("scope1.test_counter", stats1.test_counter_.name());

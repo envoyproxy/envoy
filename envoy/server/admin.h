@@ -131,7 +131,7 @@ public:
                                  const std::string& address_out_path,
                                  Network::Address::InstanceConstSharedPtr address,
                                  const Network::Socket::OptionsSharedPtr& socket_options,
-                                 Stats::ScopePtr&& listener_scope) PURE;
+                                 Stats::ScopeSharedPtr&& listener_scope) PURE;
 
   /**
    * Executes an admin request with the specified query params. Note: this must

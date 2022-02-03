@@ -481,7 +481,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   ClusterStatNames stat_names_;
   ClusterStats stats_;
   PrioritySetImpl local_priority_set_;

@@ -42,7 +42,7 @@ proxy_wasm::RegisterNullVmPluginFactory register_test_null_vm_plugin("test_null_
 
 class BaseVmTest : public testing::Test {
 public:
-  BaseVmTest() : scope_(Stats::ScopeSharedPtr(stats_store.createScope("wasm."))) {}
+  BaseVmTest() : scope_(stats_store.createScope("wasm.")) {}
 
 protected:
   Stats::IsolatedStoreImpl stats_store;
@@ -118,7 +118,7 @@ double badPong3(double) { return 3; }
 
 class WasmVmTest : public testing::TestWithParam<bool> {
 public:
-  WasmVmTest() : scope_(Stats::ScopeSharedPtr(stats_store.createScope("wasm."))) {}
+  WasmVmTest() : scope_(stats_store.createScope("wasm.")) {}
 
   void SetUp() override { // NOLINT(readability-identifier-naming)
     g_host_functions = new MockHostFunctions();

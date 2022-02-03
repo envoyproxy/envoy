@@ -343,7 +343,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  ScopePtr scope1 = store_->createScope("scope1.");
+  ScopeSharedPtr scope1 = store_->createScope("scope1.");
   Counter& c1 = store_->counterFromString("c1");
   Counter& c2 = scope1->counterFromString("c2");
   EXPECT_EQ("c1", c1.name());
@@ -434,8 +434,8 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   // Creating two scopes with the same name gets you two distinct scope objects.
-  ScopePtr scope1 = store_->createScope("scope.");
-  ScopePtr scope2 = store_->createScope("scope.");
+  ScopeSharedPtr scope1 = store_->createScope("scope.");
+  ScopeSharedPtr scope2 = store_->createScope("scope.");
   EXPECT_NE(scope1, scope2);
 
   EXPECT_EQ(0, store_->histograms().size());
@@ -512,15 +512,15 @@ TEST_F(StatsThreadLocalStoreTest, ForEach) {
   EXPECT_THAT(collect_gauges(), UnorderedElementsAreArray(empty));
   EXPECT_THAT(collect_text_readouts(), UnorderedElementsAreArray(empty));
 
-  ScopePtr scope1 = store_->createScope("scope1");
+  ScopeSharedPtr scope1 = store_->createScope("scope1");
   scope1->counterFromString("counter1");
   scope1->gaugeFromString("gauge1", Gauge::ImportMode::Accumulate);
   scope1->textReadoutFromString("tr1");
-  ScopePtr scope2 = scope1->createScope("scope2");
+  ScopeSharedPtr scope2 = scope1->createScope("scope2");
   scope2->counterFromString("counter2");
   scope2->gaugeFromString("gauge2", Gauge::ImportMode::Accumulate);
   scope2->textReadoutFromString("tr2");
-  ScopePtr scope3 = store_->createScope("scope3");
+  ScopeSharedPtr scope3 = store_->createScope("scope3");
   EXPECT_THAT(collect_scopes(),
               UnorderedElementsAreArray({"", "", "scope1", "scope1.scope2", "scope3"}));
   EXPECT_THAT(collect_counters(),
@@ -536,7 +536,7 @@ TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  ScopePtr scope1 = store_->createScope(std::string("scope1:\0:foo.", 13));
+  ScopeSharedPtr scope1 = store_->createScope(std::string("scope1:\0:foo.", 13));
   Counter& c1 = scope1->counterFromString("c1");
   EXPECT_EQ("scope1___foo.c1", c1.name());
 
@@ -546,7 +546,7 @@ TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
 }
 
 TEST_F(StatsThreadLocalStoreTest, ConstSymtabAccessor) {
-  ScopePtr scope = store_->createScope("scope.");
+  ScopeSharedPtr scope = store_->createScope("scope.");
   const Scope& cscope = *scope;
   const SymbolTable& const_symbol_table = cscope.constSymbolTable();
   SymbolTable& symbol_table = scope->symbolTable();
@@ -557,7 +557,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  ScopePtr scope1 = store_->createScope("scope1.");
+  ScopeSharedPtr scope1 = store_->createScope("scope1.");
   scope1->counterFromString("c1");
   EXPECT_EQ(1UL, store_->counters().size());
   CounterSharedPtr c1 = TestUtility::findCounter(*store_, "scope1.c1");
@@ -585,7 +585,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  ScopePtr scope1 = store_->createScope("scope1.");
+  ScopeSharedPtr scope1 = store_->createScope("scope1.");
   Counter& c1 = scope1->counterFromString("foo.bar");
   EXPECT_EQ("scope1.foo.bar", c1.name());
   StatNameManagedStorage c1_name("scope1.foo.bar", symbol_table_);
@@ -593,7 +593,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   ASSERT_TRUE(found_counter.has_value());
   EXPECT_EQ(&c1, &found_counter->get());
 
-  ScopePtr scope2 = scope1->createScope("foo.");
+  ScopeSharedPtr scope2 = scope1->createScope("foo.");
   Counter& c2 = scope2->counterFromString("bar");
   EXPECT_EQ(&c1, &c2);
   EXPECT_EQ("scope1.foo.bar", c2.name());
@@ -623,8 +623,8 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
 
   // Both scopes point to the same namespace. This can happen during reload of a cluster for
   // example.
-  ScopePtr scope1 = store_->createScope("scope1.");
-  ScopePtr scope2 = store_->createScope("scope1.");
+  ScopeSharedPtr scope1 = store_->createScope("scope1.");
+  ScopeSharedPtr scope2 = store_->createScope("scope1.");
 
   // We will call alloc twice, but they should point to the same backing storage.
   Counter& c1 = scope1->counterFromString("c");
@@ -750,7 +750,7 @@ public:
 class LookupWithStatNameTest : public ThreadLocalStoreNoMocksTestBase {};
 
 TEST_F(LookupWithStatNameTest, All) {
-  ScopePtr scope1 = store_->scopeFromStatName(makeStatName("scope1"));
+  ScopeSharedPtr scope1 = store_->scopeFromStatName(makeStatName("scope1"));
   Counter& c1 = store_->Store::counterFromStatName(makeStatName("c1"));
   Counter& c2 = scope1->counterFromStatName(makeStatName("c2"));
   EXPECT_EQ("c1", c1.name());
@@ -782,12 +782,12 @@ TEST_F(LookupWithStatNameTest, All) {
   h1.recordValue(200);
   h2.recordValue(200);
 
-  ScopePtr scope2 = scope1->scopeFromStatName(makeStatName("foo"));
+  ScopeSharedPtr scope2 = scope1->scopeFromStatName(makeStatName("foo"));
   EXPECT_EQ("scope1.foo.bar", scope2->counterFromStatName(makeStatName("bar")).name());
 
   // Validate that we sanitize away bad characters in the stats prefix. This happens only
   // when constructing a stat from a string, not from a stat name.
-  ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
+  ScopeSharedPtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
   EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
 
   EXPECT_EQ(4UL, store_->counters().size());
@@ -1104,7 +1104,7 @@ public:
     StatsMatcherPtr matcher_ptr(matcher);
     store_.setStatsMatcher(std::move(matcher_ptr));
 
-    ScopePtr scope = store_.createScope("scope.");
+    ScopeSharedPtr scope = store_.createScope("scope.");
 
     StatNamePool pool(symbol_table_);
     for (int j = 0; j < 5; ++j) {
@@ -1171,7 +1171,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   AllocatorImpl heap_alloc_;
   ThreadLocalStoreImpl store_;
-  ScopePtr scope_;
+  ScopeSharedPtr scope_;
 };
 
 INSTANTIATE_TEST_SUITE_P(RememberStatsMatcherTest, RememberStatsMatcherTest,
@@ -1429,7 +1429,7 @@ TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
   ThreadLocalStoreImpl store(alloc);
 
   store.initializeThreading(*dispatcher, tls);
-  { ScopePtr scope1 = store.createScope("scope1."); }
+  { ScopeSharedPtr scope1 = store.createScope("scope1."); }
   tls.shutdownGlobalThreading();
   store.shutdownThreading();
   tls.shutdownThread();
@@ -1495,7 +1495,7 @@ TEST_F(HistogramTest, MultiHistogramMultipleMerges) {
 }
 
 TEST_F(HistogramTest, BasicScopeHistogramMerge) {
-  ScopePtr scope1 = store_->createScope("scope1.");
+  ScopeSharedPtr scope1 = store_->createScope("scope1.");
 
   Histogram& h1 = store_->histogramFromString("h1", Histogram::Unit::Unspecified);
   Histogram& h2 = scope1->histogramFromString("h2", Histogram::Unit::Unspecified);
@@ -1574,7 +1574,7 @@ TEST_F(HistogramTest, BasicHistogramMergeSummary) {
 }
 
 TEST_F(HistogramTest, BasicHistogramUsed) {
-  ScopePtr scope1 = store_->createScope("scope1.");
+  ScopeSharedPtr scope1 = store_->createScope("scope1.");
 
   Histogram& h1 = store_->histogramFromString("h1", Histogram::Unit::Unspecified);
   Histogram& h2 = scope1->histogramFromString("h2", Histogram::Unit::Unspecified);
@@ -1605,7 +1605,7 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
 }
 
 TEST_F(HistogramTest, ParentHistogramBucketSummary) {
-  ScopePtr scope1 = store_->createScope("scope1.");
+  ScopeSharedPtr scope1 = store_->createScope("scope1.");
   Histogram& histogram = store_->histogramFromString("histogram", Histogram::Unit::Unspecified);
   store_->mergeHistograms([]() -> void {});
   ASSERT_EQ(1, store_->histograms().size());
@@ -1716,7 +1716,7 @@ protected:
 
   void createScopesIncCountersAndCleanup() {
     for (uint32_t i = 0; i < NumScopes; ++i) {
-      ScopePtr scope = store_->createScope("scope.");
+      ScopeSharedPtr scope = store_->createScope("scope.");
       Counter& counter = scope->counterFromStatName(my_counter_name_);
       counter.inc();
     }
@@ -1841,8 +1841,8 @@ TEST_F(HistogramThreadTest, MakeHistogramsAndRecordValues) {
 
 TEST_F(HistogramThreadTest, ScopeOverlap) {
   // Creating two scopes with the same name gets you two distinct scope objects.
-  ScopePtr scope1 = store_->createScope("scope.");
-  ScopePtr scope2 = store_->createScope("scope.");
+  ScopeSharedPtr scope1 = store_->createScope("scope.");
+  ScopeSharedPtr scope2 = store_->createScope("scope.");
   EXPECT_NE(scope1, scope2);
 
   EXPECT_EQ(0, store_->histograms().size());
