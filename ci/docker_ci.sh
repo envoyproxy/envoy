@@ -64,8 +64,6 @@ use_builder() {
   fi
 }
 
-IMAGES_TO_SAVE=()
-
 build_images() {
   local _args args=()
   TYPE=$1
