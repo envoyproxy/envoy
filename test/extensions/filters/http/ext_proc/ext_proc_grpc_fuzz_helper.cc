@@ -62,6 +62,7 @@ const StatusCode HttpStatusCodes[] = {
     StatusCode::UnsupportedMediaType,
     StatusCode::RangeNotSatisfiable,
     StatusCode::ExpectationFailed,
+    StatusCode::ImATeapot,
     StatusCode::MisdirectedRequest,
     StatusCode::UnprocessableEntity,
     StatusCode::Locked,

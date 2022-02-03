@@ -181,6 +181,7 @@ TEST_F(CodeUtilityTest, All) {
       std::make_pair(Code::UnsupportedMediaType, "Unsupported Media Type"),
       std::make_pair(Code::RangeNotSatisfiable, "Range Not Satisfiable"),
       std::make_pair(Code::ExpectationFailed, "Expectation Failed"),
+      std::make_pair(Code::ImATeapot, "I'm a teapot"),
       std::make_pair(Code::MisdirectedRequest, "Misdirected Request"),
       std::make_pair(Code::UnprocessableEntity, "Unprocessable Entity"),
       std::make_pair(Code::Locked, "Locked"),

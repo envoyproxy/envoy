@@ -54,6 +54,7 @@ enum class Code {
   UnsupportedMediaType          = 415,
   RangeNotSatisfiable           = 416,
   ExpectationFailed             = 417,
+  ImATeapot                     = 418,
   MisdirectedRequest            = 421,
   UnprocessableEntity           = 422,
   Locked                        = 423,
