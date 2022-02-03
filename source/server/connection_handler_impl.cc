@@ -243,7 +243,8 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
   // We do not return stopped listeners.
   // If there is exact address match, return the corresponding listener.
   if (auto listener_it = tcp_listener_map_by_address_.find(address.asStringView());
-      listener_it != tcp_listener_map_by_address_.end()) {
+      listener_it != tcp_listener_map_by_address_.end() &&
+      listener_it->second->listener_->listener() != nullptr) {
     return Network::BalancedConnectionHandlerOptRef(
         listener_it->second->tcpListener().value().get());
   }
@@ -260,7 +261,8 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
             : Network::Utility::getIpv6AnyAddress(address.ip()->port())->asString();
 
     auto iter = tcp_listener_map_by_address_.find(addr_str);
-    if (iter != tcp_listener_map_by_address_.end()) {
+    if (iter != tcp_listener_map_by_address_.end() &&
+        iter->second->listener_->listener() != nullptr) {
       details = *iter->second;
     }
   } else {
