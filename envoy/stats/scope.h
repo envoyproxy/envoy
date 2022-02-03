@@ -27,7 +27,16 @@ using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogr
 using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextReadout>>;
 using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
-using ScopePtr = ScopeSharedPtr; // TODO(jmarantz): global s/ScopePtr/ScopeSharedPtr/ & remove alias
+
+// TODO(jmarantz): In the initial transformation to store Scope as shared_ptr,
+// we don't change all the references, as that would result in an unreviewable
+// PR that combines a small number of semantic changes and a large number of
+// files with trivial changes. Furthermore, code that depends on the Envoy stats
+// infrastructure that's not in this repo will stop compiling when we remove
+// ScopePtr. We should fully remove this alias in a future PR and change all the
+// references, once known parthers that might break from this change of a chance
+// to do the global replace in their own repos.
+using ScopePtr = ScopeSharedPtr;
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
 
