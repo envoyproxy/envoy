@@ -75,8 +75,6 @@ private:
   struct ActiveListenerDetails {
     // Strong pointer to the listener, whether TCP, UDP, QUIC, etc.
     Network::ConnectionHandler::ActiveListenerPtr listener_;
-    Network::Address::InstanceConstSharedPtr address_;
-    uint64_t listener_tag_;
 
     absl::variant<absl::monostate, std::reference_wrapper<ActiveTcpListener>,
                   std::reference_wrapper<Network::UdpListenerCallbacks>,
@@ -95,12 +93,7 @@ private:
   const absl::optional<uint32_t> worker_index_;
   Event::Dispatcher& dispatcher_;
   const std::string per_handler_stat_prefix_;
-  absl::flat_hash_map<uint64_t, std::shared_ptr<ActiveListenerDetails>> listener_map_by_tag_;
-  absl::flat_hash_map<std::string, std::shared_ptr<ActiveListenerDetails>>
-      tcp_listener_map_by_address_;
-  absl::flat_hash_map<std::string, std::shared_ptr<ActiveListenerDetails>>
-      internal_listener_map_by_address_;
-
+  std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerDetails>> listeners_;
   std::atomic<uint64_t> num_handler_connections_{};
   bool disable_listeners_;
   UnitFloat listener_reject_fraction_{UnitFloat::min()};
