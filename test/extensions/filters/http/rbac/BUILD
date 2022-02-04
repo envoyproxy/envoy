@@ -14,7 +14,9 @@ envoy_package()
 
 envoy_extension_cc_test(
     name = "config_test",
-    srcs = ["config_test.cc"],
+    srcs = [
+        "config_test.cc",
+    ],
     extension_names = ["envoy.filters.http.rbac"],
     deps = [
         "//source/extensions/filters/http/rbac:config",
@@ -37,6 +39,7 @@ envoy_extension_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/expr/custom_cel_vocabulary/example/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/rbac/matchers/upstream_ip_port/v3:pkg_cc_proto",
     ],
@@ -53,6 +56,7 @@ envoy_extension_cc_test(
         "//source/extensions/key_value/file_based:config_lib",
         "//test/config:utility_lib",
         "//test/integration:http_protocol_integration_lib",
+        "@envoy_api//envoy/extensions/expr/custom_cel_vocabulary/example/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],

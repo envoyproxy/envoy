@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/rbac/v3/rbac.pb.h"
-#include "envoy/extensions/rbac/custom_library_config/v3/custom_library.pb.h"
 
+#include "source/extensions/filters/common/expr/custom_cel/custom_cel_vocabulary.h"
 #include "source/extensions/filters/common/rbac/engine.h"
 #include "source/extensions/filters/common/rbac/matchers.h"
 
@@ -23,7 +23,9 @@ public:
 };
 
 using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
-using CustomLibrary = Envoy::Extensions::Filters::Common::Expr::Library::CustomLibrary;
+using CustomCelVocabulary =
+    Envoy::Extensions::Filters::Common::Expr::Custom_Cel::CustomCelVocabulary;
+using Expr::Custom_Cel::CustomCelVocabularyPtr;
 
 enum class EnforcementMode { Enforced, Shadow };
 
@@ -54,7 +56,7 @@ private:
   Protobuf::Arena constant_arena_;
   Expr::BuilderPtr builder_;
 
-  std::unique_ptr<CustomLibrary> custom_library_;
+  CustomCelVocabularyPtr custom_cel_vocabulary_;
 };
 
 } // namespace RBAC

@@ -1,12 +1,14 @@
-#include "source/extensions/filters/common/expr/library/custom_library.h"
+#include "source/extensions/filters/common/expr/custom_cel/example/example_custom_cel_vocabulary.h"
 
-#include "envoy/config/core/v3/extension.pb.validate.h"
-#include "envoy/extensions/rbac/custom_library_config/v3/custom_library.pb.h"
-#include "envoy/extensions/rbac/custom_library_config/v3/custom_library.pb.validate.h"
+#include "envoy/extensions/expr/custom_cel_vocabulary/example/v3/config.pb.h"
+#include "envoy/extensions/expr/custom_cel_vocabulary/example/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "source/extensions/filters/common/expr/library/custom_vocabulary.h"
+#include "source/extensions/filters/common/expr/custom_cel/custom_cel_vocabulary.h"
+#include "source/extensions/filters/common/expr/custom_cel/example/custom_cel_functions.h"
+#include "source/extensions/filters/common/expr/custom_cel/example/custom_cel_variables.h"
 
+#include "eval/public/activation.h"
 #include "eval/public/cel_function_adapter.h"
 #include "eval/public/cel_value.h"
 
@@ -15,22 +17,24 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace Library {
+namespace Custom_Cel {
+namespace Example {
 
 void ThrowException(absl::string_view function_name, absl::Status status);
 
-void CustomLibrary::FillActivation(Activation* activation, Protobuf::Arena& arena,
-                                   const StreamInfo::StreamInfo& info,
-                                   const Http::RequestHeaderMap* request_headers,
-                                   const Http::ResponseHeaderMap* response_headers,
-                                   const Http::ResponseTrailerMap* response_trailers) {
-  request_headers_ = request_headers;
-  response_headers_ = response_headers;
-  response_trailers_ = response_trailers;
-  // vocabulary
+void ExampleCustomCelVocabulary::FillActivation(Activation* activation, Protobuf::Arena& arena,
+                                                const StreamInfo::StreamInfo& info,
+                                                const Http::RequestHeaderMap* request_headers,
+                                                const Http::ResponseHeaderMap* response_headers,
+                                                const Http::ResponseTrailerMap* response_trailers) {
+  set_request_headers(request_headers);
+  set_response_headers(response_headers);
+  set_response_trailers(response_trailers);
+  // variables
   activation->InsertValueProducer(
-      CustomVocabularyName, std::make_unique<CustomVocabularyWrapper>(
-                                arena, info, request_headers, response_headers, response_trailers));
+      CustomCelVariablesSetName,
+      std::make_unique<CustomCelVariablesWrapper>(arena, info, request_headers, response_headers,
+                                                  response_trailers));
   // Lazily evaluated functions only
   absl::Status status;
   status =
@@ -49,7 +53,7 @@ void CustomLibrary::FillActivation(Activation* activation, Protobuf::Arena& aren
   }
 }
 
-void CustomLibrary::RegisterFunctions(CelFunctionRegistry* registry) const {
+void ExampleCustomCelVocabulary::RegisterFunctions(CelFunctionRegistry* registry) const {
   absl::Status status;
   // lazily evaluated functions
   status = registry->RegisterLazyFunction(
@@ -81,17 +85,13 @@ void CustomLibrary::RegisterFunctions(CelFunctionRegistry* registry) const {
   }
 }
 
-CustomLibraryPtr
-CustomLibraryFactory::createLibrary(const Protobuf::Message& config,
-                                    ProtobufMessage::ValidationVisitor& validation_visitor) {
-  const auto& typed_config =
-      MessageUtil::downcastAndValidate<const envoy::config::core::v3::TypedExtensionConfig&>(
-          config, validation_visitor);
-  const auto custom_library_config = MessageUtil::anyConvertAndValidate<CustomLibraryConfig>(
-      typed_config.typed_config(), validation_visitor);
-  auto custom_library = std::make_unique<CustomLibrary>(
-      custom_library_config.replace_default_library_in_case_of_overlap());
-  return custom_library;
+CustomCelVocabularyPtr ExampleCustomCelVocabularyFactory::createCustomCelVocabulary(
+    const Protobuf::Message& config, ProtobufMessage::ValidationVisitor& validation_visitor) {
+  // calling downcastAndValidate but not using the results
+  // an exception will be thrown if the config is not validated
+  MessageUtil::downcastAndValidate<const ExampleCustomCelVocabularyConfig&>(config,
+                                                                            validation_visitor);
+  return std::make_unique<ExampleCustomCelVocabulary>();
 }
 
 void ThrowException(absl::string_view function_name, absl::Status status) {
@@ -99,9 +99,10 @@ void ThrowException(absl::string_view function_name, absl::Status status) {
       fmt::format("failed to register function '{}': {}", function_name, status.message()));
 }
 
-REGISTER_FACTORY(CustomLibraryFactory, BaseCustomLibraryFactory);
+REGISTER_FACTORY(ExampleCustomCelVocabularyFactory, CustomCelVocabularyFactory);
 
-} // namespace Library
+} // namespace Example
+} // namespace Custom_Cel
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

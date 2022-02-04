@@ -13,8 +13,8 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/network/cidr_range.h"
+#include "source/extensions/filters/common/expr/custom_cel/custom_cel_vocabulary.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
-#include "source/extensions/filters/common/expr/library/custom_library.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,7 +24,8 @@ namespace RBAC {
 
 class Matcher;
 using MatcherConstSharedPtr = std::shared_ptr<const Matcher>;
-using CustomLibrary = Envoy::Extensions::Filters::Common::Expr::Library::CustomLibrary;
+using Envoy::Extensions::Filters::Common::Expr::Custom_Cel::CustomCelVocabulary;
+using Expr::Custom_Cel::CustomCelVocabularyPtr;
 
 /**
  *  Matchers describe the rules for matching either a permission action or principal.
@@ -213,8 +214,13 @@ class PolicyMatcher : public Matcher, NonCopyable {
 public:
   PolicyMatcher(const envoy::config::rbac::v3::Policy& policy, Expr::Builder* builder,
                 ProtobufMessage::ValidationVisitor& validation_visitor)
+      : PolicyMatcher(policy, builder, validation_visitor, nullptr) {}
+
+  PolicyMatcher(const envoy::config::rbac::v3::Policy& policy, Expr::Builder* builder,
+                ProtobufMessage::ValidationVisitor& validation_visitor,
+                CustomCelVocabulary* custom_cel_vocabulary)
       : permissions_(policy.permissions(), validation_visitor), principals_(policy.principals()),
-        condition_(policy.condition()) {
+        condition_(policy.condition()), custom_cel_vocabulary_(custom_cel_vocabulary) {
     if (policy.has_condition()) {
       expr_ = Expr::createExpression(*builder, condition_);
     }
@@ -223,14 +229,12 @@ public:
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
-               const StreamInfo::StreamInfo&, CustomLibrary* custom_library) const;
-
 private:
   const OrMatcher permissions_;
   const OrMatcher principals_;
   const google::api::expr::v1alpha1::Expr condition_;
   Expr::ExpressionPtr expr_;
+  CustomCelVocabulary* custom_cel_vocabulary_;
 };
 
 class MetadataMatcher : public Matcher {

@@ -1,0 +1,43 @@
+#include "source/extensions/filters/common/expr/custom_cel/example/custom_cel_functions.h"
+
+#include "eval/public/cel_value.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
+namespace Expr {
+namespace Custom_Cel {
+namespace Example {
+
+absl::Status GetProductCelFunction::Evaluate(absl::Span<const CelValue> args, CelValue* output,
+                                             Protobuf::Arena*) const {
+  int64_t value = args[0].Int64OrDie() * args[1].Int64OrDie();
+  *output = CelValue::CreateInt64(value);
+  return absl::OkStatus();
+}
+
+absl::Status GetDoubleCelFunction::Evaluate(absl::Span<const CelValue> args, CelValue* output,
+                                            Protobuf::Arena*) const {
+  int64_t value = 2 * args[0].Int64OrDie();
+  *output = CelValue::CreateInt64(value);
+  return absl::OkStatus();
+}
+
+absl::Status Get99CelFunction::Evaluate(absl::Span<const CelValue>, CelValue* output,
+                                        Protobuf::Arena*) const {
+  *output = CelValue::CreateInt64(99);
+  return absl::OkStatus();
+}
+
+CelValue GetSquareOf(Protobuf::Arena*, int64_t i) { return CelValue::CreateInt64(i * i); }
+
+CelValue GetNextInt(Protobuf::Arena*, int64_t i) { return CelValue::CreateInt64(i + 1); }
+
+} // namespace Example
+} // namespace Custom_Cel
+} // namespace Expr
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
+} // namespace Envoy

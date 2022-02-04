@@ -2,7 +2,7 @@
 
 #include "envoy/common/exception.h"
 
-#include "source/extensions/filters/common/expr/library/custom_library.h"
+#include "source/extensions/filters/common/expr/custom_cel/custom_cel_vocabulary.h"
 
 #include "eval/public/builtin_func_registrar.h"
 #include "eval/public/cel_expr_builder_factory.h"
@@ -17,12 +17,19 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
                                const Http::RequestHeaderMap* request_headers,
                                const Http::ResponseHeaderMap* response_headers,
                                const Http::ResponseTrailerMap* response_trailers,
-                               CustomLibrary* custom_library) {
+                               CustomCelVocabulary* custom_cel_vocabulary) {
   auto activation = std::make_unique<Activation>();
 
-  if (custom_library && custom_library->replace_default_library()) {
-    custom_library->FillActivation(activation.get(), arena, info, request_headers, response_headers,
-                                   response_trailers);
+  // There are two set of variables and functions: (1) the default vocabulary (Request, Response,
+  // Connection, etc.) and (2) the custom cel vocabulary. The custom cel vocabulary's variables and
+  // functions will take precedence over the default variables and functions (Request, Response,
+  // Connection etc.), in the event of any overlap of names. The custom cel vocabulary's variables
+  // and functions are registered first. The default variables and functions (Request, Response,
+  // Connection, etc.) are registered second. The activation mapping will retain the first
+  // registration of a name and not allow it to be overwritten.
+  if (custom_cel_vocabulary) {
+    custom_cel_vocabulary->FillActivation(activation.get(), arena, info, request_headers,
+                                          response_headers, response_trailers);
   }
 
   activation->InsertValueProducer(Request,
@@ -38,15 +45,12 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
   activation->InsertValueProducer(FilterState,
                                   std::make_unique<FilterStateWrapper>(info.filterState()));
 
-  if (custom_library && !custom_library->replace_default_library()) {
-    custom_library->FillActivation(activation.get(), arena, info, request_headers, response_headers,
-                                   response_trailers);
-  }
-
   return activation;
 }
 
-BuilderPtr createBuilder(Protobuf::Arena* arena, const CustomLibrary* custom_library) {
+BuilderPtr createBuilder(Protobuf::Arena* arena) { return createBuilder(arena, nullptr); }
+
+BuilderPtr createBuilder(Protobuf::Arena* arena, const CustomCelVocabulary* custom_cel_vocabulary) {
   google::api::expr::runtime::InterpreterOptions options;
 
   // Security-oriented defaults
@@ -71,11 +75,13 @@ BuilderPtr createBuilder(Protobuf::Arena* arena, const CustomLibrary* custom_lib
         absl::StrCat("failed to register built-in functions: ", register_status.message()));
   }
 
-  // In the event of overlap between custom functions and CEL built-in functions,
-  // precedence will always be given to the CEL built-in functions.
-  // This is why custom_library->replace_default_library() is not referenced here.
-  if (custom_library) {
-    custom_library->RegisterFunctions(builder->GetRegistry());
+  // Cel's built-in functions (e.g. +, -, !, *, etc.) are registered first using
+  // RegisterBuiltinFunctions. These are functions that people would most likely not want to
+  // override. Cel's built-in functions will take precedence over any custom cel functions. The
+  // custom cel functions are registered second. The registration retains the first instance of a
+  // registration of a name and will not allow it to be overwritten.
+  if (custom_cel_vocabulary) {
+    custom_cel_vocabulary->RegisterFunctions(builder->GetRegistry());
   }
 
   return builder;
@@ -95,10 +101,18 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
                                   const StreamInfo::StreamInfo& info,
                                   const Http::RequestHeaderMap* request_headers,
                                   const Http::ResponseHeaderMap* response_headers,
+                                  const Http::ResponseTrailerMap* response_trailers) {
+  return evaluate(expr, arena, info, request_headers, response_headers, response_trailers, nullptr);
+}
+
+absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena,
+                                  const StreamInfo::StreamInfo& info,
+                                  const Http::RequestHeaderMap* request_headers,
+                                  const Http::ResponseHeaderMap* response_headers,
                                   const Http::ResponseTrailerMap* response_trailers,
-                                  CustomLibrary* custom_library) {
+                                  CustomCelVocabulary* custom_cel_vocabulary) {
   auto activation = createActivation(arena, info, request_headers, response_headers,
-                                     response_trailers, custom_library);
+                                     response_trailers, custom_cel_vocabulary);
   auto eval_status = expr.Evaluate(*activation, &arena);
   if (!eval_status.ok()) {
     return {};
@@ -113,9 +127,10 @@ bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
 }
 
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
-             const Http::RequestHeaderMap& headers, CustomLibrary* custom_library) {
+             const Http::RequestHeaderMap& headers, CustomCelVocabulary* custom_cel_vocabulary) {
   Protobuf::Arena arena;
-  auto eval_status = Expr::evaluate(expr, arena, info, &headers, nullptr, nullptr, custom_library);
+  auto eval_status =
+      Expr::evaluate(expr, arena, info, &headers, nullptr, nullptr, custom_cel_vocabulary);
   if (!eval_status.has_value()) {
     return false;
   }

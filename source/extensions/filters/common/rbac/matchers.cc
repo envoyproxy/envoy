@@ -4,7 +4,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/utility.h"
-#include "source/extensions/filters/common/expr/library/custom_library.h"
+#include "source/extensions/filters/common/expr/custom_cel/custom_cel_vocabulary.h"
 #include "source/extensions/filters/common/rbac/matcher_extension.h"
 
 namespace Envoy {
@@ -237,16 +237,10 @@ bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::Req
 bool PolicyMatcher::matches(const Network::Connection& connection,
                             const Envoy::Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo& info) const {
-  return matches(connection, headers, info, nullptr);
-}
 
-bool PolicyMatcher::matches(const Network::Connection& connection,
-                            const Envoy::Http::RequestHeaderMap& headers,
-                            const StreamInfo::StreamInfo& info,
-                            CustomLibrary* custom_library) const {
   return permissions_.matches(connection, headers, info) &&
          principals_.matches(connection, headers, info) &&
-         (expr_ == nullptr ? true : Expr::matches(*expr_, info, headers, custom_library));
+         (expr_ == nullptr ? true : Expr::matches(*expr_, info, headers, custom_cel_vocabulary_));
 }
 
 bool RequestedServerNameMatcher::matches(const Network::Connection& connection,

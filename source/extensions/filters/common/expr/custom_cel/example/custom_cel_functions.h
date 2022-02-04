@@ -5,12 +5,15 @@
 #include "eval/public/cel_function.h"
 #include "eval/public/cel_value.h"
 
+// Toy functions for the example custom cel vocabulary
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace Library {
+namespace Custom_Cel {
+namespace Example {
 
 using google::api::expr::runtime::CelFunction;
 using google::api::expr::runtime::CelFunctionDescriptor;
@@ -61,7 +64,8 @@ CelValue GetSquareOf(Protobuf::Arena* arena, int64_t i);
 
 CelValue GetNextInt(Protobuf::Arena* arena, int64_t i);
 
-} // namespace Library
+} // namespace Example
+} // namespace Custom_Cel
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

@@ -1,11 +1,11 @@
 #include "source/common/network/utility.h"
+#include "source/extensions/filters/common/expr/custom_cel/example/example_custom_cel_vocabulary.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/extensions/filters/common/expr/evaluator_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
-#include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -17,9 +17,18 @@ namespace Common {
 namespace Expr {
 namespace {
 
-DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTestCase& input) {
+using Custom_Cel::Example::ExampleCustomCelVocabulary;
+using test::extensions::filters::common::expr::EvaluatorTestCase;
+
+void ProtoFuzzer(const EvaluatorTestCase& input, bool use_custom_cel_vocabulary) {
   // Create builder without constant folding.
-  static Expr::BuilderPtr builder = Expr::createBuilder(nullptr, nullptr);
+  auto custom_cel_vocabulary = std::make_unique<ExampleCustomCelVocabulary>();
+  static Expr::BuilderPtr builder;
+  if (use_custom_cel_vocabulary) {
+    builder = Expr::createBuilder(nullptr, custom_cel_vocabulary.get());
+  } else {
+    builder = Expr::createBuilder(nullptr);
+  }
   MockTimeSystem time_source;
   std::unique_ptr<TestStreamInfo> stream_info;
 
@@ -44,11 +53,21 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTest
 
     // Evaluate the CEL expression.
     Protobuf::Arena arena;
-    Expr::evaluate(*expr, arena, *stream_info, &request_headers, &response_headers,
-                   &response_trailers, nullptr);
+    if (use_custom_cel_vocabulary) {
+      Expr::evaluate(*expr, arena, *stream_info, &request_headers, &response_headers,
+                     &response_trailers, custom_cel_vocabulary.get());
+    } else {
+      Expr::evaluate(*expr, arena, *stream_info, &request_headers, &response_headers,
+                     &response_trailers);
+    }
   } catch (const CelException& e) {
     ENVOY_LOG_MISC(debug, "CelException: {}", e.what());
   }
+}
+
+DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTestCase& input) {
+  ProtoFuzzer(input, false);
+  ProtoFuzzer(input, true);
 }
 
 } // namespace

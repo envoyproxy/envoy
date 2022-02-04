@@ -1,8 +1,8 @@
-#include "source/extensions/filters/common/expr/library/custom_vocabulary.h"
+#include "source/extensions/filters/common/expr/custom_cel/example/custom_cel_variables.h"
 
 #include "source/common/http/utility.h"
+#include "source/extensions/filters/common/expr/context.h"
 
-#include "absl/types/optional.h"
 #include "eval/public/cel_value.h"
 
 namespace Envoy {
@@ -10,23 +10,18 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace Library {
+namespace Custom_Cel {
+namespace Example {
 
-absl::optional<CelValue> CustomVocabularyWrapper::operator[](CelValue key) const {
+absl::optional<CelValue> CustomCelVariablesWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
   }
   auto value = key.StringOrDie().value();
   if (value == "team") {
     return CelValue::CreateStringView("spirit");
-  } else if (value == "ip") {
-    auto upstream_local_address = info_.upstreamLocalAddress();
-    if (upstream_local_address != nullptr) {
-      return CelValue::CreateStringView(upstream_local_address->asStringView());
-    }
   } else if (value == "protocol") {
     if (info_.protocol().has_value()) {
-      // creating string in this manner in order to use arena_
       return CelValue::CreateString(Protobuf::Arena::Create<std::string>(
           &arena_, Http::Utility::getProtocolString(info_.protocol().value())));
     }
@@ -35,7 +30,8 @@ absl::optional<CelValue> CustomVocabularyWrapper::operator[](CelValue key) const
   return {};
 }
 
-} // namespace Library
+} // namespace Example
+} // namespace Custom_Cel
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

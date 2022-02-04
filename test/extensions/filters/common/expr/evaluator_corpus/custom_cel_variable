@@ -4,22 +4,19 @@ expression {
     args {
       call_expr {
         function: "_[_]"
-	args {
-	  select_expr {
-	    operand {
-	      ident_expr {
-	        name: "request"
-	      }
-	    }
-	    field: "headers"
-	  }
-	  const_expr {
-	    string_value: "foo"
-	  }
+        args {
+          select_expr {
+            operand {
+              ident_expr {
+                name: "custom"
+              }
+            }
+            field: "team"
+          }
         }
       }
       const_expr {
-        string_value: "bar"
+        string_value: "spirit"
       }
     }
   }
@@ -29,7 +26,6 @@ request_headers {
   headers{key: ":path" value : "/"}
   headers{key: ":scheme" value : "http"}
   headers{key: ":authority" value : "foo.com"}
-  headers {key: "foo" value: "bar"}
   headers {}
   headers {}
   headers {}

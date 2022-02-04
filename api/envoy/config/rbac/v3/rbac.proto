@@ -114,8 +114,9 @@ message RBAC {
   // The policies are evaluated in lexicographic order of the policy name.
   map<string, Policy> policies = 2;
 
-  // [#extension-category: envoy.rbac.custom_library_config]
-  core.v3.TypedExtensionConfig custom_library_config = 3;
+  // Add in order to use a custom cel vocabulary with rbac cel conditional statements.
+  // [#extension-category: envoy.expr.custom_cel_vocabulary]
+  core.v3.TypedExtensionConfig custom_cel_vocabulary_config = 3;
 }
 
 // Policy specifies a role and the principals that are assigned/denied the role.

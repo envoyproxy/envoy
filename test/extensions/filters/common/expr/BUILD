@@ -56,8 +56,25 @@ envoy_cc_fuzz_test(
     deps = [
         ":evaluator_fuzz_proto_cc_proto",
         "//source/extensions/filters/common/expr:evaluator_lib",
+        "//source/extensions/filters/common/expr/custom_cel:custom_cel_vocabulary_lib",
+        "//source/extensions/filters/common/expr/custom_cel/example:example_custom_cel_vocabulary_lib",
         "//test/common/stream_info:test_util",
         "//test/fuzz:utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
+
+#envoy_cc_fuzz_test(
+#    name = "evaluator_custom_cel_fuzz_test",
+#    srcs = ["evaluator_custom_cel_fuzz_test.cc"],
+#    corpus = "evaluator_custom_cel_corpus",
+#    deps = [
+#        ":evaluator_fuzz_proto_cc_proto",
+#        "//source/extensions/filters/common/expr:evaluator_lib",
+#        "//source/extensions/filters/common/expr/custom_cel:custom_cel_vocabulary_lib",
+#        "//source/extensions/filters/common/expr/custom_cel/example:example_custom_cel_vocabulary_lib",
+#        "//test/common/stream_info:test_util",
+#        "//test/fuzz:utility_lib",
+#        "//test/test_common:utility_lib",
+#    ],
+#)

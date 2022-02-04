@@ -6,6 +6,7 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
+#include "source/extensions/filters/common/expr/custom_cel/example/example_custom_cel_vocabulary.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/common/rbac/matchers.h"
 
@@ -423,7 +424,7 @@ TEST(PolicyMatcher, PolicyMatcher) {
   policy.add_permissions()->set_destination_port(456);
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("foo");
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("bar");
-  Expr::BuilderPtr builder = Expr::createBuilder(nullptr, nullptr);
+  Expr::BuilderPtr builder = Expr::createBuilder(nullptr);
 
   RBAC::PolicyMatcher matcher(policy, builder.get(), ProtobufMessage::getStrictValidationVisitor());
 
@@ -455,6 +456,56 @@ TEST(PolicyMatcher, PolicyMatcher) {
   info.downstream_connection_info_provider_->setLocalAddress(addr);
 
   checkMatcher(matcher, false, conn, headers, info);
+}
+
+const std::string CUSTOM_CEL_VARIABLE_EXPR = R"EOF(
+          call_expr:
+            function: _==_
+            args:
+            - select_expr:
+                operand:
+                  ident_expr:
+                    name: custom
+                field: team
+            - const_expr:
+               string_value: {}
+)EOF";
+
+TEST(PolicyMatcherWithCustomCelVocabulary, PolicyMatcherWithCustomCelVocabulary) {
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  envoy::config::rbac::v3::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+  policy.mutable_condition()->MergeFrom(TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(
+      fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "spirit")));
+
+  using Envoy::Extensions::Filters::Common::Expr::BuilderPtr;
+  using Envoy::Extensions::Filters::Common::Expr::Custom_Cel::Example::ExampleCustomCelVocabulary;
+  std::unique_ptr<ExampleCustomCelVocabulary> custom_cel_vocabulary =
+      std::make_unique<ExampleCustomCelVocabulary>();
+  BuilderPtr builder =
+      Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr, custom_cel_vocabulary.get());
+  RBAC::PolicyMatcher matcher(policy, builder.get(), ProtobufMessage::getStrictValidationVisitor(),
+                              custom_cel_vocabulary.get());
+
+  // condition should return true
+  checkMatcher(matcher, true, conn, headers, info);
+
+  envoy::config::rbac::v3::Policy policy2;
+  policy2.add_permissions()->set_any(true);
+  policy2.add_principals()->set_any(true);
+  policy2.mutable_condition()->MergeFrom(TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(
+      fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "wrong")));
+
+  RBAC::PolicyMatcher matcher2(policy2, builder.get(),
+                               ProtobufMessage::getStrictValidationVisitor(),
+                               custom_cel_vocabulary.get());
+
+  //condition should return false
+  checkMatcher(matcher2, false, conn, headers, info);
 }
 
 TEST(RequestedServerNameMatcher, ValidRequestedServerName) {

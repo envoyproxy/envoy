@@ -1,3 +1,4 @@
+#include "envoy/extensions/expr/custom_cel_vocabulary/example/v3/config.pb.h"
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
@@ -719,6 +720,151 @@ typed_config:
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
 }
+
+const std::string RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  rules:
+    action: DENY
+    custom_cel_vocabulary_config:
+      name: envoy.expr.custom_cel_vocabulary.example
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.expr.custom_cel_vocabulary.example.v3.ExampleCustomCelVocabularyConfig
+    policies:
+      foo:
+        permissions:
+          - any: true
+        principals:
+          - any: true
+        condition:
+          call_expr:
+            {}
+)EOF";
+
+const std::string CUSTOM_CEL_VARIABLE_EXPR = R"EOF(
+            function: _==_
+            args:
+            - select_expr:
+                operand:
+                  ident_expr:
+                    name: custom
+                field: team
+            - const_expr:
+               string_value: {}
+)EOF";
+
+const std::string CUSTOM_CEL_FUNCTION_EXPR = R"EOF(
+            function: _==_
+            args:
+            - call_expr:
+                target:
+                  const_expr:
+                    int64_value: 4
+                function: GetSquareOf
+            - const_expr:
+                int64_value: {}
+)EOF";
+
+using RBACWithCustomCelVocabularyIntegrationTest = HttpProtocolIntegrationTest;
+
+INSTANTIATE_TEST_SUITE_P(Protocols, RBACWithCustomCelVocabularyIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+// Custom Cel Vocabulary - DENY if custom[team]==spirit
+TEST_P(RBACWithCustomCelVocabularyIntegrationTest, CustomCelVariableExprIfMatchDeny) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
+                                           fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "spirit")));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+  // Note the whitespace in the policy id is replaced by '_'.
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
+}
+
+// Custom Cel Vocabulary - NO DENY if custom[team]!=spirit
+TEST_P(RBACWithCustomCelVocabularyIntegrationTest, CustomCelVariableExprIfNoMatchNoDeny) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter(
+      fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
+                  fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "something_wrong")));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Custom Cel Vocabulary - DENY if GetSquareOf(4)==16
+TEST_P(RBACWithCustomCelVocabularyIntegrationTest, CustomCelFunctionExprIfMatchDeny) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
+                                           fmt::format(CUSTOM_CEL_FUNCTION_EXPR, "16")));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+  // Note the whitespace in the policy id is replaced by '_'.
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
+}
+
+// Custom Cel Vocabulary - NO DENY if GetSquareOf(4)==-1
+TEST_P(RBACWithCustomCelVocabularyIntegrationTest, CustomCelFunctionExprIfNoMatchNoDeny) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
+                                           fmt::format(CUSTOM_CEL_FUNCTION_EXPR, "-1")));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Custom Cel Vocabulary - NO DENY if GetSquareOf(4)==-1
+TEST_P(RBACWithCustomCelVocabularyIntegrationTest, CustomCelFunctionExprIfNoMatchNoDeny) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
+                                           fmt::format(CUSTOM_CEL_FUNCTION_EXPR, "-1")));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 #endif
 
 } // namespace

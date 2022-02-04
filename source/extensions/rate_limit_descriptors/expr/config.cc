@@ -86,7 +86,7 @@ RateLimit::DescriptorProducerPtr ExprDescriptorFactory::createDescriptorProducer
 
 Filters::Common::Expr::Builder& ExprDescriptorFactory::getOrCreateBuilder() {
   if (expr_builder_ == nullptr) {
-    expr_builder_ = Filters::Common::Expr::createBuilder(nullptr, nullptr);
+    expr_builder_ = Filters::Common::Expr::createBuilder(nullptr);
   }
   return *expr_builder_;
 }

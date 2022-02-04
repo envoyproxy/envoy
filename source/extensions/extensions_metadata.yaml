@@ -745,8 +745,8 @@ envoy.http.stateful_session.cookie:
   - envoy.http.stateful_session
   security_posture: unknown
   status: alpha
-envoy.rbac.custom_library_config.custom_library:
+envoy.expr.custom_cel_vocabulary.example:
   categories:
-  - envoy.rbac.custom_library_config
+  - envoy.expr.custom_cel_vocabulary
   security_posture: unknown
   status: alpha

@@ -1,4 +1,5 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/expr/custom_cel_vocabulary/example/v3/config.pb.h"
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/rbac/matchers/upstream_ip_port/v3/upstream_ip_port_matcher.pb.h"
 
@@ -593,6 +594,74 @@ TEST_F(UpstreamIpPortMatcherTests, EmptyUpstreamConfigPolicyDeny) {
       upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY), EnvoyException,
       "Invalid UpstreamIpPortMatcher configuration - missing `upstream_ip` "
       "and/or `upstream_port_range`");
+}
+
+const std::string CUSTOM_CEL_VARIABLE_EXPR = R"EOF(
+          call_expr:
+            function: _==_
+            args:
+            - select_expr:
+                operand:
+                  ident_expr:
+                    name: custom
+                field: team
+            - const_expr:
+               string_value: {}
+)EOF";
+
+class CustomCelVocabularyTest : public RoleBasedAccessControlFilterTest {
+public:
+  void rbacFilterConfigSetup(const std::string& condition,
+                             const envoy::config::rbac::v3::RBAC::Action& action) {
+    using envoy::extensions::expr::custom_cel_vocabulary::example::v3::
+        ExampleCustomCelVocabularyConfig;
+    envoy::config::rbac::v3::Policy policy;
+    policy.add_permissions()->set_any(true);
+    policy.add_principals()->set_any(true);
+    policy.mutable_condition()->MergeFrom(
+        TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(condition));
+
+    envoy::extensions::filters::http::rbac::v3::RBAC rbac_filter_config;
+    rbac_filter_config.mutable_rules()->set_action(action);
+    (*rbac_filter_config.mutable_rules()->mutable_policies())["foo"] = policy;
+    *rbac_filter_config.mutable_rules()->mutable_custom_cel_vocabulary_config()->mutable_name() =
+        "envoy.expr.custom_cel_vocabulary.example";
+    rbac_filter_config.mutable_rules()
+        ->mutable_custom_cel_vocabulary_config()
+        ->mutable_typed_config()
+        ->PackFrom(ExampleCustomCelVocabularyConfig());
+
+    auto rbac_filter_config_ptr = std::make_shared<RoleBasedAccessControlFilterConfig>(
+        rbac_filter_config, "test", store_, ProtobufMessage::getStrictValidationVisitor());
+
+    SetUp(rbac_filter_config_ptr);
+  }
+};
+
+TEST_F(CustomCelVocabularyTest, CustomCelVocabularyDeny) {
+
+  // should deny
+  rbacFilterConfigSetup(fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "spirit"),
+                        envoy::config::rbac::v3::RBAC::DENY);
+
+  // Filter iteration should stop since the policy is DENY.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers_, false));
+
+  // Expect `denied` stats to be incremented.
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
+TEST_F(CustomCelVocabularyTest, CustomCelVocabularyAllow) {
+
+  // should NOT deny
+  rbacFilterConfigSetup(fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "wrong"),
+                        envoy::config::rbac::v3::RBAC::DENY);
+
+  // Filter iteration should continue since it should NOT deny.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+
+  // Expect `allowed` stats to be incremented.
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
 }
 
 } // namespace

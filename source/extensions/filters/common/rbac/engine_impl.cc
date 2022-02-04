@@ -1,12 +1,11 @@
 #include "source/extensions/filters/common/rbac/engine_impl.h"
 
 #include "envoy/config/rbac/v3/rbac.pb.h"
-#include "envoy/extensions/rbac/custom_library_config/v3/custom_library.pb.h"
 #include "envoy/protobuf/message_validator.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/http/header_map_impl.h"
-#include "source/extensions/filters/common/expr/library/custom_library.h"
+#include "source/extensions/filters/common/expr/custom_cel/custom_cel_vocabulary.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,8 +13,8 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-using BaseCustomLibraryFactory =
-    Envoy::Extensions::Filters::Common::Expr::Library::BaseCustomLibraryFactory;
+using CustomCelVocabularyFactory =
+    Envoy::Extensions::Filters::Common::Expr::Custom_Cel::CustomCelVocabularyFactory;
 
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     const envoy::config::rbac::v3::RBAC& rules,
@@ -23,24 +22,27 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     : action_(rules.action()), mode_(mode) {
   // guard expression builder by presence of a condition in policies
 
-  if (rules.has_custom_library_config()) {
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<BaseCustomLibraryFactory>(
-        rules.custom_library_config());
-    custom_library_ = factory.createLibrary(rules.custom_library_config(), validation_visitor);
+  if (rules.has_custom_cel_vocabulary_config()) {
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<CustomCelVocabularyFactory>(
+        rules.custom_cel_vocabulary_config());
+    auto config = Config::Utility::translateToFactoryConfig(rules.custom_cel_vocabulary_config(),
+                                                            validation_visitor, factory);
+    custom_cel_vocabulary_ = factory.createCustomCelVocabulary(*config, validation_visitor);
   } else {
-    custom_library_ = nullptr;
+    custom_cel_vocabulary_ = nullptr;
   }
 
   for (const auto& policy : rules.policies()) {
     if (policy.second.has_condition()) {
-      builder_ = Expr::createBuilder(&constant_arena_, custom_library_.get());
+      builder_ = Expr::createBuilder(&constant_arena_, custom_cel_vocabulary_.get());
       break;
     }
   }
 
   for (const auto& policy : rules.policies()) {
     policies_.emplace(policy.first, std::make_unique<PolicyMatcher>(policy.second, builder_.get(),
-                                                                    validation_visitor));
+                                                                    validation_visitor,
+                                                                    custom_cel_vocabulary_.get()));
   }
 }
 
@@ -84,7 +86,7 @@ bool RoleBasedAccessControlEngineImpl::checkPolicyMatch(
   bool matched = false;
 
   for (const auto& policy : policies_) {
-    if (policy.second->matches(connection, headers, info, custom_library_.get())) {
+    if (policy.second->matches(connection, headers, info)) {
       matched = true;
       if (effective_policy_id != nullptr) {
         *effective_policy_id = policy.first;
