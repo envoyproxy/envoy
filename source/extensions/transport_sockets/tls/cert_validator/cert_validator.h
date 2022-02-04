@@ -14,7 +14,7 @@
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
 #include "source/common/common/matchers.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/extensions/transport_sockets/tls/stats.h"
 
 #include "openssl/ssl.h"

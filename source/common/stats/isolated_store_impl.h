@@ -13,7 +13,7 @@
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
 #include "source/common/stats/store_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/tag_utility.h"
 #include "source/common/stats/utility.h"
 
