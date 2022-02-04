@@ -3,7 +3,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/memory/stats.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
@@ -28,7 +28,7 @@ protected:
   }
 
   SymbolVec getSymbols(StatName stat_name) {
-    return SymbolTableImpl::Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
+    return SymbolTableImpl::Encoding::decodeSymbols(stat_name);
   }
   Symbol monotonicCounter() { return table_.monotonicCounter(); }
   std::string encodeDecode(absl::string_view stat_name) {
@@ -435,7 +435,10 @@ TEST_F(StatNameTest, Sort) {
   const StatNameVec sorted_names{makeStat("a.b"), makeStat("a.c"),   makeStat("a.c"),
                                  makeStat("d.a"), makeStat("d.a.a"), makeStat("d.e")};
   EXPECT_NE(names, sorted_names);
-  std::sort(names.begin(), names.end(), StatNameLessThan(table_));
+  struct GetStatName {
+    StatName operator()(const StatName& stat_name) const { return stat_name; }
+  };
+  table_.sortByStatNames<StatName>(names.begin(), names.end(), GetStatName());
   EXPECT_EQ(names, sorted_names);
 }
 

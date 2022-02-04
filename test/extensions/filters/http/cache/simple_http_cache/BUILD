@@ -13,6 +13,7 @@ envoy_extension_cc_test(
     srcs = ["simple_http_cache_test.cc"],
     extension_names = ["envoy.cache.simple_http_cache"],
     deps = [
+        "//source/extensions/filters/http/cache:cache_entry_utils_lib",
         "//source/extensions/filters/http/cache/simple_http_cache:config",
         "//test/extensions/filters/http/cache:common",
         "//test/mocks/server:factory_context_mocks",

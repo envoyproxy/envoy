@@ -13,6 +13,8 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 
+#include "absl/status/status.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -51,7 +53,7 @@ private:
   uint32_t bytes_enqueued_{};
 };
 
-class ProcessorState : public Logger::Loggable<Logger::Id::filter> {
+class ProcessorState : public Logger::Loggable<Logger::Id::ext_proc> {
 public:
   // This describes whether the filter is waiting for a response to a gRPC message.
   // We use it to determine how to respond to stream messages send back from
@@ -113,9 +115,10 @@ public:
   virtual void requestWatermark() PURE;
   virtual void clearWatermark() PURE;
 
-  bool handleHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response);
-  bool handleBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response);
-  bool handleTrailersResponse(const envoy::service::ext_proc::v3::TrailersResponse& response);
+  absl::Status handleHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response);
+  absl::Status handleBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response);
+  absl::Status
+  handleTrailersResponse(const envoy::service::ext_proc::v3::TrailersResponse& response);
 
   virtual const Buffer::Instance* bufferedData() const PURE;
   bool hasBufferedData() const { return bufferedData() != nullptr && bufferedData()->length() > 0; }

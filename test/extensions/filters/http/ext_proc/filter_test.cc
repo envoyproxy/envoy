@@ -115,24 +115,28 @@ protected:
 
   bool doSendClose() { return !server_closed_stream_; }
 
-  void setUpDecodingBuffering(Buffer::Instance& buf) {
+  void setUpDecodingBuffering(Buffer::Instance& buf, bool expect_modification = false) {
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&buf));
     EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
         .WillRepeatedly(
             Invoke([&buf](Buffer::Instance& new_chunk, Unused) { buf.add(new_chunk); }));
-    EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
-        .WillOnce(
-            Invoke([&buf](std::function<void(Buffer::Instance&)> callback) { callback(buf); }));
+    if (expect_modification) {
+      EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
+          .WillOnce(
+              Invoke([&buf](std::function<void(Buffer::Instance&)> callback) { callback(buf); }));
+    }
   }
 
-  void setUpEncodingBuffering(Buffer::Instance& buf) {
+  void setUpEncodingBuffering(Buffer::Instance& buf, bool expect_modification = false) {
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(&buf));
     EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
         .WillRepeatedly(
             Invoke([&buf](Buffer::Instance& new_chunk, Unused) { buf.add(new_chunk); }));
-    EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
-        .WillOnce(
-            Invoke([&buf](std::function<void(Buffer::Instance&)> callback) { callback(buf); }));
+    if (expect_modification) {
+      EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
+          .WillOnce(
+              Invoke([&buf](std::function<void(Buffer::Instance&)> callback) { callback(buf); }));
+    }
   }
 
   void setUpDecodingWatermarking(bool& watermarked) {
@@ -539,7 +543,7 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBuffered) {
   Buffer::OwnedImpl req_data;
   TestUtility::feedBufferWithRandomCharacters(req_data, 100);
   Buffer::OwnedImpl buffered_data;
-  setUpDecodingBuffering(buffered_data);
+  setUpDecodingBuffering(buffered_data, true);
 
   // Testing the case where we just have one chunk of data and it is buffered.
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, true));
@@ -736,7 +740,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedOneChunk) {
   Buffer::OwnedImpl req_data;
   TestUtility::feedBufferWithRandomCharacters(req_data, 100);
   Buffer::OwnedImpl buffered_request_data;
-  setUpDecodingBuffering(buffered_request_data);
+  setUpDecodingBuffering(buffered_request_data, true);
 
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, true));
 
@@ -761,7 +765,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedOneChunk) {
   Buffer::OwnedImpl resp_data;
   TestUtility::feedBufferWithRandomCharacters(resp_data, 100);
   Buffer::OwnedImpl buffered_response_data;
-  setUpEncodingBuffering(buffered_response_data);
+  setUpEncodingBuffering(buffered_response_data, true);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
 
   processResponseBody([&buffered_response_data](const HttpBody& req_body, ProcessingResponse&,
@@ -810,7 +814,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedMultiChunk) {
   TestUtility::feedBufferWithRandomCharacters(req_data, 100);
   Buffer::OwnedImpl buffered_req_data;
   Buffer::OwnedImpl empty_data;
-  setUpDecodingBuffering(buffered_req_data);
+  setUpDecodingBuffering(buffered_req_data, true);
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data, false));
   // At this point, Envoy adds data to the buffer
   buffered_req_data.add(req_data);
@@ -841,7 +845,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedMultiChunk) {
   Buffer::OwnedImpl resp_data_3;
   TestUtility::feedBufferWithRandomCharacters(resp_data_3, 100);
   Buffer::OwnedImpl buffered_resp_data;
-  setUpEncodingBuffering(buffered_resp_data);
+  setUpEncodingBuffering(buffered_resp_data, true);
 
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(resp_data_1, false));
   // Emulate what Envoy does with this data
@@ -1050,7 +1054,7 @@ TEST_F(HttpFilterTest, PostFastAndBigRequestPartialBuffering) {
   Buffer::OwnedImpl req_data_3;
   TestUtility::feedBufferWithRandomCharacters(req_data_3, 2000);
   Buffer::OwnedImpl buffered_data;
-  setUpDecodingBuffering(buffered_data);
+  setUpDecodingBuffering(buffered_data, true);
   Buffer::OwnedImpl expected_request_data;
   expected_request_data.add(req_data_1);
   expected_request_data.add(req_data_2);
@@ -1236,7 +1240,7 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
       .WillRepeatedly(Invoke(
           [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
   Buffer::OwnedImpl response_buffer;
-  setUpEncodingBuffering(response_buffer);
+  setUpEncodingBuffering(response_buffer, true);
 
   for (int i = 0; i < 3; i++) {
     Buffer::OwnedImpl resp_chunk;
@@ -1891,7 +1895,7 @@ TEST_F(HttpFilterTest, ReplaceRequest) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
 
   Buffer::OwnedImpl req_buffer;
-  setUpDecodingBuffering(req_buffer);
+  setUpDecodingBuffering(req_buffer, true);
   processRequestHeaders(
       false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& hdrs_resp) {
         hdrs_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
@@ -1950,7 +1954,7 @@ TEST_F(HttpFilterTest, ReplaceCompleteResponseBuffered) {
   Buffer::OwnedImpl resp_data_2;
   TestUtility::feedBufferWithRandomCharacters(resp_data_2, 100);
   Buffer::OwnedImpl buffered_resp_data;
-  setUpEncodingBuffering(buffered_resp_data);
+  setUpEncodingBuffering(buffered_resp_data, true);
 
   processResponseHeaders(
       false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& hdrs_resp) {
@@ -2084,6 +2088,81 @@ TEST(OverrideTest, DisabledThingsAreDisabled) {
   route1.merge(route2);
   EXPECT_TRUE(route1.disabled());
   EXPECT_FALSE(route1.processingMode());
+}
+
+// Verify that attempts to change headers that are not allowed to be changed
+// are ignored and a counter is incremented.
+TEST_F(HttpFilterTest, IgnoreInvalidHeaderMutations) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  processRequestHeaders(
+      false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& header_resp) {
+        auto headers_mut = header_resp.mutable_response()->mutable_header_mutation();
+        auto add1 = headers_mut->add_set_headers();
+        // Not allowed to change the "host" header by default
+        add1->mutable_header()->set_key("Host");
+        add1->mutable_header()->set_value("wrong:1234");
+        // Not allowed to remove x-envoy headers by default.
+        headers_mut->add_remove_headers("x-envoy-special-thing");
+      });
+
+  // The original headers should not have been modified now.
+  Http::TestRequestHeaderMapImpl expected{
+      {":path", "/"},
+      {":method", "POST"},
+      {":scheme", "http"},
+      {"host", "host"},
+  };
+  EXPECT_THAT(&request_headers_, HeaderMapEqualIgnoreOrder(&expected));
+
+  stream_callbacks_->onGrpcClose();
+  filter_->onDestroy();
+
+  EXPECT_EQ(2, config_->stats().rejected_header_mutations_.value());
+}
+
+// Verify that attempts to change headers that are not allowed to be changed
+// can be configured to cause a request failure.
+TEST_F(HttpFilterTest, FailOnInvalidHeaderMutations) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  mutation_rules:
+    disallow_is_error:
+      value: true
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+
+  Http::TestResponseHeaderMapImpl immediate_response_headers;
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(Http::Code::InternalServerError, _, _, Eq(absl::nullopt), _))
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Unused, Unused,
+                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                           Unused, Unused) { modify_headers(immediate_response_headers); }));
+  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
+  auto headers_mut =
+      resp1->mutable_request_headers()->mutable_response()->mutable_header_mutation();
+  auto add1 = headers_mut->add_set_headers();
+  // Not allowed to change the "host" header by default
+  add1->mutable_header()->set_key("Host");
+  add1->mutable_header()->set_value("wrong:1234");
+  // Not allowed to remove x-envoy headers by default.
+  headers_mut->add_remove_headers("x-envoy-special-thing");
+  stream_callbacks_->onReceiveMessage(std::move(resp1));
+  EXPECT_TRUE(immediate_response_headers.empty());
+  stream_callbacks_->onGrpcClose();
+
+  filter_->onDestroy();
 }
 
 } // namespace

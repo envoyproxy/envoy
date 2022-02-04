@@ -11,7 +11,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/event/scaled_range_timer_manager_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/server/resource_monitor_config_impl.h"
 
 #include "absl/container/node_hash_map.h"

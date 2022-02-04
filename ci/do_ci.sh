@@ -454,9 +454,12 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   # Validate repository metadata.
   echo "check repositories..."
   "${ENVOY_SRCDIR}"/tools/check_repositories.sh
-  "${ENVOY_SRCDIR}"/ci/check_repository_locations.sh
+
+  echo "check dependencies..."
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check
 
   # Run pip requirements tests
+  echo "check pip..."
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check
 
   exit 0
