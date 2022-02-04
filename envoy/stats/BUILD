@@ -32,7 +32,6 @@ envoy_cc_library(
     external_deps = ["abseil_inlined_vector"],
     deps = [
         ":refcount_ptr_interface",
-        ":symbol_table_interface",
         "//envoy/common:interval_set_interface",
         "//envoy/common:time_interface",
     ],
@@ -47,11 +46,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:non_copyable",
     ],
-)
-
-envoy_cc_library(
-    name = "symbol_table_interface",
-    hdrs = ["symbol_table.h"],
 )
 
 envoy_cc_library(
