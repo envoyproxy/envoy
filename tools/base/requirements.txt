@@ -9,11 +9,13 @@ abstracts==0.0.12 \
     # via
     #   -r requirements.in
     #   aio.api.bazel
+    #   aio.api.github
     #   aio.core
     #   aio.run.checker
     #   aio.run.runner
     #   envoy.base.utils
     #   envoy.code-format.python-check
+    #   envoy.dependency.check
     #   envoy.dependency.cve-scan
     #   envoy.dependency.pip-check
     #   envoy.distribution.release
@@ -24,12 +26,18 @@ aio.api.bazel==0.0.1 \
     --hash=sha256:21094c7f8ed038d4668d93efa908d0770cf4bb781373a1300f152b211ff3dc81 \
     --hash=sha256:d110ab219de520c911bd1505f516cf208fea75fe66529f638c9b4ac182b20ab8
     # via -r requirements.in
+aio.api.github==0.0.3 \
+    --hash=sha256:8054c3d023eb5c1dfe9ad93341f5e184c9835b2e502b737195b2539388a5af56 \
+    --hash=sha256:d7b03d5e4fc3363603ec75fed2c77f6fdbff3ac596e79328500416e2d6c7a0e9
+    # via envoy.dependency.check
 aio.core==0.2.0 \
     --hash=sha256:40a6d6495eaf11a9333847e5d74ed84452da5dfbc785c65f022d7c1343126f4c \
     --hash=sha256:a174f73793b57050c53463dde4a06f2655f613c72f4789f568dd4f32bc54af2c
     # via
     #   -r requirements.in
+    #   aio.api.github
     #   envoy.code-format.python-check
+    #   envoy.dependency.check
     #   envoy.dependency.cve-scan
     #   envoy.distribution.release
     #   envoy.distribution.repo
@@ -41,13 +49,14 @@ aio.run.checker==0.2.1 \
     # via
     #   -r requirements.in
     #   envoy.code-format.python-check
+    #   envoy.dependency.check
     #   envoy.dependency.cve-scan
     #   envoy.dependency.pip-check
     #   envoy.distribution.distrotest
     #   envoy.distribution.verify
-aio.run.runner==0.2.1 \
-    --hash=sha256:80062b417b127b433224fd889673b06167cd9fbaaf24c4148f799e3f9993632d \
-    --hash=sha256:87feef7303efba78908dde07482999daa2a0254b37a7c972b4fdfab685eb416b
+aio.run.runner==0.2.2 \
+    --hash=sha256:8d1c265076c01f5ffe6b26c08575a98db0f7bd1e38805bda98f1a7b4983619e8 \
+    --hash=sha256:92e67031877cec36fc46ec33b7ab9158464ca1b5870e13dc2fb4374200ad4878
     # via
     #   -r requirements.in
     #   aio.run.checker
@@ -109,6 +118,7 @@ aiohttp==3.7.4.post0 \
     # via
     #   aio.core
     #   aiodocker
+    #   envoy.dependency.check
     #   envoy.dependency.cve-scan
     #   envoy.github.abstract
     #   envoy.github.release
@@ -280,6 +290,7 @@ envoy.base.utils==0.0.14 \
     # via
     #   -r requirements.in
     #   envoy.code-format.python-check
+    #   envoy.dependency.check
     #   envoy.dependency.cve-scan
     #   envoy.dependency.pip-check
     #   envoy.distribution.distrotest
@@ -292,6 +303,10 @@ envoy.base.utils==0.0.14 \
 envoy.code-format.python-check==0.0.7 \
     --hash=sha256:c34f12946c908d2c7deb9faefecb044d8d5a9458755b40ed2537b04184fc8a21 \
     --hash=sha256:c4758e9da6d5cba437f8948becadb4c3ab5f9f01a07f1a0965944873ae724963
+    # via -r requirements.in
+envoy.dependency.check==0.0.1 \
+    --hash=sha256:52118226ff7f46698ad6b93ce6b04dabad4edbccc7a60db73dd1da83c12647a2 \
+    --hash=sha256:f8738db62ed52ea439e10467cd2bdc0a6469f5f63711230d5dce4656d83d1023
     # via -r requirements.in
 envoy.dependency.cve-scan==0.0.4 \
     --hash=sha256:036bc115f09b3e14151708a33f9fe4c4ee32e911c0096ff44c140492fd3bcc9a \
@@ -381,6 +396,8 @@ gidgethub==5.0.1 \
     --hash=sha256:3efbd6998600254ec7a2869318bd3ffde38edc3a0d37be0c14bc46b45947b682 \
     --hash=sha256:67245e93eb0918b37df038148af675df43b62e832c529d7f859f6b90d9f3e70d
     # via
+    #   aio.api.github
+    #   envoy.dependency.check
     #   envoy.distribution.release
     #   envoy.github.abstract
     #   envoy.github.release
@@ -419,6 +436,7 @@ jinja2==3.0.3 \
     --hash=sha256:611bb273cd68f3b993fabdc4064fc858c5b47a973cb5aa7999ec1ba405c87cd7
     # via
     #   -r requirements.in
+    #   envoy.dependency.check
     #   envoy.dependency.cve-scan
     #   sphinx
 markupsafe==2.0.1 \
@@ -530,6 +548,8 @@ packaging==21.0 \
     --hash=sha256:7dc96269f53a4ccec5c0670940a4281106dd0bb343f47b7471f779df49c2fbe7 \
     --hash=sha256:c86254f9220d55e31cc94d69bade760f0847da8000def4dfe1c6b872fd14ff14
     # via
+    #   aio.api.github
+    #   envoy.dependency.check
     #   envoy.dependency.cve-scan
     #   envoy.github.abstract
     #   envoy.github.release
