@@ -54,6 +54,7 @@ envoy_cc_posix_library(
     strip_include_prefix = "posix",
     deps = [
         ":file_shared_lib",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 

@@ -1,7 +1,7 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("@base_pip3//:requirements.bzl", "requirement")
 load("//tools/base:envoy_python.bzl", "envoy_entry_point")
+load("@base_pip3//:requirements.bzl", "requirement")
 load("@envoy_repo//:path.bzl", "PATH")
 
 licenses(["notice"])  # Apache 2
@@ -13,18 +13,17 @@ py_library(
     srcs = ["utils.py"],
 )
 
-py_binary(
-    name = "cve_scan",
-    srcs = ["cve_scan.py"],
+envoy_entry_point(
+    name = "check",
     args = [
-        "$(location :cve.yaml)",
         "--repository_locations=$(location //bazel:all_repository_locations)",
+        "--cve_config=$(location :cve.yaml)",
     ],
     data = [
         ":cve.yaml",
         "//bazel:all_repository_locations",
     ],
-    deps = [requirement("envoy.dependency.cve_scan")],
+    pkg = "envoy.dependency.check",
 )
 
 envoy_entry_point(
