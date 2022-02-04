@@ -51,8 +51,6 @@ build_args() {
 
   if [[ "${TYPE}" == *-debug ]]; then
       printf ' --build-arg ENVOY_BINARY_SUFFIX='
-  elif [[ "${TYPE}" == "-google-vrp" ]]; then
-      printf ' --build-arg ENVOY_VRP_BASE_IMAGE=%s' "${VRP_BASE_IMAGE}"
   fi
 }
 
@@ -124,9 +122,6 @@ else
   # Configure docker-buildx tools
   BUILD_COMMAND=("buildx" "build")
   config_env
-
-  # VRP base image is only for Linux amd64
-  VRP_BASE_IMAGE="${DOCKER_IMAGE_PREFIX}${IMAGE_POSTFIX}:${IMAGE_NAME}"
 fi
 
 # Test the docker build in all cases, but use a local tag that we will overwrite before push in the
