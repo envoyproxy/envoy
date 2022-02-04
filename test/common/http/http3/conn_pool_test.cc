@@ -161,7 +161,7 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
   ConnPoolCallbacks callbacks;
 
   ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks,
-                                                              {/*can_use_early_data_=*/false,
+                                                              {/*can_send_early_data_=*/false,
                                                                /*can_use_http3_=*/true});
   EXPECT_NE(nullptr, cancellable);
   std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =

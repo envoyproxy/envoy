@@ -41,7 +41,7 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
       route_policy.retryOn() ||
       (conn_pool_new_stream_with_early_data_and_alt_svc &&
        (cluster.features() & Upstream::ClusterInfo::Features::HTTP3) &&
-       Http::Utility::isZeroRttSafeRequest(request_headers))) {
+       Http::Utility::isSafeRequest(request_headers))) {
     ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, vcluster, runtime, random,
                                  dispatcher, time_source, priority,
                                  conn_pool_new_stream_with_early_data_and_alt_svc));
@@ -79,7 +79,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
           conn_pool_new_stream_with_early_data_and_alt_svc) {
   if (conn_pool_new_stream_with_early_data_and_alt_svc_ &&
       (cluster.features() & Upstream::ClusterInfo::Features::HTTP3) &&
-      Http::Utility::isZeroRttSafeRequest(request_headers)) {
+      Http::Utility::isSafeRequest(request_headers)) {
     // Because 0-RTT requests could be rejected because they are sent too early, and such requests
     // should always be retried, setup retry policy for 425 response code for all potential 0-RTT
     // requests even though the retry policy isn't configured to do so. Since 0-RTT safe requests
@@ -210,8 +210,8 @@ std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config)
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.Reset) {
       ret |= RetryPolicy::RETRY_ON_RESET;
-    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.AltProtocolsPostConnectFailure) {
-      ret |= RetryPolicy::RETRY_ON_ALT_PROTOCOLS_POST_CONNECT_FAILURE;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.Http3PostConnectFailure) {
+      ret |= RetryPolicy::RETRY_ON_HTTP3_POST_CONNECT_FAILURE;
     } else {
       all_fields_valid = false;
     }
@@ -471,7 +471,7 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
         return RetryDecision::RetryWithBackoff;
       }
     } else if (http3_used == Http3Used::Yes && clusterUseGrid(cluster_) &&
-               (retry_on_ & RetryPolicy::RETRY_ON_ALT_PROTOCOLS_POST_CONNECT_FAILURE)) {
+               (retry_on_ & RetryPolicy::RETRY_ON_HTTP3_POST_CONNECT_FAILURE)) {
       // Retry any post-handshake failure immediately with alternate protocols disabled if the
       // failed request was sent over Http/3.
       disable_alternate_protocols = true;

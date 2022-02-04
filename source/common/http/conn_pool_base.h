@@ -28,8 +28,8 @@ public:
   // OnPoolSuccess for HTTP requires both the decoder and callbacks. OnPoolFailure
   // requires only the callbacks, but passes both for consistency.
   HttpPendingStream(Envoy::ConnectionPool::ConnPoolImplBase& parent, Http::ResponseDecoder& decoder,
-                    Http::ConnectionPool::Callbacks& callbacks, bool can_use_early_data)
-      : Envoy::ConnectionPool::PendingStream(parent, can_use_early_data),
+                    Http::ConnectionPool::Callbacks& callbacks, bool can_send_early_data)
+      : Envoy::ConnectionPool::PendingStream(parent, can_send_early_data),
         context_(&decoder, &callbacks) {}
 
   Envoy::ConnectionPool::AttachContext& context() override { return context_; }
@@ -74,7 +74,7 @@ public:
 
   // Creates a new PendingStream and enqueues it into the queue.
   ConnectionPool::Cancellable* newPendingStream(Envoy::ConnectionPool::AttachContext& context,
-                                                bool can_use_early_data) override;
+                                                bool can_send_early_data) override;
   void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
                      absl::string_view failure_reason, ConnectionPool::PoolFailureReason reason,
                      Envoy::ConnectionPool::AttachContext& context) override {
@@ -89,7 +89,6 @@ public:
 
 protected:
   friend class ActiveClient;
-
   Random::RandomGenerator& random_generator_;
 };
 

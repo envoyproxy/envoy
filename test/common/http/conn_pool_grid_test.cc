@@ -158,7 +158,7 @@ TEST_F(ConnectivityGridTest, Success) {
   EXPECT_EQ(grid_.first(), nullptr);
 
   EXPECT_NE(grid_.newStream(decoder_, callbacks_,
-                            {/*can_use_early_data_=*/false,
+                            {/*can_send_early_data_=*/false,
                              /*can_use_http3_=*/true}),
             nullptr);
   EXPECT_NE(grid_.first(), nullptr);
@@ -179,7 +179,7 @@ TEST_F(ConnectivityGridTest, ImmediateSuccess) {
 
   EXPECT_CALL(callbacks_.pool_ready_, ready());
   EXPECT_EQ(grid_.newStream(decoder_, callbacks_,
-                            {/*can_use_early_data=*/false,
+                            {/*can_send_early_data=*/false,
                              /*can_use_http3_=*/true}),
             nullptr);
   EXPECT_NE(grid_.first(), nullptr);
@@ -194,7 +194,7 @@ TEST_F(ConnectivityGridTest, FailureThenSuccessSerial) {
 
   EXPECT_LOG_CONTAINS("trace", "first pool attempting to create a new stream to host 'hostname'",
                       grid_.newStream(decoder_, callbacks_,
-                                      {/*can_use_early_data=*/false,
+                                      {/*can_send_early_data=*/false,
                                        /*can_use_http3_=*/true}));
 
   EXPECT_NE(grid_.first(), nullptr);
@@ -230,7 +230,7 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnects) {
   EXPECT_CALL(*failover_timer, enabled()).WillRepeatedly(Return(false));
 
   grid_.newStream(decoder_, callbacks_,
-                  {/*can_use_early_data_=*/false,
+                  {/*can_send_early_data_=*/false,
                    /*can_use_http3_=*/true});
   EXPECT_NE(grid_.first(), nullptr);
   EXPECT_TRUE(failover_timer->enabled_);
@@ -261,7 +261,7 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelFirstConnects) {
   Event::MockTimer* failover_timer = new NiceMock<MockTimer>(&dispatcher_);
 
   grid_.newStream(decoder_, callbacks_,
-                  {/*can_use_early_data_=*/false,
+                  {/*can_send_early_data_=*/false,
                    /*can_use_http3_=*/true});
   EXPECT_NE(grid_.first(), nullptr);
   EXPECT_TRUE(failover_timer->enabled_);
@@ -293,7 +293,7 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnectsFirstFail) 
   Event::MockTimer* failover_timer = new NiceMock<MockTimer>(&dispatcher_);
 
   grid_.newStream(decoder_, callbacks_,
-                  {/*can_use_early_data_=*/false,
+                  {/*can_send_early_data_=*/false,
                    /*can_use_http3_=*/true});
   EXPECT_NE(grid_.first(), nullptr);
   EXPECT_TRUE(failover_timer->enabled_);
@@ -328,7 +328,7 @@ TEST_F(ConnectivityGridTest, NewStreamWithAltSvcDisabled) {
 
   EXPECT_CALL(callbacks_.pool_ready_, ready());
   EXPECT_EQ(grid_.newStream(decoder_, callbacks_,
-                            {/*can_use_early_data_=*/false,
+                            {/*can_send_early_data_=*/false,
                              /*can_use_http3_=*/false}),
             nullptr);
   EXPECT_NE(grid_.first(), nullptr);
@@ -348,7 +348,7 @@ TEST_F(ConnectivityGridTest, NewStreamWithAltSvcDisabledFail) {
 
   EXPECT_CALL(callbacks_.pool_failure_, ready());
   EXPECT_EQ(grid_.newStream(decoder_, callbacks_,
-                            {/*can_use_early_data_=*/false,
+                            {/*can_send_early_data_=*/false,
                              /*can_use_http3_=*/false}),
             nullptr);
   EXPECT_NE(grid_.first(), nullptr);
@@ -364,10 +364,10 @@ TEST_F(ConnectivityGridTest, FailureThenSuccessForMultipleConnectionsSerial) {
   NiceMock<MockResponseDecoder> decoder2;
   // Kick off two new streams.
   auto* cancel1 = grid_.newStream(decoder_, callbacks_,
-                                  {/*can_use_early_data_=*/false,
+                                  {/*can_send_early_data_=*/false,
                                    /*can_use_http3_=*/true});
   auto* cancel2 = grid_.newStream(decoder2, callbacks2,
-                                  {/*can_use_early_data_=*/false,
+                                  {/*can_send_early_data_=*/false,
                                    /*can_use_http3_=*/true});
 
   // Fail the first connection and verify the second pool is created.
@@ -393,7 +393,7 @@ TEST_F(ConnectivityGridTest, ImmediateDoubleFailure) {
   grid_.immediate_failure_ = true;
   EXPECT_CALL(callbacks_.pool_failure_, ready());
   EXPECT_EQ(grid_.newStream(decoder_, callbacks_,
-                            {/*can_use_early_data_=*/false,
+                            {/*can_send_early_data_=*/false,
                              /*can_use_http3_=*/true}),
             nullptr);
   EXPECT_FALSE(grid_.isHttp3Broken());
@@ -408,7 +408,7 @@ TEST_F(ConnectivityGridTest, TimeoutDoubleFailureParallel) {
   Event::MockTimer* failover_timer = new NiceMock<MockTimer>(&dispatcher_);
 
   grid_.newStream(decoder_, callbacks_,
-                  {/*can_use_early_data_=*/false,
+                  {/*can_send_early_data_=*/false,
                    /*can_use_http3_=*/true});
   EXPECT_NE(grid_.first(), nullptr);
   EXPECT_TRUE(failover_timer->enabled_);
@@ -436,7 +436,7 @@ TEST_F(ConnectivityGridTest, TestCancel) {
   EXPECT_EQ(grid_.first(), nullptr);
 
   auto cancel = grid_.newStream(decoder_, callbacks_,
-                                {/*can_use_early_data_=*/false,
+                                {/*can_send_early_data_=*/false,
                                  /*can_use_http3_=*/true});
   EXPECT_NE(grid_.first(), nullptr);
 
@@ -575,7 +575,7 @@ TEST_F(ConnectivityGridTest, SuccessAfterBroken) {
 
   EXPECT_LOG_CONTAINS("trace", "HTTP/3 is broken to host 'hostname', skipping.",
                       EXPECT_NE(grid_.newStream(decoder_, callbacks_,
-                                                {/*can_use_early_data_=*/false,
+                                                {/*can_send_early_data_=*/false,
                                                  /*can_use_http3_=*/true}),
                                 nullptr));
   EXPECT_NE(grid_.first(), nullptr);
@@ -594,7 +594,7 @@ TEST_F(ConnectivityGridTest, SuccessWithAltSvc) {
   EXPECT_EQ(grid_.first(), nullptr);
 
   EXPECT_NE(grid_.newStream(decoder_, callbacks_,
-                            {/*can_use_early_data_=*/false,
+                            {/*can_send_early_data_=*/false,
                              /*can_use_http3_=*/true}),
             nullptr);
   EXPECT_NE(grid_.first(), nullptr);
@@ -614,7 +614,7 @@ TEST_F(ConnectivityGridTest, SuccessWithoutHttp3) {
   EXPECT_LOG_CONTAINS("trace",
                       "No alternate protocols available for host 'hostname', skipping HTTP/3.",
                       EXPECT_NE(grid_.newStream(decoder_, callbacks_,
-                                                {/*can_use_early_data_=*/false,
+                                                {/*can_send_early_data_=*/false,
                                                  /*can_use_http3_=*/true}),
                                 nullptr));
   EXPECT_NE(grid_.first(), nullptr);
@@ -639,7 +639,7 @@ TEST_F(ConnectivityGridTest, SuccessWithExpiredHttp3) {
   EXPECT_LOG_CONTAINS("trace",
                       "No alternate protocols available for host 'hostname', skipping HTTP/3.",
                       EXPECT_NE(grid_.newStream(decoder_, callbacks_,
-                                                {/*can_use_early_data_=*/false,
+                                                {/*can_send_early_data_=*/false,
                                                  /*can_use_http3_=*/true}),
                                 nullptr));
   EXPECT_NE(grid_.first(), nullptr);
@@ -663,7 +663,7 @@ TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingHostname) {
 
   EXPECT_LOG_CONTAINS("trace", "HTTP/3 is not available to host 'hostname', skipping.",
                       EXPECT_NE(grid_.newStream(decoder_, callbacks_,
-                                                {/*can_use_early_data_=*/false,
+                                                {/*can_send_early_data_=*/false,
                                                  /*can_use_http3_=*/true}),
                                 nullptr));
   EXPECT_NE(grid_.first(), nullptr);
@@ -687,7 +687,7 @@ TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingPort) {
 
   EXPECT_LOG_CONTAINS("trace", "HTTP/3 is not available to host 'hostname', skipping.",
                       EXPECT_NE(grid_.newStream(decoder_, callbacks_,
-                                                {/*can_use_early_data_=*/false,
+                                                {/*can_send_early_data_=*/false,
                                                  /*can_use_http3_=*/true}),
                                 nullptr));
   EXPECT_NE(grid_.first(), nullptr);
@@ -710,7 +710,7 @@ TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingAlpn) {
 
   EXPECT_LOG_CONTAINS("trace", "HTTP/3 is not available to host 'hostname', skipping.",
                       EXPECT_NE(grid_.newStream(decoder_, callbacks_,
-                                                {/*can_use_early_data_=*/false,
+                                                {/*can_send_early_data_=*/false,
                                                  /*can_use_http3_=*/true}),
                                 nullptr));
   EXPECT_NE(grid_.first(), nullptr);
@@ -836,7 +836,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   EXPECT_CALL(os_sys_calls, close(1)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   ConnectionPool::Cancellable* cancel = (**optional_it1)
                                             ->newStream(decoder_, callbacks_,
-                                                        {/*can_use_early_data_=*/false,
+                                                        {/*can_send_early_data_=*/false,
                                                          /*can_use_http3_=*/true});
   EXPECT_EQ(nullptr, cancel);
 }

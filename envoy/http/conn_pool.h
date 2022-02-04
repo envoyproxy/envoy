@@ -82,7 +82,7 @@ class Instance : public Envoy::ConnectionPool::Instance, public Event::DeferredD
 public:
   struct StreamOptions {
     // True if the request can be sent as early data.
-    bool can_use_early_data_;
+    bool can_send_early_data_;
     // True if the request can be sent over HTTP/3.
     bool can_use_http3_;
   };
@@ -102,12 +102,12 @@ public:
    * @param cb supplies the callbacks to invoke when the connection is ready or has failed. The
    *           callbacks may be invoked immediately within the context of this call if there is a
    *           ready connection or an immediate failure. In this case, the routine returns nullptr.
+   * @param options specifies how to create the requested stream.
    * @return Cancellable* If no connection is ready, the callback is not invoked, and a handle
    *                      is returned that can be used to cancel the request. Otherwise, one of the
    *                      callbacks is called and the routine returns nullptr. NOTE: Once a callback
    *                      is called, the handle is no longer valid and any further cancellation
    *                      should be done by resetting the stream.
-   * @param options specifies how to create the requested stream.
    * @warning Do not call cancel() from the callbacks, as the request is implicitly canceled when
    *          the callbacks are called.
    */

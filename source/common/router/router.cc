@@ -698,11 +698,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   conn_pool_new_stream_with_early_data_and_alt_svc_ = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc");
-  const bool can_use_early_data = conn_pool_new_stream_with_early_data_and_alt_svc_ &&
-                                  Http::Utility::isZeroRttSafeRequest(*downstream_headers_);
+  const bool can_send_early_data = conn_pool_new_stream_with_early_data_and_alt_svc_ &&
+                                   Http::Utility::isSafeRequest(*downstream_headers_);
 
   UpstreamRequestPtr upstream_request =
-      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_use_early_data,
+      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
                                         /*can_use_http3=*/true);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
@@ -977,7 +977,7 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
           // Without any knowledge about what's going on in the connection pool, retry the request
           // with the safest settings which is no early data but keep using or not using alt-svc as
           // before. In this way, QUIC won't be falsely marked as broken.
-          doRetry(/*can_use_early_data*/ false, can_use_http3);
+          doRetry(/*can_send_early_data*/ false, can_use_http3);
         });
 
     if (retry_status == RetryStatus::Yes) {
@@ -1138,13 +1138,13 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
   }
   const RetryStatus retry_status = retry_state_->shouldRetryReset(
       reset_reason, was_using_alternate_protocol,
-      [this, can_use_early_data = upstream_request.upstreamStreamOptions().can_use_early_data_,
+      [this, can_send_early_data = upstream_request.upstreamStreamOptions().can_send_early_data_,
        can_use_http3 =
            upstream_request.upstreamStreamOptions().can_use_http3_](bool disable_http3) -> void {
         // This retry might be because of ConnectionFailure of 0-RTT handshake. In this case, though
-        // the original request is retried with the same can_use_early_data setting, it will not be
+        // the original request is retried with the same can_send_early_data setting, it will not be
         // sent as early data by the underlying connection pool grid.
-        doRetry(can_use_early_data, disable_http3 ? false : can_use_http3);
+        doRetry(can_send_early_data, disable_http3 ? false : can_use_http3);
       });
   if (retry_status == RetryStatus::Yes) {
     runRetryOptionsPredicates(upstream_request);
@@ -1378,7 +1378,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
       const RetryStatus retry_status = retry_state_->shouldRetryHeaders(
           *headers, *downstream_headers_,
           [this, can_use_http3 = upstream_request.upstreamStreamOptions().can_use_http3_,
-           had_early_data = upstream_request.upstreamStreamOptions().can_use_early_data_](
+           had_early_data = upstream_request.upstreamStreamOptions().can_send_early_data_](
               bool disable_early_data) -> void {
             doRetry((disable_early_data ? false : had_early_data), can_use_http3);
           });
@@ -1745,7 +1745,7 @@ void Filter::runRetryOptionsPredicates(UpstreamRequest& retriable_request) {
   }
 }
 
-void Filter::doRetry(bool can_use_early_data, bool can_use_http3) {
+void Filter::doRetry(bool can_send_early_data, bool can_use_http3) {
   ENVOY_STREAM_LOG(debug, "performing retry", *callbacks_);
 
   is_retry_ = true;
@@ -1768,7 +1768,7 @@ void Filter::doRetry(bool can_use_early_data, bool can_use_http3) {
     return;
   }
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
-      *this, std::move(generic_conn_pool), can_use_early_data, can_use_http3);
+      *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3);
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);

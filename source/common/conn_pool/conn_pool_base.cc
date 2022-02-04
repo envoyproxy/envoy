@@ -241,7 +241,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
 }
 
 ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& context,
-                                                             bool can_use_early_data) {
+                                                             bool can_send_early_data) {
   ASSERT(!is_draining_for_deletion_);
   ASSERT(!deferred_deleting_);
 
@@ -264,7 +264,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
     return nullptr;
   }
 
-  ConnectionPool::Cancellable* pending = newPendingStream(context, can_use_early_data);
+  ConnectionPool::Cancellable* pending = newPendingStream(context, can_send_early_data);
   ENVOY_LOG(debug, "trying to create new connection");
   ENVOY_LOG(trace, fmt::format("{}", *this));
 
@@ -522,8 +522,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
   }
 }
 
-PendingStream::PendingStream(ConnPoolImplBase& parent, bool can_use_early_data)
-    : parent_(parent), can_use_early_data_(can_use_early_data) {
+PendingStream::PendingStream(ConnPoolImplBase& parent, bool can_send_early_data)
+    : parent_(parent), can_send_early_data_(can_send_early_data) {
   parent_.host()->cluster().stats().upstream_rq_pending_total_.inc();
   parent_.host()->cluster().stats().upstream_rq_pending_active_.inc();
   parent_.host()->cluster().resourceManager(parent_.priority()).pendingRequests().inc();

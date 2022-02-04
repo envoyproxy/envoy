@@ -199,7 +199,7 @@ public:
   static constexpr uint32_t RETRY_ON_RESET                              = 0x800;
   static constexpr uint32_t RETRY_ON_RETRIABLE_HEADERS                  = 0x1000;
   static constexpr uint32_t RETRY_ON_ENVOY_RATE_LIMITED                 = 0x2000;
-  static constexpr uint32_t RETRY_ON_ALT_PROTOCOLS_POST_CONNECT_FAILURE = 0x4000;
+  static constexpr uint32_t RETRY_ON_HTTP3_POST_CONNECT_FAILURE = 0x4000;
   // clang-format on
 
   virtual ~RetryPolicy() = default;
@@ -355,7 +355,7 @@ public:
   };
 
   using DoRetryCallback = std::function<void()>;
-  using DoRetryResetCallback = std::function<void(bool disable_alternate_protocols)>;
+  using DoRetryResetCallback = std::function<void(bool disable_http3)>;
   using DoRetryHeaderCallback = std::function<void(bool disable_early_data)>;
 
   virtual ~RetryState() = default;
@@ -405,10 +405,10 @@ public:
    * Determine whether a request should be retried after a reset based on the reason for the reset.
    * @param reset_reason supplies the reset reason.
    * @param http3_used whether the reset request was sent over http3 as alternate protocol or
-   * not. nullopt means it wasn't sent at all before getting reset.
+   *                   not. nullopt means it wasn't sent at all before getting reset.
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. It takes a bool to indicate whether the
-   * retry should disable alternate protocols or not. The callback will never be called inline.
+   *                 retry should disable http3 or not. The callback will never be called inline.
    * @return RetryStatus if a retry should take place. @param callback will be called at some point
    *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.

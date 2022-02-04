@@ -224,7 +224,7 @@ TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
   }
 
   Http::TestRequestHeaderMapImpl request_headers{
-      {"x-envoy-retry-on", "refused-stream,alt-protocols-post-connect-failure"}};
+      {"x-envoy-retry-on", "refused-stream,http3-post-connect-failure"}};
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
 

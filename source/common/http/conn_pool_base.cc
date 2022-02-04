@@ -61,7 +61,7 @@ HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
                                 Http::ConnectionPool::Callbacks& callbacks,
                                 const Instance::StreamOptions& options) {
   HttpAttachContext context({&response_decoder, &callbacks});
-  return newStreamImpl(context, options.can_use_early_data_);
+  return newStreamImpl(context, options.can_send_early_data_);
 }
 
 bool HttpConnPoolImplBase::hasActiveConnections() const {
@@ -70,12 +70,12 @@ bool HttpConnPoolImplBase::hasActiveConnections() const {
 
 ConnectionPool::Cancellable*
 HttpConnPoolImplBase::newPendingStream(Envoy::ConnectionPool::AttachContext& context,
-                                       bool can_use_early_data) {
+                                       bool can_send_early_data) {
   Http::ResponseDecoder& decoder = *typedContext<HttpAttachContext>(context).decoder_;
   Http::ConnectionPool::Callbacks& callbacks = *typedContext<HttpAttachContext>(context).callbacks_;
   ENVOY_LOG(debug, "queueing stream due to no available connections");
   Envoy::ConnectionPool::PendingStreamPtr pending_stream(
-      new HttpPendingStream(*this, decoder, callbacks, can_use_early_data));
+      new HttpPendingStream(*this, decoder, callbacks, can_send_early_data));
   return addPendingStream(std::move(pending_stream));
 }
 

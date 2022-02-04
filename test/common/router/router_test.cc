@@ -94,7 +94,7 @@ public:
             Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
                        const Http::ConnectionPool::Instance::StreamOptions& options)
                        -> Http::ConnectionPool::Cancellable* {
-              EXPECT_FALSE(options.can_use_early_data_);
+              EXPECT_FALSE(options.can_send_early_data_);
               EXPECT_TRUE(options.can_use_http3_);
               response_decoder = &decoder;
               callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
@@ -3015,7 +3015,7 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks,
                            const Http::ConnectionPool::Instance::StreamOptions& options)
                            -> Http::ConnectionPool::Cancellable* {
-        EXPECT_FALSE(options.can_use_early_data_);
+        EXPECT_FALSE(options.can_send_early_data_);
         EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
         EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
                     putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
@@ -3179,7 +3179,7 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
                      const Http::ConnectionPool::Instance::StreamOptions& options)
                      -> Http::ConnectionPool::Cancellable* {
-            EXPECT_TRUE(options.can_use_early_data_);
+            EXPECT_TRUE(options.can_send_early_data_);
             EXPECT_FALSE(options.can_use_http3_);
             response_decoder = &decoder;
             EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
@@ -6025,7 +6025,7 @@ TEST_F(RouterTest, HasEarlyDataAndRetryUpon425) {
                      const Http::ConnectionPool::Instance::StreamOptions& options)
                      -> Http::ConnectionPool::Cancellable* {
             EXPECT_TRUE(options.can_use_http3_);
-            EXPECT_TRUE(options.can_use_early_data_);
+            EXPECT_TRUE(options.can_send_early_data_);
             response_decoder1 = &decoder;
             callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
@@ -6055,7 +6055,7 @@ TEST_F(RouterTest, HasEarlyDataAndRetryUpon425) {
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
                      const Http::ConnectionPool::Instance::StreamOptions& options)
                      -> Http::ConnectionPool::Cancellable* {
-            EXPECT_FALSE(options.can_use_early_data_);
+            EXPECT_FALSE(options.can_send_early_data_);
             EXPECT_TRUE(options.can_use_http3_);
             response_decoder2 = &decoder;
             callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,

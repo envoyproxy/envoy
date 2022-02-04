@@ -229,11 +229,11 @@ public:
           .WillOnce(DoAll(SaveArgAddress(&inner_decoder_), ReturnRef(inner_encoder_)));
       EXPECT_CALL(callbacks_.pool_ready_, ready());
       EXPECT_EQ(nullptr, test.pool_->newStream(decoder_, callbacks_,
-                                               {/*can_use_early_data_=*/false,
+                                               {/*can_send_early_data_=*/false,
                                                 /*can_use_http3_=*/false}));
     } else {
       handle_ = test.pool_->newStream(decoder_, callbacks_,
-                                      {/*can_use_early_data_=*/false,
+                                      {/*can_send_early_data_=*/false,
                                        /*can_use_http3_=*/false});
       EXPECT_NE(nullptr, handle_);
     }
@@ -927,7 +927,7 @@ TEST_F(Http2ConnPoolImplTest, PendingStreamsMaxPendingCircuitBreaker) {
   ConnPoolCallbacks callbacks;
   EXPECT_CALL(callbacks.pool_failure_, ready());
   EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks,
-                                      {/*can_use_early_data_=*/false,
+                                      {/*can_send_early_data_=*/false,
                                        /*can_use_http3_=*/false}));
 
   expectStreamConnect(0, r1);
@@ -1297,7 +1297,7 @@ TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {
   MockResponseDecoder decoder;
   EXPECT_CALL(callbacks.pool_failure_, ready());
   EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks,
-                                      {/*can_use_early_data_=*/false,
+                                      {/*can_send_early_data_=*/false,
                                        /*can_use_http3_=*/false}));
 
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);

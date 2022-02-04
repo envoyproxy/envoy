@@ -1666,34 +1666,34 @@ TEST(CheckRequiredHeaders, Response) {
       HeaderUtility::checkRequiredResponseHeaders(TestResponseHeaderMapImpl{{":status", "abcd"}}));
 }
 
-TEST(Utility, isZeroRttSafeRequest) {
+TEST(Utility, isSafeRequest) {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
                                                  {":authority", "host"}};
-  EXPECT_FALSE(Utility::isZeroRttSafeRequest(request_headers));
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
   request_headers.setMethod("PUT");
-  EXPECT_FALSE(Utility::isZeroRttSafeRequest(request_headers));
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
   request_headers.setMethod("DELETE");
-  EXPECT_FALSE(Utility::isZeroRttSafeRequest(request_headers));
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
   request_headers.setMethod("PATCH");
-  EXPECT_FALSE(Utility::isZeroRttSafeRequest(request_headers));
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
 
   request_headers.setMethod("GET");
-  EXPECT_TRUE(Utility::isZeroRttSafeRequest(request_headers));
+  EXPECT_TRUE(Utility::isSafeRequest(request_headers));
   request_headers.setMethod("HEAD");
-  EXPECT_TRUE(Utility::isZeroRttSafeRequest(request_headers));
+  EXPECT_TRUE(Utility::isSafeRequest(request_headers));
   request_headers.setMethod("OPTIONS");
-  EXPECT_TRUE(Utility::isZeroRttSafeRequest(request_headers));
+  EXPECT_TRUE(Utility::isSafeRequest(request_headers));
   request_headers.setMethod("TRACE");
-  EXPECT_TRUE(Utility::isZeroRttSafeRequest(request_headers));
+  EXPECT_TRUE(Utility::isSafeRequest(request_headers));
 
   request_headers.removePath();
   request_headers.setMethod("CONNECT");
-  EXPECT_FALSE(Utility::isZeroRttSafeRequest(request_headers));
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
 
   request_headers.removeMethod();
-  EXPECT_FALSE(Utility::isZeroRttSafeRequest(request_headers));
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
 };
 
 } // namespace Http

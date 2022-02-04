@@ -149,7 +149,7 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
       {":authority", "host"},
       {"x-lyft-user-id", "123"},
       {"x-forwarded-for", "10.0.0.1"},
-      {"x-envoy-retry-on", "alt-protocols-post-connect-failure"}};
+      {"x-envoy-retry-on", "http3-post-connect-failure"}};
   int port = fake_upstreams_[0]->localAddress()->ip()->port();
   std::string alt_svc = absl::StrCat("h3=\":", port, "\"; ma=86400");
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"alt-svc", alt_svc}};
