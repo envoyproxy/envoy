@@ -189,11 +189,11 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
                                Buffer::Instance& response) {
   // Display plain stats if format query param is not there.
   for (const auto& text_readout : text_readouts) {
-    response.add(fmt::format("{}: \"{}\"\n", text_readout.first,
-                             Html::Utility::sanitize(text_readout.second)));
+    response.addFragments(
+        {text_readout.first, ": \"", Html::Utility::sanitize(text_readout.second), "\"\n"});
   }
   for (const auto& stat : all_stats) {
-    response.add(fmt::format("{}: {}\n", stat.first, stat.second));
+    response.addFragments({stat.first, ": ", absl::StrCat(stat.second), "\n"});
   }
   std::map<std::string, std::string> all_histograms;
   for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
@@ -214,7 +214,7 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
     }
   }
   for (const auto& histogram : all_histograms) {
-    response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
+    response.addFragments({histogram.first, ": ", histogram.second, "\n"});
   }
 }
 

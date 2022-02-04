@@ -9,7 +9,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "re2/re2.h"
 #include "xds/type/matcher/v3/regex.pb.h"

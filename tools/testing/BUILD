@@ -21,11 +21,13 @@ envoy_py_binary(
         "//:pytest.ini",
     ],
     deps = [
+        requirement("aio.run.runner"),
+        requirement("envoy.base.utils"),
+        requirement("nest-asyncio"),
         requirement("pytest"),
+        requirement("pytest-asyncio"),
         requirement("pytest-cov"),
         requirement("pytest-patches"),
-        requirement("envoy.base.runner"),
-        requirement("envoy.base.utils"),
     ],
 )
 
@@ -37,7 +39,7 @@ envoy_py_binary(
     ],
     deps = [
         requirement("coverage"),
-        requirement("envoy.base.runner"),
+        requirement("aio.run.runner"),
         requirement("envoy.base.utils"),
     ],
 )
@@ -45,7 +47,9 @@ envoy_py_binary(
 envoy_py_binary(
     name = "tools.testing.all_pytests",
     deps = [
-        requirement("envoy.base.checker"),
-        requirement("envoy.base.utils"),
+        "@envoy_repo",
+        requirement("aio.api.bazel"),
+        requirement("aio.core"),
+        requirement("aio.run.checker"),
     ],
 )
