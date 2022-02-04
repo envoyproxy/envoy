@@ -21,7 +21,6 @@
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/utility.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Network {
