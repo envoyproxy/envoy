@@ -85,7 +85,9 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     return Http::Code::BadRequest;
   }
 
-  // If the histogram_buckets query param does not exist histogram output should contain quantile summary data. Using histogram_buckets will change output to show bucket data. The histogram_buckets query param has two possible values: cumulative or disjoint.
+  // If the histogram_buckets query param does not exist histogram output should contain quantile
+  // summary data. Using histogram_buckets will change output to show bucket data. The
+  // histogram_buckets query param has two possible values: cumulative or disjoint.
   absl::optional<std::string> histogram_buckets_value;
   if (!Utility::histogramBucketsParam(params, response, histogram_buckets_value)) {
     return Http::Code::BadRequest;
@@ -181,7 +183,8 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
 void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
                                const std::map<std::string, std::string>& text_readouts,
                                const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                               bool used_only, const absl::optional<std::string>& histogram_buckets_value,
+                               bool used_only,
+                               const absl::optional<std::string>& histogram_buckets_value,
                                const absl::optional<std::regex>& regex,
                                Buffer::Instance& response) {
   // Display plain stats if format query param is not there.
@@ -202,8 +205,10 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
       } else if (histogram_buckets_value.value() == "cumulative") {
         success = all_histograms.emplace(histogram->name(), histogram->bucketSummary()).second;
       } else {
-        ASSERT(histogram_buckets_value.value() == "disjoint"); // disjoint should be only possible value
-        success = all_histograms.emplace(histogram->name(), computeDisjointBucketSummary(histogram)).second;
+        ASSERT(histogram_buckets_value.value() ==
+               "disjoint"); // disjoint should be only possible value
+        success = all_histograms.emplace(histogram->name(), computeDisjointBucketSummary(histogram))
+                      .second;
       }
       ASSERT(success); // No duplicates expected.
     }
@@ -294,16 +299,23 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   return MessageUtil::getJsonStringFromMessageOrDie(document, pretty_print, true);
 }
 
-std::string StatsHandler::computeDisjointBucketSummary(const Stats::ParentHistogramSharedPtr& histogram) {
+std::string
+StatsHandler::computeDisjointBucketSummary(const Stats::ParentHistogramSharedPtr& histogram) {
   if (histogram->used()) {
     std::vector<std::string> bucket_summary;
-    Stats::ConstSupportedBuckets& supported_buckets = histogram->intervalStatistics().supportedBuckets();
-    const std::vector<uint64_t> disjoint_interval_buckets = histogram->intervalStatistics().computeDisjointBuckets();
-    const std::vector<uint64_t> disjoint_cumulative_buckets = histogram->cumulativeStatistics().computeDisjointBuckets();
+    Stats::ConstSupportedBuckets& supported_buckets =
+        histogram->intervalStatistics().supportedBuckets();
+    const std::vector<uint64_t> disjoint_interval_buckets =
+        histogram->intervalStatistics().computeDisjointBuckets();
+    const std::vector<uint64_t> disjoint_cumulative_buckets =
+        histogram->cumulativeStatistics().computeDisjointBuckets();
     bucket_summary.reserve(supported_buckets.size());
     // Make sure all vectors are the same size.
-    ASSERT(disjoint_interval_buckets.size() == disjoint_cumulative_buckets.size() && disjoint_cumulative_buckets.size() == supported_buckets.size());
-    std::vector<uint64_t>::size_type min_size = std::min({disjoint_interval_buckets.size(), disjoint_cumulative_buckets.size(), supported_buckets.size()});
+    ASSERT(disjoint_interval_buckets.size() == disjoint_cumulative_buckets.size() &&
+           disjoint_cumulative_buckets.size() == supported_buckets.size());
+    std::vector<uint64_t>::size_type min_size =
+        std::min({disjoint_interval_buckets.size(), disjoint_cumulative_buckets.size(),
+                  supported_buckets.size()});
     for (std::vector<uint64_t>::size_type i = 0; i < min_size; ++i) {
       bucket_summary.push_back(fmt::format("B{:g}({},{})", supported_buckets[i],
                                            disjoint_interval_buckets[i],

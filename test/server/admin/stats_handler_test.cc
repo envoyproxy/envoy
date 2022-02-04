@@ -155,14 +155,17 @@ TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsCumulative) {
 
   Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
   EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_EQ("h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,0) B500(1,1) B1000(1,1) B2500(1,1) B5000(1,1) B10000(1,1) B30000(1,1) B60000(1,1) B300000(1,1) B600000(1,1) B1.8e+06(1,1) B3.6e+06(1,1)\n",
+  EXPECT_EQ("h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,0) "
+            "B500(1,1) B1000(1,1) B2500(1,1) B5000(1,1) B10000(1,1) B30000(1,1) B60000(1,1) "
+            "B300000(1,1) B600000(1,1) B1.8e+06(1,1) B3.6e+06(1,1)\n",
             data.toString());
   shutdownThreading();
 }
 
 TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsDisjoint) {
   const std::string url = "/stats?histogram_buckets=disjoint";
-  Http::TestResponseHeaderMapImpl response_headers, used_response_headers, used_and_filter_response_headers;
+  Http::TestResponseHeaderMapImpl response_headers, used_response_headers,
+      used_and_filter_response_headers;
   Buffer::OwnedImpl data, used_data, used_and_filter_data;
   MockAdminStream admin_stream;
   Configuration::MockStatsConfig stats_config;
@@ -192,12 +195,16 @@ TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsDisjoint) {
 
   Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
   EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_EQ("h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,1) B500(1,2) B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) B300000(0,0) B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\nh2: No recorded values\n",
+  EXPECT_EQ("h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,1) "
+            "B500(1,2) B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) "
+            "B300000(0,0) B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\nh2: No recorded values\n",
             data.toString());
 
   code = handler.handlerStats(url + "&usedonly", used_response_headers, used_data, admin_stream);
   EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_EQ("h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,1) B500(1,2) B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) B300000(0,0) B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\n",
+  EXPECT_EQ("h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,1) "
+            "B500(1,2) B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) "
+            "B300000(0,0) B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\n",
             used_data.toString());
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 300));
@@ -205,9 +212,12 @@ TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsDisjoint) {
 
   store_->mergeHistograms([]() -> void {});
 
-  code = handler.handlerStats(url + "&usedonly&filter=h2", used_and_filter_response_headers, used_and_filter_data, admin_stream);
+  code = handler.handlerStats(url + "&usedonly&filter=h2", used_and_filter_response_headers,
+                              used_and_filter_data, admin_stream);
   EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_EQ("h2: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,0) B500(1,1) B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) B300000(0,0) B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\n",
+  EXPECT_EQ("h2: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,0) "
+            "B500(1,1) B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) "
+            "B300000(0,0) B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\n",
             used_and_filter_data.toString());
   shutdownThreading();
 }
@@ -225,7 +235,8 @@ TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsInvalid) {
   StatsHandler handler(instance);
   Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
   EXPECT_EQ(Http::Code::BadRequest, code);
-  EXPECT_EQ("usage: /stats?histogram_buckets=cumulative  or /stats?histogram_buckets=disjoint \n", data.toString());
+  EXPECT_EQ("usage: /stats?histogram_buckets=cumulative  or /stats?histogram_buckets=disjoint \n",
+            data.toString());
 }
 
 TEST_P(AdminStatsTest, HandlerStatsJson) {
