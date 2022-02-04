@@ -366,6 +366,67 @@ TEST_F(CdsApiImplTest, FailureSubscription) {
   EXPECT_EQ("", cds_->versionInfo());
 }
 
+// Validate behavior when the config is delivered but it fails PGV validation for slow start config.
+TEST_F(CdsApiImplTest, FailureInvalidSlowStartConfigMinWeightPercentEQ1) {
+  InSequence s;
+
+  setup();
+
+  const std::string response1_yaml = R"EOF(
+version_info: '0'
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: cluster1
+  type: EDS
+  eds_cluster_config:
+    eds_config:
+      ads: {}
+      resource_api_version: V3
+    service_name: cluster1
+  round_robin_lb_config:
+    slow_start_config:
+      min_weight_percent: 1.0
+)EOF";
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
+
+  EXPECT_THROW(TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response1),
+               EnvoyException);
+}
+
+TEST_F(CdsApiImplTest, SlowStartConfigMinWeightPercentDefault) {
+  InSequence s;
+  
+  setup();
+
+  const std::string response1_yaml = R"EOF(
+version_info: '0'
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: cluster1
+  type: EDS
+  eds_cluster_config:
+    eds_config:
+      ads: {}
+      resource_api_version: V3
+    service_name: cluster1
+  round_robin_lb_config:
+    slow_start_config:
+      slow_start_window: 30s
+)EOF";
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
+
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({})));
+  expectAdd("cluster1", "0");
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_EQ("", cds_->versionInfo());
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response1);
+  cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+  EXPECT_EQ("0", cds_->versionInfo());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
