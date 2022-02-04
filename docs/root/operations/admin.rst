@@ -444,9 +444,16 @@ modify different aspects of the server:
   Full-string matching can be specified with begin- and end-line anchors. (i.e.
   ``/stats?filter=^server.concurrency$``)
 
-  .. http:get:: /stats?histogram_buckets
+  .. http:get:: /stats?histogram_buckets=cumulative
 
-  Changes histogram output to display buckets with upper bounds (e.g. B0.5, B1, B5, ...).
+  Changes histogram output to display cumulative buckets with upper bounds (e.g. B0.5, B1, B5, ...).
+  The output for each bucket will be in the form of (interval,cumulative) (e.g. B0.5(0,0)).
+  All values below the upper bound are included even if they are placed into other buckets.
+  Compatible with ``usedonly`` and ``filter``.
+
+  .. http:get:: /stats?histogram_buckets=disjoint
+
+  Changes histogram output to display disjoint buckets with upper bounds (e.g. B0.5, B1, B5, ...).
   The output for each bucket will be in the form of (interval,cumulative) (e.g. B0.5(0,0)).
   Buckets do not include values from other buckets with smaller upper bounds;
   the previous bucket's upper bound acts as a lower bound. Compatible with ``usedonly`` and ``filter``.
