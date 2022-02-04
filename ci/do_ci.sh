@@ -161,11 +161,11 @@ function run_ci_verify () {
   OCI_TEMP_DIR="${ENVOY_DOCKER_BUILD_DIR}/image"
   mkdir -p "${OCI_TEMP_DIR}"
 
-  IMAGES=("envoy" "envoy-alpine" "envoy-contrib" "envoy-google-vrp")
+  IMAGES=("envoy" "envoy-contrib" "envoy-google-vrp")
 
   for IMAGE in "${IMAGES[@]}"; do
     tar xvf "${ENVOY_DOCKER_BUILD_DIR}/docker/${IMAGE}.tar" -C "${OCI_TEMP_DIR}"
-    skopeo copy "oci:${OCI_TEMP_DIR}" "docker-daemon:envoyproxy/envoy-${IMAGE}-dev:latest"
+    skopeo copy "oci:${OCI_TEMP_DIR}" "docker-daemon:envoyproxy/${IMAGE}-dev:latest"
     rm -rf "${OCI_TEMP_DIR:?}/*"
   done
 

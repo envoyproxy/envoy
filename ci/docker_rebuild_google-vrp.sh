@@ -25,8 +25,8 @@ BASE_DOCKER_IMAGE="envoyproxy/envoy-dev:latest"
 
 BUILD_DIR="$(mktemp -d)"
 declare -r BUILD_DIR
-cp ci/Dockerfile-envoy-google-vrp "${BUILD_DIR}"
-declare -r DOCKER_BUILD_FILE="${BUILD_DIR}"/Dockerfile-envoy-google-vrp
+cp ci/Dockerfile-envoy "${BUILD_DIR}"
+declare -r DOCKER_BUILD_FILE="${BUILD_DIR}"/Dockerfile-envoy
 
 # If we have a local Envoy binary, use a variant of the build environment that supports it.
 if [[ -n "$1" ]]; then

@@ -1,8 +1,9 @@
 ARG BUILD_OS=ubuntu
 ARG BUILD_TAG=18.04
+ARG ENVOY_VRP_BASE_IMAGE=envoy
 
 
-FROM scratch as binary
+FROM scratch AS binary
 
 ARG TARGETPLATFORM
 ARG ENVOY_BINARY=envoy
@@ -13,7 +14,7 @@ COPY --chown=root:root ${TARGETPLATFORM}/build_${ENVOY_BINARY}_release/su-exec /
 COPY ci/docker-entrypoint.sh /
 
 
-FROM ${BUILD_OS}:${BUILD_TAG} as envoy
+FROM ${BUILD_OS}:${BUILD_TAG} AS envoy
 
 RUN apt-get update && apt-get upgrade -y \
     && apt-get install --no-install-recommends -y ca-certificates \
@@ -64,7 +65,7 @@ ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["envoy", "-c", "/etc/envoy/envoy.yaml"]
 
 
-FROM envoy AS envoy-google-vrp
+FROM ${ENVOY_VRP_BASE_IMAGE} AS envoy-google-vrp
 
 RUN apt-get update \
     && apt-get upgrade -y \
