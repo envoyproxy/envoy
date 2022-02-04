@@ -150,11 +150,9 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
     ASSERT(std::numeric_limits<uint64_t>::max() - connecting_stream_capacity_ >=
            client->effectiveConcurrentStreamLimit());
     ASSERT(client->real_host_description_);
-
     // Increase the connecting capacity to reflect the streams this connection can serve.
     state_.incrConnectingAndConnectedStreamCapacity(client->effectiveConcurrentStreamLimit());
     connecting_stream_capacity_ += client->effectiveConcurrentStreamLimit();
-              << connecting_stream_capacity_ << "\n";
     ActiveClient& client_ref = *client;
     LinkedList::moveIntoList(std::move(client), owningList(client->state()));
     client_ref.getReady();
@@ -423,9 +421,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
                                          Network::ConnectionEvent event) {
   if (client.state() == ActiveClient::State::CONNECTING &&
       event != Network::ConnectionEvent::ConnectedZeroRtt) {
-    ASSERT(connecting_stream_capacity_ >= client.effectiveConcurrentStreamLimit(),
-           fmt::format("connecting_stream_capacity_ {}, client effectiveConcurrentStreamLimit {}",
-                       connecting_stream_capacity_, client.effectiveConcurrentStreamLimit()));
+    ASSERT(connecting_stream_capacity_ >= client.effectiveConcurrentStreamLimit());
     connecting_stream_capacity_ -= client.effectiveConcurrentStreamLimit();
   }
 
@@ -453,27 +449,25 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
 
-      if (!client.allows_early_data_) {
-        // Purge pending streams only if this is not a 0-RRT handshake failure.
-        ConnectionPool::PoolFailureReason reason;
-        if (client.timed_out_) {
-          reason = ConnectionPool::PoolFailureReason::Timeout;
-        } else if (event == Network::ConnectionEvent::RemoteClose) {
-          reason = ConnectionPool::PoolFailureReason::RemoteConnectionFailure;
-        } else {
-          reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
-        }
-
-        // Raw connect failures should never happen under normal circumstances. If we have an
-        // upstream that is behaving badly, streams can get stuck here in the pending state. If we
-        // see a connect failure, we purge all pending streams so that calling code can determine
-        // what to do with the stream. NOTE: We move the existing pending streams to a temporary
-        // list. This is done so that
-        //       if retry logic submits a new stream to the pool, we don't fail it inline.
-        purgePendingStreams(client.real_host_description_, failure_reason, reason);
-        // See if we should preconnect based on active connections.
-        tryCreateNewConnections();
+      // Purge pending streams only if this is not a 0-RRT handshake failure.
+      ConnectionPool::PoolFailureReason reason;
+      if (client.timed_out_) {
+        reason = ConnectionPool::PoolFailureReason::Timeout;
+      } else if (event == Network::ConnectionEvent::RemoteClose) {
+        reason = ConnectionPool::PoolFailureReason::RemoteConnectionFailure;
+      } else {
+        reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
       }
+
+      // Raw connect failures should never happen under normal circumstances. If we have an
+      // upstream that is behaving badly, streams can get stuck here in the pending state. If we
+      // see a connect failure, we purge all pending streams so that calling code can determine
+      // what to do with the stream.
+      // NOTE: We move the existing pending streams to a temporary list. This is done so that
+      //       if retry logic submits a new stream to the pool, we don't fail it inline.
+      purgePendingStreams(client.real_host_description_, failure_reason, reason);
+      // See if we should preconnect based on active connections.
+      tryCreateNewConnections();
     }
 
     // We need to release our resourceManager() resources before checking below for

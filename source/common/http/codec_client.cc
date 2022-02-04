@@ -206,6 +206,7 @@ NoConnectCodecClientProd::NoConnectCodecClientProd(CodecType type,
     // Initialize the session after max request header size is changed in above http client
     // connection creation.
     quic_session.Initialize();
+    break;
 #else
     // Should be blocked by configuration checking at an earlier point.
     PANIC("unexpected");
