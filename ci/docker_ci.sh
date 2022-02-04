@@ -36,13 +36,13 @@ build_platforms() {
 
 build_args() {
   TYPE=$1
-  FILE_SUFFIX="${TYPE/-debug/}"
-  FILE_SUFFIX="${FILE_SUFFIX/-contrib/}"
-  FILE_SUFFIX="${FILE_SUFFIX/-ltsc2022/}"
 
-  printf ' -f ci/Dockerfile-envoy%s' "${FILE_SUFFIX}"
   if [[ "${TYPE}" == *-windows* ]]; then
-   printf ' --build-arg BUILD_OS=%s --build-arg BUILD_TAG=%s' "${WINDOWS_IMAGE_BASE}" "${WINDOWS_IMAGE_TAG}"
+    printf ' -f ci/Dockerfile-envoy-windows --build-arg BUILD_OS=%s --build-arg BUILD_TAG=%s' "${WINDOWS_IMAGE_BASE}" "${WINDOWS_IMAGE_TAG}"
+  else
+    TARGET="${TYPE/-debug/}"
+    TARGET="${TARGET/-contrib/}"
+    printf ' -f ci/Dockerfile-envoy --target %s' "envoy${TARGET}"
   fi
 
   if [[ "${TYPE}" == *-contrib* ]]; then
@@ -51,8 +51,6 @@ build_args() {
 
   if [[ "${TYPE}" == *-debug ]]; then
       printf ' --build-arg ENVOY_BINARY_SUFFIX='
-  elif [[ "${TYPE}" == "-google-vrp" ]]; then
-      printf ' --build-arg ENVOY_VRP_BASE_IMAGE=%s' "${VRP_BASE_IMAGE}"
   fi
 }
 
@@ -60,15 +58,9 @@ use_builder() {
   # BuildKit is not available for Windows images, skip this
   if ! is_windows; then
     TYPE=$1
-    if [[ "${TYPE}" == "-google-vrp" ]]; then
-      docker buildx use default
-    else
-      docker buildx use multi-builder
-    fi
+    docker buildx use multi-builder
   fi
 }
-
-IMAGES_TO_SAVE=()
 
 build_images() {
   local _args args=()
@@ -80,21 +72,11 @@ build_images() {
   read -ra args <<< "$_args"
   PLATFORM="$(build_platforms "${TYPE}")"
 
+  if ! is_windows && ! [[ "${TYPE}" =~ debug ]]; then
+    args+=("-o" "type=oci,dest=${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy${TYPE}.tar")
+  fi
+
   docker "${BUILD_COMMAND[@]}" --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" .
-
-  PLATFORM="$(build_platforms "${TYPE}" | tr ',' ' ')"
-  for ARCH in ${PLATFORM}; do
-    if [[ "${ARCH}" == "linux/amd64" ]] || [[ "${ARCH}" == "windows/amd64" ]]; then
-      IMAGE_TAG="${BUILD_TAG}"
-    else
-      IMAGE_TAG="${BUILD_TAG}-${ARCH/linux\//}"
-    fi
-
-    # docker buildx load cannot have multiple platform, load individually
-    if ! is_windows; then
-      docker "${BUILD_COMMAND[@]}" --platform "${ARCH}" "${args[@]}" -t "${IMAGE_TAG}" . --load
-    fi
-  done
 }
 
 push_images() {
@@ -127,7 +109,7 @@ fi
 
 # This prefix is altered for the private security images on setec builds.
 DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
-
+mkdir -p "${ENVOY_DOCKER_IMAGE_DIRECTORY}"
 
 if is_windows; then
   BUILD_TYPES=("-${WINDOWS_BUILD_TYPE}")
@@ -140,9 +122,6 @@ else
   # Configure docker-buildx tools
   BUILD_COMMAND=("buildx" "build")
   config_env
-
-  # VRP base image is only for Linux amd64
-  VRP_BASE_IMAGE="${DOCKER_IMAGE_PREFIX}${IMAGE_POSTFIX}:${IMAGE_NAME}"
 fi
 
 # Test the docker build in all cases, but use a local tag that we will overwrite before push in the
@@ -150,23 +129,7 @@ fi
 for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
     image_tag="${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
     build_images "${BUILD_TYPE}" "$image_tag"
-
-    if ! is_windows; then
-        if [[ "$BUILD_TYPE" == "" || "$BUILD_TYPE" == "-contrib" || "$BUILD_TYPE" == "-alpine" || "$BUILD_TYPE" == "-distroless" ]]; then
-            # verify_examples expects the base and alpine images, and for them to be named `-dev`
-            dev_image="envoyproxy/envoy${BUILD_TYPE}-dev:latest"
-            docker tag "$image_tag" "$dev_image"
-            IMAGES_TO_SAVE+=("$dev_image")
-        fi
-    fi
 done
-
-mkdir -p "${ENVOY_DOCKER_IMAGE_DIRECTORY}"
-if [[ ${#IMAGES_TO_SAVE[@]} -ne 0 ]]; then
-    ENVOY_DOCKER_TAR="${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy-docker-images.tar.xz"
-    echo "Saving built images to ${ENVOY_DOCKER_TAR}: ${IMAGES_TO_SAVE[*]}"
-    docker save "${IMAGES_TO_SAVE[@]}" | xz -T0 -2 >"${ENVOY_DOCKER_TAR}"
-fi
 
 # Only push images for main builds, release branch builds, and tag builds.
 if [[ "${AZP_BRANCH}" != "${MAIN_BRANCH}" ]] &&
