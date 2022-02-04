@@ -16,23 +16,22 @@ namespace Stats {
 class StatsIsolatedStoreImplTest : public testing::Test {
 protected:
   StatsIsolatedStoreImplTest()
-      : pool_(symbol_table_), store_(std::make_unique<IsolatedStoreImpl>(symbol_table_)) {}
+      : store_(std::make_unique<IsolatedStoreImpl>(symbol_table_)), pool_(symbol_table_) {}
   ~StatsIsolatedStoreImplTest() override {
-    store_.reset();
     pool_.clear();
+    store_.reset();
     EXPECT_EQ(0, symbol_table_.numSymbols());
   }
 
   StatName makeStatName(absl::string_view name) { return pool_.add(name); }
 
   SymbolTableImpl symbol_table_;
-  StatNamePool pool_;
   std::unique_ptr<IsolatedStoreImpl> store_;
+  StatNamePool pool_;
 };
 
 TEST_F(StatsIsolatedStoreImplTest, All) {
   ScopePtr scope1 = store_->createScope("scope1.");
-  EXPECT_EQ(1, scope1.use_count());
   Counter& c1 = store_->counterFromString("c1");
   Counter& c2 = scope1->counterFromString("c2");
   EXPECT_EQ("c1", c1.name());
@@ -123,7 +122,6 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(store_->findCounter(nonexistent_name.statName()), absl::nullopt);
   EXPECT_EQ(store_->findGauge(nonexistent_name.statName()), absl::nullopt);
   EXPECT_EQ(store_->findHistogram(nonexistent_name.statName()), absl::nullopt);
-  scope1.reset();
 }
 
 TEST_F(StatsIsolatedStoreImplTest, PrefixIsStatName) {
