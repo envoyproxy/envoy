@@ -347,6 +347,8 @@ Network::ClientConnectionPtr HostImpl::createConnection(
                 socket_factory.createTransportSocket(std::move(transport_socket_options)),
                 connection_options);
 
+  connection->connectionInfoProvider().enableSettingInterfaceName(
+      cluster.setLocalInterfaceNameOnUpstreamConnections());
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);
   return connection;
@@ -843,6 +845,8 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.connection_pool_per_downstream_connection()),
       warm_hosts_(!config.health_checks().empty() &&
                   common_lb_config_.ignore_new_hosts_until_first_hc()),
+      set_local_interface_name_on_upstream_connections_(
+          config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
       cluster_type_(
           config.has_cluster_type()
               ? absl::make_optional<envoy::config::cluster::v3::Cluster::CustomClusterType>(

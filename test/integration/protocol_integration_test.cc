@@ -3519,14 +3519,18 @@ TEST_P(ProtocolIntegrationTest, NoLocalInterfaceNameForUpstreamConnection) {
 }
 
 TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.disable_local_interface_name_for_upstream_connection", "false");
-
   config_helper_.prependFilter(R"EOF(
   name: stream-info-to-headers-filter
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->mutable_upstream_connection_options()
+        ->set_set_local_interface_name_on_upstream_connections(true);
+  });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -3543,7 +3547,7 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
   ASSERT_TRUE(response->waitForEndStream());
 
   // Make sure that the local interface name was populated due to runtime override.
-  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("local-interface-name")).empty());
+  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("local-interface-name")).empty());
 }
 
 #ifdef NDEBUG

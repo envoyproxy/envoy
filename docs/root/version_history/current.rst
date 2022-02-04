@@ -22,7 +22,6 @@ Bug Fixes
 
 * data plane: fixing error handling where writing to a socket failed while under the stack of processing. This should genreally affect HTTP/3. This behavioral change can be reverted by setting ``envoy.reloadable_features.allow_upstream_inline_write`` to false.
 * eds: fix the eds cluster update by allowing update on the locality of the cluster endpoints. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints`` to false.
-* perf: adds ``envoy.reloadable_features.disable_local_interface_name_for_upstream_connection`` runtime flag to disable accessing connection data which has a non-negligible performance hit.
 * xray: fix the AWS X-Ray tracer extension to not sample the trace if ``sampled=`` keyword is not present in the header ``x-amzn-trace-id``.
 
 Removed Config or Runtime

@@ -51,7 +51,7 @@ public:
       const auto maybe_local_interface_name =
           decoder_callbacks_->streamInfo().upstreamInfo()->upstreamInterfaceName();
       if (maybe_local_interface_name.has_value()) {
-        headers.addCopy(Http::LowerCaseString("local_interface_name"),
+        headers.addCopy(Http::LowerCaseString("local-interface-name"),
                         maybe_local_interface_name.value());
       }
     }

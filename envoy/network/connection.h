@@ -194,6 +194,7 @@ public:
   /**
    * @return the connection info provider backing this connection.
    */
+  virtual ConnectionInfoSetter& connectionInfoProvider() PURE;
   virtual const ConnectionInfoProvider& connectionInfoProvider() const PURE;
   virtual ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const PURE;
 

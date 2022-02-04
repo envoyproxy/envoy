@@ -851,9 +851,7 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info_,
                      false),
-      stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr()),
-      disable_local_interface_name_for_upstream_connection_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.disable_local_interface_name_for_upstream_connection")) {
+      stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr()) {
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   // There are no meaningful socket options or source address semantics for
@@ -930,16 +928,13 @@ void ClientConnectionImpl::connect() {
 
 void ClientConnectionImpl::onConnected() {
   stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
-  // interfaceName makes a syscall. Thus, it is disabled by default.
-  //
   // There are no meaningful socket source address semantics for non-IP sockets, so skip.
-  if (!disable_local_interface_name_for_upstream_connection_ &&
-      socket_->connectionInfoProviderSharedPtr()->remoteAddress()->ip()) {
-    const auto maybe_interface_name = ioHandle().interfaceName();
+  if (socket_->connectionInfoProviderSharedPtr()->remoteAddress()->ip()) {
+    socket_->connectionInfoProvider().maybeSetInterfaceName(ioHandle());
+    const auto maybe_interface_name = socket_->connectionInfoProvider().interfaceName();
     if (maybe_interface_name.has_value()) {
       ENVOY_CONN_LOG_EVENT(debug, "conn_interface", "connected on local interface '{}'", *this,
                            maybe_interface_name.value());
-      socket_->connectionInfoProvider().setInterfaceName(maybe_interface_name.value());
     }
   }
   ConnectionImpl::onConnected();
