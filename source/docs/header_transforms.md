@@ -1,15 +1,17 @@
-## `ResponseEntry::responseHeaderTransforms` API
+## `RouteEntry::requestHeaderTransforms` and `ResponseEntry::responseHeaderTransforms` APIs
 
 ### Overview
 
-`ResponseEntry::responseHeaderTransforms` allows filters to obtain response
-header transformations that would be applied by
-`ResponseEntry::finalizeResponseHeaders`.
+`RouteEntry::requestHeaderTransforms`
+and `ResponseEntry::responseHeaderTransforms` allows filters to obtain request
+and response header transformations that would be applied by
+`RouteEntry::finalizeRequestHeaders`
+and `ResponseEntry::finalizeResponseHeaders` respectively.
 
 If you do not have full knowledge that there will be no further route
-modifications later in the filter chain, you should not use this API.
+modifications later in the filter chain, you should not use these APIs.
 
-### Usage
+### Example usage
 
 To obtain the response header transformations at request time:
 

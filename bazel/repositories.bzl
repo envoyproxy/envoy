@@ -80,6 +80,7 @@ def _envoy_repo_impl(repository_ctx):
     repo_path = repository_ctx.path(repository_ctx.attr.envoy_root).dirname
     version = repository_ctx.read(repo_path.get_child("VERSION")).strip()
     repository_ctx.file("version.bzl", "VERSION = '%s'" % version)
+    repository_ctx.file("path.bzl", "PATH = '%s'" % repo_path)
     repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'" % (repo_path, version))
     repository_ctx.file("WORKSPACE", "")
     repository_ctx.file("BUILD", """
@@ -99,22 +100,6 @@ _envoy_repo = repository_rule(
 def envoy_repo():
     if "envoy_repo" not in native.existing_rules().keys():
         _envoy_repo(name = "envoy_repo")
-
-# Python dependencies.
-def _python_deps():
-    # TODO(htuch): convert these to pip3_import.
-    external_http_archive(
-        name = "com_github_twitter_common_lang",
-        build_file = "@envoy//bazel/external:twitter_common_lang.BUILD",
-    )
-    external_http_archive(
-        name = "com_github_twitter_common_rpc",
-        build_file = "@envoy//bazel/external:twitter_common_rpc.BUILD",
-    )
-    external_http_archive(
-        name = "com_github_twitter_common_finagle_thrift",
-        build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
-    )
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
@@ -236,7 +221,6 @@ def envoy_dependencies(skip_targets = []):
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
 
-    _python_deps()
     _cc_deps()
     _go_deps(skip_targets)
     _rust_deps()
@@ -947,7 +931,7 @@ def _emscripten_toolchain():
             ".emscripten_sanity",
         ]),
         patch_cmds = [
-            "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 2.0.7 && ./emsdk activate --embedded 2.0.7; fi",
+            "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 3.1.1 && ./emsdk activate --embedded 3.1.1; fi",
         ],
     )
 
