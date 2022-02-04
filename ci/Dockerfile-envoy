@@ -90,3 +90,7 @@ EXPOSE 10000
 EXPOSE 10001
 
 CMD ["supervisord", "-c", "/etc/supervisor.conf"]
+
+
+# Make envoy image as last stage so it is built by default
+FROM envoy

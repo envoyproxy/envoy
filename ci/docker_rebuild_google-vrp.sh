@@ -43,7 +43,7 @@ fi
 
 cat "${DOCKER_BUILD_FILE}"
 
-docker build -t "envoy-google-vrp:local" --build-arg "ENVOY_VRP_BASE_IMAGE=${BASE_DOCKER_IMAGE}" -f "${DOCKER_BUILD_FILE}" .
+docker build -t "envoy-google-vrp:local" --target envoy-google-vrp --build-arg "ENVOY_VRP_BASE_IMAGE=${BASE_DOCKER_IMAGE}" -f "${DOCKER_BUILD_FILE}" .
 
 if [[ -n "$1" ]]; then
   rm -rf "${LOCAL_ENVOY_DIR}"
