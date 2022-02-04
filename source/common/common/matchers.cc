@@ -59,9 +59,10 @@ bool DoubleMatcher::match(const ProtobufWkt::Value& value) const {
     return matcher_.range().start() <= v && v < matcher_.range().end();
   case envoy::type::matcher::v3::DoubleMatcher::MatchPatternCase::kExact:
     return matcher_.exact() == v;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::type::matcher::v3::DoubleMatcher::MatchPatternCase::MATCH_PATTERN_NOT_SET:
+    break; // Fall through to PANIC.
   };
+  PANIC("unexpected");
 }
 
 ListMatcher::ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher) : matcher_(matcher) {

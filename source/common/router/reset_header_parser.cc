@@ -13,14 +13,13 @@ ResetHeaderParserImpl::ResetHeaderParserImpl(
     const envoy::config::route::v3::RetryPolicy::ResetHeader& config)
     : name_(config.name()) {
   switch (config.format()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::RetryPolicy::SECONDS:
     format_ = ResetHeaderFormat::Seconds;
     break;
   case envoy::config::route::v3::RetryPolicy::UNIX_TIMESTAMP:
     format_ = ResetHeaderFormat::UnixTimestamp;
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

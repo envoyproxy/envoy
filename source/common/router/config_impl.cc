@@ -92,9 +92,12 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
     route = std::make_shared<ConnectRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                     factory_context, validator);
     break;
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
+    break; // throw the error below.
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+  if (!route) {
+    throw EnvoyException("Invalid route config");
   }
 
   if (validation_clusters.has_value()) {
@@ -1127,7 +1130,7 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
     begin = end;
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("unexpected");
 }
 
 void RouteEntryImplBase::validateClusters(
@@ -1389,6 +1392,7 @@ VirtualHostImpl::VirtualHostImpl(
       virtual_cluster_catch_all_(*vcluster_scope_,
                                  factory_context.routerContext().virtualClusterStatNames()) {
   switch (virtual_host.require_tls()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::VirtualHost::NONE:
     ssl_requirements_ = SslRequirements::None;
     break;
@@ -1398,8 +1402,6 @@ VirtualHostImpl::VirtualHostImpl(
   case envoy::config::route::v3::VirtualHost::ALL:
     ssl_requirements_ = SslRequirements::All;
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   // Retry and Hedge policies must be set before routes, since they may use them.

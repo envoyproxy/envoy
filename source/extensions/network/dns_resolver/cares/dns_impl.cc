@@ -369,8 +369,6 @@ DnsResolverImpl::AddrInfoPendingResolution::AddrInfoPendingResolution(
   case DnsLookupFamily::All:
     lookup_all_ = true;
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -458,8 +456,6 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
         return available_interfaces;
       }
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
   return available_interfaces;
