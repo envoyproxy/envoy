@@ -214,9 +214,9 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   Network::TransportSocketFactoryPtr transport_socket_factory =
       createQuicUpstreamTransportSocketFactory(api, mock_stats_store, manager,
                                                "spiffe://lyft.com/backend-team");
-  auto& quic_transport_socket_factory = dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*transport_socket_factory);
-  auto persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher, 0);
+  auto& quic_transport_socket_factory =
+      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*transport_socket_factory);
+  auto persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(*dispatcher, 0);
 
   Network::Address::InstanceConstSharedPtr local_address;
   if (addr->ip()->version() == Network::Address::IpVersion::v4) {
@@ -226,8 +226,13 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
     local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
   }
   Network::ClientConnectionPtr connection = Quic::createQuicNetworkConnection(
-      *persistent_info, std::make_shared<quic::QuicCryptoClientConfig>(std::make_unique<Quic::EnvoyQuicProofVerifier>(quic_transport_socket_factory.sslCtx()),
-        persistent_info->getQuicSessionCacheDelegate()), quic::QuicServerId(quic_transport_socket_factory.clientContextConfig().serverNameIndication(), static_cast<uint16_t>(addr->ip()->port())), *dispatcher, addr, local_address, quic_stat_names, mock_stats_store);
+      *persistent_info,
+      std::make_shared<quic::QuicCryptoClientConfig>(
+          std::make_unique<Quic::EnvoyQuicProofVerifier>(quic_transport_socket_factory.sslCtx()),
+          persistent_info->getQuicSessionCacheDelegate()),
+      quic::QuicServerId(quic_transport_socket_factory.clientContextConfig().serverNameIndication(),
+                         static_cast<uint16_t>(addr->ip()->port())),
+      *dispatcher, addr, local_address, quic_stat_names, mock_stats_store);
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
   // Quic connection needs to finish handshake.

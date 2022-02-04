@@ -154,6 +154,7 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
     // Increase the connecting capacity to reflect the streams this connection can serve.
     state_.incrConnectingAndConnectedStreamCapacity(client->effectiveConcurrentStreamLimit());
     connecting_stream_capacity_ += client->effectiveConcurrentStreamLimit();
+              << connecting_stream_capacity_ << "\n";
     ActiveClient& client_ref = *client;
     LinkedList::moveIntoList(std::move(client), owningList(client->state()));
     client_ref.getReady();
@@ -428,13 +429,14 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     connecting_stream_capacity_ -= client.effectiveConcurrentStreamLimit();
   }
 
-  if (client.connect_timer_) {
+  if (client.connect_timer_ && event != Network::ConnectionEvent::ConnectedZeroRtt) {
     client.connect_timer_->disableTimer();
     client.connect_timer_.reset();
   }
 
-  if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
+  switch (event) {
+  case Network::ConnectionEvent::RemoteClose:
+  case Network::ConnectionEvent::LocalClose: {
     state_.decrConnectingAndConnectedStreamCapacity(client.currentUnusedCapacity());
     // Make sure that onStreamClosed won't double count.
     client.remaining_streams_ = 0;
@@ -500,7 +502,9 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     if (!pending_streams_.empty()) {
       tryCreateNewConnections();
     }
-  } else if (event == Network::ConnectionEvent::Connected) {
+    break;
+  }
+  case Network::ConnectionEvent::Connected: {
     client.conn_connect_ms_->complete();
     client.conn_connect_ms_.reset();
     ASSERT(client.state() == ActiveClient::State::CONNECTING);
@@ -524,10 +528,14 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       onUpstreamReady();
     }
     checkForIdleAndCloseIdleConnsIfDraining();
-  } else if (event == Network::ConnectionEvent::ConnectedZeroRtt) {
+    break;
+  }
+  case Network::ConnectionEvent::ConnectedZeroRtt: {
     ASSERT(client.state() == ActiveClient::State::CONNECTING);
-    std::cerr << "========== ConnectedZeroRtt\n";
+    host()->cluster().stats().upstream_cx_connect_with_0_rtt_.inc();
     client.allows_early_data_ = true;
+    break;
+  }
   }
 }
 

@@ -76,7 +76,7 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    TimeSource& time_source, ClusterConnectivityState& state,
-                    Http::PersistentQuicInfo& quic_info) override;
+                   Http::PersistentQuicInfo& quic_info) override;
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,

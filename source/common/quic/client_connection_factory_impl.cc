@@ -40,10 +40,9 @@ private:
   quic::SessionCache& cache_;
 };
 
-PersistentQuicInfoImpl::PersistentQuicInfoImpl(
-    Event::Dispatcher& dispatcher, uint32_t buffer_limit)
+PersistentQuicInfoImpl::PersistentQuicInfoImpl(Event::Dispatcher& dispatcher, uint32_t buffer_limit)
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
-    buffer_limit_(buffer_limit) {
+      buffer_limit_(buffer_limit) {
   quiche::FlagRegistry::getInstance();
 }
 
@@ -52,7 +51,9 @@ std::unique_ptr<quic::SessionCache> PersistentQuicInfoImpl::getQuicSessionCacheD
 }
 
 std::unique_ptr<Network::ClientConnection>
-createQuicNetworkConnection(Http::PersistentQuicInfo& info, std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config, const quic::QuicServerId& server_id, Event::Dispatcher& dispatcher,
+createQuicNetworkConnection(Http::PersistentQuicInfo& info,
+                            std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
+                            const quic::QuicServerId& server_id, Event::Dispatcher& dispatcher,
                             Network::Address::InstanceConstSharedPtr server_addr,
                             Network::Address::InstanceConstSharedPtr local_addr,
                             QuicStatNames& quic_stat_names, Stats::Scope& scope) {
@@ -68,8 +69,8 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, std::shared_ptr<quic
   // QUICHE client session always use the 1st version to start handshake.
   auto ret = std::make_unique<EnvoyQuicClientSession>(
       info_impl->quic_config_, quic_versions, std::move(connection), server_id,
-      std::move(crypto_config), &info_impl->push_promise_index_, dispatcher, info_impl->buffer_limit_,
-      info_impl->crypto_stream_factory_, quic_stat_names, scope);
+      std::move(crypto_config), &info_impl->push_promise_index_, dispatcher,
+      info_impl->buffer_limit_, info_impl->crypto_stream_factory_, quic_stat_names, scope);
   return ret;
 }
 

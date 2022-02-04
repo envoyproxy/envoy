@@ -192,9 +192,15 @@ public:
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
     auto session = std::make_unique<EnvoyQuicClientSession>(
         persistent_info.quic_config_, supported_versions_, std::move(connection),
-        (host.empty() ? persistent_info.server_id_
-                      : quic::QuicServerId{host, static_cast<uint16_t>(port), false}),
-        persistent_info.cryptoConfig(), &push_promise_index_, *dispatcher_,
+        quic::QuicServerId{
+            (host.empty() ? transport_socket_factory_->clientContextConfig().serverNameIndication()
+                          : host),
+            static_cast<uint16_t>(port), false},
+        std::make_shared<quic::QuicCryptoClientConfig>(
+            std::make_unique<Quic::EnvoyQuicProofVerifier>(transport_socket_factory_->sslCtx()),
+            dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+                .getQuicSessionCacheDelegate()),
+        &push_promise_index_, *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,

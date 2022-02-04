@@ -5,15 +5,12 @@
 #include <string>
 
 #include "source/common/http/codec_client.h"
-#include "source/common/http/http3/quic_client_connection_factory.h"
 #include "source/common/network/filter_impl.h"
 
 #include "test/common/http/http2/http2_frame.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/printers.h"
-
-#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 
 namespace Envoy {
 
@@ -297,7 +294,6 @@ protected:
   testing::NiceMock<Random::MockRandomGenerator> random_;
   Quic::QuicStatNames quic_stat_names_;
   std::string san_to_match_{"spiffe://lyft.com/backend-team"};
-  quic::QuicClientSessionCache quic_session_cache_;
 };
 
 // Helper class for integration tests using raw HTTP/2 frames

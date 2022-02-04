@@ -3,8 +3,8 @@
 #include <cstdint>
 
 #include "envoy/common/optref.h"
-#include "envoy/upstream/upstream.h"
 #include "envoy/http/persist_quic_info.h"
+#include "envoy/upstream/upstream.h"
 
 #include "source/common/http/codec_client.h"
 #include "source/common/http/conn_pool_base.h"
@@ -122,8 +122,8 @@ public:
                     Random::RandomGenerator& random_generator,
                     Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
                     CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
-                     OptRef<PoolConnectResultCallback> connect_callback,
-                     Http::PersistentQuicInfo& quic_info);
+                    OptRef<PoolConnectResultCallback> connect_callback,
+                    Http::PersistentQuicInfo& quic_info);
 
   ~Http3ConnPoolImpl() override;
 
@@ -131,7 +131,8 @@ public:
   // the HTTP3 active client does.
   bool trackStreamCapacity() override { return false; }
 
-  std::unique_ptr<Network::ClientConnection> createClientConnection(Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope);
+  std::unique_ptr<Network::ClientConnection>
+  createClientConnection(Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope);
 
 protected:
   void onConnected(Envoy::ConnectionPool::ActiveClient&) override;
@@ -145,10 +146,10 @@ private:
   // Store quic helpers which can be shared between connections and must live
   // beyond the lifetime of individual connections.
   Quic::PersistentQuicInfoImpl& quic_info_;
-    // server-id can change over the lifetime of Envoy but will be consistent for a
+  // server-id can change over the lifetime of Envoy but will be consistent for a
   // given connection pool.
   quic::QuicServerId server_id_;
- // Latch the latest crypto config, to determine if it has updated since last
+  // Latch the latest crypto config, to determine if it has updated since last
   // checked.
   Envoy::Ssl::ClientContextSharedPtr client_context_;
   // If client_context_ changes, client config will be updated as well.
@@ -162,9 +163,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                 Upstream::ClusterConnectivityState& state, 
-                 Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope,
-                 OptRef<PoolConnectResultCallback> connect_callback,
+                 Upstream::ClusterConnectivityState& state, Quic::QuicStatNames& quic_stat_names,
+                 Stats::Scope& scope, OptRef<PoolConnectResultCallback> connect_callback,
                  Http::PersistentQuicInfo& quic_info);
 
 } // namespace Http3

@@ -138,8 +138,7 @@ public:
                    AlternateProtocolsCacheSharedPtr alternate_protocols,
                    std::chrono::milliseconds next_attempt_duration,
                    ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
-                   Stats::Scope& scope, Http::PersistentQuicInfo&
-                   quic_info);
+                   Stats::Scope& scope, Http::PersistentQuicInfo& quic_info);
   ~ConnectivityGrid() override;
 
   // Event::DeferredDeletable

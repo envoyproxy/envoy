@@ -383,7 +383,7 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    TimeSource& time_source, ClusterConnectivityState& state,
-                     Http::PersistentQuicInfo& quic_info) PURE;
+                   Http::PersistentQuicInfo& quic_info) PURE;
 
   /**
    * Allocate a TCP connection pool for the host. Pools are separated by 'priority' and

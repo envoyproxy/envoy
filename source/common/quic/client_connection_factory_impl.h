@@ -1,5 +1,9 @@
 #pragma once
 
+#include <memory>
+
+#include "envoy/http/persist_quic_info.h"
+
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
@@ -8,12 +12,9 @@
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_client_stream.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
-#include "envoy/http/persist_quic_info.h"
-
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 #include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
-#include "quiche/quic/core/crypto/quic_client_session_cache.h"
-#include <memory>
 
 namespace Envoy {
 namespace Quic {
@@ -39,7 +40,9 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
 };
 
 std::unique_ptr<Network::ClientConnection>
-createQuicNetworkConnection(Http::PersistentQuicInfo& info, std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,  const quic::QuicServerId& server_id,  Event::Dispatcher& dispatcher,
+createQuicNetworkConnection(Http::PersistentQuicInfo& info,
+                            std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
+                            const quic::QuicServerId& server_id, Event::Dispatcher& dispatcher,
                             Network::Address::InstanceConstSharedPtr server_addr,
                             Network::Address::InstanceConstSharedPtr local_addr,
                             QuicStatNames& quic_stat_names, Stats::Scope& scope);

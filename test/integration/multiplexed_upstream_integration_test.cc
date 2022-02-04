@@ -181,6 +181,7 @@ uint64_t MultiplexedUpstreamIntegrationTest::upstreamTxResetCounterValue() {
       ->counter(absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".tx_reset"))
       ->value();
 }
+
 uint64_t MultiplexedUpstreamIntegrationTest::downstreamRxResetCounterValue() {
   return test_server_->counter(absl::StrCat(downstreamProtocolStatsRoot(), ".rx_reset"))->value();
 }
@@ -641,7 +642,10 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamGoaway) {
   cleanupUpstreamAndDownstream();
 }
 
-TEST_P(MultiplexedUpstreamIntegrationTest, ZeroRtt) {
+TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamZeroRtt) {
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
+    return;
+  }
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -656,10 +660,13 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ZeroRtt) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
 
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+
   default_request_headers_.addCopy("second_request", "1");
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
 
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response2->waitForEndStream());
 }

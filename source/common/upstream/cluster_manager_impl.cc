@@ -1363,13 +1363,15 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
                          parent_.parent_.http_context_, parent_.parent_.router_context_),
       quic_info_(
 #ifdef ENVOY_ENABLE_QUIC
-          [&cluster, &parent](){
-          auto quic_info = std::make_unique<Quic::PersistentQuicInfoImpl>(parent.thread_local_dispatcher_, cluster->perConnectionBufferLimitBytes());
-  Quic::convertQuicConfig(cluster->http3Options().quic_protocol_options(), quic_info->quic_config_);
-  quic::QuicTime::Delta crypto_timeout =
-      quic::QuicTime::Delta::FromMilliseconds(cluster->connectTimeout().count());
-  quic_info->quic_config_.set_max_time_before_crypto_handshake(crypto_timeout);
-return quic_info;
+          [&cluster, &parent]() {
+            auto quic_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
+                parent.thread_local_dispatcher_, cluster->perConnectionBufferLimitBytes());
+            Quic::convertQuicConfig(cluster->http3Options().quic_protocol_options(),
+                                    quic_info->quic_config_);
+            quic::QuicTime::Delta crypto_timeout =
+                quic::QuicTime::Delta::FromMilliseconds(cluster->connectTimeout().count());
+            quic_info->quic_config_.set_max_time_before_crypto_handshake(crypto_timeout);
+            return quic_info;
           }()
 #else
           std::make_unique<Http::PersistentQuicInfo>()
@@ -1738,7 +1740,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
 #ifdef ENVOY_ENABLE_QUIC
     return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
-                                         priority, options, transport_socket_options, state, 
+                                         priority, options, transport_socket_options, state,
                                          quic_stat_names_, stats_, {}, quic_info);
 #else
     UNREFERENCED_PARAMETER(source);
