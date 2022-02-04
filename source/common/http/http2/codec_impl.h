@@ -366,7 +366,7 @@ protected:
       // as the stream had pending data to process and the stream was not reset.
       bool buffered_on_stream_close_{false};
 
-      bool hasBufferedData() const { return body_buffered_ || trailers_buffered_; }
+      bool hasBufferedBodyOrTrailers() const { return body_buffered_ || trailers_buffered_; }
     };
 
     BufferedStreamManager stream_manager_;

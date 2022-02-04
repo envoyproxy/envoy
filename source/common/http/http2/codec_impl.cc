@@ -362,14 +362,16 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
   }
 
   if (stream_manager_.trailers_buffered_ && continueProcessingBufferedData()) {
+    ASSERT(!stream_manager_.body_buffered_);
     decodeTrailers();
   }
 
-  // Activate the buffered onStreamClose if we've drained all the buffered data,
-  // or we've gotten a reset.
-  if (stream_manager_.buffered_on_stream_close_ &&
-      (!stream_manager_.hasBufferedData() || reset_reason_.has_value())) {
-    ENVOY_CONN_LOG(debug, "invoking  onStreamClose for stream: {} via processBufferedData",
+  // Reset cases are handled by resetStream and directly invoke onStreamClose,
+  // which consumes the buffered_on_stream_close_ so we don't invoke
+  // onStreamClose twice.
+  if (stream_manager_.buffered_on_stream_close_ && !stream_manager_.hasBufferedBodyOrTrailers()) {
+    ASSERT(!reset_reason_.has_value());
+    ENVOY_CONN_LOG(debug, "invoking onStreamClose for stream: {} via processBufferedData",
                    parent_.connection_, stream_id_);
     // We only buffer the onStreamClose if we had no errors.
     parent_.onStreamClose(this, 0);
@@ -386,15 +388,17 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
     ASSERT(read_disable_count_ > 0);
     --read_disable_count_;
     if (!buffersOverrun()) {
-      if (!process_buffered_data_callback_) {
-        process_buffered_data_callback_ =
-            parent_.connection_.dispatcher().createSchedulableCallback(
-                [this]() { processBufferedData(); });
-      }
+      if (defer_processing_backedup_streams_) {
+        if (!process_buffered_data_callback_) {
+          process_buffered_data_callback_ =
+              parent_.connection_.dispatcher().createSchedulableCallback(
+                  [this]() { processBufferedData(); });
+        }
 
-      // We schedule processing to occur in another callback to avoid
-      // reentrant and deep call stacks.
-      process_buffered_data_callback_->scheduleCallbackCurrentIteration();
+        // We schedule processing to occur in another callback to avoid
+        // reentrant and deep call stacks.
+        process_buffered_data_callback_->scheduleCallbackCurrentIteration();
+      }
 
       if (parent_.use_new_codec_wrapper_) {
         parent_.adapter_->MarkDataConsumedForStream(stream_id_, unconsumed_bytes_);
@@ -1380,7 +1384,9 @@ int ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
       }
 
       stream->runResetCallbacks(reason);
-    } else if (!stream->reset_reason_.has_value() && stream->stream_manager_.hasBufferedData()) {
+
+    } else if (stream->defer_processing_backedup_streams_ && !stream->reset_reason_.has_value() &&
+               stream->stream_manager_.hasBufferedBodyOrTrailers()) {
       ASSERT(error_code == NGHTTP2_NO_ERROR);
       ENVOY_CONN_LOG(debug, "buffered onStreamClose for stream: {}", connection_, stream_id);
       // Buffer the call, rely on the stream->process_buffered_data_callback_

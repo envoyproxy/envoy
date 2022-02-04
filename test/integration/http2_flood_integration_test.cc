@@ -600,6 +600,7 @@ TEST_P(Http2FloodMitigationTest, WindowUpdateOnLowWatermarkFlood) {
   // the downstream, and only goes below watermark if the response body has
   // passed through the filter.). With defer processing of backed up streams however
   // the data won't be eagerly processed as the stream is backed up.
+  // TODO(kbaichoo): Remove this test when removing this feature tag.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.defer_processing_backedup_streams")) {
     return;

@@ -103,7 +103,9 @@ public:
   Http2CodecImplTestFixture(Http2SettingsTuple client_settings, Http2SettingsTuple server_settings,
                             bool enable_new_codec_wrapper)
       : client_settings_(client_settings), server_settings_(server_settings),
-        enable_new_codec_wrapper_(enable_new_codec_wrapper) {
+        enable_new_codec_wrapper_(enable_new_codec_wrapper),
+        defer_processing_backedup_streams_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.defer_processing_backedup_streams")) {
     // Make sure we explicitly test for stream flush timer creation.
     EXPECT_CALL(client_connection_.dispatcher_, createTimer_(_)).Times(0);
     EXPECT_CALL(server_connection_.dispatcher_, createTimer_(_)).Times(0);
@@ -321,6 +323,7 @@ public:
   absl::optional<const Http2SettingsTuple> client_settings_;
   absl::optional<const Http2SettingsTuple> server_settings_;
   bool enable_new_codec_wrapper_ = false;
+  bool defer_processing_backedup_streams_ = false;
   bool allow_metadata_ = false;
   bool stream_error_on_invalid_http_messaging_ = false;
   Stats::TestUtil::TestStore client_stats_store_;
@@ -1581,21 +1584,29 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // updates to be sent, and the client to flush all queued data.
   // For bonus corner case coverage, remove callback2 in the middle of runLowWatermarkCallbacks()
   // and ensure it is not called.
-  auto* process_buffered_data_callback =
-      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+  NiceMock<Event::MockSchedulableCallback>* process_buffered_data_callback{nullptr};
+  if (defer_processing_backedup_streams_) {
+    process_buffered_data_callback =
+        new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+  }
 
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([&]() -> void {
     request_encoder_->getStream().removeCallbacks(callbacks2);
   }));
   EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
   EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
-  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+
+  if (defer_processing_backedup_streams_) {
+    EXPECT_FALSE(process_buffered_data_callback->enabled_);
+  }
 
   server_->getStream(1)->readDisable(false);
   driveToCompletion();
 
-  EXPECT_TRUE(process_buffered_data_callback->enabled_);
-  process_buffered_data_callback->invokeCallback();
+  if (defer_processing_backedup_streams_) {
+    EXPECT_TRUE(process_buffered_data_callback->enabled_);
+    process_buffered_data_callback->invokeCallback();
+  }
 
   EXPECT_EQ(0, client_->getStream(1)->pending_send_data_->length());
   EXPECT_EQ(0, TestUtility::findGauge(client_stats_store_, "http2.pending_send_bytes")->value());
@@ -1912,10 +1923,13 @@ TEST_P(Http2CodecImplFlowControlTest, WindowUpdateOnReadResumingFlood) {
 
   EXPECT_FALSE(violation_callback->enabled_);
 
-  auto* process_buffered_data_callback =
-      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+  NiceMock<Event::MockSchedulableCallback>* process_buffered_data_callback{nullptr};
+  if (defer_processing_backedup_streams_) {
+    process_buffered_data_callback =
+        new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
 
-  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+    EXPECT_FALSE(process_buffered_data_callback->enabled_);
+  }
 
   // Now unblock the server's stream. This will cause the bytes to be consumed, 2 flow control
   // updates to be sent, and overflow outbound frame queue.
@@ -1923,7 +1937,9 @@ TEST_P(Http2CodecImplFlowControlTest, WindowUpdateOnReadResumingFlood) {
   driveToCompletion();
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+  if (defer_processing_backedup_streams_) {
+    EXPECT_TRUE(process_buffered_data_callback->enabled_);
+  }
   EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
   violation_callback->invokeCallback();
 
@@ -3239,6 +3255,8 @@ TEST_P(Http2CodecImplTest, ConnectTest) {
 }
 
 TEST_P(Http2CodecImplTest, ShouldWaitForDeferredBodyToProcessBeforeProcessingTrailers) {
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.defer_processing_backedup_streams", "true"}});
   initialize();
 
   TestRequestHeaderMapImpl request_headers;

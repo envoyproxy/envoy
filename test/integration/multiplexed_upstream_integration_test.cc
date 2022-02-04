@@ -344,8 +344,11 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRando
   }
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.defer_processing_backedup_streams")) {
-    // We end up in a state where the filter pauses the stream, but never
-    // unpauses it as we buffer data at the receiving codec.
+    // TODO(kbaichoo): fix this test to work with deferred processing by using a
+    // timer to lower the watermark when the filter has raised above watermark.
+    // Since we deferred processing data, when the filter raises watermark
+    // with deferred processing we won't invoke it again which could lower
+    // the watermark.
     return;
   }
   config_helper_.prependFilter(R"EOF(

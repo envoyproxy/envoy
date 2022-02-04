@@ -61,6 +61,8 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.conn_pool_delete_when_idle",
     "envoy.reloadable_features.correct_scheme_and_xfp",
     "envoy.reloadable_features.correctly_validate_alpn",
+    // TODO(kbaichoo): Move this to be disabled by default until fairness is
+    // implemented, and we've had more cpu time.
     "envoy.reloadable_features.defer_processing_backedup_streams",
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.enable_grpc_async_client_cache",
