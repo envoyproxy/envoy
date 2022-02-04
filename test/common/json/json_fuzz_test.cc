@@ -8,9 +8,8 @@
 namespace Envoy {
 namespace Fuzz {
 
-// We have multiple third party JSON parsers in Envoy, nlohmann/JSON, RapidJSON and Protobuf.
-// We fuzz nlohmann/JSON and protobuf and compare their results, since RapidJSON is deprecated and
-// has known limitations. See https://github.com/envoyproxy/envoy/issues/4705.
+// We have multiple third party JSON parsers in Envoy, nlohmann/JSON, and Protobuf.
+// We fuzz nlohmann/JSON and protobuf and compare their results.
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   std::string json_string{reinterpret_cast<const char*>(buf), len};
 

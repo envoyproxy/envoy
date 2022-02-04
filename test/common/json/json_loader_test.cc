@@ -71,16 +71,10 @@ TEST_F(JsonLoaderTest, Basic) {
   }
 
   {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_json")) {
-      EXPECT_THROW_WITH_MESSAGE(Factory::loadFromString("{\"hello\": \n\n\"world\""), Exception,
-                                "JSON supplied is not valid. Error(line 3, column 8, token "
-                                "\"world\"): syntax error while "
-                                "parsing object - unexpected end of input; expected '}'\n");
-    } else {
-      EXPECT_THROW_WITH_MESSAGE(Factory::loadFromString("{\"hello\": \n\n\"world\""), Exception,
-                                "JSON supplied is not valid. Error(offset 19, line 3): Missing a "
-                                "comma or '}' after an object member.\n");
-    }
+    EXPECT_THROW_WITH_MESSAGE(Factory::loadFromString("{\"hello\": \n\n\"world\""), Exception,
+                              "JSON supplied is not valid. Error(line 3, column 8, token "
+                              "\"world\"): syntax error while "
+                              "parsing object - unexpected end of input; expected '}'\n");
   }
 
   {
@@ -219,11 +213,7 @@ TEST_F(JsonLoaderTest, Basic) {
 
   {
     ObjectSharedPtr json1 = Factory::loadFromString("[ [ ] , { } ]");
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_json")) {
-      EXPECT_EQ(json1->asJsonString(), "[[],{}]");
-    } else {
-      EXPECT_EQ(json1->asJsonString(), "[null,null]");
-    }
+    EXPECT_EQ(json1->asJsonString(), "[[],{}]");
   }
 
   {
@@ -238,20 +228,12 @@ TEST_F(JsonLoaderTest, Basic) {
 
   {
     ObjectSharedPtr json = Factory::loadFromString("{\"hello\": {}}");
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_json")) {
-      EXPECT_EQ(json->getObject("hello")->asJsonString(), "{}");
-    } else {
-      EXPECT_EQ(json->getObject("hello")->asJsonString(), "null");
-    }
+    EXPECT_EQ(json->getObject("hello")->asJsonString(), "{}");
   }
 
   {
     ObjectSharedPtr json = Factory::loadFromString("{\"hello\": [] }");
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_json")) {
-      EXPECT_EQ(json->asJsonString(), "{\"hello\":[]}");
-    } else {
-      EXPECT_EQ(json->asJsonString(), "{\"hello\":null}");
-    }
+    EXPECT_EQ(json->asJsonString(), "{\"hello\":[]}");
   }
 }
 
@@ -335,14 +317,7 @@ TEST_F(JsonLoaderTest, Schema) {
     )EOF";
 
   ObjectSharedPtr json = Factory::loadFromString(json_string);
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_json")) {
-    EXPECT_THROW_WITH_MESSAGE(json->validateSchema(invalid_schema), Exception, "not implemented");
-  } else {
-    EXPECT_THROW_WITH_MESSAGE(
-        json->validateSchema(invalid_schema), Exception,
-        "JSON at lines 2-5 does not conform to schema.\n Invalid schema: #/properties/value1\n "
-        "Schema violation: type\n Offending document key: #/value1");
-  }
+  EXPECT_THROW_WITH_MESSAGE(json->validateSchema(invalid_schema), Exception, "not implemented");
 }
 
 TEST_F(JsonLoaderTest, MissingEnclosingDocument) {
@@ -355,16 +330,10 @@ TEST_F(JsonLoaderTest, MissingEnclosingDocument) {
     }
   ]
   )EOF";
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_json")) {
-    EXPECT_THROW_WITH_MESSAGE(
-        Factory::loadFromString(json_string), Exception,
-        "JSON supplied is not valid. Error(line 2, column 15, token \"listeners\" :): syntax error "
-        "while parsing value - unexpected ':'; expected end of input\n");
-  } else {
-    EXPECT_THROW_WITH_MESSAGE(Factory::loadFromString(json_string), Exception,
-                              "JSON supplied is not valid. Error(offset 14, line 2): Terminate "
-                              "parsing due to Handler error.\n");
-  }
+  EXPECT_THROW_WITH_MESSAGE(
+      Factory::loadFromString(json_string), Exception,
+      "JSON supplied is not valid. Error(line 2, column 15, token \"listeners\" :): syntax error "
+      "while parsing value - unexpected ':'; expected end of input\n");
 }
 
 TEST_F(JsonLoaderTest, AsString) {
