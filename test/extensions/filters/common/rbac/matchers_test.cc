@@ -504,7 +504,7 @@ TEST(PolicyMatcherWithCustomCelVocabulary, PolicyMatcherWithCustomCelVocabulary)
                                ProtobufMessage::getStrictValidationVisitor(),
                                custom_cel_vocabulary.get());
 
-  //condition should return false
+  // condition should return false
   checkMatcher(matcher2, false, conn, headers, info);
 }
 
