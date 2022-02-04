@@ -14,6 +14,7 @@ COPY --chown=root:root ${TARGETPLATFORM}/build_${ENVOY_BINARY}_release/su-exec /
 COPY ci/docker-entrypoint.sh /
 
 
+# STAGE: envoy
 FROM ${BUILD_OS}:${BUILD_TAG} AS envoy
 
 RUN apt-get update && apt-get upgrade -y \
@@ -36,7 +37,8 @@ ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["envoy", "-c", "/etc/envoy/envoy.yaml"]
 
 
-FROM gcr.io/distroless/base-debian11:nonroot as envoy-distroless
+# STAGE: envoy-distroless
+FROM gcr.io/distroless/base-debian11:nonroot AS envoy-distroless
 
 COPY --from=binary /usr/local/bin/* /usr/local/bin/
 COPY --from=binary /etc/envoy/envoy.yaml /etc/envoy/envoy.yaml
@@ -47,6 +49,7 @@ ENTRYPOINT ["/usr/local/bin/envoy"]
 CMD ["-c", "/etc/envoy/envoy.yaml"]
 
 
+# STAGE: envoy-alpine
 # TODO(https://github.com/envoyproxy/envoy/issues/19781): Deprecate and remove this image
 FROM frolvlad/alpine-glibc:alpine-3.14_glibc-2.33 AS envoy-alpine
 
@@ -65,6 +68,7 @@ ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["envoy", "-c", "/etc/envoy/envoy.yaml"]
 
 
+# STAGE: envoy-google-vrp
 FROM ${ENVOY_VRP_BASE_IMAGE} AS envoy-google-vrp
 
 RUN apt-get update \
