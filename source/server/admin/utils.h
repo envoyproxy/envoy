@@ -21,6 +21,8 @@ void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& h
 bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
                  absl::optional<std::regex>& regex);
 
+bool histogramBucketsParam(const Http::Utility::QueryParams& params, Buffer::Instance& response, absl::optional<std::string>& histogram_buckets_value);
+
 absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params);
 
 absl::optional<std::string> queryParam(const Http::Utility::QueryParams& params,

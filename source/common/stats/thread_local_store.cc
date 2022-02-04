@@ -940,29 +940,6 @@ std::string ParentHistogramImpl::bucketSummary() const {
   }
 }
 
-std::string ParentHistogramImpl::computeDisjointBucketSummary() const {
-  if (used()) {
-    std::vector<std::string> bucket_summary;
-    ConstSupportedBuckets& supported_buckets = interval_statistics_.supportedBuckets();
-    const std::vector<uint64_t> disjoint_interval_buckets =
-        interval_statistics_.computeDisjointBuckets();
-    const std::vector<uint64_t> disjoint_cumulative_buckets =
-        cumulative_statistics_.computeDisjointBuckets();
-    bucket_summary.reserve(supported_buckets.size());
-    // Make sure all vectors are the same size.
-    ASSERT(disjoint_interval_buckets.size() == disjoint_cumulative_buckets.size() && disjoint_cumulative_buckets.size() == supported_buckets.size());
-    std::vector<uint64_t>::size_type min_size = std::min({disjoint_interval_buckets.size(), disjoint_cumulative_buckets.size(), supported_buckets.size()});
-    for (std::vector<uint64_t>::size_type i = 0; i < min_size; ++i) {
-      bucket_summary.push_back(fmt::format("B{:g}({},{})", supported_buckets[i],
-                                           disjoint_interval_buckets[i],
-                                           disjoint_cumulative_buckets[i]));
-    }
-    return absl::StrJoin(bucket_summary, " ");
-  } else {
-    return std::string("No recorded values");
-  }
-}
-
 void ParentHistogramImpl::addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr) {
   Thread::LockGuard lock(merge_lock_);
   tls_histograms_.emplace_back(hist_ptr);

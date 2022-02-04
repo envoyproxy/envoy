@@ -56,6 +56,17 @@ bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
   return true;
 }
 
+// Helper method to get the histogram_buckets parameter. Returns false if histogram_buckets query param is found and value is not "cumulative" or "disjoint", true otherwise.
+bool histogramBucketsParam(const Http::Utility::QueryParams& params, Buffer::Instance& response,
+                 absl::optional<std::string>& histogram_buckets_value) {
+  histogram_buckets_value = queryParam(params, "histogram_buckets");
+  if (histogram_buckets_value.has_value() && histogram_buckets_value.value() != "cumulative" && histogram_buckets_value.value() != "disjoint") {
+    response.add("usage: /stats?histogram_buckets=cumulative  or /stats?histogram_buckets=disjoint \n");
+    return false;
+  }
+  return true;
+}
+
 // Helper method to get the format parameter.
 absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params) {
   return queryParam(params, "format");

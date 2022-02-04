@@ -133,8 +133,8 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
   shutdownThreading();
 }
 
-TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBuckets) {
-  const std::string url = "/stats?histogram_buckets";
+TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsCumulative) {
+  const std::string url = "/stats?histogram_buckets=cumulative";
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl data;
   MockAdminStream admin_stream;
@@ -148,19 +148,84 @@ TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBuckets) {
 
   Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
-  h1.recordValue(200);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
+  h1.recordValue(300);
 
   store_->mergeHistograms([]() -> void {});
 
   Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
   EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_EQ("h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(1,1) "
-            "B500(0,0) B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) "
-            "B300000(0,0) B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\n",
+  EXPECT_EQ("h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,0) B500(1,1) B1000(1,1) B2500(1,1) B5000(1,1) B10000(1,1) B30000(1,1) B60000(1,1) B300000(1,1) B600000(1,1) B1.8e+06(1,1) B3.6e+06(1,1)\n",
+            data.toString());
+  shutdownThreading();
+}
+
+TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsDisjoint) {
+  const std::string url = "/stats?histogram_buckets=disjoint";
+  Http::TestResponseHeaderMapImpl response_headers, used_response_headers, used_and_filter_response_headers;
+  Buffer::OwnedImpl data, used_data, used_and_filter_data;
+  MockAdminStream admin_stream;
+  Configuration::MockStatsConfig stats_config;
+  EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
+  MockInstance instance;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
+  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
+  StatsHandler handler(instance);
+
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+
+  Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
+  h1.recordValue(200);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
+  h1.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
+  h1.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+  EXPECT_EQ("h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,1) B500(1,2) B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) B300000(0,0) B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\nh2: No recorded values\n",
             data.toString());
 
+  code = handler.handlerStats(url + "&usedonly", used_response_headers, used_data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+  EXPECT_EQ("h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,1) B500(1,2) B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) B300000(0,0) B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\n",
+            used_data.toString());
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 300));
+  h2.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  code = handler.handlerStats(url + "&usedonly&filter=h2", used_and_filter_response_headers, used_and_filter_data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+  EXPECT_EQ("h2: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,0) B500(1,1) B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) B300000(0,0) B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\n",
+            used_and_filter_data.toString());
   shutdownThreading();
+}
+
+TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsInvalid) {
+  const std::string url = "/stats?histogram_buckets=invalid_input";
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl data;
+  MockAdminStream admin_stream;
+  Configuration::MockStatsConfig stats_config;
+  EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
+  MockInstance instance;
+  EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
+  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
+  StatsHandler handler(instance);
+  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  EXPECT_EQ(Http::Code::BadRequest, code);
+  EXPECT_EQ("usage: /stats?histogram_buckets=cumulative  or /stats?histogram_buckets=disjoint \n", data.toString());
 }
 
 TEST_P(AdminStatsTest, HandlerStatsJson) {

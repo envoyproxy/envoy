@@ -106,7 +106,6 @@ public:
   }
   std::string quantileSummary() const override;
   std::string bucketSummary() const override;
-  std::string computeDisjointBucketSummary() const override;
 
   // Stats::Metric
   SymbolTable& symbolTable() override;

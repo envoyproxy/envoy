@@ -201,7 +201,6 @@ public:
   void merge() override {}
   std::string quantileSummary() const override { return ""; };
   std::string bucketSummary() const override { return ""; };
-  std::string computeDisjointBucketSummary() const override { return ""; };
 
   MOCK_METHOD(bool, used, (), (const));
   MOCK_METHOD(Histogram::Unit, unit, (), (const));

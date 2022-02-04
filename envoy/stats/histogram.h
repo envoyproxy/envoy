@@ -167,11 +167,6 @@ public:
    * Returns the bucket summary representation.
    */
   virtual std::string bucketSummary() const PURE;
-
-  /**
-   * Returns the bucket summary representation with disjoint buckets.
-   */
-  virtual std::string computeDisjointBucketSummary() const PURE;
 };
 
 using ParentHistogramSharedPtr = RefcountPtr<ParentHistogram>;
