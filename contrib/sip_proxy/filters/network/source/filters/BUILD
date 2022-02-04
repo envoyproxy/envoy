@@ -37,6 +37,7 @@ envoy_cc_library(
         "//contrib/sip_proxy/filters/network/source:protocol_interface",
         "//contrib/sip_proxy/filters/network/source:sip_lib",
         "//contrib/sip_proxy/filters/network/source/router:router_interface",
+        "//contrib/sip_proxy/filters/network/source/tra:tra_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/network:connection_interface",
         "//envoy/stream_info:stream_info_interface",

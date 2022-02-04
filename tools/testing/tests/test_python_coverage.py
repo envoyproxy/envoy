@@ -56,7 +56,7 @@ def test_coveragepytest_add_arguments():
 
 
 @pytest.mark.parametrize("cov_data", ["", "SOMEPATH"])
-def test_coverage_run(patches, cov_data):
+async def test_coverage_run(patches, cov_data):
     runner = python_coverage.CoverageRunner("path1", "path2", "path3")
     patched = patches(
         ("CoverageRunner.cov_data", dict(new_callable=PropertyMock)),
@@ -68,7 +68,7 @@ def test_coverage_run(patches, cov_data):
 
     with patched as (m_cov_data, m_extra_args, m_cov_args, m_cov_rc, m_main):
         m_cov_data.return_value = cov_data
-        assert runner.run() == m_main.return_value
+        assert await runner.run() == m_main.return_value
 
     if not cov_data:
         assert (

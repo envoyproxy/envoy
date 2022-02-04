@@ -449,14 +449,17 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
 
   echo "verifying dependencies..."
   # Validate dependency relationships between core/extensions and external deps.
-  "${ENVOY_SRCDIR}"/tools/dependency/validate.py
+  time bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:validate
 
   # Validate repository metadata.
   echo "check repositories..."
   "${ENVOY_SRCDIR}"/tools/check_repositories.sh
-  "${ENVOY_SRCDIR}"/ci/check_repository_locations.sh
+
+  echo "check dependencies..."
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check
 
   # Run pip requirements tests
+  echo "check pip..."
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check
 
   exit 0
@@ -479,7 +482,7 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
   "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
 
   echo "dependency validate_test..."
-  "${ENVOY_SRCDIR}"/tools/dependency/validate_test.py
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:validate_test
 
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
