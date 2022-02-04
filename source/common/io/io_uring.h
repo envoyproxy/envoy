@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/common/pure.h"
-#include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 
 #include "source/common/network/address_impl.h"

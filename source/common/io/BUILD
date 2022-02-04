@@ -13,6 +13,10 @@ envoy_cc_library(
     hdrs = [
         "io_uring.h",
     ],
+    deps = [
+        "//envoy/server:bootstrap_extension_config_interface",
+        "//source/common/network:address_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -26,7 +30,6 @@ envoy_cc_library(
     external_deps = ["uring"],
     deps = [
         ":io_uring_interface",
-        "//source/common/network:address_lib",
         "@envoy_api//envoy/extensions/io/io_uring/v3:pkg_cc_proto",
     ],
 )
