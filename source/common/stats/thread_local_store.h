@@ -17,7 +17,7 @@
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
 #include "source/common/stats/null_text_readout.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
