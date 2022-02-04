@@ -5,4 +5,4 @@ Custom Cel Vocabulary
   :glob:
   :maxdepth: 2
 
-  custom_cel_vocabulary
+  custom_cel_vocabulary/example
