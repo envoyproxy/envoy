@@ -199,7 +199,8 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
   for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
     if (shouldShowMetric(*histogram, used_only, regex)) {
       bool success = false;
-      // Display summary of disjoint buckets if histogram_buckets query parameter is found.
+      // Display bucket data if histogram_buckets query parameter is used, otherwise output contains
+      // quantile summary data.
       if (!histogram_buckets_value.has_value()) {
         success = all_histograms.emplace(histogram->name(), histogram->quantileSummary()).second;
       } else if (histogram_buckets_value.value() == "cumulative") {
