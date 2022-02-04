@@ -7,11 +7,11 @@ envoy_package()
 envoy_cc_test(
     name = "client_integration_test",
     srcs = ["client_integration_test.cc"],
+    exec_properties = {
+        # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
+        "sandboxNetwork": "standard",
+    },
     repository = "@envoy",
-    # TODO(jpsim): Fix remote execution for these tests
-    tags = [
-        "no-remote-exec",
-    ],
     deps = [
         "//library/common/extensions/filters/http/local_error:config",
         "//library/common/extensions/filters/http/local_error:filter_cc_proto",
