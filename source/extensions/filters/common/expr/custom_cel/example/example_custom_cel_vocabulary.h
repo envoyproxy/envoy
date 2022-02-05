@@ -30,8 +30,8 @@ constexpr absl::string_view CustomCelVariablesSetName = "custom";
 constexpr absl::string_view LazyEvalFuncNameGetDouble = "GetDouble";
 constexpr absl::string_view LazyEvalFuncNameGetProduct = "GetProduct";
 constexpr absl::string_view LazyEvalFuncNameGet99 = "Get99";
-constexpr absl::string_view EagerEvalFuncNameGetNextInt = "GetNextInt";
-constexpr absl::string_view EagerEvalFuncNameGetSquareOf = "GetSquareOf";
+constexpr absl::string_view EagerEvalFuncNameGetNextInt = "getNextInt";
+constexpr absl::string_view EagerEvalFuncNameGetSquareOf = "getSquareOf";
 
 class ExampleCustomCelVocabulary : public CustomCelVocabulary {
 public:
@@ -42,14 +42,14 @@ public:
   // Lazily evaluated functions require a two parts registration.
   // FillActivation will add the name of the function to the activation here, and
   // RegisterFunctions will add it to the registry.
-  void FillActivation(Activation* activation, Protobuf::Arena& arena,
+  void fillActivation(Activation* activation, Protobuf::Arena& arena,
                       const StreamInfo::StreamInfo& info,
                       const Http::RequestHeaderMap* request_headers,
                       const Http::ResponseHeaderMap* response_headers,
                       const Http::ResponseTrailerMap* response_trailers);
 
   // RegisterFunctions: registers both lazily evaluated and eagerly evaluated functions.
-  void RegisterFunctions(CelFunctionRegistry* registry) const;
+  void registerFunctions(CelFunctionRegistry* registry) const;
 
   ~ExampleCustomCelVocabulary() {}
 };

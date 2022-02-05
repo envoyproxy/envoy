@@ -73,7 +73,7 @@ static_resources:
                             target:
                               const_expr:
                                 int64_value: 4
-                            function: GetSquareOf
+                            function: getSquareOf
                         - const_expr:
                             int64_value: 16
                     permissions:
@@ -137,7 +137,7 @@ static_resources:
                         function: _==_
                         args:
                         - call_expr:
-                            function: GetNextInt
+                            function: getNextInt
                             args:
                             - const_expr:
                                 int64_value: 1

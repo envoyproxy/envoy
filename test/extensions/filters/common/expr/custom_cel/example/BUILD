@@ -41,8 +41,6 @@ envoy_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
         "@com_google_cel_cpp//eval/public:activation",
-        "@com_google_cel_cpp//eval/public:cel_function",
-        "@com_google_cel_cpp//eval/public:cel_function_adapter",
         "@com_google_cel_cpp//eval/public:cel_function_registry",
         "@com_google_cel_cpp//eval/public:cel_value",
     ],

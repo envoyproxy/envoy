@@ -14,8 +14,6 @@ namespace Expr {
 namespace Custom_Cel {
 namespace Example {
 
-using google::api::expr::runtime::CelFunction;
-using google::api::expr::runtime::CelFunctionDescriptor;
 using google::api::expr::runtime::CelValue;
 
 class CustomCelFunctionsTests : public testing::Test {
@@ -25,7 +23,7 @@ public:
 };
 
 TEST_F(CustomCelFunctionsTests, GetProductCelFunctionTest) {
-  GetProductCelFunction function("GetProduct");
+  getProductCelFunction function("GetProduct");
   std::vector<CelValue> input_values = {CelValue::CreateInt64(2), CelValue::CreateInt64(3)};
   auto args = absl::Span<CelValue>(input_values);
   absl::Status status = function.Evaluate(args, &result, &arena);
@@ -34,7 +32,7 @@ TEST_F(CustomCelFunctionsTests, GetProductCelFunctionTest) {
 }
 
 TEST_F(CustomCelFunctionsTests, GetDoubleCelFunctionTest) {
-  GetDoubleCelFunction function("GetDouble");
+  getDoubleCelFunction function("GetDouble");
   std::vector<CelValue> input_values = {CelValue::CreateInt64(2)};
   auto args = absl::Span<CelValue>(input_values);
   absl::Status status = function.Evaluate(args, &result, &arena);
@@ -43,7 +41,7 @@ TEST_F(CustomCelFunctionsTests, GetDoubleCelFunctionTest) {
 }
 
 TEST_F(CustomCelFunctionsTests, Get99CelFunctionTest) {
-  Get99CelFunction function("Get99");
+  get99CelFunction function("Get99");
   std::vector<CelValue> input_values = {};
   auto args = absl::Span<CelValue>(input_values);
   absl::Status status = function.Evaluate(args, &result, &arena);
@@ -52,11 +50,11 @@ TEST_F(CustomCelFunctionsTests, Get99CelFunctionTest) {
 }
 
 TEST_F(CustomCelFunctionsTests, GetSquareOfTest) {
-  EXPECT_EQ(GetSquareOf(&arena, 4).Int64OrDie(), 16);
+  EXPECT_EQ(getSquareOf(&arena, 4).Int64OrDie(), 16);
 }
 
 TEST_F(CustomCelFunctionsTests, GetNextIntTest) {
-  EXPECT_EQ(GetNextInt(&arena, 10).Int64OrDie(), 11);
+  EXPECT_EQ(getNextInt(&arena, 10).Int64OrDie(), 11);
 }
 
 } // namespace Example

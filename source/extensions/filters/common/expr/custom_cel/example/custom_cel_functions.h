@@ -19,13 +19,13 @@ using google::api::expr::runtime::CelFunction;
 using google::api::expr::runtime::CelFunctionDescriptor;
 using google::api::expr::runtime::CelValue;
 
-class GetProductCelFunction : public CelFunction {
+class getProductCelFunction : public CelFunction {
 public:
-  explicit GetProductCelFunction(absl::string_view name)
+  explicit getProductCelFunction(absl::string_view name)
       : CelFunction({std::string(name), false, {CelValue::Type::kInt64, CelValue::Type::kInt64}}) {}
-  explicit GetProductCelFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
+  explicit getProductCelFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
 
-  static CelFunctionDescriptor CreateDescriptor(absl::string_view name) {
+  static CelFunctionDescriptor createDescriptor(absl::string_view name) {
     return CelFunctionDescriptor{name, false, {CelValue::Type::kInt64, CelValue::Type::kInt64}};
   }
 
@@ -33,13 +33,13 @@ public:
                         Protobuf::Arena* arena) const override;
 };
 
-class GetDoubleCelFunction : public CelFunction {
+class getDoubleCelFunction : public CelFunction {
 public:
-  explicit GetDoubleCelFunction(absl::string_view name)
+  explicit getDoubleCelFunction(absl::string_view name)
       : CelFunction({std::string(name), false, {CelValue::Type::kInt64}}) {}
-  explicit GetDoubleCelFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
+  explicit getDoubleCelFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
 
-  static CelFunctionDescriptor CreateDescriptor(absl::string_view name) {
+  static CelFunctionDescriptor createDescriptor(absl::string_view name) {
     return CelFunctionDescriptor{name, false, {CelValue::Type::kInt64}};
   }
 
@@ -47,12 +47,12 @@ public:
                         Protobuf::Arena* arena) const override;
 };
 
-class Get99CelFunction : public CelFunction {
+class get99CelFunction : public CelFunction {
 public:
-  explicit Get99CelFunction(absl::string_view name) : CelFunction({std::string(name), false, {}}) {}
-  explicit Get99CelFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
+  explicit get99CelFunction(absl::string_view name) : CelFunction({std::string(name), false, {}}) {}
+  explicit get99CelFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
 
-  static CelFunctionDescriptor CreateDescriptor(absl::string_view name) {
+  static CelFunctionDescriptor createDescriptor(absl::string_view name) {
     return CelFunctionDescriptor{name, false, {}};
   }
 
@@ -60,9 +60,9 @@ public:
                         Protobuf::Arena* arena) const override;
 };
 
-CelValue GetSquareOf(Protobuf::Arena* arena, int64_t i);
+CelValue getSquareOf(Protobuf::Arena* arena, int64_t i);
 
-CelValue GetNextInt(Protobuf::Arena* arena, int64_t i);
+CelValue getNextInt(Protobuf::Arena* arena, int64_t i);
 
 } // namespace Example
 } // namespace Custom_Cel

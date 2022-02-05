@@ -57,8 +57,11 @@ TEST_F(ExampleCustomCelVocabularyTests, FillActivationTest) {
   Activation activation;
 
   // calling FillActivation for the first time; lazy functions should be registered
-  EXPECT_NO_THROW(custom_cel_vocabulary.FillActivation(&activation, arena, mock_stream_info,
-                                                       &request_headers, &response_headers,
+  EXPECT_NO_THROW(custom_cel_vocabulary.fillActivation(&activation,
+                                                       arena,
+                                                       mock_stream_info,
+                                                       &request_headers,
+                                                       &response_headers,
                                                        &response_trailers));
 
   // verify that functions are in the activation
@@ -67,8 +70,11 @@ TEST_F(ExampleCustomCelVocabularyTests, FillActivationTest) {
   }
   // calling FillActivation for the second time
   // an exception should be thrown as the functions are already registered
-  EXPECT_THROW_WITH_REGEX(custom_cel_vocabulary.FillActivation(&activation, arena, mock_stream_info,
-                                                               &request_headers, &response_headers,
+  EXPECT_THROW_WITH_REGEX(custom_cel_vocabulary.fillActivation(&activation,
+                                                               arena,
+                                                               mock_stream_info,
+                                                               &request_headers,
+                                                               &response_headers,
                                                                &response_trailers),
                           EnvoyException, "failed to register function*");
 }
@@ -78,7 +84,7 @@ TEST_F(ExampleCustomCelVocabularyTests, RegisterFunctionsTest) {
   ExampleCustomCelVocabulary custom_cel_vocabulary;
   const CelFunctionDescriptor* function_descriptor;
 
-  EXPECT_NO_THROW(custom_cel_vocabulary.RegisterFunctions(&registry));
+  EXPECT_NO_THROW(custom_cel_vocabulary.registerFunctions(&registry));
   auto functions = registry.ListFunctions();
 
   // verify that functions are in the registry
@@ -105,7 +111,7 @@ TEST_F(ExampleCustomCelVocabularyTests, RegisterFunctionsTest) {
   }
 
   // an attempt to call RegisterFunctions a second time should fail
-  EXPECT_THROW_WITH_REGEX(custom_cel_vocabulary.RegisterFunctions(&registry), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(custom_cel_vocabulary.registerFunctions(&registry), EnvoyException,
                           "failed to register function*");
 }
 

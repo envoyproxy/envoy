@@ -22,14 +22,14 @@ namespace Example {
 
 void ThrowException(absl::string_view function_name, absl::Status status);
 
-void ExampleCustomCelVocabulary::FillActivation(Activation* activation, Protobuf::Arena& arena,
+void ExampleCustomCelVocabulary::fillActivation(Activation* activation, Protobuf::Arena& arena,
                                                 const StreamInfo::StreamInfo& info,
                                                 const Http::RequestHeaderMap* request_headers,
                                                 const Http::ResponseHeaderMap* response_headers,
                                                 const Http::ResponseTrailerMap* response_trailers) {
-  set_request_headers(request_headers);
-  set_response_headers(response_headers);
-  set_response_trailers(response_trailers);
+  setRequestHeaders(request_headers);
+  setResponseHeaders(response_headers);
+  setResponseTrailers(response_trailers);
   // variables
   activation->InsertValueProducer(
       CustomCelVariablesSetName,
@@ -38,48 +38,51 @@ void ExampleCustomCelVocabulary::FillActivation(Activation* activation, Protobuf
   // Lazily evaluated functions only
   absl::Status status;
   status =
-      activation->InsertFunction(std::make_unique<GetDoubleCelFunction>(LazyEvalFuncNameGetDouble));
+      activation->InsertFunction(std::make_unique<getDoubleCelFunction>(LazyEvalFuncNameGetDouble));
   if (!status.ok()) {
     ThrowException(LazyEvalFuncNameGetDouble, status);
   }
   status = activation->InsertFunction(
-      std::make_unique<GetProductCelFunction>(LazyEvalFuncNameGetProduct));
+      std::make_unique<getProductCelFunction>(LazyEvalFuncNameGetProduct));
   if (!status.ok()) {
     ThrowException(LazyEvalFuncNameGetProduct, status);
   }
-  status = activation->InsertFunction(std::make_unique<Get99CelFunction>(LazyEvalFuncNameGet99));
+  status = activation->InsertFunction(std::make_unique<get99CelFunction>(LazyEvalFuncNameGet99));
   if (!status.ok()) {
     ThrowException(LazyEvalFuncNameGet99, status);
   }
 }
 
-void ExampleCustomCelVocabulary::RegisterFunctions(CelFunctionRegistry* registry) const {
+void ExampleCustomCelVocabulary::registerFunctions(CelFunctionRegistry* registry) const {
   absl::Status status;
   // lazily evaluated functions
   status = registry->RegisterLazyFunction(
-      GetDoubleCelFunction::CreateDescriptor(LazyEvalFuncNameGetDouble));
+      getDoubleCelFunction::createDescriptor(LazyEvalFuncNameGetDouble));
   if (!status.ok()) {
     ThrowException(LazyEvalFuncNameGetDouble, status);
   }
   status = registry->RegisterLazyFunction(
-      GetProductCelFunction::CreateDescriptor(LazyEvalFuncNameGetProduct));
+      getProductCelFunction::createDescriptor(LazyEvalFuncNameGetProduct));
   if (!status.ok()) {
     ThrowException(LazyEvalFuncNameGetProduct, status);
   }
   status =
-      registry->RegisterLazyFunction(Get99CelFunction::CreateDescriptor(LazyEvalFuncNameGet99));
+      registry->RegisterLazyFunction(get99CelFunction::createDescriptor(
+          LazyEvalFuncNameGet99));
   if (!status.ok()) {
     ThrowException(LazyEvalFuncNameGet99, status);
   }
 
   // eagerly evaluated functions
-  status = google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
-      EagerEvalFuncNameGetNextInt, false, GetNextInt, registry);
+  status = google::api::expr::runtime::FunctionAdapter<CelValue,
+                                                       int64_t>::CreateAndRegister(
+      EagerEvalFuncNameGetNextInt, false, getNextInt, registry);
   if (!status.ok()) {
     ThrowException(EagerEvalFuncNameGetNextInt, status);
   }
-  status = google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
-      EagerEvalFuncNameGetSquareOf, true, GetSquareOf, registry);
+  status = google::api::expr::runtime::FunctionAdapter<CelValue,
+                                                       int64_t>::CreateAndRegister(
+      EagerEvalFuncNameGetSquareOf, true, getSquareOf, registry);
   if (!status.ok()) {
     ThrowException(EagerEvalFuncNameGetSquareOf, status);
   }

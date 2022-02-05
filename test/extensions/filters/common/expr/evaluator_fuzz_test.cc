@@ -20,7 +20,7 @@ namespace {
 using Custom_Cel::Example::ExampleCustomCelVocabulary;
 using test::extensions::filters::common::expr::EvaluatorTestCase;
 
-void ProtoFuzzer(const EvaluatorTestCase& input, bool use_custom_cel_vocabulary) {
+void protoFuzzer(const EvaluatorTestCase& input, bool use_custom_cel_vocabulary) {
   // Create builder without constant folding.
   auto custom_cel_vocabulary = std::make_unique<ExampleCustomCelVocabulary>();
   static Expr::BuilderPtr builder;
@@ -66,8 +66,8 @@ void ProtoFuzzer(const EvaluatorTestCase& input, bool use_custom_cel_vocabulary)
 }
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTestCase& input) {
-  ProtoFuzzer(input, false);
-  ProtoFuzzer(input, true);
+  protoFuzzer(input, false);
+  protoFuzzer(input, true);
 }
 
 } // namespace

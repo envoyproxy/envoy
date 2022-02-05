@@ -27,23 +27,23 @@ public:
 
   // FillActivation can register variable sets using InsertValueProducer.
   // Lazy function
-  virtual void FillActivation(Activation* activation, Protobuf::Arena& arena,
+  virtual void fillActivation(Activation* activation, Protobuf::Arena& arena,
                               const StreamInfo::StreamInfo& info,
                               const Http::RequestHeaderMap* request_headers,
                               const Http::ResponseHeaderMap* response_headers,
                               const Http::ResponseTrailerMap* response_trailers) PURE;
 
-  virtual void RegisterFunctions(CelFunctionRegistry* registry) const PURE;
+  virtual void registerFunctions(CelFunctionRegistry* registry) const PURE;
 
   virtual ~CustomCelVocabulary() {}
 
-  void set_request_headers(const Http::RequestHeaderMap* request_headers) {
+  void setRequestHeaders(const Http::RequestHeaderMap* request_headers) {
     request_headers_ = request_headers;
   }
-  void set_response_headers(const Http::ResponseHeaderMap* response_headers) {
+  void setResponseHeaders(const Http::ResponseHeaderMap* response_headers) {
     response_headers_ = response_headers;
   }
-  void set_response_trailers(const Http::ResponseTrailerMap* response_trailers) {
+  void setResponseTrailers(const Http::ResponseTrailerMap* response_trailers) {
     response_trailers_ = response_trailers;
   }
 
