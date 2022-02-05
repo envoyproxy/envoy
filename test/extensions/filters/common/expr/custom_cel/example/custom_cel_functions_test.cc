@@ -26,8 +26,8 @@ public:
 
 TEST_F(CustomCelFunctionsTests, GetProductCelFunctionTest) {
   GetProductCelFunction function("GetProduct");
-  std::vector<const CelValue> input_values = {CelValue::CreateInt64(2), CelValue::CreateInt64(3)};
-  auto args = absl::Span<const CelValue>(input_values);
+  std::vector<CelValue> input_values = {CelValue::CreateInt64(2), CelValue::CreateInt64(3)};
+  auto args = absl::Span<CelValue>(input_values);
   absl::Status status = function.Evaluate(args, &result, &arena);
   ASSERT_TRUE(status.ok());
   EXPECT_EQ(result.Int64OrDie(), 6);
@@ -35,8 +35,8 @@ TEST_F(CustomCelFunctionsTests, GetProductCelFunctionTest) {
 
 TEST_F(CustomCelFunctionsTests, GetDoubleCelFunctionTest) {
   GetDoubleCelFunction function("GetDouble");
-  std::vector<const CelValue> input_values = {CelValue::CreateInt64(2)};
-  auto args = absl::Span<const CelValue>(input_values);
+  std::vector<CelValue> input_values = {CelValue::CreateInt64(2)};
+  auto args = absl::Span<CelValue>(input_values);
   absl::Status status = function.Evaluate(args, &result, &arena);
   ASSERT_TRUE(status.ok());
   EXPECT_EQ(result.Int64OrDie(), 4);
@@ -44,8 +44,8 @@ TEST_F(CustomCelFunctionsTests, GetDoubleCelFunctionTest) {
 
 TEST_F(CustomCelFunctionsTests, Get99CelFunctionTest) {
   Get99CelFunction function("Get99");
-  std::vector<const CelValue> input_values = {};
-  auto args = absl::Span<const CelValue>(input_values);
+  std::vector<CelValue> input_values = {};
+  auto args = absl::Span<CelValue>(input_values);
   absl::Status status = function.Evaluate(args, &result, &arena);
   ASSERT_TRUE(status.ok());
   EXPECT_EQ(result.Int64OrDie(), 99);
