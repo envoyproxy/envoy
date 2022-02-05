@@ -157,15 +157,10 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
     return 0;
   }
 
-  // Set the trust bundle's certificate store on the context, and do the verification.
+  // Set the trust bundle's certificate store on a copy of the context, and do the verification.
   bssl::UniquePtr<X509_STORE_CTX> new_store_ctx(X509_STORE_CTX_new());
   if (!X509_STORE_CTX_init(new_store_ctx.get(), trust_bundle, &leaf_cert,
-                           X509_STORE_CTX_get0_untrusted(store_ctx))) {
-    stats_.fail_verify_error_.inc();
-    return 0;
-  }
-  // Currently this method is only used to verify server certs, so hard-code "ssl_server" for now.
-  if (!X509_STORE_CTX_set_default(new_store_ctx.get(), "ssl_server") ||
+                           X509_STORE_CTX_get0_untrusted(store_ctx)) ||
       !X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(new_store_ctx.get()),
                               X509_STORE_CTX_get0_param(store_ctx))) {
     stats_.fail_verify_error_.inc();
