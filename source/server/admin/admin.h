@@ -225,6 +225,9 @@ private:
     const bool mutates_server_state_;
   };
 
+  UrlHandler makeHandler(const std::string& prefix, const std::string& help_text,
+                         HandlerCb callback, bool removable, bool mutates_state);
+
   /**
    * Implementation of RouteConfigProvider that returns a static null route config.
    */

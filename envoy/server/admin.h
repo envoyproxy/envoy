@@ -64,19 +64,10 @@ public:
  * done in the RouteConfigProviderManagerImpl constructor in source/common/router/rds_impl.cc.
  */
 #define MAKE_ADMIN_HANDLER(X)                                                                      \
-  [this]() -> HandlerPtr {                                                                         \
-    return std::make_unique<HandlerGasket>(                                                        \
-        [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,        \
-               Buffer::Instance& data, Server::AdminStream& admin_stream) -> Http::Code {          \
-          return X(path_and_query, response_headers, data, admin_stream);                          \
-        });                                                                                        \
+  [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,              \
+         Buffer::Instance& data, Server::AdminStream& admin_stream) -> Http::Code {                \
+    return X(path_and_query, response_headers, data, admin_stream);                                \
   }
-
-/*#define MAKE_ADMIN_HANDLER(X)                                         \
-  [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,            \
-         Buffer::Instance& data, Server::AdminStream& admin_stream) -> Http::Code {              \
-    return X(path_and_query, response_headers, data, admin_stream);                              \
-    }*/
 
 /**
  * Global admin HTTP endpoint for the server.
@@ -110,17 +101,6 @@ public:
       Buffer::Instance& response, AdminStream& admin_stream)>;
 
   using GenHandlerCb = std::function<HandlerPtr()>;
-
-  class HandlerGasket : public Handler {
-  public:
-    HandlerGasket(HandlerCb handler_cb);
-    Http::Code start(absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
-                     Buffer::Instance& response, AdminStream& admin_stream) override;
-    bool nextChunk(Buffer::Instance& response) override;
-
-  private:
-    HandlerCb handler_cb_;
-  };
 
   /**
    * Add an admin handler.
@@ -194,10 +174,6 @@ public:
    * @return the number of worker threads to run in the server.
    */
   virtual uint32_t concurrency() const PURE;
-
-  static GenHandlerCb genHandler(HandlerCb cb) {
-    return [cb]() -> HandlerPtr { return std::make_unique<HandlerGasket>(cb); };
-  }
 };
 
 } // namespace Server

@@ -161,63 +161,67 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
       server_info_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
-          {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
-          {"/certs", "print certs on machine",
-           MAKE_ADMIN_HANDLER(server_info_handler_.handlerCerts), false, false},
-          {"/clusters", "upstream cluster status",
-           MAKE_ADMIN_HANDLER(clusters_handler_.handlerClusters), false, false},
-          {"/config_dump", "dump current Envoy configs (experimental)",
-           MAKE_ADMIN_HANDLER(config_dump_handler_.handlerConfigDump), false, false},
-          {"/init_dump", "dump current Envoy init manager information (experimental)",
-           MAKE_ADMIN_HANDLER(init_dump_handler_.handlerInitDump), false, false},
-          {"/contention", "dump current Envoy mutex contention stats (if enabled)",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerContention), false, false},
-          {"/cpuprofiler", "enable/disable the CPU profiler",
-           MAKE_ADMIN_HANDLER(profiling_handler_.handlerCpuProfiler), false, true},
-          {"/heapprofiler", "enable/disable the heap profiler",
-           MAKE_ADMIN_HANDLER(profiling_handler_.handlerHeapProfiler), false, true},
-          {"/healthcheck/fail", "cause the server to fail health checks",
-           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckFail), false, true},
-          {"/healthcheck/ok", "cause the server to pass health checks",
-           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckOk), false, true},
-          {"/help", "print out list of admin commands", MAKE_ADMIN_HANDLER(handlerHelp), false,
-           false},
-          {"/hot_restart_version", "print the hot restart compatibility version",
-           MAKE_ADMIN_HANDLER(server_info_handler_.handlerHotRestartVersion), false, false},
-          {"/logging", "query/change logging levels",
-           MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true},
-          {"/memory", "print current allocation/heap usage",
-           MAKE_ADMIN_HANDLER(server_info_handler_.handlerMemory), false, false},
-          {"/quitquitquit", "exit the server",
-           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerQuitQuitQuit), false, true},
-          {"/reset_counters", "reset all counters to zero",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true},
-          {"/drain_listeners", "drain listeners",
-           MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true},
-          {"/server_info", "print server version/status information",
-           MAKE_ADMIN_HANDLER(server_info_handler_.handlerServerInfo), false, false},
-          {"/ready", "print server state, return 200 if LIVE, otherwise return 503",
-           MAKE_ADMIN_HANDLER(server_info_handler_.handlerReady), false, false},
-          {"/stats", "print server stats", MAKE_ADMIN_HANDLER(stats_handler_.handlerStats), false,
-           false},
-          {"/stats/prometheus", "print server stats in prometheus format",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerPrometheusStats), false, false},
-          {"/stats/recentlookups", "Show recent stat-name lookups",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookups), false, false},
-          {"/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsClear), false, true},
-          {"/stats/recentlookups/disable", "disable recording of reset stat-name lookup names",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsDisable), false, true},
-          {"/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsEnable), false, true},
-          {"/listeners", "print listener info",
-           MAKE_ADMIN_HANDLER(listeners_handler_.handlerListenerInfo), false, false},
-          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntime),
-           false, false},
-          {"/runtime_modify", "modify runtime values",
-           MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntimeModify), false, true},
-          {"/reopen_logs", "reopen access logs",
-           MAKE_ADMIN_HANDLER(logs_handler_.handlerReopenLogs), false, true},
+          makeHandler("/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false),
+          makeHandler("/certs", "print certs on machine",
+                      MAKE_ADMIN_HANDLER(server_info_handler_.handlerCerts), false, false),
+          makeHandler("/clusters", "upstream cluster status",
+                      MAKE_ADMIN_HANDLER(clusters_handler_.handlerClusters), false, false),
+          makeHandler("/config_dump", "dump current Envoy configs (experimental)",
+                      MAKE_ADMIN_HANDLER(config_dump_handler_.handlerConfigDump), false, false),
+          makeHandler("/init_dump", "dump current Envoy init manager information (experimental)",
+                      MAKE_ADMIN_HANDLER(init_dump_handler_.handlerInitDump), false, false),
+          makeHandler("/contention", "dump current Envoy mutex contention stats (if enabled)",
+                      MAKE_ADMIN_HANDLER(stats_handler_.handlerContention), false, false),
+          makeHandler("/cpuprofiler", "enable/disable the CPU profiler",
+                      MAKE_ADMIN_HANDLER(profiling_handler_.handlerCpuProfiler), false, true),
+          makeHandler("/heapprofiler", "enable/disable the heap profiler",
+                      MAKE_ADMIN_HANDLER(profiling_handler_.handlerHeapProfiler), false, true),
+          makeHandler("/healthcheck/fail", "cause the server to fail health checks",
+                      MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckFail), false, true),
+          makeHandler("/healthcheck/ok", "cause the server to pass health checks",
+                      MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckOk), false, true),
+          makeHandler("/help", "print out list of admin commands", MAKE_ADMIN_HANDLER(handlerHelp),
+                      false, false),
+          makeHandler("/hot_restart_version", "print the hot restart compatibility version",
+                      MAKE_ADMIN_HANDLER(server_info_handler_.handlerHotRestartVersion), false,
+                      false),
+          makeHandler("/logging", "query/change logging levels",
+                      MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true),
+          makeHandler("/memory", "print current allocation/heap usage",
+                      MAKE_ADMIN_HANDLER(server_info_handler_.handlerMemory), false, false),
+          makeHandler("/quitquitquit", "exit the server",
+                      MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerQuitQuitQuit), false, true),
+          makeHandler("/reset_counters", "reset all counters to zero",
+                      MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true),
+          makeHandler("/drain_listeners", "drain listeners",
+                      MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true),
+          makeHandler("/server_info", "print server version/status information",
+                      MAKE_ADMIN_HANDLER(server_info_handler_.handlerServerInfo), false, false),
+          makeHandler("/ready", "print server state, return 200 if LIVE, otherwise return 503",
+                      MAKE_ADMIN_HANDLER(server_info_handler_.handlerReady), false, false),
+          makeHandler("/stats", "print server stats",
+                      MAKE_ADMIN_HANDLER(stats_handler_.handlerStats), false, false),
+          makeHandler("/stats/prometheus", "print server stats in prometheus format",
+                      MAKE_ADMIN_HANDLER(stats_handler_.handlerPrometheusStats), false, false),
+          makeHandler("/stats/recentlookups", "Show recent stat-name lookups",
+                      MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookups), false, false),
+          makeHandler("/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
+                      MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsClear), false,
+                      true),
+          makeHandler(
+              "/stats/recentlookups/disable", "disable recording of reset stat-name lookup names",
+              MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsDisable), false, true),
+          makeHandler(
+              "/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
+              MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsEnable), false, true),
+          makeHandler("/listeners", "print listener info",
+                      MAKE_ADMIN_HANDLER(listeners_handler_.handlerListenerInfo), false, false),
+          makeHandler("/runtime", "print runtime values",
+                      MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntime), false, false),
+          makeHandler("/runtime_modify", "modify runtime values",
+                      MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntimeModify), false, true),
+          makeHandler("/reopen_logs", "reopen access logs",
+                      MAKE_ADMIN_HANDLER(logs_handler_.handlerReopenLogs), false, true),
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()),
@@ -375,6 +379,30 @@ const Network::Address::Instance& AdminImpl::localAddress() {
   return *server_.localInfo().address();
 }
 
+class HandlerGasket : public Admin::Handler {
+public:
+  HandlerGasket(Admin::HandlerCb handler_cb) : handler_cb_(handler_cb) {}
+
+  Http::Code start(absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
+                   Buffer::Instance& response, AdminStream& admin_stream) override {
+    return handler_cb_(path_and_query, response_headers, response, admin_stream);
+  }
+
+  bool nextChunk(Buffer::Instance&) override { return false; }
+
+private:
+  Admin::HandlerCb handler_cb_;
+};
+
+AdminImpl::UrlHandler AdminImpl::makeHandler(const std::string& prefix,
+                                             const std::string& help_text, HandlerCb callback,
+                                             bool removable, bool mutates_state) {
+  GenHandlerCb gen_handler = [callback]() -> Server::Admin::HandlerPtr {
+    return std::make_unique<HandlerGasket>(callback);
+  };
+  return UrlHandler{prefix, help_text, gen_handler, removable, mutates_state};
+}
+
 bool AdminImpl::addChunkedHandler(const std::string& prefix, const std::string& help_text,
                                   GenHandlerCb callback, bool removable, bool mutates_state) {
   ASSERT(prefix.size() > 1);
@@ -443,16 +471,6 @@ void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
     handler->addListener(absl::nullopt, *listener_);
   }
 }
-
-Admin::HandlerGasket::HandlerGasket(HandlerCb handler_cb) : handler_cb_(handler_cb) {}
-
-Http::Code Admin::HandlerGasket::start(absl::string_view path_and_query,
-                                       Http::ResponseHeaderMap& response_headers,
-                                       Buffer::Instance& response, AdminStream& admin_stream) {
-  return handler_cb_(path_and_query, response_headers, response, admin_stream);
-}
-
-bool Admin::HandlerGasket::nextChunk(Buffer::Instance&) { return false; }
 
 } // namespace Server
 } // namespace Envoy
