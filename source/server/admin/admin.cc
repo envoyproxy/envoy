@@ -275,7 +275,17 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
           break;
         }
       }
-      code = handler.handler_(path_and_query, response_headers, response, admin_stream);
+
+      // TODO(jmarantz): re-organize this loop so we release the thread after each
+      // chunk.
+      {
+        Admin::HandlerPtr admin_handler = handler.handler_();
+        code = admin_handler->start(path_and_query, response_headers, response, admin_stream);
+        if (code == Http::Code::OK) {
+          while (admin_handler->nextChunk(response)) {
+          }
+        }
+      }
       Memory::Utils::tryShrinkHeap();
       break;
     }
@@ -365,8 +375,8 @@ const Network::Address::Instance& AdminImpl::localAddress() {
   return *server_.localInfo().address();
 }
 
-bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
-                           HandlerCb callback, bool removable, bool mutates_state) {
+bool AdminImpl::addChunkedHandler(const std::string& prefix, const std::string& help_text,
+                                  GenHandlerCb callback, bool removable, bool mutates_state) {
   ASSERT(prefix.size() > 1);
   ASSERT(prefix[0] == '/');
 
@@ -387,6 +397,14 @@ bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_te
     return true;
   }
   return false;
+}
+
+bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
+                           HandlerCb callback, bool removable, bool mutates_state) {
+  GenHandlerCb gen_handler = [callback]() -> HandlerPtr {
+    return std::make_unique<HandlerGasket>(callback);
+  };
+  return addChunkedHandler(prefix, help_text, gen_handler, removable, mutates_state);
 }
 
 bool AdminImpl::removeHandler(const std::string& prefix) {
@@ -425,6 +443,16 @@ void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
     handler->addListener(absl::nullopt, *listener_);
   }
 }
+
+Admin::HandlerGasket::HandlerGasket(HandlerCb handler_cb) : handler_cb_(handler_cb) {}
+
+Http::Code Admin::HandlerGasket::start(absl::string_view path_and_query,
+                                       Http::ResponseHeaderMap& response_headers,
+                                       Buffer::Instance& response, AdminStream& admin_stream) {
+  return handler_cb_(path_and_query, response_headers, response, admin_stream);
+}
+
+bool Admin::HandlerGasket::nextChunk(Buffer::Instance&) { return false; }
 
 } // namespace Server
 } // namespace Envoy

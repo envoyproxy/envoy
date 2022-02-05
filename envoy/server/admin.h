@@ -64,10 +64,19 @@ public:
  * done in the RouteConfigProviderManagerImpl constructor in source/common/router/rds_impl.cc.
  */
 #define MAKE_ADMIN_HANDLER(X)                                                                      \
-  [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,              \
-         Buffer::Instance& data, Server::AdminStream& admin_stream) -> Http::Code {                \
-    return X(path_and_query, response_headers, data, admin_stream);                                \
+  [this]() -> HandlerPtr {                                                                         \
+    return std::make_unique<HandlerGasket>(                                                        \
+        [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,        \
+               Buffer::Instance& data, Server::AdminStream& admin_stream) -> Http::Code {          \
+          return X(path_and_query, response_headers, data, admin_stream);                          \
+        });                                                                                        \
   }
+
+/*#define MAKE_ADMIN_HANDLER(X)                                         \
+  [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,            \
+         Buffer::Instance& data, Server::AdminStream& admin_stream) -> Http::Code {              \
+    return X(path_and_query, response_headers, data, admin_stream);                              \
+    }*/
 
 /**
  * Global admin HTTP endpoint for the server.
@@ -75,6 +84,16 @@ public:
 class Admin {
 public:
   virtual ~Admin() = default;
+
+  class Handler {
+  public:
+    virtual ~Handler() = default;
+    virtual Http::Code start(absl::string_view path_and_query,
+                             Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                             AdminStream& admin_stream) PURE;
+    virtual bool nextChunk(Buffer::Instance& response) PURE;
+  };
+  using HandlerPtr = std::unique_ptr<Handler>;
 
   /**
    * Callback for admin URL handlers.
@@ -90,6 +109,19 @@ public:
       absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
       Buffer::Instance& response, AdminStream& admin_stream)>;
 
+  using GenHandlerCb = std::function<HandlerPtr()>;
+
+  class HandlerGasket : public Handler {
+  public:
+    HandlerGasket(HandlerCb handler_cb);
+    Http::Code start(absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
+                     Buffer::Instance& response, AdminStream& admin_stream) override;
+    bool nextChunk(Buffer::Instance& response) override;
+
+  private:
+    HandlerCb handler_cb_;
+  };
+
   /**
    * Add an admin handler.
    * @param prefix supplies the URL prefix to handle.
@@ -101,6 +133,10 @@ public:
    */
   virtual bool addHandler(const std::string& prefix, const std::string& help_text,
                           HandlerCb callback, bool removable, bool mutates_server_state) PURE;
+
+  virtual bool addChunkedHandler(const std::string& prefix, const std::string& help_text,
+                                 GenHandlerCb callback, bool removable,
+                                 bool mutates_server_state) PURE;
 
   /**
    * Remove an admin handler if it is removable.
@@ -158,6 +194,10 @@ public:
    * @return the number of worker threads to run in the server.
    */
   virtual uint32_t concurrency() const PURE;
+
+  static GenHandlerCb genHandler(HandlerCb cb) {
+    return [cb]() -> HandlerPtr { return std::make_unique<HandlerGasket>(cb); };
+  }
 };
 
 } // namespace Server
