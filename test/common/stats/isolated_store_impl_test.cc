@@ -265,5 +265,27 @@ TEST_F(StatsIsolatedStoreImplTest, StatNamesStruct) {
   EXPECT_EQ("scope2.prefix.test_text_readout", stats2.test_text_readout_.name());
 }
 
+TEST_F(StatsIsolatedStoreImplTest, SharedScopes) {
+  std::vector<ConstScopeSharedPtr> scopes;
+
+  // Verifies shared_ptr functionality by creating some scopes, iterating
+  // through them from the store and saving them in a vector, dropping the
+  // references, and then referencing the scopes, verifying their names.
+  {
+    ScopeSharedPtr scope1 = store_->createScope("scope1.");
+    ScopeSharedPtr scope2 = store_->createScope("scope2.");
+    store_->forEachScope(
+        [](size_t) {},
+        [&scopes](const Scope& scope) { scopes.push_back(scope.makeConstShared()); });
+  }
+  ASSERT_EQ(3, scopes.size());
+  store_->symbolTable().sortByStatNames<ConstScopeSharedPtr>(
+      scopes.begin(), scopes.end(),
+      [](const ConstScopeSharedPtr& scope) -> StatName { return scope->prefix(); });
+  EXPECT_EQ("", store_->symbolTable().toString(scopes[0]->prefix())); // default scope
+  EXPECT_EQ("scope1", store_->symbolTable().toString(scopes[1]->prefix()));
+  EXPECT_EQ("scope2", store_->symbolTable().toString(scopes[2]->prefix()));
+}
+
 } // namespace Stats
 } // namespace Envoy

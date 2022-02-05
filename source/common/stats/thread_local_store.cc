@@ -975,9 +975,8 @@ void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,
                                         StatFn<const Scope> f_scope) const {
   Thread::LockGuard lock(lock_);
   if (f_size != nullptr) {
-    f_size(scopes_.size() + 1 /* for default_scope_ */);
+    f_size(scopes_.size());
   }
-  f_scope(*default_scope_);
   for (ScopeImpl* scope : scopes_) {
     f_scope(*scope);
   }

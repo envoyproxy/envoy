@@ -40,11 +40,14 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
 IsolatedStoreImpl::~IsolatedStoreImpl() = default;
 
 ScopeSharedPtr IsolatedStoreImpl::createScope(const std::string& name) {
-  return std::make_shared<ScopePrefixer>(name, *this);
+  StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), alloc_.symbolTable());
+  return scopeFromStatName(stat_name_storage.statName());
 }
 
 ScopeSharedPtr IsolatedStoreImpl::scopeFromStatName(StatName name) {
-  return std::make_shared<ScopePrefixer>(name, *this);
+  ScopeSharedPtr scope = std::make_shared<ScopePrefixer>(name, *this);
+  scopes_.push_back(scope);
+  return scope;
 }
 
 } // namespace Stats
