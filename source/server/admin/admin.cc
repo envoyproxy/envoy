@@ -383,6 +383,12 @@ class HandlerGasket : public Admin::Handler {
 public:
   HandlerGasket(Admin::HandlerCb handler_cb) : handler_cb_(handler_cb) {}
 
+  static Admin::GenHandlerCb makeGen(Admin::HandlerCb callback) {
+    return [callback]() -> Server::Admin::HandlerPtr {
+      return std::make_unique<HandlerGasket>(callback);
+    };
+  }
+
   Http::Code start(absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
                    Buffer::Instance& response, AdminStream& admin_stream) override {
     return handler_cb_(path_and_query, response_headers, response, admin_stream);
@@ -397,10 +403,7 @@ private:
 AdminImpl::UrlHandler AdminImpl::makeHandler(const std::string& prefix,
                                              const std::string& help_text, HandlerCb callback,
                                              bool removable, bool mutates_state) {
-  GenHandlerCb gen_handler = [callback]() -> Server::Admin::HandlerPtr {
-    return std::make_unique<HandlerGasket>(callback);
-  };
-  return UrlHandler{prefix, help_text, gen_handler, removable, mutates_state};
+  return UrlHandler{prefix, help_text, HandlerGasket::makeGen(callback), removable, mutates_state};
 }
 
 bool AdminImpl::addChunkedHandler(const std::string& prefix, const std::string& help_text,
@@ -429,10 +432,8 @@ bool AdminImpl::addChunkedHandler(const std::string& prefix, const std::string& 
 
 bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
                            HandlerCb callback, bool removable, bool mutates_state) {
-  GenHandlerCb gen_handler = [callback]() -> HandlerPtr {
-    return std::make_unique<HandlerGasket>(callback);
-  };
-  return addChunkedHandler(prefix, help_text, gen_handler, removable, mutates_state);
+  return addChunkedHandler(prefix, help_text, HandlerGasket::makeGen(callback), removable,
+                           mutates_state);
 }
 
 bool AdminImpl::removeHandler(const std::string& prefix) {
