@@ -847,24 +847,6 @@ TEST_P(RBACWithCustomCelVocabularyIntegrationTest, CustomCelFunctionExprIfNoMatc
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// Custom Cel Vocabulary - NO DENY if GetSquareOf(4)==-1
-TEST_P(RBACWithCustomCelVocabularyIntegrationTest, CustomCelFunctionExprIfNoMatchNoDeny) {
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
-                                           fmt::format(CUSTOM_CEL_FUNCTION_EXPR, "-1")));
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-}
-
 #endif
 
 } // namespace
