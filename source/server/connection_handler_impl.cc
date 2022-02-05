@@ -231,7 +231,7 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag) {
   auto active_listener = findActiveListenerByTag(listener_tag);
   if (active_listener.has_value()) {
     ASSERT(absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
-        active_listener->get().typed_listener_));
+        active_listener->get().typed_listener_) && active_listener->get().listener_->listener() != nullptr);
     return Network::BalancedConnectionHandlerOptRef(
         active_listener->get().tcpListener().value().get());
   }
@@ -240,6 +240,9 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag) {
 
 Network::BalancedConnectionHandlerOptRef
 ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Instance& address) {
+  if (address.type() != Network::Address::Type::Ip) {
+    return absl::nullopt;
+  }
   // We do not return stopped listeners.
   // If there is exact address match, return the corresponding listener.
   if (auto listener_it = tcp_listener_map_by_address_.find(address.asStringView());
