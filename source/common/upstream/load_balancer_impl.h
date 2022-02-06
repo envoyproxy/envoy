@@ -340,7 +340,8 @@ private:
   localitySourceType(HostAvailability host_availability) {
     switch (host_availability) {
     case HostAvailability::Healthy:
-      return absl::make_optional<HostsSource::SourceType>(HostsSource::SourceType::LocalityHealthyHosts);
+      return absl::make_optional<HostsSource::SourceType>(
+          HostsSource::SourceType::LocalityHealthyHosts);
     case HostAvailability::Degraded:
       return absl::make_optional<HostsSource::SourceType>(
           HostsSource::SourceType::LocalityDegradedHosts);
