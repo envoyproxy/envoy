@@ -28,12 +28,8 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
   // Connection, etc.) are registered second. The activation mapping will retain the first
   // registration of a name and not allow it to be overwritten.
   if (custom_cel_vocabulary) {
-    custom_cel_vocabulary->fillActivation(activation.get(),
-                                          arena,
-                                          info,
-                                          request_headers,
-                                          response_headers,
-                                          response_trailers);
+    custom_cel_vocabulary->fillActivation(activation.get(), arena, info, request_headers,
+                                          response_headers, response_trailers);
   }
 
   activation->InsertValueProducer(Request,

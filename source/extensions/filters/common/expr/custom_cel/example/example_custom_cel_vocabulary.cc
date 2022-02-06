@@ -9,6 +9,7 @@
 #include "source/extensions/filters/common/expr/custom_cel/example/custom_cel_variables.h"
 
 #include "eval/public/activation.h"
+#include "eval/public/cel_function.h"
 #include "eval/public/cel_function_adapter.h"
 #include "eval/public/cel_value.h"
 
@@ -20,7 +21,13 @@ namespace Expr {
 namespace Custom_Cel {
 namespace Example {
 
-void ThrowException(absl::string_view function_name, absl::Status status);
+using google::api::expr::runtime::FunctionAdapter;
+
+void throwException(absl::string_view function_name, absl::Status status);
+void addLazyFunctionToActivation(Activation* activation, absl::string_view function_name,
+                                 std::unique_ptr<CelFunction> function);
+void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view function_name,
+                               CelFunctionDescriptor descriptor);
 
 void ExampleCustomCelVocabulary::fillActivation(Activation* activation, Protobuf::Arena& arena,
                                                 const StreamInfo::StreamInfo& info,
@@ -36,55 +43,49 @@ void ExampleCustomCelVocabulary::fillActivation(Activation* activation, Protobuf
       std::make_unique<CustomCelVariablesWrapper>(arena, info, request_headers, response_headers,
                                                   response_trailers));
   // Lazily evaluated functions only
-  absl::Status status;
-  status =
-      activation->InsertFunction(std::make_unique<getDoubleCelFunction>(LazyEvalFuncNameGetDouble));
+  addLazyFunctionToActivation(activation, LazyEvalFuncNameGetDouble,
+                              std::make_unique<GetDoubleCelFunction>(LazyEvalFuncNameGetDouble));
+  addLazyFunctionToActivation(activation, LazyEvalFuncNameGetProduct,
+                              std::make_unique<GetDoubleCelFunction>(LazyEvalFuncNameGetProduct));
+  addLazyFunctionToActivation(activation, LazyEvalFuncNameGet99,
+                              std::make_unique<GetDoubleCelFunction>(LazyEvalFuncNameGet99));
+}
+
+void addLazyFunctionToActivation(Activation* activation, absl::string_view function_name,
+                                 std::unique_ptr<CelFunction> function) {
+  absl::Status status = activation->InsertFunction(std::move(function));
   if (!status.ok()) {
-    ThrowException(LazyEvalFuncNameGetDouble, status);
+    throwException(function_name, status);
   }
-  status = activation->InsertFunction(
-      std::make_unique<getProductCelFunction>(LazyEvalFuncNameGetProduct));
+}
+
+void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view function_name,
+                               CelFunctionDescriptor descriptor) {
+  absl::Status status = registry->RegisterLazyFunction(descriptor);
   if (!status.ok()) {
-    ThrowException(LazyEvalFuncNameGetProduct, status);
-  }
-  status = activation->InsertFunction(std::make_unique<get99CelFunction>(LazyEvalFuncNameGet99));
-  if (!status.ok()) {
-    ThrowException(LazyEvalFuncNameGet99, status);
+    throwException(function_name, status);
   }
 }
 
 void ExampleCustomCelVocabulary::registerFunctions(CelFunctionRegistry* registry) const {
-  absl::Status status;
   // lazily evaluated functions
-  status = registry->RegisterLazyFunction(
-      getDoubleCelFunction::createDescriptor(LazyEvalFuncNameGetDouble));
-  if (!status.ok()) {
-    ThrowException(LazyEvalFuncNameGetDouble, status);
-  }
-  status = registry->RegisterLazyFunction(
-      getProductCelFunction::createDescriptor(LazyEvalFuncNameGetProduct));
-  if (!status.ok()) {
-    ThrowException(LazyEvalFuncNameGetProduct, status);
-  }
-  status =
-      registry->RegisterLazyFunction(get99CelFunction::createDescriptor(
-          LazyEvalFuncNameGet99));
-  if (!status.ok()) {
-    ThrowException(LazyEvalFuncNameGet99, status);
-  }
+  addLazyFunctionToRegistry(registry, LazyEvalFuncNameGetDouble,
+                            GetDoubleCelFunction::createDescriptor(LazyEvalFuncNameGetDouble));
+  addLazyFunctionToRegistry(registry, LazyEvalFuncNameGetProduct,
+                            GetProductCelFunction::createDescriptor(LazyEvalFuncNameGetProduct));
+  addLazyFunctionToRegistry(registry, LazyEvalFuncNameGet99,
+                            Get99CelFunction::createDescriptor(LazyEvalFuncNameGet99));
 
   // eagerly evaluated functions
-  status = google::api::expr::runtime::FunctionAdapter<CelValue,
-                                                       int64_t>::CreateAndRegister(
+  absl::Status status = FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
       EagerEvalFuncNameGetNextInt, false, getNextInt, registry);
   if (!status.ok()) {
-    ThrowException(EagerEvalFuncNameGetNextInt, status);
+    throwException(EagerEvalFuncNameGetNextInt, status);
   }
-  status = google::api::expr::runtime::FunctionAdapter<CelValue,
-                                                       int64_t>::CreateAndRegister(
-      EagerEvalFuncNameGetSquareOf, true, getSquareOf, registry);
+  status = FunctionAdapter<CelValue, int64_t>::CreateAndRegister(EagerEvalFuncNameGetSquareOf, true,
+                                                                 getSquareOf, registry);
   if (!status.ok()) {
-    ThrowException(EagerEvalFuncNameGetSquareOf, status);
+    throwException(EagerEvalFuncNameGetSquareOf, status);
   }
 }
 
@@ -97,7 +98,7 @@ CustomCelVocabularyPtr ExampleCustomCelVocabularyFactory::createCustomCelVocabul
   return std::make_unique<ExampleCustomCelVocabulary>();
 }
 
-void ThrowException(absl::string_view function_name, absl::Status status) {
+void throwException(absl::string_view function_name, absl::Status status) {
   throw EnvoyException(
       fmt::format("failed to register function '{}': {}", function_name, status.message()));
 }

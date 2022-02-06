@@ -738,11 +738,11 @@ typed_config:
         principals:
           - any: true
         condition:
-          call_expr:
-            {}
+          {}
 )EOF";
 
 const std::string CUSTOM_CEL_VARIABLE_EXPR = R"EOF(
+          call_expr:
             function: _==_
             args:
             - select_expr:
@@ -755,6 +755,7 @@ const std::string CUSTOM_CEL_VARIABLE_EXPR = R"EOF(
 )EOF";
 
 const std::string CUSTOM_CEL_FUNCTION_EXPR = R"EOF(
+          call_expr:
             function: _==_
             args:
             - call_expr:

@@ -43,9 +43,9 @@ public:
     return &CustomCelVariablesList;
   }
 
-  const Http::RequestHeaderMap* request_headers() { return request_headers_; }
-  const Http::ResponseHeaderMap* response_headers() { return response_headers_; }
-  const Http::ResponseTrailerMap* response_trailers() { return response_trailers_; }
+  const Http::RequestHeaderMap* requestHeaders() { return request_headers_; }
+  const Http::ResponseHeaderMap* responseHeaders() { return response_headers_; }
+  const Http::ResponseTrailerMap* responseTrailers() { return response_trailers_; }
 
 private:
   Protobuf::Arena& arena_;

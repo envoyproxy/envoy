@@ -37,18 +37,12 @@ class ExampleCustomCelVocabulary : public CustomCelVocabulary {
 public:
   ExampleCustomCelVocabulary() : CustomCelVocabulary() {}
 
-  // FillActivation - adds variables or value producer to the activation,
-  // a mapping of names to their reference implementations
-  // Lazily evaluated functions require a two parts registration.
-  // FillActivation will add the name of the function to the activation here, and
-  // RegisterFunctions will add it to the registry.
   void fillActivation(Activation* activation, Protobuf::Arena& arena,
                       const StreamInfo::StreamInfo& info,
                       const Http::RequestHeaderMap* request_headers,
                       const Http::ResponseHeaderMap* response_headers,
                       const Http::ResponseTrailerMap* response_trailers);
 
-  // RegisterFunctions: registers both lazily evaluated and eagerly evaluated functions.
   void registerFunctions(CelFunctionRegistry* registry) const;
 
   ~ExampleCustomCelVocabulary() {}

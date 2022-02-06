@@ -22,12 +22,6 @@ namespace Example {
 using google::api::expr::runtime::CelFunctionDescriptor;
 using google::api::expr::runtime::CelFunctionRegistry;
 
-TEST(ExampleCustomCelVocabularyFactoryTests, CreateEmptyConfigProtoTest) {
-  ExampleCustomCelVocabularyFactory factory;
-  ProtobufTypes::MessagePtr message_ptr = factory.createEmptyConfigProto();
-  ASSERT_TRUE(message_ptr);
-}
-
 TEST(ExampleCustomCelVocabularyFactoryTests, CreateCustomCelVocabularyTest) {
   ExampleCustomCelVocabularyConfig config;
   ExampleCustomCelVocabularyFactory factory;
@@ -36,6 +30,18 @@ TEST(ExampleCustomCelVocabularyFactoryTests, CreateCustomCelVocabularyTest) {
   // visitor
   EXPECT_NO_THROW(custom_cel_vocabulary = factory.createCustomCelVocabulary(
                       config, ProtobufMessage::getStrictValidationVisitor()));
+}
+
+TEST(ExampleCustomCelVocabularyFactoryTests, CreateEmptyConfigProtoTest) {
+  ExampleCustomCelVocabularyFactory factory;
+  ProtobufTypes::MessagePtr message_ptr = factory.createEmptyConfigProto();
+  ASSERT_TRUE(message_ptr);
+}
+
+TEST(ExampleCustomCelVocabularyFactoryTests, CategoryTest) {
+  ExampleCustomCelVocabularyFactory factory;
+  auto category = factory.category();
+  EXPECT_EQ(category, "envoy.expr.custom_cel_vocabulary_config");
 }
 
 class ExampleCustomCelVocabularyTests : public testing::Test {
@@ -57,12 +63,12 @@ TEST_F(ExampleCustomCelVocabularyTests, FillActivationTest) {
   Activation activation;
 
   // calling FillActivation for the first time; lazy functions should be registered
-  EXPECT_NO_THROW(custom_cel_vocabulary.fillActivation(&activation,
-                                                       arena,
-                                                       mock_stream_info,
-                                                       &request_headers,
-                                                       &response_headers,
+  EXPECT_NO_THROW(custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info,
+                                                       &request_headers, &response_headers,
                                                        &response_trailers));
+  EXPECT_EQ(request_headers, *custom_cel_vocabulary.requestHeaders());
+  EXPECT_EQ(response_headers, *custom_cel_vocabulary.responseHeaders());
+  EXPECT_EQ(response_trailers, *custom_cel_vocabulary.responseTrailers());
 
   // verify that functions are in the activation
   for (int i = 0; static_cast<size_t>(i) < lazy_eval_function_names.size(); ++i) {
@@ -70,11 +76,8 @@ TEST_F(ExampleCustomCelVocabularyTests, FillActivationTest) {
   }
   // calling FillActivation for the second time
   // an exception should be thrown as the functions are already registered
-  EXPECT_THROW_WITH_REGEX(custom_cel_vocabulary.fillActivation(&activation,
-                                                               arena,
-                                                               mock_stream_info,
-                                                               &request_headers,
-                                                               &response_headers,
+  EXPECT_THROW_WITH_REGEX(custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info,
+                                                               &request_headers, &response_headers,
                                                                &response_trailers),
                           EnvoyException, "failed to register function*");
 }
@@ -113,6 +116,12 @@ TEST_F(ExampleCustomCelVocabularyTests, RegisterFunctionsTest) {
   // an attempt to call RegisterFunctions a second time should fail
   EXPECT_THROW_WITH_REGEX(custom_cel_vocabulary.registerFunctions(&registry), EnvoyException,
                           "failed to register function*");
+}
+
+TEST_F(ExampleCustomCelVocabularyTests, GetNameTest) {
+  ExampleCustomCelVocabularyFactory factory;
+  auto name = factory.name();
+  EXPECT_EQ(name, "envoy.expr.custom_cel_vocabulary.example");
 }
 
 } // namespace Example

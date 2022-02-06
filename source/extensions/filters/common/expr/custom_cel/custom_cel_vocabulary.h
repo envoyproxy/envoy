@@ -25,14 +25,18 @@ class CustomCelVocabulary {
 public:
   CustomCelVocabulary() {}
 
-  // FillActivation can register variable sets using InsertValueProducer.
-  // Lazy function
+  // fillActivation - adds variables or value producer to the activation,
+  // a mapping of names to their reference implementations
+  // Lazily evaluated functions require a two parts registration.
+  // fillActivation will add the name of the function to the activation here, and
+  // registerFunctions will add it to the registry.
   virtual void fillActivation(Activation* activation, Protobuf::Arena& arena,
                               const StreamInfo::StreamInfo& info,
                               const Http::RequestHeaderMap* request_headers,
                               const Http::ResponseHeaderMap* response_headers,
                               const Http::ResponseTrailerMap* response_trailers) PURE;
 
+  // registerFunctions: registers both lazily evaluated and eagerly evaluated functions.
   virtual void registerFunctions(CelFunctionRegistry* registry) const PURE;
 
   virtual ~CustomCelVocabulary() {}
@@ -40,12 +44,15 @@ public:
   void setRequestHeaders(const Http::RequestHeaderMap* request_headers) {
     request_headers_ = request_headers;
   }
+  const Http::RequestHeaderMap* requestHeaders() { return request_headers_; }
   void setResponseHeaders(const Http::ResponseHeaderMap* response_headers) {
     response_headers_ = response_headers;
   }
+  const Http::ResponseHeaderMap* responseHeaders() { return response_headers_; }
   void setResponseTrailers(const Http::ResponseTrailerMap* response_trailers) {
     response_trailers_ = response_trailers;
   }
+  const Http::ResponseTrailerMap* responseTrailers() { return response_trailers_; }
 
 private:
   const Http::RequestHeaderMap* request_headers_;

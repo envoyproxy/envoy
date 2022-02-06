@@ -19,11 +19,11 @@ using google::api::expr::runtime::CelFunction;
 using google::api::expr::runtime::CelFunctionDescriptor;
 using google::api::expr::runtime::CelValue;
 
-class getProductCelFunction : public CelFunction {
+class GetProductCelFunction : public CelFunction {
 public:
-  explicit getProductCelFunction(absl::string_view name)
+  explicit GetProductCelFunction(absl::string_view name)
       : CelFunction({std::string(name), false, {CelValue::Type::kInt64, CelValue::Type::kInt64}}) {}
-  explicit getProductCelFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
+  explicit GetProductCelFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
 
   static CelFunctionDescriptor createDescriptor(absl::string_view name) {
     return CelFunctionDescriptor{name, false, {CelValue::Type::kInt64, CelValue::Type::kInt64}};
@@ -33,11 +33,11 @@ public:
                         Protobuf::Arena* arena) const override;
 };
 
-class getDoubleCelFunction : public CelFunction {
+class GetDoubleCelFunction : public CelFunction {
 public:
-  explicit getDoubleCelFunction(absl::string_view name)
+  explicit GetDoubleCelFunction(absl::string_view name)
       : CelFunction({std::string(name), false, {CelValue::Type::kInt64}}) {}
-  explicit getDoubleCelFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
+  explicit GetDoubleCelFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
 
   static CelFunctionDescriptor createDescriptor(absl::string_view name) {
     return CelFunctionDescriptor{name, false, {CelValue::Type::kInt64}};
@@ -47,10 +47,10 @@ public:
                         Protobuf::Arena* arena) const override;
 };
 
-class get99CelFunction : public CelFunction {
+class Get99CelFunction : public CelFunction {
 public:
-  explicit get99CelFunction(absl::string_view name) : CelFunction({std::string(name), false, {}}) {}
-  explicit get99CelFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
+  explicit Get99CelFunction(absl::string_view name) : CelFunction({std::string(name), false, {}}) {}
+  explicit Get99CelFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
 
   static CelFunctionDescriptor createDescriptor(absl::string_view name) {
     return CelFunctionDescriptor{name, false, {}};
