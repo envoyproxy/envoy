@@ -72,8 +72,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers/xray:96.2"
 "source/extensions/tracers/zipkin:96.1"
 "source/extensions/transport_sockets:95.3"
-"source/extensions/transport_sockets/tls:94.5"
-"source/extensions/transport_sockets/tls/cert_validator:95.7"
+"source/extensions/transport_sockets/tls:94.4"
+"source/extensions/transport_sockets/tls/cert_validator:95.3"
 "source/extensions/transport_sockets/tls/ocsp:96.5"
 "source/extensions/transport_sockets/tls/private_key:77.8"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
