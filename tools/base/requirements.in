@@ -9,7 +9,6 @@ coverage
 envoy.base.utils>=0.0.14
 envoy.code_format.python_check>=0.0.7
 envoy.dependency.check
-envoy.dependency.cve_scan>=0.0.4
 envoy.dependency.pip_check>=0.1.0
 envoy.distribution.release>=0.0.7
 envoy.distribution.repo>=0.0.5
