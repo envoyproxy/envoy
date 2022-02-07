@@ -53,13 +53,13 @@ void HttpCacheImplementationTest::SetUp() {
   EXPECT_CALL(dispatcher_, post(_)).Times(AnyNumber());
   EXPECT_CALL(dispatcher_, isThreadSafe()).Times(AnyNumber());
 
-  delegate_->SetUp(dispatcher_);
+  delegate_->setUp(dispatcher_);
 }
 
 void HttpCacheImplementationTest::TearDown() {
   Assert::resetEnvoyBugCountersForTest();
 
-  delegate_->TearDown();
+  delegate_->tearDown();
 }
 
 void HttpCacheImplementationTest::updateHeaders(
@@ -299,7 +299,7 @@ TEST_P(HttpCacheImplementationTest, Fresh) {
 }
 
 TEST_P(HttpCacheImplementationTest, StaleUnusable) {
-  if (ValidationEnabled()) {
+  if (validationEnabled()) {
     // This test is for HttpCache implementations that do not yet support
     // updateHeaders (and instead return Unusable), so skip this test if the
     // delegate enables validation.
@@ -319,7 +319,7 @@ TEST_P(HttpCacheImplementationTest, StaleUnusable) {
 }
 
 TEST_P(HttpCacheImplementationTest, StaleRequiresValidation) {
-  if (!ValidationEnabled()) {
+  if (!validationEnabled()) {
     // Caches that do not implement or disable validation should skip this test.
     GTEST_SKIP();
   }
@@ -467,7 +467,7 @@ TEST_P(HttpCacheImplementationTest, VaryOnDisallowedKey) {
 }
 
 TEST_P(HttpCacheImplementationTest, UpdateHeadersAndMetadata) {
-  if (!ValidationEnabled()) {
+  if (!validationEnabled()) {
     // Caches that do not implement or disable validation should skip this test.
     GTEST_SKIP();
   }
@@ -527,7 +527,7 @@ TEST_P(HttpCacheImplementationTest, UpdateHeadersForMissingKey) {
 }
 
 TEST_P(HttpCacheImplementationTest, UpdateHeadersDisabledForVaryHeaders) {
-  if (!ValidationEnabled()) {
+  if (!validationEnabled()) {
     // UpdateHeaders would not be called when validation is disabled.
     GTEST_SKIP();
   }
@@ -558,7 +558,7 @@ TEST_P(HttpCacheImplementationTest, UpdateHeadersDisabledForVaryHeaders) {
 }
 
 TEST_P(HttpCacheImplementationTest, UpdateHeadersSkipEtagHeader) {
-  if (!ValidationEnabled()) {
+  if (!validationEnabled()) {
     // UpdateHeaders is not called when validation is disabled.
     GTEST_SKIP();
   }
@@ -588,7 +588,7 @@ TEST_P(HttpCacheImplementationTest, UpdateHeadersSkipEtagHeader) {
 }
 
 TEST_P(HttpCacheImplementationTest, UpdateHeadersSkipSpecificHeaders) {
-  if (!ValidationEnabled()) {
+  if (!validationEnabled()) {
     // UpdateHeaders is not called when validation is disabled.
     GTEST_SKIP();
   }
@@ -643,7 +643,7 @@ TEST_P(HttpCacheImplementationTest, UpdateHeadersSkipSpecificHeaders) {
 }
 
 TEST_P(HttpCacheImplementationTest, UpdateHeadersWithMultivalue) {
-  if (!ValidationEnabled()) {
+  if (!validationEnabled()) {
     // UpdateHeaders is not called when validation is disabled.
     GTEST_SKIP();
   }

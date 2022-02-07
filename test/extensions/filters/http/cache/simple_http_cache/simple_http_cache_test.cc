@@ -23,7 +23,7 @@ namespace {
 class SimpleHttpCacheTestDelegate : public HttpCacheTestDelegate {
 public:
   HttpCache& cache() override { return cache_; }
-  bool ValidationEnabled() const override { return true; }
+  bool validationEnabled() const override { return true; }
 
 private:
   SimpleHttpCache cache_;

@@ -26,17 +26,17 @@ namespace Cache {
 // concrete subclasses.
 class HttpCacheTestDelegate {
 public:
-  virtual ~HttpCacheTestDelegate() {}
+  virtual ~HttpCacheTestDelegate() = default;
 
-  virtual void SetUp(Envoy::Event::MockDispatcher& dispatcher) { dispatcher_ = &dispatcher; }
-  virtual void TearDown() {}
+  virtual void setUp(Envoy::Event::MockDispatcher& dispatcher) { dispatcher_ = &dispatcher; }
+  virtual void tearDown() {}
   virtual HttpCache& cache() = 0;
 
   // Specifies whether or not the cache supports validating stale cache entries
   // and updating their headers. If false, tests will expect the cache to return
   // CacheEntryStatus::Unusable for stale entries, instead of
   // RequiresValidation.
-  virtual bool ValidationEnabled() const = 0;
+  virtual bool validationEnabled() const = 0;
 
   Envoy::Event::MockDispatcher& dispatcher() { return *dispatcher_; }
 
@@ -56,7 +56,7 @@ protected:
   void TearDown() override;
 
   HttpCache& cache() const { return delegate_->cache(); }
-  bool ValidationEnabled() const { return delegate_->ValidationEnabled(); }
+  bool validationEnabled() const { return delegate_->validationEnabled(); }
   LookupContextPtr lookup(absl::string_view request_path);
 
   absl::Status insert(LookupContextPtr lookup,
