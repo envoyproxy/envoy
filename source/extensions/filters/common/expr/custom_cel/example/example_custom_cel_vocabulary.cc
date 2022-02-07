@@ -90,13 +90,14 @@ void ExampleCustomCelVocabulary::registerFunctions(CelFunctionRegistry* registry
                             Get99CelFunction::createDescriptor(LazyEvalFuncNameGet99));
 
   // eagerly evaluated functions
-  absl::Status status = google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
-      EagerEvalFuncNameGetNextInt, false, getNextInt, registry);
+  absl::Status status =
+      google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
+          EagerEvalFuncNameGetNextInt, false, getNextInt, registry);
   if (!status.ok()) {
     throwExceptionFunctionAlreadyAdded(EagerEvalFuncNameGetNextInt, status);
   }
-  status = google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(EagerEvalFuncNameGetSquareOf, true,
-                                                                 getSquareOf, registry);
+  status = google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
+      EagerEvalFuncNameGetSquareOf, true, getSquareOf, registry);
   if (!status.ok()) {
     throwExceptionFunctionAlreadyAdded(EagerEvalFuncNameGetSquareOf, status);
   }
