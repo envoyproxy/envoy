@@ -13,7 +13,7 @@
 #include "source/common/http/date_provider.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/network/utility.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Http {

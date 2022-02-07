@@ -3,11 +3,10 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
-"source/common:95.9" # Raise when QUIC coverage goes up
-"source/common:96.5"
+"source/common:96.0"
 "source/common/api:76.5"
 "source/common/api/posix:75.0"
-"source/common/common:96.5"
+"source/common/common:96.2"
 "source/common/common/posix:92.7"
 "source/common/config:96.5"
 "source/common/crypto:0.0"
@@ -21,7 +20,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/network/dns_resolver:90.7"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
 "source/common/protobuf:94.8"
 "source/common/quic:91.8"
-"source/common/router:96.5"
+"source/common/router:96.3"
 "source/common/secret:94.9"
 "source/common/signal:86.9" # Death tests don't report LCOV
 "source/common/singleton:95.7"
@@ -71,9 +70,9 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers/opencensus:94.8"
 "source/extensions/tracers/xray:96.2"
 "source/extensions/tracers/zipkin:95.9"
-"source/extensions/transport_sockets:95.3"
-"source/extensions/transport_sockets/tls:94.3"
-"source/extensions/transport_sockets/tls/cert_validator:95.4"
+"source/extensions/transport_sockets:95.2"
+"source/extensions/transport_sockets/tls:94.2"
+"source/extensions/transport_sockets/tls/cert_validator:94.9"
 "source/extensions/transport_sockets/tls/ocsp:96.5"
 "source/extensions/transport_sockets/tls/private_key:77.8"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build

@@ -136,14 +136,13 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
   const envoy::config::core::v3::Metadata* metadata_source;
 
   switch (source_) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::RateLimit::Action::MetaData::DYNAMIC:
     metadata_source = &info.dynamicMetadata();
     break;
   case envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY:
     metadata_source = &info.route()->metadata();
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const std::string metadata_string_value =
@@ -228,8 +227,8 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       }
       break;
     }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::ACTION_SPECIFIER_NOT_SET:
+      throw EnvoyException("invalid config");
     }
   }
   if (config.has_limit()) {
@@ -238,8 +237,9 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       limit_override_.emplace(
           new DynamicMetadataRateLimitOverride(config.limit().dynamic_metadata()));
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::route::v3::RateLimit_Override::OverrideSpecifierCase::
+        OVERRIDE_SPECIFIER_NOT_SET:
+      throw EnvoyException("invalid config");
     }
   }
 }

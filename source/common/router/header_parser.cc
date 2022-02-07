@@ -192,9 +192,6 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
             absl::StrCat(format.substr(start, pos - start)), ch));
       }
       break;
-
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   } while (++pos < format.size());
 
