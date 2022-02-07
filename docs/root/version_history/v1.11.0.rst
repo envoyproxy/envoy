@@ -86,7 +86,7 @@ Changes
 * subset: added :ref:`list_as_any <v1.11:envoy_api_field_Cluster.LbSubsetConfig.list_as_any>` option to
   the subset lb which allows matching metadata against any of the values in a list value
   on the endpoints.
-* tools: added :repo:`proto <v1.11:test/tools/router_check/validation.proto>` support for :ref:`router check tool <v1.11:install_tools_route_table_check_tool>` tests.
+* tools: added `proto <https://github.com/envoyproxy/envoy/blob/v1.11.0/test/tools/router_check/validation.proto>`_ support for :ref:`router check tool <v1.11:install_tools_route_table_check_tool>` tests.
 * tracing: add trace sampling configuration to the route, to override the route level.
 * upstream: added :ref:`upstream_cx_pool_overflow <v1.11:config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
 * upstream: an EDS management server can now force removal of a host that is still passing active
@@ -108,7 +108,7 @@ Deprecated
 * The --max-stats and --max-obj-name-len flags no longer has any effect.
 * Use of :ref:`cluster <v1.11:envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.cluster>` in :ref:`redis_proxy.proto <v1.11:envoy_api_file_envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto>` is deprecated. Set a :ref:`catch_all_route <v1.11:envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>` instead.
 * Use of :ref:`catch_all_cluster <v1.11:envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>` in :ref:`redis_proxy.proto <v1.11:envoy_api_file_envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto>` is deprecated. Set a :ref:`catch_all_route <v1.11:envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>` instead.
-* Use of json based schema in router check tool tests. The tests should follow validation :repo:`schema <v1.11:test/tools/router_check/validation.proto>`.
+* Use of json based schema in router check tool tests. The tests should follow validation `schema <https://github.com/envoyproxy/envoy/blob/v1.11.0/test/tools/router_check/validation.proto>`_.
 * Use of the v1 style route configuration for the :ref:`TCP proxy filter <v1.11:config_network_filters_tcp_proxy>`
   is now fully replaced with listener :ref:`filter chain matching <v1.11:envoy_api_msg_listener.FilterChainMatch>`.
   Use this instead.
