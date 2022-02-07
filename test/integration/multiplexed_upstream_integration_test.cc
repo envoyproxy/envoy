@@ -153,9 +153,8 @@ void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) 
   ASSERT_EQ(response->headers().get(Http::LowerCaseString("alpn"))[0]->value().getStringView(),
             expected_alpn);
 
-  ASSERT_FALSE(response->trailers()->get(Http::LowerCaseString("upstream_connect_start")).empty());
-  ASSERT_FALSE(
-      response->trailers()->get(Http::LowerCaseString("upstream_connect_complete")).empty());
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("upstream_connect_start")).empty());
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("upstream_connect_complete")).empty());
 
   ASSERT_FALSE(response->headers().get(Http::LowerCaseString("num_streams")).empty());
   EXPECT_EQ(

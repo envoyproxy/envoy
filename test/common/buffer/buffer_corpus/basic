@@ -28,9 +28,6 @@ actions {
   }
 }
 actions {
-  copy_out_to_slices: 200
-}
-actions {
   drain: 98
 }
 actions {
