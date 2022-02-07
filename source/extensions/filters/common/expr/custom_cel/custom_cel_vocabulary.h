@@ -41,20 +41,7 @@ public:
 
   virtual ~CustomCelVocabulary() = default;
 
-  void setRequestHeaders(const Http::RequestHeaderMap* request_headers) {
-    request_headers_ = request_headers;
-  }
-  const Http::RequestHeaderMap* requestHeaders() { return request_headers_; }
-  void setResponseHeaders(const Http::ResponseHeaderMap* response_headers) {
-    response_headers_ = response_headers;
-  }
-  const Http::ResponseHeaderMap* responseHeaders() { return response_headers_; }
-  void setResponseTrailers(const Http::ResponseTrailerMap* response_trailers) {
-    response_trailers_ = response_trailers;
-  }
-  const Http::ResponseTrailerMap* responseTrailers() { return response_trailers_; }
-
-private:
+protected:
   const Http::RequestHeaderMap* request_headers_;
   const Http::ResponseHeaderMap* response_headers_;
   const Http::ResponseTrailerMap* response_trailers_;

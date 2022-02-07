@@ -36,9 +36,10 @@ void ExampleCustomCelVocabulary::fillActivation(Activation* activation, Protobuf
                                                 const Http::RequestHeaderMap* request_headers,
                                                 const Http::ResponseHeaderMap* response_headers,
                                                 const Http::ResponseTrailerMap* response_trailers) {
-  setRequestHeaders(request_headers);
-  setResponseHeaders(response_headers);
-  setResponseTrailers(response_trailers);
+  request_headers_ = request_headers;
+  response_headers_ = response_headers;
+  response_trailers_ = response_trailers;
+
   // variables
   addValueProducerToActivation(activation, &arena, CustomVariablesName,
                                std::make_unique<CustomWrapper>(arena, info));

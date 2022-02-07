@@ -5,7 +5,7 @@
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/expr/context.h"
-#include "source/extensions/filters/common/expr/custom_cel//custom_cel_vocabulary.h"
+#include "source/extensions/filters/common/expr/custom_cel/custom_cel_vocabulary.h"
 #include "source/extensions/filters/common/expr/custom_cel/example/custom_cel_functions.h"
 
 #include "absl/strings/string_view.h"

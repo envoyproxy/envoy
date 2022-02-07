@@ -68,9 +68,6 @@ TEST_F(ExampleCustomCelVocabularyTests, FillActivationTest) {
   EXPECT_NO_THROW(custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info,
                                                        &request_headers, &response_headers,
                                                        &response_trailers));
-  EXPECT_EQ(request_headers, *custom_cel_vocabulary.requestHeaders());
-  EXPECT_EQ(response_headers, *custom_cel_vocabulary.responseHeaders());
-  EXPECT_EQ(response_trailers, *custom_cel_vocabulary.responseTrailers());
 
   // verify that the variable sets are in the activation
   for (int i = 0; static_cast<size_t>(i) < variable_set_names.size(); ++i) {
