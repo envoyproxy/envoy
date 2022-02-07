@@ -71,6 +71,8 @@ without further review.
 * Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
 * Tim Walsh ([twghu](https://github.com/twghu)) (walsh@redhat.com)
 * Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
+* Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) (pcrao@google.com)
+* Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
 
 In addition to the permanent Envoy security team, we have additional temporary
 contributors to envoy-setec and relevant Slack channels from:
@@ -81,8 +83,7 @@ contributors to envoy-setec and relevant Slack channels from:
   * Mike Myers ([mike-myers-tob](https://github.com/mike-myers-tob))
 
 * [Feb 2022 Security Release Contributors]
-  * Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) expiring 2/28/2023
-  * Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) expiring 2/28/2023
+  * Adi Peleg ([adisuissa](https://github.com/adisuissa)) expiring 2/28/2023
 
 # Emeritus maintainers
 
