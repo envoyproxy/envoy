@@ -7,6 +7,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/event/deferred_task.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/server/active_internal_listener.h"
@@ -231,7 +232,8 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag) {
   auto active_listener = findActiveListenerByTag(listener_tag);
   if (active_listener.has_value()) {
     ASSERT(absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
-        active_listener->get().typed_listener_) && active_listener->get().listener_->listener() != nullptr);
+               active_listener->get().typed_listener_) &&
+           active_listener->get().listener_->listener() != nullptr);
     return Network::BalancedConnectionHandlerOptRef(
         active_listener->get().tcpListener().value().get());
   }
@@ -240,9 +242,9 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag) {
 
 Network::BalancedConnectionHandlerOptRef
 ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Instance& address) {
-  if (address.type() != Network::Address::Type::Ip) {
-    return absl::nullopt;
-  }
+  // Only Ip address can be restored to original address and redirect.
+  ASSERT(address.type() == Network::Address::Type::Ip);
+
   // We do not return stopped listeners.
   // If there is exact address match, return the corresponding listener.
   if (auto listener_it = tcp_listener_map_by_address_.find(address.asStringView());
@@ -258,10 +260,9 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
   // TODO(wattli): consolidate with previous search for more efficiency.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.listener_wildcard_match_ip_family")) {
-    std::string addr_str =
-        address.ip()->version() == Network::Address::IpVersion::v4
-            ? Network::Utility::getIpv4AnyAddress(address.ip()->port())->asString()
-            : Network::Utility::getIpv6AnyAddress(address.ip()->port())->asString();
+    std::string addr_str = address.ip()->version() == Network::Address::IpVersion::v4
+                               ? Network::Address::Ipv4Instance(address.ip()->port()).asString()
+                               : Network::Address::Ipv6Instance(address.ip()->port()).asString();
 
     auto iter = tcp_listener_map_by_address_.find(addr_str);
     if (iter != tcp_listener_map_by_address_.end() &&
