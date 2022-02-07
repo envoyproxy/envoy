@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.extensions.expr.custom_cel_vocabulary.example.v3;
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.expr.custom_cel_vocabulary.example.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/expr/custom_cel_vocabulary/example/v3;examplev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Example Custom CEL Vocabulary Config]
+
+// This is an implementation of the category envoy.expr.custom_cel_vocabulary
+// This is empty but any necessary fields can be added.
+// [#extension: envoy.expr.custom_cel_vocabulary.example]
+message ExampleCustomCelVocabularyConfig {
+}
