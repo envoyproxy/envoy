@@ -181,6 +181,15 @@ docker rmi debian:11
 docker rmi buildpack-deps:stretch
 docker rmi buildpack-deps:buster
 docker rmi buildpack-deps:bullseye
+docker rmi ubuntu:16.04
+docker rmi ubuntu:18.04
+docker rmi ubuntu:20.04
+
+echo
+echo "Dump diskpace usage before building"
+echo "> du -ch / | grep [0-9]G"
+du -ch / | grep [0-9]G
+echo
 
 for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
     image_tag="${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
