@@ -35,7 +35,10 @@ void ActiveClient::onEnlisted() {
   // HTTP/3 codec hasn't tried to connect yet.
   MultiplexedActiveClientBase::onEnlisted();
   ASSERT(codec_client_);
-  codec_client_->connect();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted")) {
+    codec_client_->connect();
+  }
 }
 
 void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
@@ -140,9 +143,15 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         return client;
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
-        CodecClientPtr codec{new NoConnectCodecClientProd(
-            CodecType::HTTP3, std::move(data.connection_), data.host_description_,
-            pool->dispatcher(), pool->randomGenerator())};
+        CodecClientPtr codec =
+            Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted")
+                ? std::make_unique<NoConnectCodecClientProd>(
+                      CodecType::HTTP3, std::move(data.connection_), data.host_description_,
+                      pool->dispatcher(), pool->randomGenerator())
+                : std::make_unique<CodecClientProd>(CodecType::HTTP3, std::move(data.connection_),
+                                                    data.host_description_, pool->dispatcher(),
+                                                    pool->randomGenerator());
         return codec;
       },
       std::vector<Protocol>{Protocol::Http3}, time_source, connect_callback);

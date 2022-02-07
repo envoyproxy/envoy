@@ -748,7 +748,12 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
   EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 101}));
 
-  EXPECT_CALL(callbacks_.pool_failure_, ready());
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted")) {
+    EXPECT_CALL(callbacks_.pool_failure_, ready());
+  } else {
+    EXPECT_CALL(os_sys_calls, close(1)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  }
   ConnectionPool::Cancellable* cancel = (**optional_it1)->newStream(decoder_, callbacks_);
   EXPECT_EQ(nullptr, cancel);
 }

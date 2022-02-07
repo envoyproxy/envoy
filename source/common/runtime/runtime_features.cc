@@ -75,6 +75,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.listener_reuse_port_default_enabled",
     "envoy.reloadable_features.listener_wildcard_match_ip_family",
     "envoy.reloadable_features.new_tcp_connection_pool",
+    "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted",
     "envoy.reloadable_features.proxy_102_103",
     "envoy.reloadable_features.remove_legacy_json",
     "envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints",
