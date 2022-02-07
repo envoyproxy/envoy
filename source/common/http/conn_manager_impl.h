@@ -397,7 +397,7 @@ private:
    * Check to see if the connection can be closed after gracefully waiting to send pending codec
    * data.
    */
-  void checkForDeferredClose();
+  void checkForDeferredClose(bool skip_deferred_close);
 
   /**
    * Do a delayed destruction of a stream to allow for stack unwind. Also calls onDestroy() for
