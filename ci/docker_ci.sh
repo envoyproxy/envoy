@@ -79,7 +79,7 @@ build_images() {
   echo "Building images for ${PLATFORM} ${BUILD_TAG}"
   echo
   echo "docker command:"
-  echo "> docker ${BUILD_COMMAND[*]} --platform ${PLATFORM} ${args[@]} -t ${BUILD_TAG}"
+  echo "> docker ${BUILD_COMMAND[*]} --platform ${PLATFORM} ${args[*]} -t ${BUILD_TAG}"
   echo
   echo "df -h"
   df -h
