@@ -36,7 +36,7 @@ constexpr absl::string_view EagerEvalFuncNameGetSquareOf = "getSquareOf";
 
 class ExampleCustomCelVocabulary : public CustomCelVocabulary {
 public:
-  ExampleCustomCelVocabulary() : CustomCelVocabulary(){};
+  ExampleCustomCelVocabulary() = default;
 
   void fillActivation(Activation* activation, Protobuf::Arena& arena,
                       const StreamInfo::StreamInfo& info,
