@@ -101,6 +101,7 @@ public:
 
   /**
    * Sets the srtt estimate for an origin, assuming the origin exists in the cache.
+   * Otherwise this is a no-op.
    * @param origin The origin to set network characteristics for.
    * @param srtt The smothed round trip time for the origin.
    */
