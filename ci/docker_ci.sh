@@ -93,6 +93,9 @@ build_images() {
   echo "docker volume ls"
   docker volume ls
   echo
+  echo "docker system df -v"
+  docker system df -v
+  echo
   echo "ls -lh ${ENVOY_DOCKER_IMAGE_DIRECTORY}"
   ls -lh "${ENVOY_DOCKER_IMAGE_DIRECTORY}"
   echo
@@ -112,6 +115,10 @@ build_images() {
   echo
   echo "docker volume ls"
   docker volume ls
+  echo
+  echo
+  echo "docker system df -v"
+  docker system df -v
   echo
   echo "ls -lh ${ENVOY_DOCKER_IMAGE_DIRECTORY}"
   ls -lh "${ENVOY_DOCKER_IMAGE_DIRECTORY}"
