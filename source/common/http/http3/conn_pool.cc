@@ -30,8 +30,9 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                                   parent.host()->cluster().stats().upstream_cx_http3_total_, data) {
 }
 
-void ActiveClient::getReady() {
-  MultiplexedActiveClientBase::getReady();
+void ActiveClient::onEnlisted() {
+  // HTTP/3 codec hasn't tried to connect yet.
+  MultiplexedActiveClientBase::onEnlisted();
   ASSERT(codec_client_);
   codec_client_->connect();
 }

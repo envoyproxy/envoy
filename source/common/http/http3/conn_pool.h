@@ -38,7 +38,7 @@ public:
   }
 
   // ConnectionPool::ActiveClient
-  void getReady() override;
+  void onEnlisted() override;
   uint32_t effectiveConcurrentStreamLimit() const override {
     return std::min<int64_t>(MultiplexedActiveClientBase::effectiveConcurrentStreamLimit(),
                              quiche_capacity_);
