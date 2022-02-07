@@ -396,7 +396,7 @@ resources:
 
 TEST_F(CdsApiImplTest, SlowStartConfigMinWeightPercentDefault) {
   InSequence s;
-  
+
   setup();
 
   const std::string response1_yaml = R"EOF(
