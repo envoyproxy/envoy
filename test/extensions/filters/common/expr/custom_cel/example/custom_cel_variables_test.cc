@@ -42,6 +42,12 @@ TEST_F(CustomVariablesTests, TeamTest) {
   EXPECT_EQ(value->StringOrDie().value(), "spirit");
 }
 
+TEST_F(CustomVariablesTests, NonexistentTest) {
+  CustomWrapper custom_vars(arena, mock_stream_info);
+  auto value = custom_vars[CelValue::CreateStringView("nonexistent")];
+  ASSERT_FALSE(value.has_value());
+}
+
 TEST_F(CustomVariablesTests, ProtocolIsNullTest) {
   CustomWrapper custom_vars(arena, mock_stream_info);
   EXPECT_CALL(mock_stream_info, protocol());
@@ -69,8 +75,11 @@ TEST_F(SourceVariablesTests, ListKeysTest) {
 }
 
 TEST_F(SourceVariablesTests, AddressPortDescriptionTest) {
+  // incorrect integer key
   SourceWrapper source_vars(arena, mock_stream_info);
   auto value = source_vars[CelValue::CreateInt64(1)];
+  ASSERT_FALSE(value.has_value());
+  value = source_vars[CelValue::CreateStringView("nonexistent")];
   ASSERT_FALSE(value.has_value());
 
   mock_stream_info.downstream_connection_info_provider_->setRemoteAddress(
