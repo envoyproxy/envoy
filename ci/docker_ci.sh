@@ -165,6 +165,23 @@ fi
 
 # Test the docker build in all cases, but use a local tag that we will overwrite before push in the
 # cases where we do push.
+echo "Pruning images before build to free up diskspace"
+docker rmi node:12
+docker rmi node:14
+docker rmi node:16
+docker rmi node:12-alpine
+docker rmi node:14-alpine
+docker rmi node:16-alpine
+docker rmi alpine:3.12
+docker rmi alpine:3.13
+docker rmi alpine:3.14
+docker rmi debian:9
+docker rmi debian:10
+docker rmi debian:11
+docker rmi buildpack-deps:stretch
+docker rmi buildpack-deps:buster
+docker rmi buildpack-deps:bullseye
+
 for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
     image_tag="${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
     build_images "${BUILD_TYPE}" "$image_tag"
