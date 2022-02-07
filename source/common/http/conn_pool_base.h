@@ -134,8 +134,6 @@ public:
   uint64_t id() const override { return codec_client_->id(); }
   HttpConnPoolImplBase& parent() { return *static_cast<HttpConnPoolImplBase*>(&parent_); }
 
-  void connect() { codec_client_->connect(); }
-
   Http::CodecClientPtr codec_client_;
 };
 
