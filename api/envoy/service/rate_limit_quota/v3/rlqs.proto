@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.rate_limit_quota.v3;
 
-import "envoy/type/v3/token_bucket.proto";
+import "envoy/type/v3/ratelimit_strategy.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
@@ -68,59 +68,22 @@ message RateLimitQuotaAssignments {
     // Bucket id for which this quota is granted.
     BucketId bucket_id = 1 [(validate.rules).message = {required: true}];
 
-    // The timestamp at which the server issued the quota.
-    // Assignment with timestamps older than the active assignment
-    // must be discarded.
-    google.protobuf.Timestamp assignment_timestamp = 2;
-
     // A duration after which the assignment should be considered expired if it
     // hasn't received a new value.
     // If unset, the assignment has no expiration date.
-    google.protobuf.Duration assignment_time_to_live = 3;
+    google.protobuf.Duration assignment_time_to_live = 2;
 
     // Rate limiter strategy determines the implementation details for when to
     // allow and deny the requests matched to the bucket.
     // If unset, no limit.
-    RateLimitStrategy rate_limit_strategy = 4;
+    type.v3.RateLimitStrategy rate_limit_strategy = 3;
   }
 
   // An ordered list of assignments to be applied to the quota buckets.
   // When the quota is different from bucket's active assignment,
-  // the data plane must immediately end the active assignment, and
-  // report the usage. Exceptions:
-  // - There's no active assignment for the bucket.
-  // - Only assignment_timestamp field changes.
+  // the data plane must immediately end the assignment, and
+  // report the usage.
   repeated QuotaAssignment quota_assignment = 1;
-}
-
-message RateLimitStrategy {
-  message Unlimited {
-  }
-
-  message LimitAll {
-  }
-
-  message QpsLimiter {
-    // The number of queries per second to allow.
-    // Request over the limit are denied.
-    // Setting this field to zero is equivalent to the LimitAll strategy.
-    uint64 queries_per_second = 1;
-  }
-
-  oneof strategy {
-    // Allow infinite requests.
-    Unlimited unlimited = 1;
-
-    // Allow no requests.
-    LimitAll limit_all = 2;
-
-    // Allow the same number of requests as the number of tokens available in
-    // the token bucket.
-    type.v3.TokenBucket token_bucket = 3;
-
-    // Limit the number of queries per second.
-    QpsLimiter queries_per_second = 4;
-  }
 }
 
 // The identifier for the bucket. Used to match the bucket on the control

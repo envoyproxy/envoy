@@ -60,7 +60,7 @@ message RateLimitStrategy {
 message RateLimitStrategyQueue {
   // Controls the order in which requests are discarded when the queue length
   // is reached.
-  enum QueueSpillover {
+  enum QueueFullBehavior {
     // When the queue limit is reached, discard requests from the front of the
     // queue (the oldest requests).
     // The new requests are added to the back of the queue as usual.
@@ -74,7 +74,7 @@ message RateLimitStrategyQueue {
   uint32 max_length = 1 [(validate.rules).uint32 = {gte: 1}];
 
   // When the length is reached, whether discard old requests or new requests.
-  QueueSpillover spillover_order = 2;
+  QueueFullBehavior queue_full_behavior = 2;
 
   // Whether to deny the requests discarded due to queue lengths limit,
   // or allow them.

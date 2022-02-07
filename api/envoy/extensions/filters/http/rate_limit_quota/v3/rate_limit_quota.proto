@@ -72,7 +72,7 @@ message RateLimitQuotaBucketSettings {
 
   // Specifies the behavior when the bucket's assignment has expired, and
   // hasn't been refreshed due to server's unavailability.
-  message FallbackBehavior {
+  message ExpiredAssignmentBehavior {
     message FallbackLastAssignment {
       // Limit the time the last assignment is used as a fallback.
       // [#comment:TODO(sergiitk): what to do after that?]
@@ -145,7 +145,7 @@ message RateLimitQuotaBucketSettings {
 
   // Specifies a behavior when the bucket's assignment has expired, and
   // hasn't been refresh due to server's unavailability.
-  FallbackBehavior fallback_behavior = 5;
+  ExpiredAssignmentBehavior expired_assignment_behavior = 5;
 
   // A duration after which, if no requests are matched to the bucket,
   // the bucket is considered inactive. The client is to send a message to
