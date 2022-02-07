@@ -981,7 +981,7 @@ TEST_F(HappyEyeballsConnectionImplTest, AddressProvider) {
   connectFirstAttempt();
 
   ConnectionInfoSetterImpl provider(std::make_shared<Address::Ipv4Instance>(80),
-                                          std::make_shared<Address::Ipv4Instance>(80));
+                                    std::make_shared<Address::Ipv4Instance>(80));
   EXPECT_CALL(*created_connections_[0], connectionInfoProvider()).WillOnce(ReturnRef(provider));
   impl_->connectionInfoProvider();
 }
