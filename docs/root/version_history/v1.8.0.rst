@@ -125,5 +125,5 @@ Deprecated
 * Use of ``runtime`` in ``RouteMatch``, found in
   `route.proto <https://github.com/envoyproxy/envoy/blob/main/api/envoy/api/v2/route/route.proto>`_.
   Set the ``runtime_fraction`` field instead.
-* Use of the string ``user`` field in ``Authenticated`` in `rbac.proto <https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/rbac/v2alpha/rbac.proto>`_
+* Use of the string ``user`` field in ``Authenticated`` in `rbac.proto <https://github.com/envoyproxy/envoy/blob/release/v1.8/api/envoy/config/rbac/v2alpha/rbac.proto>`_
   is deprecated in favor of the new ``StringMatcher`` based ``principal_name`` field.
