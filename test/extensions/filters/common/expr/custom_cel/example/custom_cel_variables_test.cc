@@ -69,15 +69,19 @@ TEST_F(SourceVariablesTests, ListKeysTest) {
 }
 
 TEST_F(SourceVariablesTests, AddressPortDescriptionTest) {
+  SourceWrapper source_vars(arena, mock_stream_info);
+  auto value = source_vars[CelValue::CreateInt64(1)];
+  ASSERT_FALSE(value.has_value());
+
   mock_stream_info.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 80));
   EXPECT_CALL(mock_stream_info, downstreamAddressProvider()).Times(3);
-  SourceWrapper source_vars(arena, mock_stream_info);
-  auto value = source_vars[CelValue::CreateStringView("address")];
+  SourceWrapper source_vars2(arena, mock_stream_info);
+  value = source_vars2[CelValue::CreateStringView("address")];
   EXPECT_EQ(value->StringOrDie().value(), "0.0.0.0:80");
-  value = source_vars[CelValue::CreateStringView("port")];
+  value = source_vars2[CelValue::CreateStringView("port")];
   EXPECT_EQ(value->Int64OrDie(), 80);
-  value = source_vars[CelValue::CreateStringView("description")];
+  value = source_vars2[CelValue::CreateStringView("description")];
   EXPECT_EQ(value->StringOrDie().value(), "description: has address, port values");
 }
 
