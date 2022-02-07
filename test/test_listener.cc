@@ -1,6 +1,7 @@
 #include "test/test_listener.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "test/test_common/global.h"
 
@@ -17,6 +18,7 @@ void TestListener::OnTestEnd(const ::testing::TestInfo& test_info) {
   RELEASE_ASSERT(!Thread::MainThread::isMainThreadActive(),
                  absl::StrCat("MainThreadLeak: [", test_info.test_suite_name(), ".",
                               test_info.name(), "] test exited before main thread shut down"));
+  Runtime::RuntimeFeaturesDefaults::get().restoreDefaults();
 }
 
 } // namespace Envoy

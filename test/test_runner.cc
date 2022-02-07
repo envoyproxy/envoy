@@ -10,7 +10,6 @@
 #include "source/exe/process_wide.h"
 #include "source/server/backtrace.h"
 
-#include "test/common/runtime/utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_listener.h"
@@ -46,24 +45,19 @@ public:
       : runtime_override_(runtime_override), disable_(disable) {}
 
   // On each test start, edit RuntimeFeaturesDefaults with our custom runtime defaults.
+  // The defaults will be restored by TestListener::OnTestEnd.
   void OnTestStart(const ::testing::TestInfo&) override {
     if (!runtime_override_.empty()) {
-      bool reset = disable_ ? Runtime::RuntimeFeaturesPeer::disableFeature(runtime_override_)
-                            : Runtime::RuntimeFeaturesPeer::enableFeature(runtime_override_);
-      if (!reset) {
-        // If the entry was already in the hash map, don't remove it OnTestEnd.
+      bool old_value = Runtime::runtimeFeatureEnabled(runtime_override_);
+      if (disable_ != old_value) {
+        // If the entry was already in the hash map, don't invert it OnTestEnd.
         runtime_override_.clear();
+      } else {
+        Runtime::maybeSetRuntimeGuard(runtime_override_, !disable_);
       }
     }
   }
 
-  // As each test ends, clean up the RuntimeFeaturesDefaults state.
-  void OnTestEnd(const ::testing::TestInfo&) override {
-    if (!runtime_override_.empty()) {
-      disable_ ? Runtime::RuntimeFeaturesPeer::enableFeature(runtime_override_)
-               : Runtime::RuntimeFeaturesPeer::disableFeature(runtime_override_);
-    }
-  }
   std::string runtime_override_;
   // This marks whether the runtime feature was enabled by default and needs to be overridden to
   // false.

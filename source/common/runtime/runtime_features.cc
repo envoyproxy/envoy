@@ -1,34 +1,84 @@
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/flags/flag.h"
 #include "absl/strings/match.h"
+#include "absl/strings/str_replace.h"
+
+#define RUNTIME_GUARD(name) ABSL_FLAG(bool, name, true, "");
+
+RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
+RUNTIME_GUARD(envoy_reloadable_features_allow_response_for_timeout);
+RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
+RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
+RUNTIME_GUARD(envoy_reloadable_features_correct_scheme_and_xfp);
+RUNTIME_GUARD(envoy_reloadable_features_correctly_validate_alpn);
+RUNTIME_GUARD(envoy_reloadable_features_disable_tls_inspector_injection);
+RUNTIME_GUARD(envoy_reloadable_features_enable_grpc_async_client_cache);
+RUNTIME_GUARD(envoy_reloadable_features_fix_added_trailers);
+RUNTIME_GUARD(envoy_reloadable_features_handle_stream_reset_during_hcm_encoding);
+RUNTIME_GUARD(envoy_reloadable_features_http2_allow_capacity_increase_by_settings);
+RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
+RUNTIME_GUARD(envoy_reloadable_features_http_ext_authz_do_not_skip_direct_response_and_redirect);
+RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
+RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
+RUNTIME_GUARD(envoy_reloadable_features_internal_address);
+RUNTIME_GUARD(envoy_reloadable_features_internal_redirects_with_body);
+RUNTIME_GUARD(envoy_reloadable_features_listener_reuse_port_default_enabled);
+RUNTIME_GUARD(envoy_reloadable_features_listener_wildcard_match_ip_family);
+RUNTIME_GUARD(envoy_reloadable_features_new_tcp_connection_pool);
+RUNTIME_GUARD(envoy_reloadable_features_proxy_102_103);
+RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_json);
+RUNTIME_GUARD(envoy_reloadable_features_sanitize_http_header_referer);
+RUNTIME_GUARD(envoy_reloadable_features_skip_dispatching_frames_for_closed_connection);
+RUNTIME_GUARD(envoy_reloadable_features_support_locality_update_on_eds_cluster_endpoints);
+RUNTIME_GUARD(envoy_reloadable_features_udp_listener_updates_filter_chain_in_place);
+RUNTIME_GUARD(envoy_reloadable_features_update_expected_rq_timeout_on_retry);
+RUNTIME_GUARD(envoy_reloadable_features_use_dns_ttl);
+RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
+RUNTIME_GUARD(envoy_reloadable_features_vhds_heartbeats);
+RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
+RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
+
+// Sentinal and test flag.
+ABSL_FLAG(bool, envoy_reloadable_features_test_feature_false, false, "");
+// TODO(alyssawilk, junr03) flip (and add release notes + docs) these after Lyft tests
+ABSL_FLAG(bool, envoy_reloadable_features_allow_multiple_dns_addresses, false, "");
+// TODO(adisuissa) reset to true to enable unified mux by default
+ABSL_FLAG(bool, envoy_reloadable_features_unified_mux, false, "");
+
+ABSL_FLAG(uint64_t, envoy_buffer_overflow_multiplier, 0, "");
+ABSL_FLAG(uint64_t, envoy_do_not_use_going_away_max_http2_outbound_response, 2, "");
+ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");
 
 namespace Envoy {
 namespace Runtime {
 
 bool isRuntimeFeature(absl::string_view feature) {
-  return RuntimeFeaturesDefaults::get().enabledByDefault(feature) ||
-         RuntimeFeaturesDefaults::get().existsButDisabled(feature);
+  return RuntimeFeaturesDefaults::get().getFlag(feature) != nullptr;
 }
 
 bool runtimeFeatureEnabled(absl::string_view feature) {
-  ASSERT(isRuntimeFeature(feature));
-  if (Runtime::LoaderSingleton::getExisting()) {
-    return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->runtimeFeatureEnabled(
-        feature);
+  auto* flag = RuntimeFeaturesDefaults::get().getFlag(feature);
+  if (flag == nullptr) {
+    IS_ENVOY_BUG(absl::StrCat("Unable to find runtime feature ", feature));
+    return false;
   }
-  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), debug,
-                      "Unable to use runtime singleton for feature {}", feature);
-  return RuntimeFeaturesDefaults::get().enabledByDefault(feature);
+  return absl::GetFlag(*flag);
 }
 
 uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
-  ASSERT(absl::StartsWith(feature, "envoy."));
-  if (Runtime::LoaderSingleton::getExisting()) {
-    return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->getInteger(
-        std::string(feature), default_value);
+  if (!absl::StartsWith(feature, "envoy.")) {
+    return default_value;
   }
-  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), debug,
-                      "Unable to use runtime singleton for feature {}", feature);
+
+  // DO NOT ADD MORE FLAGS HERE.  This function deprecated and being removed.
+  if (feature == "envoy.buffer.overflow_multiplier") {
+    return absl::GetFlag(FLAGS_envoy_buffer_overflow_multiplier);
+  } else if (feature == "envoy.do_not_use_going_away_max_http2_outbound_responses") {
+    return absl::GetFlag(FLAGS_envoy_do_not_use_going_away_max_http2_outbound_response);
+  } else if (feature == "envoy.http.headermap.lazy_map_min_size") {
+    return absl::GetFlag(FLAGS_envoy_headermap_lazy_map_min_size);
+  }
   return default_value;
 }
 
@@ -52,69 +102,87 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 // clang-format off
-constexpr const char* runtime_features[] = {
-    // Enabled
-    "envoy.reloadable_features.test_feature_true",
-    // Begin alphabetically sorted section.
-    "envoy.reloadable_features.allow_response_for_timeout",
-    "envoy.reloadable_features.allow_upstream_inline_write",
-    "envoy.reloadable_features.conn_pool_delete_when_idle",
-    "envoy.reloadable_features.correct_scheme_and_xfp",
-    "envoy.reloadable_features.correctly_validate_alpn",
-    "envoy.reloadable_features.disable_tls_inspector_injection",
-    "envoy.reloadable_features.enable_grpc_async_client_cache",
-    "envoy.reloadable_features.fix_added_trailers",
-    "envoy.reloadable_features.handle_stream_reset_during_hcm_encoding",
-    "envoy.reloadable_features.http2_allow_capacity_increase_by_settings",
-    "envoy.reloadable_features.http2_new_codec_wrapper",
-    "envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect",
-    "envoy.reloadable_features.http_reject_path_with_fragment",
-    "envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled",
-    "envoy.reloadable_features.internal_address",
-    "envoy.reloadable_features.internal_redirects_with_body",
-    "envoy.reloadable_features.listener_reuse_port_default_enabled",
-    "envoy.reloadable_features.listener_wildcard_match_ip_family",
-    "envoy.reloadable_features.new_tcp_connection_pool",
-    "envoy.reloadable_features.proxy_102_103",
-    "envoy.reloadable_features.remove_legacy_json",
-    "envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints",
-    "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place",
-    "envoy.reloadable_features.update_expected_rq_timeout_on_retry",
-    "envoy.reloadable_features.use_dns_ttl",
-    "envoy.reloadable_features.validate_connect",
-    "envoy.reloadable_features.vhds_heartbeats",
-    "envoy.restart_features.explicit_wildcard_resource",
-    "envoy.restart_features.use_apple_api_for_dns_lookups",
-    // Misplaced flags: please do not add flags to this section.
-    "envoy.reloadable_features.sanitize_http_header_referer",
-    "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection",
-    // End misplaced flags: please do not add flags in this section.
+constexpr absl::Flag<bool>* runtime_features[] = {
+  // Test flags
+  &FLAGS_envoy_reloadable_features_test_feature_false,
+  &FLAGS_envoy_reloadable_features_test_feature_true,
+  // Begin alphabetically sorted section_
+  &FLAGS_envoy_reloadable_features_allow_multiple_dns_addresses,
+  &FLAGS_envoy_reloadable_features_allow_response_for_timeout,
+  &FLAGS_envoy_reloadable_features_allow_upstream_inline_write,
+  &FLAGS_envoy_reloadable_features_conn_pool_delete_when_idle,
+  &FLAGS_envoy_reloadable_features_correct_scheme_and_xfp,
+  &FLAGS_envoy_reloadable_features_correctly_validate_alpn,
+  &FLAGS_envoy_reloadable_features_disable_tls_inspector_injection,
+  &FLAGS_envoy_reloadable_features_enable_grpc_async_client_cache,
+  &FLAGS_envoy_reloadable_features_fix_added_trailers,
+  &FLAGS_envoy_reloadable_features_handle_stream_reset_during_hcm_encoding,
+  &FLAGS_envoy_reloadable_features_http2_allow_capacity_increase_by_settings,
+  &FLAGS_envoy_reloadable_features_http2_new_codec_wrapper,
+  &FLAGS_envoy_reloadable_features_http_ext_authz_do_not_skip_direct_response_and_redirect,
+  &FLAGS_envoy_reloadable_features_http_reject_path_with_fragment,
+  &FLAGS_envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled,
+  &FLAGS_envoy_reloadable_features_internal_address,
+  &FLAGS_envoy_reloadable_features_internal_redirects_with_body,
+  &FLAGS_envoy_reloadable_features_listener_reuse_port_default_enabled,
+  &FLAGS_envoy_reloadable_features_listener_wildcard_match_ip_family,
+  &FLAGS_envoy_reloadable_features_new_tcp_connection_pool,
+  &FLAGS_envoy_reloadable_features_proxy_102_103,
+  &FLAGS_envoy_reloadable_features_remove_legacy_json,
+  &FLAGS_envoy_reloadable_features_sanitize_http_header_referer,
+  &FLAGS_envoy_reloadable_features_skip_dispatching_frames_for_closed_connection,
+  &FLAGS_envoy_reloadable_features_support_locality_update_on_eds_cluster_endpoints,
+  &FLAGS_envoy_reloadable_features_udp_listener_updates_filter_chain_in_place,
+  &FLAGS_envoy_reloadable_features_unified_mux,
+  &FLAGS_envoy_reloadable_features_update_expected_rq_timeout_on_retry,
+  &FLAGS_envoy_reloadable_features_use_dns_ttl,
+  &FLAGS_envoy_reloadable_features_validate_connect,
+  &FLAGS_envoy_reloadable_features_vhds_heartbeats,
+  &FLAGS_envoy_restart_features_explicit_wildcard_resource,
+  &FLAGS_envoy_restart_features_use_apple_api_for_dns_lookups,
 };
 // clang-format on
 
-// This is a section for officially sanctioned runtime features which are too
-// high risk to be enabled by default. Examples where we have opted to land
-// features without enabling by default are swapping the underlying buffer
-// implementation or the HTTP/1.1 codec implementation. Most features should be
-// enabled by default.
-//
-// When features are added here, there should be a tracking bug assigned to the
-// code owner to flip the default after sufficient testing.
-constexpr const char* disabled_runtime_features[] = {
-    // TODO(alyssawilk, junr03) flip (and add release notes + docs) these after Lyft tests
-    "envoy.reloadable_features.allow_multiple_dns_addresses",
-    // Sentinel and test flag.
-    "envoy.reloadable_features.test_feature_false",
-    // TODO(dmitri-d) reset to true to enable unified mux by default
-    "envoy.reloadable_features.unified_mux",
-};
+void maybeSetRuntimeGuard(absl::string_view name, bool value) {
+  auto* flag = RuntimeFeaturesDefaults::get().getFlag(name);
+  if (flag == nullptr) {
+    IS_ENVOY_BUG(absl::StrCat("Unable to find runtime feature ", name));
+    return;
+  }
+  absl::SetFlag(flag, value);
+}
+
+// TODO(alyssawilk) deprecate use of this
+void maybeSetDeprecatedInts(absl::string_view name, uint32_t value) {
+  if (!absl::StartsWith(name, "envoy.")) {
+    return;
+  }
+
+  // DO NOT ADD MORE FLAGS HERE.  This function deprecated and being removed.
+  if (name == "envoy.buffer.overflow_multiplier") {
+    absl::SetFlag(&FLAGS_envoy_buffer_overflow_multiplier, value);
+  } else if (name == "envoy.do_not_use_going_away_max_http2_outbound_responses") {
+    absl::SetFlag(&FLAGS_envoy_do_not_use_going_away_max_http2_outbound_response, value);
+  } else if (name == "envoy.http.headermap.lazy_map_min_size") {
+    absl::SetFlag(&FLAGS_envoy_headermap_lazy_map_min_size, value);
+  }
+}
+
+std::string swapPrefix(std::string name) {
+  return absl::StrReplaceAll(name, {{"envoy_", "envoy."}, {"features_", "features."}});
+}
 
 RuntimeFeatures::RuntimeFeatures() {
   for (auto& feature : runtime_features) {
-    enabled_features_.insert(feature);
-  }
-  for (auto& feature : disabled_runtime_features) {
-    disabled_features_.insert(feature);
+    auto& reflection = absl::GetFlagReflectionHandle(*feature);
+    std::string envoy_name = swapPrefix(std::string(reflection.Name()));
+    all_features_.emplace(envoy_name, feature);
+    absl::optional<bool> value = reflection.TryGet<bool>();
+    if (value.has_value() && value.value()) {
+      enabled_features_.emplace(envoy_name, feature);
+    } else {
+      disabled_features_.emplace(envoy_name, feature);
+    }
   }
 }
 

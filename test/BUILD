@@ -30,7 +30,6 @@ envoy_cc_test_library(
         "//source/common/event:libevent_lib",
         "//source/exe:process_wide_lib",
         "//source/server:backtrace_lib",
-        "//test/common/runtime:utility_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:global_lib",
