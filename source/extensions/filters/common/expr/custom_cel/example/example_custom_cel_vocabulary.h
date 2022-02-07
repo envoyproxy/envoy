@@ -26,7 +26,8 @@ using envoy::extensions::expr::custom_cel_vocabulary::example::v3::ExampleCustom
 using google::api::expr::runtime::Activation;
 using google::api::expr::runtime::CelFunctionRegistry;
 
-constexpr absl::string_view CustomCelVariablesSetName = "custom";
+constexpr absl::string_view CustomVariablesName = "custom";
+constexpr absl::string_view SourceVariablesName = "source";
 constexpr absl::string_view LazyEvalFuncNameGetDouble = "GetDouble";
 constexpr absl::string_view LazyEvalFuncNameGetProduct = "GetProduct";
 constexpr absl::string_view LazyEvalFuncNameGet99 = "Get99";

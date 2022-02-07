@@ -46,6 +46,7 @@ TEST(ExampleCustomCelVocabularyFactoryTests, CategoryTest) {
 
 class ExampleCustomCelVocabularyTests : public testing::Test {
 public:
+  std::array<absl::string_view, 2> variable_set_names = {CustomVariablesName, SourceVariablesName};
   std::array<absl::string_view, 3> lazy_eval_function_names = {
       LazyEvalFuncNameGetDouble, LazyEvalFuncNameGetProduct, LazyEvalFuncNameGet99};
   std::array<absl::string_view, 2> eager_eval_function_names = {EagerEvalFuncNameGetNextInt,
@@ -70,16 +71,20 @@ TEST_F(ExampleCustomCelVocabularyTests, FillActivationTest) {
   EXPECT_EQ(response_headers, *custom_cel_vocabulary.responseHeaders());
   EXPECT_EQ(response_trailers, *custom_cel_vocabulary.responseTrailers());
 
-  // verify that functions are in the activation
+  // verify that the variable setes are in the activation
+  for (int i = 0; static_cast<size_t>(i) < variable_set_names.size(); ++i) {
+    ASSERT_TRUE(activation.FindValue(variable_set_names[i], &arena).has_value());
+  }
+  // verify that the functions are in the activation
   for (int i = 0; static_cast<size_t>(i) < lazy_eval_function_names.size(); ++i) {
     EXPECT_EQ(activation.FindFunctionOverloads(lazy_eval_function_names[i]).size(), 1);
   }
   // calling FillActivation for the second time
-  // an exception should be thrown as the functions are already registered
+  // an exception should be thrown as the value producers/variables sets are already registered
   EXPECT_THROW_WITH_REGEX(custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info,
                                                                &request_headers, &response_headers,
                                                                &response_trailers),
-                          EnvoyException, "failed to register function*");
+                          EnvoyException, "failed to register variable set*");
 }
 
 TEST_F(ExampleCustomCelVocabularyTests, RegisterFunctionsTest) {

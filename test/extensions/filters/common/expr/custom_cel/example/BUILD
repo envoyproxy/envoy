@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["custom_cel_variables_test.cc"],
     deps = [
         "//source/common/http:utility_lib",
+        "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:message_validator_lib",

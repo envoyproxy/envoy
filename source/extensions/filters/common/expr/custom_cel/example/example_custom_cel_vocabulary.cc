@@ -23,11 +23,15 @@ namespace Example {
 
 using google::api::expr::runtime::FunctionAdapter;
 
-void throwException(absl::string_view function_name, absl::Status status);
+void throwExceptionValueProducerAlreadyAdded(absl::string_view value_producer_name);
+void throwExceptionFunctionAlreadyAdded(absl::string_view function_name, absl::Status status);
 void addLazyFunctionToActivation(Activation* activation, absl::string_view function_name,
                                  std::unique_ptr<CelFunction> function);
 void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view function_name,
                                CelFunctionDescriptor descriptor);
+void addValueProducerToActivation(Activation* activation, Protobuf::Arena* arena,
+                                  const absl::string_view value_producer_name,
+                                  std::unique_ptr<BaseWrapper> value_producer);
 
 void ExampleCustomCelVocabulary::fillActivation(Activation* activation, Protobuf::Arena& arena,
                                                 const StreamInfo::StreamInfo& info,
@@ -38,10 +42,11 @@ void ExampleCustomCelVocabulary::fillActivation(Activation* activation, Protobuf
   setResponseHeaders(response_headers);
   setResponseTrailers(response_trailers);
   // variables
-  activation->InsertValueProducer(
-      CustomCelVariablesSetName,
-      std::make_unique<CustomCelVariablesWrapper>(arena, info, request_headers, response_headers,
-                                                  response_trailers));
+  addValueProducerToActivation(activation, &arena, CustomVariablesName,
+                               std::make_unique<CustomWrapper>(arena, info));
+  addValueProducerToActivation(activation, &arena, SourceVariablesName,
+                               std::make_unique<SourceWrapper>(arena, info));
+
   // Lazily evaluated functions only
   addLazyFunctionToActivation(activation, LazyEvalFuncNameGetDouble,
                               std::make_unique<GetDoubleCelFunction>(LazyEvalFuncNameGetDouble));
@@ -51,11 +56,21 @@ void ExampleCustomCelVocabulary::fillActivation(Activation* activation, Protobuf
                               std::make_unique<GetDoubleCelFunction>(LazyEvalFuncNameGet99));
 }
 
+void addValueProducerToActivation(Activation* activation, Protobuf::Arena* arena,
+                                  const absl::string_view value_producer_name,
+                                  std::unique_ptr<BaseWrapper> value_producer) {
+  auto entry = activation->FindValue(value_producer_name, arena);
+  if (entry.has_value()) {
+    throwExceptionValueProducerAlreadyAdded(value_producer_name);
+  }
+  activation->InsertValueProducer(value_producer_name, std::move(value_producer));
+}
+
 void addLazyFunctionToActivation(Activation* activation, absl::string_view function_name,
                                  std::unique_ptr<CelFunction> function) {
   absl::Status status = activation->InsertFunction(std::move(function));
   if (!status.ok()) {
-    throwException(function_name, status);
+    throwExceptionFunctionAlreadyAdded(function_name, status);
   }
 }
 
@@ -63,7 +78,7 @@ void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view 
                                CelFunctionDescriptor descriptor) {
   absl::Status status = registry->RegisterLazyFunction(descriptor);
   if (!status.ok()) {
-    throwException(function_name, status);
+    throwExceptionFunctionAlreadyAdded(function_name, status);
   }
 }
 
@@ -80,12 +95,12 @@ void ExampleCustomCelVocabulary::registerFunctions(CelFunctionRegistry* registry
   absl::Status status = FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
       EagerEvalFuncNameGetNextInt, false, getNextInt, registry);
   if (!status.ok()) {
-    throwException(EagerEvalFuncNameGetNextInt, status);
+    throwExceptionFunctionAlreadyAdded(EagerEvalFuncNameGetNextInt, status);
   }
   status = FunctionAdapter<CelValue, int64_t>::CreateAndRegister(EagerEvalFuncNameGetSquareOf, true,
                                                                  getSquareOf, registry);
   if (!status.ok()) {
-    throwException(EagerEvalFuncNameGetSquareOf, status);
+    throwExceptionFunctionAlreadyAdded(EagerEvalFuncNameGetSquareOf, status);
   }
 }
 
@@ -98,7 +113,13 @@ CustomCelVocabularyPtr ExampleCustomCelVocabularyFactory::createCustomCelVocabul
   return std::make_unique<ExampleCustomCelVocabulary>();
 }
 
-void throwException(absl::string_view function_name, absl::Status status) {
+void throwExceptionValueProducerAlreadyAdded(absl::string_view value_producer_name) {
+  throw EnvoyException(
+      fmt::format("failed to register variable set '{}': It has already been registered.",
+                  value_producer_name));
+}
+
+void throwExceptionFunctionAlreadyAdded(absl::string_view function_name, absl::Status status) {
   throw EnvoyException(
       fmt::format("failed to register function '{}': {}", function_name, status.message()));
 }

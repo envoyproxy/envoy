@@ -20,39 +20,50 @@ namespace Example {
 
 using ContainerBackedListImpl = google::api::expr::runtime::ContainerBackedListImpl;
 
-constexpr absl::string_view VariableTeam = "team";
-constexpr absl::string_view VariableProtocol = "protocol";
+constexpr absl::string_view Team = "team";
+constexpr absl::string_view Protocol = "protocol";
 
-const ContainerBackedListImpl CustomCelVariablesList{{
-    CelValue::CreateStringView(VariableTeam),
-    CelValue::CreateStringView(VariableProtocol),
+const ContainerBackedListImpl CustomList{{
+    CelValue::CreateStringView(Team),
+    CelValue::CreateStringView(Protocol),
 }};
 
-class CustomCelVariablesWrapper : public BaseWrapper {
+constexpr absl::string_view Address = "address";
+constexpr absl::string_view Port = "port";
+constexpr absl::string_view Description = "description";
+
+const ContainerBackedListImpl SourceList{{
+    CelValue::CreateStringView(Address),
+    CelValue::CreateStringView(Port),
+    CelValue::CreateStringView(Description),
+}};
+
+class CustomWrapper : public BaseWrapper {
 public:
-  CustomCelVariablesWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info,
-                            const Http::RequestHeaderMap* request_headers,
-                            const Http::ResponseHeaderMap* response_headers,
-                            const Http::ResponseTrailerMap* response_trailers)
-      : arena_(arena), info_(info), request_headers_(request_headers),
-        response_headers_(response_headers), response_trailers_(response_trailers) {}
+  CustomWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info)
+      : arena_(arena), info_(info) {}
 
   absl::optional<CelValue> operator[](CelValue key) const override;
 
-  const google::api::expr::runtime::CelList* ListKeys() const override {
-    return &CustomCelVariablesList;
-  }
-
-  const Http::RequestHeaderMap* requestHeaders() { return request_headers_; }
-  const Http::ResponseHeaderMap* responseHeaders() { return response_headers_; }
-  const Http::ResponseTrailerMap* responseTrailers() { return response_trailers_; }
+  const google::api::expr::runtime::CelList* ListKeys() const override { return &CustomList; }
 
 private:
   Protobuf::Arena& arena_;
   const StreamInfo::StreamInfo& info_;
-  const Http::RequestHeaderMap* request_headers_;
-  const Http::ResponseHeaderMap* response_headers_;
-  const Http::ResponseTrailerMap* response_trailers_;
+};
+
+class SourceWrapper : public BaseWrapper {
+public:
+  SourceWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info)
+      : arena_(arena), info_(info) {}
+
+  absl::optional<CelValue> operator[](CelValue key) const override;
+
+  const google::api::expr::runtime::CelList* ListKeys() const override { return &SourceList; }
+
+private:
+  Protobuf::Arena& arena_;
+  const StreamInfo::StreamInfo& info_;
 };
 
 } // namespace Example

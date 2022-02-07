@@ -26,9 +26,9 @@ public:
   CustomCelVocabulary() {}
 
   // fillActivation - adds variables or value producer to the activation,
-  // a mapping of names to their reference implementations
+  // a mapping of names to their reference implementations.
   // Lazily evaluated functions require a two parts registration.
-  // fillActivation will add the name of the function to the activation here, and
+  // fillActivation will add the name of the function to the activation, and
   // registerFunctions will add it to the registry.
   virtual void fillActivation(Activation* activation, Protobuf::Arena& arena,
                               const StreamInfo::StreamInfo& info,
