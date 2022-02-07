@@ -1,6 +1,7 @@
 #include "envoy/protobuf/message_validator.h"
 
-#include "source/extensions/filters/common/expr/custom_cel//custom_cel_vocabulary.h"
+#include "source/extensions/filters/common/expr/custom_cel/custom_cel_vocabulary.h"
+#include "source/extensions/filters/common/expr/custom_cel/example/custom_cel_variables.h"
 #include "source/extensions/filters/common/expr/custom_cel/example/example_custom_cel_vocabulary.h"
 
 #include "test/mocks/stream_info/mocks.h"
@@ -79,12 +80,70 @@ TEST_F(ExampleCustomCelVocabularyTests, FillActivationTest) {
   for (int i = 0; static_cast<size_t>(i) < lazy_eval_function_names.size(); ++i) {
     EXPECT_EQ(activation.FindFunctionOverloads(lazy_eval_function_names[i]).size(), 1);
   }
-  // calling FillActivation for the second time
-  // an exception should be thrown as the value producers/variables sets are already registered
-  EXPECT_THROW_WITH_REGEX(custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info,
-                                                               &request_headers, &response_headers,
-                                                               &response_trailers),
-                          EnvoyException, "failed to register variable set*");
+}
+
+TEST_F(ExampleCustomCelVocabularyTests, AddRedundantMappingToActivationTest) {
+  ExampleCustomCelVocabulary custom_cel_vocabulary;
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo mock_stream_info;
+  Protobuf::Arena arena;
+
+  {
+    Activation activation;
+    activation.InsertValueProducer(CustomVariablesName,
+                                   std::make_unique<CustomWrapper>(arena, mock_stream_info));
+    EXPECT_THROW_WITH_REGEX(
+        custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
+                                             &response_headers, &response_trailers),
+        EnvoyException, "failed to register variable set*");
+  }
+  {
+    Activation activation;
+    activation.InsertValueProducer(SourceVariablesName,
+                                   std::make_unique<SourceWrapper>(arena, mock_stream_info));
+    EXPECT_THROW_WITH_REGEX(
+        custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
+                                             &response_headers, &response_trailers),
+        EnvoyException, "failed to register variable set*");
+  }
+  {
+    Activation activation;
+    absl::Status status = activation.InsertFunction(
+        std::make_unique<GetDoubleCelFunction>(LazyEvalFuncNameGetDouble));
+    EXPECT_THROW_WITH_REGEX(
+        custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
+                                             &response_headers, &response_trailers),
+        EnvoyException, "failed to register function*");
+  }
+  {
+    Activation activation;
+    absl::Status status = activation.InsertFunction(
+        std::make_unique<GetDoubleCelFunction>(LazyEvalFuncNameGetDouble));
+    EXPECT_THROW_WITH_REGEX(
+        custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
+                                             &response_headers, &response_trailers),
+        EnvoyException, "failed to register function*");
+  }
+  {
+    Activation activation;
+    absl::Status status = activation.InsertFunction(
+        std::make_unique<GetDoubleCelFunction>(LazyEvalFuncNameGetProduct));
+    EXPECT_THROW_WITH_REGEX(
+        custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
+                                             &response_headers, &response_trailers),
+        EnvoyException, "failed to register function*");
+  }
+  {
+    Activation activation;
+    absl::Status status =
+        activation.InsertFunction(std::make_unique<GetDoubleCelFunction>(LazyEvalFuncNameGet99));
+    EXPECT_THROW_WITH_REGEX(
+        custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
+                                             &response_headers, &response_trailers),
+        EnvoyException, "failed to register function*");
+  }
 }
 
 TEST_F(ExampleCustomCelVocabularyTests, RegisterFunctionsTest) {
@@ -117,10 +176,47 @@ TEST_F(ExampleCustomCelVocabularyTests, RegisterFunctionsTest) {
                   .size(),
               1);
   }
+}
 
-  // an attempt to call RegisterFunctions a second time should fail
-  EXPECT_THROW_WITH_REGEX(custom_cel_vocabulary.registerFunctions(&registry), EnvoyException,
-                          "failed to register function*");
+TEST_F(ExampleCustomCelVocabularyTests, AddRedundantRegistrationToRegistryTest) {
+  ExampleCustomCelVocabulary custom_cel_vocabulary;
+  {
+    google::api::expr::runtime::CelFunctionRegistry registry;
+    absl::Status status = registry.RegisterLazyFunction(
+        GetDoubleCelFunction::createDescriptor(LazyEvalFuncNameGetDouble));
+    EXPECT_THROW_WITH_REGEX(custom_cel_vocabulary.registerFunctions(&registry), EnvoyException,
+                            "failed to register function*");
+  }
+  {
+    google::api::expr::runtime::CelFunctionRegistry registry;
+    absl::Status status = registry.RegisterLazyFunction(
+        GetProductCelFunction::createDescriptor(LazyEvalFuncNameGetProduct));
+    EXPECT_THROW_WITH_REGEX(custom_cel_vocabulary.registerFunctions(&registry), EnvoyException,
+                            "failed to register function*");
+  }
+  {
+    google::api::expr::runtime::CelFunctionRegistry registry;
+    absl::Status status =
+        registry.RegisterLazyFunction(Get99CelFunction::createDescriptor(LazyEvalFuncNameGet99));
+    EXPECT_THROW_WITH_REGEX(custom_cel_vocabulary.registerFunctions(&registry), EnvoyException,
+                            "failed to register function*");
+  }
+  {
+    google::api::expr::runtime::CelFunctionRegistry registry;
+    absl::Status status =
+        google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
+            EagerEvalFuncNameGetNextInt, false, getNextInt, &registry);
+    EXPECT_THROW_WITH_REGEX(custom_cel_vocabulary.registerFunctions(&registry), EnvoyException,
+                            "failed to register function*");
+  }
+  {
+    google::api::expr::runtime::CelFunctionRegistry registry;
+    absl::Status status =
+        google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
+            EagerEvalFuncNameGetSquareOf, true, getSquareOf, &registry);
+    EXPECT_THROW_WITH_REGEX(custom_cel_vocabulary.registerFunctions(&registry), EnvoyException,
+                            "failed to register function*");
+  }
 }
 
 TEST_F(ExampleCustomCelVocabularyTests, GetNameTest) {

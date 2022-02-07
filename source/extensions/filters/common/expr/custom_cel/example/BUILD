@@ -24,7 +24,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "custom_cel_words_lib",
+    name = "custom_cel_variables_lib",
     srcs = ["custom_cel_variables.cc"],
     hdrs = ["custom_cel_variables.h"],
     deps = [
@@ -46,7 +46,7 @@ envoy_cc_extension(
     ],
     deps = [
         ":custom_cel_functions_lib",
-        ":custom_cel_words_lib",
+        ":custom_cel_variables_lib",
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/expr:context_lib",

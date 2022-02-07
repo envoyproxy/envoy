@@ -50,10 +50,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "example_custom_cel_vocabulary_test",
     srcs = ["example_custom_cel_vocabulary_test.cc"],
-    #    extension_names = ["envoy.expr.custom_cel_vocabulary.example"],
     deps = [
         "//source/common/protobuf:message_validator_lib",
         "//source/extensions/filters/common/expr/custom_cel:custom_cel_vocabulary_lib",
+        "//source/extensions/filters/common/expr/custom_cel/example:custom_cel_variables_lib",
         "//source/extensions/filters/common/expr/custom_cel/example:example_custom_cel_vocabulary_lib",
         "//test/config:utility_lib",
         "//test/mocks/stream_info:stream_info_mocks",
