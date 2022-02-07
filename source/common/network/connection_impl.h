@@ -82,7 +82,8 @@ public:
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }
   State state() const override;
   bool connecting() const override {
-    ENVOY_CONN_LOG_EVENT(debug, "current connecting state: {}", *this, connecting_);
+    ENVOY_CONN_LOG_EVENT(debug, "connection_connecting_state", "current connecting state: {}",
+                         *this, connecting_);
     return connecting_;
   }
   void write(Buffer::Instance& data, bool end_stream) override;
