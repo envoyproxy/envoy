@@ -135,7 +135,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   }
 
   uint64_t data_to_write = write_buffer_->length();
-  ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
+  ENVOY_CONN_LOG_EVENT(debug, "closing data_to_write={} type={}", *this, data_to_write,
+                       enumToInt(type));
   const bool delayed_close_timeout_set = delayed_close_timeout_.count() > 0;
   if (data_to_write == 0 || type == ConnectionCloseType::NoFlush ||
       !transport_socket_->canFlushClose()) {
@@ -677,18 +678,18 @@ void ConnectionImpl::onWriteReady() {
         socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).return_value_ == 0, "");
 
     if (error == 0) {
-      ENVOY_CONN_LOG(debug, "connected", *this);
+      ENVOY_CONN_LOG_EVENT(debug, "connected", *this);
       connecting_ = false;
       onConnected();
       transport_socket_->onConnected();
       // It's possible that we closed during the connect callback.
       if (state() != State::Open) {
-        ENVOY_CONN_LOG(debug, "close during connected callback", *this);
+        ENVOY_CONN_LOG_EVENT(debug, "close during connected callback", *this);
         return;
       }
     } else {
       setFailureReason(absl::StrCat("delayed connect error: ", error));
-      ENVOY_CONN_LOG(debug, "{}", *this, transportFailureReason());
+      ENVOY_CONN_LOG_EVENT(debug, "{}", *this, transportFailureReason());
       closeSocket(ConnectionEvent::RemoteClose);
       return;
     }
