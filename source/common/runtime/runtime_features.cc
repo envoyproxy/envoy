@@ -77,6 +77,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.new_tcp_connection_pool",
     "envoy.reloadable_features.proxy_102_103",
     "envoy.reloadable_features.remove_legacy_json",
+    "envoy.reloadable_features.skip_delay_close",
     "envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints",
     "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place",
     "envoy.reloadable_features.update_expected_rq_timeout_on_retry",

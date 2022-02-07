@@ -186,11 +186,12 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
 
 void ConnectionManagerImpl::checkForDeferredClose(bool skip_delay_close) {
   Network::ConnectionCloseType close = Network::ConnectionCloseType::FlushWriteAndDelay;
-  if (skip_delay_close) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_delay_close") &&
+      skip_delay_close) {
     close = Network::ConnectionCloseType::FlushWrite;
   }
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
-    doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
+    doConnectionClose(close, absl::nullopt,
                       StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect);
   }
 }
@@ -247,11 +248,12 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   // If HTTP/1.0 has no content length, it is framed by close and won't consider
   // the request complete until the FIN is read. Don't delay close in this case.
   bool http_10_sans_cl = (codec_->protocol() == Protocol::Http10) &&
-      (!stream.response_headers_ || !stream.response_headers_->ContentLength());
+                         (!stream.response_headers_ || !stream.response_headers_->ContentLength());
   // We also don't delay-close in the case of HTTP/1.1 where the request is
   // fully read, as there's no race condition to avoid.
   bool connection_close = stream.state_.saw_connection_close_;
   bool request_complete = stream.filter_manager_.remoteComplete();
+
   checkForDeferredClose(connection_close && (request_complete || http_10_sans_cl));
 }
 
