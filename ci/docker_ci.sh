@@ -88,10 +88,10 @@ build_images() {
   docker ps -a
   echo
   echo "docker image ls -a"
-  docker ps -a
+  docker image ls -a
   echo
   echo "docker volume ls"
-  docker ps -a
+  docker volume ls
   echo
   echo "ls -lh ${ENVOY_DOCKER_IMAGE_DIRECTORY}"
   ls -lh "${ENVOY_DOCKER_IMAGE_DIRECTORY}"
@@ -108,10 +108,10 @@ build_images() {
   docker ps -a
   echo
   echo "docker image ls -a"
-  docker ps -a
+  docker image ls -a
   echo
   echo "docker volume ls"
-  docker ps -a
+  docker volume ls
   echo
   echo "ls -lh ${ENVOY_DOCKER_IMAGE_DIRECTORY}"
   ls -lh "${ENVOY_DOCKER_IMAGE_DIRECTORY}"
