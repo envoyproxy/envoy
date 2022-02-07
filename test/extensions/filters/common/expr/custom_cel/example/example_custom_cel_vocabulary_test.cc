@@ -71,7 +71,7 @@ TEST_F(ExampleCustomCelVocabularyTests, FillActivationTest) {
   EXPECT_EQ(response_headers, *custom_cel_vocabulary.responseHeaders());
   EXPECT_EQ(response_trailers, *custom_cel_vocabulary.responseTrailers());
 
-  // verify that the variable setes are in the activation
+  // verify that the variable sets are in the activation
   for (int i = 0; static_cast<size_t>(i) < variable_set_names.size(); ++i) {
     ASSERT_TRUE(activation.FindValue(variable_set_names[i], &arena).has_value());
   }
