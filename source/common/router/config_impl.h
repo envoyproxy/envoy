@@ -973,7 +973,7 @@ private:
   PerFilterConfigs per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;
-  const std::string random_value_name_;
+  const std::string random_value_header_name_;
 };
 
 /**
