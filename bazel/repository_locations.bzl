@@ -76,17 +76,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Minimal OpenSSL fork",
         project_url = "https://github.com/google/boringssl",
         # To update BoringSSL, which tracks Chromium releases:
-        # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/dev release.
+        # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/beta release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
-        # 3. Find a commit in BoringSSL's "main-with-bazel" branch that merges <boringssl_revision>.
+        # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-94.0.4606.81 (linux/dev)
-        version = "648cbaf033401b7fe7acdce02f275b06a88aab5c",
-        sha256 = "579cb415458e9f3642da0a39a72f79fdfe6dc9c1713b3a823f1e276681b9703e",
+        # chromium-99.0.4844.17 (linux/beta)
+        version = "5416e4f16bffdc24e71e84d6e3977eed73c6f6b3",
+        sha256 = "864cb8005739db6f2b615ed167ba12a88a7f5c54e39c911e1c271fdfad21a3e7",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2021-07-15",
+        release_date = "2022-01-05",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(

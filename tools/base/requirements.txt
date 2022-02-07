@@ -16,7 +16,6 @@ abstracts==0.0.12 \
     #   envoy.base.utils
     #   envoy.code-format.python-check
     #   envoy.dependency.check
-    #   envoy.dependency.cve-scan
     #   envoy.dependency.pip-check
     #   envoy.distribution.release
     #   envoy.distribution.repo
@@ -38,7 +37,6 @@ aio.core==0.2.0 \
     #   aio.api.github
     #   envoy.code-format.python-check
     #   envoy.dependency.check
-    #   envoy.dependency.cve-scan
     #   envoy.distribution.release
     #   envoy.distribution.repo
     #   envoy.github.abstract
@@ -50,7 +48,6 @@ aio.run.checker==0.2.1 \
     #   -r requirements.in
     #   envoy.code-format.python-check
     #   envoy.dependency.check
-    #   envoy.dependency.cve-scan
     #   envoy.dependency.pip-check
     #   envoy.distribution.distrotest
     #   envoy.distribution.verify
@@ -119,7 +116,6 @@ aiohttp==3.7.4.post0 \
     #   aio.core
     #   aiodocker
     #   envoy.dependency.check
-    #   envoy.dependency.cve-scan
     #   envoy.github.abstract
     #   envoy.github.release
     #   slackclient
@@ -291,7 +287,6 @@ envoy.base.utils==0.0.14 \
     #   -r requirements.in
     #   envoy.code-format.python-check
     #   envoy.dependency.check
-    #   envoy.dependency.cve-scan
     #   envoy.dependency.pip-check
     #   envoy.distribution.distrotest
     #   envoy.distribution.release
@@ -307,10 +302,6 @@ envoy.code-format.python-check==0.0.7 \
 envoy.dependency.check==0.0.1 \
     --hash=sha256:52118226ff7f46698ad6b93ce6b04dabad4edbccc7a60db73dd1da83c12647a2 \
     --hash=sha256:f8738db62ed52ea439e10467cd2bdc0a6469f5f63711230d5dce4656d83d1023
-    # via -r requirements.in
-envoy.dependency.cve-scan==0.0.4 \
-    --hash=sha256:036bc115f09b3e14151708a33f9fe4c4ee32e911c0096ff44c140492fd3bcc9a \
-    --hash=sha256:087abcbc5a366d0ef27359829096451b1578feb11f87920cc63dc853ebf2ac71
     # via -r requirements.in
 envoy.dependency.pip-check==0.1.0 \
     --hash=sha256:8b05a513969300a0e5dd54a0440e2a564296cb29b7ef7f4c25dc9c7e4ff30e28 \
@@ -437,7 +428,6 @@ jinja2==3.0.3 \
     # via
     #   -r requirements.in
     #   envoy.dependency.check
-    #   envoy.dependency.cve-scan
     #   sphinx
 markupsafe==2.0.1 \
     --hash=sha256:01a9b8ea66f1658938f65b93a85ebe8bc016e6769611be228d797c9d998dd298 \
@@ -550,7 +540,6 @@ packaging==21.0 \
     # via
     #   aio.api.github
     #   envoy.dependency.check
-    #   envoy.dependency.cve-scan
     #   envoy.github.abstract
     #   envoy.github.release
     #   pytest

@@ -57,7 +57,6 @@ build_args() {
 use_builder() {
   # BuildKit is not available for Windows images, skip this
   if ! is_windows; then
-    TYPE=$1
     docker buildx use multi-builder
   fi
 }
