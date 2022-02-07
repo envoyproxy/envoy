@@ -34,6 +34,8 @@ public:
                uint32_t concurrent_stream_limit);
   ~ActiveClient() override;
 
+  virtual void onEnlisted() {}
+
   virtual void releaseResources() { releaseResourcesBase(); }
   void releaseResourcesBase();
 

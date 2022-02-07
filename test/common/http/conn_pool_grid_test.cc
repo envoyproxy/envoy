@@ -748,7 +748,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
   EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 101}));
 
-  EXPECT_CALL(os_sys_calls, close(1)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
   ConnectionPool::Cancellable* cancel = (**optional_it1)->newStream(decoder_, callbacks_);
   EXPECT_EQ(nullptr, cancel);
 }

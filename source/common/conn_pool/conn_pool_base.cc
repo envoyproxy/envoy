@@ -154,7 +154,13 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
     // Increase the connecting capacity to reflect the streams this connection can serve.
     state_.incrConnectingAndConnectedStreamCapacity(client->effectiveConcurrentStreamLimit());
     connecting_stream_capacity_ += client->effectiveConcurrentStreamLimit();
+    ActiveClient& client_ref = *client;
     LinkedList::moveIntoList(std::move(client), owningList(client->state()));
+    client_ref.onEnlisted();
+    if (client_ref.state() == ActiveClient::State::CLOSED) {
+      ENVOY_LOG(trace, "created connection failed immediately");
+      return ConnectionResult::FailedToCreateConnection;
+    }
     return can_create_connection ? ConnectionResult::CreatedNewConnection
                                  : ConnectionResult::CreatedButRateLimited;
   } else {
@@ -279,11 +285,15 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
                  result == ConnectionResult::FailedToCreateConnection),
             fmt::format("Failed to create expected connection: {}", *this));
   if (result == ConnectionResult::FailedToCreateConnection) {
-    // This currently only happens for HTTP/3 if secrets aren't yet loaded.
-    // Trigger connection failure.
-    pending->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
-    onPoolFailure(nullptr, absl::string_view(), ConnectionPool::PoolFailureReason::Overflow,
-                  context);
+    // This currently only happens for HTTP/3 if 1) secrets aren't yet loaded,
+    // or 2) connect failed immediately.
+    if (!pending_streams_.empty()) {
+      // If pending streams hasn't been purged. This failure must be because of 1). Trigger
+      // connection failure.
+      pending->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+      onPoolFailure(nullptr, absl::string_view(), ConnectionPool::PoolFailureReason::Overflow,
+                    context);
+    }
     return nullptr;
   }
 

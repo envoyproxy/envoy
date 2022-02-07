@@ -31,6 +31,13 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                                   parent.host()->cluster().stats().upstream_cx_http3_total_, data) {
 }
 
+void ActiveClient::onEnlisted() {
+  // HTTP/3 codec hasn't tried to connect yet.
+  MultiplexedActiveClientBase::onEnlisted();
+  ASSERT(codec_client_);
+  codec_client_->connect();
+}
+
 void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
   updateCapacity(num_streams);
   if (state() == ActiveClient::State::BUSY && currentUnusedCapacity() != 0) {
@@ -133,9 +140,9 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         return client;
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
-        CodecClientPtr codec{new CodecClientProd(CodecType::HTTP3, std::move(data.connection_),
-                                                 data.host_description_, pool->dispatcher(),
-                                                 pool->randomGenerator())};
+        CodecClientPtr codec{new NoConnectCodecClientProd(
+            CodecType::HTTP3, std::move(data.connection_), data.host_description_,
+            pool->dispatcher(), pool->randomGenerator())};
         return codec;
       },
       std::vector<Protocol>{Protocol::Http3}, time_source, connect_callback);
