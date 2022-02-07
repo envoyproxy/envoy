@@ -915,12 +915,12 @@ void ClientConnectionImpl::connect() {
   if (result.errno_ == SOCKET_ERROR_IN_PROGRESS) {
 #endif
     ASSERT(connecting_);
-    ENVOY_CONN_LOG(debug, "connection in progress", *this);
+    ENVOY_CONN_LOG_EVENT(debug, "connection_in_progress", "connection in progress", *this);
   } else {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
     connecting_ = false;
     setFailureReason(absl::StrCat("immediate connect error: ", result.errno_));
-    ENVOY_CONN_LOG(debug, "{}", *this, failureReason());
+    ENVOY_CONN_LOG_EVENT(debug, "connection_immediate_error", "{}", *this, failureReason());
 
     // Trigger a write event. This is needed on macOS and seems harmless on Linux.
     ioHandle().activateFileEvents(Event::FileReadyType::Write);
