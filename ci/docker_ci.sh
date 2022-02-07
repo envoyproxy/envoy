@@ -75,7 +75,47 @@ build_images() {
     args+=("-o" "type=oci,dest=${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy${TYPE}.tar")
   fi
 
+  echo
+  echo "Building images for ${PLATFORM} ${BUILD_TAG}"
+  echo
+  echo "docker command:"
+  echo "> docker ${BUILD_COMMAND[*]} --platform ${PLATFORM} ${args[@]} -t ${BUILD_TAG}"
+  echo
+  echo "df -h"
+  df -h
+  echo
+  echo "docker ps -a"
+  docker ps -a
+  echo
+  echo "docker image ls -a"
+  docker ps -a
+  echo
+  echo "docker volume ls"
+  docker ps -a
+  echo
+  echo "ls -lh ${ENVOY_DOCKER_IMAGE_DIRECTORY}"
+  ls -lh "${ENVOY_DOCKER_IMAGE_DIRECTORY}"
+  echo
+
   docker "${BUILD_COMMAND[@]}" --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" .
+
+  echo "Finished building images for ${PLATFORM} ${BUILD_TAG}"
+  echo
+  echo "df -h"
+  df -h
+  echo
+  echo "docker ps -a"
+  docker ps -a
+  echo
+  echo "docker image ls -a"
+  docker ps -a
+  echo
+  echo "docker volume ls"
+  docker ps -a
+  echo
+  echo "ls -lh ${ENVOY_DOCKER_IMAGE_DIRECTORY}"
+  ls -lh "${ENVOY_DOCKER_IMAGE_DIRECTORY}"
+  echo
 }
 
 push_images() {
@@ -116,7 +156,7 @@ if is_windows; then
   BUILD_COMMAND=("build")
 else
   # "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
-  BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-distroless" "-google-vrp")
+  BUILD_TYPES=("" "-debug")  #  "-contrib" "-contrib-debug" "-distroless" "-google-vrp")
 
   # Configure docker-buildx tools
   BUILD_COMMAND=("buildx" "build")
