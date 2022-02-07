@@ -36,17 +36,17 @@ constexpr absl::string_view EagerEvalFuncNameGetSquareOf = "getSquareOf";
 
 class ExampleCustomCelVocabulary : public CustomCelVocabulary {
 public:
-  ExampleCustomCelVocabulary() : CustomCelVocabulary() {}
+  ExampleCustomCelVocabulary() : CustomCelVocabulary() {};
 
   void fillActivation(Activation* activation, Protobuf::Arena& arena,
                       const StreamInfo::StreamInfo& info,
                       const Http::RequestHeaderMap* request_headers,
                       const Http::ResponseHeaderMap* response_headers,
-                      const Http::ResponseTrailerMap* response_trailers);
+                      const Http::ResponseTrailerMap* response_trailers) override;
 
-  void registerFunctions(CelFunctionRegistry* registry) const;
+  void registerFunctions(CelFunctionRegistry* registry) override;
 
-  ~ExampleCustomCelVocabulary() {}
+  ~ExampleCustomCelVocabulary() override = default;
 };
 
 class ExampleCustomCelVocabularyFactory : public CustomCelVocabularyFactory {

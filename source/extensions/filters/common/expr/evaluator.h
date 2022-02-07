@@ -39,7 +39,7 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
 // Creates an expression builder. The optional arena is used to enable constant folding
 // for intermediate evaluation results.
 // Throws an exception if fails to construct an expression builder.
-BuilderPtr createBuilder(Protobuf::Arena* arena, const CustomCelVocabulary* custom_cel_vocabulary);
+BuilderPtr createBuilder(Protobuf::Arena* arena, CustomCelVocabulary* custom_cel_vocabulary);
 
 BuilderPtr createBuilder(Protobuf::Arena* arena);
 

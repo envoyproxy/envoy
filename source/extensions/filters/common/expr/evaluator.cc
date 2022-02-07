@@ -50,7 +50,7 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
 
 BuilderPtr createBuilder(Protobuf::Arena* arena) { return createBuilder(arena, nullptr); }
 
-BuilderPtr createBuilder(Protobuf::Arena* arena, const CustomCelVocabulary* custom_cel_vocabulary) {
+BuilderPtr createBuilder(Protobuf::Arena* arena, CustomCelVocabulary* custom_cel_vocabulary) {
   google::api::expr::runtime::InterpreterOptions options;
 
   // Security-oriented defaults

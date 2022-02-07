@@ -22,7 +22,7 @@ public:
   CelValue result;
 };
 
-void MatchDescriptorsTest(CelFunctionDescriptor descriptor1, CelFunctionDescriptor descriptor2) {
+void matchDescriptorsTest(CelFunctionDescriptor descriptor1, CelFunctionDescriptor descriptor2) {
   EXPECT_EQ(descriptor1.name(), descriptor2.name());
   EXPECT_EQ(descriptor1.receiver_style(), descriptor2.receiver_style());
   EXPECT_EQ(descriptor1.types(), descriptor2.types());
@@ -35,7 +35,7 @@ TEST_F(CustomCelFunctionsTests, GetProductCelFunctionTest) {
   absl::Status status = function.Evaluate(args, &result, &arena);
   ASSERT_TRUE(status.ok());
   EXPECT_EQ(result.Int64OrDie(), 6);
-  MatchDescriptorsTest(function.createDescriptor("GetProduct"), function.descriptor());
+  matchDescriptorsTest(function.createDescriptor("GetProduct"), function.descriptor());
 }
 
 TEST_F(CustomCelFunctionsTests, GetDoubleCelFunctionTest) {
@@ -45,7 +45,7 @@ TEST_F(CustomCelFunctionsTests, GetDoubleCelFunctionTest) {
   absl::Status status = function.Evaluate(args, &result, &arena);
   ASSERT_TRUE(status.ok());
   EXPECT_EQ(result.Int64OrDie(), 4);
-  MatchDescriptorsTest(function.createDescriptor("GetDouble"), function.descriptor());
+  matchDescriptorsTest(function.createDescriptor("GetDouble"), function.descriptor());
 }
 
 TEST_F(CustomCelFunctionsTests, Get99CelFunctionTest) {
@@ -55,7 +55,7 @@ TEST_F(CustomCelFunctionsTests, Get99CelFunctionTest) {
   absl::Status status = function.Evaluate(args, &result, &arena);
   ASSERT_TRUE(status.ok());
   EXPECT_EQ(result.Int64OrDie(), 99);
-  MatchDescriptorsTest(function.createDescriptor("Get99"), function.descriptor());
+  matchDescriptorsTest(function.createDescriptor("Get99"), function.descriptor());
 }
 
 TEST_F(CustomCelFunctionsTests, GetSquareOfTest) {

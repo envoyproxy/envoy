@@ -21,8 +21,6 @@ namespace Expr {
 namespace Custom_Cel {
 namespace Example {
 
-using google::api::expr::runtime::FunctionAdapter;
-
 void throwExceptionValueProducerAlreadyAdded(absl::string_view value_producer_name);
 void throwExceptionFunctionAlreadyAdded(absl::string_view function_name, absl::Status status);
 void addLazyFunctionToActivation(Activation* activation, absl::string_view function_name,
@@ -82,7 +80,7 @@ void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view 
   }
 }
 
-void ExampleCustomCelVocabulary::registerFunctions(CelFunctionRegistry* registry) const {
+void ExampleCustomCelVocabulary::registerFunctions(CelFunctionRegistry* registry) {
   // lazily evaluated functions
   addLazyFunctionToRegistry(registry, LazyEvalFuncNameGetDouble,
                             GetDoubleCelFunction::createDescriptor(LazyEvalFuncNameGetDouble));
@@ -92,12 +90,12 @@ void ExampleCustomCelVocabulary::registerFunctions(CelFunctionRegistry* registry
                             Get99CelFunction::createDescriptor(LazyEvalFuncNameGet99));
 
   // eagerly evaluated functions
-  absl::Status status = FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
+  absl::Status status = google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
       EagerEvalFuncNameGetNextInt, false, getNextInt, registry);
   if (!status.ok()) {
     throwExceptionFunctionAlreadyAdded(EagerEvalFuncNameGetNextInt, status);
   }
-  status = FunctionAdapter<CelValue, int64_t>::CreateAndRegister(EagerEvalFuncNameGetSquareOf, true,
+  status = google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(EagerEvalFuncNameGetSquareOf, true,
                                                                  getSquareOf, registry);
   if (!status.ok()) {
     throwExceptionFunctionAlreadyAdded(EagerEvalFuncNameGetSquareOf, status);

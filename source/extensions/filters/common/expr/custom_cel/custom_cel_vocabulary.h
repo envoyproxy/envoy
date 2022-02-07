@@ -23,7 +23,7 @@ using google::api::expr::runtime::CelFunctionRegistry;
 
 class CustomCelVocabulary {
 public:
-  CustomCelVocabulary() {}
+  CustomCelVocabulary() = default;
 
   // fillActivation - adds variables or value producer to the activation,
   // a mapping of names to their reference implementations.
@@ -37,9 +37,9 @@ public:
                               const Http::ResponseTrailerMap* response_trailers) PURE;
 
   // registerFunctions: registers both lazily evaluated and eagerly evaluated functions.
-  virtual void registerFunctions(CelFunctionRegistry* registry) const PURE;
+  virtual void registerFunctions(CelFunctionRegistry* registry) PURE;
 
-  virtual ~CustomCelVocabulary() {}
+  virtual ~CustomCelVocabulary() = default;
 
   void setRequestHeaders(const Http::RequestHeaderMap* request_headers) {
     request_headers_ = request_headers;
