@@ -427,15 +427,16 @@ void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
 
 void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                                          Network::ConnectionEvent event) {
-  if (client.state() == ActiveClient::State::CONNECTING &&
-      event != Network::ConnectionEvent::ConnectedZeroRtt) {
-    ASSERT(connecting_stream_capacity_ >= client.effectiveConcurrentStreamLimit());
-    connecting_stream_capacity_ -= client.effectiveConcurrentStreamLimit();
-  }
+  if (event != Network::ConnectionEvent::ConnectedZeroRtt) {
+    if (client.state() == ActiveClient::State::CONNECTING) {
+      ASSERT(connecting_stream_capacity_ >= client.effectiveConcurrentStreamLimit());
+      connecting_stream_capacity_ -= client.effectiveConcurrentStreamLimit();
+    }
 
-  if (client.connect_timer_ && event != Network::ConnectionEvent::ConnectedZeroRtt) {
-    client.connect_timer_->disableTimer();
-    client.connect_timer_.reset();
+    if (client.connect_timer_) {
+      client.connect_timer_->disableTimer();
+      client.connect_timer_.reset();
+    }
   }
 
   switch (event) {

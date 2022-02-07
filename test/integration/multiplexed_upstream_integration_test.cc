@@ -642,7 +642,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamGoaway) {
   cleanupUpstreamAndDownstream();
 }
 
-TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamZeroRtt) {
+TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamCachesZeroRttKeys) {
   if (upstreamProtocol() != Http::CodecType::HTTP3) {
     return;
   }
