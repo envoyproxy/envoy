@@ -458,7 +458,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
 
-      // Purge pending streams only if this is not a 0-RRT handshake failure.
+      // Purge pending streams only if this is not a 0-RTT handshake failure.
       ConnectionPool::PoolFailureReason reason;
       if (client.timed_out_) {
         reason = ConnectionPool::PoolFailureReason::Timeout;
