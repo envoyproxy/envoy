@@ -197,7 +197,7 @@ ConnectivityGrid::ConnectivityGrid(
   AlternateProtocolsCache::Origin origin("https", host_->hostname(),
                                          host_->address()->ip()->port());
   std::chrono::milliseconds rtt =
-      std::chrono::duration_cast<std::chrono::milliseconds>(alternate_protocols_->getRtt(origin));
+      std::chrono::duration_cast<std::chrono::milliseconds>(alternate_protocols_->getSrtt(origin));
   if (rtt.count() != 0) {
     next_attempt_duration_ = std::chrono::milliseconds(rtt.count() * 2);
   }

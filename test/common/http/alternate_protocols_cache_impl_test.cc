@@ -56,12 +56,15 @@ TEST_F(AlternateProtocolsCacheImplTest, Init) {
   EXPECT_EQ(0, protocols_->size());
 }
 
-TEST_F(AlternateProtocolsCacheImplTest, SetAlternatives) {
+TEST_F(AlternateProtocolsCacheImplTest, SetAlternativesAndSrtt) {
   initialize();
   EXPECT_EQ(0, protocols_->size());
   EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0"));
   protocols_->setAlternatives(origin1_, protocols1_);
+  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|5"));
+  protocols_->setSrtt(origin1_, std::chrono::microseconds(5));
   EXPECT_EQ(1, protocols_->size());
+  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
 }
 
 TEST_F(AlternateProtocolsCacheImplTest, FindAlternatives) {

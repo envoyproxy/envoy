@@ -76,7 +76,7 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
   quic::QuicConfig config;
   PersistentQuicInfoImpl info{dispatcher_, *factory_, simTime(), 30, config, 45};
 
-  EXPECT_CALL(rtt_cache, getRtt).WillOnce(Return(std::chrono::microseconds(5)));
+  EXPECT_CALL(rtt_cache, getSrtt).WillOnce(Return(std::chrono::microseconds(5)));
 
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       info, dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_);
