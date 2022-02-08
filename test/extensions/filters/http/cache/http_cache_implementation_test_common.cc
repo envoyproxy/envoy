@@ -243,6 +243,7 @@ TEST_P(HttpCacheImplementationTest, PutGet) {
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
       {"date", formatter_.fromTime(time_source_.systemTime())},
       {"cache-control", "public,max-age=3600"}};
 
@@ -450,19 +451,20 @@ TEST_P(HttpCacheImplementationTest, VaryResponses) {
 
 TEST_P(HttpCacheImplementationTest, VaryOnDisallowedKey) {
   // Responses will vary on accept.
-  const std::string RequestPath("some-resource");
+  const std::string request_path("/path");
   Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
       {"date", formatter_.fromTime(time_source_.systemTime())},
       {"cache-control", "public,max-age=3600"},
       {"vary", "user-agent"}};
 
   // First request.
   request_headers_.setCopy(Http::LowerCaseString("user-agent"), "user_agent_one");
-  LookupContextPtr first_value_vary = lookup(RequestPath);
+  LookupContextPtr first_value_vary = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
-  const std::string Body1("one");
-  ASSERT_THAT(insert(move(first_value_vary), response_headers, Body1), IsOk());
-  first_value_vary = lookup(RequestPath);
+  const std::string body("one");
+  ASSERT_THAT(insert(move(first_value_vary), response_headers, body), IsOk());
+  first_value_vary = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 }
 
@@ -534,7 +536,8 @@ TEST_P(HttpCacheImplementationTest, UpdateHeadersDisabledForVaryHeaders) {
 
   const std::string request_path_1("/name");
   const std::string time_value_1 = formatter_.fromTime(time_source_.systemTime());
-  Http::TestResponseHeaderMapImpl response_headers_1{{"date", time_value_1},
+  Http::TestResponseHeaderMapImpl response_headers_1{{":status", "200"},
+                                                     {"date", time_value_1},
                                                      {"cache-control", "public,max-age=3600"},
                                                      {"accept", "image/*"},
                                                      {"vary", "accept"}};
@@ -547,7 +550,8 @@ TEST_P(HttpCacheImplementationTest, UpdateHeadersDisabledForVaryHeaders) {
   time_source_.advanceTimeWait(Seconds(3600));
   const SystemTime time_2 = time_source_.systemTime();
   const std::string time_value_2 = formatter_.fromTime(time_2);
-  Http::TestResponseHeaderMapImpl response_headers_2{{"date", time_value_2},
+  Http::TestResponseHeaderMapImpl response_headers_2{{":status", "200"},
+                                                     {"date", time_value_2},
                                                      {"cache-control", "public,max-age=3600"},
                                                      {"accept", "image/*"},
                                                      {"vary", "accept"}};
@@ -565,8 +569,10 @@ TEST_P(HttpCacheImplementationTest, UpdateHeadersSkipEtagHeader) {
 
   const std::string request_path_1("/name");
   const std::string time_value_1 = formatter_.fromTime(time_source_.systemTime());
-  Http::TestResponseHeaderMapImpl response_headers_1{
-      {"date", time_value_1}, {"cache-control", "public,max-age=3600"}, {"etag", "0000-0000"}};
+  Http::TestResponseHeaderMapImpl response_headers_1{{":status", "200"},
+                                                     {"date", time_value_1},
+                                                     {"cache-control", "public,max-age=3600"},
+                                                     {"etag", "0000-0000"}};
   ASSERT_THAT(insert(request_path_1, response_headers_1, "body"), IsOk());
   // An age header is inserted by `makeLookUpResult`
   response_headers_1.setReferenceKey(Http::LowerCaseString("age"), "0");
@@ -576,11 +582,15 @@ TEST_P(HttpCacheImplementationTest, UpdateHeadersSkipEtagHeader) {
   time_source_.advanceTimeWait(Seconds(3601));
   const SystemTime time_2 = time_source_.systemTime();
   const std::string time_value_2 = formatter_.fromTime(time_2);
-  Http::TestResponseHeaderMapImpl response_headers_2{
-      {"date", time_value_2}, {"cache-control", "public,max-age=3600"}, {"etag", "1111-1111"}};
+  Http::TestResponseHeaderMapImpl response_headers_2{{":status", "200"},
+                                                     {"date", time_value_2},
+                                                     {"cache-control", "public,max-age=3600"},
+                                                     {"etag", "1111-1111"}};
   // The etag header should not be updated
-  Http::TestResponseHeaderMapImpl response_headers_3{
-      {"date", time_value_2}, {"cache-control", "public,max-age=3600"}, {"etag", "0000-0000"}};
+  Http::TestResponseHeaderMapImpl response_headers_3{{":status", "200"},
+                                                     {"date", time_value_2},
+                                                     {"cache-control", "public,max-age=3600"},
+                                                     {"etag", "0000-0000"}};
 
   updateHeaders(request_path_1, response_headers_2, {time_2});
   response_headers_3.setReferenceKey(Http::LowerCaseString("age"), "0");
@@ -598,6 +608,7 @@ TEST_P(HttpCacheImplementationTest, UpdateHeadersSkipSpecificHeaders) {
 
   // Vary not tested because we have separate tests that cover it
   Http::TestResponseHeaderMapImpl origin_response_headers{
+      {":status", "200"},
       {"date", time_value_1},
       {"cache-control", "public,max-age=3600"},
       {"content-range", "bytes 200-1000/67589"},
@@ -616,6 +627,7 @@ TEST_P(HttpCacheImplementationTest, UpdateHeadersSkipSpecificHeaders) {
   const SystemTime time_2 = time_source_.systemTime();
   const std::string time_value_2 = formatter_.fromTime(time_2);
   Http::TestResponseHeaderMapImpl incoming_response_headers{
+      {":status", "200"},
       {"date", time_value_2},
       {"cache-control", "public,max-age=3600"},
       {"content-range", "bytes 5-1000/67589"},
@@ -628,6 +640,7 @@ TEST_P(HttpCacheImplementationTest, UpdateHeadersSkipSpecificHeaders) {
   // The skipped headers should not be updated
   // "age" and "link" should be updated
   Http::TestResponseHeaderMapImpl expected_response_headers{
+      {":status", "200"},
       {"date", time_value_2},
       {"cache-control", "public,max-age=3600"},
       {"content-range", "bytes 200-1000/67589"},
@@ -689,6 +702,7 @@ TEST_P(HttpCacheImplementationTest, PutGetWithTrailers) {
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
       {"date", formatter_.fromTime(time_source_.systemTime())},
       {"cache-control", "public,max-age=3600"}};
   const std::string body1("Value");
@@ -717,6 +731,7 @@ TEST_P(HttpCacheImplementationTest, EmptyTrailers) {
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
       {"date", formatter_.fromTime(time_source_.systemTime())},
       {"cache-control", "public,max-age=3600"}};
   const std::string body1("Value");
