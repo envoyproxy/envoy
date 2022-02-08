@@ -7,6 +7,7 @@ import public "envoy/config/trace/v3/dynamic_ot.proto";
 import public "envoy/config/trace/v3/http_tracer.proto";
 import public "envoy/config/trace/v3/lightstep.proto";
 import public "envoy/config/trace/v3/opencensus.proto";
+import public "envoy/config/trace/v3/opentelemetry.proto";
 import public "envoy/config/trace/v3/service.proto";
 import public "envoy/config/trace/v3/zipkin.proto";
 
