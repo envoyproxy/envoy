@@ -67,12 +67,12 @@ public:
    * Create an empty mutable Slice that owns its storage, which it charges to the provided account,
    * if any.
    * @param storage backend storage for the slice.
-   * @param size the size already used in storage.
+   * @param used_size the size already used in storage.
    * @param account the account to charge.
    */
-  Slice(SizedStorage storage, uint64_t size, const BufferMemoryAccountSharedPtr& account)
+  Slice(SizedStorage storage, uint64_t used_size, const BufferMemoryAccountSharedPtr& account)
       : capacity_(storage.len_), storage_(std::move(storage.mem_)), base_(storage_.get()),
-        reservable_(size) {
+        reservable_(used_size) {
     ASSERT(sliceSize(capacity_) == capacity_);
     ASSERT(reservable_ <= capacity_);
 
@@ -368,9 +368,8 @@ public:
    * @return a backend storage for slice.
    */
   static inline SizedStorage newStorage(uint64_t min_capacity) {
-    SizedStorage storage{nullptr, sliceSize(min_capacity)};
-    storage.mem_.reset(new uint8_t[storage.len_]);
-    return storage;
+    const uint64_t slice_size = sliceSize(min_capacity);
+    return {StoragePtr{new uint8_t[slice_size]}, slice_size};
   }
 
 protected:
