@@ -43,7 +43,7 @@ message RateLimitQuota {
   xds.type.matcher.v3.Matcher bucket_matchers = 3;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 6]
 message RateLimitQuotaBucketSettings {
   // Configures the behavior when the first request has been matched to
   // the bucket, and the data plane is waiting for the RLQS to return the
@@ -147,12 +147,6 @@ message RateLimitQuotaBucketSettings {
   // Specifies a behavior when the bucket's assignment has expired, and
   // hasn't been refresh due to server's unavailability.
   ExpiredAssignmentBehavior expired_assignment_behavior = 5;
-
-  // A duration after which, if no requests are matched to the bucket,
-  // the bucket is considered inactive. The client is to send a message to
-  // the server indicating it's no longer tracking the bucket.
-  google.protobuf.Duration bucket_inactivity_timeout = 6
-      [(validate.rules).duration = {required: true}];
 }
 
 message RateLimitQuotaPerRoute {
