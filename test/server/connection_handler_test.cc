@@ -769,11 +769,11 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
 
 // When update a listener, the old listener will be stopped and the new listener will
 // be added into ConnectionHandler before remove the old listener from ConnectionHandler.
-// This test ensure ConnectionHandler can query the correct Listener when balanced the connection
+// This test ensure ConnectionHandler can query the correct Listener when redirect the connection
 // through `getBalancedHandlerByAddress`
 TEST_F(ConnectionHandlerTest, MatchLatestListener) {
   Network::TcpListenerCallbacks* listener_callbacks;
-  // The Listener1 will accept the new connection first then balanced to other listener.
+  // The Listener1 will accept the new connection first then redirect to other listener.
   auto listener1 = new NiceMock<Network::MockListener>();
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks);
@@ -782,8 +782,13 @@ TEST_F(ConnectionHandlerTest, MatchLatestListener) {
   handler_->addListener(absl::nullopt, *test_listener1);
 
   // Listener2 will be replaced by Listener3.
+  auto listener2_overridden_filter_chain_manager =
+      std::make_shared<NiceMock<Network::MockFilterChainManager>>();
   auto listener2 = new NiceMock<Network::MockListener>();
-  TestListener* test_listener2 = addListener(2, false, false, "test_listener2", listener2);
+  TestListener* test_listener2 =
+      addListener(2, false, false, "test_listener2", listener2, nullptr, nullptr, nullptr,
+                  Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
+                  listener2_overridden_filter_chain_manager);
   Network::Address::InstanceConstSharedPtr listener2_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 10002));
   EXPECT_CALL(test_listener2->socket_factory_, localAddress())
@@ -791,8 +796,13 @@ TEST_F(ConnectionHandlerTest, MatchLatestListener) {
   handler_->addListener(absl::nullopt, *test_listener2);
 
   // Listener3 will replace the listener2.
+  auto listener3_overridden_filter_chain_manager =
+      std::make_shared<NiceMock<Network::MockFilterChainManager>>();
   auto listener3 = new NiceMock<Network::MockListener>();
-  TestListener* test_listener3 = addListener(3, false, false, "test_listener3", listener3);
+  TestListener* test_listener3 =
+      addListener(3, false, false, "test_listener3", listener3, nullptr, nullptr, nullptr,
+                  Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
+                  listener3_overridden_filter_chain_manager);
   Network::Address::InstanceConstSharedPtr listener3_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 10002));
   EXPECT_CALL(test_listener3->socket_factory_, localAddress())
@@ -826,7 +836,12 @@ TEST_F(ConnectionHandlerTest, MatchLatestListener) {
         cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
         return Network::FilterStatus::Continue;
       }));
-  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+  // Ensure the request is going to the listener3.
+  EXPECT_CALL(*listener3_overridden_filter_chain_manager, findFilterChain(_))
+      .WillOnce(Return(filter_chain_.get()));
+  // Ensure the request isn't going to the listener1 and listener2.
+  EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
+  EXPECT_CALL(*listener2_overridden_filter_chain_manager, findFilterChain(_)).Times(0);
 
   auto* connection = new NiceMock<Network::MockServerConnection>();
   EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
@@ -835,6 +850,203 @@ TEST_F(ConnectionHandlerTest, MatchLatestListener) {
   EXPECT_EQ(1UL, handler_->numConnections());
 
   EXPECT_CALL(*listener3, onDestroy());
+  EXPECT_CALL(*listener1, onDestroy());
+  EXPECT_CALL(*access_log_, log(_, _, _, _));
+}
+
+TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedListener) {
+  Network::TcpListenerCallbacks* listener_callbacks;
+  // The Listener1 will accept the new connection first then redirect to other listener.
+  auto listener1 = new NiceMock<Network::MockListener>();
+  TestListener* test_listener1 =
+      addListener(1, true, true, "test_listener1", listener1, &listener_callbacks);
+  EXPECT_CALL(test_listener1->socket_factory_, localAddress())
+      .WillRepeatedly(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener1);
+
+  auto listener2_overridden_filter_chain_manager =
+      std::make_shared<NiceMock<Network::MockFilterChainManager>>();
+  auto listener2 = new NiceMock<Network::MockListener>();
+  TestListener* test_listener2 =
+      addListener(2, false, false, "test_listener2", listener2, nullptr, nullptr, nullptr,
+                  Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
+                  listener2_overridden_filter_chain_manager);
+  Network::Address::InstanceConstSharedPtr listener2_address(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10002));
+  EXPECT_CALL(test_listener2->socket_factory_, localAddress())
+      .WillRepeatedly(ReturnRef(listener2_address));
+  handler_->addListener(absl::nullopt, *test_listener2);
+
+  // Stop the listener2.
+  EXPECT_CALL(*listener2, onDestroy());
+  handler_->stopListeners(2);
+
+  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
+  EXPECT_CALL(*test_filter, destroy_());
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  bool redirected = false;
+  EXPECT_CALL(factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+        // Insert the Mock filter.
+        if (!redirected) {
+          manager.addAcceptFilter(listener_filter_matcher_,
+                                  Network::ListenerFilterPtr{test_filter});
+          redirected = true;
+        }
+        return true;
+      }));
+  // This is the address of listener2.
+  Network::Address::InstanceConstSharedPtr alt_address(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10002, nullptr));
+  EXPECT_CALL(*test_filter, onAccept(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+        cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
+        return Network::FilterStatus::Continue;
+      }));
+  // Ensure the request isn't going to the listener2.
+  EXPECT_CALL(*listener2_overridden_filter_chain_manager, findFilterChain(_)).Times(0);
+  // Ensure the request is going to the listener1.
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+
+  auto* connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
+  EXPECT_EQ(1UL, handler_->numConnections());
+
+  EXPECT_CALL(*listener1, onDestroy());
+  EXPECT_CALL(*access_log_, log(_, _, _, _));
+}
+
+TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedAnyAddressListener) {
+  Network::TcpListenerCallbacks* listener_callbacks;
+  // The Listener1 will accept the new connection first then redirect to other listener.
+  auto listener1 = new NiceMock<Network::MockListener>();
+  TestListener* test_listener1 =
+      addListener(1, true, true, "test_listener1", listener1, &listener_callbacks);
+  EXPECT_CALL(test_listener1->socket_factory_, localAddress())
+      .WillRepeatedly(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener1);
+
+  auto listener2_overridden_filter_chain_manager =
+      std::make_shared<NiceMock<Network::MockFilterChainManager>>();
+  auto listener2 = new NiceMock<Network::MockListener>();
+  TestListener* test_listener2 =
+      addListener(2, false, false, "test_listener2", listener2, nullptr, nullptr, nullptr,
+                  Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
+                  listener2_overridden_filter_chain_manager);
+  Network::Address::InstanceConstSharedPtr listener2_address(
+      new Network::Address::Ipv4Instance("0.0.0.0", 10002));
+  EXPECT_CALL(test_listener2->socket_factory_, localAddress())
+      .WillRepeatedly(ReturnRef(listener2_address));
+  handler_->addListener(absl::nullopt, *test_listener2);
+
+  // Stop the listener2.
+  EXPECT_CALL(*listener2, onDestroy());
+  handler_->stopListeners(2);
+
+  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
+  EXPECT_CALL(*test_filter, destroy_());
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  bool redirected = false;
+  EXPECT_CALL(factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+        // Insert the Mock filter.
+        if (!redirected) {
+          manager.addAcceptFilter(listener_filter_matcher_,
+                                  Network::ListenerFilterPtr{test_filter});
+          redirected = true;
+        }
+        return true;
+      }));
+  // This is the address of listener2.
+  Network::Address::InstanceConstSharedPtr alt_address(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10002, nullptr));
+  EXPECT_CALL(*test_filter, onAccept(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+        cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
+        return Network::FilterStatus::Continue;
+      }));
+  // Ensure the request isn't going to the listener2.
+  EXPECT_CALL(*listener2_overridden_filter_chain_manager, findFilterChain(_)).Times(0);
+  // Ensure the request is going to the listener1.
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+
+  auto* connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
+  EXPECT_EQ(1UL, handler_->numConnections());
+
+  EXPECT_CALL(*listener1, onDestroy());
+  EXPECT_CALL(*access_log_, log(_, _, _, _));
+}
+
+TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedAnyAddressListenerOnOldBehavior) {
+  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
+
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.listener_wildcard_match_ip_family", "false"}});
+
+  Network::TcpListenerCallbacks* listener_callbacks;
+  // The Listener1 will accept the new connection first then redirect to other listener.
+  auto listener1 = new NiceMock<Network::MockListener>();
+  TestListener* test_listener1 =
+      addListener(1, true, true, "test_listener1", listener1, &listener_callbacks);
+  EXPECT_CALL(test_listener1->socket_factory_, localAddress())
+      .WillRepeatedly(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener1);
+
+  auto listener2_overridden_filter_chain_manager =
+      std::make_shared<NiceMock<Network::MockFilterChainManager>>();
+  auto listener2 = new NiceMock<Network::MockListener>();
+  TestListener* test_listener2 =
+      addListener(2, false, false, "test_listener2", listener2, nullptr, nullptr, nullptr,
+                  Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
+                  listener2_overridden_filter_chain_manager);
+  Network::Address::InstanceConstSharedPtr listener2_address(
+      new Network::Address::Ipv4Instance("0.0.0.0", 10002));
+  EXPECT_CALL(test_listener2->socket_factory_, localAddress())
+      .WillRepeatedly(ReturnRef(listener2_address));
+  handler_->addListener(absl::nullopt, *test_listener2);
+
+  // Stop the listener2.
+  EXPECT_CALL(*listener2, onDestroy());
+  handler_->stopListeners(2);
+
+  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
+  EXPECT_CALL(*test_filter, destroy_());
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  bool redirected = false;
+  EXPECT_CALL(factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+        // Insert the Mock filter.
+        if (!redirected) {
+          manager.addAcceptFilter(listener_filter_matcher_,
+                                  Network::ListenerFilterPtr{test_filter});
+          redirected = true;
+        }
+        return true;
+      }));
+  // This is the address of listener2.
+  Network::Address::InstanceConstSharedPtr alt_address(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10002, nullptr));
+  EXPECT_CALL(*test_filter, onAccept(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+        cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
+        return Network::FilterStatus::Continue;
+      }));
+  // Ensure the request isn't going to the listener2.
+  EXPECT_CALL(*listener2_overridden_filter_chain_manager, findFilterChain(_)).Times(0);
+  // Ensure the request is going to the listener1.
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+
+  auto* connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
+  EXPECT_EQ(1UL, handler_->numConnections());
+
   EXPECT_CALL(*listener1, onDestroy());
   EXPECT_CALL(*access_log_, log(_, _, _, _));
 }
