@@ -155,8 +155,7 @@ TEST(IoSocketHandleImpl, NullptrIfaddrs) {
 
 class IoSocketHandleImplTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, IoSocketHandleImplTest,
-                         testing::ValuesIn({Network::Address::IpVersion::v4,
-                                            Network::Address::IpVersion::v6}),
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
 TEST_P(IoSocketHandleImplTest, InterfaceNameForLoopback) {

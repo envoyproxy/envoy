@@ -21,7 +21,7 @@ public:
 
   /**
    * Returns the host's currently resolved address. This address may change periodically due to
-   * async re-resolution.
+   * async re-resolution. This address may be null in the case of failed resolution.
    */
   virtual Network::Address::InstanceConstSharedPtr address() const PURE;
 

@@ -5,7 +5,7 @@
 #include "source/common/memory/stats.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/stat_merger.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 #include "source/server/listener_impl.h"
 
