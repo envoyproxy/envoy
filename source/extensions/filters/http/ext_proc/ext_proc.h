@@ -96,7 +96,7 @@ private:
   absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode> processing_mode_;
 };
 
-class Filter : public Logger::Loggable<Logger::Id::filter>,
+class Filter : public Logger::Loggable<Logger::Id::ext_proc>,
                public Http::PassThroughFilter,
                public ExternalProcessorCallbacks {
   // The result of an attempt to open the stream

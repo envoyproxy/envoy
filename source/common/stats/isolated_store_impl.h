@@ -13,7 +13,7 @@
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
 #include "source/common/stats/store_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/tag_utility.h"
 #include "source/common/stats/utility.h"
 
@@ -225,6 +225,11 @@ public:
 
   void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override {
     text_readouts_.forEachStat(f_size, f_stat);
+  }
+
+  void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
+    UNREFERENCED_PARAMETER(f_size);
+    UNREFERENCED_PARAMETER(f_stat);
   }
 
   void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override {

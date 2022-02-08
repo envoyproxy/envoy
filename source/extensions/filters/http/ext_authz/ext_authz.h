@@ -269,6 +269,7 @@ public:
   void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;
 
 private:
+  absl::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers,
                     const Router::RouteConstSharedPtr& route);
