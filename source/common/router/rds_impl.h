@@ -99,8 +99,8 @@ private:
 class RdsRouteConfigSubscription : public Rds::RdsRouteConfigSubscription {
 public:
   RdsRouteConfigSubscription(
-      RouteConfigUpdateReceiver* config_update,
-      Envoy::Config::OpaqueResourceDecoder* resource_decoder,
+      RouteConfigUpdatePtr&& config_update,
+      std::unique_ptr<Envoy::Config::OpaqueResourceDecoder>&& resource_decoder,
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
       const uint64_t manager_identifier,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
@@ -114,7 +114,8 @@ public:
                               std::unique_ptr<Cleanup>& resume_rds);
 
 private:
-  void beforeProviderUpdate() override;
+  void beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>& noop_init_manager,
+                            std::unique_ptr<Cleanup>& resume_rds) override;
   void afterProviderUpdate() override;
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addUpdateCallback(std::function<void()> callback) {
@@ -144,7 +145,7 @@ struct UpdateOnDemandCallback {
 class RdsRouteConfigProviderImpl : public RouteConfigProvider,
                                    Logger::Loggable<Logger::Id::router> {
 public:
-  RdsRouteConfigProviderImpl(RdsRouteConfigSubscription* subscription,
+  RdsRouteConfigProviderImpl(RdsRouteConfigSubscriptionSharedPtr&& subscription,
                              Server::Configuration::ServerFactoryContext& factory_context);
 
   RdsRouteConfigSubscription& subscription();

@@ -73,7 +73,8 @@ private:
 
   bool validateUpdateSize(int num_resources);
 
-  virtual void beforeProviderUpdate() {}
+  virtual void beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>&,
+                                    std::unique_ptr<Cleanup>&) {}
   virtual void afterProviderUpdate() {}
 
 protected:

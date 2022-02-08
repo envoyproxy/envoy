@@ -95,7 +95,7 @@ RouteConfigProviderManager::reuseDynamicProvider(uint64_t manager_identifier,
                                                  const std::string& route_config_name) {
   auto it = dynamic_route_config_providers_.find(manager_identifier);
   if (it == dynamic_route_config_providers_.end()) {
-    return RouteConfigProviderSharedPtr();
+    return nullptr;
   }
   // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up
   // in the RdsRouteConfigSubscription destructor, and the single threaded nature

@@ -69,25 +69,24 @@ ConfigConstSharedPtr StaticRouteConfigProviderImpl::configCast() const {
 
 // TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
-    RouteConfigUpdateReceiver* config_update,
-    Envoy::Config::OpaqueResourceDecoder* resource_decoder,
+    RouteConfigUpdatePtr&& config_update,
+    std::unique_ptr<Envoy::Config::OpaqueResourceDecoder>&& resource_decoder,
     const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
     const uint64_t manager_identifier, Server::Configuration::ServerFactoryContext& factory_context,
     const std::string& stat_prefix, Rds::RouteConfigProviderManager& route_config_provider_manager)
-    : Rds::RdsRouteConfigSubscription(
-          RouteConfigUpdatePtr(config_update),
-          std::unique_ptr<Envoy::Config::OpaqueResourceDecoder>(resource_decoder),
-          rds.config_source(), rds.route_config_name(), manager_identifier, factory_context,
-          stat_prefix + "rds.", "RDS", route_config_provider_manager),
-      config_update_info_(config_update) {}
+    : Rds::RdsRouteConfigSubscription(std::move(config_update), std::move(resource_decoder),
+                                      rds.config_source(), rds.route_config_name(),
+                                      manager_identifier, factory_context, stat_prefix + "rds.",
+                                      "RDS", route_config_provider_manager),
+      config_update_info_(static_cast<RouteConfigUpdateReceiver*>(
+          Rds::RdsRouteConfigSubscription::config_update_info_.get())) {}
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() { config_update_info_.release(); }
 
-void RdsRouteConfigSubscription::beforeProviderUpdate() {
+void RdsRouteConfigSubscription::beforeProviderUpdate(
+    std::unique_ptr<Init::ManagerImpl>& noop_init_manager, std::unique_ptr<Cleanup>& resume_rds) {
   if (config_update_info_->protobufConfigurationCast().has_vhds() &&
       config_update_info_->vhdsConfigurationChanged()) {
-    std::unique_ptr<Init::ManagerImpl> noop_init_manager;
-    std::unique_ptr<Cleanup> resume_rds;
     ENVOY_LOG(debug,
               "rds: vhds configuration present/changed, (re)starting vhds: config_name={} hash={}",
               route_config_name_, routeConfigUpdate()->configHash());
@@ -139,10 +138,10 @@ void RdsRouteConfigSubscription::updateOnDemand(const std::string& aliases) {
 }
 
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
-    RdsRouteConfigSubscription* subscription,
+    RdsRouteConfigSubscriptionSharedPtr&& subscription,
     Server::Configuration::ServerFactoryContext& factory_context)
-    : base_(RdsRouteConfigSubscriptionSharedPtr(subscription), factory_context),
-      config_update_info_(subscription->routeConfigUpdate()), factory_context_(factory_context) {
+    : base_(subscription, factory_context), config_update_info_(subscription->routeConfigUpdate()),
+      factory_context_(factory_context) {
   // The subscription referenced by the 'base_' and by 'this' is the same.
   // In it the provider is already set by the 'base_' so it points to that.
   // Need to set again to point to 'this'.
@@ -235,15 +234,16 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
       rds, rds.route_config_name(), init_manager,
       [&optional_http_filters, &factory_context, &rds, &stat_prefix,
        this](uint64_t manager_identifier) {
-        auto config_update = new RouteConfigUpdateReceiverImpl(proto_traits_, factory_context,
-                                                               optional_http_filters);
-        auto resource_decoder = new Envoy::Config::OpaqueResourceDecoderImpl<
-            envoy::config::route::v3::RouteConfiguration>(
+        auto config_update = std::make_unique<RouteConfigUpdateReceiverImpl>(
+            proto_traits_, factory_context, optional_http_filters);
+        auto resource_decoder = std::make_unique<
+            Envoy::Config::OpaqueResourceDecoderImpl<envoy::config::route::v3::RouteConfiguration>>(
             factory_context.messageValidationContext().dynamicValidationVisitor(), "name");
-        auto subscription =
-            new RdsRouteConfigSubscription(config_update, resource_decoder, rds, manager_identifier,
-                                           factory_context, stat_prefix, manager_);
-        auto provider = std::make_shared<RdsRouteConfigProviderImpl>(subscription, factory_context);
+        auto subscription = std::make_shared<RdsRouteConfigSubscription>(
+            std::move(config_update), std::move(resource_decoder), rds, manager_identifier,
+            factory_context, stat_prefix, manager_);
+        auto provider =
+            std::make_shared<RdsRouteConfigProviderImpl>(std::move(subscription), factory_context);
         return std::make_pair(provider, &provider->subscription().initTarget());
       });
   ASSERT(dynamic_cast<RouteConfigProvider*>(provider.get()));

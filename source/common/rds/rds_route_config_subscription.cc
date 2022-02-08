@@ -73,11 +73,13 @@ void RdsRouteConfigSubscription::onConfigUpdate(
         fmt::format("Unexpected {} configuration (expecting {}): {}", rds_type_, route_config_name_,
                     resourceName(route_config_provider_manager_.protoTraits(), route_config)));
   }
+  std::unique_ptr<Init::ManagerImpl> noop_init_manager;
+  std::unique_ptr<Cleanup> resume_rds;
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
     stats_.config_reload_.inc();
     stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
 
-    beforeProviderUpdate();
+    beforeProviderUpdate(noop_init_manager, resume_rds);
 
     ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
               config_update_info_->configHash());
