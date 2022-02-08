@@ -25,11 +25,12 @@ namespace Outlier {
 
 DetectorSharedPtr DetectorImplFactory::createForCluster(
     Cluster& cluster, const envoy::config::cluster::v3::Cluster& cluster_config,
-    Event::Dispatcher& dispatcher, Runtime::Loader& runtime, EventLoggerSharedPtr event_logger) {
+    Event::Dispatcher& dispatcher, Runtime::Loader& runtime, EventLoggerSharedPtr event_logger,
+    Random::RandomGenerator& random) {
   if (cluster_config.has_outlier_detection()) {
 
     return DetectorImpl::create(cluster, cluster_config.outlier_detection(), dispatcher, runtime,
-                                dispatcher.timeSource(), std::move(event_logger));
+                                dispatcher.timeSource(), std::move(event_logger), random);
   } else {
     return nullptr;
   }
@@ -254,16 +255,20 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
       // base_ejection_time whatever is larger.
       max_ejection_time_ms_(static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(
           config, max_ejection_time,
-          std::max(DEFAULT_MAX_EJECTION_TIME_MS, base_ejection_time_ms_)))) {}
+          std::max(DEFAULT_MAX_EJECTION_TIME_MS, base_ejection_time_ms_)))),
+      max_ejection_time_jitter_ms_(static_cast<uint64_t>(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, max_ejection_time_jitter,
+                                     DEFAULT_MAX_EJECTION_TIME_JITTER_MS))) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::config::cluster::v3::OutlierDetection& config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                           TimeSource& time_source, EventLoggerSharedPtr event_logger)
+                           TimeSource& time_source, EventLoggerSharedPtr event_logger,
+                           Random::RandomGenerator& random)
     : config_(config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
       stats_(generateStats(cluster.info()->statsScope())),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
-      event_logger_(event_logger) {
+      event_logger_(event_logger), random_generator_(random) {
   // Insert success rate initial numbers for each type of SR detector
   external_origin_sr_num_ = {-1, -1};
   local_origin_sr_num_ = {-1, -1};
@@ -282,9 +287,10 @@ std::shared_ptr<DetectorImpl>
 DetectorImpl::create(const Cluster& cluster,
                      const envoy::config::cluster::v3::OutlierDetection& config,
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                     TimeSource& time_source, EventLoggerSharedPtr event_logger) {
+                     TimeSource& time_source, EventLoggerSharedPtr event_logger,
+                     Random::RandomGenerator& random) {
   std::shared_ptr<DetectorImpl> detector(
-      new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger));
+      new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger, random));
 
   if (detector->config().maxEjectionTimeMs() < detector->config().baseEjectionTimeMs()) {
     throw EnvoyException(
@@ -348,8 +354,9 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
       runtime_.snapshot().getInteger(BaseEjectionTimeMsRuntime, config_.baseEjectionTimeMs()));
   const std::chrono::milliseconds max_eject_time = std::chrono::milliseconds(
       runtime_.snapshot().getInteger(MaxEjectionTimeMsRuntime, config_.maxEjectionTimeMs()));
+  const std::chrono::milliseconds jitter = monitor->getJitter();
   ASSERT(monitor->numEjections() > 0);
-  if ((min(base_eject_time * monitor->ejectTimeBackoff(), max_eject_time)) <=
+  if ((min(base_eject_time * monitor->ejectTimeBackoff() + jitter, max_eject_time + jitter)) <=
       (now - monitor->lastEjectionTime().value())) {
     ejections_active_helper_.dec();
     host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
@@ -471,8 +478,24 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
           runtime_.snapshot().getInteger(BaseEjectionTimeMsRuntime, config_.baseEjectionTimeMs()));
       const std::chrono::milliseconds max_eject_time = std::chrono::milliseconds(
           runtime_.snapshot().getInteger(MaxEjectionTimeMsRuntime, config_.maxEjectionTimeMs()));
-      if ((host_monitors_[host]->ejectTimeBackoff() * base_eject_time) <
-          (max_eject_time + base_eject_time)) {
+      const std::chrono::milliseconds max_eject_time_jitter = std::chrono::milliseconds(
+          runtime_.snapshot().getInteger(MaxEjectionTimeJitterMsRuntime, config_.maxEjectionTimeJitterMs()));
+
+      // Generate random jitter so that not all hosts uneject at the same time, 
+      // which could possibly generate a connection storm
+
+      // std::chrono::milliseconds receives a signed integer as input, so we ensure that our random
+      // random value is in the range [0, std::numeric_limits<long>::max())
+      long random_long = static_cast<long>(random_generator_() % (std::numeric_limits<long>::max()));
+      // cap the jitter at max_eject_time_jitter
+      const std::chrono::milliseconds jitter =
+          std::chrono::milliseconds(random_long) % (max_eject_time_jitter + std::chrono::milliseconds(1));
+      // save the jitter on the current host_monitor
+      host_monitors_[host]->setJitter(jitter);
+
+
+      if ((host_monitors_[host]->ejectTimeBackoff() * base_eject_time + jitter) <
+          (max_eject_time + base_eject_time + jitter)) {
         host_monitors_[host]->ejectTimeBackoff()++;
       }
 
