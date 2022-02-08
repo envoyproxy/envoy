@@ -129,7 +129,7 @@ public:
     const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectinDuration() const {
       return max_downstream_connection_duration_;
     }
-    std::unique_ptr<TunnelingConfigHelperImpl> tunneling_config_helper_;
+    const TunnelingConfigHelper* tunnelingConfigHelper() { return tunneling_config_helper_.get(); }
 
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
@@ -141,6 +141,7 @@ public:
     const TcpProxyStats stats_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
     absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
+    std::unique_ptr<TunnelingConfigHelper> tunneling_config_helper_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -168,8 +169,9 @@ public:
   const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
     return shared_config_->maxDownstreamConnectinDuration();
   }
+  // Return nullptr if there is no tunneling config.
   const TunnelingConfigHelper* tunnelingConfigHelper() {
-    return shared_config_->tunneling_config_helper_.get();
+    return shared_config_->tunnelingConfigHelper();
   }
   UpstreamDrainManager& drainManager();
   SharedConfigSharedPtr sharedConfig() { return shared_config_; }
