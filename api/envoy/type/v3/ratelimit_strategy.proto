@@ -22,25 +22,28 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 message RateLimitStrategy {
   // Choose between allow all and deny all.
-  enum BooleanChoice {
-    DENY_ALL = 0;
-    ALLOW_ALL = 1;
+  enum BlanketRule {
+    ALLOW_ALL = 0;
+    DENY_ALL = 1;
   }
 
   // Limit the number of requests per second.
   message RequestsPerTimeUnit {
     // The number of requests per unit of time to allow. Requests over the limit
     // are denied.
-    // If set to 0, deny all (equivalent to RateLimitStrategyDenyAll).
+    // If set to 0, deny all (equivalent to BlanketRule.DENY_ALL).
     uint64 requests_per_time_unit = 1;
 
-    // The unit of time.
-    RateLimitUnit time_unit = 2 [(validate.rules).enum = {defined_only: true}];
+    // The unit of time. Ignored when requests_per_time_unit is 0 (deny all).
+    RateLimitUnit time_unit = 2;
   }
 
   oneof strategy {
+    option (validate.required) = true;
+
     // Allow or Deny the requests.
-    BooleanChoice boolean_choice = 1;
+    // If unset, allow all.
+    BlanketRule blanket_rule = 1;
 
     // A number of requests per time unit, f.e. requests per second.
     RequestsPerTimeUnit requests_per_time_unit = 2;
@@ -76,7 +79,7 @@ message RateLimitStrategyQueue {
   // When the length is reached, whether discard old requests or new requests.
   QueueFullBehavior queue_full_behavior = 2;
 
-  // Whether to deny the requests discarded due to queue lengths limit,
-  // or allow them.
-  RateLimitStrategy.BooleanChoice spillover_discard_strategy = 3;
+  // Whether to deny the requests discarded due to queue lengths limit.
+  // If unset, allow all.
+  RateLimitStrategy.BlanketRule spillover_discard_strategy = 3;
 }

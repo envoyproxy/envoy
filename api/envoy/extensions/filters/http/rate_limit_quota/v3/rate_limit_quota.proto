@@ -53,7 +53,8 @@ message RateLimitQuotaBucketSettings {
       option (validate.required) = true;
 
       // Allow or Deny the requests until the bucket is assigned a quota.
-      type.v3.RateLimitStrategy.BooleanChoice process_requests = 1;
+      // If unset, allow all.
+      type.v3.RateLimitStrategy.BlanketRule blanket_rule = 1;
 
       // Queue the requests until the bucket is assigned a quota.
       // The data plane maintains a separate queue for each bucket that has
