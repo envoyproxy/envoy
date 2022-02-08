@@ -28,7 +28,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // Rate limit :ref:`configuration overview <config_http_filters_rate_limit_quota>`.
 // [#extension: envoy.filters.http.rate_limit_quota]
 
-message RateLimitQuota {
+message RateLimitQuotaFilterConfig {
   // [#comment:TODO(sergiitk): preview mode matchers]
 
   // Configuration for the gRPC service that hosts an external rate limit
