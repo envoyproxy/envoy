@@ -76,7 +76,9 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
     quic::QuicServerId& server_id = info_impl->server_id_;
     Http::AlternateProtocolsCache::Origin origin("https", server_id.host(), server_id.port());
     std::chrono::microseconds rtt = rtt_cache.value().get().getSrtt(origin);
-    info_impl->quic_config_.SetInitialRoundTripTimeUsToSend(rtt.count());
+    if (rtt.count() != 0) {
+      info_impl->quic_config_.SetInitialRoundTripTimeUsToSend(rtt.count());
+    }
   }
 
   // QUICHE client session always use the 1st version to start handshake.

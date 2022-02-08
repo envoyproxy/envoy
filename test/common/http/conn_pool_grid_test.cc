@@ -254,13 +254,13 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnects) {
 
 // Test timer is affected by prior rtt.
 TEST_F(ConnectivityGridTest, SrttMatters) {
-  addHttp3AlternateProtocol(std::chrono::microseconds(2000000));
+  addHttp3AlternateProtocol(std::chrono::microseconds(2000));
   initialize();
   EXPECT_EQ(grid_->first(), nullptr);
 
   // This timer will be returned and armed based on prior rtt.
   Event::MockTimer* failover_timer = new StrictMock<MockTimer>(&dispatcher_);
-  EXPECT_CALL(*failover_timer, enableTimer(std::chrono::milliseconds(4000), nullptr));
+  EXPECT_CALL(*failover_timer, enableTimer(std::chrono::milliseconds(4), nullptr));
   EXPECT_CALL(*failover_timer, enabled()).WillRepeatedly(Return(false));
 
   auto cancel = grid_->newStream(decoder_, callbacks_);

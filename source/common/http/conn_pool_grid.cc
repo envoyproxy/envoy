@@ -11,6 +11,9 @@ namespace {
 absl::string_view describePool(const ConnectionPool::Instance& pool) {
   return pool.protocolDescription();
 }
+
+static constexpr uint32_t kDefaultTimeoutMs = 300;
+
 } // namespace
 
 ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
@@ -189,7 +192,7 @@ ConnectivityGrid::ConnectivityGrid(
     Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
-      state_(state), next_attempt_duration_(std::chrono::milliseconds(300)),
+      state_(state), next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
       time_source_(time_source), http3_status_tracker_(dispatcher_),
       alternate_protocols_(alternate_protocols), quic_stat_names_(quic_stat_names), scope_(scope) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
