@@ -31,25 +31,22 @@ service RateLimitQuotaService {
 }
 
 message RateLimitQuotaUsageReports {
-  // [#next-free-field: 7]
+  // [#next-free-field: 6]
   message BucketQuotaUsage {
     // Bucket id for which request quota usage is reported.
     BucketId bucket_id = 1 [(validate.rules).message = {required: true}];
 
-    // Auto-incrementing number used to deduplicate usage reports.
-    uint64 report_id = 2;
-
     // Time elapsed since the last report.
-    google.protobuf.Duration time_elapsed = 3;
+    google.protobuf.Duration time_elapsed = 2;
 
     // Requests the data plane has allowed through.
-    uint64 num_requests_allowed = 4;
+    uint64 num_requests_allowed = 3;
 
     // Requests throttled.
-    uint64 num_requests_denied = 5;
+    uint64 num_requests_denied = 4;
 
     // Requests in the queue waiting for the assignment.
-    uint64 num_requests_queued = 6;
+    uint64 num_requests_queued = 5;
   }
 
   // All quota requests must specify the domain. This enables sharing the quota
