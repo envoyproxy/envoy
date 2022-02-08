@@ -1138,7 +1138,7 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("This causes a deadlock")
+  @Ignore("Concurrent Engines not yet: https://github.com/envoyproxy/envoy-mobile/issues/2003")
   public void testInitTwoEnginesSimultaneously() throws Exception {
     // Threads will block on runBlocker to ensure simultaneous execution.
     ConditionVariable runBlocker = new ConditionVariable(false);
@@ -1173,7 +1173,7 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("This causes a crash")
+  @Ignore("Concurrent Engines not yet: https://github.com/envoyproxy/envoy-mobile/issues/2003")
   public void testInitDifferentEngines() throws Exception {
     // Test that concurrently instantiating Cronet context's upon various
     // different versions of the same Android Context does not cause crashes
@@ -1191,7 +1191,7 @@ public class CronetUrlRequestContextTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunNativeCronet // Java engine doesn't produce metrics
-  @Ignore("Metrics not implemented yet: https://github.com/envoyproxy/envoy-mobile/issues/1520")
+  @Ignore("UMA not implemented yet: https://github.com/envoyproxy/envoy-mobile/issues/1615")
   public void testGetGlobalMetricsDeltas() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
 

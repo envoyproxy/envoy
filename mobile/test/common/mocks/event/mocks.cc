@@ -14,5 +14,10 @@ using testing::ReturnPointee;
 using testing::SaveArg;
 
 namespace Envoy {
-namespace Event {} // namespace Event
+namespace Event {
+
+MockProvisionalDispatcher::MockProvisionalDispatcher() {
+  ON_CALL(*this, timeSource()).WillByDefault(testing::ReturnRef(time_system_));
+}
+} // namespace Event
 } // namespace Envoy

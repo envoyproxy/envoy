@@ -204,7 +204,8 @@ envoy_final_stream_intel PlatformBridgeFilter::finalStreamIntel() {
   // FIXME: Stream handle cannot currently be set from the filter context.
   envoy_final_stream_intel final_stream_intel{-1, -1, -1, -1, -1, -1, -1, -1,
                                               -1, -1, -1, 0,  0,  0,  0};
-  setFinalStreamIntel(decoder_callbacks_->streamInfo(), final_stream_intel);
+  setFinalStreamIntel(decoder_callbacks_->streamInfo(), dispatcher_.timeSource(),
+                      final_stream_intel);
   return final_stream_intel;
 }
 

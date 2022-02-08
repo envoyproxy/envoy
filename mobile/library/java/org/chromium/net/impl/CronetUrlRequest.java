@@ -31,6 +31,7 @@ import org.chromium.net.CallbackException;
 import org.chromium.net.CronetException;
 import org.chromium.net.InlineExecutionProhibitedException;
 import org.chromium.net.RequestFinishedInfo;
+import org.chromium.net.RequestFinishedInfo.Metrics;
 import org.chromium.net.UploadDataProvider;
 
 /** UrlRequest, backed by Envoy-Mobile. */
@@ -528,6 +529,9 @@ public final class CronetUrlRequest extends UrlRequestBase {
     boolean hasUserAgent = false;
     boolean hasContentType = false;
     for (Map.Entry<String, String> header : headersList) {
+      if (header.getKey().isEmpty()) {
+        throw new IllegalArgumentException("Invalid header =");
+      }
       hasUserAgent = hasUserAgent ||
                      (header.getKey().equalsIgnoreCase(USER_AGENT) && !header.getValue().isEmpty());
       hasContentType = hasContentType || (header.getKey().equalsIgnoreCase(CONTENT_TYPE) &&
@@ -589,6 +593,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
       public void run() {
         try {
           mCallback.onCanceled(CronetUrlRequest.this, mUrlResponseInfo);
+          maybeReportMetrics();
         } catch (Exception exception) {
           Log.e(CronetUrlRequestContext.LOG_TAG, "Exception in onCanceled method", exception);
         }
@@ -603,6 +608,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
       public void run() {
         try {
           mCallback.onSucceeded(CronetUrlRequest.this, mUrlResponseInfo);
+          maybeReportMetrics();
         } catch (Exception exception) {
           Log.e(CronetUrlRequestContext.LOG_TAG, "Exception in onSucceeded method", exception);
         }
@@ -617,6 +623,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
       public void run() {
         try {
           mCallback.onFailed(CronetUrlRequest.this, mUrlResponseInfo, mException);
+          maybeReportMetrics();
         } catch (Exception exception) {
           Log.e(CronetUrlRequestContext.LOG_TAG, "Exception in onFailed method", exception);
         }
@@ -664,6 +671,53 @@ public final class CronetUrlRequest extends UrlRequestBase {
   private void recordEnvoyStreamIntel(EnvoyStreamIntel envoyStreamIntel) {
     mUrlResponseInfo.setReceivedByteCount(envoyStreamIntel.getConsumedBytesFromResponse() +
                                           mBytesReceivedFromRedirects);
+  }
+
+  // Maybe report metrics. This method should only be called on Callback's executor thread and
+  // after Callback's onSucceeded, onFailed and onCanceled.
+  private void maybeReportMetrics() {
+    if (mEnvoyFinalStreamIntel != null) {
+      Metrics metrics = getMetrics(mEnvoyFinalStreamIntel, mBytesReceivedFromRedirects);
+      final RequestFinishedInfo requestInfo =
+          new RequestFinishedInfoImpl(mInitialUrl, mRequestAnnotations, metrics,
+                                      getFinishedReason(), mUrlResponseInfo, mException);
+      mRequestContext.reportRequestFinished(requestInfo);
+      if (mRequestFinishedListener != null) {
+        try {
+          mRequestFinishedListener.getExecutor().execute(new Runnable() {
+            @Override
+            public void run() {
+              mRequestFinishedListener.onRequestFinished(requestInfo);
+            }
+          });
+        } catch (RejectedExecutionException failException) {
+          Log.e(CronetUrlRequestContext.LOG_TAG, "Exception posting task to executor",
+                failException);
+        }
+      }
+    }
+  }
+
+  private static Metrics getMetrics(EnvoyFinalStreamIntel intel, long bytesReceivedFromRedirects) {
+    return new CronetMetrics(
+        intel.getRequestStartMs(), intel.getDnsStartMs(), intel.getDnsEndMs(),
+        intel.getConnectStartMs(), intel.getConnectEndMs(), intel.getSslStartMs(),
+        intel.getSslEndMs(), intel.getSendingStartMs(), intel.getSendingEndMs(),
+        /* pushStartMs= */ -1, /* pushEndMs= */ -1, intel.getResponseStartMs(),
+        intel.getRequestEndMs(), intel.getSocketReused(), intel.getSentByteCount(),
+        intel.getReceivedByteCount() + bytesReceivedFromRedirects);
+  }
+
+  @RequestFinishedInfoImpl.FinishedReason
+  private int getFinishedReason() {
+    switch (mState.get()) {
+    case State.COMPLETE:
+      return RequestFinishedInfoImpl.SUCCEEDED;
+    case State.CANCELLED:
+      return RequestFinishedInfoImpl.CANCELED;
+    default:
+      return RequestFinishedInfoImpl.FAILED;
+    }
   }
 
   private static class HeadersList extends ArrayList<Map.Entry<String, String>> {}
