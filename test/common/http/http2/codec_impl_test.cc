@@ -1597,6 +1597,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
 
   if (defer_processing_backedup_streams_) {
+    // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
     EXPECT_FALSE(process_buffered_data_callback->enabled_);
   }
 
