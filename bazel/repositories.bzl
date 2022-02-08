@@ -4,6 +4,7 @@ load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
@@ -215,6 +216,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("rules_cc")
     external_http_archive("rules_pkg")
     _com_github_fdio_vpp_vcl()
+    _bazel_zig_cc()
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
@@ -1122,6 +1124,18 @@ def _com_github_fdio_vpp_vcl():
         name = "com_github_fdio_vpp_vcl",
         build_file_content = BUILD_ALL_CONTENT,
         patches = ["@envoy//bazel/foreign_cc:vpp_vcl.patch"],
+    )
+
+def _bazel_zig_cc():
+    # Workaround for bazel-zig-cc using dashes.
+    if "bazel-zig-cc" in native.existing_rules().keys():
+        return
+    location = REPOSITORY_LOCATIONS["bazel_zig_cc"]
+    http_archive(
+        name = "bazel-zig-cc",
+        urls = location["urls"],
+        sha256 = location["sha256"],
+        strip_prefix = location.get("strip_prefix", ""),
     )
 
 def _foreign_cc_dependencies():

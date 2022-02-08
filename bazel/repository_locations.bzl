@@ -80,9 +80,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-99.0.4844.17 (linux/beta)
-        version = "5416e4f16bffdc24e71e84d6e3977eed73c6f6b3",
-        sha256 = "864cb8005739db6f2b615ed167ba12a88a7f5c54e39c911e1c271fdfad21a3e7",
+        # master
+        version = "eaa29f431f71b8121e1da76bcd3ddc2248238ade",
+        sha256 = "7dec97795a7ac7e3832228e4440ee06cceb18d3663f4580b0840e685281e28a0",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
@@ -795,13 +795,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
         # NOTE: Update together with com_googlesource_chromium_base_trace_event_common and com_googlesource_chromium_zlib.
-        version = "9.9.115.5",
+        version = "10.0.101",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
-        sha256 = "60a6759069350571b24b65eb88c2c1908afed2b938dae6a92b305924f3b64e84",
+        sha256 = "75abf6815c59f0553c2ceee80c0c18244fe084aaaed2f4383c45236276165931",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/v8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-01-31",
+        release_date = "2022-02-08",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_chromium_base_trace_event_common = dict(
@@ -810,13 +810,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://chromium.googlesource.com/chromium/src/base/trace_event/common/",
         # NOTE: Update together with v8 and com_googlesource_chromium_zlib.
         # Use version and sha256 from https://storage.googleapis.com/envoyproxy-wee8/v8-<v8_version>-deps.sha256.
-        version = "7f36dbc19d31e2aad895c60261ca8f726442bfbb",
+        version = "d115b033c4e53666b535cbd1985ffe60badad082",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
-        sha256 = "4e9f31f393ea87bf3987f9a5e3b1d8314ad45f00e5a79c61cdcc1ef1eed2f05b",
+        sha256 = "976bc8efe682d821bd112861e71da3728134609193e0d334dee1afa90d3dc027",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/chromium-base_trace_event_common-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2021-10-27",
+        release_date = "2022-01-19",
         cpe = "N/A",
     ),
     com_googlesource_chromium_zlib = dict(
@@ -825,13 +825,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://chromium.googlesource.com/chromium/src/third_party/zlib/",
         # NOTE: Update together with v8 and com_googlesource_chromium_base_trace_event_common.
         # Use version and sha256 from https://storage.googleapis.com/envoyproxy-wee8/v8-<v8_version>-deps.sha256.
-        version = "fc5cfd78a357d5bb7735a58f383634faaafe706a",
+        version = "3fc79233fe8ff5cf39fec4c8b8a46272d4f11cec",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
-        sha256 = "695c73750cf6472fc6c926e43952262206f1475157377364142bdbb84a1a5a83",
+        sha256 = "d43651deccdfe257f3fbc43d1cf10cd32561988621ad85e7ae1508ebf636522a",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/chromium-zlib-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-01-12",
+        release_date = "2022-02-07",
         cpe = "N/A",
     ),
     com_github_google_quiche = dict(
@@ -1133,6 +1133,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["other"],
         extensions = ["envoy.bootstrap.vcl"],
         release_date = "2021-12-10",
+        cpe = "N/A",
+    ),
+    bazel_zig_cc = dict(
+        project_name = "Bazel Zig C/C++ rules",
+        project_desc = "Bazel Zig C/C++ rules",
+        project_url = "https://git.sr.ht/~motiejus/bazel-zig-cc",
+        version = "v0.4.4",
+        sha256 = "ad6384b4d16ebb3e5047df6548a195e598346da84e5f320250beb9198705ac81",
+        strip_prefix = "bazel-zig-cc-{version}",
+        urls = ["https://git.sr.ht/~motiejus/bazel-zig-cc/archive/{version}.tar.gz"],
+        use_category = ["build"],
+        release_date = "2022-02-05",
         cpe = "N/A",
     ),
 )
