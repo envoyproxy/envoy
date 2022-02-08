@@ -66,5 +66,7 @@ bool ProvisionalDispatcher::trackedObjectStackIsEmpty() const {
   return event_dispatcher_->trackedObjectStackIsEmpty();
 }
 
+TimeSource& ProvisionalDispatcher::timeSource() { return event_dispatcher_->timeSource(); }
+
 } // namespace Event
 } // namespace Envoy

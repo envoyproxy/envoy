@@ -17,5 +17,6 @@ envoy_cc_mock(
         "//library/common/event:provisional_dispatcher_lib",
         "@envoy//envoy/event:deferred_deletable",
         "@envoy//envoy/event:dispatcher_interface",
+        "@envoy//test/test_common:test_time_lib",
     ],
 )

@@ -53,6 +53,11 @@ public:
    */
   virtual void deferredDelete(DeferredDeletablePtr&& to_delete);
 
+  /**
+   * Exposes the TimeSource held by the underlying Event::Dispatcher.
+   */
+  virtual TimeSource& timeSource();
+
   // Used for testing.
   Thread::ThreadSynchronizer& synchronizer() { return synchronizer_; }
 
