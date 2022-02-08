@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <cstring>
 
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/network/connection.h"
@@ -83,6 +84,33 @@ public:
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     filter_callbacks_ = &callbacks;
     filter_callbacks_->connection().addConnectionCallbacks(*this);
+    injectDynamicDescriptorKeys(config_->descriptors(), filter_callbacks_->connection());
+  }
+
+  void injectDynamicDescriptorKeys(std::vector<RateLimit::Descriptor> original_descriptors, 
+    const Network::Connection& connection) {
+    std::vector<RateLimit::Descriptor> dynamicDescriptors = std::vector<RateLimit::Descriptor>();
+    for (const RateLimit::Descriptor& descriptor : original_descriptors) {
+      RateLimit::Descriptor new_descriptor;
+      for (const RateLimit::DescriptorEntry& descriptorEntry : descriptor.entries_) {
+        std::string value = descriptorEntry.value_;
+
+        //TODO: do we care about case sensitivity? 
+        if ( strcasecmp(descriptorEntry.key_.c_str(), "remote_address") == 0 
+          && strcasecmp(descriptorEntry.value_.c_str(), "downstream_ip") == 0) {
+          // TODO: do we want the port numbers? IPv6 support? 
+          // TODO: safety checks on stream_info and its fields? 
+          // TODO: what exactly should the token representing downstream_ip be? 
+          // TODO: should we use remote address or direct remote address as the substitution? 
+          if (connection.connectionInfoProvider().remoteAddress()->type() == Network::Address::Type::Ip) {
+            value = connection.connectionInfoProvider().remoteAddress()->ip()->addressAsString();
+          }
+        }
+        new_descriptor.entries_.push_back({descriptorEntry.key_, value });
+      } 
+      dynamicDescriptors.push_back(new_descriptor);
+    }
+    filter_descriptors_ = dynamicDescriptors;
   }
 
   // Network::ConnectionCallbacks
@@ -90,6 +118,7 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
+  const std::vector<RateLimit::Descriptor>& descriptors() { return filter_descriptors_; }
   // RateLimit::RequestCallbacks
   void complete(Filters::Common::RateLimit::LimitStatus status,
                 Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
@@ -102,6 +131,7 @@ private:
   enum class Status { NotStarted, Calling, Complete };
 
   ConfigSharedPtr config_;
+  std::vector<RateLimit::Descriptor> filter_descriptors_;
   Filters::Common::RateLimit::ClientPtr client_;
   Network::ReadFilterCallbacks* filter_callbacks_{};
   Status status_{Status::NotStarted};

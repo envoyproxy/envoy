@@ -9,6 +9,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/filter_manager_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
+#include "source/common/network/address_impl.h"
 #include "source/extensions/filters/network/ratelimit/ratelimit.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
@@ -38,7 +39,7 @@ namespace RateLimitFilter {
 
 class RateLimitFilterTest : public testing::Test {
 public:
-  void SetUpTest(const std::string& yaml) {
+  void setUpTest(const std::string& yaml) {
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.tcp_filter_enabled", 100))
         .WillByDefault(Return(true));
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.tcp_filter_enforcing", 100))
@@ -49,6 +50,11 @@ public:
     config_ = std::make_shared<Config>(proto_config, stats_store_, runtime_);
     client_ = new Filters::Common::RateLimit::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
+
+    auto downstream_direct_remote =
+      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance("8.8.8.8", 3000)};
+    filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(downstream_direct_remote);
+      
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
     // NOP currently.
@@ -91,6 +97,17 @@ stat_prefix: name
 failure_mode_deny: true
 )EOF";
 
+  const std::string replace_ip_config = R"EOF(
+domain: foo
+descriptors:
+- entries:
+   - key: remote_address
+     value: downstream_ip
+   - key: hello
+     value: world
+stat_prefix: name
+)EOF";
+
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   ConfigSharedPtr config_;
@@ -102,7 +119,7 @@ failure_mode_deny: true
 
 TEST_F(RateLimitFilterTest, OK) {
   InSequence s;
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
 
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
@@ -131,9 +148,58 @@ TEST_F(RateLimitFilterTest, OK) {
   EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.ok").value());
 }
 
+TEST_F(RateLimitFilterTest, ReplaceDownstreamIP) {
+  InSequence s;
+  setUpTest(replace_ip_config);
+  //filter_->injectDynamicDescriptorKeys(config_->descriptors() ,filter_callbacks_.connection_);
+
+  std::vector<RateLimit::Descriptor> expected_descriptors;
+  expected_descriptors.push_back({{{"remote_address",  "8.8.8.8" }, {"hello", "world"}}});
+  
+  std::vector<RateLimit::Descriptor> actual_descriptors{filter_->descriptors().begin(), filter_->descriptors().end()};
+
+  for ( auto it_expected = expected_descriptors.begin(), it_actual = actual_descriptors.begin(); it_expected != expected_descriptors.end() && it_actual != actual_descriptors.end(); ++it_expected, ++it_actual ) {
+    std::vector<RateLimit::DescriptorEntry> de1 = it_expected->entries_;
+    std::vector<RateLimit::DescriptorEntry> de2 = it_actual->entries_;
+    for ( auto de_expected = de1.begin(), de_actual = de2.begin(); de_expected != de1.end() && de_actual != de2.end(); ++de_expected, ++de_actual) {
+      auto actual_entry = de_actual.base();
+      auto expected_entry = de_expected.base();
+      EXPECT_EQ(actual_entry->key_, expected_entry->key_);
+      EXPECT_EQ(actual_entry->value_, expected_entry->value_);
+
+    }
+  }
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"remote_address", "downstream_ip"}, {"hello", "world"}}}}),
+                              testing::A<Tracing::Span&>(), _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  EXPECT_CALL(filter_callbacks_, continueReading());
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  EXPECT_CALL(*client_, cancel()).Times(0);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
+
+  EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.total").value());
+  EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.ok").value());
+}
+
 TEST_F(RateLimitFilterTest, OverLimit) {
   InSequence s;
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
 
   EXPECT_CALL(*client_, limit(_, "foo", _, _, _))
       .WillOnce(
@@ -159,7 +225,7 @@ TEST_F(RateLimitFilterTest, OverLimit) {
 
 TEST_F(RateLimitFilterTest, OverLimitWithDynamicMetadata) {
   InSequence s;
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
 
   EXPECT_CALL(*client_, limit(_, "foo", _, _, _))
       .WillOnce(
@@ -199,7 +265,7 @@ TEST_F(RateLimitFilterTest, OverLimitWithDynamicMetadata) {
 
 TEST_F(RateLimitFilterTest, OverLimitNotEnforcing) {
   InSequence s;
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
 
   EXPECT_CALL(*client_, limit(_, "foo", _, _, _))
       .WillOnce(
@@ -228,7 +294,7 @@ TEST_F(RateLimitFilterTest, OverLimitNotEnforcing) {
 
 TEST_F(RateLimitFilterTest, Error) {
   InSequence s;
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
 
   EXPECT_CALL(*client_, limit(_, "foo", _, _, _))
       .WillOnce(
@@ -256,7 +322,7 @@ TEST_F(RateLimitFilterTest, Error) {
 
 TEST_F(RateLimitFilterTest, Disconnect) {
   InSequence s;
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
 
   EXPECT_CALL(*client_, limit(_, "foo", _, _, _))
       .WillOnce(
@@ -276,7 +342,7 @@ TEST_F(RateLimitFilterTest, Disconnect) {
 
 TEST_F(RateLimitFilterTest, ImmediateOK) {
   InSequence s;
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
 
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, limit(_, "foo", _, _, _))
@@ -300,7 +366,7 @@ TEST_F(RateLimitFilterTest, ImmediateOK) {
 
 TEST_F(RateLimitFilterTest, ImmediateError) {
   InSequence s;
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
 
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, limit(_, "foo", _, _, _))
@@ -325,7 +391,7 @@ TEST_F(RateLimitFilterTest, ImmediateError) {
 
 TEST_F(RateLimitFilterTest, RuntimeDisable) {
   InSequence s;
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("ratelimit.tcp_filter_enabled", 100))
       .WillOnce(Return(false));
@@ -338,7 +404,7 @@ TEST_F(RateLimitFilterTest, RuntimeDisable) {
 
 TEST_F(RateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
   InSequence s;
-  SetUpTest(fail_close_config_);
+  setUpTest(fail_close_config_);
 
   EXPECT_CALL(*client_, limit(_, "foo", _, _, _))
       .WillOnce(
