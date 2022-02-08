@@ -52,6 +52,8 @@ TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 }
 
 TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithGiantBodyNoBuffer) {
+  ENVOY_LOG_MISC(warn, "manually lowering logs to error");
+  LogLevelSetter save_levels(spdlog::level::err);
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false, nullptr,
                                        TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
@@ -1339,7 +1341,7 @@ TEST_P(MultiplexedIntegrationTest, DelayedCloseDisabled) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Needs HTTP/3 "bad frame" equivalent.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(0); });
+             hcm) { hcm.mutable_delayed_close_timeout()->set_nanos(0); });
   initialize();
   std::string response;
   auto connection = createConnectionDriver(

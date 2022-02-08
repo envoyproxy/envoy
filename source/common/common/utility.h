@@ -15,6 +15,8 @@
 #include "source/common/common/hash.h"
 #include "source/common/common/non_copyable.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -514,7 +516,7 @@ public:
       begin = end;
     }
 
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpectedly reached");
   }
 };
 

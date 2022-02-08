@@ -2,6 +2,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/http/cache/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
@@ -47,14 +48,15 @@ protected:
                      const Http::TestResponseHeaderMapImpl& response_headers,
                      const ResponseMetadata& metadata) {
     LookupRequest request = makeLookupRequest(request_path);
-    LookupContextPtr context = cache_.makeLookupContext(std::move(request));
+    LookupContextPtr context = cache_.makeLookupContext(std::move(request), decoder_callbacks_);
     updateHeaders(*context, response_headers, metadata);
   }
 
   // Performs a cache lookup.
   LookupContextPtr lookup(absl::string_view request_path) {
     LookupRequest request = makeLookupRequest(request_path);
-    LookupContextPtr context = cache_.makeLookupContext(std::move(request));
+
+    LookupContextPtr context = cache_.makeLookupContext(std::move(request), decoder_callbacks_);
     context->getHeaders([this](LookupResult&& result) { lookup_result_ = std::move(result); });
     return context;
   }
@@ -63,7 +65,7 @@ protected:
   void insert(LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& response_headers,
               const absl::string_view response_body,
               const Http::TestResponseTrailerMapImpl& response_trailers = {}) {
-    InsertContextPtr inserter = cache_.makeInsertContext(move(lookup));
+    InsertContextPtr inserter = cache_.makeInsertContext(move(lookup), encoder_callbacks_);
     const ResponseMetadata metadata = {time_source_.systemTime()};
     inserter->insertHeaders(response_headers, metadata, false);
     inserter->insertBody(
@@ -170,6 +172,8 @@ protected:
   Event::SimulatedTimeSystem time_source_;
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   VaryAllowList vary_allow_list_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
 // Simple flow of putting in an item, getting it, deleting it.
@@ -280,7 +284,7 @@ TEST_F(SimpleHttpCacheTest, StreamingPut) {
       {"date", formatter_.fromTime(time_source_.systemTime())},
       {"age", "2"},
       {"cache-control", "public, max-age=3600"}};
-  InsertContextPtr inserter = cache_.makeInsertContext(lookup(RequestPath));
+  InsertContextPtr inserter = cache_.makeInsertContext(lookup(RequestPath), encoder_callbacks_);
   const ResponseMetadata metadata = {time_source_.systemTime()};
 
   inserter->insertHeaders(response_headers, metadata, false);

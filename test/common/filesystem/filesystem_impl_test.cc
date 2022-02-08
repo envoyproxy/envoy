@@ -463,5 +463,15 @@ TEST_F(FileSystemImplTest, TestIoFileError) {
   EXPECT_EQ(IoFileError::IoErrorCode::UnknownError, error3.getErrorCode());
 }
 
+TEST_F(FileSystemImplTest, Overwrite) {
+  const std::string original = "test_envoy";
+  std::string full_filename = TestEnvironment::writeStringToFileForTest("filename", original);
+  EXPECT_EQ(original, TestEnvironment::readFileToStringForTest(full_filename));
+
+  const std::string shorter = "short";
+  TestEnvironment::writeStringToFileForTest("filename", shorter, false, false);
+  EXPECT_EQ(shorter, TestEnvironment::readFileToStringForTest(full_filename));
+}
+
 } // namespace Filesystem
 } // namespace Envoy

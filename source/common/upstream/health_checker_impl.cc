@@ -293,7 +293,6 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       *request_headers,
       // Here there is no downstream connection so scheme will be based on
       // upstream crypto
-      host_->transportSocketFactory().implementsSecureTransport(),
       host_->transportSocketFactory().implementsSecureTransport());
   StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource(),
                                          local_connection_info_provider_);
@@ -325,13 +324,6 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
     Http::GoAwayErrorCode error_code) {
   ENVOY_CONN_LOG(debug, "connection going away goaway_code={}, health_flags={}", *client_,
                  error_code, HostUtility::healthFlagsToString(*host_));
-
-  // Runtime guard around graceful handling of NO_ERROR GOAWAY handling. The old behavior is to
-  // ignore GOAWAY completely.
-  if (!parent_.runtime_.snapshot().runtimeFeatureEnabled(
-          "envoy.reloadable_features.health_check.graceful_goaway_handling")) {
-    return;
-  }
 
   if (request_in_flight_ && error_code == Http::GoAwayErrorCode::NoError) {
     // The server is starting a graceful shutdown. Allow the in flight request
@@ -752,7 +744,6 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
       headers_message->headers(),
       // Here there is no downstream connection so scheme will be based on
       // upstream crypto
-      host_->transportSocketFactory().implementsSecureTransport(),
       host_->transportSocketFactory().implementsSecureTransport());
 
   auto status = request_encoder_->encodeHeaders(headers_message->headers(), false);

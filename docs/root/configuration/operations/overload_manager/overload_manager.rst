@@ -7,9 +7,9 @@ The :ref:`overload manager <arch_overview_overload_manager>` is configured in th
 :ref:`overload_manager <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.overload_manager>`
 field.
 
-An example configuration of the overload manager is shown below. It shows a configuration to
-disable HTTP/1.x keepalive when heap memory usage reaches 95% and to stop accepting
-requests when heap memory usage reaches 99%.
+An example configuration of the overload manager is shown below. It shows a
+configuration to drain HTTP/X connections when heap memory usage reaches 95%
+and to stop accepting requests when heap memory usage reaches 99%.
 
 .. code-block:: yaml
 
@@ -81,7 +81,9 @@ The following overload actions are supported:
     - Envoy will immediately respond with a 503 response code to new requests
 
   * - envoy.overload_actions.disable_http_keepalive
-    - Envoy will stop accepting streams on incoming HTTP connections
+    - Envoy will drain HTTP/2 and HTTP/3 connections using ``GOAWAY`` with a
+      drain grace period. For HTTP/1, Envoy will set a drain timer to close the
+      more idle recently used connections.
 
   * - envoy.overload_actions.stop_accepting_connections
     - Envoy will stop accepting new network connections on its configured listeners

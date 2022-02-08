@@ -57,7 +57,11 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
       sent_head_request_ = true;
     }
   }
-  WriteHeaders(std::move(spdy_headers), end_stream, nullptr);
+  {
+    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
+    WriteHeaders(std::move(spdy_headers), end_stream, nullptr);
+  }
+
   if (local_end_stream_) {
     onLocalEndStream();
   }
@@ -86,7 +90,10 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
   }
   absl::Span<quic::QuicMemSlice> span(quic_slices);
   // QUIC stream must take all.
-  WriteBodySlices(span, end_stream);
+  {
+    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
+    WriteBodySlices(span, end_stream);
+  }
   if (data.length() > 0) {
     // Send buffer didn't take all the data, threshold needs to be adjusted.
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
@@ -102,7 +109,12 @@ void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& traile
   local_end_stream_ = true;
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
   ScopedWatermarkBufferUpdater updater(this, this);
-  WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+
+  {
+    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
+    WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+  }
+
   onLocalEndStream();
 }
 
@@ -132,6 +144,7 @@ void EnvoyQuicClientStream::switchStreamBlockState() {
 
 void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
+  mutableBytesMeter()->addHeaderBytesReceived(frame_len);
   if (read_side_closed()) {
     return;
   }
@@ -186,6 +199,15 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   ConsumeHeaderList();
 }
 
+void EnvoyQuicClientStream::OnStreamFrame(const quic::QuicStreamFrame& frame) {
+  uint64_t highest_byte_received = frame.data_length + frame.offset;
+  if (highest_byte_received > bytesMeter()->wireBytesReceived()) {
+    mutableBytesMeter()->addWireBytesReceived(highest_byte_received -
+                                              bytesMeter()->wireBytesReceived());
+  }
+  quic::QuicSpdyClientStream::OnStreamFrame(frame);
+}
+
 void EnvoyQuicClientStream::OnBodyAvailable() {
   ASSERT(FinishedReadingHeaders());
   if (read_side_closed()) {
@@ -236,6 +258,7 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
 
 void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
+  mutableBytesMeter()->addHeaderBytesReceived(frame_len);
   if (read_side_closed()) {
     return;
   }
