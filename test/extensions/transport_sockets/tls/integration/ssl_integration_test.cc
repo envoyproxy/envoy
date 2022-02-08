@@ -41,7 +41,8 @@ void SslIntegrationTestBase::initialize() {
                                   .setEcdsaCertOcspStaple(server_ecdsa_cert_ocsp_staple_)
                                   .setOcspStapleRequired(ocsp_staple_required_)
                                   .setTlsV13(server_tlsv1_3_)
-                                  .setExpectClientEcdsaCert(client_ecdsa_cert_));
+                                  .setExpectClientEcdsaCert(client_ecdsa_cert_)
+                                  .setTlsKeyLogFilter(debug_tls_keylog_mode_));
 
   HttpIntegrationTest::initialize();
 
@@ -85,6 +86,56 @@ void SslIntegrationTestBase::checkStats() {
   Stats::CounterSharedPtr counter = test_server_->counter(listenerStatPrefix("ssl.handshake"));
   EXPECT_EQ(expected_handshakes, counter->value());
   counter->reset();
+}
+
+class SslKeyLogTest : public SslIntegrationTest {
+public:
+  void setLocalFilter() { debug_tls_keylog_mode_ = 0x1; }
+  void setRemoteFilter() { debug_tls_keylog_mode_ = 0x10; }
+  void setBothLocalAndRemoteFilter() { debug_tls_keylog_mode_ = 0x11; }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslKeyLogTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(SslKeyLogTest, SetLocalFilter) {
+  setLocalFilter();
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  codec_client_ = makeHttpConnection(creator());
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto result = codec_client_->startRequest(request_headers);
+  codec_client_->close();
+}
+
+TEST_P(SslKeyLogTest, SetRemoteFilter) {
+  setRemoteFilter();
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  codec_client_ = makeHttpConnection(creator());
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto result = codec_client_->startRequest(request_headers);
+  codec_client_->close();
+}
+
+TEST_P(SslKeyLogTest, SetLocalAndRemoteFilter) {
+  setBothLocalAndRemoteFilter();
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  codec_client_ = makeHttpConnection(creator());
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto result = codec_client_->startRequest(request_headers);
+  codec_client_->close();
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslIntegrationTest,

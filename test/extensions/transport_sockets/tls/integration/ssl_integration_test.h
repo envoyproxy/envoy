@@ -39,6 +39,7 @@ protected:
   // Set this true to debug SSL handshake issues with openssl s_client. The
   // verbose trace will be in the logs, openssl must be installed separately.
   bool debug_with_s_client_{false};
+  int debug_tls_keylog_mode_{0};
   std::unique_ptr<ContextManager> context_manager_;
 };
 

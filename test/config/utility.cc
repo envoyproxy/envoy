@@ -1213,17 +1213,24 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
 }
 
 void ConfigHelper::initializeTlsKeyLog(
-    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
-  auto tls_keylog_path = common_tls_context.mutable_tls_keylog()->mutable_tls_keylog_path();
-  auto tls_keylog_local = common_tls_context.mutable_tls_keylog()->mutable_tls_keylog_local();
-  auto tls_keylog_remote = common_tls_context.mutable_tls_keylog()->mutable_tls_keylog_remote();
-  auto new_element_local = tls_keylog_local->Add();
-  new_element_local->set_address_prefix("127.0.0.1");
-  new_element_local->mutable_prefix_len()->set_value(32);
-  auto new_element_remote = tls_keylog_remote->Add();
-  new_element_remote->set_address_prefix("127.0.0.1");
-  new_element_remote->mutable_prefix_len()->set_value(32);
+    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& tls_context, int mode) {
+  if (mode == 0) {
+    return;
+  }
+  auto tls_keylog_path = tls_context.mutable_tls_keylog()->mutable_logfile_path();
   *tls_keylog_path = std::string("/dev/null");
+  if (mode & 0x1) {
+    auto tls_keylog_local = tls_context.mutable_tls_keylog()->mutable_local_address_range();
+    auto new_element_local = tls_keylog_local->Add();
+    new_element_local->set_address_prefix("127.0.0.1");
+    new_element_local->mutable_prefix_len()->set_value(32);
+  }
+  if (mode & 0x10) {
+    auto tls_keylog_remote = tls_context.mutable_tls_keylog()->mutable_remote_address_range();
+    auto new_element_remote = tls_keylog_remote->Add();
+    new_element_remote->set_address_prefix("127.0.0.1");
+    new_element_remote->mutable_prefix_len()->set_value(32);
+  }
 }
 
 void ConfigHelper::initializeTls(
@@ -1274,7 +1281,7 @@ void ConfigHelper::initializeTls(
     *validation_context->mutable_match_typed_subject_alt_names() = {options.san_matchers_.begin(),
                                                                     options.san_matchers_.end()};
   }
-  initializeTlsKeyLog(common_tls_context);
+  initializeTlsKeyLog(common_tls_context, options.tls_keylog_filter_mode_);
 }
 
 void ConfigHelper::renameListener(const std::string& name) {

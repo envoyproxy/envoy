@@ -87,6 +87,11 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setTlsKeyLogFilter(int mode) {
+      tls_keylog_filter_mode_ = mode;
+      return *this;
+    }
+
     bool allow_expired_certificate_{};
     envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
     bool rsa_cert_{true};
@@ -96,6 +101,7 @@ public:
     bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
     bool expect_client_ecdsa_cert_{false};
+    int tls_keylog_filter_mode_{0};
     std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
         san_matchers_{};
   };
@@ -113,7 +119,8 @@ public:
                 envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_context);
 
   static void initializeTlsKeyLog(
-      envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context);
+      envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
+      int mode);
   using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v3::Bootstrap&)>;
   using HttpModifierFunction = std::function<void(HttpConnectionManager&)>;
 
