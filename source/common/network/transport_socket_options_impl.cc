@@ -67,29 +67,28 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   absl::optional<Network::ProxyProtocolData> proxy_protocol_options;
 
   bool needs_transport_socket_options = false;
-  if (auto typed_data =
-          filter_state.getDataReadOnlyTyped<UpstreamServerName>(UpstreamServerName::key());
+  if (auto typed_data = filter_state.getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
       typed_data != nullptr) {
     server_name = typed_data->value();
     needs_transport_socket_options = true;
   }
 
-  if (auto typed_data = filter_state.getDataReadOnlyTyped<Network::ApplicationProtocols>(
+  if (auto typed_data = filter_state.getDataReadOnly<Network::ApplicationProtocols>(
           Network::ApplicationProtocols::key());
       typed_data != nullptr) {
     application_protocols = typed_data->value();
     needs_transport_socket_options = true;
   }
 
-  if (auto typed_data = filter_state.getDataReadOnlyTyped<UpstreamSubjectAltNames>(
-          UpstreamSubjectAltNames::key());
+  if (auto typed_data =
+          filter_state.getDataReadOnly<UpstreamSubjectAltNames>(UpstreamSubjectAltNames::key());
       typed_data != nullptr) {
     subject_alt_names = typed_data->value();
     needs_transport_socket_options = true;
   }
 
-  if (auto typed_data = filter_state.getDataReadOnlyTyped<ProxyProtocolFilterState>(
-          ProxyProtocolFilterState::key());
+  if (auto typed_data =
+          filter_state.getDataReadOnly<ProxyProtocolFilterState>(ProxyProtocolFilterState::key());
       typed_data != nullptr) {
     proxy_protocol_options.emplace(typed_data->value());
     needs_transport_socket_options = true;

@@ -483,13 +483,13 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
   EXPECT_TRUE(
       callbacks_.streamInfo().downstreamTiming().getValue(ProxyFilter::DNS_END).has_value());
 
-  const StreamInfo::UpstreamAddress& updated_address_obj =
+  const StreamInfo::UpstreamAddress* updated_address_obj =
       filter_state->getDataReadOnly<StreamInfo::UpstreamAddress>(
           StreamInfo::UpstreamAddress::key());
 
   // Verify the data
-  EXPECT_TRUE(updated_address_obj.address_);
-  EXPECT_EQ(updated_address_obj.address_->asStringView(), host_info->address_->asStringView());
+  EXPECT_TRUE(updated_address_obj->address_);
+  EXPECT_EQ(updated_address_obj->address_->asStringView(), host_info->address_->asStringView());
 
   filter_->onDestroy();
 }

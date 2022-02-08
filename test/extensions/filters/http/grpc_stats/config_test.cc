@@ -364,10 +364,10 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
   EXPECT_TRUE(stats_store_.findCounterByString(
       "grpc.lyft.users.BadCompanions.GetBadCompanions.request_message_count"));
 
-  const auto& data =
+  const auto* data =
       stream_info_.filterState()->getDataReadOnly<GrpcStatsObject>("envoy.filters.http.grpc_stats");
-  EXPECT_EQ(2U, data.request_message_count);
-  EXPECT_EQ(0U, data.response_message_count);
+  EXPECT_EQ(2U, data->request_message_count);
+  EXPECT_EQ(0U, data->response_message_count);
 
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc+proto"},
                                                    {":status", "200"}};

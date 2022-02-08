@@ -274,10 +274,8 @@ void Utility::extractCommonAccessLogProperties(
   }
 
   for (const auto& key : config.filter_state_objects_to_log()) {
-    if (stream_info.filterState().hasDataWithName(key)) {
-      const auto& obj =
-          stream_info.filterState().getDataReadOnly<StreamInfo::FilterState::Object>(key);
-      ProtobufTypes::MessagePtr serialized_proto = obj.serializeAsProto();
+    if (auto state = stream_info.filterState().getDataReadOnlyGeneric(key); state != nullptr) {
+      ProtobufTypes::MessagePtr serialized_proto = state->serializeAsProto();
       if (serialized_proto != nullptr) {
         auto& filter_state_objects = *common_access_log.mutable_filter_state_objects();
         ProtobufWkt::Any& any = filter_state_objects[key];

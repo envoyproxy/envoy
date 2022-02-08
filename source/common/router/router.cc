@@ -392,10 +392,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // we should append cluster and host headers to the response, and whether to forward the request
   // upstream.
   const StreamInfo::FilterStateSharedPtr& filter_state = callbacks_->streamInfo().filterState();
-  const DebugConfig* debug_config =
-      filter_state->hasData<DebugConfig>(DebugConfig::key())
-          ? &(filter_state->getDataReadOnly<DebugConfig>(DebugConfig::key()))
-          : nullptr;
+  const DebugConfig* debug_config = filter_state->getDataReadOnly<DebugConfig>(DebugConfig::key());
 
   // TODO: Maybe add a filter API for this.
   grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
@@ -574,24 +571,18 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       *callbacks_->streamInfo().filterState());
 
-  auto has_options_from_downstream =
-      downstreamConnection() && downstreamConnection()
-                                    ->streamInfo()
-                                    .filterState()
-                                    .hasData<Network::UpstreamSocketOptionsFilterState>(
-                                        Network::UpstreamSocketOptionsFilterState::key());
-
-  if (has_options_from_downstream) {
-    auto downstream_options = downstreamConnection()
-                                  ->streamInfo()
-                                  .filterState()
-                                  .getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
-                                      Network::UpstreamSocketOptionsFilterState::key())
-                                  .value();
-    if (!upstream_options_) {
-      upstream_options_ = std::make_shared<Network::Socket::Options>();
+  if (auto downstream_connection = downstreamConnection(); downstream_connection != nullptr) {
+    if (auto typed_state = downstream_connection->streamInfo()
+                               .filterState()
+                               .getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
+                                   Network::UpstreamSocketOptionsFilterState::key());
+        typed_state != nullptr) {
+      auto downstream_options = typed_state->value();
+      if (!upstream_options_) {
+        upstream_options_ = std::make_shared<Network::Socket::Options>();
+      }
+      Network::Socket::appendOptions(upstream_options_, downstream_options);
     }
-    Network::Socket::appendOptions(upstream_options_, downstream_options);
   }
 
   if (upstream_options_ && callbacks_->getUpstreamSocketOptions()) {
@@ -1611,15 +1602,20 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   const StreamInfo::FilterStateSharedPtr& filter_state = callbacks_->streamInfo().filterState();
   // Make sure that performing the redirect won't result in exceeding the configured number of
   // redirects allowed for this route.
-  if (!filter_state->hasData<StreamInfo::UInt32Accessor>(NumInternalRedirectsFilterStateName)) {
-    filter_state->setData(
-        NumInternalRedirectsFilterStateName, std::make_shared<StreamInfo::UInt32AccessorImpl>(0),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
-  }
-  StreamInfo::UInt32Accessor& num_internal_redirect =
-      filter_state->getDataMutable<StreamInfo::UInt32Accessor>(NumInternalRedirectsFilterStateName);
+  StreamInfo::UInt32Accessor* num_internal_redirect{};
 
-  if (num_internal_redirect.value() >= policy.maxInternalRedirects()) {
+  if (num_internal_redirect = filter_state->getDataMutable<StreamInfo::UInt32Accessor>(
+          NumInternalRedirectsFilterStateName);
+      num_internal_redirect == nullptr) {
+    auto state = std::make_shared<StreamInfo::UInt32AccessorImpl>(0);
+    num_internal_redirect = state.get();
+
+    filter_state->setData(NumInternalRedirectsFilterStateName, std::move(state),
+                          StreamInfo::FilterState::StateType::Mutable,
+                          StreamInfo::FilterState::LifeSpan::Request);
+  }
+
+  if (num_internal_redirect->value() >= policy.maxInternalRedirects()) {
     config_.stats_.passthrough_internal_redirect_too_many_redirects_.inc();
     return false;
   }
@@ -1680,7 +1676,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
     callbacks_->modifyDecodingBuffer([](Buffer::Instance& data) { data.drain(data.length()); });
   }
 
-  num_internal_redirect.increment();
+  num_internal_redirect->increment();
   restore_original_headers.cancel();
   // Preserve the original request URL for the second pass.
   downstream_headers.setEnvoyOriginalUrl(absl::StrCat(scheme_is_http

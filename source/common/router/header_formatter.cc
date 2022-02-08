@@ -179,13 +179,15 @@ parsePerRequestStateField(absl::string_view param_str) {
   return [param](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
     const Envoy::StreamInfo::FilterState& filter_state = stream_info.filterState();
 
+    auto state = filter_state.getDataReadOnlyGeneric(param);
     // No such value means don't output anything.
-    if (!filter_state.hasDataWithName(param)) {
+    if (state == nullptr) {
       return std::string();
     }
 
+    auto typed_state = dynamic_cast<const StringAccessor*>(state);
     // Value exists but isn't string accessible is a contract violation; throw an error.
-    if (!filter_state.hasData<StringAccessor>(param)) {
+    if (typed_state == nullptr) {
       ENVOY_LOG_MISC(debug,
                      "Invalid header information: PER_REQUEST_STATE value \"{}\" "
                      "exists but is not string accessible",
@@ -193,7 +195,7 @@ parsePerRequestStateField(absl::string_view param_str) {
       return std::string();
     }
 
-    return std::string(filter_state.getDataReadOnly<StringAccessor>(param).asString());
+    return std::string(typed_state->asString());
   };
 }
 

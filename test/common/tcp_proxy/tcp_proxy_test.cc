@@ -116,7 +116,7 @@ public:
             .filterState()
             ->getDataMutable<Network::UpstreamSocketOptionsFilterState>(
                 Network::UpstreamSocketOptionsFilterState::key())
-            .addOption(
+            ->addOption(
                 Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
       }
       filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
@@ -1085,7 +1085,7 @@ TEST_F(TcpProxyTest, ShareFilterState) {
                 .upstreamInfo()
                 ->upstreamFilterState()
                 ->getDataReadOnly<PerConnectionCluster>("envoy.tcp_proxy.cluster")
-                .value());
+                ->value());
 }
 
 // Tests that filter callback can access downstream and upstream address and ssl properties.
