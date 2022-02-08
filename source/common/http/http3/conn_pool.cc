@@ -35,8 +35,8 @@ void ActiveClient::onEnlisted() {
   // HTTP/3 codec hasn't tried to connect yet.
   MultiplexedActiveClientBase::onEnlisted();
   ASSERT(codec_client_);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted")) {
+  if (dynamic_cast<CodecClientProd*>(codec_client_.get()) == nullptr) {
+    // Hasn't called connect() yet.
     codec_client_->connect();
   }
 }
@@ -138,6 +138,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         Network::Connection& connection = *data.connection_;
         auto client = std::make_unique<ActiveClient>(*pool, data);
         if (connection.state() == Network::Connection::State::Closed) {
+          ASSERT(dynamic_cast<CodecClientProd*>(client->codec_client_.get()) != nullptr);
           return nullptr;
         }
         return client;
