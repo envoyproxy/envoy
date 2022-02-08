@@ -133,7 +133,9 @@ public:
   TsiSocketFactory(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator);
 
   bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override { return false; }
+  void hashKey(std::vector<uint8_t>& key,
+               Network::TransportSocketOptionsConstSharedPtr options) const override;
+
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
 

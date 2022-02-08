@@ -1,5 +1,7 @@
 #include "source/extensions/transport_sockets/starttls/starttls_socket.h"
 
+#include "source/common/network/transport_socket_options_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -28,6 +30,11 @@ Network::TransportSocketPtr StartTlsSocketFactory::createTransportSocket(
       raw_socket_factory_->createTransportSocket(transport_socket_options),
       tls_socket_factory_->createTransportSocket(transport_socket_options),
       transport_socket_options);
+}
+
+void StartTlsSocketFactory::hashKey(std::vector<uint8_t>& key,
+                                    Network::TransportSocketOptionsConstSharedPtr options) const {
+  return Network::TransportSocketOptionsUtility::commonHashKey(key, options);
 }
 
 } // namespace StartTls

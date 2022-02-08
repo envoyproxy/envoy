@@ -20,9 +20,8 @@ public:
     return transport_socket_factory_->implementsSecureTransport();
   }
   bool supportsAlpn() const override { return transport_socket_factory_->supportsAlpn(); }
-  bool usesProxyProtocolOptions() const override {
-    return transport_socket_factory_->usesProxyProtocolOptions();
-  }
+  void hashKey(std::vector<uint8_t>& key,
+               Network::TransportSocketOptionsConstSharedPtr options) const override;
 
 protected:
   // The wrapped factory.

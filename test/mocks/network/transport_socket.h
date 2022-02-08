@@ -37,10 +37,11 @@ public:
   ~MockTransportSocketFactory() override;
 
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
-  MOCK_METHOD(bool, usesProxyProtocolOptions, (), (const));
   MOCK_METHOD(bool, supportsAlpn, (), (const));
   MOCK_METHOD(TransportSocketPtr, createTransportSocket, (TransportSocketOptionsConstSharedPtr),
               (const));
+  MOCK_METHOD(void, hashKey,
+              (std::vector<uint8_t> & key, TransportSocketOptionsConstSharedPtr options), (const));
 };
 
 } // namespace Network

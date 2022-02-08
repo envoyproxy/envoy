@@ -106,8 +106,9 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override { return false; }
   bool supportsAlpn() const override { return true; }
+  void hashKey(std::vector<uint8_t>& key,
+               Network::TransportSocketOptionsConstSharedPtr options) const override;
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
@@ -136,7 +137,8 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override { return false; }
+  void hashKey(std::vector<uint8_t>& key,
+               Network::TransportSocketOptionsConstSharedPtr options) const override;
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;

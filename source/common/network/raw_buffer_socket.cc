@@ -4,6 +4,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/http/headers.h"
+#include "source/common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -92,5 +93,10 @@ RawBufferSocketFactory::createTransportSocket(TransportSocketOptionsConstSharedP
 }
 
 bool RawBufferSocketFactory::implementsSecureTransport() const { return false; }
+
+void RawBufferSocketFactory::hashKey(std::vector<uint8_t>& key,
+                                     TransportSocketOptionsConstSharedPtr options) const {
+  return TransportSocketOptionsUtility::commonHashKey(key, options);
+}
 } // namespace Network
 } // namespace Envoy

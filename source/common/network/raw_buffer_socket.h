@@ -34,7 +34,8 @@ public:
   TransportSocketPtr
   createTransportSocket(TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override { return false; }
+  void hashKey(std::vector<uint8_t>& key,
+               TransportSocketOptionsConstSharedPtr options) const override;
 };
 
 } // namespace Network

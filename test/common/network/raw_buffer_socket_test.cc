@@ -9,7 +9,7 @@ namespace Network {
 
 TEST(RawBufferSocketFactory, RawBufferSocketFactory) {
   TransportSocketFactoryPtr factory = Envoy::Network::Test::createRawBufferSocketFactory();
-  EXPECT_FALSE(factory->usesProxyProtocolOptions());
+  EXPECT_FALSE(factory->implementsSecureTransport());
 }
 
 } // namespace Network

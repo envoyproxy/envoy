@@ -76,7 +76,8 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override { return false; }
-  bool usesProxyProtocolOptions() const override { return false; }
+  void hashKey(std::vector<uint8_t>& key,
+               Network::TransportSocketOptionsConstSharedPtr options) const override;
 
 private:
   Network::TransportSocketFactoryPtr raw_socket_factory_;

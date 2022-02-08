@@ -113,7 +113,6 @@ TEST(StartTls, BasicFactoryTest) {
       Network::TransportSocketFactoryPtr(raw_buffer_factory),
       Network::TransportSocketFactoryPtr(ssl_factory));
   ASSERT_FALSE(factory->implementsSecureTransport());
-  ASSERT_FALSE(factory->usesProxyProtocolOptions());
 }
 
 } // namespace StartTls

@@ -658,7 +658,6 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   auto factory =
       std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context);
   factory->initialize();
-  ASSERT_FALSE(factory->usesProxyProtocolOptions());
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
   EXPECT_CALL(matcher, resolve(_))
@@ -700,7 +699,6 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   auto factory =
       std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context);
   factory->initialize();
-  ASSERT_FALSE(factory->usesProxyProtocolOptions());
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
   EXPECT_CALL(matcher, resolve(_))

@@ -917,10 +917,6 @@ TEST_F(TsiSocketFactoryTest, ImplementsSecureTransport) {
   EXPECT_TRUE(socket_factory_->implementsSecureTransport());
 }
 
-TEST_F(TsiSocketFactoryTest, UsesProxyProtocolOptions) {
-  EXPECT_FALSE(socket_factory_->usesProxyProtocolOptions());
-}
-
 } // namespace
 } // namespace Alts
 } // namespace TransportSockets

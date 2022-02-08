@@ -2,10 +2,16 @@
 
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.validate.h"
 
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
 namespace Envoy {
 namespace Quic {
+
+void QuicTransportSocketFactoryBase::hashKey(
+    std::vector<uint8_t>& key, Network::TransportSocketOptionsConstSharedPtr options) const {
+  return Network::TransportSocketOptionsUtility::commonHashKey(key, options);
+}
 
 Network::TransportSocketFactoryPtr
 QuicServerTransportSocketConfigFactory::createTransportSocketFactory(

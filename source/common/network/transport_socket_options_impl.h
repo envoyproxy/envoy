@@ -29,8 +29,6 @@ public:
   absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
     return inner_options_->proxyProtocolOptions();
   }
-  void hashKey(std::vector<uint8_t>& key,
-               const Network::TransportSocketFactory& factory) const override;
   const StreamInfo::FilterStateSharedPtr& filterState() const override {
     return inner_options_->filterState();
   }
@@ -71,8 +69,6 @@ public:
   absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
     return proxy_protocol_options_;
   }
-  void hashKey(std::vector<uint8_t>& key,
-               const Network::TransportSocketFactory& factory) const override;
   const StreamInfo::FilterStateSharedPtr& filterState() const override { return filter_state_; }
 
 private:
@@ -94,6 +90,12 @@ public:
    */
   static TransportSocketOptionsConstSharedPtr
   fromFilterState(const StreamInfo::FilterStateSharedPtr& stream_info);
+
+  /**
+   * Compute the generic hash key from the transport socket options.
+   */
+  static void commonHashKey(std::vector<std::uint8_t>& key,
+                            TransportSocketOptionsConstSharedPtr options);
 };
 
 } // namespace Network
