@@ -151,6 +151,7 @@ void FilterConfigSubscription::onConfigUpdate(
     last_config_hash_ = 0;
     last_config_ = nullptr;
     last_type_url_ = "";
+    last_version_info_ = "";
     last_factory_name_ = "";
   } else if (!added_resources.empty()) {
     onConfigUpdate(added_resources, added_resources[0].get().version());

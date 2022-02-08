@@ -783,6 +783,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ReloadBoth) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
+  codec_client_->close();
 }
 
 } // namespace
