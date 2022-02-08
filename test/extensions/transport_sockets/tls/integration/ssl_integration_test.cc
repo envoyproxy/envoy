@@ -90,6 +90,7 @@ void SslIntegrationTestBase::checkStats() {
 
 class SslKeyLogTest : public SslIntegrationTest {
 public:
+  SslKeyLogTest() { config_helper_.addRuntimeOverride("tls_keylog", "true"); };
   void setLocalFilter() { debug_tls_keylog_mode_ = 0x1; }
   void setRemoteFilter() { debug_tls_keylog_mode_ = 0x10; }
   void setBothLocalAndRemoteFilter() { debug_tls_keylog_mode_ = 0x11; }

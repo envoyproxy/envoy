@@ -79,12 +79,19 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   BIO* bio = BIO_new_io_handle(&callbacks_->ioHandle());
   SSL_set_bio(rawSsl(), bio, bio);
 
-  auto match = tlsKeyLogMatch(callbacks_->connection().connectionInfoProvider().localAddress(),
-                              callbacks_->connection().connectionInfoProvider().remoteAddress());
-  if (match) {
-    ENVOY_LOG(debug, "Enable tls key log, log path: {}, index: {}",
-              config_->getTlsKeyLogPath().c_str(), ssl_ex_data_index_);
-    enableTlsKeyLog();
+  auto runtime = Runtime::LoaderSingleton::getExisting();
+  if (runtime != nullptr) {
+    auto tls_keylog_enable = runtime->threadsafeSnapshot()->getBoolean("tls_keylog", false);
+    if (tls_keylog_enable) {
+      auto match =
+          tlsKeyLogMatch(callbacks_->connection().connectionInfoProvider().localAddress(),
+                         callbacks_->connection().connectionInfoProvider().remoteAddress());
+      if (match) {
+        ENVOY_LOG(debug, "Enable tls key log, log path: {}, index: {}",
+                  config_->getTlsKeyLogPath().c_str(), ssl_ex_data_index_);
+        enableTlsKeyLog();
+      }
+    }
   }
 }
 
