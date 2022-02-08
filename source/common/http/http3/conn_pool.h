@@ -155,7 +155,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-                 Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope,
+                 Quic::QuicStatNames& quic_stat_names,
+                 OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope,
                  OptRef<PoolConnectResultCallback> connect_callback);
 
 } // namespace Http3

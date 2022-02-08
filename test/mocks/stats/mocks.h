@@ -18,7 +18,7 @@
 #include "source/common/stats/histogram_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stats/store_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/timespan_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
