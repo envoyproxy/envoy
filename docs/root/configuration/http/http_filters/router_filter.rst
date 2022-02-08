@@ -128,6 +128,9 @@ retriable-headers
   :ref:`the retry policy <envoy_v3_api_field_config.route.v3.RetryPolicy.retriable_headers>` or in the
   :ref:`config_http_filters_router_x-envoy-retriable-header-names` header.
 
+http3-post-connect-failure:
+  Envoy will attempt a retry if a request is sent over HTTP/3 to the upstream server and failed after getting connected.
+
 The number of retries can be controlled via the
 :ref:`config_http_filters_router_x-envoy-max-retries` header or via the :ref:`route
 configuration <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>` or via the

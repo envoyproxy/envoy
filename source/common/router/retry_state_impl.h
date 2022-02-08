@@ -100,16 +100,16 @@ private:
                  Runtime::Loader& runtime, Random::RandomGenerator& random,
                  Event::Dispatcher& dispatcher, TimeSource& time_source,
                  Upstream::ResourcePriority priority,
-                 bool conn_pool_new_stream_with_early_data_and_alt_svc);
+                 bool conn_pool_new_stream_with_early_data_and_http3);
 
   void enableBackoffTimer();
   void resetRetry();
   // Returns if the retry policy would retry the reset and how. Does not
   // take into account circuit breaking or remaining tries.
-  // disable_alternate_protocols: populated to tell the caller whether to disable alt svc or not
-  // when the return value indicates retry.
+  // disable_http3: populated to tell the caller whether to disable http3 or not when the return
+  // value indicates retry.
   RetryDecision wouldRetryFromReset(const Http::StreamResetReason reset_reason,
-                                    Http3Used http3_used, bool& disable_alternate_protocols);
+                                    Http3Used http3_used, bool& disable_http3);
   RetryStatus shouldRetry(RetryDecision would_retry, DoRetryCallback callback);
 
   const Upstream::ClusterInfo& cluster_;
@@ -133,7 +133,7 @@ private:
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
   std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
   std::chrono::milliseconds reset_max_interval_{};
-  bool conn_pool_new_stream_with_early_data_and_alt_svc_{};
+  const bool conn_pool_new_stream_with_early_data_and_http3_{};
 };
 
 } // namespace Router

@@ -601,7 +601,7 @@ private:
   bool include_attempt_count_in_request_ : 1;
   bool request_buffer_overflowed_ : 1;
   bool internal_redirects_with_body_enabled_ : 1;
-  bool conn_pool_new_stream_with_early_data_and_alt_svc_ : 1;
+  bool conn_pool_new_stream_with_early_data_and_http3_ : 1;
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
 

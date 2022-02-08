@@ -36,8 +36,8 @@ public:
 
   RouterRetryStateImplTest()
       : callback_([this]() -> void { callback_ready_.ready(); }),
-        reset_callback_([this](bool disable_alt_svc) -> void {
-          retry_disable_alt_svc_ = disable_alt_svc;
+        reset_callback_([this](bool disable_http3) -> void {
+          retry_disable_http3_ = disable_http3;
           callback_ready_.ready();
         }),
         header_callback_([this](bool disable_early_data) -> void {
@@ -133,8 +133,7 @@ public:
     }
     const bool expect_disable_early_data = response_status == "425";
 
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc") &&
+    if (Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
         expect_disable_early_data) {
       expectSchedulableCallback();
     } else {
@@ -176,7 +175,7 @@ public:
   RetryStatePtr state_;
   ReadyWatcher callback_ready_;
   bool retry_disable_early_data_{false};
-  bool retry_disable_alt_svc_{false};
+  bool retry_disable_http3_{false};
   RetryState::DoRetryCallback callback_;
   RetryState::DoRetryResetCallback reset_callback_;
   RetryState::DoRetryHeaderCallback header_callback_;
@@ -205,7 +204,7 @@ TEST_F(RouterRetryStateImplTest, PolicyRefusedStream) {
                                                        RetryState::Http3Used::No, reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
-  EXPECT_FALSE(retry_disable_alt_svc_);
+  EXPECT_FALSE(retry_disable_http3_);
 
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
             state_->shouldRetryReset(remote_refused_stream_reset_, RetryState::Http3Used::No,
@@ -218,8 +217,7 @@ TEST_F(RouterRetryStateImplTest, PolicyRefusedStream) {
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
+  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
     return;
   }
 
@@ -228,8 +226,8 @@ TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
 
-  // Post-connect failure over HTTP/3 should be retried immediately with alternate protocols
-  // disabled if the cluster is configured with auto pool.
+  // Post-connect failure over HTTP/3 should be retried immediately with HTTP/3 disabled if the
+  // cluster is configured with auto pool.
   EXPECT_CALL(cluster_, features())
       .Times(2u)
       .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP3 |
@@ -241,7 +239,7 @@ TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
                                      reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_schedulable_callback_->invokeCallback();
-  EXPECT_TRUE(retry_disable_alt_svc_);
+  EXPECT_TRUE(retry_disable_http3_);
 
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
             state_->shouldRetryReset(remote_refused_stream_reset_, RetryState::Http3Used::No,
@@ -475,8 +473,7 @@ TEST_F(RouterRetryStateImplTest, RetriableStatusCodes) {
 }
 
 TEST_F(RouterRetryStateImplTest, Http3AutoConfigRetryOnTooEarlyRetriableStatusCode) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
+  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
     return;
   }
   // Retry upon 425 should be automatically configured for H3 upstream.
@@ -487,8 +484,7 @@ TEST_F(RouterRetryStateImplTest, Http3AutoConfigRetryOnTooEarlyRetriableStatusCo
 }
 
 TEST_F(RouterRetryStateImplTest, NoRetryUponTooEarlyStatusCodeWithDownstreamEarlyData) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
+  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
     return;
   }
   EXPECT_CALL(cluster_, features()).WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP3));
@@ -1001,11 +997,10 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   expectSchedulableCallback();
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, RetryState::Http3Used::Yes,
                                                        reset_callback_));
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
+  if (Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
     EXPECT_CALL(callback_ready_, ready());
     retry_schedulable_callback_->invokeCallback();
-    EXPECT_FALSE(retry_disable_alt_svc_);
+    EXPECT_FALSE(retry_disable_http3_);
   }
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};

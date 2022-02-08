@@ -625,7 +625,8 @@ convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_
 
 /**
  * @param request_headers the request header to be looked into.
- * @return true if the request method is 0-RTT safe.
+ * @return true if the request method is safe method defined in
+ * https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1
  */
 bool isSafeRequest(Http::RequestHeaderMap& request_headers);
 

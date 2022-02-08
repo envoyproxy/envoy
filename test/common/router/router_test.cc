@@ -3024,7 +3024,7 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
         return nullptr;
       }));
   EXPECT_CALL(*router_.retry_state_,
-              shouldRetryReset(_, /*alternate_protocols_used=*/RetryState::Http3Used::Unknown, _))
+              shouldRetryReset(_, /*http3_used=*/RetryState::Http3Used::Unknown, _))
       .WillOnce(Return(RetryStatus::NoRetryLimitExceeded));
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
   router_.retry_state_->callback_();
@@ -3100,11 +3100,10 @@ TEST_F(RouterTest, RetryUpstreamReset) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(Http::StreamResetReason::RemoteReset, _, _))
-      .WillOnce(Invoke([this](const Http::StreamResetReason,
-                              RetryState::Http3Used alternate_protocols_used,
+      .WillOnce(Invoke([this](const Http::StreamResetReason, RetryState::Http3Used http3_used,
                               RetryState::DoRetryResetCallback callback) {
-        EXPECT_EQ(RetryState::Http3Used::No, alternate_protocols_used);
-        router_.retry_state_->callback_ = [callback]() { callback(/*disable_alt_svc=*/false); };
+        EXPECT_EQ(RetryState::Http3Used::No, http3_used);
+        router_.retry_state_->callback_ = [callback]() { callback(/*disable_http3=*/false); };
         return RetryStatus::Yes;
       }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
@@ -3160,11 +3159,10 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(Http::StreamResetReason::RemoteReset, _, _))
-      .WillOnce(Invoke([this](const Http::StreamResetReason,
-                              RetryState::Http3Used alternate_protocols_used,
+      .WillOnce(Invoke([this](const Http::StreamResetReason, RetryState::Http3Used http3_used,
                               RetryState::DoRetryResetCallback callback) {
-        EXPECT_EQ(RetryState::Http3Used::Yes, alternate_protocols_used);
-        router_.retry_state_->callback_ = [callback]() { callback(/*disable_alt_svc=*/true); };
+        EXPECT_EQ(RetryState::Http3Used::Yes, http3_used);
+        router_.retry_state_->callback_ = [callback]() { callback(/*disable_http3=*/true); };
         return RetryStatus::Yes;
       }));
 

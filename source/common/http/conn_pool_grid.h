@@ -127,7 +127,8 @@ public:
     bool http3_attempt_failed_{};
     // True if the TCP attempt succeeded.
     bool tcp_attempt_succeeded_{};
-    Instance::StreamOptions stream_options_{};
+    // Latch the passed-in stream options.
+    const Instance::StreamOptions stream_options_{};
   };
   using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;
 

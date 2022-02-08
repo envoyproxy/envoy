@@ -696,9 +696,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
 
-  conn_pool_new_stream_with_early_data_and_alt_svc_ = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc");
-  const bool can_send_early_data = conn_pool_new_stream_with_early_data_and_alt_svc_ &&
+  conn_pool_new_stream_with_early_data_and_http3_ =
+      Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3);
+  const bool can_send_early_data = conn_pool_new_stream_with_early_data_and_http3_ &&
                                    Http::Utility::isSafeRequest(*downstream_headers_);
 
   UpstreamRequestPtr upstream_request =
@@ -1128,16 +1128,15 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
   if (downstream_response_started_ || !retry_state_ || upstream_request.retried()) {
     return false;
   }
-  RetryState::Http3Used was_using_alternate_protocol = RetryState::Http3Used::Unknown;
-  if (conn_pool_new_stream_with_early_data_and_alt_svc_ && upstream_request.hadUpstream()) {
-    was_using_alternate_protocol =
-        (upstream_request.streamInfo().protocol().has_value() &&
-         upstream_request.streamInfo().protocol().value() == Http::Protocol::Http3)
-            ? RetryState::Http3Used::Yes
-            : RetryState::Http3Used::No;
+  RetryState::Http3Used was_using_http3 = RetryState::Http3Used::Unknown;
+  if (conn_pool_new_stream_with_early_data_and_http3_ && upstream_request.hadUpstream()) {
+    was_using_http3 = (upstream_request.streamInfo().protocol().has_value() &&
+                       upstream_request.streamInfo().protocol().value() == Http::Protocol::Http3)
+                          ? RetryState::Http3Used::Yes
+                          : RetryState::Http3Used::No;
   }
   const RetryStatus retry_status = retry_state_->shouldRetryReset(
-      reset_reason, was_using_alternate_protocol,
+      reset_reason, was_using_http3,
       [this, can_send_early_data = upstream_request.upstreamStreamOptions().can_send_early_data_,
        can_use_http3 =
            upstream_request.upstreamStreamOptions().can_use_http3_](bool disable_http3) -> void {
