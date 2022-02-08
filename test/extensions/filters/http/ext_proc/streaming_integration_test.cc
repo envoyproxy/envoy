@@ -472,6 +472,7 @@ TEST_P(StreamingIntegrationTest, GetAndProcessStreamedResponseBody) {
   EXPECT_TRUE(client_response_->complete());
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
   EXPECT_EQ(client_response_->body().size(), response_size);
+  test_processor_.shutdown();
   EXPECT_EQ(processor_response_hash_, HashUtil::xxHash64(client_response_->body()));
 }
 

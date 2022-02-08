@@ -29,7 +29,7 @@ TEST_P(VersionIntegrationTest, IpTaggingV3StaticTypedStructConfig) {
   config_helper_.prependFilter(absl::StrCat(R"EOF(
 name: ip_tagging
 typed_config:
-  "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+  "@type": type.googleapis.com/xds.type.v3.TypedStruct
   type_url: type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
   value:
   )EOF",

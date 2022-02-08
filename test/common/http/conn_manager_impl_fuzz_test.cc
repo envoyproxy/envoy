@@ -217,6 +217,9 @@ public:
     return ip_detection_extensions_;
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
+  const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
+    return proxy_status_config_.get();
+  }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
@@ -264,6 +267,7 @@ public:
   bool normalize_path_{true};
   LocalReply::LocalReplyPtr local_reply_;
   std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
+  std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
 };
 
 // Internal representation of stream state. Encapsulates the stream state, mocks
@@ -473,7 +477,7 @@ public:
         auto headers = std::make_unique<TestResponseHeaderMapImpl>(
             Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.continue_headers()));
         headers->setReferenceKey(Headers::get().Status, "100");
-        decoder_filter_->callbacks_->encode100ContinueHeaders(std::move(headers));
+        decoder_filter_->callbacks_->encode1xxHeaders(std::move(headers));
         // We don't allow multiple 100-continue headers in HCM, UpstreamRequest is responsible
         // for coalescing.
         state = StreamState::PendingNonInformationalHeaders;

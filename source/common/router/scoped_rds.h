@@ -52,7 +52,8 @@ public:
                                    ScopedRoutesConfigProviderManager& config_provider_manager,
                                    envoy::config::core::v3::ConfigSource rds_config_source,
                                    envoy::extensions::filters::network::http_connection_manager::
-                                       v3::ScopedRoutes::ScopeKeyBuilder scope_key_builder);
+                                       v3::ScopedRoutes::ScopeKeyBuilder scope_key_builder,
+                                   const OptionalHttpFilters& optional_http_filters);
 
   ~InlineScopedRoutesConfigProvider() override = default;
 
@@ -61,9 +62,9 @@ public:
   // Envoy::Config::ConfigProvider
   Envoy::Config::ConfigProvider::ConfigProtoVector getConfigProtos() const override {
     Envoy::Config::ConfigProvider::ConfigProtoVector out_protos;
-    std::for_each(config_protos_.begin(), config_protos_.end(),
-                  [&out_protos](const std::unique_ptr<const Protobuf::Message>& message) {
-                    out_protos.push_back(message.get());
+    std::for_each(scopes_.begin(), scopes_.end(),
+                  [&out_protos](const ScopedRouteInfoConstSharedPtr& scope) {
+                    out_protos.push_back(&scope->configProto());
                   });
     return out_protos;
   }
@@ -73,8 +74,8 @@ public:
 
 private:
   const std::string name_;
+  const std::vector<ScopedRouteInfoConstSharedPtr> scopes_;
   ConfigConstSharedPtr config_;
-  const std::vector<std::unique_ptr<const Protobuf::Message>> config_protos_;
   const envoy::config::core::v3::ConfigSource rds_config_source_;
 };
 
@@ -285,17 +286,15 @@ public:
   Envoy::Config::ConfigProviderPtr
   createStaticConfigProvider(const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
                              const Envoy::Config::ConfigProviderManager::OptionalArg&) override {
-    ASSERT(false,
-           "SRDS supports delta updates and requires the use of the createStaticConfigProvider() "
-           "overload that accepts a config proto set as an argument.");
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("SRDS supports delta updates and requires the use of the createStaticConfigProvider() "
+          "overload that accepts a config proto set as an argument.");
   }
   Envoy::Config::ConfigProviderPtr createStaticConfigProvider(
       std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,
       Server::Configuration::ServerFactoryContext& factory_context,
       const Envoy::Config::ConfigProviderManager::OptionalArg& optarg) override;
 
-  RouteConfigProviderManager& routeConfigProviderPanager() {
+  RouteConfigProviderManager& routeConfigProviderManager() {
     return route_config_provider_manager_;
   }
 

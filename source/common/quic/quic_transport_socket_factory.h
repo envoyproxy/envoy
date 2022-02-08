@@ -46,7 +46,7 @@ public:
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr /*options*/) const override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
   bool implementsSecureTransport() const override { return true; }
   bool usesProxyProtocolOptions() const override { return false; }
@@ -108,7 +108,7 @@ public:
     return fallback_factory_->createTransportSocket(options);
   }
 
-  Envoy::Ssl::ClientContextSharedPtr sslCtx() { return fallback_factory_->sslCtx(); }
+  virtual Envoy::Ssl::ClientContextSharedPtr sslCtx() { return fallback_factory_->sslCtx(); }
 
   const Ssl::ClientContextConfig& clientContextConfig() const {
     return fallback_factory_->config();

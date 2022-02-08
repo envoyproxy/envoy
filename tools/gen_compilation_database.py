@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 
-# This method is equivalent to https://github.com/grailbio/bazel-compilation-database/blob/master/generate.sh
+# This method is equivalent to https://github.com/grailbio/bazel-compilation-database/blob/master/generate.py
 def generate_compilation_database(args):
     # We need to download all remote outputs for generated source code. This option lives here to override those
     # specified in bazelrc.
@@ -25,11 +25,19 @@ def generate_compilation_database(args):
     execroot = subprocess.check_output(["bazel", "info", "execution_root"]
                                        + bazel_options).decode().strip()
 
-    compdb = []
-    for compdb_file in Path(execroot).glob("**/*.compile_commands.json"):
-        compdb.extend(
-            json.loads("[" + compdb_file.read_text().replace("__EXEC_ROOT__", execroot) + "]"))
-    return compdb
+    db_entries = []
+    for db in Path(execroot).glob('**/*.compile_commands.json'):
+        db_entries.extend(json.loads(db.read_text()))
+
+    def replace_execroot_marker(db_entry):
+        if 'directory' in db_entry and db_entry['directory'] == '__EXEC_ROOT__':
+            db_entry['directory'] = execroot
+        if 'command' in db_entry:
+            db_entry['command'] = (
+                db_entry['command'].replace('-isysroot __BAZEL_XCODE_SDKROOT__', ''))
+        return db_entry
+
+    return list(map(replace_execroot_marker, db_entries))
 
 
 def is_header(filename):

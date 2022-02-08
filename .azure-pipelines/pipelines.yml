@@ -336,10 +336,16 @@ stages:
         targetPath: $(Build.StagingDirectory)
     - bash: |
         set -e
-        mkdir -p linux/amd64 && tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz -C ./linux/amd64
+        mkdir -p linux/amd64
+        tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz -C ./linux/amd64
         tar zxf $(Build.StagingDirectory)/bazel.release/envoy-contrib_binary.tar.gz -C ./linux/amd64
-        mkdir -p linux/arm64 && tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz -C ./linux/arm64
+        rm $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz
+        rm $(Build.StagingDirectory)/bazel.release/envoy-contrib_binary.tar.gz
+        mkdir -p linux/arm64
+        tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz -C ./linux/arm64
         tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy-contrib_binary.tar.gz -C ./linux/arm64
+        rm $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz
+        rm $(Build.StagingDirectory)/bazel.release.arm64/envoy-contrib_binary.tar.gz
         ci/docker_ci.sh
       workingDirectory: $(Build.SourcesDirectory)
       env:
@@ -416,8 +422,7 @@ stages:
       inputs:
         buildType: current
         artifactName: "docker"
-        itemPattern: "docker/envoy-docker-images.tar.xz"
-        downloadType: single
+        itemPattern: "docker/envoy*.tar"
         targetPath: $(Build.StagingDirectory)
     - bash: ./ci/do_ci.sh verify_examples
       env:
@@ -432,8 +437,7 @@ stages:
       inputs:
         buildType: current
         artifactName: "docker"
-        itemPattern: "docker/envoy-docker-images.tar.xz"
-        downloadType: single
+        itemPattern: "docker/envoy*.tar"
         targetPath: $(Build.StagingDirectory)
     - bash: ./ci/do_ci.sh verify_build_examples
       env:
@@ -480,7 +484,7 @@ stages:
   - job: release
     timeoutInMinutes: 120
     pool:
-      vmImage: "windows-latest"
+      vmImage: "windows-2019"
     steps:
     - task: Cache@2
       inputs:
@@ -516,7 +520,7 @@ stages:
     strategy:
       matrix:
         windows2019:
-          imageName: 'windows-latest'
+          imageName: 'windows-2019'
           windowsBuildType: "windows"
           windowsImageBase: "mcr.microsoft.com/windows/servercore"
           windowsImageTag: "ltsc2019"

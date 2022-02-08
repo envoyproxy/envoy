@@ -29,6 +29,9 @@ public:
                                   SocketOptionName ipv6_optname, absl::string_view ipv6_value)
       : ipv4_option_(std::make_unique<SocketOptionImpl>(in_state, ipv4_optname, ipv4_value)),
         ipv6_option_(std::make_unique<SocketOptionImpl>(in_state, ipv6_optname, ipv6_value)) {}
+  AddrFamilyAwareSocketOptionImpl(Socket::OptionConstPtr&& ipv4_option,
+                                  Socket::OptionConstPtr&& ipv6_option)
+      : ipv4_option_(std::move(ipv4_option)), ipv6_option_(std::move(ipv6_option)) {}
 
   // Socket::Option
   bool setOption(Socket& socket,
@@ -41,6 +44,7 @@ public:
   absl::optional<Details>
   getOptionDetails(const Socket& socket,
                    envoy::config::core::v3::SocketOption::SocketState state) const override;
+  bool isSupported() const override { return true; }
 
   /**
    * Set a socket option that applies at both IPv4 and IPv6 socket levels. When the underlying FD
@@ -59,12 +63,12 @@ public:
    */
   static bool setIpSocketOption(Socket& socket,
                                 envoy::config::core::v3::SocketOption::SocketState state,
-                                const std::unique_ptr<SocketOptionImpl>& ipv4_option,
-                                const std::unique_ptr<SocketOptionImpl>& ipv6_option);
+                                const Socket::Option& ipv4_option,
+                                const Socket::Option& ipv6_option);
 
 private:
-  const std::unique_ptr<SocketOptionImpl> ipv4_option_;
-  const std::unique_ptr<SocketOptionImpl> ipv6_option_;
+  const Socket::OptionConstPtr ipv4_option_;
+  const Socket::OptionConstPtr ipv6_option_;
 };
 
 } // namespace Network

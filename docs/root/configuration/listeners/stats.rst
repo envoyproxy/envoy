@@ -36,6 +36,16 @@ The following TLS statistics are rooted at *listener.<address>.ssl.*:
 
 .. include:: ../../_include/ssl_stats.rst
 
+.. _config_listener_stats_tcp:
+
+TCP statistics
+--------------
+
+The following TCP statistics, which are available when using the :ref:`TCP stats transport socket <envoy_v3_api_msg_extensions.transport_sockets.tcp_stats.v3.Config>`,
+are rooted at *listener.<address>.tcp_stats.*:
+
+.. include:: ../../_include/tcp_stats.rst
+
 .. _config_listener_stats_udp:
 
 UDP statistics

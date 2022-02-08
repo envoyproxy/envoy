@@ -26,6 +26,10 @@ public:
                          Network::ClientConnectionPtr&& conn,
                          Upstream::HostDescriptionConstSharedPtr host_description,
                          Http::CodecType type);
+  IntegrationCodecClient(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+                         Network::ClientConnectionPtr&& conn,
+                         Upstream::HostDescriptionConstSharedPtr host_description,
+                         Http::CodecType type, bool wait_till_connected);
 
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(const Http::RequestHeaderMap& headers);
   IntegrationStreamDecoderPtr makeRequestWithBody(const Http::RequestHeaderMap& headers,
@@ -52,7 +56,8 @@ public:
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
-    ConnectionCallbacks(IntegrationCodecClient& parent) : parent_(parent) {}
+    ConnectionCallbacks(IntegrationCodecClient& parent, bool block_till_connected)
+        : parent_(parent), block_till_connected_(block_till_connected) {}
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override;
@@ -60,6 +65,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     IntegrationCodecClient& parent_;
+    bool block_till_connected_;
   };
 
   struct CodecCallbacks : public Http::ConnectionCallbacks {
@@ -136,6 +142,9 @@ protected:
   // Enable the encoding/decoding of Http1 trailers upstream
   ConfigHelper::ConfigModifierFunction setEnableUpstreamTrailersHttp1();
 
+  // Enable Proxy-Status response header.
+  ConfigHelper::HttpModifierFunction configureProxyStatus();
+
   // Sends |request_headers| and |request_body_size| bytes of body upstream.
   // Configured upstream to send |response_headers| and |response_body_size|
   // bytes of body downstream.
@@ -186,7 +195,9 @@ protected:
   void sendRequestAndVerifyResponse(const Http::TestRequestHeaderMapImpl& request_headers,
                                     const int request_size,
                                     const Http::TestResponseHeaderMapImpl& response_headers,
-                                    const int response_size, const int backend_idx);
+                                    const int response_size, const int backend_idx,
+                                    absl::optional<const Http::TestResponseHeaderMapImpl>
+                                        expected_response_headers = absl::nullopt);
 
   // Check for completion of upstream_request_, and a simple "200" response.
   void checkSimpleRequestSuccess(uint64_t expected_request_size, uint64_t expected_response_size,
@@ -240,11 +251,12 @@ protected:
   void testRetryAttemptCountHeader();
   void testGrpcRetry();
 
-  void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
-                                    const std::string& via = "", bool disconnect_after_100 = false);
+  void testEnvoyHandling1xx(bool additional_continue_from_upstream = false,
+                            const std::string& via = "", bool disconnect_after_100 = false);
   void testEnvoyProxying1xx(bool continue_before_upstream_complete = false,
                             bool with_encoder_filter = false,
-                            bool with_multiple_1xx_headers = false);
+                            bool with_multiple_1xx_headers = false,
+                            absl::string_view initial_code = "100");
   void simultaneousRequest(uint32_t request1_bytes, uint32_t request2_bytes,
                            uint32_t response1_bytes, uint32_t response2_bytes);
 

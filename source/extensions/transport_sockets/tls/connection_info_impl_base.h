@@ -38,11 +38,11 @@ public:
   uint16_t ciphersuiteId() const override;
   std::string ciphersuiteString() const override;
   const std::string& tlsVersion() const override;
+  const std::string& alpn() const override;
 
   virtual SSL* ssl() const PURE;
 
 protected:
-  bssl::UniquePtr<SSL> ssl_;
   mutable std::vector<std::string> cached_uri_san_local_certificate_;
   mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::string cached_sha_1_peer_certificate_digest_;
@@ -57,6 +57,7 @@ protected:
   mutable std::vector<std::string> cached_dns_san_local_certificate_;
   mutable std::string cached_session_id_;
   mutable std::string cached_tls_version_;
+  mutable std::string alpn_;
 };
 
 } // namespace Tls

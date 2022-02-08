@@ -109,7 +109,7 @@ address:
     port_value: 1234
 api_listener:
   api_listener:
-    "@type": type.googleapis.com/envoy.api.v2.Cluster
+    "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
     name: cluster1
     type: EDS
     eds_cluster_config:
@@ -119,12 +119,18 @@ api_listener:
 
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
 
+  ProtobufWkt::Any expected_any_proto;
+  envoy::config::cluster::v3::Cluster expected_cluster_proto;
+  expected_cluster_proto.set_name("cluster1");
+  expected_cluster_proto.set_type(envoy::config::cluster::v3::Cluster::EDS);
+  expected_cluster_proto.mutable_eds_cluster_config()->mutable_eds_config()->set_path("eds path");
+  expected_any_proto.PackFrom(expected_cluster_proto);
   EXPECT_THROW_WITH_MESSAGE(
       HttpApiListener(config, *listener_manager_, config.name()), EnvoyException,
-      "Unable to unpack as "
-      "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager: "
-      "[type.googleapis.com/envoy.api.v2.Cluster] {\n  name: \"cluster1\"\n  type: EDS\n  "
-      "eds_cluster_config {\n    eds_config {\n      path: \"eds path\"\n    }\n  }\n}\n");
+      fmt::format("Unable to unpack as "
+                  "envoy.extensions.filters.network.http_connection_manager.v3."
+                  "HttpConnectionManager: {}",
+                  expected_any_proto.DebugString()));
 }
 
 TEST_F(ApiListenerTest, HttpApiListenerShutdown) {

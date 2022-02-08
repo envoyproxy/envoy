@@ -48,42 +48,7 @@ struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigF
   }
 };
 
-TEST(MatchWrapper, DisabledByDefault) {
-  NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-
-  const auto config =
-      TestUtility::parseYaml<envoy::extensions::common::matching::v3::ExtensionWithMatcher>(R"EOF(
-extension_config:
-  name: test
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.StringValue
-xds_matcher:
-  matcher_tree:
-    input:
-      name: request-headers
-      typed_config:
-        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-        header_name: default-matcher-header
-    exact_match_map:
-        map:
-            match:
-                action:
-                    name: skip
-                    typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
-)EOF");
-
-  MatchWrapperConfig match_wrapper_config;
-  EXPECT_THROW_WITH_MESSAGE(
-      match_wrapper_config.createFilterFactoryFromProto(config, "", factory_context),
-      EnvoyException, "Experimental matching API is not enabled");
-}
-
 TEST(MatchWrapper, WithMatcher) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.experimental_matching_api", "true"}});
-
   TestFactory test_factory;
   Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
       inject_factory(test_factory);
@@ -131,10 +96,6 @@ xds_matcher:
 }
 
 TEST(MatchWrapper, DEPRECATED_FEATURE_TEST(WithDeprecatedMatcher)) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.experimental_matching_api", "true"}});
-
   TestFactory test_factory;
   Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
       inject_factory(test_factory);
@@ -182,10 +143,6 @@ matcher:
 }
 
 TEST(MatchWrapper, WithNoMatcher) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.experimental_matching_api", "true"}});
-
   TestFactory test_factory;
   Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
       inject_factory(test_factory);
@@ -207,10 +164,6 @@ extension_config:
 }
 
 TEST(MatchWrapper, WithMatcherInvalidDataInput) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.experimental_matching_api", "true"}});
-
   TestFactory test_factory;
   Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
       inject_factory(test_factory);

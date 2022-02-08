@@ -24,7 +24,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
@@ -216,6 +216,15 @@ public:
   static Stats::GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
 
   /**
+   * Find a histogram in a stats store.
+   * @param store supplies the stats store.
+   * @param name supplies the name to search for.
+   * @return Stats::ParentHistogramSharedPtr the histogram or nullptr if there is none.
+   */
+  static Stats::ParentHistogramSharedPtr findHistogram(Stats::Store& store,
+                                                       const std::string& name);
+
+  /**
    * Wait for a counter to == a given value.
    * @param store supplies the stats store.
    * @param name supplies the name of the counter to wait for.
@@ -278,6 +287,17 @@ public:
                  std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**
+   * Wait for a gauge to be destroyed.
+   * @param store supplies the stats store.
+   * @param name gauge name.
+   * @param time_system the time system to use for waiting.
+   * @return AssertionSuccess() if the gauge is destroyed within a fixed timeout, else
+   * AssertionFailure().
+   */
+  static AssertionResult waitForGaugeDestroyed(Stats::Store& store, const std::string& name,
+                                               Event::TestTimeSystem& time_system);
+
+  /**
    * Wait for a histogram to have samples.
    * @param store supplies the stats store.
    * @param name histogram name.
@@ -314,7 +334,7 @@ public:
    */
   static std::list<Network::DnsResponse>
   makeDnsResponse(const std::list<std::string>& addresses,
-                  std::chrono::seconds = std::chrono::seconds(0));
+                  std::chrono::seconds = std::chrono::seconds(6));
 
   /**
    * List files in a given directory path
@@ -753,7 +773,7 @@ public:
     case envoy::config::core::v3::ApiVersion::V3:
       return "V3";
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("reached unexpected code");
     }
   }
 };

@@ -10,6 +10,7 @@
 #include "envoy/common/resource.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
@@ -107,6 +108,16 @@ public:
 using UdpListenerConfigOptRef = OptRef<UdpListenerConfig>;
 
 /**
+ * Configuration for an internal listener.
+ */
+class InternalListenerConfig {
+public:
+  virtual ~InternalListenerConfig() = default;
+};
+
+using InternalListenerConfigOptRef = OptRef<InternalListenerConfig>;
+
+/**
  * A configuration for an individual listener.
  */
 class ListenerConfig {
@@ -185,6 +196,11 @@ public:
   virtual UdpListenerConfigOptRef udpListenerConfig() PURE;
 
   /**
+   * @return the internal configuration for the listener IFF it is an internal listener.
+   */
+  virtual InternalListenerConfigOptRef internalListenerConfig() PURE;
+
+  /**
    * @return traffic direction of the listener.
    */
   virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
@@ -214,6 +230,12 @@ public:
    * @return init manager of the listener.
    */
   virtual Init::Manager& initManager() PURE;
+
+  /**
+   * @return bool whether the listener should avoid blocking connections based on the globally set
+   * limit.
+   */
+  virtual bool ignoreGlobalConnLimit() const PURE;
 };
 
 /**
@@ -428,6 +450,40 @@ public:
 using UdpListenerPtr = std::unique_ptr<UdpListener>;
 
 /**
+ * Internal listener callbacks.
+ */
+class InternalListener {
+public:
+  virtual ~InternalListener() = default;
+
+  /**
+   * Called when a new connection is accepted.
+   * @param socket supplies the socket that is moved into the callee.
+   */
+  virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
+};
+using InternalListenerOptRef = OptRef<InternalListener>;
+
+/**
+ * The query interface of the registered internal listener callbacks.
+ */
+class InternalListenerManager {
+public:
+  virtual ~InternalListenerManager() = default;
+
+  /**
+   * Return the internal listener callbacks binding the listener address.
+   *
+   * @param listen_address the internal address of the expected internal listener.
+   */
+  virtual InternalListenerOptRef
+  findByAddress(const Address::InstanceConstSharedPtr& listen_address) PURE;
+};
+
+using InternalListenerManagerOptRef =
+    absl::optional<std::reference_wrapper<InternalListenerManager>>;
+
+/**
  * Handles delivering datagrams to the correct worker.
  */
 class UdpListenerWorkerRouter {
@@ -453,6 +509,11 @@ public:
 };
 
 using UdpListenerWorkerRouterPtr = std::unique_ptr<UdpListenerWorkerRouter>;
+
+/**
+ * Base class for all listener typed metadata factories.
+ */
+class ListenerTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
 } // namespace Network
 } // namespace Envoy

@@ -99,21 +99,6 @@ TEST_F(HeaderUtilityTest, RemovePortsFromHostConnect) {
   }
 }
 
-// Port's part from host header won't be removed if method is "connect"
-TEST_F(HeaderUtilityTest, RemovePortsFromHostConnectLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.strip_port_from_connect", "false"}});
-  const std::vector<std::pair<std::string, std::string>> host_headers{
-      {"localhost:443", "localhost:443"},
-  };
-  for (const auto& host_pair : host_headers) {
-    auto& host_header = hostHeaderEntry(host_pair.first, true);
-    HeaderUtility::stripPortFromHost(headers_, 443);
-    EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
-  }
-}
-
 // Host's trailing dot from host header get removed.
 TEST_F(HeaderUtilityTest, RemoveTrailingDotFromHost) {
   const std::vector<std::pair<std::string, std::string>> host_headers{
@@ -916,20 +901,26 @@ TEST(ValidateHeaders, Connect) {
 
 TEST(ValidateHeaders, ContentLength) {
   bool should_close_connection;
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::ACCEPT,
-            HeaderUtility::validateContentLength("1,1", true, should_close_connection));
+  size_t content_length{0};
+  EXPECT_EQ(
+      HeaderUtility::HeaderValidationResult::ACCEPT,
+      HeaderUtility::validateContentLength("1,1", true, should_close_connection, content_length));
+  EXPECT_FALSE(should_close_connection);
+  EXPECT_EQ(1, content_length);
+
+  EXPECT_EQ(
+      HeaderUtility::HeaderValidationResult::REJECT,
+      HeaderUtility::validateContentLength("1,2", true, should_close_connection, content_length));
   EXPECT_FALSE(should_close_connection);
 
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
-            HeaderUtility::validateContentLength("1,2", true, should_close_connection));
-  EXPECT_FALSE(should_close_connection);
-
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
-            HeaderUtility::validateContentLength("1,2", false, should_close_connection));
+  EXPECT_EQ(
+      HeaderUtility::HeaderValidationResult::REJECT,
+      HeaderUtility::validateContentLength("1,2", false, should_close_connection, content_length));
   EXPECT_TRUE(should_close_connection);
 
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
-            HeaderUtility::validateContentLength("-1", false, should_close_connection));
+  EXPECT_EQ(
+      HeaderUtility::HeaderValidationResult::REJECT,
+      HeaderUtility::validateContentLength("-1", false, should_close_connection, content_length));
   EXPECT_TRUE(should_close_connection);
 }
 

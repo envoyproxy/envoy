@@ -28,14 +28,20 @@ envoy_extension_cc_test_library(
 envoy_extension_cc_test(
     name = "dns_filter_test",
     srcs = ["dns_filter_test.cc"],
+    args = [
+        # Force creation of c-ares DnsResolverImpl when running test on macOS.
+        "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
+    ],
     extension_names = ["envoy.filters.udp_listener.dns_filter"],
     deps = [
         ":dns_filter_test_lib",
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:listener_factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:registry_lib",
         "@envoy_api//envoy/extensions/filters/udp/dns_filter/v3:pkg_cc_proto",
     ],
 )

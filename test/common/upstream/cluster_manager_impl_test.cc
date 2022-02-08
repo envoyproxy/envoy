@@ -4,6 +4,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "source/common/config/xds_resource.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/router/context_impl.h"
@@ -14,14 +15,17 @@
 #include "test/config/v2_link_hacks.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/matcher/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/upstream/cds_api.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/cluster_real_priority_set.h"
 #include "test/mocks/upstream/cluster_update_callbacks.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/load_balancer_context.h"
+#include "test/mocks/upstream/od_cds_api.h"
 #include "test/mocks/upstream/thread_aware_load_balancer.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -69,11 +73,23 @@ std::string clustersJson(const std::vector<std::string>& clusters) {
   return fmt::sprintf("\"clusters\": [%s]", absl::StrJoin(clusters, ","));
 }
 
+void verifyCaresDnsConfigAndUnpack(
+    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
+    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& cares) {
+  // Verify typed DNS resolver config is c-ares.
+  EXPECT_EQ(typed_dns_resolver_config.name(), std::string(Network::CaresDnsResolver));
+  EXPECT_EQ(
+      typed_dns_resolver_config.typed_config().type_url(),
+      "type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
+  typed_dns_resolver_config.typed_config().UnpackTo(&cares);
+}
+
 class ClusterManagerImplTest : public testing::Test {
 public:
   ClusterManagerImplTest()
       : http_context_(factory_.stats_.symbolTable()), grpc_context_(factory_.stats_.symbolTable()),
-        router_context_(factory_.stats_.symbolTable()) {}
+        router_context_(factory_.stats_.symbolTable()),
+        registered_dns_factory_(dns_resolver_factory_) {}
 
   void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
@@ -177,11 +193,9 @@ public:
   Http::ContextImpl http_context_;
   Grpc::ContextImpl grpc_context_;
   Router::ContextImpl router_context_;
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
 };
-
-MATCHER_P(CustomDnsResolversSizeEquals, expectedResolvers, "") {
-  return expectedResolvers.size() == arg.size();
-}
 
 envoy::config::bootstrap::v3::Bootstrap defaultConfig() {
   const std::string yaml = R"EOF(
@@ -190,6 +204,255 @@ static_resources:
   )EOF";
 
   return parseBootstrapFromV3Yaml(yaml);
+}
+
+class ODCDTest : public ClusterManagerImplTest {
+public:
+  void SetUp() override {
+    create(defaultConfig());
+    odcds_ = MockOdCdsApi::create();
+    odcds_handle_ = cluster_manager_->createOdCdsApiHandle(odcds_);
+  }
+
+  void TearDown() override {
+    odcds_.reset();
+    odcds_handle_.reset();
+    factory_.tls_.shutdownThread();
+  }
+
+  ClusterDiscoveryCallbackPtr createCallback() {
+    return std::make_unique<ClusterDiscoveryCallback>(
+        [this](ClusterDiscoveryStatus cluster_status) {
+          UNREFERENCED_PARAMETER(cluster_status);
+          ++callback_call_count_;
+        });
+  }
+
+  ClusterDiscoveryCallbackPtr createCallback(ClusterDiscoveryStatus expected_cluster_status) {
+    return std::make_unique<ClusterDiscoveryCallback>(
+        [this, expected_cluster_status](ClusterDiscoveryStatus cluster_status) {
+          EXPECT_EQ(expected_cluster_status, cluster_status);
+          ++callback_call_count_;
+        });
+  }
+
+  MockOdCdsApiSharedPtr odcds_;
+  OdCdsApiHandlePtr odcds_handle_;
+  std::chrono::milliseconds timeout_ = std::chrono::milliseconds(5000);
+  unsigned callback_call_count_ = 0u;
+};
+
+// Check that we create a valid handle for valid config source and null resource locator.
+TEST_F(ODCDTest, TestAllocate) {
+  envoy::config::core::v3::ConfigSource config;
+  OptRef<xds::core::v3::ResourceLocator> locator;
+  ProtobufMessage::MockValidationVisitor mock_visitor;
+
+  config.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
+  config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster");
+
+  auto handle = cluster_manager_->allocateOdCdsApi(config, locator, mock_visitor);
+  EXPECT_NE(handle, nullptr);
+}
+
+// Check that we create a valid handle for valid config source and resource locator.
+TEST_F(ODCDTest, TestAllocateWithLocator) {
+  envoy::config::core::v3::ConfigSource config;
+  ProtobufMessage::MockValidationVisitor mock_visitor;
+
+  config.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
+  config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster");
+
+  auto locator =
+      Config::XdsResourceIdentifier::decodeUrl("xdstp://foo/envoy.config.cluster.v3.Cluster/bar");
+  auto handle = cluster_manager_->allocateOdCdsApi(config, locator, mock_visitor);
+  EXPECT_NE(handle, nullptr);
+}
+
+// Check if requesting for an unknown cluster calls into ODCDS instead of invoking the callback.
+TEST_F(ODCDTest, TestRequest) {
+  auto cb = createCallback();
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  EXPECT_EQ(callback_call_count_, 0);
+}
+
+// Check if repeatedly requesting for an unknown cluster calls only once into ODCDS instead of
+// invoking the callbacks.
+TEST_F(ODCDTest, TestRequestRepeated) {
+  auto cb1 = createCallback();
+  auto cb2 = createCallback();
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto handle1 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb1), timeout_);
+  auto handle2 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb2), timeout_);
+  EXPECT_EQ(callback_call_count_, 0);
+}
+
+// Check if requesting an unknown cluster calls into ODCDS, even after the successful discovery of
+// the cluster and its following expiration (removal). Also make sure that the callback is called on
+// the successful discovery.
+TEST_F(ODCDTest, TestClusterRediscovered) {
+  auto cb = createCallback(ClusterDiscoveryStatus::Available);
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(2);
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1");
+  EXPECT_EQ(callback_call_count_, 1);
+  handle.reset();
+  cluster_manager_->removeCluster("cluster_foo");
+  cb = createCallback();
+  handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  EXPECT_EQ(callback_call_count_, 1);
+}
+
+// Check if requesting an unknown cluster calls into ODCDS, even after the expired discovery of the
+// cluster. Also make sure that the callback is called on the expired discovery.
+TEST_F(ODCDTest, TestClusterRediscoveredAfterExpiration) {
+  auto cb = createCallback(ClusterDiscoveryStatus::Timeout);
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(2);
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  cluster_manager_->notifyExpiredDiscovery("cluster_foo");
+  EXPECT_EQ(callback_call_count_, 1);
+  handle.reset();
+  cb = createCallback();
+  handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  EXPECT_EQ(callback_call_count_, 1);
+}
+
+// Check if requesting an unknown cluster calls into ODCDS, even after
+// the discovery found out that the cluster is missing in the
+// management server. Also make sure that the callback is called on
+// the failed discovery.
+TEST_F(ODCDTest, TestClusterRediscoveredAfterMissing) {
+  auto cb = createCallback(ClusterDiscoveryStatus::Missing);
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(2);
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  cluster_manager_->notifyMissingCluster("cluster_foo");
+  EXPECT_EQ(callback_call_count_, 1);
+  handle.reset();
+  cb = createCallback();
+  handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  EXPECT_EQ(callback_call_count_, 1);
+}
+
+// Check that we do nothing if we get a notification about irrelevant
+// missing cluster.
+TEST_F(ODCDTest, TestIrrelevantNotifyMissingCluster) {
+  auto cb = createCallback(ClusterDiscoveryStatus::Timeout);
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  cluster_manager_->notifyMissingCluster("cluster_bar");
+  EXPECT_EQ(callback_call_count_, 0);
+}
+
+// Check that the callback is not called when some other cluster is added.
+TEST_F(ODCDTest, TestDiscoveryManagerIgnoresIrrelevantClusters) {
+  auto cb = std::make_unique<ClusterDiscoveryCallback>([](ClusterDiscoveryStatus) {
+    ADD_FAILURE() << "The callback should not be called for irrelevant clusters";
+  });
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_irrelevant"), "version1");
+}
+
+// Start a couple of discoveries and drop the discovery handles in different order, make sure no
+// callbacks are invoked when discoveries are done.
+TEST_F(ODCDTest, TestDroppingHandles) {
+  auto cb1 = std::make_unique<ClusterDiscoveryCallback>(
+      [](ClusterDiscoveryStatus) { ADD_FAILURE() << "The callback 1 should not be called"; });
+  auto cb2 = std::make_unique<ClusterDiscoveryCallback>(
+      [](ClusterDiscoveryStatus) { ADD_FAILURE() << "The callback 2 should not be called"; });
+  auto cb3 = std::make_unique<ClusterDiscoveryCallback>(
+      [](ClusterDiscoveryStatus) { ADD_FAILURE() << "The callback 3 should not be called"; });
+  auto cb4 = std::make_unique<ClusterDiscoveryCallback>(
+      [](ClusterDiscoveryStatus) { ADD_FAILURE() << "The callback 4 should not be called"; });
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo1"));
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo2"));
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo3"));
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo4"));
+  auto handle1 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo1", std::move(cb1), timeout_);
+  auto handle2 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo2", std::move(cb2), timeout_);
+  auto handle3 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo3", std::move(cb3), timeout_);
+  auto handle4 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo4", std::move(cb4), timeout_);
+
+  handle2.reset();
+  handle3.reset();
+  handle1.reset();
+  handle4.reset();
+
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo1"), "version1");
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo2"), "version1");
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo3"), "version1");
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo4"), "version1");
+}
+
+// Checks that dropping discovery handles will result in callbacks not being invoked.
+TEST_F(ODCDTest, TestHandles) {
+  auto cb1 = createCallback(ClusterDiscoveryStatus::Available);
+  auto cb2 = std::make_unique<ClusterDiscoveryCallback>(
+      [](ClusterDiscoveryStatus) { ADD_FAILURE() << "The callback 2 should not be called"; });
+  auto cb3 = std::make_unique<ClusterDiscoveryCallback>(
+      [](ClusterDiscoveryStatus) { ADD_FAILURE() << "The callback 3 should not be called"; });
+  auto cb4 = createCallback(ClusterDiscoveryStatus::Available);
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto handle1 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb1), timeout_);
+  auto handle2 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb2), timeout_);
+  auto handle3 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb3), timeout_);
+  auto handle4 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb4), timeout_);
+
+  // handle1 and handle4 are left intact, so their respective callbacks will be invoked.
+  handle2.reset();
+  handle3.reset();
+
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1");
+  EXPECT_EQ(callback_call_count_, 2);
+}
+
+// Check if callback is invoked when trying to discover a cluster we already know about. It should
+// not call into ODCDS in such case.
+TEST_F(ODCDTest, TestCallbackWithExistingCluster) {
+  auto cb = createCallback(ClusterDiscoveryStatus::Available);
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1");
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(0);
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  EXPECT_EQ(callback_call_count_, 1);
+}
+
+// Checks that the cluster manager detects that a thread has requested a cluster that some other
+// thread already did earlier, so it does not start another discovery process.
+TEST_F(ODCDTest, TestMainThreadDiscoveryInProgressDetection) {
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto cb1 = createCallback();
+  auto cb2 = createCallback();
+  auto handle1 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb1), timeout_);
+  auto cdm = cluster_manager_->createAndSwapClusterDiscoveryManager("another_fake_thread");
+  auto handle2 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb2), timeout_);
 }
 
 class AlpnSocketFactory : public Network::RawBufferSocketFactory {
@@ -2203,7 +2466,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
@@ -2340,7 +2603,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
@@ -2555,7 +2818,7 @@ TEST_F(ClusterManagerImplTest, UseTcpInDefaultDnsResolver) {
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   // As custom resolvers are not specified in config, this method should not be called,
   // resolver from context should be used instead.
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).Times(0);
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).Times(0);
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -2581,18 +2844,61 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedField) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  auto resolvers = envoy::config::core::v3::Address();
-  resolvers.mutable_socket_address()->set_address("1.2.3.4");
-  resolvers.mutable_socket_address()->set_port_value(80);
-  std::vector<Network::Address::InstanceConstSharedPtr> expectedDnsResolvers;
-  expectedDnsResolvers.push_back(Network::Address::resolveProtoAddress(resolvers));
-
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 80),
+                                             resolvers);
+  cares.add_resolvers()->MergeFrom(resolvers);
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   // As custom resolver is specified via deprecated field `dns_resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_,
-              createDnsResolver(CustomDnsResolversSizeEquals(expectedDnsResolvers), _))
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(dns_resolver));
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV3Yaml(yaml));
+  factory_.tls_.shutdownThread();
+}
 
+// Test that custom DNS resolver is used, when custom resolver is configured
+// per cluster and deprecated field `dns_resolvers` is specified with multiple resolvers.
+TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedFieldMultipleResolvers) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      dns_resolvers:
+      - socket_address:
+          address: 1.2.3.4
+          port_value: 80
+      - socket_address:
+          address: 1.2.3.5
+          port_value: 81
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 80),
+                                             resolvers);
+  cares.add_resolvers()->MergeFrom(resolvers);
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.5", 81),
+                                             resolvers);
+  cares.add_resolvers()->MergeFrom(resolvers);
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  // As custom resolver is specified via deprecated field `dns_resolvers` in clusters
+  // config, the method `createDnsResolver` is called once.
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, ProtoEq(typed_dns_resolver_config)))
+      .WillOnce(Return(dns_resolver));
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
@@ -2617,16 +2923,106 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecified) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  auto resolvers = envoy::config::core::v3::Address();
-  resolvers.mutable_socket_address()->set_address("1.2.3.4");
-  resolvers.mutable_socket_address()->set_port_value(80);
-  std::vector<Network::Address::InstanceConstSharedPtr> expectedDnsResolvers;
-  expectedDnsResolvers.push_back(Network::Address::resolveProtoAddress(resolvers));
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 80),
+                                             resolvers);
+  cares.add_resolvers()->MergeFrom(resolvers);
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_,
-              createDnsResolver(CustomDnsResolversSizeEquals(expectedDnsResolvers), _))
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, ProtoEq(typed_dns_resolver_config)))
+      .WillOnce(Return(dns_resolver));
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV3Yaml(yaml));
+  factory_.tls_.shutdownThread();
+}
+
+// Test that custom DNS resolver is used, when custom resolver is configured per cluster,
+// and multiple resolvers are configured.
+TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedMultipleResolvers) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      dns_resolution_config:
+        resolvers:
+          - socket_address:
+              address: 1.2.3.4
+              port_value: 80
+          - socket_address:
+              address: 1.2.3.5
+              port_value: 81
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 80),
+                                             resolvers);
+  cares.add_resolvers()->MergeFrom(resolvers);
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.5", 81),
+                                             resolvers);
+  cares.add_resolvers()->MergeFrom(resolvers);
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+
+  // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
+  // config, the method `createDnsResolver` is called once.
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, ProtoEq(typed_dns_resolver_config)))
+      .WillOnce(Return(dns_resolver));
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV3Yaml(yaml));
+  factory_.tls_.shutdownThread();
+}
+
+// Test that custom DNS resolver is used and overriding the specified deprecated field
+// `dns_resolvers`.
+TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedOveridingDeprecatedResolver) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      dns_resolvers:
+      - socket_address:
+          address: 1.2.3.4
+          port_value: 80
+      dns_resolution_config:
+        resolvers:
+          - socket_address:
+              address: 1.2.3.5
+              port_value: 81
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.5", 81),
+                                             resolvers);
+  cares.add_resolvers()->MergeFrom(resolvers);
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+
+  // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
+  // config, the method `createDnsResolver` is called once.
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
@@ -2654,17 +3050,19 @@ TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolver) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&dns_resolver_options), Return(dns_resolver)));
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  // `false` here means use_tcp_for_dns_lookups is not being set via bootstrap config
-  EXPECT_EQ(false, dns_resolver_options.use_tcp_for_dns_lookups());
+
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  EXPECT_EQ(false, cares.dns_resolver_options().use_tcp_for_dns_lookups());
   factory_.tls_.shutdownThread();
 }
 
@@ -2685,17 +3083,19 @@ TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolverViaDeprecatedField) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&dns_resolver_options), Return(dns_resolver)));
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  // `true` here means use_tcp_for_dns_lookups is set to true
-  EXPECT_EQ(true, dns_resolver_options.use_tcp_for_dns_lookups());
+
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
   factory_.tls_.shutdownThread();
 }
 
@@ -2720,17 +3120,18 @@ TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolverDeprecatedFieldOverrid
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&dns_resolver_options), Return(dns_resolver)));
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  // `false` here means dns_resolver_options.use_tcp_for_dns_lookups is set to false.
-  EXPECT_EQ(false, dns_resolver_options.use_tcp_for_dns_lookups());
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  EXPECT_EQ(false, cares.dns_resolver_options().use_tcp_for_dns_lookups());
   factory_.tls_.shutdownThread();
 }
 
@@ -2755,17 +3156,19 @@ TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolverDeprecatedFieldOverrid
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&dns_resolver_options), Return(dns_resolver)));
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  // `true` here means dns_resolver_options.use_tcp_for_dns_lookups is set to true.
-  EXPECT_EQ(true, dns_resolver_options.use_tcp_for_dns_lookups());
+
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
   factory_.tls_.shutdownThread();
 }
 
@@ -2789,17 +3192,19 @@ TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolver) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&dns_resolver_options), Return(dns_resolver)));
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  // `true` here means dns_resolver_options.use_tcp_for_dns_lookups is set to true.
-  EXPECT_EQ(true, dns_resolver_options.use_tcp_for_dns_lookups());
+
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
   factory_.tls_.shutdownThread();
 }
 
@@ -2820,17 +3225,19 @@ TEST_F(ClusterManagerImplTest, DefaultSearchDomainWithCustomDnsResolver) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&dns_resolver_options), Return(dns_resolver)));
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  // `false` here means no_default_search_domain is not being set via bootstrap config
-  EXPECT_EQ(false, dns_resolver_options.no_default_search_domain());
+
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  EXPECT_EQ(false, cares.dns_resolver_options().no_default_search_domain());
   factory_.tls_.shutdownThread();
 }
 
@@ -2853,17 +3260,19 @@ TEST_F(ClusterManagerImplTest, DefaultSearchDomainWithCustomDnsResolverWithConfi
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&dns_resolver_options), Return(dns_resolver)));
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  // `false` here means dns_resolver_options.no_default_search_domain is set to false.
-  EXPECT_EQ(false, dns_resolver_options.no_default_search_domain());
+
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  EXPECT_EQ(false, cares.dns_resolver_options().no_default_search_domain());
   factory_.tls_.shutdownThread();
 }
 
@@ -2886,17 +3295,248 @@ TEST_F(ClusterManagerImplTest, NoDefaultSearchDomainWithCustomDnsResolver) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&dns_resolver_options), Return(dns_resolver)));
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  // `true` here means dns_resolver_options.no_default_search_domain is set to true.
-  EXPECT_EQ(true, dns_resolver_options.no_default_search_domain());
+
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  EXPECT_EQ(true, cares.dns_resolver_options().no_default_search_domain());
+  factory_.tls_.shutdownThread();
+}
+
+// Test that typed_dns_resolver_config is specified and is used.
+TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecified) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      typed_dns_resolver_config:
+        name: envoy.network.dns_resolver.cares
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+          resolvers:
+          - socket_address:
+              address: "1.2.3.4"
+              port_value: 80
+          dns_resolver_options:
+            use_tcp_for_dns_lookups: true
+            no_default_search_domain: true
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 80),
+                                             resolvers);
+  EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
+  EXPECT_EQ(true, cares.dns_resolver_options().no_default_search_domain());
+  EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers));
+  factory_.tls_.shutdownThread();
+}
+
+// Test that resolvers in typed_dns_resolver_config is specified and is used.
+TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigResolversSpecified) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      typed_dns_resolver_config:
+        name: envoy.network.dns_resolver.cares
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+          resolvers:
+          - socket_address:
+              address: "1.2.3.4"
+              port_value: 80
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 80),
+                                             resolvers);
+  EXPECT_EQ(false, cares.dns_resolver_options().use_tcp_for_dns_lookups());
+  EXPECT_EQ(false, cares.dns_resolver_options().no_default_search_domain());
+  EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers));
+  factory_.tls_.shutdownThread();
+}
+
+// Test that multiple resolvers in typed_dns_resolver_config is specified and is used.
+TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigMultipleResolversSpecified) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      typed_dns_resolver_config:
+        name: envoy.network.dns_resolver.cares
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+          resolvers:
+          - socket_address:
+              address: "1.2.3.4"
+              port_value: 80
+          - socket_address:
+              address: "1.2.3.5"
+              port_value: 81
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 80),
+                                             resolvers);
+  EXPECT_EQ(false, cares.dns_resolver_options().use_tcp_for_dns_lookups());
+  EXPECT_EQ(false, cares.dns_resolver_options().no_default_search_domain());
+  EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers));
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.5", 81),
+                                             resolvers);
+  EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(1), resolvers));
+  factory_.tls_.shutdownThread();
+}
+
+// Test that dns_resolver_options in typed_dns_resolver_config is specified and is used.
+TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigResolverOptionsSpecified) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      typed_dns_resolver_config:
+        name: envoy.network.dns_resolver.cares
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+          dns_resolver_options:
+            use_tcp_for_dns_lookups: true
+            no_default_search_domain: true
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
+  EXPECT_EQ(true, cares.dns_resolver_options().no_default_search_domain());
+  EXPECT_EQ(0, cares.resolvers().size());
+  factory_.tls_.shutdownThread();
+}
+
+// Test that when typed_dns_resolver_config is specified, it is used. All other deprecated
+// configurations are ignored, which includes dns_resolvers, use_tcp_for_dns_lookups, and
+// dns_resolution_config.
+TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedOveridingDeprecatedConfig) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      dns_resolvers:
+      - socket_address:
+          address: 1.2.3.4
+          port_value: 80
+      use_tcp_for_dns_lookups: false
+      dns_resolution_config:
+        resolvers:
+          - socket_address:
+              address: 1.2.3.5
+              port_value: 81
+        dns_resolver_options:
+          use_tcp_for_dns_lookups: false
+          no_default_search_domain: false
+      typed_dns_resolver_config:
+        name: envoy.network.dns_resolver.cares
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+          resolvers:
+          - socket_address:
+              address: "9.10.11.12"
+              port_value: 100
+          - socket_address:
+              address: "5.6.7.8"
+              port_value: 200
+          dns_resolver_options:
+            use_tcp_for_dns_lookups: true
+            no_default_search_domain: true
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("9.10.11.12", 100),
+                                             resolvers);
+  EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
+  EXPECT_EQ(true, cares.dns_resolver_options().no_default_search_domain());
+  EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers));
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("5.6.7.8", 200),
+                                             resolvers);
+  EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(1), resolvers));
   factory_.tls_.shutdownThread();
 }
 
@@ -2929,7 +3569,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
@@ -3021,7 +3661,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);

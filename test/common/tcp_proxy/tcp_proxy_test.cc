@@ -852,19 +852,6 @@ TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
   EXPECT_EQ(access_log_data_, "127.0.0.1:80 observability_name");
 }
 
-// Test that access log fields %UPSTREAM_HOST% and %UPSTREAM_CLUSTER% are correctly logged with the
-// cluster name.
-TEST_F(TcpProxyTest, AccessLogUpstreamHostLegacyName) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.use_observable_cluster_name", "false"}});
-  setup(1, accessLogConfig("%UPSTREAM_HOST% %UPSTREAM_CLUSTER%"));
-  raiseEventUpstreamConnected(0);
-  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-  filter_.reset();
-  EXPECT_EQ(access_log_data_, "127.0.0.1:80 fake_cluster");
-}
-
 // Test that access log field %UPSTREAM_LOCAL_ADDRESS% is correctly logged.
 TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   setup(1, accessLogConfig("%UPSTREAM_LOCAL_ADDRESS%"));
@@ -935,8 +922,9 @@ TEST_F(TcpProxyTest, AccessLogUpstreamSSLConnection) {
   EXPECT_CALL(*upstream_connections_.at(0), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
 
   raiseEventUpstreamConnected(0);
-  ASSERT_NE(nullptr, filter_->getStreamInfo().upstreamSslConnection());
-  EXPECT_EQ(session_id, filter_->getStreamInfo().upstreamSslConnection()->sessionId());
+  ASSERT_NE(nullptr, filter_->getStreamInfo().upstreamInfo()->upstreamSslConnection());
+  EXPECT_EQ(session_id,
+            filter_->getStreamInfo().upstreamInfo()->upstreamSslConnection()->sessionId());
 }
 
 // Tests that upstream flush works properly with no idle timeout configured.
@@ -1081,7 +1069,8 @@ TEST_F(TcpProxyTest, ShareFilterState) {
   raiseEventUpstreamConnected(0);
   EXPECT_EQ("filter_state_cluster",
             filter_callbacks_.connection_.streamInfo()
-                .upstreamFilterState()
+                .upstreamInfo()
+                ->upstreamFilterState()
                 ->getDataReadOnly<PerConnectionCluster>("envoy.tcp_proxy.cluster")
                 .value());
 }
@@ -1093,9 +1082,10 @@ TEST_F(TcpProxyTest, AccessDownstreamAndUpstreamProperties) {
   raiseEventUpstreamConnected(0);
   EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamAddressProvider().sslConnection(),
             filter_callbacks_.connection().ssl());
-  EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamLocalAddress(),
-            upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().localAddress());
-  EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamSslConnection(),
+  EXPECT_EQ(
+      filter_callbacks_.connection().streamInfo().upstreamInfo()->upstreamLocalAddress().get(),
+      upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().localAddress().get());
+  EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamInfo()->upstreamSslConnection(),
             upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().sslConnection());
 }
 } // namespace

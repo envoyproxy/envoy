@@ -236,7 +236,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   route_ = callbacks_->route();
   if (!route_) {
     ENVOY_STREAM_LOG(debug, "no route match for method '{}'", *callbacks_, metadata->methodName());
-    stats().route_missing_.inc();
+    stats().named_.route_missing_.inc();
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::UnknownMethod,
                      fmt::format("no route for method '{}'", metadata->methodName())),
@@ -294,7 +294,7 @@ FilterStatus Router::messageEnd() {
   ProtocolConverter::messageEnd();
   const auto encode_size = upstream_request_->encodeAndWrite(upstream_request_buffer_);
   addSize(encode_size);
-  recordUpstreamRequestSize(*cluster_, request_size_);
+  stats().recordUpstreamRequestSize(*cluster_, request_size_);
 
   // Dispatch shadow requests, if any.
   // Note: if connections aren't ready, the write will happen when appropriate.

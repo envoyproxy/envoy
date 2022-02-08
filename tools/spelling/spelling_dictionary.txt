@@ -11,6 +11,7 @@ ALS
 AMZ
 APC
 API
+ARRAYSIZE
 ARN
 ASAN
 ASCII
@@ -20,6 +21,7 @@ ASSERTs
 AST
 AWS
 BACKTRACE
+BBR
 BSON
 BPF
 Repick
@@ -31,6 +33,7 @@ CDN
 CDS
 CEL
 DSR
+DSS
 EBADF
 ENOTCONN
 EPIPE
@@ -128,6 +131,8 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+dereferencing
+dnsresolvers
 guarddog
 GC
 GCC
@@ -145,7 +150,6 @@ GSS
 GTEST
 GURL
 Grabbit
-Hashable
 HC
 HCM
 HDS
@@ -203,6 +207,7 @@ MD
 MERCHANTABILITY
 Merkle
 MGET
+MPTCP
 MQ
 MSDN
 MSET
@@ -233,6 +238,8 @@ Nilsson
 Nonhashable
 Oauth
 OCSP
+OD
+ODCDS
 OID
 OK
 OOM
@@ -252,6 +259,7 @@ PEM
 PERF
 PGV
 PID
+PKCS12
 PKTINFO
 PNG
 Pointwise
@@ -366,6 +374,7 @@ UUID
 UUIDs
 VC
 VCHAR
+VCL
 VH
 VHDS
 VLOG
@@ -396,6 +405,7 @@ absl
 accesslog
 accessor
 accessors
+acked
 ackless
 acks
 acls
@@ -481,6 +491,7 @@ bursty
 bytecode
 bytestream
 bytestring
+cacert
 cacheable
 cacheability
 callee
@@ -497,6 +508,7 @@ canonicalizer
 canonicalizing
 cardinality
 casted
+cfg
 charset
 checkin
 checksum
@@ -571,6 +583,7 @@ dedup
 dedupe
 deduplicate
 deduplicates
+deduplication
 deflater
 deletable
 deleter
@@ -633,6 +646,7 @@ evbuffer
 evbuffers
 evconnlistener
 evented
+eventfd
 evwatch
 exe
 execlp
@@ -697,6 +711,7 @@ handshaker
 hardcoded
 hardcodes
 hardcoding
+hashable
 hasher
 hashtagging
 hd
@@ -743,6 +758,7 @@ interpretable
 intra
 ints
 invariance
+invoker
 iovec
 iovecs
 ips
@@ -763,6 +779,7 @@ keyder
 kqueue
 kubernetes
 kv
+kvlist
 kvs
 lala
 latencies
@@ -812,6 +829,7 @@ megamiss
 mem
 memcmp
 memcpy
+memset
 memoize
 mergeable
 messagename
@@ -855,6 +873,7 @@ nan
 nanos
 natively
 ndk
+negative
 netblock
 netblocks
 netfilter
@@ -1000,6 +1019,7 @@ rebalancer
 rebalancing
 rebuffer
 rebuilder
+receival
 reconnection
 recurse
 recv
@@ -1084,6 +1104,7 @@ sendto
 serializable
 serializer
 serv
+servercert
 setenv
 setsockopt
 sig
@@ -1094,6 +1115,7 @@ siginfo
 signalstack
 siloed
 sim
+sinked
 sizeof
 smatch
 snapshotted
@@ -1152,6 +1174,7 @@ subsetting
 substr
 substring
 substrings
+subtree
 subtrees
 subtype
 subtypes
@@ -1301,3 +1324,6 @@ crlf
 ep
 suri
 transid
+routable
+vhosts
+infos

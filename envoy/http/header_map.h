@@ -304,6 +304,7 @@ private:
   HEADER_FUNC(Expect)                                                                              \
   HEADER_FUNC(ForwardedClientCert)                                                                 \
   HEADER_FUNC(ForwardedFor)                                                                        \
+  HEADER_FUNC(ForwardedHost)                                                                       \
   HEADER_FUNC(ForwardedProto)                                                                      \
   HEADER_FUNC(GrpcTimeout)                                                                         \
   HEADER_FUNC(Host)                                                                                \
@@ -355,6 +356,7 @@ private:
   HEADER_FUNC(EnvoyDecoratorOperation)                                                             \
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(ProxyConnection)                                                                     \
+  HEADER_FUNC(ProxyStatus)                                                                         \
   HEADER_FUNC(RequestId)                                                                           \
   HEADER_FUNC(TransferEncoding)                                                                    \
   HEADER_FUNC(Upgrade)                                                                             \

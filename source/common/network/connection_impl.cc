@@ -549,6 +549,14 @@ void ConnectionImpl::onWriteBufferHighWatermark() {
   }
 }
 
+void ConnectionImpl::setFailureReason(absl::string_view failure_reason) {
+  if (!transport_socket_->failureReason().empty()) {
+    failure_reason_ = absl::StrCat(failure_reason, ". ", transport_socket_->failureReason());
+  } else {
+    failure_reason_ = std::string(failure_reason);
+  }
+}
+
 void ConnectionImpl::onFileEvent(uint32_t events) {
   ScopeTrackerScopeState scope(this, this->dispatcher_);
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
@@ -671,6 +679,7 @@ void ConnectionImpl::onWriteReady() {
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
       connecting_ = false;
+      onConnected();
       transport_socket_->onConnected();
       // It's possible that we closed during the connect callback.
       if (state() != State::Open) {
@@ -678,8 +687,8 @@ void ConnectionImpl::onWriteReady() {
         return;
       }
     } else {
-      failure_reason_ = absl::StrCat("delayed connect error: ", error);
-      ENVOY_CONN_LOG(debug, "{}", *this, failure_reason_);
+      setFailureReason(absl::StrCat("delayed connect error: ", error));
+      ENVOY_CONN_LOG(debug, "{}", *this, transportFailureReason());
       closeSocket(ConnectionEvent::RemoteClose);
       return;
     }
@@ -762,10 +771,6 @@ bool ConnectionImpl::bothSidesHalfClosed() {
 }
 
 absl::string_view ConnectionImpl::transportFailureReason() const {
-  // TODO(mattklein123): Is it possible for there to be a local failure reason and a transport
-  // failure reason? If so we may need to combine these somehow.
-  ENVOY_BUG(!(!failure_reason_.empty() && !transport_socket_->failureReason().empty()),
-            "both connection and transport failure reason are not empty");
   if (!failure_reason_.empty()) {
     return failure_reason_;
   }
@@ -827,7 +832,7 @@ void ServerConnectionImpl::onTransportSocketConnectTimeout() {
   stream_info_.setConnectionTerminationDetails(kTransportSocketConnectTimeoutTerminationDetails);
   closeConnectionImmediately();
   transport_socket_timeout_stat_->inc();
-  failure_reason_ = "connect timeout";
+  setFailureReason("connect timeout");
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
@@ -845,8 +850,9 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info_,
                      false),
-      stream_info_(dispatcher.timeSource(), socket_->connectionInfoProviderSharedPtr()) {
+      stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr()) {
 
+  stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   // There are no meaningful socket options or source address semantics for
   // non-IP sockets, so skip.
   if (socket_->connectionInfoProviderSharedPtr()->remoteAddress()->ip() == nullptr) {
@@ -871,9 +877,9 @@ ClientConnectionImpl::ClientConnectionImpl(
   if (*source != nullptr) {
     Api::SysCallIntResult result = socket_->bind(*source);
     if (result.return_value_ < 0) {
-      failure_reason_ = absl::StrCat("failed to bind to ", source->get()->asString(), ": ",
-                                     errorDetails(result.errno_));
-      ENVOY_LOG_MISC(debug, failure_reason_);
+      setFailureReason(absl::StrCat("failed to bind to ", source->get()->asString(), ": ",
+                                    errorDetails(result.errno_)));
+      ENVOY_LOG_MISC(debug, failureReason());
       bind_error_ = true;
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect".
@@ -886,10 +892,11 @@ ClientConnectionImpl::ClientConnectionImpl(
 }
 
 void ClientConnectionImpl::connect() {
-  ENVOY_CONN_LOG(debug, "connecting to {}", *this,
-                 socket_->connectionInfoProvider().remoteAddress()->asString());
+  ENVOY_CONN_LOG_EVENT(debug, "client_connection", "connecting to {}", *this,
+                       socket_->connectionInfoProvider().remoteAddress()->asString());
   const Api::SysCallIntResult result =
       socket_->connect(socket_->connectionInfoProvider().remoteAddress());
+  stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
   if (result.return_value_ == 0) {
     // write will become ready.
     ASSERT(connecting_);
@@ -910,12 +917,27 @@ void ClientConnectionImpl::connect() {
   } else {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
     connecting_ = false;
-    failure_reason_ = absl::StrCat("immediate connect error: ", result.errno_);
-    ENVOY_CONN_LOG(debug, "{}", *this, failure_reason_);
+    setFailureReason(absl::StrCat("immediate connect error: ", result.errno_));
+    ENVOY_CONN_LOG(debug, "{}", *this, failureReason());
 
     // Trigger a write event. This is needed on macOS and seems harmless on Linux.
     ioHandle().activateFileEvents(Event::FileReadyType::Write);
   }
+}
+
+void ClientConnectionImpl::onConnected() {
+  stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
+  // There are no meaningful socket source address semantics for non-IP sockets, so skip.
+  if (socket_->connectionInfoProviderSharedPtr()->remoteAddress()->ip()) {
+    // interfaceName makes a syscall. Call once to minimize perf hit.
+    const auto maybe_interface_name = ioHandle().interfaceName();
+    if (maybe_interface_name.has_value()) {
+      ENVOY_CONN_LOG_EVENT(debug, "conn_interface", "connected on local interface '{}'", *this,
+                           maybe_interface_name.value());
+      socket_->connectionInfoProvider().setInterfaceName(maybe_interface_name.value());
+    }
+  }
+  ConnectionImpl::onConnected();
 }
 
 } // namespace Network

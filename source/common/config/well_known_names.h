@@ -12,6 +12,8 @@
 namespace Envoy {
 namespace Config {
 
+bool doesTagNameValueMatchInvalidCharRegex(absl::string_view name);
+
 /**
  * Well-known address resolver names.
  */

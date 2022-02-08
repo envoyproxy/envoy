@@ -16,6 +16,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/hash_policy.h"
+#include "envoy/http/stateful_session.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -29,7 +30,7 @@
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/global.h"
@@ -263,9 +264,11 @@ public:
 class TestVirtualCluster : public VirtualCluster {
 public:
   // Router::VirtualCluster
+  const absl::optional<std::string>& name() const override { return name_; }
   Stats::StatName statName() const override { return stat_name_.statName(); }
   VirtualClusterStats& stats() const override { return stats_; }
 
+  const absl::optional<std::string> name_ = "fake_virtual_cluster";
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::StatNameManagedStorage stat_name_{"fake_virtual_cluster", *symbol_table_};
   Stats::IsolatedStoreImpl stats_store_;
@@ -364,6 +367,8 @@ public:
               (Http::RequestHeaderMap & headers, const StreamInfo::StreamInfo& stream_info,
                bool insert_envoy_original_path),
               (const));
+  MOCK_METHOD(Http::HeaderTransforms, requestHeaderTransforms,
+              (const StreamInfo::StreamInfo& stream_info, bool do_formatting), (const));
   MOCK_METHOD(void, finalizeResponseHeaders,
               (Http::ResponseHeaderMap & headers, const StreamInfo::StreamInfo& stream_info),
               (const));
@@ -390,6 +395,7 @@ public:
   MOCK_METHOD(const VirtualCluster*, virtualCluster, (const Http::HeaderMap& headers), (const));
   MOCK_METHOD(const VirtualHost&, virtualHost, (), (const));
   MOCK_METHOD(bool, autoHostRewrite, (), (const));
+  MOCK_METHOD(bool, appendXfh, (), (const));
   MOCK_METHOD((const std::multimap<std::string, std::string>&), opaqueConfig, (), (const));
   MOCK_METHOD(bool, includeVirtualHostRateLimits, (), (const));
   MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
@@ -506,7 +512,6 @@ public:
   MOCK_METHOD(absl::optional<ConfigInfo>, configInfo, (), (const));
   MOCK_METHOD(SystemTime, lastUpdated, (), (const));
   MOCK_METHOD(void, onConfigUpdate, ());
-  MOCK_METHOD(void, validateConfig, (const envoy::config::route::v3::RouteConfiguration&), (const));
   MOCK_METHOD(void, requestVirtualHostsUpdate,
               (const std::string&, Event::Dispatcher&,
                std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb));
@@ -573,7 +578,7 @@ public:
 
   MOCK_METHOD(void, decodeData, (Buffer::Instance&, bool));
   MOCK_METHOD(void, decodeMetadata, (Http::MetadataMapPtr &&));
-  MOCK_METHOD(void, decode100ContinueHeaders, (Http::ResponseHeaderMapPtr &&));
+  MOCK_METHOD(void, decode1xxHeaders, (Http::ResponseHeaderMapPtr &&));
   MOCK_METHOD(void, decodeHeaders, (Http::ResponseHeaderMapPtr&&, bool));
   MOCK_METHOD(void, decodeTrailers, (Http::ResponseTrailerMapPtr &&));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));

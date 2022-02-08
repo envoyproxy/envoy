@@ -33,6 +33,15 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "cache_entry_utils_test",
+    srcs = ["cache_entry_utils_test.cc"],
+    extension_names = ["envoy.filters.http.cache"],
+    deps = [
+        "//source/extensions/filters/http/cache:cache_entry_utils_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "http_cache_test",
     srcs = ["http_cache_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
@@ -42,6 +51,17 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/cache/simple_http_cache:config",
         "//test/mocks/http:http_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "range_utils_test",
+    srcs = ["range_utils_test.cc"],
+    extension_names = ["envoy.filters.http.cache"],
+    deps = [
+        ":common",
+        "//source/extensions/filters/http/cache:range_utils_lib",
         "//test/test_common:utility_lib",
     ],
 )

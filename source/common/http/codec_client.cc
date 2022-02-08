@@ -79,6 +79,10 @@ RequestEncoder& CodecClient::newStream(ResponseDecoder& response_decoder) {
   request->encoder_ = &codec_->newStream(*request);
   request->encoder_->getStream().addCallbacks(*request);
   LinkedList::moveIntoList(std::move(request), active_requests_);
+
+  auto upstream_info = connection_->streamInfo().upstreamInfo();
+  upstream_info->setUpstreamNumStreams(upstream_info->upstreamNumStreams() + 1);
+
   disableIdleTimer();
   return *active_requests_.front()->encoder_;
 }
@@ -110,16 +114,9 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
     if (connected_) {
       reason = StreamResetReason::ConnectionTermination;
       if (protocol_error_) {
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
-          reason = StreamResetReason::ProtocolError;
-          connection_->streamInfo().setResponseFlag(
-              StreamInfo::ResponseFlag::UpstreamProtocolError);
-        }
+        reason = StreamResetReason::ProtocolError;
+        connection_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
       }
-    } else {
-      ENVOY_CONN_LOG(warn, "Connection is closed by {} during connecting.", *connection_,
-                     (event == Network::ConnectionEvent::RemoteClose ? "peer" : "self"));
     }
     while (!active_requests_.empty()) {
       // Fake resetting all active streams so that reset() callbacks get invoked.
@@ -202,7 +199,7 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
     break;
 #else
     // Should be blocked by configuration checking at an earlier point.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
 #endif
   }
   }

@@ -87,14 +87,17 @@ listener_filters:
     stat_prefix: "my_prefix"
     client_config:
       resolver_timeout: 1s
-      dns_resolution_config:
-        resolvers:
-        - socket_address:
-            address: {}
-            port_value: {}
-        dns_resolver_options:
-          use_tcp_for_dns_lookups: false
-          no_default_search_domain: false
+      typed_dns_resolver_config:
+        name: envoy.network.dns_resolver.cares
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+          resolvers:
+          - socket_address:
+              address: {}
+              port_value: {}
+          dns_resolver_options:
+            use_tcp_for_dns_lookups: false
+            no_default_search_domain: false
       max_pending_lookups: 256
     server_config:
       inline_dns_table:

@@ -101,7 +101,7 @@ class RetryOptionsPredicate {
 public:
   struct UpdateOptionsParameters {
     // Stream info for the previous request attempt that is about to be retried.
-    const StreamInfo::StreamInfo& retriable_request_stream_info_;
+    StreamInfo::StreamInfo& retriable_request_stream_info_;
     // The current upstream socket options that were used for connection pool selection on the
     // previous attempt, or the result of an updated set of options from a previously run
     // retry options predicate.

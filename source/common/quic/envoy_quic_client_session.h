@@ -1,26 +1,17 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#pragma GCC diagnostic ignored "-Wtype-limits"
-#endif
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_client_stream.h"
+#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_stat_names.h"
 
 #include "quiche/quic/core/http/quic_spdy_client_session.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/common/quic/envoy_quic_client_stream.h"
-#include "source/common/quic/envoy_quic_client_connection.h"
-#include "source/common/quic/quic_filter_manager_connection_impl.h"
-#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
-#include "source/common/quic/quic_stat_names.h"
-
 namespace Envoy {
 namespace Quic {
+
+class EnvoyQuicClientSession;
 
 // Act as a Network::ClientConnection to ClientCodec.
 // TODO(danzh) This class doesn't need to inherit Network::FilterManager
@@ -69,8 +60,11 @@ public:
   void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicResetStreamError error,
                                quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
+
   // quic::QuicSpdyClientSessionBase
-  void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
+  bool ShouldKeepConnectionAlive() const override;
+  // quic::ProofHandler
+  void OnProofVerifyDetailsAvailable(const quic::ProofVerifyDetails& verify_details) override;
 
   // PacketsToReadDelegate
   size_t numPacketsExpectedPerEventLoop() override {
@@ -78,6 +72,12 @@ public:
     // active stream.
     return std::max<size_t>(1, GetNumActiveStreams()) * Network::NUM_DATAGRAMS_PER_RECEIVE;
   }
+
+  // QuicFilterManagerConnectionImpl
+  void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) override;
+
+  // Notify any registered connection pool when new streams are available.
+  void OnCanCreateNewOutgoingStream(bool) override;
 
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 
@@ -88,7 +88,12 @@ protected:
   quic::QuicSpdyStream* CreateIncomingStream(quic::QuicStreamId id) override;
   quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
   std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream() override;
-
+  bool ShouldCreateOutgoingBidirectionalStream() override {
+    ASSERT(quic::QuicSpdyClientSession::ShouldCreateOutgoingBidirectionalStream());
+    // Prefer creating an "invalid" stream outside of current stream bounds to
+    // crashing when dereferencing a nullptr in QuicHttpClientConnectionImpl::newStream
+    return true;
+  }
   // QuicFilterManagerConnectionImpl
   bool hasDataToWrite() override;
   // Used by base class to access quic connection after initialization.
@@ -96,15 +101,16 @@ protected:
   quic::QuicConnection* quicConnection() override;
 
 private:
+  uint64_t streamsAvailable();
+
   // These callbacks are owned by network filters and quic session should outlive
   // them.
   Http::ConnectionCallbacks* http_connection_callbacks_{nullptr};
-  // TODO(danzh) deprecate this field once server_id() is made const.
-  const std::string host_name_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory_;
   QuicStatNames& quic_stat_names_;
   Stats::Scope& scope_;
+  bool disable_keepalive_{false};
 };
 
 } // namespace Quic

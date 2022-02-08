@@ -34,7 +34,14 @@ public:
   CdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
                             ConfigHelper::discoveredClustersBootstrap(
-                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+                                        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw
+                                    ? "GRPC"
+                                    : "DELTA_GRPC")) {
+    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+    }
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
   }
@@ -106,7 +113,7 @@ public:
     EXPECT_TRUE(xds_stream_->waitForHeadersComplete());
     Envoy::Http::LowerCaseString path_string(":path");
     std::string expected_method(
-        sotwOrDelta() == Grpc::SotwOrDelta::Sotw
+        sotwOrDelta() == Grpc::SotwOrDelta::Sotw || sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw
             ? "/envoy.service.cluster.v3.ClusterDiscoveryService/StreamClusters"
             : "/envoy.service.cluster.v3.ClusterDiscoveryService/DeltaClusters");
     EXPECT_EQ(xds_stream_->headers().get(path_string)[0]->value(), expected_method);
@@ -140,6 +147,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, CdsIntegrationTest,
 // 7) We send Envoy a request, which we verify is properly proxied to and served by that cluster.
 TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
+  config_helper_.addConfigModifier(configureProxyStatus());
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
   test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
 
@@ -156,6 +164,8 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
       lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(response->headers().getProxyStatusValue(),
+            "envoy; error=destination_unavailable; details=\"cluster_not_found; NC\"");
 
   cleanupUpstreamAndDownstream();
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -173,6 +183,32 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
 
   cleanupUpstreamAndDownstream();
+}
+
+// Make sure that clusters won't create new connections on teardown.
+TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
+  initialize();
+  test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+
+  // Make the upstreams stop working, to ensure the connection was not
+  // established.
+  fake_upstreams_[1]->dispatcher()->exit();
+  fake_upstreams_[2]->dispatcher()->exit();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/cluster1"}, {":scheme", "http"}, {":authority", "host"}});
+
+  // Tell Envoy that cluster_1 is gone.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                             {ClusterName1}, "42");
+  // We can continue the test once we're sure that Envoy's ClusterManager has made use of
+  // the DiscoveryResponse that says cluster_1 is gone.
+  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  codec_client_->sendReset(encoder_decoder.first);
+  cleanupUpstreamAndDownstream();
+  // Make sure there was only one connection attempt.
+  EXPECT_LE(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
 }
 
 // Test the fast addition and removal of clusters when they use ThreadAwareLb.
@@ -261,6 +297,7 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
 // resources it already has: the reconnected stream need not start with a state-of-the-world update.
 TEST_P(CdsIntegrationTest, VersionsRememberedAfterReconnect) {
   SKIP_IF_XDS_IS(Grpc::SotwOrDelta::Sotw);
+  SKIP_IF_XDS_IS(Grpc::SotwOrDelta::UnifiedSotw);
 
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");

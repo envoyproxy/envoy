@@ -42,7 +42,7 @@ namespace {
 
 std::string makeTempDir(std::string basename_template) {
 #ifdef WIN32
-  std::string name_template = "c:\\Windows\\TEMP\\" + basename_template;
+  std::string name_template = TestEnvironment::temporaryDirectory() + "/" + basename_template;
   char* dirname = ::_mktemp(&name_template[0]);
   RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
                                                  name_template, errorDetails(errno)));
@@ -264,7 +264,11 @@ const std::string& TestEnvironment::temporaryDirectory() {
 
 std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
-  return runfiles_->Rlocation(workspace);
+  auto path = runfiles_->Rlocation(workspace);
+#ifdef WIN32
+  path = std::regex_replace(path, std::regex("\\\\"), "/");
+#endif
+  return path;
 }
 
 std::string TestEnvironment::runfilesPath(const std::string& path, const std::string& workspace) {
@@ -398,17 +402,19 @@ void TestEnvironment::exec(const std::vector<std::string>& args) {
 
 std::string TestEnvironment::writeStringToFileForTest(const std::string& filename,
                                                       const std::string& contents,
-                                                      bool fully_qualified_path) {
+                                                      bool fully_qualified_path, bool do_unlink) {
   const std::string out_path =
       fully_qualified_path ? filename : TestEnvironment::temporaryPath(filename);
-  unlink(out_path.c_str());
+  if (do_unlink) {
+    unlink(out_path.c_str());
+  }
 
   Filesystem::FilePathAndType out_file_info{Filesystem::DestinationType::File, out_path};
   Filesystem::FilePtr file = Filesystem::fileSystemForTest().createFile(out_file_info);
   const Filesystem::FlagSet flags{1 << Filesystem::File::Operation::Write |
                                   1 << Filesystem::File::Operation::Create};
   const Api::IoCallBoolResult open_result = file->open(flags);
-  EXPECT_TRUE(open_result.return_value_);
+  EXPECT_TRUE(open_result.return_value_) << open_result.err_->getErrorDetails();
   const Api::IoCallSizeResult result = file->write(contents);
   EXPECT_EQ(contents.length(), result.return_value_);
   return out_path;

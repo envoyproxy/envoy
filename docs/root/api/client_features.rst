@@ -14,7 +14,7 @@ Currently Defined Client Features
 
 - **envoy.config.require-any-fields-contain-struct**: This feature indicates that xDS client
   requires that the configuration entries of type  *google.protobuf.Any* contain messages of type
-  *udpa.type.v1.TypedStruct* only.
+  *xds.type.v3.TypedStruct* (or, for historical reasons, *udpa.type.v1.TypedStruct*) only.
 - **envoy.lb.does_not_support_overprovisioning**: This feature indicates that the client does not
   support overprovisioning for priority failover and locality weighting as configured by the
   :ref:`overprovisioning_factor <envoy_v3_api_field_config.endpoint.v3.clusterloadassignment.policy.overprovisioning_factor>`

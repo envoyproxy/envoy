@@ -1,0 +1,51 @@
+# Not a git repo so embed version
+--- src/CMakeLists.txt
++++ src/CMakeLists.txt
+@@ -40,12 +40,8 @@ include(cmake/ccache.cmake)
+ ##############################################################################
+ # VPP Version
+ ##############################################################################
+-execute_process(
+-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+-  COMMAND scripts/version
+-  OUTPUT_VARIABLE VPP_VERSION
+-  OUTPUT_STRIP_TRAILING_WHITESPACE
+-)
++
++set(VPP_VERSION 22.02-rc0~385-g7c3275e84)
+ string(REPLACE "-" ";" VPP_LIB_VERSION ${VPP_VERSION})
+ list(GET VPP_LIB_VERSION 0 VPP_LIB_VERSION)
+ 
+@@ -188,7 +184,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+   find_package(OpenSSL)
+   set(SUBDIRS
+     vppinfra svm vlib vlibmemory vlibapi vnet vpp vat vat2 vcl vpp-api
+-    plugins tools/vppapigen tools/g2 tools/perftool cmake pkg
++    tools/vppapigen tools/g2 tools/perftool cmake pkg
+     tools/appimage
+   )
+ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+
+--- src/cmake/ccache.cmake
++++ src/cmake/ccache.cmake
+@@ -14,7 +14,7 @@
+ ##############################################################################
+ # ccache
+ ##############################################################################
+-option(VPP_USE_CCACHE "Use ccache compiler cache." ON)
++option(VPP_USE_CCACHE "Use ccache compiler cache." OFF)
+ if(VPP_USE_CCACHE)
+   find_program(CCACHE_FOUND ccache)
+   message(STATUS "Looking for ccache")
+
+--- src/cmake/library.cmake
++++ src/cmake/library.cmake
+@@ -24,7 +24,7 @@ macro(add_vpp_library lib)
+   set_target_properties(${lo} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+   target_compile_options(${lo} PUBLIC ${VPP_DEFAULT_MARCH_FLAGS})
+ 
+-  add_library(${lib} SHARED)
++  add_library(${lib} STATIC)
+   target_sources(${lib} PRIVATE $<TARGET_OBJECTS:${lo}>)
+ 
+   if(VPP_LIB_VERSION)

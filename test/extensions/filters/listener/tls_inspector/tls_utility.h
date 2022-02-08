@@ -19,6 +19,12 @@ namespace Test {
 std::vector<uint8_t> generateClientHello(uint16_t tls_min_version, uint16_t tls_max_version,
                                          const std::string& sni_name, const std::string& alpn);
 
+/**
+ * Generate a TLS ClientHello in wire-format from a `JA3` fingerprint.
+ * @param ja3_fingerprint The `JA3` fingerprint to use when creating the ClientHello message.
+ */
+std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja3_fingerprint);
+
 } // namespace Test
 } // namespace Tls
 } // namespace Envoy

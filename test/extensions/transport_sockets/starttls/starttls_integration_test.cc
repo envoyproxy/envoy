@@ -258,7 +258,6 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  ASSERT_THAT(test_server_->server().listenerManager().numConnections(), 1);
 
   Buffer::OwnedImpl buffer;
   buffer.add("hello");
@@ -326,7 +325,6 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromUpstream) {
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  ASSERT_THAT(test_server_->server().listenerManager().numConnections(), 1);
 
   Buffer::OwnedImpl buffer;
   buffer.add("hello");

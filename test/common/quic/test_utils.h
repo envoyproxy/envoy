@@ -83,7 +83,7 @@ public:
                        uint32_t send_buffer_limit)
       : quic::QuicSpdySession(connection, /*visitor=*/nullptr, config, supported_versions),
         QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
-                                        send_buffer_limit),
+                                        send_buffer_limit, {nullptr}),
         crypto_stream_(std::make_unique<TestQuicCryptoStream>(this)) {}
 
   void Initialize() override {

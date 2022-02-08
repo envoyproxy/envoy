@@ -502,6 +502,11 @@ public:
   virtual ~VirtualCluster() = default;
 
   /**
+   * @return the string name of the virtual cluster.
+   */
+  virtual const absl::optional<std::string>& name() const PURE;
+
+  /**
    * @return the stat-name of the virtual cluster.
    */
   virtual Stats::StatName statName() const PURE;
@@ -759,6 +764,18 @@ public:
                                       bool insert_envoy_original_path) const PURE;
 
   /**
+   * Returns the request header transforms that would be applied if finalizeRequestHeaders were
+   * called now. This is useful if you want to obtain request header transforms which was or will be
+   * applied through finalizeRequestHeaders call. Note: do not use unless you are sure that there
+   * will be no route modifications later in the filter chain.
+   * @param stream_info holds additional information about the request.
+   * @param do_formatting whether or not to evaluate configured transformations; if false, returns
+   * original values instead.
+   */
+  virtual Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                         bool do_formatting = true) const PURE;
+
+  /**
    * @return const HashPolicy* the optional hash policy for the route.
    */
   virtual const Http::HashPolicy* hashPolicy() const PURE;
@@ -869,6 +886,11 @@ public:
    * @return bool true if the :authority header should be overwritten with the upstream hostname.
    */
   virtual bool autoHostRewrite() const PURE;
+
+  /**
+   * @return bool true if the x-forwarded-host header should be updated.
+   */
+  virtual bool appendXfh() const PURE;
 
   /**
    * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
@@ -1299,7 +1321,6 @@ public:
   virtual void readDisable(bool disable) PURE;
   /**
    * Reset the stream. No events will fire beyond this point.
-   * @param reason supplies the reset reason.
    */
   virtual void resetStream() PURE;
 
@@ -1308,6 +1329,11 @@ public:
    * @param the account to assign the generic upstream.
    */
   virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
+
+  /**
+   * Get the bytes meter for this stream.
+   */
+  virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
 };
 
 using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;

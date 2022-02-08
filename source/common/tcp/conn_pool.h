@@ -217,6 +217,7 @@ public:
     callbacks->onPoolFailure(reason, failure_reason, host_description);
   }
 
+  bool enforceMaxRequests() const override { return false; }
   // These two functions exist for testing parity between old and new Tcp Connection Pools.
   virtual void onConnReleased(Envoy::ConnectionPool::ActiveClient&) {}
   virtual void onConnDestroyed() {}

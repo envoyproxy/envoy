@@ -50,12 +50,6 @@ public:
                                         std::move(transport_socket), options);
   }
 
-  Network::DnsResolverSharedPtr createDnsResolver(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-      const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) override {
-    return impl_.createDnsResolver(resolvers, dns_resolver_options);
-  }
-
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override {
     return impl_.createFileEvent(fd, cb, trigger, events);
@@ -66,9 +60,9 @@ public:
   }
 
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::TcpListenerCallbacks& cb,
-                                      bool bind_to_port) override {
-    return impl_.createListener(std::move(socket), cb, bind_to_port);
+                                      Network::TcpListenerCallbacks& cb, bool bind_to_port,
+                                      bool ignore_global_conn_limit) override {
+    return impl_.createListener(std::move(socket), cb, bind_to_port, ignore_global_conn_limit);
   }
 
   Network::UdpListenerPtr

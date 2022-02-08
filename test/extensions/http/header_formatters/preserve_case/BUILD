@@ -35,3 +35,17 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "preserve_case_formatter_reason_phrase_integration_test",
+    srcs = [
+        "preserve_case_formatter_reason_phrase_integration_test.cc",
+    ],
+    extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
+    deps = [
+        "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
+        "//test/integration:http_integration_lib",
+        "//test/integration:http_protocol_integration_lib",
+        "@envoy_api//envoy/extensions/http/header_formatters/preserve_case/v3:pkg_cc_proto",
+    ],
+)

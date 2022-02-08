@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/network/connection.h"
 #include "envoy/network/hash_policy.h"
 #include "envoy/type/v3/hash_policy.pb.h"
 
@@ -15,16 +16,12 @@ public:
   explicit HashPolicyImpl(const absl::Span<const envoy::type::v3::HashPolicy* const>& hash_policy);
 
   // Network::HashPolicy
-  absl::optional<uint64_t>
-  generateHash(const Network::Address::Instance* downstream_addr,
-               const Network::Address::Instance* upstream_addr) const override;
+  absl::optional<uint64_t> generateHash(const Network::Connection& connection) const override;
 
   class HashMethod {
   public:
     virtual ~HashMethod() = default;
-    virtual absl::optional<uint64_t>
-    evaluate(const Network::Address::Instance* downstream_addr,
-             const Network::Address::Instance* upstream_addr) const PURE;
+    virtual absl::optional<uint64_t> evaluate(const Network::Connection& connection) const PURE;
   };
 
   using HashMethodPtr = std::unique_ptr<HashMethod>;

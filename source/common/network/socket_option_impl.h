@@ -138,8 +138,7 @@ public:
   absl::optional<Details>
   getOptionDetails(const Socket& socket,
                    envoy::config::core::v3::SocketOption::SocketState state) const override;
-
-  bool isSupported() const;
+  bool isSupported() const override;
 
   /**
    * Set the option on the given socket.
@@ -161,8 +160,6 @@ private:
   // the buffer so its data() is not aligned in to alignof(void*).
   const std::vector<uint8_t> value_;
 };
-
-using SocketOptionImplOptRef = absl::optional<std::reference_wrapper<SocketOptionImpl>>;
 
 } // namespace Network
 } // namespace Envoy

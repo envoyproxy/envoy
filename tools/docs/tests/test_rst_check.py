@@ -341,7 +341,7 @@ def test_rst_checker_constructor():
 
 
 @pytest.mark.parametrize("errors", [[], ["err1", "err2"]])
-def test_rst_checker_check_current_version(patches, errors):
+async def test_rst_checker_check_current_version(patches, errors):
     checker = rst_check.RSTChecker("path1", "path2", "path3")
     patched = patches(
         "pathlib",
@@ -351,7 +351,7 @@ def test_rst_checker_check_current_version(patches, errors):
 
     with patched as (m_plib, m_version, m_error):
         m_version.return_value.run_checks.return_value = errors
-        checker.check_current_version()
+        assert not await checker.check_current_version()
 
     assert (
         list(m_plib.Path.call_args)

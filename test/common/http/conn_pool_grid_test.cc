@@ -88,6 +88,8 @@ public:
 
   ConnectionPool::Callbacks* callbacks(int index = 0) { return callbacks_[index]; }
 
+  bool isHttp3Confirmed() const { return http3_status_tracker_.isHttp3Confirmed(); }
+
   StreamInfo::MockStreamInfo* info_;
   NiceMock<MockRequestEncoder>* encoder_;
   void setDestroying() { destroying_ = true; }
@@ -161,9 +163,10 @@ TEST_F(ConnectivityGridTest, Success) {
 
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_.callbacks(), nullptr);
+  grid_.onHandshakeComplete();
+  EXPECT_TRUE(grid_.isHttp3Confirmed());
   EXPECT_CALL(callbacks_.pool_ready_, ready());
   grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
-  EXPECT_FALSE(grid_.isHttp3Broken());
 }
 
 // Test the first pool successfully connecting under the stack of newStream.
@@ -175,6 +178,7 @@ TEST_F(ConnectivityGridTest, ImmediateSuccess) {
   EXPECT_EQ(grid_.newStream(decoder_, callbacks_), nullptr);
   EXPECT_NE(grid_.first(), nullptr);
   EXPECT_FALSE(grid_.isHttp3Broken());
+  EXPECT_FALSE(grid_.isHttp3Confirmed());
 }
 
 // Test the first pool failing and the second connecting.
@@ -714,13 +718,32 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   ASSERT_TRUE(optional_it1.has_value());
   EXPECT_EQ("HTTP/3", (**optional_it1)->protocolDescription());
 
+  const bool supports_getifaddrs = Api::OsSysCallsSingleton::get().supportsGetifaddrs();
+  Api::InterfaceAddressVector interfaces{};
+  if (supports_getifaddrs) {
+    ASSERT_EQ(0, Api::OsSysCallsSingleton::get().getifaddrs(interfaces).return_value_);
+  }
+
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(supports_getifaddrs));
+  if (supports_getifaddrs) {
+    EXPECT_CALL(os_sys_calls, getifaddrs(_))
+        .WillOnce(
+            Invoke([&](Api::InterfaceAddressVector& interface_vector) -> Api::SysCallIntResult {
+              interface_vector.insert(interface_vector.begin(), interfaces.begin(),
+                                      interfaces.end());
+              return {0, 0};
+            }));
+  }
   EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillOnce(Return(Api::SysCallSocketResult{1, 0}));
 #if defined(__APPLE__) || defined(WIN32)
   EXPECT_CALL(os_sys_calls, setsocketblocking(1, false))
       .WillOnce(Return(Api::SysCallIntResult{1, 0}));
 #endif
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _))
+      .Times(testing::AtLeast(0u))
+      .WillRepeatedly(Return(0));
   EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{1, 0}));
   EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
   EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 101}));

@@ -355,9 +355,8 @@ TEST_F(EdsTest, EdsClusterFromFileIsPrimaryCluster) {
   EXPECT_TRUE(initialized_);
 }
 
-namespace {
-
-void endpointWeightChangeCausesRebuildTest(EdsTest& test, bool expect_rebuild) {
+// Verify that host weight changes cause a full rebuild.
+TEST_F(EdsTest, EndpointWeightChangeCausesRebuild) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   auto* endpoints = cluster_load_assignment.add_endpoints();
@@ -366,43 +365,26 @@ void endpointWeightChangeCausesRebuildTest(EdsTest& test, bool expect_rebuild) {
   endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
   endpoint->mutable_load_balancing_weight()->set_value(30);
 
-  test.initialize();
-  test.doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_TRUE(test.initialized_);
-  EXPECT_EQ(0UL, test.stats_.counter("cluster.name.update_no_rebuild").value());
-  EXPECT_EQ(30UL,
-            test.stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate)
-                .value());
-  auto& hosts = test.cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized_);
+  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(
+      30UL,
+      stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate).value());
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 1);
   EXPECT_EQ(hosts[0]->weight(), 30);
 
   endpoint->mutable_load_balancing_weight()->set_value(31);
-  test.doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_EQ(expect_rebuild ? 0UL : 1UL,
-            test.stats_.counter("cluster.name.update_no_rebuild").value());
-  EXPECT_EQ(31UL,
-            test.stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate)
-                .value());
-  auto& new_hosts = test.cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(
+      31UL,
+      stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate).value());
+  auto& new_hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(new_hosts.size(), 1);
   EXPECT_EQ(new_hosts[0]->weight(), 31);
-}
-
-} // namespace
-
-// Verify that host weight changes cause a full rebuild.
-TEST_F(EdsTest, EndpointWeightChangeCausesRebuild) {
-  endpointWeightChangeCausesRebuildTest(*this, true);
-}
-
-// Verify that host weight changes do not cause a full rebuild when the feature flag is disabled.
-TEST_F(EdsTest, EndpointWeightChangeCausesRebuildDisabled) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.upstream_host_weight_change_causes_rebuild", "false"}});
-
-  endpointWeightChangeCausesRebuildTest(*this, false);
 }
 
 // Validate that onConfigUpdate() updates the endpoint metadata.
@@ -1472,6 +1454,132 @@ TEST_F(EdsTest, EndpointLocality) {
     EXPECT_EQ("world", locality.sub_zone());
   }
   EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
+}
+
+// Validate that onConfigUpdate() updates the endpoint locality of an existing endpoint.
+TEST_F(EdsTest, EndpointLocalityUpdated) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  auto* locality = endpoints->mutable_locality();
+  locality->set_region("oceania");
+  locality->set_zone("hello");
+  locality->set_sub_zone("world");
+
+  {
+    auto* endpoint_address = endpoints->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+    endpoint_address->set_address("1.2.3.4");
+    endpoint_address->set_port_value(80);
+  }
+  {
+    auto* endpoint_address = endpoints->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+    endpoint_address->set_address("2.3.4.5");
+    endpoint_address->set_port_value(80);
+  }
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized_);
+
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 2);
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(0, hosts[i]->priority());
+    const auto& locality = hosts[i]->locality();
+    EXPECT_EQ("oceania", locality.region());
+    EXPECT_EQ("hello", locality.zone());
+    EXPECT_EQ("world", locality.sub_zone());
+  }
+  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
+
+  // Update locality now
+  locality->set_region("space");
+  locality->set_zone("station");
+  locality->set_sub_zone("mars");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  auto& updatedHosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(updatedHosts.size(), 2);
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(0, updatedHosts[i]->priority());
+    const auto& locality = updatedHosts[i]->locality();
+    EXPECT_EQ("space", locality.region());
+    EXPECT_EQ("station", locality.zone());
+    EXPECT_EQ("mars", locality.sub_zone());
+  }
+}
+
+// Validate that onConfigUpdate() does not update the endpoint locality if fix for the issue,
+// https://github.com/envoyproxy/envoy/issues/12392, is disabled.
+// Unlike EndpointLocalityUpdated, runtime feature flag is disabled this time and then it is
+// verified that locality update does not happen on eds cluster endpoints.
+TEST_F(EdsTest, EndpointLocalityNotUpdatedIfFixDisabled) {
+  Runtime::LoaderSingleton::initialize(&runtime_);
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints", "false"}});
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  auto* locality = endpoints->mutable_locality();
+  locality->set_region("oceania");
+  locality->set_zone("hello");
+  locality->set_sub_zone("world");
+
+  {
+    auto* endpoint_address = endpoints->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+    endpoint_address->set_address("1.2.3.4");
+    endpoint_address->set_port_value(80);
+  }
+  {
+    auto* endpoint_address = endpoints->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+    endpoint_address->set_address("2.3.4.5");
+    endpoint_address->set_port_value(80);
+  }
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized_);
+
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 2);
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(0, hosts[i]->priority());
+    const auto& locality = hosts[i]->locality();
+    EXPECT_EQ("oceania", locality.region());
+    EXPECT_EQ("hello", locality.zone());
+    EXPECT_EQ("world", locality.sub_zone());
+  }
+  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
+
+  // Update locality now
+  locality->set_region("space");
+  locality->set_zone("station");
+  locality->set_sub_zone("mars");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  // runtime flag is disabled, verify that locality does not get updated
+  auto& updatedHosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(updatedHosts.size(), 2);
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(0, updatedHosts[i]->priority());
+    const auto& locality = updatedHosts[i]->locality();
+    EXPECT_EQ("oceania", locality.region());
+    EXPECT_EQ("hello", locality.zone());
+    EXPECT_EQ("world", locality.sub_zone());
+  }
+  Runtime::LoaderSingleton::clear();
 }
 
 // Validate that onConfigUpdate() does not propagate locality weights to the host set when

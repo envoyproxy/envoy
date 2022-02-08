@@ -13,11 +13,9 @@ constexpr absl::string_view text{"application/grpc-web-text"};
 constexpr absl::string_view binary{"application/grpc-web"};
 constexpr uint64_t MAX_BUFFERED_PLAINTEXT_LENGTH = 16384;
 
-using SkipEncodingEmptyTrailers = bool;
 using ContentType = std::string;
 using Accept = std::string;
-using TestParams = std::tuple<Network::Address::IpVersion, Http::CodecType,
-                              SkipEncodingEmptyTrailers, ContentType, Accept>;
+using TestParams = std::tuple<Network::Address::IpVersion, Http::CodecType, ContentType, Accept>;
 
 class GrpcWebFilterIntegrationTest : public testing::TestWithParam<TestParams>,
                                      public HttpIntegrationTest {
@@ -33,19 +31,10 @@ public:
   void initialize() override {
     if (downstream_protocol_ == Http::CodecType::HTTP1) {
       config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
-    } else {
-      skipEncodingEmptyTrailers(http2_skip_encoding_empty_trailers_);
     }
-
     setUpstreamProtocol(Http::CodecType::HTTP2);
 
     HttpIntegrationTest::initialize();
-  }
-
-  void skipEncodingEmptyTrailers(SkipEncodingEmptyTrailers http2_skip_encoding_empty_trailers) {
-    config_helper_.addRuntimeOverride(
-        "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
-        http2_skip_encoding_empty_trailers ? "true" : "false");
   }
 
   void setLocalReplyConfig(const std::string& yaml) {
@@ -134,27 +123,23 @@ public:
 
   static std::string testParamsToString(const testing::TestParamInfo<TestParams> params) {
     return fmt::format(
-        "{}_{}_{}_{}_{}",
+        "{}_{}_{}_{}",
         TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
             std::get<0>(params.param), params.index)),
         std::get<1>(params.param) == Http::CodecType::HTTP2 ? "Http2" : "Http",
-        std::get<2>(params.param) ? "SkipEncodingEmptyTrailers" : "SubmitEncodingEmptyTrailers",
-        std::get<3>(params.param) == text ? "SendText" : "SendBinary",
-        std::get<4>(params.param) == text ? "AcceptText" : "AcceptBinary");
+        std::get<2>(params.param) == text ? "SendText" : "SendBinary",
+        std::get<3>(params.param) == text ? "AcceptText" : "AcceptBinary");
   }
 
   const Envoy::Http::CodecType downstream_protocol_{std::get<1>(GetParam())};
-  const bool http2_skip_encoding_empty_trailers_{std::get<2>(GetParam())};
-  const ContentType content_type_{std::get<3>(GetParam())};
-  const Accept accept_{std::get<4>(GetParam())};
+  const ContentType content_type_{std::get<2>(GetParam())};
+  const Accept accept_{std::get<3>(GetParam())};
 };
 
 INSTANTIATE_TEST_SUITE_P(
     Params, GrpcWebFilterIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2),
-                     testing::Values(SkipEncodingEmptyTrailers{true},
-                                     SkipEncodingEmptyTrailers{false}),
                      testing::Values(ContentType{text}, ContentType{binary}),
                      testing::Values(Accept{text}, Accept{binary})),
     GrpcWebFilterIntegrationTest::testParamsToString);
@@ -206,15 +191,9 @@ TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
   }
 
   if (downstream_protocol_ == Http::CodecType::HTTP2) {
-    if (http2_skip_encoding_empty_trailers_) {
-      // When the downstream protocol is HTTP/2 and the feature-flag to skip encoding empty trailers
-      // is turned on, expect that the trailers are included in the response-body.
-      EXPECT_EQ(nullptr, response->trailers());
-    } else {
-      // Otherwise, we send empty trailers.
-      ASSERT_NE(nullptr, response->trailers());
-      EXPECT_TRUE(response->trailers()->empty());
-    }
+    // When the downstream protocol is HTTP/2 expect that the trailers are included in the
+    // response-body.
+    EXPECT_EQ(nullptr, response->trailers());
   }
 }
 

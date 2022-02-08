@@ -48,10 +48,14 @@ TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
 TEST_P(AdminInstanceTest, Getters) {
   EXPECT_EQ(&admin_.mutableSocket(), &admin_.socket());
   EXPECT_EQ(1, admin_.concurrency());
-  EXPECT_EQ(false, admin_.preserveExternalRequestId());
+  EXPECT_FALSE(admin_.preserveExternalRequestId());
   EXPECT_EQ(nullptr, admin_.tracer());
-  EXPECT_EQ(false, admin_.streamErrorOnInvalidHttpMessaging());
-  EXPECT_EQ(false, admin_.schemeToSet().has_value());
+  EXPECT_FALSE(admin_.streamErrorOnInvalidHttpMessaging());
+  EXPECT_FALSE(admin_.schemeToSet().has_value());
+  EXPECT_EQ(admin_.pathWithEscapedSlashesAction(),
+            envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::KEEP_UNCHANGED);
+  EXPECT_NE(nullptr, admin_.scopedRouteConfigProvider());
 }
 
 TEST_P(AdminInstanceTest, WriteAddressToFile) {
@@ -63,7 +67,7 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 
 TEST_P(AdminInstanceTest, AdminAddress) {
   std::string address_out_path = TestEnvironment::temporaryPath("admin.address");
-  AdminImpl admin_address_out_path(cpu_profile_path_, server_);
+  AdminImpl admin_address_out_path(cpu_profile_path_, server_, false);
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
@@ -78,7 +82,7 @@ TEST_P(AdminInstanceTest, AdminAddress) {
 
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
-  AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_);
+  AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_, false);
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(

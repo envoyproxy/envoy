@@ -58,24 +58,6 @@ std::ostream& operator<<(std::ostream& os, const ResponseCacheControl& response_
   return os << s;
 }
 
-std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {
-  switch (status) {
-  case CacheEntryStatus::Ok:
-    return os << "Ok";
-  case CacheEntryStatus::Unusable:
-    return os << "Unusable";
-  case CacheEntryStatus::RequiresValidation:
-    return os << "RequiresValidation";
-  case CacheEntryStatus::FoundNotModified:
-    return os << "FoundNotModified";
-  case CacheEntryStatus::SatisfiableRange:
-    return os << "SatisfiableRange";
-  case CacheEntryStatus::NotSatisfiableRange:
-    return os << "NotSatisfiableRange";
-  }
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
 std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range) {
   return os << "[" << range.begin() << "," << range.end() << ")";
 }

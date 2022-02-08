@@ -44,7 +44,7 @@ typed_config:
   log_format:
     text_format_source:
       inline_string: "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE%
-      %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %REQ(:AUTHORITY)% %UPSTREAM_HOST%
+      %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% %UPSTREAM_WIRE_BYTES_SENT% %REQ(:AUTHORITY)% %UPSTREAM_HOST%
       %UPSTREAM_LOCAL_ADDRESS% %RESP(X-UPSTREAM-HEADER)% %TRAILER(X-TRAILER)%\n"
   path: "/dev/null"
   )EOF";
@@ -89,6 +89,8 @@ public:
     ON_CALL(*cluster_info_, name()).WillByDefault(ReturnRef(cluster_name));
     ON_CALL(*cluster_info_, observabilityName()).WillByDefault(ReturnRef(cluster_name));
     ON_CALL(callbacks_.stream_info_, upstreamClusterInfo()).WillByDefault(Return(cluster_info_));
+    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_).Times(testing::AnyNumber());
+    callbacks_.dispatcher_.delete_immediately_ = true;
 
     if (upstream_log) {
       ON_CALL(*context_.access_log_manager_.file_, write(_))
@@ -232,7 +234,9 @@ public:
         new Http::TestResponseHeaderMapImpl{{":status", "200"}});
     EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
                 putHttpResponseCode(200));
-    response_decoder->decodeHeaders(std::move(response_headers), true);
+    if (response_decoder != nullptr) {
+      response_decoder->decodeHeaders(std::move(response_headers), true);
+    }
   }
 
   std::vector<std::string> output_;
@@ -268,7 +272,8 @@ TEST_F(RouterUpstreamLogTest, LogSingleTry) {
   run();
 
   EXPECT_EQ(output_.size(), 1U);
-  EXPECT_EQ(output_.front(), "GET / HTTP/1.0 200 - 0 0 host 10.0.0.5:9211 10.0.0.5:10211 - -\n");
+  EXPECT_EQ(output_.front(),
+            "GET / HTTP/1.0 200 - 0 0 0 0 host 10.0.0.5:9211 10.0.0.5:10211 - -\n");
 }
 
 TEST_F(RouterUpstreamLogTest, LogRetries) {
@@ -276,8 +281,8 @@ TEST_F(RouterUpstreamLogTest, LogRetries) {
   runWithRetry();
 
   EXPECT_EQ(output_.size(), 2U);
-  EXPECT_EQ(output_.front(), "GET / HTTP/1.0 0 UT 0 0 host 10.0.0.5:9211 10.0.0.5:10211 - -\n");
-  EXPECT_EQ(output_.back(), "GET / HTTP/1.0 200 - 0 0 host 10.0.0.5:9211 10.0.0.5:10212 - -\n");
+  EXPECT_EQ(output_.front(), "GET / HTTP/1.0 0 UT 0 0 0 0 host 10.0.0.5:9211 10.0.0.5:10211 - -\n");
+  EXPECT_EQ(output_.back(), "GET / HTTP/1.0 200 - 0 0 0 0 host 10.0.0.5:9211 10.0.0.5:10212 - -\n");
 }
 
 TEST_F(RouterUpstreamLogTest, LogFailure) {
@@ -285,7 +290,8 @@ TEST_F(RouterUpstreamLogTest, LogFailure) {
   run(503, {}, {}, {});
 
   EXPECT_EQ(output_.size(), 1U);
-  EXPECT_EQ(output_.front(), "GET / HTTP/1.0 503 - 0 0 host 10.0.0.5:9211 10.0.0.5:10211 - -\n");
+  EXPECT_EQ(output_.front(),
+            "GET / HTTP/1.0 503 - 0 0 0 0 host 10.0.0.5:9211 10.0.0.5:10211 - -\n");
 }
 
 TEST_F(RouterUpstreamLogTest, LogHeaders) {
@@ -295,7 +301,7 @@ TEST_F(RouterUpstreamLogTest, LogHeaders) {
 
   EXPECT_EQ(output_.size(), 1U);
   EXPECT_EQ(output_.front(),
-            "GET /foo HTTP/1.0 200 - 0 0 host 10.0.0.5:9211 10.0.0.5:10211 abcdef value\n");
+            "GET /foo HTTP/1.0 200 - 0 0 0 0 host 10.0.0.5:9211 10.0.0.5:10211 abcdef value\n");
 }
 
 // Test timestamps and durations are emitted.

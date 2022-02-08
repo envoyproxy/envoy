@@ -73,6 +73,19 @@ public:
 };
 
 /**
+ * Implementation of LoadMetricStats.
+ */
+class LoadMetricStatsImpl : public LoadMetricStats {
+public:
+  void add(const absl::string_view key, double value) override;
+  StatMapPtr latch() override;
+
+private:
+  absl::Mutex mu_;
+  StatMapPtr map_ ABSL_GUARDED_BY(mu_);
+};
+
+/**
  * Implementation of Upstream::HostDescription.
  */
 class HostDescriptionImpl : virtual public HostDescription,
@@ -133,6 +146,7 @@ public:
     return *null_outlier_detector;
   }
   HostStats& stats() const override { return stats_; }
+  LoadMetricStats& loadMetricStats() const override { return load_metric_stats_; }
   const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
   const std::string& hostname() const override { return hostname_; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
@@ -185,6 +199,7 @@ private:
   const envoy::config::core::v3::Locality locality_;
   Stats::StatNameDynamicStorage locality_zone_stat_name_;
   mutable HostStats stats_;
+  mutable LoadMetricStatsImpl load_metric_stats_;
   Outlier::DetectorHostMonitorPtr outlier_detector_;
   HealthCheckHostMonitorPtr health_checker_;
   std::atomic<uint32_t> priority_;
@@ -613,6 +628,9 @@ public:
   const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
     return idle_timeout_;
   }
+  const absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
+    return max_connection_duration_;
+  }
   float perUpstreamPreconnectRatio() const override { return per_upstream_preconnect_ratio_; }
   float peekaheadRatio() const override { return peekahead_ratio_; }
   uint32_t perConnectionBufferLimitBytes() const override {
@@ -631,6 +649,7 @@ public:
   const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
     return http_protocol_options_->common_http_protocol_options_;
   }
+  void configureLbPolicies(const envoy::config::cluster::v3::Cluster& config);
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
   LoadBalancerType lbType() const override { return lb_type_; }
@@ -769,6 +788,7 @@ private:
   const uint32_t max_response_headers_count_;
   const std::chrono::milliseconds connect_timeout_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
+  absl::optional<std::chrono::milliseconds> max_connection_duration_;
   const float per_upstream_preconnect_ratio_;
   const float peekahead_ratio_;
   const uint32_t per_connection_buffer_limit_bytes_;

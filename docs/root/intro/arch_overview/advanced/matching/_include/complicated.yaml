@@ -90,11 +90,3 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 8080
-
-layered_runtime:
-  layers:
-  - name: static-layer
-    static_layer:
-      envoy:
-        reloadable_features:
-          experimental_matching_api: true

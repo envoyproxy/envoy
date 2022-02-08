@@ -88,8 +88,6 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -102,14 +100,39 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/stats:stats_lib",
-        "//source/server:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
-        "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/api:api_mocks",
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:network_utility_lib",
-        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "active_internal_listener_test",
+    srcs = ["active_internal_listener_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:listen_socket_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/stats:stats_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/server:connection_handler_lib",
+        "//test/mocks/network:network_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "active_udp_listener_test",
+    srcs = ["active_udp_listener_test.cc"],
+    deps = [
+        "//source/common/network:listen_socket_lib",
+        "//source/common/network:socket_option_factory_lib",
+        "//source/common/network:udp_packet_writer_handler_lib",
+        "//source/server:active_udp_listener",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
     ],
 )
 
@@ -413,8 +436,6 @@ envoy_cc_test(
         "//source/extensions/filters/http/health_check:config",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
-        "//source/extensions/filters/network/redis_proxy:config",
-        "//source/extensions/stat_sinks/statsd:config",
         "//source/extensions/tracers/zipkin:config",
         "//source/server:process_context_lib",
         "//source/server:server_lib",

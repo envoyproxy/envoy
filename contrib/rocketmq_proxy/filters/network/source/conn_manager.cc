@@ -198,7 +198,7 @@ void ConnectionManager::onHeartbeat(RemotingCommandPtr request) {
 void ConnectionManager::addOrUpdateGroupMember(absl::string_view group,
                                                absl::string_view client_id) {
   ENVOY_LOG(trace, "#addOrUpdateGroupMember. Group: {}, client ID: {}", group, client_id);
-  auto search = group_members_.find(std::string(group.data(), group.length()));
+  auto search = group_members_.find(group);
   if (search == group_members_.end()) {
     std::vector<ConsumerGroupMember> members;
     members.emplace_back(ConsumerGroupMember(client_id, *this));

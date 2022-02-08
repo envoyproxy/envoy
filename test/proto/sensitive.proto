@@ -10,7 +10,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 
 import "udpa/annotations/sensitive.proto";
-import "udpa/type/v1/typed_struct.proto";
+import "xds/type/v3/typed_struct.proto";
 
 message Sensitive {
   string sensitive_string = 1 [(udpa.annotations.sensitive) = true];
@@ -23,8 +23,8 @@ message Sensitive {
   repeated Sensitive sensitive_repeated_message = 8 [(udpa.annotations.sensitive) = true];
   google.protobuf.Any sensitive_any = 9 [(udpa.annotations.sensitive) = true];
   repeated google.protobuf.Any sensitive_repeated_any = 10 [(udpa.annotations.sensitive) = true];
-  udpa.type.v1.TypedStruct sensitive_typed_struct = 11 [(udpa.annotations.sensitive) = true];
-  repeated udpa.type.v1.TypedStruct sensitive_repeated_typed_struct = 12
+  xds.type.v3.TypedStruct sensitive_typed_struct = 11 [(udpa.annotations.sensitive) = true];
+  repeated xds.type.v3.TypedStruct sensitive_repeated_typed_struct = 12
       [(udpa.annotations.sensitive) = true];
   map<string, string> sensitive_string_map = 13 [(udpa.annotations.sensitive) = true];
   map<string, int64> sensitive_int_map = 14 [(udpa.annotations.sensitive) = true];
@@ -39,8 +39,8 @@ message Sensitive {
   repeated Sensitive insensitive_repeated_message = 108;
   google.protobuf.Any insensitive_any = 109;
   repeated google.protobuf.Any insensitive_repeated_any = 110;
-  udpa.type.v1.TypedStruct insensitive_typed_struct = 111;
-  repeated udpa.type.v1.TypedStruct insensitive_repeated_typed_struct = 112;
+  xds.type.v3.TypedStruct insensitive_typed_struct = 111;
+  repeated xds.type.v3.TypedStruct insensitive_repeated_typed_struct = 112;
   map<string, string> insensitive_string_map = 113;
   map<string, int64> insensitive_int_map = 114;
 }

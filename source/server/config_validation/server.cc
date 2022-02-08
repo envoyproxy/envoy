@@ -82,7 +82,7 @@ void ValidationInstance::initialize(const Options& options,
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
-  Config::Utility::createTagProducer(bootstrap_);
+  Config::Utility::createTagProducer(bootstrap_, options_.statsTags());
   if (!bootstrap_.node().user_agent_build_version().has_version()) {
     *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
   }

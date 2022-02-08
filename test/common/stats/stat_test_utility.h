@@ -155,10 +155,25 @@ public:
   GaugeOptConstRef findGaugeByString(const std::string& name) const;
   HistogramOptConstRef findHistogramByString(const std::string& name) const;
 
+  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
+    histogram_values_map_[histogram.name()].push_back(value);
+  }
+
+  std::vector<uint64_t> histogramValues(const std::string& name, bool clear) {
+    auto it = histogram_values_map_.find(name);
+    ASSERT(it != histogram_values_map_.end(), absl::StrCat("Couldn't find histogram ", name));
+    std::vector<uint64_t> copy = it->second;
+    if (clear) {
+      it->second.clear();
+    }
+    return copy;
+  }
+
 private:
   absl::flat_hash_map<std::string, Counter*> counter_map_;
   absl::flat_hash_map<std::string, Gauge*> gauge_map_;
   absl::flat_hash_map<std::string, Histogram*> histogram_map_;
+  absl::flat_hash_map<std::string, std::vector<uint64_t>> histogram_values_map_;
 };
 
 // Compares the memory consumed against an exact expected value, but only on

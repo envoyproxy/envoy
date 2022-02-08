@@ -11,9 +11,10 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class DeltaSubscriptionImplTest : public DeltaSubscriptionTestHarness, public testing::Test {
+class DeltaSubscriptionImplTest : public DeltaSubscriptionTestHarness,
+                                  public testing::TestWithParam<LegacyOrUnified> {
 protected:
-  DeltaSubscriptionImplTest() = default;
+  DeltaSubscriptionImplTest() : DeltaSubscriptionTestHarness(GetParam()){};
 
   // We need to destroy the subscription before the test's destruction, because the subscription's
   // destructor removes its watch from the NewGrpcMuxImpl, and that removal process involves
@@ -21,7 +22,10 @@ protected:
   void TearDown() override { doSubscriptionTearDown(); }
 };
 
-TEST_F(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
+INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionImplTest, DeltaSubscriptionImplTest,
+                         testing::ValuesIn({LegacyOrUnified::Legacy, LegacyOrUnified::Unified}));
+
+TEST_P(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
   startSubscription({"name1", "name2", "name3"});
   expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   subscription_->updateResourceInterest({"name3", "name4"});
@@ -39,7 +43,7 @@ TEST_F(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
 // Also demonstrates the collapsing of subscription interest updates into a single
 // request. (This collapsing happens any time multiple updates arrive before a request
 // can be sent, not just with pausing: rate limiting or a down gRPC stream would also do it).
-TEST_F(DeltaSubscriptionImplTest, PauseHoldsRequest) {
+TEST_P(DeltaSubscriptionImplTest, PauseHoldsRequest) {
   startSubscription({"name1", "name2", "name3"});
   auto resume_sub = subscription_->pause();
   // If nested pause wasn't handled correctly, the single expectedSendMessage below would be
@@ -56,14 +60,14 @@ TEST_F(DeltaSubscriptionImplTest, PauseHoldsRequest) {
   subscription_->updateResourceInterest({"name3", "name4"});
 }
 
-TEST_F(DeltaSubscriptionImplTest, ResponseCausesAck) {
+TEST_P(DeltaSubscriptionImplTest, ResponseCausesAck) {
   startSubscription({"name1"});
   deliverConfigUpdate({"name1"}, "someversion", true);
 }
 
 // Checks that after a pause(), no ACK requests are sent until resume(), but that after the
 // resume, *all* ACKs that arrived during the pause are sent (in order).
-TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
+TEST_P(DeltaSubscriptionImplTest, PauseQueuesAcks) {
   startSubscription({"name1", "name2", "name3"});
   auto resume_sub = subscription_->pause();
   // The server gives us our first version of resource name1.
@@ -77,8 +81,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
-        ->onDiscoveryResponse(std::move(message), control_plane_stats_);
+    onDiscoveryResponse(std::move(message));
   }
   // The server gives us our first version of resource name2.
   // subscription_ now wants to ACK name1 and then name2 (but can't due to pause).
@@ -91,8 +94,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
-        ->onDiscoveryResponse(std::move(message), control_plane_stats_);
+    onDiscoveryResponse(std::move(message));
   }
   // The server gives us an updated version of resource name1.
   // subscription_ now wants to ACK name1A, then name2, then name1B (but can't due to pause).
@@ -105,8 +107,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
-        ->onDiscoveryResponse(std::move(message), control_plane_stats_);
+    onDiscoveryResponse(std::move(message));
   }
   // All ACK sendMessage()s will happen upon calling resume().
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
@@ -122,7 +123,11 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
   // in the correct order.
 }
 
-TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
+class DeltaSubscriptionNoGrpcStreamTest : public testing::TestWithParam<LegacyOrUnified> {};
+INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionNoGrpcStreamTest, DeltaSubscriptionNoGrpcStreamTest,
+                         testing::ValuesIn({LegacyOrUnified::Legacy, LegacyOrUnified::Unified}));
+
+TEST_P(DeltaSubscriptionNoGrpcStreamTest, NoGrpcStream) {
   Stats::IsolatedStoreImpl stats_store;
   SubscriptionStats stats(Utility::generateStats(stats_store));
 
@@ -141,9 +146,16 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
   const Protobuf::MethodDescriptor* method_descriptor =
       Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints");
-  NewGrpcMuxImplSharedPtr xds_context = std::make_shared<NewGrpcMuxImpl>(
-      std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor, random,
-      stats_store, rate_limit_settings, local_info);
+  GrpcMuxSharedPtr xds_context;
+  if (GetParam() == LegacyOrUnified::Unified) {
+    xds_context = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
+        std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,
+        random, stats_store, rate_limit_settings, local_info, false);
+  } else {
+    xds_context = std::make_shared<NewGrpcMuxImpl>(
+        std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,
+        random, stats_store, rate_limit_settings, local_info);
+  }
 
   GrpcSubscriptionImplPtr subscription = std::make_unique<GrpcSubscriptionImpl>(
       xds_context, callbacks, resource_decoder, stats, Config::TypeUrl::get().ClusterLoadAssignment,

@@ -107,7 +107,8 @@ LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_p
   }
 
   // The percentages should always add up to 100 but we have to have a return for the compiler.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("unexpected load error");
+  return {0, HostAvailability::Healthy};
 }
 
 LoadBalancerBase::LoadBalancerBase(
@@ -747,9 +748,8 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
     return host_set.healthyHostsPerLocality().get()[hosts_source.locality_index_];
   case HostsSource::SourceType::LocalityDegradedHosts:
     return host_set.degradedHostsPerLocality().get()[hosts_source.locality_index_];
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 EdfLoadBalancerBase::EdfLoadBalancerBase(
@@ -959,7 +959,7 @@ double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host&
     aggression_ = aggression_runtime_ != absl::nullopt ? aggression_runtime_.value().value() : 1.0;
     if (aggression_ < 0.0) {
       ENVOY_LOG_EVERY_POW_2(error, "Invalid runtime value provided for aggression parameter, "
-                                   "agression cannot be less than 0.0");
+                                   "aggression cannot be less than 0.0");
     }
     aggression_ = std::max(0.0, aggression_);
 

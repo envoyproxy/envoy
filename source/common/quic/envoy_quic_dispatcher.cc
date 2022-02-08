@@ -61,12 +61,12 @@ void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_i
 std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
     quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
     const quic::QuicSocketAddress& peer_address, absl::string_view /*alpn*/,
-    const quic::ParsedQuicVersion& version, absl::string_view sni) {
+    const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo) {
   quic::QuicConfig quic_config = config();
   // TODO(danzh) use passed-in ALPN instead of hard-coded h3 after proof source interfaces takes in
   // ALPN.
   Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
-      listen_socket_.ioHandle(), self_address, peer_address, std::string(sni), "h3");
+      listen_socket_.ioHandle(), self_address, peer_address, std::string(parsed_chlo.sni), "h3");
   const Network::FilterChain* filter_chain =
       listener_config_->filterChainManager().findFilterChain(*connection_socket);
 

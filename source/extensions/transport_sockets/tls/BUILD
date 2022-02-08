@@ -31,6 +31,7 @@ envoy_cc_library(
     srcs = ["connection_info_impl_base.cc"],
     hdrs = ["connection_info_impl_base.h"],
     external_deps = ["ssl"],
+    visibility = ["//visibility:public"],
     deps = [
         ":context_lib",
         ":utility_lib",

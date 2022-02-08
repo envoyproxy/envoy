@@ -37,14 +37,24 @@
 #include "test/test_common/utility.h"
 
 #include "absl/container/node_hash_set.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
+#include "xds/type/v3/typed_struct.pb.h"
 
 using namespace std::chrono_literals;
 
 namespace Envoy {
 
-using testing::HasSubstr;
+using ::testing::HasSubstr;
+
+bool checkProtoEquality(const ProtobufWkt::Value& proto1, std::string text_proto2) {
+  ProtobufWkt::Value proto2;
+  if (!Protobuf::TextFormat::ParseFromString(text_proto2, &proto2)) {
+    return false;
+  }
+  return Envoy::Protobuf::util::MessageDifferencer::Equals(proto1, proto2);
+}
 
 class RuntimeStatsHelper : public TestScopedRuntime {
 public:
@@ -178,9 +188,11 @@ TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   Protobuf::RepeatedPtrField<ProtobufWkt::UInt32Value> repeated;
   EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));
   repeated.Add()->set_value(10);
-  EXPECT_EQ("[value: 10\n]", RepeatedPtrUtil::debugString(repeated));
+  EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
+              testing::ContainsRegex("\\[value:\\s*10\n\\]"));
   repeated.Add()->set_value(20);
-  EXPECT_EQ("[value: 10\n, value: 20\n]", RepeatedPtrUtil::debugString(repeated));
+  EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
+              testing::ContainsRegex("\\[value:\\s*10\n, value:\\s*20\n\\]"));
 }
 
 // Validated exception thrown when downcastAndValidate observes a PGV failures.
@@ -999,35 +1011,40 @@ insensitive_repeated_typed_struct:
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+template <typename T> class TypedStructUtilityTest : public ProtobufUtilityTest {};
+
+using TypedStructTypes = ::testing::Types<xds::type::v3::TypedStruct, udpa::type::v1::TypedStruct>;
+TYPED_TEST_SUITE(TypedStructUtilityTest, TypedStructTypes);
+
 // Empty `TypedStruct` can be trivially redacted.
-TEST_F(ProtobufUtilityTest, RedactEmptyTypedStruct) {
-  udpa::type::v1::TypedStruct actual;
+TYPED_TEST(TypedStructUtilityTest, RedactEmptyTypedStruct) {
+  TypeParam actual;
   TestUtility::loadFromYaml(R"EOF(
 type_url: type.googleapis.com/envoy.test.Sensitive
 )EOF",
                             actual);
 
-  udpa::type::v1::TypedStruct expected = actual;
+  TypeParam expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
-TEST_F(ProtobufUtilityTest, RedactTypedStructWithNoTypeUrl) {
-  udpa::type::v1::TypedStruct actual;
+TYPED_TEST(TypedStructUtilityTest, RedactTypedStructWithNoTypeUrl) {
+  TypeParam actual;
   TestUtility::loadFromYaml(R"EOF(
 value:
   sensitive_string: This field is sensitive, but we have no way of knowing.
 )EOF",
                             actual);
 
-  udpa::type::v1::TypedStruct expected = actual;
+  TypeParam expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
 // Messages packed into `TypedStruct` with unknown type URLs are skipped.
-TEST_F(ProtobufUtilityTest, RedactTypedStructWithUnknownTypeUrl) {
-  udpa::type::v1::TypedStruct actual;
+TYPED_TEST(TypedStructUtilityTest, RedactTypedStructWithUnknownTypeUrl) {
+  TypeParam actual;
   TestUtility::loadFromYaml(R"EOF(
 type_url: type.googleapis.com/envoy.unknown.Message
 value:
@@ -1035,14 +1052,14 @@ value:
 )EOF",
                             actual);
 
-  udpa::type::v1::TypedStruct expected = actual;
+  TypeParam expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
-TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlTypedStruct) {
-  udpa::type::v1::TypedStruct actual;
-  udpa::type::v1::TypedStruct expected = actual;
+TYPED_TEST(TypedStructUtilityTest, RedactEmptyTypeUrlTypedStruct) {
+  TypeParam actual;
+  TypeParam expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
@@ -1222,25 +1239,28 @@ TEST_F(ProtobufUtilityTest, MessageUtilLoadYamlDouble) {
 }
 
 TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlScalar) {
-  EXPECT_EQ(ValueUtil::loadFromYaml("null").ShortDebugString(), "null_value: NULL_VALUE");
-  EXPECT_EQ(ValueUtil::loadFromYaml("true").ShortDebugString(), "bool_value: true");
-  EXPECT_EQ(ValueUtil::loadFromYaml("1").ShortDebugString(), "number_value: 1");
-  EXPECT_EQ(ValueUtil::loadFromYaml("9223372036854775807").ShortDebugString(),
-            "string_value: \"9223372036854775807\"");
-  EXPECT_EQ(ValueUtil::loadFromYaml("\"foo\"").ShortDebugString(), "string_value: \"foo\"");
-  EXPECT_EQ(ValueUtil::loadFromYaml("foo").ShortDebugString(), "string_value: \"foo\"");
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("null"), "null_value: NULL_VALUE"));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("true"), "bool_value: true"));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("1"), "number_value: 1"));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("9223372036854775807"),
+                                 "string_value: \"9223372036854775807\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("\"foo\""), "string_value: \"foo\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("foo"), "string_value: \"foo\""));
 }
 
 TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObject) {
-  EXPECT_EQ(ValueUtil::loadFromYaml("[foo, bar]").ShortDebugString(),
-            "list_value { values { string_value: \"foo\" } values { string_value: \"bar\" } }");
-  EXPECT_EQ(ValueUtil::loadFromYaml("foo: bar").ShortDebugString(),
-            "struct_value { fields { key: \"foo\" value { string_value: \"bar\" } } }");
+  EXPECT_TRUE(checkProtoEquality(
+      ValueUtil::loadFromYaml("[foo, bar]"),
+      "list_value { values { string_value: \"foo\" } values { string_value: \"bar\" } }"));
+  EXPECT_TRUE(checkProtoEquality(
+      ValueUtil::loadFromYaml("foo: bar"),
+      "struct_value { fields { key: \"foo\" value { string_value: \"bar\" } } }"));
 }
 
 TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObjectWithIgnoredEntries) {
-  EXPECT_EQ(ValueUtil::loadFromYaml("!ignore foo: bar\nbaz: qux").ShortDebugString(),
-            "struct_value { fields { key: \"baz\" value { string_value: \"qux\" } } }");
+  EXPECT_TRUE(checkProtoEquality(
+      ValueUtil::loadFromYaml("!ignore foo: bar\nbaz: qux"),
+      "struct_value { fields { key: \"baz\" value { string_value: \"qux\" } } }"));
 }
 
 TEST(LoadFromYamlExceptionTest, BadConversion) {
@@ -1457,9 +1477,13 @@ TEST_F(ProtobufUtilityTest, JsonConvertFail) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(-281474976710656);
   ProtobufWkt::Struct dest_struct;
+  std::string expected_duration_text = R"pb(seconds: -281474976710656)pb";
+  ProtobufWkt::Duration expected_duration_proto;
+  Protobuf::TextFormat::ParseFromString(expected_duration_text, &expected_duration_proto);
   EXPECT_THROW_WITH_REGEX(TestUtility::jsonConvert(source_duration, dest_struct), EnvoyException,
-                          "Unable to convert protobuf message to JSON string.*"
-                          "seconds exceeds limit for field:  seconds: -281474976710656\n");
+                          fmt::format("Unable to convert protobuf message to JSON string.*"
+                                      "seconds exceeds limit for field:  {}",
+                                      expected_duration_proto.DebugString()));
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/3665.
@@ -1480,14 +1504,14 @@ TEST_F(ProtobufUtilityTest, JsonConvertCamelSnake) {
                        .string_value());
 }
 
-// Test the jsonConvertValue happy path. Failure modes are converted by jsonConvert tests.
+// Test the jsonConvertValue in both success and failure modes.
 TEST_F(ProtobufUtilityTest, JsonConvertValueSuccess) {
   {
     envoy::config::bootstrap::v3::Bootstrap source;
     source.set_flags_path("foo");
     ProtobufWkt::Value tmp;
     envoy::config::bootstrap::v3::Bootstrap dest;
-    MessageUtil::jsonConvertValue(source, tmp);
+    EXPECT_TRUE(MessageUtil::jsonConvertValue(source, tmp));
     TestUtility::jsonConvert(tmp, dest);
     EXPECT_EQ("foo", dest.flags_path());
   }
@@ -1496,11 +1520,18 @@ TEST_F(ProtobufUtilityTest, JsonConvertValueSuccess) {
     ProtobufWkt::StringValue source;
     source.set_value("foo");
     ProtobufWkt::Value dest;
-    MessageUtil::jsonConvertValue(source, dest);
+    EXPECT_TRUE(MessageUtil::jsonConvertValue(source, dest));
 
     ProtobufWkt::Value expected;
     expected.set_string_value("foo");
     EXPECT_THAT(dest, ProtoEq(expected));
+  }
+
+  {
+    ProtobufWkt::Duration source;
+    source.set_seconds(-281474976710656);
+    ProtobufWkt::Value dest;
+    EXPECT_FALSE(MessageUtil::jsonConvertValue(source, dest));
   }
 }
 
@@ -1948,51 +1979,6 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnumGlobalOverride)) {
       "'envoy.test.deprecation_test.Base.InnerMessageWithDeprecationEnum.deprecated_enum' "
       "from file deprecated.proto. This enum value will be removed from Envoy soon.",
       checkForDeprecation(base));
-}
-
-// Verify that direct use of a hidden_envoy_deprecated field fails, but upgrade
-// succeeds
-TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(ManualDeprecatedFieldAddition)) {
-  // Create a base message and insert a deprecated field. When upgrading the
-  // deprecated field should be set as deprecated, and a warning should be logged
-  envoy::test::deprecation_test::Base base_should_warn =
-      TestUtility::parseYaml<envoy::test::deprecation_test::Base>(R"EOF(
-      not_deprecated: field1
-      is_deprecated: hidden_field1
-      not_deprecated_message:
-        inner_not_deprecated: subfield1
-      repeated_message:
-        - inner_not_deprecated: subfield2
-    )EOF");
-
-  // Non-fatal checks for a deprecated field should log rather than throw an exception.
-  EXPECT_LOG_CONTAINS("warning",
-                      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
-                      checkForDeprecation(base_should_warn));
-  EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
-  EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
-
-  // Create an upgraded message and insert a deprecated field. This is a bypass
-  // of the upgrading procedure validation, and should fail
-  envoy::test::deprecation_test::UpgradedBase base_should_fail =
-      TestUtility::parseYaml<envoy::test::deprecation_test::UpgradedBase>(R"EOF(
-      not_deprecated: field1
-      hidden_envoy_deprecated_is_deprecated: hidden_field1
-      not_deprecated_message:
-        inner_not_deprecated: subfield1
-      repeated_message:
-        - inner_not_deprecated: subfield2
-    )EOF");
-
-  EXPECT_THROW_WITH_REGEX(
-      MessageUtil::checkForUnexpectedFields(base_should_fail,
-                                            ProtobufMessage::getStrictValidationVisitor()),
-      ProtoValidationException,
-      "Illegal use of hidden_envoy_deprecated_ V2 field "
-      "'envoy.test.deprecation_test.UpgradedBase.hidden_envoy_deprecated_is_deprecated'");
-  // The config will be rejected, so the feature will not be used.
-  EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
-  EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
 }
 
 class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};

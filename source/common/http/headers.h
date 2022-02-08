@@ -204,6 +204,7 @@ public:
   const LowerCaseString Path{":path"};
   const LowerCaseString Protocol{":protocol"};
   const LowerCaseString ProxyConnection{"proxy-connection"};
+  const LowerCaseString ProxyStatus{"proxy-status"};
   const LowerCaseString Range{"range"};
   const LowerCaseString RequestId{"x-request-id"};
   const LowerCaseString Scheme{":scheme"};
@@ -218,6 +219,7 @@ public:
   const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
   const LowerCaseString XSquashDebug{"x-squash-debug"};
+  const LowerCaseString EarlyData{"early-data"};
 
   struct {
     const std::string Close{"close"};

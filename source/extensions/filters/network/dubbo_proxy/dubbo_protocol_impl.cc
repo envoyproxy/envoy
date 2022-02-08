@@ -153,6 +153,11 @@ bool DubboProtocolImpl::decodeData(Buffer::Instance& buffer, ContextSharedPtr co
     break;
   }
   case MessageType::Response: {
+    // Non `Ok` response body has no response type info and skip deserialization.
+    if (metadata->responseStatus() != ResponseStatus::Ok) {
+      metadata->setMessageType(MessageType::Exception);
+      break;
+    }
     auto ret = serializer_->deserializeRpcResult(buffer, context);
     if (!ret.second) {
       return false;
@@ -208,9 +213,9 @@ bool DubboProtocolImpl::encode(Buffer::Instance& buffer, const MessageMetadata& 
   case MessageType::Request:
   case MessageType::Oneway:
   case MessageType::Exception:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 }
 

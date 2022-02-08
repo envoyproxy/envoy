@@ -149,6 +149,13 @@ protected:
   void onWriteBufferLowWatermark();
   void onWriteBufferHighWatermark();
 
+  // This is called when the underlying socket is connected, not when the
+  // connected event is raised.
+  virtual void onConnected() {}
+
+  void setFailureReason(absl::string_view failure_reason);
+  const std::string& failureReason() const { return failure_reason_; }
+
   TransportSocketPtr transport_socket_;
   ConnectionSocketPtr socket_;
   StreamInfo::StreamInfo& stream_info_;
@@ -168,7 +175,6 @@ protected:
   bool connecting_{false};
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
-  std::string failure_reason_;
 
 private:
   friend class HappyEyeballsConnectionImpl;
@@ -191,6 +197,8 @@ private:
   static std::atomic<uint64_t> next_global_id_;
 
   std::list<BytesSentCb> bytes_sent_callbacks_;
+  // Should be set with setFailureReason.
+  std::string failure_reason_;
   // Tracks the number of times reads have been disabled. If N different components call
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
   // has been called N times.
@@ -254,6 +262,8 @@ public:
   void connect() override;
 
 private:
+  void onConnected() override;
+
   StreamInfo::StreamInfoImpl stream_info_;
 };
 
