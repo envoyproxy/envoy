@@ -141,7 +141,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
       break;
     case SamplingDecision::NotSampled:
       // should never get here. If the header has Sampled=0 then we never call startSpan().
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      IS_ENVOY_BUG("unexpected code path hit");
     default:
       break;
     }
