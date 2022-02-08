@@ -18,7 +18,7 @@ public:
   constexpr static char name[] = "add-invalid-data-filter";
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
-    if (headers.get(Envoy::Http::LowerCaseString("invalid-encode")).size()) {
+    if (!headers.get(Envoy::Http::LowerCaseString("invalid-encode")).empty()) {
       Buffer::OwnedImpl body("body");
       encoder_callbacks_->addEncodedData(body, false);
     }
