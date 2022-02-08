@@ -33,6 +33,15 @@ index e65b55e..f0a61dd 100644
  #
  # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
  #XCFLAGS+= -DLUAJIT_DISABLE_JIT
+@@ -212,7 +212,7 @@ TARGET_STCC= $(STATIC_CC)
+ TARGET_DYNCC= $(DYNAMIC_CC)
+ TARGET_LD= $(CROSS)$(CC)
+ TARGET_AR= $(CROSS)ar rcus 2>/dev/null
+-TARGET_STRIP= $(CROSS)strip
++TARGET_STRIP?= $(CROSS)strip
+ 
+ TARGET_LIBPATH= $(or $(PREFIX),/usr/local)/$(or $(MULTILIB),lib)
+ TARGET_SONAME= libluajit-$(ABIVER).so.$(MAJVER)
 @@ -591,7 +591,7 @@ endif
  
  Q= @
@@ -125,7 +134,7 @@ new file mode 100755
 index 0000000..3eb74ff
 --- /dev/null
 +++ b/build.py
-@@ -0,0 +1,49 @@
+@@ -0,0 +1,52 @@
 +#!/usr/bin/env python3
 +
 +import argparse
@@ -146,6 +155,9 @@ index 0000000..3eb74ff
 +    os.environ["TARGET_LDFLAGS"] = os.environ.get("CFLAGS", "") + " -fno-function-sections -fno-data-sections"
 +    os.environ["CFLAGS"] = ""
 +    os.environ["LDFLAGS"] = ""
++
++    # Don't strip the binary - it doesn't work when cross-compiling, and we don't use it anyway.
++    os.environ["TARGET_STRIP"] = "@echo"
 +
 +    # Remove LuaJIT from ASAN for now.
 +    # TODO(htuch): Remove this when https://github.com/envoyproxy/envoy/issues/6084 is resolved.
