@@ -84,6 +84,9 @@ public:
   };
 
   ~DynamicFilterConfigProviderImpl() override {
+    // Issuing an empty update to guarantee that the shared current config is
+    // deleted on the main thread last. This is required if the current config
+    // holds its own TLS.
     if (!tls_.isShutdown()) {
       update(absl::nullopt, nullptr);
     }
@@ -130,6 +133,7 @@ private:
   }
 
   void update(absl::optional<FactoryCb> config, Config::ConfigAppliedCb applied_on_all_threads) {
+    // This call must not capture 'this' as it is invoked on all workers asynchronously.
     tls_.runOnAllThreads([config](OptRef<ThreadLocalConfig> tls) { tls->config_ = config; },
                          [main_config = main_config_, config, applied_on_all_threads]() {
                            // This happens after all workers have discarded the previous config so
