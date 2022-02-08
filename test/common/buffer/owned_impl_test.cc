@@ -853,7 +853,7 @@ TEST_F(OwnedImplTest, ReserveSingleOverCommit) {
       "length <= slice_.len_. Details: commit() length must be <= size of the Reservation");
 }
 
-// Test functionality of the `freelist` (a performance optimization)
+// Test functionality of the `freelist` (a performance optimization).
 TEST_F(OwnedImplTest, SliceFreeList) {
   Buffer::OwnedImpl b1, b2;
   std::vector<void*> slices;
