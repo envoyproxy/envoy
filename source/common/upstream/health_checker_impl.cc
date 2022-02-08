@@ -325,13 +325,6 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
   ENVOY_CONN_LOG(debug, "connection going away goaway_code={}, health_flags={}", *client_,
                  error_code, HostUtility::healthFlagsToString(*host_));
 
-  // Runtime guard around graceful handling of NO_ERROR GOAWAY handling. The old behavior is to
-  // ignore GOAWAY completely.
-  if (!parent_.runtime_.snapshot().runtimeFeatureEnabled(
-          "envoy.reloadable_features.health_check.graceful_goaway_handling")) {
-    return;
-  }
-
   if (request_in_flight_ && error_code == Http::GoAwayErrorCode::NoError) {
     // The server is starting a graceful shutdown. Allow the in flight request
     // to finish without treating this as a health check error, and then

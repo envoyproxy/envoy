@@ -723,5 +723,43 @@ public:
   }
 };
 
+// An enum representation of the Proxy-Status error space.
+enum class ProxyStatusError {
+  DnsTimeout,
+  DnsError,
+  DestinationNotFound,
+  DestinationUnavailable,
+  DestinationIpProhibited,
+  DestinationIpUnroutable,
+  ConnectionRefused,
+  ConnectionTerminated,
+  ConnectionTimeout,
+  ConnectionReadTimeout,
+  ConnectionWriteTimeout,
+  ConnectionLimitReached,
+  TlsProtocolError,
+  TlsCertificateError,
+  TlsAlertReceived,
+  HttpRequestError,
+  HttpRequestDenied,
+  HttpResponseIncomplete,
+  HttpResponseHeaderSectionSize,
+  HttpResponseHeaderSize,
+  HttpResponseBodySize,
+  HttpResponseTrailerSectionSize,
+  HttpResponseTrailerSize,
+  HttpResponseTransferCoding,
+  HttpResponseContentCoding,
+  HttpResponseTimeout,
+  HttpUpgradeFailed,
+  HttpProtocolError,
+  ProxyInternalResponse,
+  ProxyInternalError,
+  ProxyConfigurationError,
+  ProxyLoopDetected,
+  // ATTENTION: MAKE SURE THAT THIS REMAINS EQUAL TO THE LAST FLAG.
+  LastProxyStatus = ProxyLoopDetected,
+};
+
 } // namespace StreamInfo
 } // namespace Envoy

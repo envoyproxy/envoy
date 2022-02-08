@@ -10,6 +10,7 @@
 #include "cluster_manager_factory.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "od_cds_api_handle.h"
 #include "thread_local_cluster.h"
 
 namespace Envoy {
@@ -71,6 +72,10 @@ public:
   MOCK_METHOD(void, drainConnections, (const std::string& cluster));
   MOCK_METHOD(void, drainConnections, ());
   MOCK_METHOD(void, checkActiveStaticCluster, (const std::string& cluster));
+  MOCK_METHOD(OdCdsApiHandlePtr, allocateOdCdsApi,
+              (const envoy::config::core::v3::ConfigSource& odcds_config,
+               OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
+               ProtobufMessage::ValidationVisitor& validation_visitor));
 
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   envoy::config::core::v3::BindConfig bind_config_;
@@ -89,5 +94,4 @@ public:
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
 };
 } // namespace Upstream
-
 } // namespace Envoy

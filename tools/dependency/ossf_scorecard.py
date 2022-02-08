@@ -24,9 +24,8 @@ import json
 import os
 import subprocess as sp
 import sys
-
-import exports
-import utils
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
 
 Scorecard = namedtuple(
     'Scorecard', [
@@ -40,6 +39,35 @@ Scorecard = namedtuple(
         'security_policy',
         'releases',
     ])
+
+
+# Obtain GitHub project URL from a list of URLs.
+def get_github_project_url(urls):
+    for url in urls:
+        if not url.startswith('https://github.com/'):
+            continue
+        components = url.split('/')
+        return f'https://github.com/{components[3]}/{components[4]}'
+    return None
+
+
+# Shared Starlark/Python files must have a .bzl suffix for Starlark import, so
+# we are forced to do this workaround.
+def load_module(name, path):
+    spec = spec_from_loader(name, SourceFileLoader(name, path))
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+# this is the relative path in a bazel build
+# to call this module outside of a bazel build set the `API_PATH` first,
+# for example, if running from the envoy repo root: `export API_PATH=api/`
+api_path = os.getenv("API_PATH", "external/envoy_api")
+
+# Modules
+repository_locations_utils = load_module(
+    'repository_locations_utils', os.path.join(api_path, 'bazel/repository_locations_utils.bzl'))
 
 
 # Thrown on errors related to release date.
@@ -63,7 +91,7 @@ def score(scorecard_path, repository_locations):
             continue
         results_key = metadata['project_name']
         formatted_name = '=HYPERLINK("%s", "%s")' % (metadata['project_url'], results_key)
-        github_project_url = utils.get_github_project_url(metadata['urls'])
+        github_project_url = get_github_project_url(metadata['urls'])
         if not github_project_url:
             na = 'Not Scorecard compatible'
             results[results_key] = Scorecard(
@@ -139,8 +167,8 @@ if __name__ == '__main__':
     path = sys.argv[1]
     scorecard_path = sys.argv[2]
     csv_output_path = sys.argv[3]
-    spec_loader = exports.repository_locations_utils.load_repository_locations_spec
-    path_module = exports.load_module('repository_locations', path)
+    spec_loader = repository_locations_utils.load_repository_locations_spec
+    path_module = load_module('repository_locations', path)
     try:
         results = score(scorecard_path, spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC))
         print_csv_results(csv_output_path, results)

@@ -15,7 +15,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/upstream/cluster_update_tracker.h"
 #include "source/extensions/tracers/common/ot/opentracing_driver_impl.h"
 
