@@ -18,6 +18,7 @@ Http::Code LogsHandler::handlerLogging(absl::string_view url, Http::ResponseHead
   Http::Code rc = Http::Code::OK;
   if (!query_params.empty() && !changeLogLevel(query_params)) {
     response.add("usage: /logging?<name>=<level> (change single level)\n");
+    response.add("usage: /logging?<name1>=<level1>&<name2>=<level2> (change multiple level)\n");
     response.add("usage: /logging?level=<level> (change all levels)\n");
     response.add("levels: ");
     for (auto level_string_view : spdlog::level::level_string_views) {
@@ -52,13 +53,21 @@ Http::Code LogsHandler::handlerReopenLogs(absl::string_view, Http::ResponseHeade
 }
 
 bool LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params) {
-  if (params.size() != 1) {
-    return false;
+  // When level is present, we only accept exact one param.
+  if (params.find("level") != params.end()) {
+    if (params.size() != 1) {
+      return false;
+    }
   }
 
-  std::string name = params.begin()->first;
-  std::string level = params.begin()->second;
+  bool ret = true;
+  for (const auto& [name, level] : params) {
+    ret = changeLogLevelByName(name, level) && ret;
+  }
+  return ret;
+}
 
+bool LogsHandler::changeLogLevelByName(const std::string& name, const std::string& level) {
   // First see if the level is valid.
   size_t level_to_use = std::numeric_limits<size_t>::max();
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {

@@ -36,7 +36,8 @@ Runtime update of Fancy Logger is supported with administration interface, i.e. 
 
 1. `POST /logging`: List all names (i.e. file paths) of all active loggers and their levels;
 2. `POST /logging?<file_path>=<level>`: Given the current file path, change the log level of the file;
-3. `POST /logging?level=<level>`: Change levels of all loggers.
+3. `POST /logging?<file_path>=<level>[&<file_path>=<level>...]`: Change log level of multiple file paths at once;
+4. `POST /logging?level=<level>`: Change levels of all loggers.
 
 Users can view and change the log level in a granularity of file in runtime through admin page. Note that `file_path` is determined by `__FILE__` macro, which is the path seen by preprocessor.
 

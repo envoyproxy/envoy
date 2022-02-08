@@ -33,6 +33,7 @@ private:
    * @return TRUE if level change succeeded, FALSE otherwise.
    */
   bool changeLogLevel(const Http::Utility::QueryParams& params);
+  bool changeLogLevelByName(const std::string& name, const std::string& level);
 };
 
 } // namespace Server
