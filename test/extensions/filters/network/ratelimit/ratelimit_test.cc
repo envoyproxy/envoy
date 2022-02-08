@@ -7,9 +7,9 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/network/filter_manager_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
-#include "source/common/network/address_impl.h"
 #include "source/extensions/filters/network/ratelimit/ratelimit.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
@@ -51,10 +51,11 @@ public:
     client_ = new Filters::Common::RateLimit::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
 
-    auto downstream_direct_remote =
-      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance("8.8.8.8", 3000)};
-    filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(downstream_direct_remote);
-      
+    auto downstream_direct_remote = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("8.8.8.8", 3000)};
+    filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+        ->setRemoteAddress(downstream_direct_remote);
+
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
     // NOP currently.
@@ -151,22 +152,25 @@ TEST_F(RateLimitFilterTest, OK) {
 TEST_F(RateLimitFilterTest, ReplaceDownstreamIP) {
   InSequence s;
   setUpTest(replace_ip_config);
-  //filter_->injectDynamicDescriptorKeys(config_->descriptors() ,filter_callbacks_.connection_);
+  // filter_->injectDynamicDescriptorKeys(config_->descriptors() ,filter_callbacks_.connection_);
 
   std::vector<RateLimit::Descriptor> expected_descriptors;
-  expected_descriptors.push_back({{{"remote_address",  "8.8.8.8" }, {"hello", "world"}}});
-  
-  std::vector<RateLimit::Descriptor> actual_descriptors{filter_->descriptors().begin(), filter_->descriptors().end()};
+  expected_descriptors.push_back({{{"remote_address", "8.8.8.8"}, {"hello", "world"}}});
 
-  for ( auto it_expected = expected_descriptors.begin(), it_actual = actual_descriptors.begin(); it_expected != expected_descriptors.end() && it_actual != actual_descriptors.end(); ++it_expected, ++it_actual ) {
+  std::vector<RateLimit::Descriptor> actual_descriptors{filter_->descriptors().begin(),
+                                                        filter_->descriptors().end()};
+
+  for (auto it_expected = expected_descriptors.begin(), it_actual = actual_descriptors.begin();
+       it_expected != expected_descriptors.end() && it_actual != actual_descriptors.end();
+       ++it_expected, ++it_actual) {
     std::vector<RateLimit::DescriptorEntry> de1 = it_expected->entries_;
     std::vector<RateLimit::DescriptorEntry> de2 = it_actual->entries_;
-    for ( auto de_expected = de1.begin(), de_actual = de2.begin(); de_expected != de1.end() && de_actual != de2.end(); ++de_expected, ++de_actual) {
+    for (auto de_expected = de1.begin(), de_actual = de2.begin();
+         de_expected != de1.end() && de_actual != de2.end(); ++de_expected, ++de_actual) {
       auto actual_entry = de_actual.base();
       auto expected_entry = de_expected.base();
       EXPECT_EQ(actual_entry->key_, expected_entry->key_);
       EXPECT_EQ(actual_entry->value_, expected_entry->value_);
-
     }
   }
 
