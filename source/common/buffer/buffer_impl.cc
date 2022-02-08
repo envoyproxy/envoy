@@ -392,7 +392,7 @@ ReservationSingleSlice OwnedImpl::reserveSingleSlice(uint64_t length, bool separ
   } else {
     slice_owner->owned_storage_ = Slice::newStorage(length);
     ASSERT(slice_owner->owned_storage_.len_ >= length);
-    reservation_slice = {slice_owner->owned_storage_.mem_.get(), length};
+    reservation_slice = {slice_owner->owned_storage_.mem_.get(), static_cast<size_t>(length)};
   }
 
   reservation.bufferImplUseOnlySliceOwner() = std::move(slice_owner);
