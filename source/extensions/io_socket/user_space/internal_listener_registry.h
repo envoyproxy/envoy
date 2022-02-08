@@ -11,9 +11,8 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Bootstrap {
-namespace InternalListener {
-
+namespace IoSocket {
+namespace UserSpace {
 class TlsInternalListenerRegistry : public Singleton::Instance,
                                     public Network::InternalListenerRegistry {
 public:
@@ -24,8 +23,7 @@ public:
     return nullptr;
   }
 
-  std::unique_ptr<ThreadLocal::TypedSlot<Extensions::InternalListener::ThreadLocalRegistryImpl>>
-      tls_slot_;
+  std::unique_ptr<ThreadLocal::TypedSlot<IoSocket::UserSpace::ThreadLocalRegistryImpl>> tls_slot_;
 };
 class InternalListenerExtension : public Server::BootstrapExtension {
 public:
@@ -48,12 +46,12 @@ public:
                            Server::Configuration::ServerFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::io_socket::user_space::v3::InternalConnectionRegistry>();
+        envoy::extensions::io_socket::user_space::v3::InternalListenerRegistry>();
   }
   std::string name() const override { return "envoy.bootstrap.internal_listener_registry"; };
 };
 
-} // namespace InternalListener
-} // namespace Bootstrap
+} // namespace UserSpace
+} // namespace IoSocket
 } // namespace Extensions
 } // namespace Envoy

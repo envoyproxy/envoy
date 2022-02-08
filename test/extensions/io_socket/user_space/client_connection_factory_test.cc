@@ -40,9 +40,8 @@ public:
         buf_(1024) {
     std::tie(io_handle_, io_handle_peer_) = IoHandleFactory::createIoHandlePair();
     EXPECT_CALL(tls_allocator_, allocateSlot());
-    tls_slot_ =
-        ThreadLocal::TypedSlot<Extensions::InternalListener::ThreadLocalRegistryImpl>::makeUnique(
-            tls_allocator_);
+    tls_slot_ = ThreadLocal::TypedSlot<IoSocket::UserSpace::ThreadLocalRegistryImpl>::makeUnique(
+        tls_allocator_);
     tls_slot_->set([r = registry_](Event::Dispatcher&) { return r; });
     // TODO: restore the original value via RAII.
     Extensions::IoSocket::UserSpace::InternalClientConnectionFactory::registry_tls_slot_ =
@@ -52,11 +51,10 @@ public:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   MockInternalListenerManger internal_listener_manager_;
-  std::shared_ptr<Extensions::InternalListener::ThreadLocalRegistryImpl> registry_{
-      std::make_shared<Extensions::InternalListener::ThreadLocalRegistryImpl>()};
+  std::shared_ptr<IoSocket::UserSpace::ThreadLocalRegistryImpl> registry_{
+      std::make_shared<IoSocket::UserSpace::ThreadLocalRegistryImpl>()};
   ThreadLocal::MockInstance tls_allocator_;
-  std::unique_ptr<ThreadLocal::TypedSlot<Extensions::InternalListener::ThreadLocalRegistryImpl>>
-      tls_slot_;
+  std::unique_ptr<ThreadLocal::TypedSlot<IoSocket::UserSpace::ThreadLocalRegistryImpl>> tls_slot_;
 
   // Owned by IoHandleImpl.
   NiceMock<Event::MockSchedulableCallback>* schedulable_cb_;

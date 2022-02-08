@@ -7,8 +7,8 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Bootstrap {
-namespace InternalListener {
+namespace IoSocket {
+namespace UserSpace {
 
 SINGLETON_MANAGER_REGISTRATION(internal_listener_registry);
 
@@ -33,10 +33,10 @@ void InternalListenerExtension::onServerInitialized() {
   ASSERT(internal_listener_registry->tls_slot_ == nullptr);
 
   tls_registry_->tls_slot_ =
-      ThreadLocal::TypedSlot<Extensions::InternalListener::ThreadLocalRegistryImpl>::makeUnique(
+      ThreadLocal::TypedSlot<IoSocket::UserSpace::ThreadLocalRegistryImpl>::makeUnique(
           server_context_.threadLocal());
   tls_registry_->tls_slot_->set([](Event::Dispatcher&) {
-    return std::make_shared<Extensions::InternalListener::ThreadLocalRegistryImpl>();
+    return std::make_shared<IoSocket::UserSpace::ThreadLocalRegistryImpl>();
   });
 
   Extensions::IoSocket::UserSpace::InternalClientConnectionFactory::registry_tls_slot_ =
@@ -51,7 +51,7 @@ Server::BootstrapExtensionPtr InternalListenerRegistryFactory::createBootstrapEx
 
 REGISTER_FACTORY(InternalListenerRegistryFactory, Server::Configuration::BootstrapExtensionFactory);
 
-} // namespace InternalListener
-} // namespace Bootstrap
+} // namespace UserSpace
+} // namespace IoSocket
 } // namespace Extensions
 } // namespace Envoy

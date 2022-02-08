@@ -13,8 +13,14 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/io_socket/user_space/v3;user_spacev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: InternalConnectionRegistry]
+// [#protodoc-title: Internal Listener]
+// `InternalListenerRegistry` message is the configuration of the `envoy.bootstrap.internal_listener_registry` bootstrap extension.
+// This boot strap extension is required to support adding a listener with an internal address.
+// To establish a connection to a registered internal listener, another `envoy.io_socket.user_space` extension is required.
+// The `InternalClientConnectionFactory` within enables the dispatcher to create client connection to any envoy internal address.
 // [#extension: envoy.io_socket.user_space]
 
-message InternalConnectionRegistry {
+// [#not-implemented-hide:]
+// Configuration for internal listener registry.
+message InternalListenerRegistry {
 }

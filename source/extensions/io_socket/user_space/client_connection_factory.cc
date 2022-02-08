@@ -13,7 +13,7 @@ namespace Extensions {
 namespace IoSocket {
 namespace UserSpace {
 
-ThreadLocal::TypedSlot<Extensions::InternalListener::ThreadLocalRegistryImpl>*
+ThreadLocal::TypedSlot<IoSocket::UserSpace::ThreadLocalRegistryImpl>*
     InternalClientConnectionFactory::registry_tls_slot_ = nullptr;
 
 Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnection(

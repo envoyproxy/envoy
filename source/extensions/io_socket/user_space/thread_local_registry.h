@@ -5,7 +5,8 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace InternalListener {
+namespace IoSocket {
+namespace UserSpace {
 
 class ThreadLocalRegistryImpl : public ThreadLocal::ThreadLocalObject,
                                 public Network::LocalInternalListenerRegistry {
@@ -27,6 +28,7 @@ public:
 private:
   Network::InternalListenerManager* manager_{nullptr};
 };
-} // namespace InternalListener
+} // namespace UserSpace
+} // namespace IoSocket
 } // namespace Extensions
 } // namespace Envoy

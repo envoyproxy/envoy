@@ -20,7 +20,7 @@ class InternalClientConnectionFactory : public Network::ClientConnectionFactory,
                                         Logger::Loggable<Logger::Id::connection> {
 public:
   ~InternalClientConnectionFactory() override = default;
-  std::string name() const override { return "EnvoyInternal"; }
+  std::string name() const override { return "envoy_internal"; }
   Network::ClientConnectionPtr
   createClientConnection(Event::Dispatcher& dispatcher,
                          Network::Address::InstanceConstSharedPtr address,
@@ -34,8 +34,7 @@ public:
   // Since the population and the lookup is supposed to be executed in the same worker thread,
   // neither need to hold a lock.
   // TODO(lambdai): make it friend to only bootstrap extension.
-  static ThreadLocal::TypedSlot<Extensions::InternalListener::ThreadLocalRegistryImpl>*
-      registry_tls_slot_;
+  static ThreadLocal::TypedSlot<IoSocket::UserSpace::ThreadLocalRegistryImpl>* registry_tls_slot_;
 };
 
 } // namespace UserSpace
