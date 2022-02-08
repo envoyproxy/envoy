@@ -35,7 +35,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 49]
+// [#next-free-field: 50]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -300,6 +300,54 @@ message HttpConnectionManager {
     // respond with 400 to paths that are malformed (e.g. for paths that fail RFC 3986
     // normalization due to disallowed characters.)
     type.http.v3.PathTransformation http_filter_transformation = 2;
+  }
+
+  // Configures the manner in which the Proxy-Status HTTP response header is
+  // populated.
+  //
+  // See the [Proxy-Status
+  // RFC](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-proxy-status-08).
+  // [#comment:TODO: Update this with the non-draft URL when finalized.]
+  //
+  // The Proxy-Status header is a string of the form:
+  //
+  //   "<server_name>; error=<error_type>; details=<details>"
+  // [#next-free-field: 7]
+  message ProxyStatusConfig {
+    // If true, the details field of the Proxy-Status header is not populated with stream_info.response_code_details.
+    // This value defaults to `false`, i.e. the `details` field is populated by default.
+    bool remove_details = 1;
+
+    // If true, the details field of the Proxy-Status header will not contain
+    // connection termination details. This value defaults to `false`, i.e. the
+    // `details` field will contain connection termination details by default.
+    bool remove_connection_termination_details = 2;
+
+    // If true, the details field of the Proxy-Status header will not contain an
+    // enumeration of the Envoy ResponseFlags. This value defaults to `false`,
+    // i.e. the `details` field will contain a list of ResponseFlags by default.
+    bool remove_response_flags = 3;
+
+    // If true, overwrites the existing Status header with the response code
+    // recommended by the Proxy-Status spec.
+    // This value defaults to `false`, i.e. the HTTP response code is not
+    // overwritten.
+    bool set_recommended_response_code = 4;
+
+    // The name of the proxy as it appears at the start of the Proxy-Status
+    // header.
+    //
+    // If neither of these values are set, this value defaults to `server_name`,
+    // which itself defaults to "envoy".
+    oneof proxy_name {
+      // If `use_node_id` is set, Proxy-Status headers will use the Envoy's node
+      // ID as the name of the proxy.
+      bool use_node_id = 5;
+
+      // If `literal_proxy_name` is set, Proxy-Status headers will use this
+      // value as the name of the proxy.
+      string literal_proxy_name = 6;
+    }
   }
 
   reserved 27, 11;
@@ -707,6 +755,11 @@ message HttpConnectionManager {
   // setting this option will strip a trailing dot, if present, from the host section,
   // leaving the port as is (e.g. host value `example.com.:443` will be updated to `example.com:443`).
   bool strip_trailing_host_dot = 47;
+
+  // Proxy-Status HTTP response header configuration.
+  // If this config is set, the Proxy-Status HTTP response header field is
+  // populated. By default, it is not.
+  ProxyStatusConfig proxy_status_config = 49;
 }
 
 // The configuration to customize local reply returned by Envoy.

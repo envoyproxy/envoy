@@ -170,7 +170,7 @@ public:
                                std::make_shared<quic::QuicCryptoClientConfig>(
                                    quic::test::crypto_test_utils::ProofVerifierForTesting()),
                                nullptr, dispatcher, send_buffer_limit, crypto_stream_factory,
-                               quic_stat_names_, stats_store_) {}
+                               quic_stat_names_, {}, stats_store_) {}
 
   void Initialize() override {
     EnvoyQuicClientSession::Initialize();

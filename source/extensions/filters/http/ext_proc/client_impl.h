@@ -38,7 +38,7 @@ private:
 
 class ExternalProcessorStreamImpl : public ExternalProcessorStream,
                                     public Grpc::AsyncStreamCallbacks<ProcessingResponse>,
-                                    public Logger::Loggable<Logger::Id::filter> {
+                                    public Logger::Loggable<Logger::Id::ext_proc> {
 public:
   ExternalProcessorStreamImpl(Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
                               ExternalProcessorCallbacks& callbacks,

@@ -206,7 +206,6 @@ private:
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
   Http3StatusTracker http3_status_tracker_;
-  // TODO(RyanTheOptimist): Make the alternate_protocols_ member non-optional.
   AlternateProtocolsCacheSharedPtr alternate_protocols_;
 
   // True iff this pool is draining. No new streams or connections should be created
