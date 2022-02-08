@@ -25,14 +25,13 @@ Filter::Filter(const ConfigSharedPtr config) : config_(config) {
   http_parser_init(&parser_, HTTP_REQUEST);
 }
 
-http_parser_settings Filter::settings_{
-    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-};
-
 thread_local uint8_t Filter::buf_[Config::MAX_INSPECT_SIZE];
 
 namespace {
-constexpr absl::string_view response_body = " 200 Connection Established\r\n\r\n";
+constexpr absl::string_view ResponseBody = " 200 Connection Established\r\n\r\n";
+constexpr http_parser_settings Settings{
+    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+};
 }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
@@ -103,20 +102,21 @@ ParseState Filter::onRead() {
   if (result.return_value_ == 0) {
     return ParseState::Error;
   }
-  return parseConnect(absl::string_view(reinterpret_cast<const char*>(buf_), result.return_value_));
+  return parseConnect(buf_, result.return_value_);
 }
 
-ParseState Filter::parseConnect(absl::string_view data) {
-  const size_t len = std::min(data.length(), HTTP1_CONNECT_PREFACE.length());
-  if (HTTP1_CONNECT_PREFACE.compare(0, len, data, 0, len) == 0) {
-    if (data.length() < HTTP1_CONNECT_PREFACE.length()) {
+ParseState Filter::parseConnect(uint8_t* buf, size_t len) {
+  absl::string_view data = absl::string_view(reinterpret_cast<const char*>(buf), len);
+  const size_t min_len = std::min(len, HTTP1_CONNECT_PREFACE.length());
+  if (HTTP1_CONNECT_PREFACE.compare(0, min_len, data, 0, min_len) == 0) {
+    if (len < HTTP1_CONNECT_PREFACE.length()) {
       return ParseState::Continue;
     } else {
       absl::string_view new_data = data.substr(parser_.nread);
       size_t pos = new_data.find("\r\n\r\n");
       if (pos != absl::string_view::npos) {
         new_data = new_data.substr(0, pos + 4);
-        ssize_t rc = http_parser_execute(&parser_, &settings_, new_data.data(), new_data.length());
+        ssize_t rc = http_parser_execute(&parser_, &Settings, new_data.data(), new_data.length());
         ENVOY_LOG(trace, "connect handler: http_parser parsed {} chars, error code: {}", rc,
                   HTTP_PARSER_ERRNO(&parser_));
 
@@ -126,11 +126,12 @@ ParseState Filter::parseConnect(absl::string_view data) {
           config_->stats().connect_not_found_.inc();
           return ParseState::Done;
         }
+        absl::string_view protocol = "";
         if (parser_.http_major == 1) {
           if (parser_.http_minor == 0) {
-            protocol_ = Http::Headers::get().ProtocolStrings.Http10String;
+            protocol = Http::Headers::get().ProtocolStrings.Http10String;
           } else if (parser_.http_minor == 1) {
-            protocol_ = Http::Headers::get().ProtocolStrings.Http11String;
+            protocol = Http::Headers::get().ProtocolStrings.Http11String;
           }
         } else {
           ENVOY_LOG(trace, "connect:handler: unsupported http version: {}.{}", parser_.http_major,
@@ -138,8 +139,6 @@ ParseState Filter::parseConnect(absl::string_view data) {
           config_->stats().connect_not_found_.inc();
           return ParseState::Done;
         }
-
-        std::vector<absl::string_view> fields = absl::StrSplit(data, absl::ByAnyChar(" :"));
 
         // drain data from listener
         auto result = cb_->socket().ioHandle().recv(buf_, pos + 4, 0);
@@ -153,8 +152,8 @@ ParseState Filter::parseConnect(absl::string_view data) {
           return ParseState::Error;
         }
         // terminate CONNECT request
-        resp_buf_.add(protocol_);
-        resp_buf_.add(response_body);
+        resp_buf_.add(protocol);
+        resp_buf_.add(ResponseBody);
         result = cb_->socket().ioHandle().write(resp_buf_);
         if (!result.ok()) {
           config_->stats().write_error_.inc();
@@ -164,7 +163,9 @@ ParseState Filter::parseConnect(absl::string_view data) {
         if (result.return_value_ == 0) {
           return ParseState::Error;
         }
-        cb_->socket().setRequestedServerName(fields[1]);
+
+        const auto server_url = StringUtil::cropRight(StringUtil::cropLeft(data, " "), " ");
+        cb_->socket().setRequestedServerName(StringUtil::cropRight(server_url, ":"));
         config_->stats().connect_found_.inc();
         return ParseState::Done;
       } else {

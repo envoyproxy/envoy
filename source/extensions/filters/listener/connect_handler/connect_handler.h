@@ -40,6 +40,7 @@ enum class ParseState {
   // Parser reports unrecoverable error.
   Error
 };
+
 /**
  * Global configuration for CONNECT handler.
  */
@@ -68,19 +69,17 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
 private:
-  ParseState parseConnect(absl::string_view data);
+  ParseState parseConnect(uint8_t* buf, size_t len);
   ParseState onRead();
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{};
 
+  // Use static thread_local to avoid allocating buffer over and over again.
   static thread_local uint8_t buf_[Config::MAX_INSPECT_SIZE];
   static constexpr absl::string_view HTTP1_CONNECT_PREFACE = "CONNECT";
   Buffer::OwnedImpl resp_buf_{};
-  absl::string_view protocol_;
-  absl::string_view request_url_;
   http_parser parser_;
-  static http_parser_settings settings_;
 };
 
 } // namespace ConnectHandler
