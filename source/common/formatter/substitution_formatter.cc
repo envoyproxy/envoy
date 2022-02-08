@@ -856,13 +856,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 std::string upstream_cluster_name;
                 if (stream_info.upstreamClusterInfo().has_value() &&
                     stream_info.upstreamClusterInfo().value() != nullptr) {
-                  if (Runtime::runtimeFeatureEnabled(
-                          "envoy.reloadable_features.use_observable_cluster_name")) {
-                    upstream_cluster_name =
-                        stream_info.upstreamClusterInfo().value()->observabilityName();
-                  } else {
-                    upstream_cluster_name = stream_info.upstreamClusterInfo().value()->name();
-                  }
+                  upstream_cluster_name =
+                      stream_info.upstreamClusterInfo().value()->observabilityName();
                 }
 
                 return upstream_cluster_name.empty()
@@ -877,6 +872,61 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                   -> std::shared_ptr<const Envoy::Network::Address::Instance> {
                 if (stream_info.upstreamInfo().has_value()) {
                   return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
+                }
+                return nullptr;
+              });
+        }},
+       {"UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT",
+        []() {
+          return StreamInfoAddressFieldExtractor::withoutPort(
+              [](const StreamInfo::StreamInfo& stream_info)
+                  -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+                if (stream_info.upstreamInfo().has_value()) {
+                  return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
+                }
+                return nullptr;
+              });
+        }},
+       {"UPSTREAM_LOCAL_PORT",
+        []() {
+          return StreamInfoAddressFieldExtractor::justPort(
+              [](const StreamInfo::StreamInfo& stream_info)
+                  -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+                if (stream_info.upstreamInfo().has_value()) {
+                  return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
+                }
+                return nullptr;
+              });
+        }},
+       {"UPSTREAM_REMOTE_ADDRESS",
+        []() {
+          return StreamInfoAddressFieldExtractor::withPort(
+              [](const StreamInfo::StreamInfo& stream_info)
+                  -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+                if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
+                  return stream_info.upstreamInfo()->upstreamHost()->address();
+                }
+                return nullptr;
+              });
+        }},
+       {"UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT",
+        []() {
+          return StreamInfoAddressFieldExtractor::withoutPort(
+              [](const StreamInfo::StreamInfo& stream_info)
+                  -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+                if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
+                  return stream_info.upstreamInfo()->upstreamHost()->address();
+                }
+                return nullptr;
+              });
+        }},
+       {"UPSTREAM_REMOTE_PORT",
+        []() {
+          return StreamInfoAddressFieldExtractor::justPort(
+              [](const StreamInfo::StreamInfo& stream_info)
+                  -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+                if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
+                  return stream_info.upstreamInfo()->upstreamHost()->address();
                 }
                 return nullptr;
               });
@@ -923,6 +973,13 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return stream_info.downstreamAddressProvider().remoteAddress();
               });
         }},
+       {"DOWNSTREAM_REMOTE_PORT",
+        []() {
+          return StreamInfoAddressFieldExtractor::justPort(
+              [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                return stream_info.downstreamAddressProvider().remoteAddress();
+              });
+        }},
        {"DOWNSTREAM_DIRECT_REMOTE_ADDRESS",
         []() {
           return StreamInfoAddressFieldExtractor::withPort(
@@ -934,6 +991,13 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
         []() {
           return StreamInfoAddressFieldExtractor::withoutPort(
               [](const StreamInfo::StreamInfo& stream_info) {
+                return stream_info.downstreamAddressProvider().directRemoteAddress();
+              });
+        }},
+       {"DOWNSTREAM_DIRECT_REMOTE_PORT",
+        []() {
+          return StreamInfoAddressFieldExtractor::justPort(
+              [](const Envoy::StreamInfo::StreamInfo& stream_info) {
                 return stream_info.downstreamAddressProvider().directRemoteAddress();
               });
         }},
@@ -1348,8 +1412,7 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
   }
 
   std::string str;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unquote_log_string_values") &&
-      value.kind_case() == ProtobufWkt::Value::kStringValue) {
+  if (value.kind_case() == ProtobufWkt::Value::kStringValue) {
     str = value.string_value();
   } else {
     str = MessageUtil::getJsonStringFromMessageOrDie(value, false, true);

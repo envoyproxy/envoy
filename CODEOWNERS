@@ -33,6 +33,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/compressor @rojkov @dio
 # external processing filter
 /*/extensions/filters/http/ext_proc @gbrail @snowp
+/*/extensions/filters/common/mutation_rules @gbrail @snowp
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
@@ -60,7 +61,7 @@ extensions/filters/common/original_src @snowp @klarose
 # tracers.datadog extension
 /*/extensions/tracers/datadog @cgilmour @palazzem @mattklein123
 # tracers.xray extension
-/*/extensions/tracers/xray @abaptiste @lavignes @mattklein123
+/*/extensions/tracers/xray @abaptiste @suniltheta @mattklein123
 # tracers.skywalking extension
 /*/extensions/tracers/skywalking @wbpcode @dio @lizan @Shikugawa
 # quic extension
@@ -134,7 +135,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/http_connection_manager @alyssawilk @mattklein123
 /*/extensions/filters/network/tcp_proxy @alyssawilk @zuercher @ggreenway
 /*/extensions/filters/network/echo @htuch @alyssawilk
-/*/extensions/filters/udp/dns_filter @abaptiste @mattklein123
+/*/extensions/filters/udp/dns_filter @abaptiste @mattklein123 @yanjunxiang-google
 /*/extensions/filters/network/direct_response @kyessenov @zuercher
 /*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010
 /*/extensions/clusters/aggregate @yxue @snowp

@@ -50,22 +50,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "http2_platform_impl_lib",
-    hdrs = [
-        "http2_macros_impl.h",
-    ],
-    external_deps = [
-        "abseil_base",
-        "abseil_str_format",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":quic_platform_logging_impl_lib",
-        ":quiche_flags_impl_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "quic_platform_logging_impl_lib",
     srcs = [
         "quic_logging_impl.cc",
@@ -177,7 +161,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quiche_common_platform_impl_lib",
     hdrs = [
-        "quiche_flag_utils_impl.h",
         "quiche_logging_impl.h",
     ],
     external_deps = [

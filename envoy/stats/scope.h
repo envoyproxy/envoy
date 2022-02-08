@@ -6,7 +6,6 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
-#include "envoy/stats/symbol_table.h"
 #include "envoy/stats/tag.h"
 
 #include "absl/types/optional.h"
@@ -249,6 +248,14 @@ public:
    *         was hit.
    */
   virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
+
+  /**
+   * @return the aggregated prefix for this scope. A trailing dot is not
+   * included, even if one was supplied when creating the scope. If this is a
+   * nested scope, it will include names from every level. E.g.
+   *     store.createScope("foo").createScope("bar").prefix() will be the StatName "foo.bar"
+   */
+  virtual StatName prefix() const PURE;
 };
 
 } // namespace Stats

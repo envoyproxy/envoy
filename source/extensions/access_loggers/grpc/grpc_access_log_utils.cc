@@ -39,7 +39,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x2000000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x4000000,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -145,6 +145,10 @@ void Utility::responseFlagsToAccessLogResponseFlags(
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::OverloadManager)) {
     common_access_log.mutable_response_flags()->set_overload_manager(true);
+  }
+
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DnsResolutionFailed)) {
+    common_access_log.mutable_response_flags()->set_dns_resolution_failure(true);
   }
 }
 

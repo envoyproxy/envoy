@@ -21,14 +21,9 @@ namespace {
 class StatefulSessionIntegrationTest : public Envoy::HttpIntegrationTest, public testing::Test {
 public:
   StatefulSessionIntegrationTest()
-      : HttpIntegrationTest(
-            Http::CodecType::HTTP1,
-            [](int i) { return Network::Utility::parseInternetAddress("127.0.0.1", 50000 + i); },
-            Network::Address::IpVersion::v4) {
+      : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4) {
     // Create 4 different upstream server for stateful session test.
     setUpstreamCount(4);
-
-    skipPortUsageValidation();
 
     // Update endpoints of default cluster `cluster_0` to 4 different fake upstreams.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -42,22 +37,22 @@ public:
             address:
               socket_address:
                 address: 127.0.0.1
-                port_value: 50000
+                port_value: 0
         - endpoint:
             address:
               socket_address:
                 address: 127.0.0.1
-                port_value: 50001
+                port_value: 0
         - endpoint:
             address:
               socket_address:
                 address: 127.0.0.1
-                port_value: 50002
+                port_value: 0
         - endpoint:
             address:
               socket_address:
                 address: 127.0.0.1
-                port_value: 50003
+                port_value: 0
       )EOF";
 
       envoy::config::endpoint::v3::LocalityLbEndpoints new_lb_endpints;
@@ -138,8 +133,13 @@ TEST_F(StatefulSessionIntegrationTest, NormalStatefulSession) {
 
   auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
   ASSERT(upstream_index.has_value());
-  const std::string address_string = fmt::format("127.0.0.1:{}", upstream_index.value() + 50000);
-  const std::string encoded_address = Envoy::Base64::encode(address_string.data(), 15);
+
+  envoy::config::endpoint::v3::LbEndpoint endpoint;
+  setUpstreamAddress(upstream_index.value(), endpoint);
+  const std::string address_string =
+      fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+  const std::string encoded_address =
+      Envoy::Base64::encode(address_string.data(), address_string.size());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
@@ -161,18 +161,25 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
   initializeFilterAndRoute(STATEFUL_SESSION_FILTER, "");
 
   {
+
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(1, endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+    const std::string encoded_address =
+        Envoy::Base64::encode(address_string.data(), address_string.size());
+
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"},
         {":path", "/test"},
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
-        {"cookie", fmt::format("global-session-cookie=\"{}\"",
-                               Envoy::Base64::encode("127.0.0.1:50001", 15))}};
+        {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
 
     auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
-    // `127.0.0.1:50001` should be selected and it's upstream index is 1.
+    // The upstream with index 1 should be selected.
     auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
     EXPECT_EQ(upstream_index.value(), 1);
 
@@ -190,18 +197,24 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
   }
 
   {
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(2, endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+    const std::string encoded_address =
+        Envoy::Base64::encode(address_string.data(), address_string.size());
+
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"},
         {":path", "/test"},
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
-        {"cookie", fmt::format("global-session-cookie=\"{}\"",
-                               Envoy::Base64::encode("127.0.0.1:50002", 15))}};
+        {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
 
     auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
-    // `127.0.0.1:50002` should be selected and it's upstream index is 2.
+    // The upstream with index 2 should be selected.
     auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
     EXPECT_EQ(upstream_index.value(), 2);
 
@@ -227,14 +240,19 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
         {"cookie", fmt::format("global-session-cookie=\"{}\"",
-                               Envoy::Base64::encode("127.0.0.1:50005", 15))}};
+                               Envoy::Base64::encode("127.0.0.7:50000", 15))}};
 
     auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
     auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
     ASSERT(upstream_index.has_value());
-    const std::string address_string = fmt::format("127.0.0.1:{}", upstream_index.value() + 50000);
-    const std::string encoded_address = Envoy::Base64::encode(address_string.data(), 15);
+
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(upstream_index.value(), endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+    const std::string encoded_address =
+        Envoy::Base64::encode(address_string.data(), address_string.size());
 
     upstream_request_->encodeHeaders(default_response_headers_, true);
 
@@ -259,6 +277,13 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
   uint64_t first_index = 0;
   uint64_t second_index = 0;
 
+  envoy::config::endpoint::v3::LbEndpoint endpoint;
+  setUpstreamAddress(1, endpoint);
+  const std::string address_string =
+      fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+  const std::string encoded_address =
+      Envoy::Base64::encode(address_string.data(), address_string.size());
+
   {
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl request_headers{
@@ -266,8 +291,7 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
         {":path", "/test"},
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
-        {"cookie", fmt::format("global-session-cookie=\"{}\"",
-                               Envoy::Base64::encode("127.0.0.1:50001", 15))}};
+        {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
 
     auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
@@ -295,8 +319,7 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
         {":path", "/test"},
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
-        {"cookie", fmt::format("global-session-cookie=\"{}\"",
-                               Envoy::Base64::encode("127.0.0.1:50001", 15))}};
+        {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
 
     auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
@@ -325,21 +348,32 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverriddenByRoute) {
   initializeFilterAndRoute(STATEFUL_SESSION_FILTER, OVERRIDE_STATEFUL_SESSION);
 
   {
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(1, endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+    const std::string encoded_address =
+        Envoy::Base64::encode(address_string.data(), address_string.size());
+
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"},
         {":path", "/test"},
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
-        {"cookie", fmt::format("global-session-cookie=\"{}\"",
-                               Envoy::Base64::encode("127.0.0.1:50001", 15))}};
+        {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
 
     auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
     auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
     ASSERT(upstream_index.has_value());
-    const std::string address_string = fmt::format("127.0.0.1:{}", upstream_index.value() + 50000);
-    const std::string encoded_address = Envoy::Base64::encode(address_string.data(), 15);
+
+    envoy::config::endpoint::v3::LbEndpoint route_endpoint;
+    setUpstreamAddress(upstream_index.value(), route_endpoint);
+    const std::string route_address_string = fmt::format(
+        "127.0.0.1:{}", route_endpoint.endpoint().address().socket_address().port_value());
+    const std::string route_encoded_address =
+        Envoy::Base64::encode(route_address_string.data(), route_address_string.size());
 
     upstream_request_->encodeHeaders(default_response_headers_, true);
 
@@ -349,26 +383,32 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverriddenByRoute) {
     EXPECT_TRUE(response->complete());
 
     EXPECT_EQ(
-        Envoy::Http::Utility::makeSetCookieValue("route-session-cookie", encoded_address, "/path",
-                                                 std::chrono::seconds(120), true),
+        Envoy::Http::Utility::makeSetCookieValue("route-session-cookie", route_encoded_address,
+                                                 "/path", std::chrono::seconds(120), true),
         response->headers().get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView());
 
     cleanupUpstreamAndDownstream();
   }
 
   {
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(2, endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+    const std::string encoded_address =
+        Envoy::Base64::encode(address_string.data(), address_string.size());
+
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"},
         {":path", "/test"},
         {":scheme", "http"},
         {":authority", "stateful.session.com"},
-        {"cookie",
-         fmt::format("route-session-cookie=\"{}\"", Envoy::Base64::encode("127.0.0.1:50002", 15))}};
+        {"cookie", fmt::format("route-session-cookie=\"{}\"", encoded_address)}};
 
     auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
-    // Stateful session is overridden and `127.0.0.1:50002` should be selected.
+    // Stateful session is overridden and the upstream with index 2 should be selected..
     auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
     EXPECT_EQ(upstream_index.value(), 2);
 

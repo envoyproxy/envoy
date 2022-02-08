@@ -5757,12 +5757,12 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   // With no scheme and x-forwarded-proto, set scheme based on encryption level
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, false, false);
+    FilterUtility::setUpstreamScheme(headers, false);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, true, true);
+    FilterUtility::setUpstreamScheme(headers, true);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 
@@ -5770,7 +5770,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setForwardedProto("foo");
-    FilterUtility::setUpstreamScheme(headers, true, true);
+    FilterUtility::setUpstreamScheme(headers, true);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 
@@ -5778,7 +5778,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
-    FilterUtility::setUpstreamScheme(headers, true, true);
+    FilterUtility::setUpstreamScheme(headers, true);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
 
@@ -5787,23 +5787,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
     Http::TestRequestHeaderMapImpl headers;
     headers.setScheme(Http::Headers::get().SchemeValues.Https);
     headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
-    FilterUtility::setUpstreamScheme(headers, false, false);
-    EXPECT_EQ("https", headers.get_(":scheme"));
-  }
-
-  // New logic uses downstream crypto
-  {
-    Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, false, true);
-    EXPECT_EQ("http", headers.get_(":scheme"));
-  }
-
-  // Legacy logic uses upstream crypto
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.preserve_downstream_scheme", "false"}});
-  {
-    Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, false, true);
+    FilterUtility::setUpstreamScheme(headers, false);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 }
