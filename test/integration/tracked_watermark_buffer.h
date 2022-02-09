@@ -30,9 +30,9 @@ public:
         on_delete_(on_delete), on_bind_(on_bind) {}
   ~TrackedWatermarkBuffer() override { on_delete_(this); }
 
-  void setWatermarks(uint32_t watermark, uint32_t) override {
+  void setWatermarks(uint32_t watermark, uint32_t overload) override {
     update_high_watermark_(watermark);
-    WatermarkBuffer::setWatermarks(watermark);
+    WatermarkBuffer::setWatermarks(watermark, overload);
   }
 
   void bindAccount(BufferMemoryAccountSharedPtr account) override {
