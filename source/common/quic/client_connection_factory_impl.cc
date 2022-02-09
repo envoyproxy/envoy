@@ -50,6 +50,18 @@ std::unique_ptr<quic::SessionCache> PersistentQuicInfoImpl::getQuicSessionCacheD
   return std::make_unique<QuicSessionCacheDelegate>(session_cache_);
 }
 
+std::unique_ptr<PersistentQuicInfoImpl>
+createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
+                                   const Upstream::ClusterInfo& cluster) {
+  auto quic_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
+      dispatcher, cluster.perConnectionBufferLimitBytes());
+  Quic::convertQuicConfig(cluster.http3Options().quic_protocol_options(), quic_info->quic_config_);
+  quic::QuicTime::Delta crypto_timeout =
+      quic::QuicTime::Delta::FromMilliseconds(cluster.connectTimeout().count());
+  quic_info->quic_config_.set_max_time_before_crypto_handshake(crypto_timeout);
+  return quic_info;
+}
+
 std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     Http::PersistentQuicInfo& info, std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
     const quic::QuicServerId& server_id, Event::Dispatcher& dispatcher,

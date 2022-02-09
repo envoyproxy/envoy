@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/http/persist_quic_info.h"
+#include "envoy/upstream/upstream.h"
 
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_client_session.h"
@@ -38,6 +39,10 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   EnvoyQuicCryptoClientStreamFactoryImpl crypto_stream_factory_;
   quic::QuicClientSessionCache session_cache_;
 };
+
+std::unique_ptr<PersistentQuicInfoImpl>
+createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
+                                   const Upstream::ClusterInfo& cluster);
 
 std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     Http::PersistentQuicInfo& info, std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,

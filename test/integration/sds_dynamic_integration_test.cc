@@ -297,22 +297,7 @@ resources:
           address, Network::Address::InstanceConstSharedPtr(),
           client_ssl_ctx_->createTransportSocket(nullptr), nullptr);
     }
-#ifdef ENVOY_ENABLE_QUIC
-    std::string url = "udp://" + Network::Test::getLoopbackAddressUrlString(version_) + ":" +
-                      std::to_string(port);
-    Network::Address::InstanceConstSharedPtr local_address;
-    if (version_ == Network::Address::IpVersion::v4) {
-      local_address = Network::Utility::getLocalAddress(Network::Address::IpVersion::v4);
-    } else {
-      // Docker only works with loopback v6 address.
-      local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
-    }
-    return Quic::createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_,
-                                             Network::Utility::resolveUrl(url), local_address,
-                                             quic_stat_names_, {}, stats_store_);
-#else
-    PANIC("reached unexpected code");
-#endif
+    return makeClientConnectionWithOptions(port, nullptr);
   }
 
 protected:

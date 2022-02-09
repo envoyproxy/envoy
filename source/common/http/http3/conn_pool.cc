@@ -105,14 +105,19 @@ std::unique_ptr<Network::ClientConnection>
 Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
                                           OptRef<Http::AlternateProtocolsCache> rtt_cache,
                                           Stats::Scope& scope) {
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config = cryptoConfig();
+  if (crypto_config == nullptr) {
+    return nullptr; // no secrets available yet.
+  }
   auto source_address = host()->cluster().sourceAddress();
   if (!source_address.get()) {
     auto host_address = host()->address();
     source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
   }
-  return Quic::createQuicNetworkConnection(quic_info_, cryptoConfig(), server_id_, dispatcher(),
-                                           host()->address(), source_address, quic_stat_names,
-                                           rtt_cache, scope);
+
+  return Quic::createQuicNetworkConnection(quic_info_, std::move(crypto_config), server_id_,
+                                           dispatcher(), host()->address(), source_address,
+                                           quic_stat_names, rtt_cache, scope);
 }
 
 std::unique_ptr<Http3ConnPoolImpl>

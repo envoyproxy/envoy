@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
 
@@ -21,6 +23,21 @@ class QuicNetworkConnectionTest : public Event::TestUsingSimulatedTime,
                                   public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   void initialize() {
+    EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes()).WillOnce(Return(45));
+    EXPECT_CALL(*cluster_, connectTimeout).WillOnce(Return(std::chrono::seconds(10)));
+    auto* protocol_options = cluster_->http3_options_.mutable_quic_protocol_options();
+    protocol_options->mutable_max_concurrent_streams()->set_value(43);
+    protocol_options->mutable_initial_stream_window_size()->set_value(65555);
+    quic_info_ = createPersistentQuicInfoForCluster(dispatcher_, *cluster_);
+    EXPECT_EQ(quic_info_->quic_config_.max_time_before_crypto_handshake(),
+              quic::QuicTime::Delta::FromSeconds(10));
+    EXPECT_EQ(quic_info_->quic_config_.GetMaxBidirectionalStreamsToSend(),
+              protocol_options->max_concurrent_streams().value());
+    EXPECT_EQ(quic_info_->quic_config_.GetMaxUnidirectionalStreamsToSend(),
+              protocol_options->max_concurrent_streams().value());
+    EXPECT_EQ(quic_info_->quic_config_.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend(),
+              protocol_options->initial_stream_window_size().value());
+
     test_address_ = Network::Utility::resolveUrl(
         absl::StrCat("tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":30"));
     Ssl::ClientContextSharedPtr context{new Ssl::MockClientContext()};
@@ -30,6 +47,9 @@ protected:
         std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
             new NiceMock<Ssl::MockClientContextConfig>),
         context_);
+    crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
+        std::make_unique<Quic::EnvoyQuicProofVerifier>(factory_->sslCtx()),
+        quic_info_->getQuicSessionCacheDelegate());
   }
 
   uint32_t highWatermark(EnvoyQuicClientSession* session) {
@@ -37,6 +57,7 @@ protected:
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
+  std::unique_ptr<PersistentQuicInfoImpl> quic_info_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
   NiceMock<Random::MockRandomGenerator> random_;
@@ -44,6 +65,7 @@ protected:
   Network::Address::InstanceConstSharedPtr test_address_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   Stats::IsolatedStoreImpl store_;
   QuicStatNames quic_stat_names_{store_.symbolTable()};
 };
@@ -51,12 +73,11 @@ protected:
 TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   initialize();
 
-  quic::QuicConfig config;
   const int port = 30;
-  PersistentQuicInfoImpl info{dispatcher_, *factory_, simTime(), port, config, 45};
-
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
-      info, dispatcher_, test_address_, test_address_, quic_stat_names_, {}, store_);
+      *quic_info_, crypto_config_,
+      quic::QuicServerId{factory_->clientContextConfig().serverNameIndication(), port, false},
+      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, store_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
   client_connection->connect();
