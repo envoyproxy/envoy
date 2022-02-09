@@ -27,10 +27,7 @@ IoUringFactoryImpl::IoUringFactoryImpl() {
   is_instantiated_ = true;
 }
 
-IoUring& IoUringFactoryImpl::getOrCreate() const {
-  static thread_local IoUringImpl uring(io_uring_size_, use_submission_queue_polling_);
-  return uring;
-}
+IoUring& IoUringFactoryImpl::getOrCreate() const { return tls_->getTyped<IoUringImpl>(); }
 
 Server::BootstrapExtensionPtr
 IoUringFactoryImpl::createBootstrapExtension(const Protobuf::Message& config,
@@ -40,7 +37,16 @@ IoUringFactoryImpl::createBootstrapExtension(const Protobuf::Message& config,
           config, context.messageValidationContext().staticValidationVisitor());
   io_uring_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(typed_config, io_uring_size, DefaultIoUringSize);
   use_submission_queue_polling_ = typed_config.use_submission_queue_polling();
+
+  tls_ = context.threadLocal().allocateSlot();
   return std::make_unique<IoUringExtension>(*this);
+}
+
+void IoUringFactoryImpl::initialize() {
+  tls_->set([io_uring_size = io_uring_size_,
+             use_submission_queue_polling = use_submission_queue_polling_](Event::Dispatcher&) {
+    return std::make_shared<IoUringImpl>(io_uring_size, use_submission_queue_polling);
+  });
 }
 
 ProtobufTypes::MessagePtr IoUringFactoryImpl::createEmptyConfigProto() {

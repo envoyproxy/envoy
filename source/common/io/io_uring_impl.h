@@ -7,20 +7,10 @@
 namespace Envoy {
 namespace Io {
 
-class IoUringExtension : public Server::BootstrapExtension {
-public:
-  IoUringExtension(IoUringFactory& factory) : factory_(factory) {}
-
-  // Server::BootstrapExtension
-  void onServerInitialized() override {}
-
-protected:
-  IoUringFactory& factory_;
-};
-
 class IoUringFactoryImpl : public IoUringFactoryBase {
 public:
   IoUringFactoryImpl();
+  void initialize();
 
   // IoUringFactory
   IoUring& getOrCreate() const override;
@@ -35,11 +25,23 @@ public:
 private:
   uint32_t io_uring_size_{};
   bool use_submission_queue_polling_{};
+  ThreadLocal::SlotPtr tls_;
 
   static thread_local bool is_instantiated_;
 };
 
-class IoUringImpl : public IoUring {
+class IoUringExtension : public Server::BootstrapExtension {
+public:
+  IoUringExtension(IoUringFactoryImpl& factory) : factory_(factory) {}
+
+  // Server::BootstrapExtension
+  void onServerInitialized() override { factory_.initialize(); }
+
+protected:
+  IoUringFactoryImpl& factory_;
+};
+
+class IoUringImpl : public IoUring, public ThreadLocal::ThreadLocalObject {
 public:
   IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling);
   ~IoUringImpl() override;
