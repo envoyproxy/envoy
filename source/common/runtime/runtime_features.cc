@@ -54,13 +54,13 @@ RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
 RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
 
 // Begin false flags. These should come with a TODO to flip true.
-// Sentinal and test flag.
+// Sentinel and test flag.
 ABSL_FLAG(bool, envoy_reloadable_features_test_feature_false, false, "");
 // TODO(alyssawilk, junr03) flip (and add release notes + docs) these after Lyft tests
 ABSL_FLAG(bool, envoy_reloadable_features_allow_multiple_dns_addresses, false, "");
 // TODO(adisuissa) reset to true to enable unified mux by default
 ABSL_FLAG(bool, envoy_reloadable_features_unified_mux, false, "");
-// TODO(birenroy) reset to true after bugfixes
+// TODO(birenroy) reset to true after bug fixes
 ABSL_FLAG(bool, envoy_reloadable_features_http2_new_codec_wrapper, false, "");
 
 // Block of non-boolean flags. These are deprecated.Do not add more.

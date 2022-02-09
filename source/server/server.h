@@ -358,7 +358,7 @@ private:
   std::unique_ptr<AdminImpl> admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
-  std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
+  Runtime::LoaderPtr runtime_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;

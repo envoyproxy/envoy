@@ -620,8 +620,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
-  runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
-      component_factory.createRuntime(*this, initial_config));
+  runtime_ = component_factory.createRuntime(*this, initial_config);
   initial_config.initAdminAccessLog(bootstrap_, *this);
 
   if (initial_config.admin().address()) {

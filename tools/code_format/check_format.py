@@ -520,16 +520,17 @@ class FormatChecker:
     def check_runtime_flags(self, file_path, error_messages):
         previous_flag = ""
         for line_number, line in enumerate(self.read_lines(file_path)):
-          if line.startswith("RUNTIME_GUARD"):
-            match = FLAG_REGEX.match(line)
-            if not match:
-                error_messages.append("%s does not look like a reloadable flag" % line)
-                break
+            if line.startswith("RUNTIME_GUARD"):
+                match = FLAG_REGEX.match(line)
+                if not match:
+                    error_messages.append("%s does not look like a reloadable flag" % line)
+                    break
 
-            if previous_flag:
-                if line < previous_flag and match.groups()[0] not in UNSORTED_FLAGS:
-                    error_messages.append("%s and %s are out of order\n" % (line, previous_flag))
-            previous_flag = line
+                if previous_flag:
+                    if line < previous_flag and match.groups()[0] not in UNSORTED_FLAGS:
+                        error_messages.append(
+                            "%s and %s are out of order\n" % (line, previous_flag))
+                previous_flag = line
 
     def check_file_contents(self, file_path, checker):
         error_messages = []
