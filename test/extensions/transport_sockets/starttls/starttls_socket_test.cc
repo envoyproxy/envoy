@@ -113,6 +113,9 @@ TEST(StartTls, BasicFactoryTest) {
       Network::TransportSocketFactoryPtr(raw_buffer_factory),
       Network::TransportSocketFactoryPtr(ssl_factory));
   ASSERT_FALSE(factory->implementsSecureTransport());
+  std::vector<uint8_t> key;
+  factory->hashKey(key, nullptr);
+  EXPECT_EQ(0, key.size());
 }
 
 } // namespace StartTls

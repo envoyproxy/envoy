@@ -917,6 +917,12 @@ TEST_F(TsiSocketFactoryTest, ImplementsSecureTransport) {
   EXPECT_TRUE(socket_factory_->implementsSecureTransport());
 }
 
+TEST_F(TsiSocketFactoryTest, HashKey) {
+  std::vector<uint8_t> key;
+  socket_factory_->hashKey(key, nullptr);
+  EXPECT_EQ(0, key.size());
+}
+
 } // namespace
 } // namespace Alts
 } // namespace TransportSockets
