@@ -1,7 +1,6 @@
 #include "source/common/common/thread.h"
 
 #include <thread>
-
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
 
@@ -40,8 +39,10 @@ struct ThreadIds {
   // properly.
   void releaseMainThread() {
     absl::MutexLock lock(&mutex_);
-    ASSERT(main_thread_use_count_ > 0);
-    ASSERT(std::this_thread::get_id() == main_thread_id_);
+    if (!skipAsserts()) {
+      ASSERT(main_thread_use_count_ > 0);
+      ASSERT(std::this_thread::get_id() == main_thread_id_);
+    }
     if (--main_thread_use_count_ == 0) {
       // Clearing the thread ID when its use-count goes to zero allows us
       // to read the atomic without taking a lock.
@@ -53,7 +54,7 @@ struct ThreadIds {
   // thread matches any previous declarations.
   void registerMainThread() {
     absl::MutexLock lock(&mutex_);
-    if (++main_thread_use_count_ > 1) {
+    if (++main_thread_use_count_ > 1 && !skipAsserts()) {
       ASSERT(std::this_thread::get_id() == main_thread_id_);
     } else {
       main_thread_id_ = std::this_thread::get_id();

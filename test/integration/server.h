@@ -446,7 +446,8 @@ public:
       Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
       uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
       Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
-      Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false);
+      Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false,
+      bool skip_asserts = false);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -475,7 +476,7 @@ public:
              ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
              uint32_t concurrency, std::chrono::seconds drain_time,
              Server::DrainStrategy drain_strategy,
-             Buffer::WatermarkFactorySharedPtr watermark_factory);
+             Buffer::WatermarkFactorySharedPtr watermark_factory, bool skip_asserts);
 
   void waitForCounterEq(const std::string& name, uint64_t value,
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
@@ -561,6 +562,7 @@ public:
   virtual Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() PURE;
   void useAdminInterfaceToQuit(bool use) { use_admin_interface_to_quit_ = use; }
   bool useAdminInterfaceToQuit() { return use_admin_interface_to_quit_; }
+  bool skipAsserts() const { return skip_asserts_; }
 
 protected:
   IntegrationTestServer(Event::TestTimeSystem& time_system, Api::Api& api,
@@ -593,8 +595,9 @@ private:
                      ProcessObjectOptRef process_object,
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-                     Buffer::WatermarkFactorySharedPtr watermark_factory);
+                     Buffer::WatermarkFactorySharedPtr watermark_factory, bool skip_asserts);
 
+  bool skip_asserts_;
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;
   const std::string config_path_;
@@ -647,6 +650,7 @@ private:
 
   // Owned by this class. An owning pointer is not used because the actual allocation is done
   // on a stack in a non-main thread.
+  std::unique_ptr<Thread::SkipAsserts> skip;
   Server::Instance* server_{};
   Stats::Store* stat_store_{};
   Network::Address::InstanceConstSharedPtr admin_address_;

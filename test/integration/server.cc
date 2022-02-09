@@ -59,7 +59,8 @@ IntegrationTestServerPtr IntegrationTestServer::create(
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
     ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
     uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-    Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_real_stats) {
+    Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_real_stats,
+    bool skip_asserts) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path, use_real_stats)};
   if (server_ready_function != nullptr) {
@@ -67,7 +68,7 @@ IntegrationTestServerPtr IntegrationTestServer::create(
   }
   server->start(version, on_server_init_function, deterministic_value, defer_listener_finalization,
                 process_object, validation_config, concurrency, drain_time, drain_strategy,
-                watermark_factory);
+                watermark_factory, skip_asserts);
   return server;
 }
 
@@ -100,14 +101,14 @@ void IntegrationTestServer::start(
     absl::optional<uint64_t> deterministic_value, bool defer_listener_finalization,
     ProcessObjectOptRef process_object, Server::FieldValidationConfig validator_config,
     uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-    Buffer::WatermarkFactorySharedPtr watermark_factory) {
+    Buffer::WatermarkFactorySharedPtr watermark_factory, bool skip_asserts) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
   thread_ = api_.threadFactory().createThread([version, deterministic_value, process_object,
                                                validator_config, concurrency, drain_time,
-                                               drain_strategy, watermark_factory, this]() -> void {
+                                               drain_strategy, watermark_factory, this, skip_asserts]() -> void {
     threadRoutine(version, deterministic_value, process_object, validator_config, concurrency,
-                  drain_time, drain_strategy, watermark_factory);
+                  drain_time, drain_strategy, watermark_factory, skip_asserts);
   });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
@@ -186,7 +187,9 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
                                           Server::FieldValidationConfig validation_config,
                                           uint32_t concurrency, std::chrono::seconds drain_time,
                                           Server::DrainStrategy drain_strategy,
-                                          Buffer::WatermarkFactorySharedPtr watermark_factory) {
+                                          Buffer::WatermarkFactorySharedPtr watermark_factory,
+                                          bool skip_asserts) {
+  skip_asserts_ = skip_asserts;
   OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version, validation_config,
                                                     concurrency, drain_time, drain_strategy));
   Thread::MutexBasicLockable lock;
@@ -220,6 +223,9 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Random::RandomGeneratorPtr&& random_generator, ProcessObjectOptRef process_object,
     Buffer::WatermarkFactorySharedPtr watermark_factory) {
   {
+    if (skipAsserts()) {
+      skip = std::make_unique<Thread::SkipAsserts>();
+    }
     Init::ManagerImpl init_manager{"Server"};
     Server::HotRestartNopImpl restarter;
     ThreadLocal::InstanceImpl tls;

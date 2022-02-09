@@ -405,6 +405,7 @@ protected:
   bool tls_xds_upstream_{false};
   bool use_lds_{true}; // Use the integration framework's LDS set up.
   bool upstream_tls_{false};
+  bool skip_asserts_{false};
 
   Network::TransportSocketFactoryPtr
   createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config);
