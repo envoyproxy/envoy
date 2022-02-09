@@ -69,7 +69,7 @@ build:tsan-dev --test_env="TSAN_OPTIONS=report_atomic_races=0"
 
 # Exclude debug info from the release binary since it makes it too large to fit
 # into a zip file. This shouldn't affect crash reports.
-build:release-common --define=no_debug_info=1
+build:release-ios --define=no_debug_info=1
 
 # Flags for release builds targeting iOS
 build:release-ios --apple_bitcode=embedded

@@ -53,6 +53,13 @@ def android_artifacts(name, android_library, manifest, archive_name, native_deps
     _jni_archive = _create_jni_library(name, native_deps)
     _aar_output = _create_aar(name, archive_name, _classes_jar, _jni_archive, proguard_rules, visibility)
 
+    native.filegroup(
+        name = name + "_objdump_collector",
+        srcs = native_deps,
+        output_group = "objdump",
+        visibility = ["//visibility:public"],
+    )
+
     # Generate other needed files for a maven publish
     _sources_name, _javadocs_name = _create_sources_javadocs(name, android_library)
     _pom_name = _create_pom_xml(name, android_library, visibility)
