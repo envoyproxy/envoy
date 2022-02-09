@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/common/pure.h"
-#include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 
 #include "source/common/network/address_impl.h"
@@ -106,12 +105,32 @@ class IoUringFactory {
 public:
   virtual ~IoUringFactory() = default;
 
+  /**
+   * Returns an instance of IoUring and creates it if needed for the current
+   * thread.
+   */
   virtual IoUring& getOrCreate() const PURE;
 };
 
+/**
+ * Class to be derived by all IoUringFactory implementations.
+ *
+ * It acts both as a IoUringFactory ans ad a BootstrapExtensionFactory. The
+ * latter is used, on the one hand, to configure and initialize the factory, on
+ * the other, for IoUringFactory lookup by leveraging the FactoryRegistry. As
+ * required for all bootstrap extensions, all derived classes should register
+ * via the REGISTER_FACTORY() macro as BootstrapExtensionFactory.
+ *
+ * IoUringFactory instances can be retrieved using the factory name, i.e.,
+ * string returned by name() function implemented by all classes that derive
+ * IoUringFactoryBase, via Io::ioUringFactory().
+ */
 class IoUringFactoryBase : public IoUringFactory,
                            public Server::Configuration::BootstrapExtensionFactory {};
 
+/*
+ * Lookup IoUringFactory instance by name.
+ */
 static inline const IoUringFactory* ioUringFactory(std::string name) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::getFactory(name);

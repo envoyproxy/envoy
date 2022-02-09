@@ -158,11 +158,12 @@ TEST_F(IoUringImplTest, PrepareReadvAllDataFitsOneChunk) {
   int32_t completions_nr = 0;
   auto file_event = dispatcher->createFileEvent(
       event_fd,
-      [&uring, &completions_nr](uint32_t) {
+      [&uring, &completions_nr, d = dispatcher.get()](uint32_t) {
         uring.forEveryCompletion([&completions_nr](void*, int32_t res) {
           completions_nr++;
           EXPECT_EQ(res, strlen("test text"));
         });
+        d->exit();
       },
       trigger, Event::FileReadyType::Read);
 
@@ -170,7 +171,7 @@ TEST_F(IoUringImplTest, PrepareReadvAllDataFitsOneChunk) {
   EXPECT_STREQ(static_cast<char*>(iov.iov_base), "");
   uring.submit();
 
-  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher->run(Event::Dispatcher::RunType::Block);
 
   // Check that the completion callback has been actually called.
   EXPECT_EQ(completions_nr, 1);
@@ -211,7 +212,7 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
           EXPECT_TRUE(user_data != nullptr);
           EXPECT_EQ(res, 2);
           completions_nr++;
-          // Note: generally events are not guarranteed to complete in the same order
+          // Note: generally events are not guaranteed to complete in the same order
           // we submit them, but for this case of reading from a single file it's ok
           // to expect the same order.
           EXPECT_EQ(reinterpret_cast<int64_t>(user_data), completions_nr);
