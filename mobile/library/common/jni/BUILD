@@ -1,4 +1,5 @@
 load("//bazel:kotlin_lib.bzl", "envoy_mobile_so_to_jni_lib")
+load("//bazel:android_debug_info.bzl", "android_debug_info")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_mobile_test_extensions.bzl", "TEST_EXTENSIONS")
@@ -59,13 +60,18 @@ cc_binary(
         "-llog",
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
-        "//conditions:default": ["-Wl,-s"],
+        "//conditions:default": [],
     }),
     linkshared = True,
     deps = [
         ":envoy_jni_lib",
         "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
     ],
+)
+
+android_debug_info(
+    name = "libenvoy_jni.so.debug_info",
+    dep = "libenvoy_jni.so",
 )
 
 ## Targets for local execution

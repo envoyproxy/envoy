@@ -8,6 +8,7 @@
 /dist/*pom.xml
 /dist/*.aar
 /dist/*.jar
+/dist/*.objdump
 /dist/envoy_aar_sources.zip
 /dist/Envoy.framework
 /dist/*.asc
