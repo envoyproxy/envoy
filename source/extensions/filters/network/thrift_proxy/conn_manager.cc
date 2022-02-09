@@ -124,8 +124,6 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
   case DirectResponse::ResponseType::Exception:
     stats_.response_exception_.inc();
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
