@@ -101,7 +101,8 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmHttpFilterTest,
-                         Envoy::Extensions::Common::Wasm::runtime_and_language_values);
+                         Envoy::Extensions::Common::Wasm::runtime_and_language_values,
+                         Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 // Bad code in initial config.
 TEST_P(WasmHttpFilterTest, BadCode) {
@@ -944,10 +945,6 @@ TEST_P(WasmHttpFilterTest, AsyncCallAfterDestroyed) {
 }
 
 TEST_P(WasmHttpFilterTest, GrpcCall) {
-  if (std::get<0>(GetParam()) == "wamr" && std::get<1>(GetParam()) == "rust") {
-    // WAMR hardcodes 16 KiB stack, which is too small to decode protobufs in Rust.
-    return;
-  }
   std::vector<std::string> proto_or_cluster;
   proto_or_cluster.push_back("grpc_call");
   if (std::get<1>(GetParam()) == "cpp") {
@@ -1380,10 +1377,6 @@ void WasmHttpFilterTest::setupGrpcStreamTest(Grpc::RawAsyncStreamCallbacks*& cal
 }
 
 TEST_P(WasmHttpFilterTest, GrpcStream) {
-  if (std::get<0>(GetParam()) == "wamr" && std::get<1>(GetParam()) == "rust") {
-    // WAMR hardcodes 16 KiB stack, which is too small to decode protobufs in Rust.
-    return;
-  }
   std::vector<std::string> proto_or_cluster;
   proto_or_cluster.push_back("grpc_stream");
   if (std::get<1>(GetParam()) == "cpp") {
@@ -1446,10 +1439,6 @@ TEST_P(WasmHttpFilterTest, GrpcStream) {
 
 // Local close followed by remote close.
 TEST_P(WasmHttpFilterTest, GrpcStreamCloseLocal) {
-  if (std::get<0>(GetParam()) == "wamr" && std::get<1>(GetParam()) == "rust") {
-    // WAMR hardcodes 16 KiB stack, which is too small to decode protobufs in Rust.
-    return;
-  }
   std::vector<std::string> proto_or_cluster;
   proto_or_cluster.push_back("grpc_stream");
   if (std::get<1>(GetParam()) == "cpp") {
@@ -1511,10 +1500,6 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseLocal) {
 
 // Remote close followed by local close.
 TEST_P(WasmHttpFilterTest, GrpcStreamCloseRemote) {
-  if (std::get<0>(GetParam()) == "wamr" && std::get<1>(GetParam()) == "rust") {
-    // WAMR hardcodes 16 KiB stack, which is too small to decode protobufs in Rust.
-    return;
-  }
   std::vector<std::string> proto_or_cluster;
   proto_or_cluster.push_back("grpc_stream");
   if (std::get<1>(GetParam()) == "cpp") {
@@ -1626,10 +1611,6 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCancel) {
 }
 
 TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
-  if (std::get<0>(GetParam()) == "wamr" && std::get<1>(GetParam()) == "rust") {
-    // WAMR hardcodes 16 KiB stack, which is too small to decode protobufs in Rust.
-    return;
-  }
   std::vector<std::string> proto_or_cluster;
   proto_or_cluster.push_back("grpc_stream");
   if (std::get<1>(GetParam()) == "cpp") {

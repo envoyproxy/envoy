@@ -58,17 +58,15 @@ constexpr const char* runtime_features[] = {
     // Begin alphabetically sorted section.
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.allow_upstream_inline_write",
+    "envoy.reloadable_features.append_or_truncate",
     "envoy.reloadable_features.conn_pool_delete_when_idle",
     "envoy.reloadable_features.correct_scheme_and_xfp",
     "envoy.reloadable_features.correctly_validate_alpn",
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.enable_grpc_async_client_cache",
     "envoy.reloadable_features.fix_added_trailers",
-    "envoy.reloadable_features.grpc_bridge_stats_disabled",
     "envoy.reloadable_features.handle_stream_reset_during_hcm_encoding",
-    "envoy.reloadable_features.health_check.graceful_goaway_handling",
     "envoy.reloadable_features.http2_allow_capacity_increase_by_settings",
-    "envoy.reloadable_features.http2_consume_stream_refused_errors",
     "envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect",
     "envoy.reloadable_features.http_reject_path_with_fragment",
     "envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled",
@@ -77,12 +75,10 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.listener_reuse_port_default_enabled",
     "envoy.reloadable_features.listener_wildcard_match_ip_family",
     "envoy.reloadable_features.new_tcp_connection_pool",
-    "envoy.reloadable_features.no_chunked_encoding_header_for_304",
     "envoy.reloadable_features.proxy_102_103",
     "envoy.reloadable_features.remove_legacy_json",
+    "envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints",
     "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place",
-    "envoy.reloadable_features.udp_per_event_loop_read_limit",
-    "envoy.reloadable_features.unquote_log_string_values",
     "envoy.reloadable_features.update_expected_rq_timeout_on_retry",
     "envoy.reloadable_features.use_dns_ttl",
     "envoy.reloadable_features.validate_connect",
@@ -111,7 +107,7 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.test_feature_false",
     // TODO(dmitri-d) reset to true to enable unified mux by default
     "envoy.reloadable_features.unified_mux",
-    // TODO(birenroy): flip to true in a future PR to enable by default
+    // TODO(birenroy) flip after https://github.com/envoyproxy/envoy/issues/19761 sorted.
     "envoy.reloadable_features.http2_new_codec_wrapper",
 };
 

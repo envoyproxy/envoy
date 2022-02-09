@@ -153,9 +153,8 @@ void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) 
   ASSERT_EQ(response->headers().get(Http::LowerCaseString("alpn"))[0]->value().getStringView(),
             expected_alpn);
 
-  ASSERT_FALSE(response->trailers()->get(Http::LowerCaseString("upstream_connect_start")).empty());
-  ASSERT_FALSE(
-      response->trailers()->get(Http::LowerCaseString("upstream_connect_complete")).empty());
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("upstream_connect_start")).empty());
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("upstream_connect_complete")).empty());
 
   ASSERT_FALSE(response->headers().get(Http::LowerCaseString("num_streams")).empty());
   EXPECT_EQ(
@@ -338,20 +337,14 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBuffe
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
-  if (upstreamProtocol() == Http::CodecType::HTTP3 &&
-      downstreamProtocol() == Http::CodecType::HTTP2) {
-    // This test depends on fragile preconditions.
-    // With HTTP/2 downstream all the requests are processed before the
-    // responses are sent, then the connection read-disable results in not
-    // receiving flow control window updates.
+  // random-pause-filter does not support HTTP3.
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
     return;
   }
-  config_helper_.prependFilter(
-      fmt::format(R"EOF(
-  name: pause-filter{}
+  config_helper_.prependFilter(R"EOF(
+  name: random-pause-filter
   typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty)EOF",
-                  downstreamProtocol() == Http::CodecType::HTTP3 ? "-for-quic" : ""));
+    "@type": type.googleapis.com/google.protobuf.Empty)EOF");
 
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }

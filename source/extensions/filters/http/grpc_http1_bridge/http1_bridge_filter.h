@@ -54,15 +54,7 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
-  bool doStatTracking() const {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_bridge_stats_disabled")) {
-      return false;
-    }
-    return request_stat_names_.has_value();
-  }
-
 private:
-  void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
   void setupStatTracking(const Http::RequestHeaderMap& headers);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
@@ -70,8 +62,6 @@ private:
   Http::ResponseHeaderMap* response_headers_{};
   bool do_bridging_{};
   bool do_framing_{};
-  Upstream::ClusterInfoConstSharedPtr cluster_;
-  absl::optional<Grpc::Context::RequestStatNames> request_stat_names_;
   Grpc::Context& context_;
   bool upgrade_protobuf_{};
 };

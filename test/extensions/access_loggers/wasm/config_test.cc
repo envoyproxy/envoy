@@ -32,10 +32,12 @@ private:
   Stats::Scope& scope_;
 };
 
-class WasmAccessLogConfigTest : public testing::TestWithParam<std::string> {};
+class WasmAccessLogConfigTest
+    : public testing::TestWithParam<std::tuple<std::string, std::string>> {};
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmAccessLogConfigTest,
-                         Envoy::Extensions::Common::Wasm::runtime_values);
+                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values,
+                         Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 TEST_P(WasmAccessLogConfigTest, CreateWasmFromEmpty) {
   auto factory =
@@ -56,12 +58,6 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromEmpty) {
 }
 
 TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
           "envoy.access_loggers.wasm");
@@ -69,9 +65,9 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
 
   envoy::extensions::access_loggers::wasm::v3::WasmAccessLog config;
   config.mutable_config()->mutable_vm_config()->set_runtime(
-      absl::StrCat("envoy.wasm.runtime.", GetParam()));
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
   std::string code;
-  if (GetParam() != "null") {
+  if (std::get<0>(GetParam()) != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         "{{ test_rundir "
         "}}/test/extensions/access_loggers/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"));

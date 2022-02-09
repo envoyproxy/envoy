@@ -22,7 +22,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Wasm {
 
-class WasmNetworkFilterConfigTest : public testing::TestWithParam<std::string> {
+class WasmNetworkFilterConfigTest
+    : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   WasmNetworkFilterConfigTest() : api_(Api::createApiForTest(stats_store_)) {
     ON_CALL(context_, api()).WillByDefault(ReturnRef(*api_));
@@ -57,23 +58,18 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNetworkFilterConfigTest,
-                         Envoy::Extensions::Common::Wasm::runtime_values);
+                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values,
+                         Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"
@@ -106,24 +102,19 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineWasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string code =
-      GetParam() != "null" ? TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-                                 "{{ test_rundir "
-                                 "}}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm/"
-                                 "proxy_wasm_test_cpp.wasm"))
-                           : "NetworkTestCpp";
+      std::get<0>(GetParam()) != "null"
+          ? TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+                "{{ test_rundir "
+                "}}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm/"
+                "proxy_wasm_test_cpp.wasm"))
+          : "NetworkTestCpp";
   EXPECT_FALSE(code.empty());
   const std::string yaml = absl::StrCat(R"EOF(
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                        GetParam(), R"EOF("
+                                        std::get<0>(GetParam()), R"EOF("
       code:
         local: { inline_bytes: ")EOF",
                                         Base64::encode(code.data(), code.size()), R"EOF(" }
@@ -147,7 +138,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCode) {
     name: "test"
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                        GetParam(), R"EOF("
+                                        std::get<0>(GetParam()), R"EOF("
       code:
         local: { inline_string: "bad code" }
   )EOF");
@@ -167,7 +158,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCodeFailOpenNackConfig) {
     fail_open: true
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                        GetParam(), R"EOF("
+                                        std::get<0>(GetParam()), R"EOF("
       code:
         local: { inline_string: "bad code" }
   )EOF");
@@ -181,20 +172,14 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCodeFailOpenNackConfig) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailClosed) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"
@@ -210,13 +195,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailClosed) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
@@ -224,7 +203,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
     fail_open: true
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"
@@ -238,20 +217,14 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefault) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"
@@ -271,20 +244,14 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefaul
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"
@@ -306,20 +273,14 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigAllowOnVmStart) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"

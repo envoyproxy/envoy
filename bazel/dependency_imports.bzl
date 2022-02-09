@@ -1,6 +1,5 @@
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
-load("@bazel_toolchains//rules/exec_properties:exec_properties.bzl", "create_rbe_exec_properties_dict", "custom_exec_properties")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
@@ -34,13 +33,6 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     rules_cc_dependencies()
     rules_cc_toolchains()
     emsdk_emscripten_deps()
-
-    custom_exec_properties(
-        name = "envoy_large_machine_exec_property",
-        constants = {
-            "LARGE_MACHINE": create_rbe_exec_properties_dict(labels = dict(size = "large")),
-        },
-    )
 
     # These dependencies, like most of the Go in this repository, exist only for the API.
     go_repository(
