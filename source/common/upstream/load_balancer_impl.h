@@ -384,6 +384,8 @@ private:
   std::vector<PerPriorityStatePtr> per_priority_state_;
   Common::CallbackHandlePtr priority_update_cb_;
   Common::CallbackHandlePtr local_priority_set_member_update_cb_handle_;
+
+  friend class TestZoneAwareLoadBalancer;
 };
 
 /**
