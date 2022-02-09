@@ -372,8 +372,8 @@ message Cluster {
 
     // Configures the minimum percentage of origin weight that avoids too small new weight,
     // which may cause endpoints in slow start mode receive no traffic in slow start window.
-    // Range between (0.0, 1.0). If not specified, the default is 0.1.
-    double min_weight_percent = 3 [(validate.rules).double = {lt: 1.0 gt: 0.0 ignore_empty: true}];
+    // If not specified, the default is 10%.
+    type.v3.Percent min_weight_percent = 3;
   }
 
   // Specific configuration for the RoundRobin load balancing policy.

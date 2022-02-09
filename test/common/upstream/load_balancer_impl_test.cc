@@ -1597,7 +1597,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithDefaultParams) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithMinWeightPercent) {
-  round_robin_lb_config_.mutable_slow_start_config()->set_min_weight_percent(0.3);
+  round_robin_lb_config_.mutable_slow_start_config()->mutable_min_weight_percent()->set_value(30);
   init(false);
   const auto slow_start_window =
       EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(*lb_));
@@ -1611,57 +1611,6 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithMinWeightPercent) {
   const auto min_weight_percent =
       EdfLoadBalancerBasePeer::minWeightPercent(static_cast<EdfLoadBalancerBase&>(*lb_));
   EXPECT_DOUBLE_EQ(min_weight_percent, 0.3);
-}
-
-TEST_P(RoundRobinLoadBalancerTest, SlowStartWithMinWeightPercentGT1) {
-  round_robin_lb_config_.mutable_slow_start_config()->set_min_weight_percent(1.1);
-  init(false);
-  const auto slow_start_window =
-      EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(0), slow_start_window);
-  const auto aggression =
-      EdfLoadBalancerBasePeer::aggression(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(1.0, aggression);
-  const auto latest_host_added_time =
-      EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);
-  const auto min_weight_percent =
-      EdfLoadBalancerBasePeer::minWeightPercent(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_DOUBLE_EQ(min_weight_percent, 0.1);
-}
-
-TEST_P(RoundRobinLoadBalancerTest, SlowStartWithMinWeightPercentLT0) {
-  round_robin_lb_config_.mutable_slow_start_config()->set_min_weight_percent(-1.1);
-  init(false);
-  const auto slow_start_window =
-      EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(0), slow_start_window);
-  const auto aggression =
-      EdfLoadBalancerBasePeer::aggression(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(1.0, aggression);
-  const auto latest_host_added_time =
-      EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);
-  const auto min_weight_percent =
-      EdfLoadBalancerBasePeer::minWeightPercent(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_DOUBLE_EQ(min_weight_percent, 0.1);
-}
-
-TEST_P(RoundRobinLoadBalancerTest, SlowStartWithMinWeightPercentEQ1) {
-  round_robin_lb_config_.mutable_slow_start_config()->set_min_weight_percent(1);
-  init(false);
-  const auto slow_start_window =
-      EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(0), slow_start_window);
-  const auto aggression =
-      EdfLoadBalancerBasePeer::aggression(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(1.0, aggression);
-  const auto latest_host_added_time =
-      EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);
-  const auto min_weight_percent =
-      EdfLoadBalancerBasePeer::minWeightPercent(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_DOUBLE_EQ(min_weight_percent, 0.1);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
@@ -1945,7 +1894,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitNonLinearAggression) {
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitMinWeightPercent35) {
   round_robin_lb_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
-  round_robin_lb_config_.mutable_slow_start_config()->set_min_weight_percent(0.35);
+  round_robin_lb_config_.mutable_slow_start_config()->mutable_min_weight_percent()->set_value(35);
   simTime().advanceTimeWait(std::chrono::seconds(1));
   auto host1 = makeTestHost(info_, "tcp://127.0.0.1:80", simTime());
   host_set_.hosts_ = {host1};
