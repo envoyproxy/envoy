@@ -5,8 +5,8 @@ import Foundation
 /// Note: -1 means "not present" for the fields of type Int64.
 @objcMembers
 public final class FinalStreamIntel: StreamIntel {
-  /// The time the request started, in ms since the epoch.
-  public let requestStartMs: Int64
+  /// The time the stream started (a.k.a. request started), in ms since the epoch.
+  public let streamStartMs: Int64
   /// The time the DNS resolution for this request started, in ms since the epoch.
   public let dnsStartMs: Int64
   /// The time the DNS resolution for this request completed, in ms since the epoch.
@@ -26,7 +26,7 @@ public final class FinalStreamIntel: StreamIntel {
   /// The time the first byte of the response was received, in ms since the epoch.
   public let responseStartMs: Int64
   /// The time the last byte of the request was received, in ms since the epoch.
-  public let requestEndMs: Int64
+  public let streamEndMs: Int64
   /// True if the upstream socket had been used previously.
   public let socketReused: Bool
   /// The number of bytes sent upstream.
@@ -42,7 +42,7 @@ public final class FinalStreamIntel: StreamIntel {
     streamId: Int64,
     connectionId: Int64,
     attemptCount: UInt64,
-    requestStartMs: Int64,
+    streamStartMs: Int64,
     dnsStartMs: Int64,
     dnsEndMs: Int64,
     connectStartMs: Int64,
@@ -52,13 +52,13 @@ public final class FinalStreamIntel: StreamIntel {
     sendingStartMs: Int64,
     sendingEndMs: Int64,
     responseStartMs: Int64,
-    requestEndMs: Int64,
+    streamEndMs: Int64,
     socketReused: Bool,
     sentByteCount: UInt64,
     receivedByteCount: UInt64,
     responseFlags: UInt64
   ) {
-    self.requestStartMs = requestStartMs
+    self.streamStartMs = streamStartMs
     self.dnsStartMs = dnsStartMs
     self.dnsEndMs = dnsEndMs
     self.connectStartMs = connectStartMs
@@ -68,7 +68,7 @@ public final class FinalStreamIntel: StreamIntel {
     self.sendingStartMs = sendingStartMs
     self.sendingEndMs = sendingEndMs
     self.responseStartMs = responseStartMs
-    self.requestEndMs = requestEndMs
+    self.streamEndMs = streamEndMs
     self.socketReused = socketReused
     self.sentByteCount = sentByteCount
     self.receivedByteCount = receivedByteCount
@@ -83,7 +83,7 @@ extension FinalStreamIntel {
       streamId: cIntel.stream_id,
       connectionId: cIntel.connection_id,
       attemptCount: cIntel.attempt_count,
-      requestStartMs: cFinalIntel.request_start_ms,
+      streamStartMs: cFinalIntel.stream_start_ms,
       dnsStartMs: cFinalIntel.dns_start_ms,
       dnsEndMs: cFinalIntel.dns_end_ms,
       connectStartMs: cFinalIntel.connect_start_ms,
@@ -93,7 +93,7 @@ extension FinalStreamIntel {
       sendingStartMs: cFinalIntel.sending_start_ms,
       sendingEndMs: cFinalIntel.sending_end_ms,
       responseStartMs: cFinalIntel.response_start_ms,
-      requestEndMs: cFinalIntel.request_end_ms,
+      streamEndMs: cFinalIntel.stream_end_ms,
       socketReused: cFinalIntel.socket_reused != 0,
       sentByteCount: cFinalIntel.sent_byte_count,
       receivedByteCount: cFinalIntel.received_byte_count,
