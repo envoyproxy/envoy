@@ -62,6 +62,7 @@ bool LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params) {
   std::string value = params.begin()->second;
 
   if (key == "paths") {
+    // Bulk change log level by name:level pairs
     bool ret = true;
     auto pairs = StringUtil::splitToken(value, ",", /*keep_empty_string=*/false,
                                         /*trim_whitespace=*/true);
@@ -77,59 +78,72 @@ bool LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params) {
     }
 
     return ret;
+  } else if (key == "level") {
+    // Change all log levels
+    return changeAllLogLevels(value);
+  } else {
+    // Change specific log level by its name
+    return changeLogLevelByName(key, value);
   }
-
-  return changeLogLevelByName(key, value);
 }
 
-bool LogsHandler::changeLogLevelByName(const std::string& name, const std::string& level) {
-  // First see if the level is valid.
-  size_t level_to_use = std::numeric_limits<size_t>::max();
+static bool parseLevel(const std::string& level, spdlog::level::level_enum& level_to_use) {
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
     if (level == spdlog::level::level_string_views[i]) {
-      level_to_use = i;
-      break;
+      level_to_use = static_cast<spdlog::level::level_enum>(i);
+      return true;
     }
   }
 
-  if (level_to_use == std::numeric_limits<size_t>::max()) {
+  return false;
+}
+
+bool LogsHandler::changeAllLogLevels(const std::string& level) {
+  spdlog::level::level_enum level_to_use;
+  if (!parseLevel(level, level_to_use)) {
     return false;
   }
 
   if (!Logger::Context::useFancyLogger()) {
-    // Now either change all levels or a single level.
-    if (name == "level") {
-      ENVOY_LOG(debug, "change all log levels: level='{}'", level);
-      for (Logger::Logger& logger : Logger::Registry::loggers()) {
-        logger.setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
-      }
-    } else {
-      ENVOY_LOG(debug, "change log level: name='{}' level='{}'", name, level);
-      Logger::Logger* logger_to_change = nullptr;
-      for (Logger::Logger& logger : Logger::Registry::loggers()) {
-        if (logger.name() == name) {
-          logger_to_change = &logger;
-          break;
-        }
-      }
-
-      if (!logger_to_change) {
-        return false;
-      }
-
-      logger_to_change->setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
+    ENVOY_LOG(debug, "change all log levels: level='{}'", level);
+    for (Logger::Logger& logger : Logger::Registry::loggers()) {
+      logger.setLevel(level_to_use);
     }
   } else {
     // Level setting with Fancy Logger.
-    spdlog::level::level_enum lv = static_cast<spdlog::level::level_enum>(level_to_use);
-    if (name == "level") {
-      FANCY_LOG(info, "change all log levels: level='{}'", level);
-      getFancyContext().setAllFancyLoggers(lv);
-    } else {
-      FANCY_LOG(info, "change log level: name='{}' level='{}'", name, level);
-      bool res = getFancyContext().setFancyLogger(name, lv);
-      return res;
+    FANCY_LOG(info, "change all log levels: level='{}'", level);
+    getFancyContext().setAllFancyLoggers(level_to_use);
+  }
+
+  return true;
+}
+
+bool LogsHandler::changeLogLevelByName(const std::string& name, const std::string& level) {
+  spdlog::level::level_enum level_to_use;
+  if (!parseLevel(level, level_to_use)) {
+    return false;
+  }
+
+  if (!Logger::Context::useFancyLogger()) {
+    ENVOY_LOG(debug, "change log level: name='{}' level='{}'", name, level);
+    Logger::Logger* logger_to_change = nullptr;
+    for (Logger::Logger& logger : Logger::Registry::loggers()) {
+      if (logger.name() == name) {
+        logger_to_change = &logger;
+        break;
+      }
     }
+
+    if (!logger_to_change) {
+      return false;
+    }
+
+    logger_to_change->setLevel(level_to_use);
+  } else {
+    // Level setting with Fancy Logger.
+    FANCY_LOG(info, "change log level: name='{}' level='{}'", name, level);
+    bool res = getFancyContext().setFancyLogger(name, level_to_use);
+    return res;
   }
 
   return true;
