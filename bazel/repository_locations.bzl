@@ -916,7 +916,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "re2-{version}",
         urls = ["https://github.com/google/re2/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-02-01",
+        release_date = "2022-01-31",
         cpe = "N/A",
     ),
     # Included to access FuzzedDataProvider.h. This is compiler agnostic but
