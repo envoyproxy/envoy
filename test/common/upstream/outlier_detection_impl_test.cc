@@ -632,6 +632,67 @@ TEST_F(OutlierDetectorImplTest, TimeoutWithHttpCode) {
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 }
 
+/*
+ * Test validates scenario when large number of timeouts are
+ * reported to the outlier detector. The first N timeouts will
+ * cause host ejection. Subsequent timeouts, reported while host
+ * is ejected, should not affect unejecting the host.
+ * Any additional timeouts reported after host has been unejected
+ * should cause the host to be ejected again.
+ */
+TEST_F(OutlierDetectorImplTest, LargeNumberOfTimeouts) {
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({
+      "tcp://127.0.0.1:80",
+  });
+
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, outlier_detection_split_, dispatcher_, runtime_, time_system_, event_logger_));
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveLocalOriginFailureRuntime, 100))
+      .WillByDefault(Return(true));
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // Report several LOCAL_ORIGIN_TIMEOUT. Host should be ejected.
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+                       envoy::data::cluster::v3::CONSECUTIVE_LOCAL_ORIGIN_FAILURE, true));
+  // Get the configured number of failures and simulate than number of timeouts.
+  uint32_t n =
+      runtime_.snapshot_.getInteger(Consecutive5xxRuntime, detector->config().consecutive5xx());
+  while (n--) {
+    hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout);
+  }
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  // Simulate more timeouts after the host have been ejected.
+  n = 2 * runtime_.snapshot_.getInteger(Consecutive5xxRuntime, detector->config().consecutive5xx());
+  while (n--) {
+    hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout);
+  }
+
+  // Wait until the host is unejected.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(50001));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  // Simulate more timeouts. The host should be ejected.
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+                       envoy::data::cluster::v3::CONSECUTIVE_LOCAL_ORIGIN_FAILURE, true));
+  n = runtime_.snapshot_.getInteger(Consecutive5xxRuntime, detector->config().consecutive5xx());
+  while (n--) {
+    hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout);
+  }
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+}
+
 /**
  * Set of tests to verify ejecting and unejecting nodes when local/connect failures are reported.
  */
