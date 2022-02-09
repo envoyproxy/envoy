@@ -183,7 +183,7 @@ public:
   void localOriginFailure();
   void localOriginNoFailure();
 
-  // handlers for setting and getting jitter, used to add a random value 
+  // handlers for setting and getting jitter, used to add a random value
   // to outlier eject time in order to prevent a connection storm when
   // hosts are unejected
   void setJitter(const std::chrono::milliseconds jitter) { jitter_ = jitter; }
