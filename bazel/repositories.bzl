@@ -638,6 +638,10 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/strings:strings",
     )
     native.bind(
+        name = "abseil_span",
+        actual = "@com_google_absl//absl/types:span",
+    )
+    native.bind(
         name = "abseil_int128",
         actual = "@com_google_absl//absl/numeric:int128",
     )
