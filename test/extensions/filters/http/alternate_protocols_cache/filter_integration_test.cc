@@ -178,8 +178,7 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(response_headers, true);
   ASSERT_TRUE(response2->waitForEndStream());
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
+  if (Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
     EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
   }
 

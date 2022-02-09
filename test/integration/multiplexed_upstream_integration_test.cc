@@ -641,8 +641,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamGoaway) {
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, EarlyDataRejected) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc") ||
+  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) ||
       upstreamProtocol() != Http::CodecType::HTTP3) {
     return;
   }
