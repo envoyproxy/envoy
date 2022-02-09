@@ -28,7 +28,7 @@ class ProxyProtoFilterChainMatchIntegrationTest : public ProxyProtoTcpIntegratio
 public:
   ProxyProtoFilterChainMatchIntegrationTest();
 
-  void send(const std::string& data);
+  void send(const std::string& data, bool end_stream = false);
 };
 
 } // namespace Envoy

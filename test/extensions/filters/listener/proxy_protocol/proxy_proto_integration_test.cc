@@ -314,16 +314,16 @@ ProxyProtoFilterChainMatchIntegrationTest::ProxyProtoFilterChainMatchIntegration
   });
 }
 
-void ProxyProtoFilterChainMatchIntegrationTest::send(const std::string& data) {
+void ProxyProtoFilterChainMatchIntegrationTest::send(const std::string& data, bool end_stream) {
   initialize();
 
   // Set verify to false because it is expected that Envoy will immediately disconnect after
   // receiving the PROXY header, and it is a race whether the `write()` will fail due to
   // disconnect, or finish the write before receiving the disconnect.
   constexpr bool verify = false;
-
+  enableHalfClose(true);
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(tcp_client->write(data, false, verify));
+  ASSERT_TRUE(tcp_client->write(data, end_stream, verify));
   tcp_client->waitForDisconnect();
 }
 
@@ -334,6 +334,12 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtoFilterChainMatchIntegrationTest,
 // Validate that source IP and direct source IP match correctly.
 TEST_P(ProxyProtoFilterChainMatchIntegrationTest, MatchDirectSourceAndSource) {
   send("PROXY TCP4 1.2.3.4 254.254.254.254 12345 1234\r\nhello");
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
+              testing::HasSubstr("directsource_localhost_and_source_1.2.3.0/24 -"));
+}
+
+TEST_P(ProxyProtoFilterChainMatchIntegrationTest, CloseAfterProxyProtocol) {
+  send("PROXY TCP4 1.2.3.4 254.254.254.254 12345 1234", true);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::HasSubstr("directsource_localhost_and_source_1.2.3.0/24 -"));
 }
