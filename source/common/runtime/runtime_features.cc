@@ -16,11 +16,10 @@
  *
  * The runtime guard to use in source and release notes will then be of the form
  * "envoy.reloadable_features.flag_name" due to the prior naming scheme and swapPrefix.
-**/
+ **/
 
 #define RUNTIME_GUARD(name) ABSL_FLAG(bool, name, true, "");
 
-RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_allow_response_for_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
 RUNTIME_GUARD(envoy_reloadable_features_append_or_truncate);
@@ -45,6 +44,7 @@ RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_json);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_http_header_referer);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dispatching_frames_for_closed_connection);
 RUNTIME_GUARD(envoy_reloadable_features_support_locality_update_on_eds_cluster_endpoints);
+RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_udp_listener_updates_filter_chain_in_place);
 RUNTIME_GUARD(envoy_reloadable_features_update_expected_rq_timeout_on_retry);
 RUNTIME_GUARD(envoy_reloadable_features_use_dns_ttl);
@@ -89,7 +89,7 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
     return default_value;
   }
 
-  // DO NOT ADD MORE FLAGS HERE.  This function deprecated and being removed.
+  // DO NOT ADD MORE FLAGS HERE. This function deprecated and being removed.
   if (feature == "envoy.buffer.overflow_multiplier") {
     return absl::GetFlag(FLAGS_envoy_buffer_overflow_multiplier);
   } else if (feature == "envoy.do_not_use_going_away_max_http2_outbound_responses") {
@@ -177,7 +177,7 @@ void maybeSetDeprecatedInts(absl::string_view name, uint32_t value) {
     return;
   }
 
-  // DO NOT ADD MORE FLAGS HERE.  This function deprecated and being removed.
+  // DO NOT ADD MORE FLAGS HERE. This function deprecated and being removed.
   if (name == "envoy.buffer.overflow_multiplier") {
     absl::SetFlag(&FLAGS_envoy_buffer_overflow_multiplier, value);
   } else if (name == "envoy.do_not_use_going_away_max_http2_outbound_responses") {

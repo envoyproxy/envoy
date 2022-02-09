@@ -183,7 +183,7 @@ FOR_EACH_N_REGEX = re.compile("for_each_n\(")
 # Check for punctuation in a terminal ref clause, e.g.
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
 DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
-FLAG_REGEX = re.compile("    \"(.*)\",")
+FLAG_REGEX = re.compile("RUNTIME_GUARD\((.*)\);")
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -516,23 +516,11 @@ class FormatChecker:
         subdir = path[0:slash]
         return subdir in SUBDIR_SET
 
-    # simple check that all flags between "Begin alphabetically sorted section."
-    # and the end of the struct are in order (except the ones that already aren't)
+    # simple check that all flags are sorted.
     def check_runtime_flags(self, file_path, error_messages):
-        # TODO(alyssa) fix these checks for the new system before submitting.
-        return
-        in_flag_block = False
         previous_flag = ""
         for line_number, line in enumerate(self.read_lines(file_path)):
-            if "Begin alphabetically" in line:
-                in_flag_block = True
-                continue
-            if not in_flag_block:
-                continue
-            if "}" in line:
-                break
-            if "//" in line:
-                continue
+          if line.startswith("RUNTIME_GUARD"):
             match = FLAG_REGEX.match(line)
             if not match:
                 error_messages.append("%s does not look like a reloadable flag" % line)
