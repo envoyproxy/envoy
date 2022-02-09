@@ -31,8 +31,8 @@ public:
   statsAsJsonHandler(std::map<std::string, uint64_t>& all_stats,
                      std::map<std::string, std::string>& all_text_readouts,
                      const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                     const bool used_only, const absl::optional<std::regex> regex = absl::nullopt) {
-    return StatsHandler::statsAsJson(all_stats, all_text_readouts, all_histograms, used_only, regex,
+                     const bool used_only, const absl::optional<std::string>& histogram_buckets_value = absl::nullopt, const absl::optional<std::regex> regex = absl::nullopt) {
+    return StatsHandler::statsAsJson(all_stats, all_text_readouts, all_histograms, used_only, histogram_buckets_value, regex,
                                      true /*pretty_print*/);
   }
 
@@ -628,7 +628,7 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
   std::map<std::string, uint64_t> all_stats;
   std::map<std::string, std::string> all_text_readouts;
   std::string actual_json =
-      statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(), false,
+      statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(), false, absl::nullopt,
                          absl::optional<std::regex>{std::regex("[a-z]1")});
 
   // Because this is a filter case, we don't expect to see any stats except for those containing
@@ -739,7 +739,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
   std::map<std::string, uint64_t> all_stats;
   std::map<std::string, std::string> all_text_readouts;
   std::string actual_json =
-      statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(), true,
+      statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(), true, absl::nullopt,
                          absl::optional<std::regex>{std::regex("h[12]")});
 
   // Expected JSON should not have h2 values as it is not used, and should not have h3 values as
