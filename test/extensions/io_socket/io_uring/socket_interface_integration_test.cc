@@ -25,6 +25,9 @@ bootstrap_extensions:
   - name: envoy.extensions.network.socket_interface.default_socket_interface
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.network.socket_interface.v3.IoUringSocketInterface
+  - name: envoy.extensions.io.io_uring
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.io.io_uring.v3.IoUring
       io_uring_size: 20
 default_socket_interface: "envoy.extensions.network.socket_interface.io_uring"
     )EOF");

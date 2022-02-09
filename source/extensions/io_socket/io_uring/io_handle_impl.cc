@@ -32,7 +32,9 @@ IoUringSocketHandleImpl::IoUringSocketHandleImpl(const uint32_t read_buffer_size
 
 IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
   if (SOCKET_VALID(fd_)) {
-    IoUringSocketHandleImpl::close();
+    // The TLS slot has been shut down by this moment with IoUring wiped out, thus
+    // better use this posix system call instead of IoUringSocketHandleImpl::close().
+    ::close(fd_);
   }
 }
 
