@@ -40,6 +40,7 @@ MakePropagationModes(const envoy::config::trace::v3::LightstepConfig& lightstep_
   result.reserve(lightstep_config.propagation_modes().size());
   for (auto propagation_mode : lightstep_config.propagation_modes()) {
     switch (propagation_mode) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::config::trace::v3::LightstepConfig::ENVOY:
       result.push_back(lightstep::PropagationMode::envoy);
       break;
@@ -52,8 +53,6 @@ MakePropagationModes(const envoy::config::trace::v3::LightstepConfig& lightstep_
     case envoy::config::trace::v3::LightstepConfig::TRACE_CONTEXT:
       result.push_back(lightstep::PropagationMode::trace_context);
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
   return result;

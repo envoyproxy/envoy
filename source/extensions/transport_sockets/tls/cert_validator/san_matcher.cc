@@ -34,6 +34,7 @@ SanMatcherPtr createStringSanMatcher(
                 4);
 
   switch (matcher.san_type()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS:
     return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher.matcher())};
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL:
@@ -42,9 +43,10 @@ SanMatcherPtr createStringSanMatcher(
     return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_URI, matcher.matcher())};
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS:
     return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_IPADD, matcher.matcher())};
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SAN_TYPE_UNSPECIFIED:
+    PANIC("unhandled value");
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace Tls

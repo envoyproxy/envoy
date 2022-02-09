@@ -49,25 +49,6 @@ ENTRYPOINT ["/usr/local/bin/envoy"]
 CMD ["-c", "/etc/envoy/envoy.yaml"]
 
 
-# STAGE: envoy-alpine
-# TODO(https://github.com/envoyproxy/envoy/issues/19781): Deprecate and remove this image
-FROM frolvlad/alpine-glibc:alpine-3.14_glibc-2.33 AS envoy-alpine
-
-RUN mkdir -p /etc/envoy
-
-COPY --from=binary /usr/local/bin/envoy /usr/local/bin/
-COPY --from=binary /etc/envoy/envoy.yaml /etc/envoy/envoy.yaml
-
-RUN apk add --no-cache shadow su-exec \
-    && addgroup -S envoy && adduser --no-create-home -S envoy -G envoy
-
-EXPOSE 10000
-
-COPY ci/docker-entrypoint.sh /
-ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["envoy", "-c", "/etc/envoy/envoy.yaml"]
-
-
 # STAGE: envoy-google-vrp
 FROM ${ENVOY_VRP_BASE_IMAGE} AS envoy-google-vrp
 
