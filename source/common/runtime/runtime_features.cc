@@ -4,11 +4,26 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
 
+/* To add a runtime guard to Envoy, add 2 lines to this file.
+ *
+ * RUNTIME_GUARD(envoy_reloadable_features_flag_name)
+ *
+ * to the sorted macro block below and
+ *
+ * &FLAGS_envoy_reloadable_features_flag_name
+ *
+ * to the runtime features constexpr.
+ *
+ * The runtime guard to use in source and release notes will then be of the form
+ * "envoy.reloadable_features.flag_name" due to the prior naming scheme and swapPrefix.
+**/
+
 #define RUNTIME_GUARD(name) ABSL_FLAG(bool, name, true, "");
 
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_allow_response_for_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
+RUNTIME_GUARD(envoy_reloadable_features_append_or_truncate);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_correct_scheme_and_xfp);
 RUNTIME_GUARD(envoy_reloadable_features_correctly_validate_alpn);
@@ -17,7 +32,6 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_grpc_async_client_cache);
 RUNTIME_GUARD(envoy_reloadable_features_fix_added_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_handle_stream_reset_during_hcm_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_http2_allow_capacity_increase_by_settings);
-RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
 RUNTIME_GUARD(envoy_reloadable_features_http_ext_authz_do_not_skip_direct_response_and_redirect);
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
@@ -39,13 +53,17 @@ RUNTIME_GUARD(envoy_reloadable_features_vhds_heartbeats);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
 RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
 
+// Begin false flags. These should come with a TODO to flip true.
 // Sentinal and test flag.
 ABSL_FLAG(bool, envoy_reloadable_features_test_feature_false, false, "");
 // TODO(alyssawilk, junr03) flip (and add release notes + docs) these after Lyft tests
 ABSL_FLAG(bool, envoy_reloadable_features_allow_multiple_dns_addresses, false, "");
 // TODO(adisuissa) reset to true to enable unified mux by default
 ABSL_FLAG(bool, envoy_reloadable_features_unified_mux, false, "");
+// TODO(birenroy) reset to true after bugfixes
+ABSL_FLAG(bool, envoy_reloadable_features_http2_new_codec_wrapper, false, "");
 
+// Block of non-boolean flags. These are deprecated.Do not add more.
 ABSL_FLAG(uint64_t, envoy_buffer_overflow_multiplier, 0, "");
 ABSL_FLAG(uint64_t, envoy_do_not_use_going_away_max_http2_outbound_response, 2, "");
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");
@@ -110,6 +128,7 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_allow_multiple_dns_addresses,
   &FLAGS_envoy_reloadable_features_allow_response_for_timeout,
   &FLAGS_envoy_reloadable_features_allow_upstream_inline_write,
+  &FLAGS_envoy_reloadable_features_append_or_truncate,
   &FLAGS_envoy_reloadable_features_conn_pool_delete_when_idle,
   &FLAGS_envoy_reloadable_features_correct_scheme_and_xfp,
   &FLAGS_envoy_reloadable_features_correctly_validate_alpn,

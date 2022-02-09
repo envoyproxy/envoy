@@ -298,6 +298,7 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
     const envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol& version,
     unsigned default_version) {
   switch (version) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO:
     return default_version;
   case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0:
@@ -308,9 +309,8 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
     return TLS1_2_VERSION;
   case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3:
     return TLS1_3_VERSION;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 const unsigned ClientContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_2_VERSION;
