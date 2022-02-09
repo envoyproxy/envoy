@@ -102,18 +102,20 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
   const absl::string_view allow_methods = allowMethods();
   if (!allow_methods.empty()) {
     if (allow_methods == "*") {
-      response_headers->setInline(access_control_allow_methods_handle.handle(), 
-                                  headers.getInlineValue(access_control_request_method_handle.handle()));
+      response_headers->setInline(
+          access_control_allow_methods_handle.handle(),
+          headers.getInlineValue(access_control_request_method_handle.handle()));
     } else {
       response_headers->setInline(access_control_allow_methods_handle.handle(), allow_methods);
-    }  
+    }
   }
 
   const absl::string_view allow_headers = allowHeaders();
   if (!allow_headers.empty()) {
     if (allow_headers == "*") {
-      response_headers->setInline(access_control_allow_headers_handle.handle(),
-                                  headers.getInlineValue(access_control_request_headers_handle.handle()));
+      response_headers->setInline(
+          access_control_allow_headers_handle.handle(),
+          headers.getInlineValue(access_control_request_headers_handle.handle()));
     } else {
       response_headers->setInline(access_control_allow_headers_handle.handle(), allow_headers);
     }
