@@ -105,7 +105,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         !address->ip()->ipv6()->v6only()) {
       if (address->ip()->isAnyAddress()) {
         tcp_listener_map_by_address_.insert_or_assign(
-            Network::Utility::getIpv4AnyAddress(address->ip()->port())->asStringView(), details);
+            Network::Address::Ipv4Instance(address->ip()->port()).asStringView(), details);
       } else {
         auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
         if (!v4_compatible_addr.ok() && !v4_compatible_addr.status().ok()) {
@@ -142,7 +142,7 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
           !address->ip()->ipv6()->v6only()) {
         if (address->ip()->isAnyAddress()) {
           tcp_listener_map_by_address_.erase(
-              Network::Utility::getIpv4AnyAddress(address->ip()->port())->asStringView());
+              Network::Address::Ipv4Instance(address->ip()->port()).asStringView());
         } else {
           auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
           ASSERT(v4_compatible_addr.ok());
