@@ -268,6 +268,7 @@ envoy_cc_library(
         ":quic_filter_manager_connection_lib",
         ":quic_stat_names_lib",
         ":quic_transport_socket_factory_lib",
+        "//envoy/http:alternate_protocols_cache_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/http:codes_lib",

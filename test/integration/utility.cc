@@ -232,7 +232,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
           persistent_info->getQuicSessionCacheDelegate()),
       quic::QuicServerId(quic_transport_socket_factory.clientContextConfig().serverNameIndication(),
                          static_cast<uint16_t>(addr->ip()->port())),
-      *dispatcher, addr, local_address, quic_stat_names, mock_stats_store);
+      *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store);
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
   // Quic connection needs to finish handshake.

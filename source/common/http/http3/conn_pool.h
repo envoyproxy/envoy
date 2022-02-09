@@ -132,7 +132,8 @@ public:
   bool trackStreamCapacity() override { return false; }
 
   std::unique_ptr<Network::ClientConnection>
-  createClientConnection(Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope);
+  createClientConnection(Quic::QuicStatNames& quic_stat_names,
+                         OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope);
 
 protected:
   void onConnected(Envoy::ConnectionPool::ActiveClient&) override;
@@ -164,7 +165,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, Quic::QuicStatNames& quic_stat_names,
-                 Stats::Scope& scope, OptRef<PoolConnectResultCallback> connect_callback,
+                 OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope,
+                 OptRef<PoolConnectResultCallback> connect_callback,
                  Http::PersistentQuicInfo& quic_info);
 
 } // namespace Http3

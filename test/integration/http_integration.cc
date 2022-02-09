@@ -255,7 +255,7 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
       quic::QuicServerId(
           quic_transport_socket_factory_ref.clientContextConfig().serverNameIndication(),
           static_cast<uint16_t>(port)),
-      *dispatcher_, server_addr, local_addr, quic_stat_names_, stats_store_);
+      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, stats_store_);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;
@@ -397,6 +397,14 @@ ConfigHelper::ConfigModifierFunction HttpIntegrationTest::setEnableUpstreamTrail
       ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                        protocol_options);
     }
+  };
+}
+
+ConfigHelper::HttpModifierFunction HttpIntegrationTest::configureProxyStatus() {
+  return [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+    auto* psc = hcm.mutable_proxy_status_config();
+    psc->set_set_recommended_response_code(false);
   };
 }
 
@@ -549,6 +557,11 @@ void HttpIntegrationTest::checkSimpleRequestSuccess(uint64_t expected_request_si
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
     uint64_t request_size, uint64_t response_size, bool big_header, bool set_content_length_header,
     ConnectionCreationFunction* create_connection, std::chrono::milliseconds timeout) {
+#if defined(ENVOY_CONFIG_COVERAGE)
+  // https://github.com/envoyproxy/envoy/issues/19595
+  ENVOY_LOG_MISC(warn, "manually lowering logs to error");
+  LogLevelSetter save_levels(spdlog::level::err);
+#endif
   initialize();
   codec_client_ = makeHttpConnection(
       create_connection ? ((*create_connection)()) : makeClientConnection((lookupPort("http"))));
@@ -626,22 +639,28 @@ void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
 // Change the default route to be restrictive, and send a request to an alternate route.
 void HttpIntegrationTest::testRouterNotFound() {
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
+  config_helper_.addConfigModifier(configureProxyStatus());
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
+  EXPECT_EQ(response->headers().getProxyStatusValue(),
+            "envoy; error=destination_not_found; details=\"route_not_found; NR\"");
 }
 
 // Change the default route to be restrictive, and send a POST to an alternate route.
 void HttpIntegrationTest::testRouterNotFoundWithBody() {
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
+  config_helper_.addConfigModifier(configureProxyStatus());
   initialize();
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "POST", "/notfound", "foo", downstream_protocol_, version_);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
+  EXPECT_EQ(response->headers().getProxyStatusValue(),
+            "envoy; error=destination_not_found; details=\"route_not_found; NR\"");
 }
 
 // Make sure virtual cluster stats are charged to the appropriate virtual cluster.
@@ -690,6 +709,7 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
+  config_helper_.addConfigModifier(configureProxyStatus());
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -715,6 +735,9 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(response->headers().getProxyStatusValue(),
+            "envoy; error=connection_terminated; "
+            "details=\"upstream_reset_before_response_started{connection_termination}; UC\"");
   EXPECT_EQ("upstream connect error or disconnect/reset before headers. reset reason: connection "
             "termination",
             response->body());

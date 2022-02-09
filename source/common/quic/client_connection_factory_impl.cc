@@ -50,13 +50,12 @@ std::unique_ptr<quic::SessionCache> PersistentQuicInfoImpl::getQuicSessionCacheD
   return std::make_unique<QuicSessionCacheDelegate>(session_cache_);
 }
 
-std::unique_ptr<Network::ClientConnection>
-createQuicNetworkConnection(Http::PersistentQuicInfo& info,
-                            std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
-                            const quic::QuicServerId& server_id, Event::Dispatcher& dispatcher,
-                            Network::Address::InstanceConstSharedPtr server_addr,
-                            Network::Address::InstanceConstSharedPtr local_addr,
-                            QuicStatNames& quic_stat_names, Stats::Scope& scope) {
+std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
+    Http::PersistentQuicInfo& info, std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
+    const quic::QuicServerId& server_id, Event::Dispatcher& dispatcher,
+    Network::Address::InstanceConstSharedPtr server_addr,
+    Network::Address::InstanceConstSharedPtr local_addr, QuicStatNames& quic_stat_names,
+    OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope) {
   ASSERT(GetQuicReloadableFlag(quic_single_ack_in_packet2));
   ASSERT(crypto_config != nullptr);
   PersistentQuicInfoImpl* info_impl = reinterpret_cast<PersistentQuicInfoImpl*>(&info);
@@ -67,11 +66,11 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info,
       info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, nullptr);
 
   // QUICHE client session always use the 1st version to start handshake.
-  auto ret = std::make_unique<EnvoyQuicClientSession>(
+  return std::make_unique<EnvoyQuicClientSession>(
       info_impl->quic_config_, quic_versions, std::move(connection), server_id,
       std::move(crypto_config), &info_impl->push_promise_index_, dispatcher,
-      info_impl->buffer_limit_, info_impl->crypto_stream_factory_, quic_stat_names, scope);
-  return ret;
+      info_impl->buffer_limit_, info_impl->crypto_stream_factory_, quic_stat_names, rtt_cache,
+      scope);
 }
 
 } // namespace Quic

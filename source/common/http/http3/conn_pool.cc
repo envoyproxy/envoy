@@ -103,6 +103,7 @@ std::shared_ptr<quic::QuicCryptoClientConfig> Http3ConnPoolImpl::cryptoConfig() 
 
 std::unique_ptr<Network::ClientConnection>
 Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
+                                          OptRef<Http::AlternateProtocolsCache> rtt_cache,
                                           Stats::Scope& scope) {
   auto source_address = host()->cluster().sourceAddress();
   if (!source_address.get()) {
@@ -111,7 +112,7 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
   }
   return Quic::createQuicNetworkConnection(quic_info_, cryptoConfig(), server_id_, dispatcher(),
                                            host()->address(), source_address, quic_stat_names,
-                                           scope);
+                                           rtt_cache, scope);
 }
 
 std::unique_ptr<Http3ConnPoolImpl>
@@ -120,11 +121,12 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, Quic::QuicStatNames& quic_stat_names,
-                 Stats::Scope& scope, OptRef<PoolConnectResultCallback> connect_callback,
+                 OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope,
+                 OptRef<PoolConnectResultCallback> connect_callback,
                  Http::PersistentQuicInfo& quic_info) {
   return std::make_unique<Http3ConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
-      [&quic_stat_names,
+      [&quic_stat_names, rtt_cache,
        &scope](HttpConnPoolImplBase* pool) -> ::Envoy::ConnectionPool::ActiveClientPtr {
         ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool), debug,
                             "Creating Http/3 client");
@@ -141,7 +143,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         Http3ConnPoolImpl* h3_pool = reinterpret_cast<Http3ConnPoolImpl*>(pool);
         Upstream::Host::CreateConnectionData data{};
         data.host_description_ = pool->host();
-        data.connection_ = h3_pool->createClientConnection(quic_stat_names, scope);
+        data.connection_ = h3_pool->createClientConnection(quic_stat_names, rtt_cache, scope);
         if (data.connection_ == nullptr) {
           ENVOY_LOG_EVERY_POW_2_TO_LOGGER(
               Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool), warn,
