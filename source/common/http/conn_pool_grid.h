@@ -136,7 +136,6 @@ public:
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
                    AlternateProtocolsCacheSharedPtr alternate_protocols,
-                   std::chrono::milliseconds next_attempt_duration,
                    ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
                    Stats::Scope& scope);
   ~ConnectivityGrid() override;
