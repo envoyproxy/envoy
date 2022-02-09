@@ -85,18 +85,17 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
 }
 
 uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
-  if (!absl::StartsWith(feature, "envoy.")) {
-    return default_value;
+  if (absl::StartsWith(feature, "envoy.")) {
+    // DO NOT ADD MORE FLAGS HERE. This function deprecated and being removed.
+    if (feature == "envoy.buffer.overflow_multiplier") {
+      return absl::GetFlag(FLAGS_envoy_buffer_overflow_multiplier);
+    } else if (feature == "envoy.do_not_use_going_away_max_http2_outbound_responses") {
+      return absl::GetFlag(FLAGS_envoy_do_not_use_going_away_max_http2_outbound_response);
+    } else if (feature == "envoy.http.headermap.lazy_map_min_size") {
+      return absl::GetFlag(FLAGS_envoy_headermap_lazy_map_min_size);
+    }
   }
-
-  // DO NOT ADD MORE FLAGS HERE. This function deprecated and being removed.
-  if (feature == "envoy.buffer.overflow_multiplier") {
-    return absl::GetFlag(FLAGS_envoy_buffer_overflow_multiplier);
-  } else if (feature == "envoy.do_not_use_going_away_max_http2_outbound_responses") {
-    return absl::GetFlag(FLAGS_envoy_do_not_use_going_away_max_http2_outbound_response);
-  } else if (feature == "envoy.http.headermap.lazy_map_min_size") {
-    return absl::GetFlag(FLAGS_envoy_headermap_lazy_map_min_size);
-  }
+  IS_ENVOY_BUG(absl::StrCat("requested an unsupported integer ", feature));
   return default_value;
 }
 
