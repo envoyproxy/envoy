@@ -59,20 +59,18 @@ protected:
   bool validationEnabled() const { return delegate_->validationEnabled(); }
   LookupContextPtr lookup(absl::string_view request_path);
 
-  absl::Status insert(LookupContextPtr lookup,
-                      const Http::TestResponseHeaderMapImpl& headers,
+  absl::Status insert(LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& headers,
                       const absl::string_view body,
                       std::chrono::milliseconds timeout = std::chrono::seconds(1));
 
-  virtual absl::Status
-  insert(LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& headers,
-         const absl::string_view body,
-         const absl::optional<Http::TestResponseTrailerMapImpl> trailers,
-         std::chrono::milliseconds timeout = std::chrono::seconds(1));
+  virtual absl::Status insert(LookupContextPtr lookup,
+                              const Http::TestResponseHeaderMapImpl& headers,
+                              const absl::string_view body,
+                              const absl::optional<Http::TestResponseTrailerMapImpl> trailers,
+                              std::chrono::milliseconds timeout = std::chrono::seconds(1));
 
   absl::Status insert(absl::string_view request_path,
-                      const Http::TestResponseHeaderMapImpl& headers,
-                      const absl::string_view body,
+                      const Http::TestResponseHeaderMapImpl& headers, const absl::string_view body,
                       std::chrono::milliseconds timeout = std::chrono::seconds(1));
 
   Http::ResponseHeaderMapPtr getHeaders(LookupContext& context);
