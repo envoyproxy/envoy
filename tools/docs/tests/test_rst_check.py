@@ -252,9 +252,9 @@ def test_rst_check_current_version_check_ticks(patches, single_tick_re_matches, 
         prefix="tools.docs.rst_check")
 
     with patched as (m_single_tick_re, m_ref_tickes_re, m_link_ticks_re):
-        m_single_tick_re.return_value.match.return_value=single_tick_re_matches
-        m_ref_tickes_re.return_value.match.return_value=ref_ticks_re
-        m_link_ticks_re.return_value.match.return_value=link_ticks_re
+        m_single_tick_re.return_value.match.return_value = single_tick_re_matches
+        m_ref_tickes_re.return_value.match.return_value = ref_ticks_re
+        m_link_ticks_re.return_value.match.return_value = link_ticks_re
         assert (
             version_file.check_ticks("LINE")
             == (["Backticks should come in pairs (``foo``) except for links (`title <url>`_) or refs (ref:`text <ref>`): LINE"]
