@@ -60,8 +60,8 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
 HttpUpstream::HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                            const TunnelingConfigHelper& config,
                            const StreamInfo::StreamInfo& downstream_info)
-    : config_(config), header_parser_(config.headerEvaluator()), downstream_info_(downstream_info),
-      response_decoder_(*this), upstream_callbacks_(callbacks) {}
+    : config_(config), downstream_info_(downstream_info), response_decoder_(*this),
+      upstream_callbacks_(callbacks) {}
 
 HttpUpstream::~HttpUpstream() { resetEncoder(Network::ConnectionEvent::LocalClose); }
 
@@ -282,7 +282,7 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
                           Http::Headers::get().ProtocolValues.Bytestream);
   }
 
-  header_parser_.evaluateHeaders(*headers, &downstream_info_);
+  config_.headerEvaluator().evaluateHeaders(*headers, &downstream_info_);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
   ASSERT(status.ok());
@@ -309,7 +309,7 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
     headers->addReference(Http::Headers::get().Path, "/");
   }
 
-  header_parser_.evaluateHeaders(*headers, &downstream_info_);
+  config_.headerEvaluator().evaluateHeaders(*headers, &downstream_info_);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
   ASSERT(status.ok());

@@ -152,9 +152,11 @@ protected:
                const TunnelingConfigHelper& config, const StreamInfo::StreamInfo& downstream_info);
   void resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
 
+  // The encoder offered by the upstream http client.
   Http::RequestEncoder* request_encoder_{};
+  // The config object that is owned by the downstream network filter chain factory.
   const TunnelingConfigHelper& config_;
-  const Envoy::Http::HeaderEvaluator& header_parser_;
+  // The downstream info that is owned by the downstream connection.
   const StreamInfo::StreamInfo& downstream_info_;
 
 private:

@@ -122,9 +122,6 @@ class GenericConnPoolFactory : public Envoy::Config::TypedFactory {
 public:
   ~GenericConnPoolFactory() override = default;
 
-  using TunnelingConfig =
-      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
-
   /*
    * @param thread_local_cluster the thread local cluster to use for conn pool creation.
    * @param config the tunneling config, if doing connect tunneling.

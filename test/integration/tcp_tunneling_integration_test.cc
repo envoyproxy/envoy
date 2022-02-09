@@ -606,7 +606,8 @@ TEST_P(TcpTunnelingIntegrationTest, BasicHeaderEvaluationTunnelingConfig) {
   closeConnection(fake_upstream_connection_);
 }
 
-TEST_P(TcpTunnelingIntegrationTest, BasicHeaderEvaluatorConfigUpdate) {
+// Verify the header evaluator is reused among multiple tcp requests on the same filter chain.
+TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorReuse) {
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     return;
   }
@@ -702,8 +703,107 @@ TEST_P(TcpTunnelingIntegrationTest, BasicHeaderEvaluatorConfigUpdate) {
   tcp_client_->close();
   tcp_client_2->close();
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
   // If the upstream now sends 'end stream' the connection is fully closed.
   upstream_request_->encodeData(0, true);
+
+  ASSERT_TRUE(upstream_request_2->waitForEndStream(*dispatcher_));
+  // If the upstream now sends 'end stream' the connection is fully closed.
+  upstream_request_2->encodeData(0, true);
+}
+
+// Verify that the header evaluator is updated without lifetime issue.
+TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("host.com:80");
+    auto address_header = proxy_config.mutable_tunneling_config()->mutable_headers_to_add()->Add();
+    address_header->mutable_header()->set_key("config-version");
+    address_header->mutable_header()->set_value("1");
+
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      filter->mutable_typed_config()->PackFrom(proxy_config);
+      break;
+    }
+  });
+
+  initialize();
+  // Start a connection, and verify the upgrade headers are received upstream.
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
+
+  EXPECT_EQ(upstream_request_->headers()
+                .get(Envoy::Http::LowerCaseString("config-version"))[0]
+                ->value()
+                .getStringView(),
+            "1");
+
+  // Send upgrade headers downstream, fully establishing the connection.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  ASSERT_TRUE(tcp_client_->write("hello", false));
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  new_config_helper.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* header =
+            proxy_config.mutable_tunneling_config()->mutable_headers_to_add()->Mutable(0);
+        header->mutable_header()->set_value("2");
+
+        auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+        for (auto& listener : *listeners) {
+          if (listener.name() != "tcp_proxy") {
+            continue;
+          }
+          // trigger full listener update.
+          (*(*listener.mutable_metadata()->mutable_filter_metadata())["random_filter_name"]
+                .mutable_fields())["random_key"]
+              .set_number_value(2);
+          auto* filter_chain = listener.mutable_filter_chains(0);
+          auto* filter = filter_chain->mutable_filters(0);
+          filter->mutable_typed_config()->PackFrom(proxy_config);
+          break;
+        }
+      });
+  new_config_helper.setLds("1");
+
+  test_server_->waitForCounterEq("listener_manager.listener_modified", 1);
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  auto tcp_client_2 = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // The upstream http2 or http3 connection is reused.
+  ASSERT_TRUE(fake_upstream_connection_ != nullptr);
+
+  FakeStreamPtr upstream_request_2;
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_2));
+  ASSERT_TRUE(upstream_request_2->waitForHeadersComplete());
+  // Verify the tcp proxy new header evaluator is applied.
+  EXPECT_EQ(upstream_request_2->headers()
+                .get(Envoy::Http::LowerCaseString("config-version"))[0]
+                ->value()
+                .getStringView(),
+            "2");
+  upstream_request_2->encodeHeaders(default_response_headers_, false);
+
+  tcp_client_->close();
+  tcp_client_2->close();
 
   ASSERT_TRUE(upstream_request_2->waitForEndStream(*dispatcher_));
   // If the upstream now sends 'end stream' the connection is fully closed.
