@@ -3,7 +3,7 @@ package io.envoyproxy.envoymobile.engine;
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel;
 
 class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
-  private long requestStartMs;
+  private long streamStartMs;
   private long dnsStartMs;
   private long dnsEndMs;
   private long connectStartMs;
@@ -13,14 +13,14 @@ class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
   private long sendingStartMs;
   private long sendingEndMs;
   private long responseStartMs;
-  private long requestEndMs;
+  private long streamEndMs;
   private boolean socketReused;
   private long sentByteCount;
   private long receivedByteCount;
   private long responseFlags;
 
   EnvoyFinalStreamIntelImpl(long[] values) {
-    requestStartMs = values[0];
+    streamStartMs = values[0];
     dnsStartMs = values[1];
     dnsEndMs = values[2];
     connectStartMs = values[3];
@@ -30,7 +30,7 @@ class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
     sendingStartMs = values[7];
     sendingEndMs = values[8];
     responseStartMs = values[9];
-    requestEndMs = values[10];
+    streamEndMs = values[10];
     socketReused = values[11] != 0;
     sentByteCount = values[12];
     receivedByteCount = values[13];
@@ -38,8 +38,8 @@ class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
   }
 
   @Override
-  public long getRequestStartMs() {
-    return requestStartMs;
+  public long getStreamStartMs() {
+    return streamStartMs;
   }
   @Override
   public long getDnsStartMs() {
@@ -78,8 +78,8 @@ class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
     return responseStartMs;
   }
   @Override
-  public long getRequestEndMs() {
-    return requestEndMs;
+  public long getStreamEndMs() {
+    return streamEndMs;
   }
   @Override
   public boolean getSocketReused() {

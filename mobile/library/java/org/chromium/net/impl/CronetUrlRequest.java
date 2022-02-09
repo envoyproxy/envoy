@@ -700,11 +700,11 @@ public final class CronetUrlRequest extends UrlRequestBase {
 
   private static Metrics getMetrics(EnvoyFinalStreamIntel intel, long bytesReceivedFromRedirects) {
     return new CronetMetrics(
-        intel.getRequestStartMs(), intel.getDnsStartMs(), intel.getDnsEndMs(),
+        intel.getStreamStartMs(), intel.getDnsStartMs(), intel.getDnsEndMs(),
         intel.getConnectStartMs(), intel.getConnectEndMs(), intel.getSslStartMs(),
         intel.getSslEndMs(), intel.getSendingStartMs(), intel.getSendingEndMs(),
         /* pushStartMs= */ -1, /* pushEndMs= */ -1, intel.getResponseStartMs(),
-        intel.getRequestEndMs(), intel.getSocketReused(), intel.getSentByteCount(),
+        intel.getStreamEndMs(), intel.getSocketReused(), intel.getSentByteCount(),
         intel.getReceivedByteCount() + bytesReceivedFromRedirects);
   }
 

@@ -50,19 +50,19 @@ void validateStreamIntel(const envoy_final_stream_intel& final_intel) {
   EXPECT_EQ(-1, final_intel.ssl_start_ms);
   EXPECT_EQ(-1, final_intel.ssl_end_ms);
 
-  ASSERT_NE(-1, final_intel.request_start_ms);
+  ASSERT_NE(-1, final_intel.stream_start_ms);
   ASSERT_NE(-1, final_intel.connect_start_ms);
   ASSERT_NE(-1, final_intel.connect_end_ms);
   ASSERT_NE(-1, final_intel.sending_start_ms);
   ASSERT_NE(-1, final_intel.sending_end_ms);
   ASSERT_NE(-1, final_intel.response_start_ms);
-  ASSERT_NE(-1, final_intel.request_end_ms);
+  ASSERT_NE(-1, final_intel.stream_end_ms);
 
-  ASSERT_LE(final_intel.request_start_ms, final_intel.connect_start_ms);
+  ASSERT_LE(final_intel.stream_start_ms, final_intel.connect_start_ms);
   ASSERT_LE(final_intel.connect_start_ms, final_intel.connect_end_ms);
   ASSERT_LE(final_intel.connect_end_ms, final_intel.sending_start_ms);
   ASSERT_LE(final_intel.sending_start_ms, final_intel.sending_end_ms);
-  ASSERT_LE(final_intel.response_start_ms, final_intel.request_end_ms);
+  ASSERT_LE(final_intel.response_start_ms, final_intel.stream_end_ms);
 }
 
 // TODO(junr03): move this to derive from the ApiListenerIntegrationTest after moving that class

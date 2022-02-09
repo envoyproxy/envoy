@@ -36,8 +36,8 @@ public:
     EXPECT_EQ(a.ssl_start_ms, b.ssl_start_ms);
     EXPECT_EQ(a.ssl_end_ms, b.ssl_end_ms);
     EXPECT_EQ(a.socket_reused, b.socket_reused);
-    EXPECT_EQ(a.request_start_ms, b.request_start_ms);
-    EXPECT_EQ(a.request_end_ms, b.request_end_ms);
+    EXPECT_EQ(a.stream_start_ms, b.stream_start_ms);
+    EXPECT_EQ(a.stream_end_ms, b.stream_end_ms);
     EXPECT_EQ(a.dns_start_ms, b.dns_start_ms);
     EXPECT_EQ(a.dns_end_ms, b.dns_end_ms);
     EXPECT_EQ(a.sent_byte_count, b.sent_byte_count);
@@ -51,10 +51,10 @@ public:
 TEST_F(FinalIntelTest, Unset) {
   StreamInfoImpl stream_info{Http::Protocol::Http2, start_time_source_, nullptr};
   // By convention the "StreamInfoImpl instantiation" is when the request starts.
-  expected_intel_.request_start_ms = SYSTEM_TIME_START_MS;
+  expected_intel_.stream_start_ms = SYSTEM_TIME_START_MS;
   // The SystemTime (11111) is irrelevant for the fake_current_time.
   StalledTimeSource fake_current_time(11111, MONOTONIC_TIME_START_MS + 500);
-  expected_intel_.request_end_ms = SYSTEM_TIME_START_MS + 500;
+  expected_intel_.stream_end_ms = SYSTEM_TIME_START_MS + 500;
 
   setFinalStreamIntel(stream_info, fake_current_time, final_intel_);
 
@@ -67,7 +67,7 @@ TEST_F(FinalIntelTest, SetWithSsl) {
   auto upstream_info = stream_info.upstreamInfo();
   auto& timing = upstream_info->upstreamTiming();
 
-  expected_intel_.request_start_ms = SYSTEM_TIME_START_MS;
+  expected_intel_.stream_start_ms = SYSTEM_TIME_START_MS;
   timing.first_upstream_tx_byte_sent_ =
       MonotonicTime(std::chrono::milliseconds(MONOTONIC_TIME_START_MS + 100));
   expected_intel_.sending_start_ms = SYSTEM_TIME_START_MS + 100;
@@ -88,7 +88,7 @@ TEST_F(FinalIntelTest, SetWithSsl) {
       MonotonicTime(std::chrono::milliseconds(MONOTONIC_TIME_START_MS + 600));
   expected_intel_.ssl_end_ms = SYSTEM_TIME_START_MS + 600;
   StalledTimeSource fake_current_time(11111, MONOTONIC_TIME_START_MS + 700);
-  expected_intel_.request_end_ms = SYSTEM_TIME_START_MS + 700;
+  expected_intel_.stream_end_ms = SYSTEM_TIME_START_MS + 700;
 
   upstream_info->setUpstreamNumStreams(5);
   expected_intel_.socket_reused = 1;
@@ -104,7 +104,7 @@ TEST_F(FinalIntelTest, SetWithoutSsl) {
   auto upstream_info = stream_info.upstreamInfo();
   auto& timing = upstream_info->upstreamTiming();
 
-  expected_intel_.request_start_ms = SYSTEM_TIME_START_MS;
+  expected_intel_.stream_start_ms = SYSTEM_TIME_START_MS;
   timing.first_upstream_tx_byte_sent_ =
       MonotonicTime(std::chrono::milliseconds(MONOTONIC_TIME_START_MS + 100));
   expected_intel_.sending_start_ms = SYSTEM_TIME_START_MS + 100;
@@ -123,7 +123,7 @@ TEST_F(FinalIntelTest, SetWithoutSsl) {
   expected_intel_.ssl_start_ms = -1;
   expected_intel_.ssl_end_ms = -1;
   StalledTimeSource fake_current_time(11111, MONOTONIC_TIME_START_MS + 600);
-  expected_intel_.request_end_ms = SYSTEM_TIME_START_MS + 600;
+  expected_intel_.stream_end_ms = SYSTEM_TIME_START_MS + 600;
 
   upstream_info->setUpstreamNumStreams(5);
   expected_intel_.socket_reused = 1;
