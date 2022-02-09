@@ -1,6 +1,7 @@
 #include "source/common/common/thread.h"
 
 #include <thread>
+
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
 
