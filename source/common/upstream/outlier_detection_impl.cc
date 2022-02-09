@@ -488,6 +488,8 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
       // random value is in the range [0, std::numeric_limits<long>::max())
       long random_long = static_cast<long>(random_generator_() % (std::numeric_limits<long>::max()));
       // cap the jitter at max_eject_time_jitter
+      // if max_eject_time_jitter is 0, the jitter will also equal 0 because we apply the
+      // modulo operator with 1.
       const std::chrono::milliseconds jitter =
           std::chrono::milliseconds(random_long) % (max_eject_time_jitter + std::chrono::milliseconds(1));
       // save the jitter on the current host_monitor
