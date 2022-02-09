@@ -13,6 +13,7 @@ public:
   MOCK_METHOD(void, setAlternatives,
               (const Origin& origin, std::vector<AlternateProtocol>& protocols));
   MOCK_METHOD(void, setSrtt, (const Origin& origin, std::chrono::microseconds srtt));
+  MOCK_METHOD(std::chrono::microseconds, getSrtt, (const Origin& origin), (const));
   MOCK_METHOD(OptRef<const std::vector<AlternateProtocol>>, findAlternatives,
               (const Origin& origin));
   MOCK_METHOD(size_t, size, (), (const));
