@@ -45,9 +45,14 @@ RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
         // At the creation of a RDS route config provider, the factory_context's initManager is
         // always valid, though the init manager may go away later when the listener goes away.
         config.rds(), optional_http_filters, factory_context, stat_prefix, init_manager);
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      RouteSpecifierCase::kScopedRoutes:
+    FALLTHRU; // PANIC
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      RouteSpecifierCase::ROUTE_SPECIFIER_NOT_SET:
+    PANIC("not implemented");
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(

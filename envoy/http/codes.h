@@ -3,7 +3,6 @@
 #include <chrono>
 
 #include "envoy/stats/scope.h"
-#include "envoy/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Http {

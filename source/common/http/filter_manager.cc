@@ -747,9 +747,9 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
     // choose to buffer/stop iteration that's fine.
     decodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
-    // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
-    // throw an exception here.
-    PANIC("fatal error adding decoded data");
+    IS_ENVOY_BUG("Invalid request data");
+    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().FilterAddedInvalidRequestData);
   }
 }
 
@@ -1228,9 +1228,9 @@ void FilterManager::addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::In
     // choose to buffer/stop iteration that's fine.
     encodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
-    // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
-    // throw an exception here.
-    PANIC("fatal error adding decoded data");
+    IS_ENVOY_BUG("Invalid response data");
+    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().FilterAddedInvalidResponseData);
   }
 }
 

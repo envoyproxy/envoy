@@ -1021,10 +1021,8 @@ OcspStapleAction ServerContextImpl::ocspStapleAction(const TlsContext& ctx,
       return OcspStapleAction::Fail;
     }
     return OcspStapleAction::Staple;
-
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 enum ssl_select_cert_result_t
