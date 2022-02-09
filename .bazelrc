@@ -71,6 +71,7 @@ build:asan --linkopt -fsanitize=address,undefined
 build:asan --copt -fno-sanitize=vptr,function
 build:asan --linkopt -fno-sanitize=vptr,function
 build:asan --copt -DADDRESS_SANITIZER=1
+build:asan --copt -DUNDEFINED_SANITIZER=1
 build:asan --copt -D__SANITIZE_ADDRESS__
 build:asan --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true:detect_odr_violation=1
 build:asan --test_env=UBSAN_OPTIONS=halt_on_error=true:print_stacktrace=1
@@ -109,6 +110,7 @@ build:clang-tsan --define ENVOY_CONFIG_TSAN=1
 build:clang-tsan --copt -fsanitize=thread
 build:clang-tsan --linkopt -fsanitize=thread
 build:clang-tsan --linkopt -fuse-ld=lld
+build:clang-tsan --copt -DTHREAD_SANITIZER=1
 build:clang-tsan --build_tag_filters=-no_san,-no_tsan
 build:clang-tsan --test_tag_filters=-no_san,-no_tsan
 # Needed due to https://github.com/libevent/libevent/issues/777
@@ -127,6 +129,7 @@ build:clang-msan --copt -fsanitize=memory
 build:clang-msan --linkopt -fsanitize=memory
 build:clang-msan --linkopt -fuse-ld=lld
 build:clang-msan --copt -fsanitize-memory-track-origins=2
+build:clang-msan --copt -DMEMORY_SANITIZER=1
 build:clang-msan --test_env=MSAN_SYMBOLIZER_PATH
 # MSAN needs -O1 to get reasonable performance.
 build:clang-msan --copt -O1
