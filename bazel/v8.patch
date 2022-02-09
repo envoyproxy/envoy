@@ -1,0 +1,56 @@
+# 1. Use already imported python dependencies.
+# 2. Fix the include path for //external:zlib.
+# 3. Add support for --define=no_debug_info=1.
+# 4. Disable pointer compression (https://crbug.com/v8/12592).
+
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 1cc0121e60..dedc78fbb0 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -4,7 +4,7 @@
+ 
+ load("@bazel_skylib//lib:selects.bzl", "selects")
+ load("@rules_python//python:defs.bzl", "py_binary")
+-load("@v8_python_deps//:requirements.bzl", "requirement")
++load("@base_pip3//:requirements.bzl", "requirement")
+ load(
+     "@v8//:bazel/defs.bzl",
+     "v8_binary",
+@@ -161,7 +161,7 @@ v8_int(
+ # If no explicit value for v8_enable_pointer_compression, we set it to 'none'.
+ v8_string(
+     name = "v8_enable_pointer_compression",
+-    default = "none",
++    default = "False",
+ )
+ 
+ # Default setting for v8_enable_pointer_compression.
+diff --git a/bazel/defs.bzl b/bazel/defs.bzl
+index 0e9559a65f..fa0c460c48 100644
+--- a/bazel/defs.bzl
++++ b/bazel/defs.bzl
+@@ -151,6 +151,11 @@ def _default_args():
+                 "-fno-integrated-as",
+             ],
+             "//conditions:default": [],
++        }) + select({
++            "@envoy//bazel:no_debug_info": [
++                "-g0",
++            ],
++            "//conditions:default": [],
+         }),
+         includes = ["include"],
+         linkopts = select({
+diff --git a/src/snapshot/snapshot-utils.cc b/src/snapshot/snapshot-utils.cc
+index 6db6698d7e..b56d31085f 100644
+--- a/src/snapshot/snapshot-utils.cc
++++ b/src/snapshot/snapshot-utils.cc
+@@ -5,7 +5,7 @@
+ #include "src/snapshot/snapshot-utils.h"
+ 
+ #include "src/base/sanitizer/msan.h"
+-#include "third_party/zlib/zlib.h"
++#include "zlib.h"
+ 
+ namespace v8 {
+ namespace internal {
