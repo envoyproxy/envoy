@@ -31,9 +31,11 @@ public:
   statsAsJsonHandler(std::map<std::string, uint64_t>& all_stats,
                      std::map<std::string, std::string>& all_text_readouts,
                      const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                     const bool used_only, const absl::optional<std::string>& histogram_buckets_value = absl::nullopt, const absl::optional<std::regex> regex = absl::nullopt) {
-    return StatsHandler::statsAsJson(all_stats, all_text_readouts, all_histograms, used_only, histogram_buckets_value, regex,
-                                     true /*pretty_print*/);
+                     const bool used_only,
+                     const absl::optional<std::string>& histogram_buckets_value = absl::nullopt,
+                     const absl::optional<std::regex> regex = absl::nullopt) {
+    return StatsHandler::statsAsJson(all_stats, all_text_readouts, all_histograms, used_only,
+                                     histogram_buckets_value, regex, true /*pretty_print*/);
   }
 
   Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }

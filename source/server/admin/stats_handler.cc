@@ -128,8 +128,8 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
 
   if (format_value.value() == "json") {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-    response.add(
-        statsAsJson(all_stats, text_readouts, server_.stats().histograms(), used_only, histogram_buckets_value, regex));
+    response.add(statsAsJson(all_stats, text_readouts, server_.stats().histograms(), used_only,
+                             histogram_buckets_value, regex));
     return Http::Code::OK;
   }
 
@@ -223,9 +223,9 @@ std::string
 StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                           const std::map<std::string, std::string>& text_readouts,
                           const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                          const bool used_only, const absl::optional<std::string>& histogram_buckets_value,
-                          const absl::optional<std::regex>& regex,
-                          const bool pretty_print) {
+                          const bool used_only,
+                          const absl::optional<std::string>& histogram_buckets_value,
+                          const absl::optional<std::regex>& regex, const bool pretty_print) {
 
   ProtobufWkt::Struct document;
   std::vector<ProtobufWkt::Value> stats_array;
@@ -253,7 +253,8 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   // Display bucket data if histogram_buckets query parameter is used, otherwise output contains
   // quantile summary data.
   if (!histogram_buckets_value.has_value()) {
-    std::vector<ProtobufWkt::Value> computed_quantile_array = statsAsJsonQuantileSummaryHelper(all_histograms, used_only, regex);
+    std::vector<ProtobufWkt::Value> computed_quantile_array =
+        statsAsJsonQuantileSummaryHelper(all_histograms, used_only, regex);
     if (!computed_quantile_array.empty()) { // If used histogram found.
       // It is not possible for the supported quantiles to differ across histograms, so it is ok
       // to send them once.
@@ -265,20 +266,22 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
       (*histograms_obj_fields)["supported_quantiles"] =
           ValueUtil::listValue(supported_quantile_array);
 
-      (*histograms_obj_fields)["computed_quantiles"] = ValueUtil::listValue(computed_quantile_array);
+      (*histograms_obj_fields)["computed_quantiles"] =
+          ValueUtil::listValue(computed_quantile_array);
       (*histograms_obj_container_fields)["histograms"] = ValueUtil::structValue(histograms_obj);
       stats_array.push_back(ValueUtil::structValue(histograms_obj_container));
     }
   } else if (histogram_buckets_value.value() == "cumulative") {
-    std::vector<ProtobufWkt::Value> histogram_obj_array = statsAsJsonCumulativeHistogramBucketsHelper(all_histograms, used_only, regex);
+    std::vector<ProtobufWkt::Value> histogram_obj_array =
+        statsAsJsonCumulativeHistogramBucketsHelper(all_histograms, used_only, regex);
     if (!histogram_obj_array.empty()) { // If used histogram found.
       (*histograms_obj_container_fields)["histograms"] = ValueUtil::listValue(histogram_obj_array);
       stats_array.push_back(ValueUtil::structValue(histograms_obj_container));
     }
   } else {
-    ASSERT(histogram_buckets_value.value() ==
-            "disjoint"); // disjoint should be only possible value
-    std::vector<ProtobufWkt::Value> histogram_obj_array = statsAsJsonDisjointHistogramBucketsHelper(all_histograms, used_only, regex);
+    ASSERT(histogram_buckets_value.value() == "disjoint"); // disjoint should be only possible value
+    std::vector<ProtobufWkt::Value> histogram_obj_array =
+        statsAsJsonDisjointHistogramBucketsHelper(all_histograms, used_only, regex);
     if (!histogram_obj_array.empty()) { // If used histogram found.
       (*histograms_obj_container_fields)["histograms"] = ValueUtil::listValue(histogram_obj_array);
       stats_array.push_back(ValueUtil::structValue(histograms_obj_container));
@@ -305,9 +308,8 @@ StatsHandler::computeDisjointBucketSummary(const Stats::ParentHistogramSharedPtr
     // Make sure all vectors are the same size.
     ASSERT(disjoint_interval_buckets.size() == disjoint_cumulative_buckets.size() &&
            disjoint_cumulative_buckets.size() == supported_buckets.size());
-    size_t min_size =
-        std::min({disjoint_interval_buckets.size(), disjoint_cumulative_buckets.size(),
-                  supported_buckets.size()});
+    size_t min_size = std::min({disjoint_interval_buckets.size(),
+                                disjoint_cumulative_buckets.size(), supported_buckets.size()});
     for (size_t i = 0; i < min_size; ++i) {
       bucket_summary.push_back(fmt::format("B{:g}({},{})", supported_buckets[i],
                                            disjoint_interval_buckets[i],
@@ -319,7 +321,9 @@ StatsHandler::computeDisjointBucketSummary(const Stats::ParentHistogramSharedPtr
   }
 }
 
-std::vector<ProtobufWkt::Value> StatsHandler::statsAsJsonQuantileSummaryHelper(const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only, const absl::optional<std::regex>& regex) {
+std::vector<ProtobufWkt::Value> StatsHandler::statsAsJsonQuantileSummaryHelper(
+    const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
+    const absl::optional<std::regex>& regex) {
   std::vector<ProtobufWkt::Value> computed_quantile_array;
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
     if (shouldShowMetric(*histogram, used_only, regex)) {
@@ -347,42 +351,49 @@ std::vector<ProtobufWkt::Value> StatsHandler::statsAsJsonQuantileSummaryHelper(c
   return computed_quantile_array;
 }
 
-std::vector<ProtobufWkt::Value> StatsHandler::statsAsJsonCumulativeHistogramBucketsHelper(const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only, const absl::optional<std::regex>& regex) {
+std::vector<ProtobufWkt::Value> StatsHandler::statsAsJsonCumulativeHistogramBucketsHelper(
+    const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
+    const absl::optional<std::regex>& regex) {
   std::vector<ProtobufWkt::Value> histogram_obj_array;
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
     if (shouldShowMetric(*histogram, used_only, regex)) {
-      histogram_obj_array.push_back(statsAsJsonHistogramBucketsCreateHistogramElementHelper(histogram->intervalStatistics().supportedBuckets(),
-                    histogram->intervalStatistics().computedBuckets(),
-                    histogram->cumulativeStatistics().computedBuckets(), histogram->name()));
+      histogram_obj_array.push_back(statsAsJsonHistogramBucketsCreateHistogramElementHelper(
+          histogram->intervalStatistics().supportedBuckets(),
+          histogram->intervalStatistics().computedBuckets(),
+          histogram->cumulativeStatistics().computedBuckets(), histogram->name()));
     }
   }
   return histogram_obj_array;
 }
 
-std::vector<ProtobufWkt::Value> StatsHandler::statsAsJsonDisjointHistogramBucketsHelper(const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only, const absl::optional<std::regex>& regex) {
+std::vector<ProtobufWkt::Value> StatsHandler::statsAsJsonDisjointHistogramBucketsHelper(
+    const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
+    const absl::optional<std::regex>& regex) {
   std::vector<ProtobufWkt::Value> histogram_obj_array;
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
     if (shouldShowMetric(*histogram, used_only, regex)) {
-      histogram_obj_array.push_back(statsAsJsonHistogramBucketsCreateHistogramElementHelper(histogram->intervalStatistics().supportedBuckets(),
-                    histogram->intervalStatistics().computeDisjointBuckets(),
-                    histogram->cumulativeStatistics().computeDisjointBuckets(), histogram->name()));
+      histogram_obj_array.push_back(statsAsJsonHistogramBucketsCreateHistogramElementHelper(
+          histogram->intervalStatistics().supportedBuckets(),
+          histogram->intervalStatistics().computeDisjointBuckets(),
+          histogram->cumulativeStatistics().computeDisjointBuckets(), histogram->name()));
     }
   }
   return histogram_obj_array;
 }
 
-ProtobufWkt::Value StatsHandler::statsAsJsonHistogramBucketsCreateHistogramElementHelper(Stats::ConstSupportedBuckets& supported_buckets, const std::vector<uint64_t> interval_buckets, const std::vector<uint64_t> cumulative_buckets, const std::string& name) {
+ProtobufWkt::Value StatsHandler::statsAsJsonHistogramBucketsCreateHistogramElementHelper(
+    Stats::ConstSupportedBuckets& supported_buckets, const std::vector<uint64_t> interval_buckets,
+    const std::vector<uint64_t> cumulative_buckets, const std::string& name) {
   ProtobufWkt::Struct histogram_obj;
   auto* histogram_obj_fields = histogram_obj.mutable_fields();
   (*histogram_obj_fields)["name"] = ValueUtil::stringValue(name);
 
   // Make sure all vectors are the same size.
   ASSERT(interval_buckets.size() == cumulative_buckets.size() &&
-          cumulative_buckets.size() == supported_buckets.size());
+         cumulative_buckets.size() == supported_buckets.size());
   size_t min_size =
-    std::min({interval_buckets.size(), cumulative_buckets.size(),
-              supported_buckets.size()});
-  
+      std::min({interval_buckets.size(), cumulative_buckets.size(), supported_buckets.size()});
+
   std::vector<ProtobufWkt::Value> supported_bucket_array;
   std::vector<ProtobufWkt::Value> computed_bucket_array;
   for (size_t i = 0; i < min_size; ++i) {
