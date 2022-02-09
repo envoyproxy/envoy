@@ -686,7 +686,7 @@ TEST_F(OldVhdsDeltaSubscriptionStateTest, ResourceTTL) {
 
   // Heartbeat update should not be propagated to the subscription callback.
   EXPECT_CALL(*ttl_timer_, enabled());
-  deliverDiscoveryResponse(create_resource_with_ttl(false), {}, "debug1", "nonce1", true, 0);
+  deliverDiscoveryResponse(create_resource_with_ttl(false), {}, "debug1", "nonce1", true, 1);
 }
 
 } // namespace
