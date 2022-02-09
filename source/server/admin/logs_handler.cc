@@ -4,6 +4,7 @@
 
 #include "source/common/common/fancy_logger.h"
 #include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
 #include "source/server/admin/utils.h"
 
 namespace Envoy {
@@ -18,7 +19,7 @@ Http::Code LogsHandler::handlerLogging(absl::string_view url, Http::ResponseHead
   Http::Code rc = Http::Code::OK;
   if (!query_params.empty() && !changeLogLevel(query_params)) {
     response.add("usage: /logging?<name>=<level> (change single level)\n");
-    response.add("usage: /logging?<name1>=<level1>&<name2>=<level2> (change multiple level)\n");
+    response.add("usage: /logging?paths=name1:level1,name2,level2,... (change multiple levels)\n");
     response.add("usage: /logging?level=<level> (change all levels)\n");
     response.add("levels: ");
     for (auto level_string_view : spdlog::level::level_string_views) {
@@ -53,18 +54,32 @@ Http::Code LogsHandler::handlerReopenLogs(absl::string_view, Http::ResponseHeade
 }
 
 bool LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params) {
-  // When level is present, we only accept exact one param.
-  if (params.find("level") != params.end()) {
-    if (params.size() != 1) {
-      return false;
-    }
+  if (params.size() != 1) {
+    return false;
   }
 
-  bool ret = true;
-  for (const auto& [name, level] : params) {
-    ret = changeLogLevelByName(name, level) && ret;
+  std::string key = params.begin()->first;
+  std::string value = params.begin()->second;
+
+  if (key == "paths") {
+    bool ret = true;
+    auto pairs = StringUtil::splitToken(value, ",", /*keep_empty_string=*/false,
+                                        /*trim_whitespace=*/true);
+    for (const auto& s : pairs) {
+      size_t colon_index = s.find(':');
+      if (colon_index == absl::string_view::npos) {
+        continue;
+      }
+
+      std::string name(s.substr(0, colon_index));
+      std::string level(s.substr(colon_index + 1));
+      ret = changeLogLevelByName(name, level) && ret;
+    }
+
+    return ret;
   }
-  return ret;
+
+  return changeLogLevelByName(key, value);
 }
 
 bool LogsHandler::changeLogLevelByName(const std::string& name, const std::string& level) {

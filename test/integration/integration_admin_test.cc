@@ -55,12 +55,20 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   EXPECT_EQ("200", request("admin", "POST", "/logging?assert=trace", response));
   EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
 
-  // Multiple loggers at once.
-  EXPECT_EQ("200",
-            request("admin", "POST", "/logging?assert=debug&admin=debug&config=debug", response));
+  // Multiple loggers at once with bad logger (partial success).
+  EXPECT_EQ("404",
+            request("admin", "POST",
+                    "/logging?paths=blah:debug,assert:debug,admin:debug,config:debug", response));
   EXPECT_EQ(spdlog::level::debug, Logger::Registry::getLog(Logger::Id::assert).level());
   EXPECT_EQ(spdlog::level::debug, Logger::Registry::getLog(Logger::Id::admin).level());
   EXPECT_EQ(spdlog::level::debug, Logger::Registry::getLog(Logger::Id::config).level());
+
+  // Multiple loggers at once
+  EXPECT_EQ("200", request("admin", "POST", "/logging?paths=assert:trace,admin:trace,config:trace",
+                           response));
+  EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
+  EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::admin).level());
+  EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::config).level());
 
   spdlog::string_view_t level_name = spdlog::level::level_string_views[default_log_level_];
   EXPECT_EQ("200",
