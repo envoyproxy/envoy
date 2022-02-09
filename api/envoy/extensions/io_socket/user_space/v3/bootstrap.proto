@@ -14,13 +14,25 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/io_
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Internal Listener]
-// `InternalListenerRegistry` message is the configuration of the `envoy.bootstrap.internal_listener_registry` bootstrap extension.
-// This boot strap extension is required to support adding a listener with an internal address.
-// To establish a connection to a registered internal listener, another `envoy.io_socket.user_space` extension is required.
-// The `InternalClientConnectionFactory` within enables the dispatcher to create client connection to any envoy internal address.
+//
+// This extension contains 2 major components to add a listener with
+// an :ref:`envoy internal address <envoy_v3_api_msg_config.core.v3.EnvoyInternalAddress>`
+// and to create a client connection to that :ref:`listener <envoy.config.listener.v3.Listener>`
+//
+// 1. The bootstrap extension `envoy.bootstrap.internal_listener_registry`
+//
+// This bootstrap extension is required to support looking up the target listener via an
+// :ref:`envoy internal address <envoy_v3_api_msg_config.core.v3.EnvoyInternalAddress>` on each worker threads.
+//
+// 2. The client connection factory `network.connection.client.envoy_internal`
+//
+// This factory is implicitly instantiated by the dispatcher to establish a client connection to the above
+// internal listener,
+//
 // [#extension: envoy.io_socket.user_space]
 
 // [#not-implemented-hide:]
 // Configuration for internal listener registry.
+// [#extension-category: envoy.bootstrap]
 message InternalListenerRegistry {
 }
