@@ -147,6 +147,14 @@ void AlternateProtocolsCacheImpl::setSrtt(const Origin& origin, std::chrono::mic
   }
 }
 
+std::chrono::microseconds AlternateProtocolsCacheImpl::getSrtt(const Origin& origin) const {
+  auto entry_it = protocols_.find(origin);
+  if (entry_it == protocols_.end()) {
+    return std::chrono::microseconds(0);
+  }
+  return entry_it->second.srtt;
+}
+
 void AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
                                                       std::vector<AlternateProtocol>& protocols) {
   static const size_t max_protocols = 10;

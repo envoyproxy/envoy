@@ -168,7 +168,7 @@ bool DubboProtocolImpl::decodeData(Buffer::Instance& buffer, ContextSharedPtr co
     break;
   }
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not handled");
   }
 
   return true;
