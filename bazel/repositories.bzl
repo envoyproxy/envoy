@@ -199,13 +199,13 @@ def envoy_dependencies(skip_targets = []):
     _net_zlib()
     _com_github_zlib_ng_zlib_ng()
     _org_brotli()
+    _re2()
     _upb()
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
     _emscripten_toolchain()
     _rules_fuzzing()
     external_http_archive("proxy_wasm_rust_sdk")
-    external_http_archive("com_googlesource_code_re2")
     _com_google_cel_cpp()
     _com_github_google_perfetto()
     external_http_archive("com_github_google_flatbuffers")
@@ -902,11 +902,6 @@ def _com_github_grpc_grpc():
     )
 
     native.bind(
-        name = "re2",
-        actual = "@com_googlesource_code_re2//:re2",
-    )
-
-    native.bind(
         name = "upb_lib_descriptor",
         actual = "@upb//:descriptor_upb_proto",
     )
@@ -924,6 +919,14 @@ def _com_github_grpc_grpc():
     native.bind(
         name = "upb_json_lib",
         actual = "@upb//:json",
+    )
+
+def _re2():
+    external_http_archive("com_googlesource_code_re2")
+
+    native.bind(
+        name = "re2",
+        actual = "@com_googlesource_code_re2//:re2",
     )
 
 def _upb():
