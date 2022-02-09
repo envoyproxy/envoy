@@ -21,12 +21,12 @@ TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateMonitorInvalidConfig) 
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ProactiveResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.downstream_connections");
-  EXPECT_NE(factory, nullptr);
+  ASSERT(factory != nullptr);
   EXPECT_EQ("envoy.resource_monitors.downstream_connections", factory->name());
 
   envoy::extensions::resource_monitors::downstream_connections::v3::DownstreamConnectionsConfig
       config;
-  config.set_max_active_downstream_connections(std::numeric_limits<uint64_t>::max());
+  config.set_max_active_downstream_connections(-1);
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
@@ -43,7 +43,7 @@ TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateCustomMonitor) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ProactiveResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.downstream_connections");
-  EXPECT_NE(factory, nullptr);
+  ASSERT(factory != nullptr);
   EXPECT_EQ("envoy.resource_monitors.downstream_connections", factory->name());
 
   envoy::extensions::resource_monitors::downstream_connections::v3::DownstreamConnectionsConfig
@@ -62,7 +62,7 @@ TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateDefaultMonitor) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ProactiveResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.downstream_connections");
-  EXPECT_NE(factory, nullptr);
+  ASSERT(factory != nullptr);
 
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
