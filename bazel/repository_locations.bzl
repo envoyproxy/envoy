@@ -76,17 +76,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Minimal OpenSSL fork",
         project_url = "https://github.com/google/boringssl",
         # To update BoringSSL, which tracks Chromium releases:
-        # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/dev release.
+        # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/beta release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
-        # 3. Find a commit in BoringSSL's "main-with-bazel" branch that merges <boringssl_revision>.
+        # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-94.0.4606.81 (linux/dev)
-        version = "648cbaf033401b7fe7acdce02f275b06a88aab5c",
-        sha256 = "579cb415458e9f3642da0a39a72f79fdfe6dc9c1713b3a823f1e276681b9703e",
+        # chromium-99.0.4844.17 (linux/beta)
+        version = "5416e4f16bffdc24e71e84d6e3977eed73c6f6b3",
+        sha256 = "864cb8005739db6f2b615ed167ba12a88a7f5c54e39c911e1c271fdfad21a3e7",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2021-07-15",
+        release_date = "2022-01-05",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
@@ -606,12 +606,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Protocol Buffers",
         project_desc = "Language-neutral, platform-neutral extensible mechanism for serializing structured data",
         project_url = "https://developers.google.com/protocol-buffers",
-        version = "3.19.3",
-        sha256 = "84cca73ed97abce159c381e682ba0237bc21952359b07d8d45dc7e6399edd923",
+        version = "3.19.4",
+        sha256 = "ba0650be1b169d24908eeddbe6107f011d8df0da5b1a5a4449a913b10e578faf",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-all-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2022-01-11",
+        release_date = "2022-01-28",
         cpe = "cpe:2.3:a:google:protobuf:*",
     ),
     grpc_httpjson_transcoding = dict(
@@ -809,12 +809,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "a780cd0c3b26c0307bd63c68c4d72dd04f63d8bb",
-        sha256 = "d5985917e0e91306f5e37cae50fa7153d9716184cc536c2db30908cf9ef6ffef",
+        version = "d016c016b69388a6e6940a5da165acfeca30494d",
+        sha256 = "f7bdff35de187082275e21b1c7fd5b8509c944f24c253c5ac53f1f074bf9f496",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["dataplane_core"],
-        release_date = "2022-01-31",
+        release_date = "2022-02-07",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
@@ -994,8 +994,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (C++ host implementation)",
         project_desc = "WebAssembly for Proxies (C++ host implementation)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host",
-        version = "44a63ebe58770a07e36ff1ff149f176fd8371810",
-        sha256 = "4a3b5fb6d2013b1e3e825857805f519117509446bbf1036c038a1785ad77456f",
+        version = "819dcc02bd2bc6fdec07720379c4d522d6b7da08",
+        sha256 = "95b72d43d7cacc608bbc1370ba83fbfa893f807620b39470101079a23327a7c3",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -1011,7 +1011,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2022-01-26",
+        release_date = "2022-02-01",
         cpe = "N/A",
     ),
     proxy_wasm_rust_sdk = dict(
