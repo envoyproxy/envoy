@@ -57,7 +57,6 @@ public:
     localitySourceType(static_cast<LoadBalancerBase::HostAvailability>(123));
   }
   void runInvalidSourceType() { sourceType(static_cast<LoadBalancerBase::HostAvailability>(123)); }
-  const HostMapConstSharedPtr& crossPriorityHostMapForTest() { PANIC("not implemented"); }
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override { PANIC("not implemented"); }
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { PANIC("not implemented"); }
 };
