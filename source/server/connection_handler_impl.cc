@@ -145,6 +145,7 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
               Network::Address::Ipv4Instance(address->ip()->port()).asStringView());
         } else {
           auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
+          // When add listener, already ensure this is a valid v4 compatible address.
           ASSERT(v4_compatible_addr.ok());
           tcp_listener_map_by_address_.erase(v4_compatible_addr.value()->asStringView());
         }
