@@ -6,6 +6,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/alternate_protocols_cache.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -86,6 +87,27 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   EXPECT_EQ(highWatermark(session), 45);
   EXPECT_EQ(absl::nullopt, session->unixSocketPeerCredentials());
   EXPECT_EQ(absl::nullopt, session->lastRoundTripTime());
+  client_connection->close(Network::ConnectionCloseType::NoFlush);
+}
+
+TEST_P(QuicNetworkConnectionTest, Srtt) {
+  initialize();
+
+  Http::MockAlternateProtocolsCache rtt_cache;
+  quic::QuicConfig config;
+  PersistentQuicInfoImpl info{dispatcher_, *factory_, simTime(), 30, config, 45};
+
+  EXPECT_CALL(rtt_cache, getSrtt).WillOnce(Return(std::chrono::microseconds(5)));
+
+  std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
+      info, dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_);
+
+  EXPECT_EQ(info.quic_config_.GetInitialRoundTripTimeUsToSend(), 5);
+
+  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+  session->Initialize();
+  client_connection->connect();
+  EXPECT_TRUE(client_connection->connecting());
   client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 

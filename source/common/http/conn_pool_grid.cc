@@ -11,6 +11,9 @@ namespace {
 absl::string_view describePool(const ConnectionPool::Instance& pool) {
   return pool.protocolDescription();
 }
+
+static constexpr uint32_t kDefaultTimeoutMs = 300;
+
 } // namespace
 
 ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
@@ -185,17 +188,23 @@ ConnectivityGrid::ConnectivityGrid(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-    AlternateProtocolsCacheSharedPtr alternate_protocols,
-    std::chrono::milliseconds next_attempt_duration, ConnectivityOptions connectivity_options,
+    AlternateProtocolsCacheSharedPtr alternate_protocols, ConnectivityOptions connectivity_options,
     Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope, Http::PersistentQuicInfo& quic_info)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
-      state_(state), next_attempt_duration_(next_attempt_duration), time_source_(time_source),
-      http3_status_tracker_(dispatcher_), alternate_protocols_(alternate_protocols),
-      quic_stat_names_(quic_stat_names), scope_(scope), quic_info_(quic_info) {
+      state_(state), next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
+      time_source_(time_source), http3_status_tracker_(dispatcher_),
+      alternate_protocols_(alternate_protocols), quic_stat_names_(quic_stat_names), scope_(scope),
+      quic_info_(quic_info) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
-  // TODO(#15649) support v6/v4, WiFi/cellular.
+  AlternateProtocolsCache::Origin origin("https", host_->hostname(),
+                                         host_->address()->ip()->port());
+  std::chrono::milliseconds rtt =
+      std::chrono::duration_cast<std::chrono::milliseconds>(alternate_protocols_->getSrtt(origin));
+  if (rtt.count() != 0) {
+    next_attempt_duration_ = std::chrono::milliseconds(rtt.count() * 2);
+  }
   ASSERT(connectivity_options.protocols_.size() == 3);
   ASSERT(alternate_protocols);
 }
