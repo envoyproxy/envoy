@@ -597,7 +597,7 @@ private:
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
                      Buffer::WatermarkFactorySharedPtr watermark_factory, bool skip_asserts);
 
-  bool skip_asserts_;
+  bool skip_asserts_{false};
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;
   const std::string config_path_;
@@ -648,9 +648,11 @@ private:
                                ProcessObjectOptRef process_object,
                                Buffer::WatermarkFactorySharedPtr watermark_factory) override;
 
+  // Used to skip thread checks for multi-envoy tests, when the test server is
+  // created create() with skip_asserts = true.
+  std::unique_ptr<Thread::SkipAsserts> skip_;
   // Owned by this class. An owning pointer is not used because the actual allocation is done
   // on a stack in a non-main thread.
-  std::unique_ptr<Thread::SkipAsserts> skip;
   Server::Instance* server_{};
   Stats::Store* stat_store_{};
   Network::Address::InstanceConstSharedPtr admin_address_;

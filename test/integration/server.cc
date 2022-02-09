@@ -224,7 +224,7 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Buffer::WatermarkFactorySharedPtr watermark_factory) {
   {
     if (skipAsserts()) {
-      skip = std::make_unique<Thread::SkipAsserts>();
+      skip_ = std::make_unique<Thread::SkipAsserts>();
     }
     Init::ManagerImpl init_manager{"Server"};
     Server::HotRestartNopImpl restarter;
