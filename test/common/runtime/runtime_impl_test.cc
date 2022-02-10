@@ -841,9 +841,10 @@ TEST(NoRuntime, DefaultIntValues) {
   ASSERT_TRUE(Runtime::LoaderSingleton::getExisting() == nullptr);
 
   // Feature defaults should still work.
-  EXPECT_ENVOY_BUG(EXPECT_EQ(0x1230000ABCDULL,
-              getInteger("envoy.reloadable_features.test_int_feature_default", 0x1230000ABCDULL)),
-                   "requested an unsupported integer");
+  EXPECT_ENVOY_BUG(
+      EXPECT_EQ(0x1230000ABCDULL,
+                getInteger("envoy.reloadable_features.test_int_feature_default", 0x1230000ABCDULL)),
+      "requested an unsupported integer");
 }
 
 // Test RTDS layer(s).
