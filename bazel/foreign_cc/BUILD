@@ -392,7 +392,6 @@ envoy_cmake(
 envoy_cmake(
     name = "wamr",
     cache_entries = {
-        "LLVM_DIR": "$EXT_BUILD_DEPS/copy_llvm/llvm/lib/cmake/llvm",
         "WAMR_BUILD_INTERP": "1",
         "WAMR_BUILD_FAST_INTERP": "1",
         "WAMR_BUILD_JIT": "0",
@@ -406,7 +405,6 @@ envoy_cmake(
     lib_source = "@com_github_wamr//:all",
     out_static_libs = ["libvmlib.a"],
     tags = ["skip_on_windows"],
-    deps = [":llvm"],
 )
 
 envoy_cmake(

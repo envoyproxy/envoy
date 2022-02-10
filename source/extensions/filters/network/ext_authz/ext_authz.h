@@ -134,6 +134,7 @@ private:
   bool filterEnabled(const envoy::config::core::v3::Metadata& metadata) {
     return config_->filterEnabledMetadata(metadata);
   }
+  absl::optional<MonotonicTime> start_time_;
 
   ConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;

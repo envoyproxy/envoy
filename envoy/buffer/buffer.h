@@ -202,16 +202,6 @@ public:
   virtual void copyOut(size_t start, uint64_t size, void* data) const PURE;
 
   /**
-   * Copy out a section of the buffer to  dynamic array of slices.
-   * @param size supplies the size of the data that will be copied.
-   * @param slices supplies the output slices to fill.
-   * @param num_slice supplies the number of slices to fill.
-   * @return the number of bytes copied.
-   */
-  virtual uint64_t copyOutToSlices(uint64_t size, Buffer::RawSlice* slices,
-                                   uint64_t num_slice) const PURE;
-
-  /**
    * Drain data from the buffer.
    * @param size supplies the length of data to drain.
    */

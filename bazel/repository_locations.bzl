@@ -76,17 +76,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Minimal OpenSSL fork",
         project_url = "https://github.com/google/boringssl",
         # To update BoringSSL, which tracks Chromium releases:
-        # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/dev release.
+        # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/beta release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
-        # 3. Find a commit in BoringSSL's "main-with-bazel" branch that merges <boringssl_revision>.
+        # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-94.0.4606.81 (linux/dev)
-        version = "648cbaf033401b7fe7acdce02f275b06a88aab5c",
-        sha256 = "579cb415458e9f3642da0a39a72f79fdfe6dc9c1713b3a823f1e276681b9703e",
+        # chromium-99.0.4844.17 (linux/beta)
+        version = "5416e4f16bffdc24e71e84d6e3977eed73c6f6b3",
+        sha256 = "864cb8005739db6f2b615ed167ba12a88a7f5c54e39c911e1c271fdfad21a3e7",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2021-07-15",
+        release_date = "2022-01-05",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
@@ -618,12 +618,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Protocol Buffers",
         project_desc = "Language-neutral, platform-neutral extensible mechanism for serializing structured data",
         project_url = "https://developers.google.com/protocol-buffers",
-        version = "3.19.3",
-        sha256 = "84cca73ed97abce159c381e682ba0237bc21952359b07d8d45dc7e6399edd923",
+        version = "3.19.4",
+        sha256 = "ba0650be1b169d24908eeddbe6107f011d8df0da5b1a5a4449a913b10e578faf",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-all-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2022-01-11",
+        release_date = "2022-01-28",
         cpe = "cpe:2.3:a:google:protobuf:*",
     ),
     grpc_httpjson_transcoding = dict(
@@ -691,12 +691,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Packaging rules for Bazel",
         project_desc = "Bazel rules for the packaging distributions",
         project_url = "https://github.com/bazelbuild/rules_pkg",
-        version = "e5d1ed4e23b291073d8a9058a671a1bd9664f230",
-        sha256 = "c76ca18f745673b8c2a7bbe867893ffb252c6bebf91f9a1eee15cfa054957ea7",
+        version = "0.6.0",
+        sha256 = "04535dbfbdf3ec839a2c578a0705a34e5a0bbfd4438b29e285b961e6e0b97ce1",
         strip_prefix = "rules_pkg-{version}",
         urls = ["https://github.com/bazelbuild/rules_pkg/archive/{version}.tar.gz"],
         use_category = ["build"],
-        release_date = "2021-12-15",
+        release_date = "2022-01-24",
     ),
     org_llvm_llvm = dict(
         # When changing this, you must re-generate the list of llvm libs
@@ -802,31 +802,60 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-01-05",
         cpe = "cpe:2.3:a:haxx:libcurl:*",
     ),
-    com_googlesource_chromium_v8 = dict(
+    v8 = dict(
         project_name = "V8",
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
-        version = "9.9.115.3",
-        # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
-        # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "4f4353928d10adbc07503edcb7dbd5a20981de669225dcffc450472cbfb179c2",
-        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.tar.gz"],
-        strip_prefix = "wee8",
+        # NOTE: Update together with com_googlesource_chromium_base_trace_event_common and com_googlesource_chromium_zlib.
+        version = "9.9.115.5",
+        # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
+        sha256 = "60a6759069350571b24b65eb88c2c1908afed2b938dae6a92b305924f3b64e84",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/v8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-01-24",
+        release_date = "2022-01-31",
         cpe = "cpe:2.3:a:google:v8:*",
+    ),
+    com_googlesource_chromium_base_trace_event_common = dict(
+        project_name = "Chromium's trace event headers",
+        project_desc = "Chromium's trace event headers",
+        project_url = "https://chromium.googlesource.com/chromium/src/base/trace_event/common/",
+        # NOTE: Update together with v8 and com_googlesource_chromium_zlib.
+        # Use version and sha256 from https://storage.googleapis.com/envoyproxy-wee8/v8-<v8_version>-deps.sha256.
+        version = "7f36dbc19d31e2aad895c60261ca8f726442bfbb",
+        # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
+        sha256 = "4e9f31f393ea87bf3987f9a5e3b1d8314ad45f00e5a79c61cdcc1ef1eed2f05b",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/chromium-base_trace_event_common-{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.wasm.runtime.v8"],
+        release_date = "2021-10-27",
+        cpe = "N/A",
+    ),
+    com_googlesource_chromium_zlib = dict(
+        project_name = "Chromium's zlib",
+        project_desc = "Chromium’s fork of zlib with compression utils",
+        project_url = "https://chromium.googlesource.com/chromium/src/third_party/zlib/",
+        # NOTE: Update together with v8 and com_googlesource_chromium_base_trace_event_common.
+        # Use version and sha256 from https://storage.googleapis.com/envoyproxy-wee8/v8-<v8_version>-deps.sha256.
+        version = "fc5cfd78a357d5bb7735a58f383634faaafe706a",
+        # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
+        sha256 = "695c73750cf6472fc6c926e43952262206f1475157377364142bdbb84a1a5a83",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/chromium-zlib-{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.wasm.runtime.v8"],
+        release_date = "2022-01-12",
+        cpe = "N/A",
     ),
     com_github_google_quiche = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "919b260490a635bae43c3190523aaff71d4b1009",
-        sha256 = "5dbb6a898018cd3168b7f4f0cdd0ee162deb91f26697ac8acc5f63d4170a8112",
+        version = "d016c016b69388a6e6940a5da165acfeca30494d",
+        sha256 = "f7bdff35de187082275e21b1c7fd5b8509c944f24c253c5ac53f1f074bf9f496",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["dataplane_core"],
-        release_date = "2022-01-19",
+        release_date = "2022-02-07",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
@@ -1006,8 +1035,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (C++ host implementation)",
         project_desc = "WebAssembly for Proxies (C++ host implementation)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host",
-        version = "4634be18b3c2f54999be713fe3e183d62d9ec4a5",
-        sha256 = "0a4da917ef23eb085dcc09b4f741c11944cd8963b116082488f3977bf2812ac2",
+        version = "819dcc02bd2bc6fdec07720379c4d522d6b7da08",
+        sha256 = "95b72d43d7cacc608bbc1370ba83fbfa893f807620b39470101079a23327a7c3",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -1023,7 +1052,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2022-01-13",
+        release_date = "2022-02-01",
         cpe = "N/A",
     ),
     proxy_wasm_rust_sdk = dict(
