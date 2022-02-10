@@ -44,12 +44,14 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
 
 void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
   absl::flat_hash_map<std::string, bool> quiche_flags_override;
+#ifdef ENVOY_ENABLE_QUIC
   for (const auto& it : flag_map) {
     if (absl::StartsWith(it.first, quiche::EnvoyQuicheReloadableFlagPrefix) &&
         it.second.bool_value_.has_value()) {
       quiche_flags_override[it.first.substr(quiche::EnvoyFeaturePrefix.length())] =
           it.second.bool_value_.value();
     }
+#endif
     if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
       maybeSetRuntimeGuard(it.first, it.second.bool_value_.value());
     }

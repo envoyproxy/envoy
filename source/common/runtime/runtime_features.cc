@@ -18,7 +18,8 @@
  * "envoy.reloadable_features.flag_name" due to the prior naming scheme and swapPrefix.
  **/
 
-#define RUNTIME_GUARD(name) ABSL_FLAG(bool, name, true, "");
+#define RUNTIME_GUARD(name) ABSL_FLAG(bool, name, true, "");        // NOLINT
+#define FALSE_RUNTIME_GUARD(name) ABSL_FLAG(bool, name, false, ""); // NOLINT
 
 RUNTIME_GUARD(envoy_reloadable_features_allow_response_for_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
@@ -55,18 +56,18 @@ RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
 
 // Begin false flags. These should come with a TODO to flip true.
 // Sentinel and test flag.
-ABSL_FLAG(bool, envoy_reloadable_features_test_feature_false, false, "");
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 // TODO(alyssawilk, junr03) flip (and add release notes + docs) these after Lyft tests
-ABSL_FLAG(bool, envoy_reloadable_features_allow_multiple_dns_addresses, false, "");
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 // TODO(adisuissa) reset to true to enable unified mux by default
-ABSL_FLAG(bool, envoy_reloadable_features_unified_mux, false, "");
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 // TODO(birenroy) reset to true after bug fixes
-ABSL_FLAG(bool, envoy_reloadable_features_http2_new_codec_wrapper, false, "");
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
 
 // Block of non-boolean flags. These are deprecated.Do not add more.
-ABSL_FLAG(uint64_t, envoy_buffer_overflow_multiplier, 0, "");
-ABSL_FLAG(uint64_t, envoy_do_not_use_going_away_max_http2_outbound_response, 2, "");
-ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");
+ABSL_FLAG(uint64_t, envoy_buffer_overflow_multiplier, 0, "");                        // NOLINT
+ABSL_FLAG(uint64_t, envoy_do_not_use_going_away_max_http2_outbound_response, 2, ""); // NOLINT
+ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");                       // NOLINT
 
 namespace Envoy {
 namespace Runtime {
