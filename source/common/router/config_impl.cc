@@ -1119,8 +1119,10 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
       if (absl::SimpleAtoi(header_value[0]->value().getStringView(), &random_value)) {
         random_value_from_header = random_value;
       }
-    } else {
-      // Random value should be found here. But if it is not found due to some errors, log the
+    }
+
+    if (!random_value_from_header.has_value()) {
+      // Random value should be found here. But if it is not set due to some errors, log the
       // information and fallback to the random value that is set by stream id.
       ENVOY_LOG(debug, "The random value can not be found from the header and it will fall back to "
                        "the value that is set by stream id");
