@@ -790,31 +790,60 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-01-05",
         cpe = "cpe:2.3:a:haxx:libcurl:*",
     ),
-    com_googlesource_chromium_v8 = dict(
+    v8 = dict(
         project_name = "V8",
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
-        version = "9.9.115.3",
-        # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
-        # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "4f4353928d10adbc07503edcb7dbd5a20981de669225dcffc450472cbfb179c2",
-        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.tar.gz"],
-        strip_prefix = "wee8",
+        # NOTE: Update together with com_googlesource_chromium_base_trace_event_common and com_googlesource_chromium_zlib.
+        version = "9.9.115.5",
+        # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
+        sha256 = "60a6759069350571b24b65eb88c2c1908afed2b938dae6a92b305924f3b64e84",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/v8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-01-24",
+        release_date = "2022-01-31",
         cpe = "cpe:2.3:a:google:v8:*",
+    ),
+    com_googlesource_chromium_base_trace_event_common = dict(
+        project_name = "Chromium's trace event headers",
+        project_desc = "Chromium's trace event headers",
+        project_url = "https://chromium.googlesource.com/chromium/src/base/trace_event/common/",
+        # NOTE: Update together with v8 and com_googlesource_chromium_zlib.
+        # Use version and sha256 from https://storage.googleapis.com/envoyproxy-wee8/v8-<v8_version>-deps.sha256.
+        version = "7f36dbc19d31e2aad895c60261ca8f726442bfbb",
+        # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
+        sha256 = "4e9f31f393ea87bf3987f9a5e3b1d8314ad45f00e5a79c61cdcc1ef1eed2f05b",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/chromium-base_trace_event_common-{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.wasm.runtime.v8"],
+        release_date = "2021-10-27",
+        cpe = "N/A",
+    ),
+    com_googlesource_chromium_zlib = dict(
+        project_name = "Chromium's zlib",
+        project_desc = "Chromium’s fork of zlib with compression utils",
+        project_url = "https://chromium.googlesource.com/chromium/src/third_party/zlib/",
+        # NOTE: Update together with v8 and com_googlesource_chromium_base_trace_event_common.
+        # Use version and sha256 from https://storage.googleapis.com/envoyproxy-wee8/v8-<v8_version>-deps.sha256.
+        version = "fc5cfd78a357d5bb7735a58f383634faaafe706a",
+        # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
+        sha256 = "695c73750cf6472fc6c926e43952262206f1475157377364142bdbb84a1a5a83",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/chromium-zlib-{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.wasm.runtime.v8"],
+        release_date = "2022-01-12",
+        cpe = "N/A",
     ),
     com_github_google_quiche = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "f99859b80ee8732eb601215d80f87379ada5d134",
-        sha256 = "087628c3cf56c49d622e57793795592f03e9536bfe3ae96af2aaa4768868acc8",
+        version = "b5824c589ce35636fbeb5483f6b3faf2e8463453",
+        sha256 = "605c4103e95b406939da7c9c2739f920adbb4f88725d2081316f9b33661e16a1",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["dataplane_core"],
-        release_date = "2022-02-03",
+        release_date = "2022-02-09",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(

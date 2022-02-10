@@ -53,28 +53,27 @@ TransportSocketOptionsConstSharedPtr TransportSocketOptionsUtility::fromFilterSt
   std::vector<std::string> alpn_fallback;
   absl::optional<Network::ProxyProtocolData> proxy_protocol_options;
 
-  if (filter_state->hasData<UpstreamServerName>(UpstreamServerName::key())) {
-    const auto& upstream_server_name =
-        filter_state->getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
-    server_name = upstream_server_name.value();
+  if (auto typed_data = filter_state.getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
+      typed_data != nullptr) {
+    server_name = typed_data->value();
   }
 
-  if (filter_state->hasData<Network::ApplicationProtocols>(Network::ApplicationProtocols::key())) {
-    const auto& alpn = filter_state->getDataReadOnly<Network::ApplicationProtocols>(
-        Network::ApplicationProtocols::key());
-    application_protocols = alpn.value();
+  if (auto typed_data = filter_state.getDataReadOnly<Network::ApplicationProtocols>(
+          Network::ApplicationProtocols::key());
+      typed_data != nullptr) {
+    application_protocols = typed_data->value();
   }
 
-  if (filter_state->hasData<UpstreamSubjectAltNames>(UpstreamSubjectAltNames::key())) {
-    const auto& upstream_subject_alt_names =
-        filter_state->getDataReadOnly<UpstreamSubjectAltNames>(UpstreamSubjectAltNames::key());
-    subject_alt_names = upstream_subject_alt_names.value();
+  if (auto typed_data =
+          filter_state.getDataReadOnly<UpstreamSubjectAltNames>(UpstreamSubjectAltNames::key());
+      typed_data != nullptr) {
+    subject_alt_names = typed_data->value();
   }
 
-  if (filter_state->hasData<ProxyProtocolFilterState>(ProxyProtocolFilterState::key())) {
-    const auto& proxy_protocol_filter_state =
-        filter_state->getDataReadOnly<ProxyProtocolFilterState>(ProxyProtocolFilterState::key());
-    proxy_protocol_options.emplace(proxy_protocol_filter_state.value());
+  if (auto typed_data =
+          filter_state.getDataReadOnly<ProxyProtocolFilterState>(ProxyProtocolFilterState::key());
+      typed_data != nullptr) {
+    proxy_protocol_options.emplace(typed_data->value());
   }
 
   return std::make_shared<Network::TransportSocketOptionsImpl>(

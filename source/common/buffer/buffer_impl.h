@@ -369,7 +369,7 @@ public:
    */
   static inline SizedStorage newStorage(uint64_t min_capacity) {
     const uint64_t slice_size = sliceSize(min_capacity);
-    return {StoragePtr{new uint8_t[slice_size]}, slice_size};
+    return {StoragePtr{new uint8_t[slice_size]}, static_cast<size_t>(slice_size)};
   }
 
 protected:
@@ -697,7 +697,7 @@ public:
   // Does not implement watermarking.
   // TODO(antoniovicente) Implement watermarks by merging the OwnedImpl and WatermarkBuffer
   // implementations. Also, make high-watermark config a constructor argument.
-  void setWatermarks(uint32_t) override { ASSERT(false, "watermarks not implemented."); }
+  void setWatermarks(uint32_t, uint32_t) override { ASSERT(false, "watermarks not implemented."); }
   uint32_t highWatermark() const override { return 0; }
   bool highWatermarkTriggered() const override { return false; }
 
