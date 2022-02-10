@@ -74,11 +74,52 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressWitho
   testFormatting("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "127.0.0.1");
 }
 
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamRemotePortVariable) {
+  testFormatting("DOWNSTREAM_REMOTE_PORT", "0");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamDirectRemoteAddressVariable) {
+  testFormatting("DOWNSTREAM_DIRECT_REMOTE_ADDRESS", "127.0.0.3:63443");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest,
+       TestFormatWithDownstreamDirectRemoteAddressWithoutPortVariable) {
+  testFormatting("DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT", "127.0.0.3");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamDirectRemotePortVariable) {
+  testFormatting("DOWNSTREAM_DIRECT_REMOTE_PORT", "63443");
+}
+
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressVariable) {
   testFormatting("DOWNSTREAM_LOCAL_ADDRESS", "127.0.0.2:0");
 }
 
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressVariableVariants) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  // Validate for IPv4 address
+  auto address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("127.1.2.3", 8443)};
+  stream_info.downstream_connection_info_provider_->setLocalAddress(address);
+  testFormatting(stream_info, "DOWNSTREAM_LOCAL_ADDRESS", "127.1.2.3:8443");
+
+  // Validate for IPv6 address
+  address =
+      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 9443)};
+  stream_info.downstream_connection_info_provider_->setLocalAddress(address);
+  testFormatting(stream_info, "DOWNSTREAM_LOCAL_ADDRESS", "[::1]:9443");
+
+  // Validate for Pipe
+  address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
+  stream_info.downstream_connection_info_provider_->setLocalAddress(address);
+  testFormatting(stream_info, "DOWNSTREAM_LOCAL_ADDRESS", "/foo");
+}
+
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalPortVariable) {
+  testFormatting("DOWNSTREAM_LOCAL_PORT", "0");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalPortVariableVariants) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   // Validate for IPv4 address
   auto address = Network::Address::InstanceConstSharedPtr{
@@ -102,12 +143,76 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressWithou
   testFormatting("DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "127.0.0.2");
 }
 
+TEST_F(StreamInfoHeaderFormatterTest,
+       TestFormatWithDownstreamLocalAddressWithoutPortVariableVariants) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  // Validate for IPv4 address
+  auto address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("127.1.2.3", 8443)};
+  stream_info.downstream_connection_info_provider_->setLocalAddress(address);
+  testFormatting(stream_info, "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "127.1.2.3");
+
+  // Validate for IPv6 address
+  address =
+      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 9443)};
+  stream_info.downstream_connection_info_provider_->setLocalAddress(address);
+  testFormatting(stream_info, "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "::1");
+
+  // Validate for Pipe
+  address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
+  stream_info.downstream_connection_info_provider_->setLocalAddress(address);
+  testFormatting(stream_info, "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "/foo");
+}
+
 TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemoteAddressVariable) {
   testFormatting("UPSTREAM_REMOTE_ADDRESS", "10.0.0.1:443");
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   stream_info.upstreamInfo()->setUpstreamHost(nullptr);
   testFormatting(stream_info, "UPSTREAM_REMOTE_ADDRESS", "");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemotePortVariable) {
+  testFormatting("UPSTREAM_REMOTE_PORT", "443");
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+  testFormatting(stream_info, "UPSTREAM_REMOTE_PORT", "");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemoteAddressWithoutPortVariable) {
+  testFormatting("UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "10.0.0.1");
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+  testFormatting(stream_info, "UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamLocalAddressVariable) {
+  testFormatting("UPSTREAM_LOCAL_ADDRESS", "127.1.2.3:58443");
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+  stream_info.upstreamInfo()->setUpstreamLocalAddress(nullptr);
+  testFormatting(stream_info, "UPSTREAM_LOCAL_ADDRESS", "");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamLocalPortVariable) {
+  testFormatting("UPSTREAM_LOCAL_PORT", "58443");
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+  stream_info.upstreamInfo()->setUpstreamLocalAddress(nullptr);
+  testFormatting(stream_info, "UPSTREAM_LOCAL_PORT", "");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamLocalAddressWithoutPortVariable) {
+  testFormatting("UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "127.1.2.3");
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+  stream_info.upstreamInfo()->setUpstreamLocalAddress(nullptr);
+  testFormatting(stream_info, "UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestformatWithHostnameVariable) {
@@ -715,7 +820,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
   filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
                         StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
-  EXPECT_EQ("test_value", filter_state->getDataReadOnly<StringAccessor>("testing").asString());
+  EXPECT_EQ("test_value", filter_state->getDataReadOnly<StringAccessor>("testing")->asString());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
@@ -723,7 +828,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
 
   testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "test_value");
   testFormatting(stream_info, "PER_REQUEST_STATE(testing2)", "");
-  EXPECT_EQ("test_value", filter_state->getDataReadOnly<StringAccessor>("testing").asString());
+  EXPECT_EQ("test_value", filter_state->getDataReadOnly<StringAccessor>("testing")->asString());
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVariable) {
@@ -733,7 +838,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVari
   filter_state->setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1),
                         StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
-  EXPECT_EQ(1, filter_state->getDataReadOnly<StreamInfo::TestIntAccessor>("testing").access());
+  EXPECT_EQ(1, filter_state->getDataReadOnly<StreamInfo::TestIntAccessor>("testing")->access());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
@@ -835,6 +940,29 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA({\"a\":1}), because JSON field from line 1 accessed with type 'Array' "
       "does not match actual type 'Object'.");
+
+  // Number overflow.
+  EXPECT_THROW_WITH_MESSAGE(
+      StreamInfoHeaderFormatter(
+          "UPSTREAM_METADATA(-"
+          "5211111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+          "1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+          "1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+          "1111111111111111111111111111111111111111111111111)",
+          false),
+      EnvoyException,
+      "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+      "...]), actual format "
+      "UPSTREAM_METADATA(-"
+      "52111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      "1111111111111111111111111111111111111), because JSON supplied is not valid. Error(position: "
+      "314):  number overflow parsing '-"
+      "52111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      "1111111111111111111111111111111111111'\n");
 }
 
 TEST(HeaderParserTest, TestParseInternal) {
@@ -856,6 +984,10 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%%%PROTOCOL%%%", {"%HTTP/1.1%"}, {}},
       {"%DOWNSTREAM_REMOTE_ADDRESS%", {"127.0.0.1:0"}, {}},
       {"%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", {"127.0.0.1"}, {}},
+      {"%DOWNSTREAM_REMOTE_PORT%", {"0"}, {}},
+      {"%DOWNSTREAM_DIRECT_REMOTE_ADDRESS%", {"127.0.0.3:63443"}, {}},
+      {"%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%", {"127.0.0.3"}, {}},
+      {"%DOWNSTREAM_DIRECT_REMOTE_PORT%", {"63443"}, {}},
       {"%DOWNSTREAM_LOCAL_ADDRESS%", {"127.0.0.2:0"}, {}},
       {"%DOWNSTREAM_LOCAL_PORT%", {"0"}, {}},
       {"%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%", {"127.0.0.2"}, {}},
@@ -868,6 +1000,11 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
       {R"EOF(%UPSTREAM_METADATA(["\"quoted\"", "\"key\""])%)EOF", {"value"}, {}},
       {"%UPSTREAM_REMOTE_ADDRESS%", {"10.0.0.1:443"}, {}},
+      {"%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", {"10.0.0.1"}, {}},
+      {"%UPSTREAM_REMOTE_PORT%", {"443"}, {}},
+      {"%UPSTREAM_LOCAL_ADDRESS%", {"127.0.0.3:8443"}, {}},
+      {"%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%", {"127.0.0.3"}, {}},
+      {"%UPSTREAM_LOCAL_PORT%", {"8443"}, {}},
       {"%REQUESTED_SERVER_NAME%", {"foo.bar"}, {}},
       {"%VIRTUAL_CLUSTER_NAME%", {"authN"}, {}},
       {"%PER_REQUEST_STATE(testing)%", {"test_value"}, {}},
@@ -977,6 +1114,9 @@ TEST(HeaderParserTest, TestParseInternal) {
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   stream_info.upstreamInfo()->setUpstreamHost(host);
+  auto local_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("127.0.0.3", 8443)};
+  stream_info.upstreamInfo()->setUpstreamLocalAddress(local_address);
 
   Http::TestRequestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::LowerCaseString(std::string("x-request-id")), 123);
@@ -1057,6 +1197,9 @@ request_headers_to_add:
   - header:
       key: "x-client-ip-port"
       value: "%DOWNSTREAM_REMOTE_ADDRESS%"
+  - header:
+      key: "x-client-port"
+      value: "%DOWNSTREAM_REMOTE_PORT%"
     append: true
 )EOF";
 
@@ -1067,6 +1210,7 @@ request_headers_to_add:
   req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_TRUE(header_map.has("x-client-ip"));
   EXPECT_TRUE(header_map.has("x-client-ip-port"));
+  EXPECT_TRUE(header_map.has("x-client-port"));
 }
 
 TEST(HeaderParserTest, EvaluateHeadersWithNullStreamInfo) {
@@ -1083,6 +1227,9 @@ request_headers_to_add:
   - header:
       key: "x-client-ip-port"
       value: "%DOWNSTREAM_REMOTE_ADDRESS%"
+  - header:
+      key: "x-client-port"
+      value: "%DOWNSTREAM_REMOTE_PORT%"
     append: true
 )EOF";
 
@@ -1092,8 +1239,10 @@ request_headers_to_add:
   req_header_parser->evaluateHeaders(header_map, nullptr);
   EXPECT_TRUE(header_map.has("x-client-ip"));
   EXPECT_TRUE(header_map.has("x-client-ip-port"));
+  EXPECT_TRUE(header_map.has("x-client-port"));
   EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", header_map.get_("x-client-ip"));
   EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS%", header_map.get_("x-client-ip-port"));
+  EXPECT_EQ("%DOWNSTREAM_REMOTE_PORT%", header_map.get_("x-client-port"));
 }
 
 TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {

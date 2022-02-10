@@ -201,6 +201,10 @@ private:
     }
     void finalizeRequestHeaders(Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                                 bool) const override {}
+    Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo&,
+                                                   bool) const override {
+      return {};
+    }
     void finalizeResponseHeaders(Http::ResponseHeaderMap&,
                                  const StreamInfo::StreamInfo&) const override {}
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
@@ -399,6 +403,8 @@ private:
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
   void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {}
   void resetIdleTimer() override {}
+  void setUpstreamOverrideHost(absl::string_view) override {}
+  absl::optional<absl::string_view> upstreamOverrideHost() const override { return {}; }
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override {

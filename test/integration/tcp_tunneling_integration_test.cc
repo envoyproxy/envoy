@@ -243,6 +243,24 @@ TEST_P(ConnectTerminationIntegrationTest, BasicMaxStreamDuration) {
   }
 }
 
+// Verify Envoy ignores the Host field in HTTP/1.1 CONNECT message.
+TEST_P(ConnectTerminationIntegrationTest, IgnoreH11HostField) {
+  // This test is HTTP/1.1 specific.
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    return;
+  }
+  initialize();
+
+  std::string response;
+  const std::string full_request = "CONNECT www.foo.com:443 HTTP/1.1\r\n"
+                                   "Host: www.bar.com:443\r\n\r\n";
+  EXPECT_LOG_CONTAINS(
+      "",
+      "':authority', 'www.foo.com:443'\n"
+      "':method', 'CONNECT'",
+      sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false););
+}
+
 // For this class, forward the CONNECT request upstream
 class ProxyingConnectIntegrationTest : public HttpProtocolIntegrationTest {
 public:
@@ -289,54 +307,6 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
   RELEASE_ASSERT(result, result.message());
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
-  } else {
-    EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Protocol)[0]->value(),
-              "bytestream");
-  }
-
-  // Send response headers
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-
-  // Wait for them to arrive downstream.
-  response_->waitForHeaders();
-  EXPECT_EQ("200", response_->headers().getStatusValue());
-
-  // Make sure that even once the response has started, that data can continue to go upstream.
-  codec_client_->sendData(*request_encoder_, "hello", false);
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
-
-  // Also test upstream to downstream data.
-  upstream_request_->encodeData(12, false);
-  response_->waitForBodyData(12);
-
-  cleanupUpstreamAndDownstream();
-}
-
-TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithPortStrippingLegacy) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.strip_port_from_connect", "false");
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) { hcm.set_strip_any_host_port(true); });
-
-  initialize();
-
-  // Send request headers.
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(connect_headers_);
-  request_encoder_ = &encoder_decoder.first;
-  response_ = std::move(encoder_decoder.second);
-
-  // Wait for them to arrive upstream.
-  AssertionResult result =
-      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
-  RELEASE_ASSERT(result, result.message());
-  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
-  RELEASE_ASSERT(result, result.message());
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
-  EXPECT_EQ(upstream_request_->headers().getHostValue(), "host:80");
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
   } else {

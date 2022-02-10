@@ -178,12 +178,12 @@ public:
     EXPECT_EQ(server_name,
               stream_info.filterState()
                   ->getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
-                  .value());
+                  ->value());
     if (should_validate_san) {
       EXPECT_EQ(alt_server_name, stream_info.filterState()
                                      ->getDataReadOnly<Network::UpstreamSubjectAltNames>(
                                          Network::UpstreamSubjectAltNames::key())
-                                     .value()[0]);
+                                     ->value()[0]);
     }
     EXPECT_CALL(cancellable_, cancel(_));
     router_.onDestroy();
@@ -4540,26 +4540,6 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
                     .value());
 }
 
-TEST_F(RouterTest, InternalRedirectRejectedWithRequestBodyDisabledLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.internal_redirects_with_body", "false"}});
-
-  enableRedirects();
-  sendRequest();
-
-  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("random_fake_data"));
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(body_data.get()));
-  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
-
-  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
-  Buffer::OwnedImpl data("1234567890");
-  response_decoder_->decodeData(data, true);
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_internal_redirect_failed_total")
-                    .value());
-}
-
 TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {
   enableRedirects();
   sendRequest(false);
@@ -4588,7 +4568,7 @@ TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {
   EXPECT_EQ(1, callbacks_.streamInfo()
                    .filterState()
                    ->getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
-                   .value());
+                   ->value());
 }
 
 TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
@@ -4651,7 +4631,7 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   EXPECT_EQ(3, callbacks_.streamInfo()
                    .filterState()
                    ->getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
-                   .value());
+                   ->value());
 }
 
 TEST_F(RouterTest, InternalRedirectStripsFragment) {
@@ -4781,7 +4761,7 @@ TEST_F(RouterTest, Shadow) {
         EXPECT_NE(request->body().length(), 0);
         EXPECT_NE(nullptr, request->trailers());
         EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
-        EXPECT_TRUE(options.sampled_);
+        EXPECT_TRUE(options.sampled_.value());
       }));
   EXPECT_CALL(*shadow_writer_, shadow_("fizz", _, _))
       .WillOnce(Invoke([](const std::string&, Http::RequestMessagePtr& request,
@@ -4789,7 +4769,7 @@ TEST_F(RouterTest, Shadow) {
         EXPECT_NE(request->body().length(), 0);
         EXPECT_NE(nullptr, request->trailers());
         EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
-        EXPECT_FALSE(options.sampled_);
+        EXPECT_FALSE(options.sampled_.value());
       }));
   router_.decodeTrailers(trailers);
   EXPECT_EQ(1U,
@@ -5757,12 +5737,12 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   // With no scheme and x-forwarded-proto, set scheme based on encryption level
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, false, false);
+    FilterUtility::setUpstreamScheme(headers, false);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, true, true);
+    FilterUtility::setUpstreamScheme(headers, true);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 
@@ -5770,7 +5750,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setForwardedProto("foo");
-    FilterUtility::setUpstreamScheme(headers, true, true);
+    FilterUtility::setUpstreamScheme(headers, true);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 
@@ -5778,7 +5758,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
-    FilterUtility::setUpstreamScheme(headers, true, true);
+    FilterUtility::setUpstreamScheme(headers, true);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
 
@@ -5787,23 +5767,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
     Http::TestRequestHeaderMapImpl headers;
     headers.setScheme(Http::Headers::get().SchemeValues.Https);
     headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
-    FilterUtility::setUpstreamScheme(headers, false, false);
-    EXPECT_EQ("https", headers.get_(":scheme"));
-  }
-
-  // New logic uses downstream crypto
-  {
-    Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, false, true);
-    EXPECT_EQ("http", headers.get_(":scheme"));
-  }
-
-  // Legacy logic uses upstream crypto
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.preserve_downstream_scheme", "false"}});
-  {
-    Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, false, true);
+    FilterUtility::setUpstreamScheme(headers, false);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 }
@@ -6044,7 +6008,7 @@ TEST_F(RouterTest, RedirectRecords) {
   router_.downstream_connection_.stream_info_.filterState()
       ->getDataMutable<Network::UpstreamSocketOptionsFilterState>(
           Network::UpstreamSocketOptionsFilterState::key())
-      .addOption(Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
+      ->addOption(Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   headers.setMethod("CONNECT");
@@ -6592,6 +6556,79 @@ TEST(RouterFilterUtilityTest, SetTimeoutHeaders) {
     EXPECT_EQ("50", headers.get_(
                         "x-envoy-expected-rq-timeout-ms")); // Remains of global timeout as hedged
   }
+}
+
+// Test the case that request with upstream override host.
+TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
+  NiceMock<Http::MockRequestEncoder> encoder_for_first_reqeust;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder_for_first_reqeust,
+                                  cm_.thread_local_cluster_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
+            return nullptr;
+          }));
+  expectResponseTimerCreate();
+
+  // Simulate the load balancer to call the `overrideHostToSelect`. When `overrideHostToSelect` of
+  // `LoadBalancerContext` is called, `upstreamOverrideHost` of StreamDecoderFilterCallbacks will be
+  // called to get address of upstream host that should be selected first.
+  EXPECT_CALL(callbacks_, upstreamOverrideHost())
+      .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
+
+  auto override_host = router_.overrideHostToSelect();
+  EXPECT_EQ("1.2.3.4", override_host->first);
+  EXPECT_EQ(~static_cast<uint32_t>(0), override_host->second);
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  // Simulate the normal first request.
+  router_.decodeHeaders(headers, true);
+
+  // Mock response with status 503.
+  router_.retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers_503(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  ASSERT(response_decoder != nullptr);
+  // NOLINTNEXTLINE: Silence null pointer access warning
+  response_decoder->decodeHeaders(std::move(response_headers_503), true);
+
+  // Kick off a new request.
+  NiceMock<Http::MockRequestEncoder> encoder_for_retry_request;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder_for_retry_request,
+                                  cm_.thread_local_cluster_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
+            return nullptr;
+          }));
+  router_.retry_state_->callback_();
+
+  // Simulate the load balancer to call the `overrideHostToSelect` again. The upstream override host
+  // will be ignored when the request is retried.
+  EXPECT_CALL(callbacks_, upstreamOverrideHost()).Times(0);
+  EXPECT_EQ(absl::nullopt, router_.overrideHostToSelect());
+
+  // Normal response.
+  Http::ResponseHeaderMapPtr response_headers_200(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+
+  EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
+  ASSERT(response_decoder != nullptr);
+  // NOLINTNEXTLINE: Silence null pointer access warning
+  response_decoder->decodeHeaders(std::move(response_headers_200), true);
+
+  EXPECT_EQ(2, callbacks_.stream_info_.attemptCount().value());
+
+  router_.onDestroy();
 }
 
 } // namespace Router

@@ -146,6 +146,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/http:codec_interface",
         "//source/common/http:codec_helper_lib",
+        "@com_github_google_quiche//:http2_adapter",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -267,6 +268,7 @@ envoy_cc_library(
         ":quic_filter_manager_connection_lib",
         ":quic_stat_names_lib",
         ":quic_transport_socket_factory_lib",
+        "//envoy/http:alternate_protocols_cache_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/http:codes_lib",

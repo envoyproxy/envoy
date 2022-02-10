@@ -285,10 +285,6 @@ private:
     Tracing::Config& tracingConfig() override;
     const ScopeTrackedObject& scope() override;
 
-    bool enableInternalRedirectsWithBody() const override {
-      return connection_manager_.enable_internal_redirects_with_body_;
-    }
-
     void traceRequest();
 
     // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is
@@ -454,12 +450,12 @@ private:
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
   bool remote_close_{};
-  bool enable_internal_redirects_with_body_{};
   // Hop by hop headers should always be cleared for Envoy-as-a-proxy but will
   // not be for Envoy-mobile.
   bool clear_hop_by_hop_response_headers_{true};
   // The number of requests accumulated on the current connection.
   uint64_t accumulated_requests_{};
+  const std::string proxy_name_; // for Proxy-Status.
 };
 
 } // namespace Http

@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package envoy.type.http.v3;
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.type.http.v3";
+option java_outer_classname = "CookieProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/http/v3;httpv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Http cookie API]
+
+// Cookie defines an API for obtaining or generating HTTP cookie.
+message Cookie {
+  // The name that will be used to obtain cookie value from downstream HTTP request or generate
+  // new cookie for downstream.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Duration of cookie. This will be used to set the expiry time of a new cookie when it is
+  // generated. Set this to 0 to use a session cookie.
+  google.protobuf.Duration ttl = 2 [(validate.rules).duration = {gte {}}];
+
+  // Path of cookie. This will be used to set the path of a new cookie when it is generated.
+  // If no path is specified here, no path will be set for the cookie.
+  string path = 3;
+}

@@ -40,6 +40,7 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::DoAll;
+using testing::EndsWith;
 using testing::Eq;
 using testing::HasSubstr;
 using testing::InSequence;
@@ -2643,7 +2644,7 @@ TEST_F(MockTransportConnectionImplTest, WriteReadyOnConnected) {
 }
 
 // Test the interface used by external consumers.
-TEST_F(MockTransportConnectionImplTest, FlushWriteBuffer) {
+TEST_F(MockTransportConnectionImplTest, FlushWriteBufferAndRtt) {
   InSequence s;
 
   // Queue up some data in write buffer.
@@ -2653,6 +2654,9 @@ TEST_F(MockTransportConnectionImplTest, FlushWriteBuffer) {
   EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
   connection_->write(buffer, false);
+
+  // Make sure calling the rtt function doesn't cause problems.
+  connection_->lastRoundTripTime();
 
   // A read event triggers underlying socket to ask for more data.
   EXPECT_CALL(*transport_socket_, doRead(_)).WillOnce(InvokeWithoutArgs([this] {
@@ -2947,6 +2951,22 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   connection->noDelay(true);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_THAT(connection->transportFailureReason(), StartsWith("delayed connect error"));
+}
+
+TEST_P(TcpClientConnectionImplTest, BadConnectConnRefusedWithTransportError) {
+  // Connecting to an invalid port on localhost will cause ECONNREFUSED which is a different code
+  // path from other errors. Test this also.
+  auto transport_socket = std::make_unique<NiceMock<MockTransportSocket>>();
+  EXPECT_CALL(*transport_socket, failureReason()).WillRepeatedly(Return("custom error"));
+  ClientConnectionPtr connection = dispatcher_->createClientConnection(
+      Utility::resolveUrl(
+          fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
+      Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr);
+  connection->connect();
+  connection->noDelay(true);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_THAT(connection->transportFailureReason(), StartsWith("delayed connect error"));
+  EXPECT_THAT(connection->transportFailureReason(), EndsWith("custom error"));
 }
 
 class PipeClientConnectionImplTest : public testing::Test {

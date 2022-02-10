@@ -153,9 +153,8 @@ void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) 
   ASSERT_EQ(response->headers().get(Http::LowerCaseString("alpn"))[0]->value().getStringView(),
             expected_alpn);
 
-  ASSERT_FALSE(response->trailers()->get(Http::LowerCaseString("upstream_connect_start")).empty());
-  ASSERT_FALSE(
-      response->trailers()->get(Http::LowerCaseString("upstream_connect_complete")).empty());
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("upstream_connect_start")).empty());
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("upstream_connect_complete")).empty());
 
   ASSERT_FALSE(response->headers().get(Http::LowerCaseString("num_streams")).empty());
   EXPECT_EQ(
@@ -338,20 +337,14 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBuffe
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
-  if (upstreamProtocol() == Http::CodecType::HTTP3 &&
-      downstreamProtocol() == Http::CodecType::HTTP2) {
-    // This test depends on fragile preconditions.
-    // With HTTP/2 downstream all the requests are processed before the
-    // responses are sent, then the connection read-disable results in not
-    // receiving flow control window updates.
+  // random-pause-filter does not support HTTP3.
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
     return;
   }
-  config_helper_.prependFilter(
-      fmt::format(R"EOF(
-  name: pause-filter{}
+  config_helper_.prependFilter(R"EOF(
+  name: random-pause-filter
   typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty)EOF",
-                  downstreamProtocol() == Http::CodecType::HTTP3 ? "-for-quic" : ""));
+    "@type": type.googleapis.com/google.protobuf.Empty)EOF");
 
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
@@ -493,7 +486,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, TestManyResponseHeadersRejected) {
 
   Http::TestResponseHeaderMapImpl many_headers(default_response_headers_);
   for (int i = 0; i < 100; i++) {
-    many_headers.addCopy("many", std::string(1, 'a'));
+    many_headers.addCopy(absl::StrCat("many", i), std::string(1, 'a'));
   }
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
@@ -546,6 +539,45 @@ TEST_P(MultiplexedUpstreamIntegrationTest, LargeResponseHeadersRejected) {
   ASSERT_TRUE(response->waitForEndStream());
   // Upstream stream reset.
   EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+TEST_P(MultiplexedUpstreamIntegrationTest, NoInitialStreams) {
+  // Set the fake upstream to start with 0 streams available.
+  upstreamConfig().http2_options_.mutable_max_concurrent_streams()->set_value(0);
+  EXPECT_EQ(0, upstreamConfig().http2_options_.max_concurrent_streams().value());
+
+  envoy::config::listener::v3::QuicProtocolOptions options;
+  options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(0);
+  mergeOptions(options);
+  initialize();
+
+  // Create the client connection and send a request.
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"},
+                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "100"},
+                                     {"x-envoy-max-retries", "100"}});
+
+  // There should now be an upstream connection, but no upstream stream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_FALSE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_,
+                                                           std::chrono::milliseconds(100)));
+
+  // Update the upstream to have 1 stream available. Now Envoy should ship the
+  // original request upstream.
+  fake_upstream_connection_->updateConcurrentStreams(1);
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  // Make sure the standard request/response pipeline works as expected.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/13933

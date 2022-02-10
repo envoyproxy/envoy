@@ -62,6 +62,22 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
 template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatcherPtr<DataType>()>;
 
 /**
+ * A matcher that will always resolve to associated on_no_match. This is used when
+ * the matcher is configured without a matcher, allowing for a tree that always resolves
+ * to a specific OnMatch.
+ */
+template <class DataType> class AnyMatcher : public MatchTree<DataType> {
+public:
+  explicit AnyMatcher(absl::optional<OnMatch<DataType>> on_no_match)
+      : on_no_match_(std::move(on_no_match)) {}
+
+  typename MatchTree<DataType>::MatchResult match(const DataType&) override {
+    return {MatchState::MatchComplete, on_no_match_};
+  }
+  const absl::optional<OnMatch<DataType>> on_no_match_;
+};
+
+/**
  * Recursively constructs a MatchTree from a protobuf configuration.
  * @param DataType the type used as a source for DataInputs
  * @param ActionFactoryContext the context provided to Action factories
@@ -82,10 +98,10 @@ public:
       return createTreeMatcher(config);
     case MatcherType::kMatcherList:
       return createListMatcher(config);
-    default:
-      IS_ENVOY_BUG("match fail");
-      return nullptr;
+    case MatcherType::MATCHER_TYPE_NOT_SET:
+      return createAnyMatcher(config);
     }
+    return nullptr;
   }
 
   absl::optional<OnMatchFactoryCb<DataType>>
@@ -99,6 +115,15 @@ public:
   }
 
 private:
+  template <class MatcherType>
+  MatchTreeFactoryCb<DataType> createAnyMatcher(const MatcherType& config) {
+    auto on_no_match = createOnMatch(config.on_no_match());
+
+    return [on_no_match]() {
+      return std::make_unique<AnyMatcher<DataType>>(
+          on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
+    };
+  }
   template <class MatcherType>
   MatchTreeFactoryCb<DataType> createListMatcher(const MatcherType& config) {
     std::vector<std::pair<FieldMatcherFactoryCb<DataType>, OnMatchFactoryCb<DataType>>>
@@ -167,9 +192,10 @@ private:
         return std::make_unique<NotFieldMatcher<DataType>>(matcher_factory());
       };
     }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case PredicateType::MATCH_TYPE_NOT_SET:
+      PANIC_DUE_TO_PROTO_UNSET;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   template <class MatcherType>
@@ -197,7 +223,9 @@ private:
       };
     }
     case MatcherType::MatcherTree::kPrefixMatchMap:
-      PANIC("unsupported");
+      PANIC("unexpected matcher type");
+    case MatcherType::MatcherTree::TREE_TYPE_NOT_SET:
+      PANIC("unexpected matcher type");
     case MatcherType::MatcherTree::kCustomMatch: {
       auto& factory = Config::Utility::getAndCheckFactory<CustomMatcherFactory<DataType>>(
           matcher.matcher_tree().custom_match());
@@ -207,9 +235,8 @@ private:
       return factory.createCustomMatcherFactoryCb(*message, server_factory_context_, data_input,
                                                   *this);
     }
-    default:
-      PANIC("unsupported");
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   template <class OnMatchType>
@@ -290,9 +317,10 @@ private:
           server_factory_context_.messageValidationVisitor(), factory);
       return factory.createInputMatcherFactoryCb(*message, server_factory_context_);
     }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case SinglePredicateType::MATCHER_NOT_SET:
+      PANIC_DUE_TO_PROTO_UNSET;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   const std::string stats_prefix_;
