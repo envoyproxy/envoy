@@ -63,7 +63,7 @@ public interface EnvoyHTTPCallbacks {
   void onCancel(EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel);
 
   /**
-   * Callback signature which notify when there is buffer available for request body upload.
+   * Called to signal there is buffer space available for continued request body upload.
    *
    * This is only ever called when the library is in explicit flow control mode. When enabled,
    * the issuer should wait for this callback after calling sendData, before making another call
