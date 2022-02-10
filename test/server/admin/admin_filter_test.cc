@@ -26,10 +26,10 @@ public:
   Http::TestRequestHeaderMapImpl request_headers_;
 
   static Admin::HandlerPtr adminHandlerCallback(absl::string_view path_and_query,
-                                                AdminFilter& filter) {
+                                                AdminStream& admin_stream) {
     // silence compiler warnings for unused params
     UNREFERENCED_PARAMETER(path_and_query);
-    UNREFERENCED_PARAMETER(filter);
+    UNREFERENCED_PARAMETER(admin_stream);
     return AdminImpl::makeStaticTextHandler("OK\n", Http::Code::OK);
   }
 };

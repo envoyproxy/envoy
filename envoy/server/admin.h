@@ -76,29 +76,26 @@ class Admin {
 public:
   virtual ~Admin() = default;
 
-  // Represents a handler for admin endpoints, allowing for chunked responses.a
+  // Represents a handler for admin endpoints, allowing for chunked responses.
   class Handler {
   public:
     virtual ~Handler() = default;
 
     /**
-     * Initiates a handler. The URL must be supplied to the constructor, where
-     * applicable.
+     * Initiates a handler. The URL can be supplied to the constructor if needed.
      *
      * @param response_headers successful text responses don't need to modify this,
      *        but if we want to respond with (e.g.) JSON or HTML we can can set
      *        those here.
      * @return the HTTP status of the response.
      */
-    virtual Http::Code start( // absl::string_view path_and_query,
-        Http::ResponseHeaderMap& response_headers
-        /*, Buffer::Instance& response */) PURE;
+    virtual Http::Code start(Http::ResponseHeaderMap& response_headers) PURE;
 
     /**
      * Adds the next chunk of data to the response. Note that nextChunk can
      * return 'true' but not add any data to the response, in which case a chunk
      * is not sent, and a subsequent call to nextChunk can be made later,
-     * e.g. after a post().
+     * possibly after a post() or low-watermark callback on the http filter.
      *
      * @param response a buffer in which to write the chunk
      * @return whether or not any chunks follow this one.

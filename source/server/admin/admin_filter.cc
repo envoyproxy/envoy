@@ -5,7 +5,8 @@
 namespace Envoy {
 namespace Server {
 
-AdminFilter::AdminFilter(AdminHandlerFn admin_handler_fn) : admin_handler_fn_(admin_handler_fn) {}
+AdminFilter::AdminFilter(Admin::GenHandlerCb admin_handler_fn)
+    : admin_handler_fn_(admin_handler_fn) {}
 
 Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                      bool end_stream) {

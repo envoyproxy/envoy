@@ -202,9 +202,9 @@ public:
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
   Server::Instance& server() { return server_; }
 
-  AdminFilter::AdminHandlerFn createHandlerFunction() {
-    return [this](absl::string_view path_and_query, AdminFilter& filter) -> HandlerPtr {
-      return findHandler(path_and_query, filter);
+  GenHandlerCb createHandlerFunction() {
+    return [this](absl::string_view path_and_query, AdminStream& admin_stream) -> HandlerPtr {
+      return findHandler(path_and_query, admin_stream);
     };
   }
   AdminFilter::AdminServerCallbackFunction createCallbackFunction() {
