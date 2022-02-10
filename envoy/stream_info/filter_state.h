@@ -91,8 +91,7 @@ public:
    * type does not match the expected type.
    */
   template <typename T> const T* getDataReadOnly(absl::string_view data_name) const {
-    const auto* generic_result = getDataReadOnlyGeneric(data_name);
-    return generic_result == nullptr ? nullptr : dynamic_cast<const T*>(generic_result);
+    return dynamic_cast<const T*>(getDataReadOnlyGeneric(data_name));
   }
 
   /**
@@ -107,8 +106,7 @@ public:
    * type does not match the expected type.
    */
   template <typename T> T* getDataMutable(absl::string_view data_name) {
-    auto* generic_result = getDataMutableGeneric(data_name);
-    return generic_result == nullptr ? nullptr : dynamic_cast<T*>(generic_result);
+    return dynamic_cast<T*>(getDataMutableGeneric(data_name));
   }
 
   /**
