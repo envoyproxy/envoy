@@ -75,7 +75,7 @@ public:
   SSL* rawSslForTest() const { return rawSsl(); }
   static bool tlsKeyLogMatch(const Network::Address::InstanceConstSharedPtr local,
                              const Network::Address::InstanceConstSharedPtr remote,
-                             Ssl::ContextConfig* config);
+                             const Ssl::ContextConfig& config);
   void enableTlsKeyLog();
   void disableTlsKeyLog();
   static void keylogCallback(const SSL* ssl, const char* line);

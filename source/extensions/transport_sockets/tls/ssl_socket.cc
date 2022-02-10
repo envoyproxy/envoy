@@ -323,7 +323,7 @@ void SslSocket::keylogCallback(const SSL* ssl, const char* line) {
   ASSERT(bio_keylog != nullptr);
   auto match =
       tlsKeyLogMatch(callback->connection().connectionInfoProvider().localAddress(),
-                     callback->connection().connectionInfoProvider().remoteAddress(), config);
+                     callback->connection().connectionInfoProvider().remoteAddress(), *config);
   if (match) {
     BIO_printf(bio_keylog, "%s\n", line);
     BIO_flush(bio_keylog);
@@ -487,9 +487,9 @@ Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {
 
 bool SslSocket::tlsKeyLogMatch(const Network::Address::InstanceConstSharedPtr local,
                                const Network::Address::InstanceConstSharedPtr remote,
-                               Ssl::ContextConfig* config) {
-  auto local_ip = config->tlsKeyLogLocal();
-  auto remote_ip = config->tlsKeyLogRemote();
+                               const Ssl::ContextConfig& config) {
+  const Network::Address::IpList& local_ip = config.tlsKeyLogLocal();
+  const Network::Address::IpList& remote_ip = config.tlsKeyLogRemote();
   bool match = false;
   bool match_local = false;
   bool enable_local = false;
