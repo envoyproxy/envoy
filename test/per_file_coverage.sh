@@ -32,7 +32,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/exe:92.6"
 "source/extensions/common:95.8"
 "source/extensions/common/tap:94.2"
-"source/extensions/common/wasm:95.2" # flaky: be careful adjusting
+"source/extensions/common/wasm:95.1" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
 "source/extensions/filters/common:96.1"
 "source/extensions/filters/common/expr:96.2"
