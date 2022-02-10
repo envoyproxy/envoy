@@ -34,6 +34,8 @@ public:
                uint32_t concurrent_stream_limit);
   ~ActiveClient() override;
 
+  // Called after this client is added to the list associated with its state_. At this point, the
+  // client starts to contributes to the pool capacity.
   virtual void onEnlisted() {}
 
   virtual void releaseResources() { releaseResourcesBase(); }

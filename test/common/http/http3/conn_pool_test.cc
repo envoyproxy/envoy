@@ -133,7 +133,10 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
                        transport_options, state_, quic_stat_names_, {}, store_,
                        makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_);
 
-  EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
+  MockResponseDecoder decoder;
+  ConnPoolCallbacks callbacks;
+  EXPECT_CALL(callbacks.pool_failure_, ready());
+  EXPECT_EQ(pool->newStream(decoder, callbacks), nullptr);
 }
 
 TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
