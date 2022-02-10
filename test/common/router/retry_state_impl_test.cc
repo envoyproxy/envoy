@@ -229,7 +229,6 @@ TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
   // Post-connect failure over HTTP/3 should be retried immediately with HTTP/3 disabled if the
   // cluster is configured with auto pool.
   EXPECT_CALL(cluster_, features())
-      .Times(2u)
       .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP3 |
                              Upstream::ClusterInfo::Features::USE_ALPN));
 
@@ -249,6 +248,23 @@ TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
   EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_.value());
+}
+
+TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailureWithoutTcpFallback) {
+  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
+    return;
+  }
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-envoy-retry-on", "http3-post-connect-failure"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  // Post-connect failure over HTTP/3 should not be retried if the cluster is configured with
+  // explicit h3 pool.
+  EXPECT_CALL(cluster_, features()).WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP3));
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetryReset(remote_refused_stream_reset_,
+                                                      RetryState::Http3Used::Yes, reset_callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, Policy5xxResetOverflow) {
@@ -957,7 +973,7 @@ TEST_F(RouterRetryStateImplTest, MaxRetriesHeader) {
 }
 
 TEST_F(RouterRetryStateImplTest, Backoff) {
-  policy_.num_retries_ = 4;
+  policy_.num_retries_ = 5;
   policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
   Http::TestRequestHeaderMapImpl request_headers;
   setup(request_headers);
@@ -1003,13 +1019,25 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
     EXPECT_FALSE(retry_disable_http3_);
   }
 
+  // Connect failure over HTTP/3 should be retried only with timed backoff if the cluster is
+  // configured with explicit h3 pool.
+  EXPECT_CALL(cluster_, features())
+      .Times(2u)
+      .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP3));
+  EXPECT_CALL(random_, random()).WillOnce(Return(190));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(190), _));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, RetryState::Http3Used::Yes,
+                                                       reset_callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->invokeCallback();
+
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(RetryStatus::No,
             state_->shouldRetryHeaders(response_headers, request_headers, header_callback_));
 
-  EXPECT_EQ(4UL, cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(5UL, cluster_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_success_.value());
-  EXPECT_EQ(4UL, virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(5UL, virtual_cluster_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_success_.value());
   EXPECT_EQ(0UL, cluster_.circuit_breakers_stats_.rq_retry_open_.value());
 }
