@@ -53,7 +53,7 @@ private:
   uint32_t bytes_enqueued_{};
 };
 
-class ProcessorState : public Logger::Loggable<Logger::Id::filter> {
+class ProcessorState : public Logger::Loggable<Logger::Id::ext_proc> {
 public:
   // This describes whether the filter is waiting for a response to a gRPC message.
   // We use it to determine how to respond to stream messages send back from

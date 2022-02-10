@@ -246,20 +246,18 @@ public:
   static Address::InstanceConstSharedPtr getIpv6LoopbackAddress();
 
   /**
-   * @param port to be included in address, the default is 0.
    * @return Address::InstanceConstSharedPtr an address that represents the IPv4 wildcard address
    *         (i.e. "0.0.0.0"). Used during binding to indicate that incoming connections to any
    *         local IPv4 address are to be accepted.
    */
-  static Address::InstanceConstSharedPtr getIpv4AnyAddress(uint32_t port = 0);
+  static Address::InstanceConstSharedPtr getIpv4AnyAddress();
 
   /**
-   * @param port to be included in address, the default is 0.
    * @return Address::InstanceConstSharedPtr an address that represents the IPv6 wildcard address
    *         (i.e. "::"). Used during binding to indicate that incoming connections to any local
    *         IPv6 address are to be accepted.
    */
-  static Address::InstanceConstSharedPtr getIpv6AnyAddress(uint32_t port = 0);
+  static Address::InstanceConstSharedPtr getIpv6AnyAddress();
 
   /**
    * @return the IPv4 CIDR catch-all address (0.0.0.0/0).

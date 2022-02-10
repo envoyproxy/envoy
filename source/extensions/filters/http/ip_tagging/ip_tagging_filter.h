@@ -14,7 +14,7 @@
 
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/lc_trie.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Extensions {

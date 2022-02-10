@@ -42,6 +42,7 @@ namespace Logger {
   FUNCTION(dubbo)                                                                                  \
   FUNCTION(envoy_bug)                                                                              \
   FUNCTION(ext_authz)                                                                              \
+  FUNCTION(ext_proc)                                                                               \
   FUNCTION(rocketmq)                                                                               \
   FUNCTION(file)                                                                                   \
   FUNCTION(filter)                                                                                 \
