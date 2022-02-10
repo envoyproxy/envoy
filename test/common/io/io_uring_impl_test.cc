@@ -14,24 +14,21 @@ namespace {
 
 class IoUringBaseTest : public ::testing::Test {
 public:
-  IoUringBaseTest()
-      : factory_(const_cast<IoUringFactory*>(ioUringFactory("envoy.extensions.io.io_uring"))),
-        api_(Api::createApiForTest()) {
+  IoUringBaseTest() : api_(Api::createApiForTest()) {
     envoy::extensions::io::io_uring::v3::IoUring config;
     config.mutable_io_uring_size()->set_value(2);
-    extension_ =
-        dynamic_cast<IoUringFactoryBase*>(factory_)->createBootstrapExtension(config, context_);
+    extension_ = factory_.createBootstrapExtension(config, context_);
     extension_->onServerInitialized();
   }
 
   void TearDown() override {
-    auto& uring = factory_->getOrCreate();
+    auto& uring = factory_.getOrCreate();
     if (uring.isEventfdRegistered()) {
       uring.unregisterEventfd();
     }
   }
 
-  IoUringFactory* factory_;
+  IoUringFactoryImpl factory_;
   Api::ApiPtr api_;
   Server::BootstrapExtensionPtr extension_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
@@ -67,7 +64,7 @@ TEST_P(IoUringImplParamTest, InvalidParams) {
   SET_SOCKET_INVALID(fd);
   auto dispatcher = api_->allocateDispatcher("test_thread");
 
-  auto& uring = factory_->getOrCreate();
+  auto& uring = factory_.getOrCreate();
 
   os_fd_t event_fd = uring.registerEventfd();
   const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
@@ -111,11 +108,9 @@ protected:
 };
 
 TEST_F(IoUringImplTest, Instantiate) {
-  auto& uring1 = factory_->getOrCreate();
-  auto& uring2 = factory_->getOrCreate();
+  auto& uring1 = factory_.getOrCreate();
+  auto& uring2 = factory_.getOrCreate();
   EXPECT_EQ(&uring1, &uring2);
-
-  EXPECT_DEATH(IoUringFactoryImpl factory2, "only one io_uring per thread is supported now");
 }
 
 TEST_F(IoUringImplTest, EmptyConfig) {
@@ -129,7 +124,7 @@ TEST_F(IoUringImplTest, EmptyConfig) {
 }
 
 TEST_F(IoUringImplTest, RegisterEventfd) {
-  auto& uring = factory_->getOrCreate();
+  auto& uring = factory_.getOrCreate();
 
   EXPECT_FALSE(uring.isEventfdRegistered());
   uring.registerEventfd();
@@ -152,7 +147,7 @@ TEST_F(IoUringImplTest, PrepareReadvAllDataFitsOneChunk) {
   iov.iov_base = buffer;
   iov.iov_len = 4096;
 
-  auto& uring = factory_->getOrCreate();
+  auto& uring = factory_.getOrCreate();
   os_fd_t event_fd = uring.registerEventfd();
 
   const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
@@ -201,7 +196,7 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   iov3.iov_base = buffer3;
   iov3.iov_len = 2;
 
-  auto& uring = factory_->getOrCreate();
+  auto& uring = factory_.getOrCreate();
 
   os_fd_t event_fd = uring.registerEventfd();
   const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;

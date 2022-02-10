@@ -16,17 +16,6 @@ constexpr uint32_t DefaultIoUringSize = 300;
 
 } // namespace
 
-thread_local bool IoUringFactoryImpl::is_instantiated_ = false;
-
-IoUringFactoryImpl::IoUringFactoryImpl() {
-  // TODO(rojkov): Currently only one factory per thread is supported which is
-  // enough for networking, but future IO use cases may need to have multiple
-  // factories supported with different settings: e.g. one factory for
-  // networking and one more for block IO.
-  RELEASE_ASSERT(!is_instantiated_, "only one io_uring per thread is supported now");
-  is_instantiated_ = true;
-}
-
 IoUring& IoUringFactoryImpl::getOrCreate() const { return tls_->getTyped<IoUringImpl>(); }
 
 Server::BootstrapExtensionPtr
