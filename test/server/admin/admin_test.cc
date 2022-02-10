@@ -130,7 +130,7 @@ public:
   }
 
   void nextChunk(Buffer::Instance& response) override {
-    if (++count_ == 3) {
+    if (++count_ == 4) {
       return;
     }
     response.add("Text ");
@@ -140,9 +140,8 @@ private:
   uint32_t count_{0};
 };
 
-#if 0
 TEST_P(AdminInstanceTest, CustomChunkedHandler) {
-  auto callback = []() -> Admin::HandlerPtr {
+  auto callback = [](AdminStream&) -> Admin::HandlerPtr {
     Admin::HandlerPtr handler = Admin::HandlerPtr(new ChunkedHandler);
     return handler;
   };
@@ -177,7 +176,6 @@ TEST_P(AdminInstanceTest, CustomChunkedHandler) {
     EXPECT_EQ("Text Text Text ", response.toString());
   }
 }
-#endif
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
