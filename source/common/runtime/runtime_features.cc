@@ -71,7 +71,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.http_reject_path_with_fragment",
     "envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled",
     "envoy.reloadable_features.internal_address",
-    "envoy.reloadable_features.internal_redirects_with_body",
     "envoy.reloadable_features.listener_reuse_port_default_enabled",
     "envoy.reloadable_features.listener_wildcard_match_ip_family",
     "envoy.reloadable_features.new_tcp_connection_pool",

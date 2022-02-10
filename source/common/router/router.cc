@@ -688,9 +688,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
-  internal_redirects_with_body_enabled_ =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_redirects_with_body");
-
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
   // Hang onto the modify_headers function for later use in handling upstream responses.
@@ -753,8 +750,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   ASSERT(upstream_requests_.size() <= 1);
 
   bool buffering = (retry_state_ && retry_state_->enabled()) || !active_shadow_policies_.empty() ||
-                   (internal_redirects_with_body_enabled_ && route_entry_ &&
-                    route_entry_->internalRedirectPolicy().enabled());
+                   (route_entry_ && route_entry_->internalRedirectPolicy().enabled());
   if (buffering &&
       getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
     // The request is larger than we should buffer. Give up on the retry/shadow
@@ -1554,9 +1550,7 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
   const uint64_t status_code = Http::Utility::getResponseStatus(headers);
 
   // Redirects are not supported for streaming requests yet.
-  if (downstream_end_stream_ &&
-      ((internal_redirects_with_body_enabled_ && !request_buffer_overflowed_) ||
-       !callbacks_->decodingBuffer()) &&
+  if (downstream_end_stream_ && (!request_buffer_overflowed_ || !callbacks_->decodingBuffer()) &&
       location != nullptr &&
       convertRequestHeadersForInternalRedirect(*downstream_headers_, *location, status_code) &&
       callbacks_->recreateStream(&headers)) {
@@ -1568,7 +1562,7 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
   // details for other failure modes here.
   if (!downstream_end_stream_) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: request incomplete", *callbacks_);
-  } else if (internal_redirects_with_body_enabled_ && request_buffer_overflowed_) {
+  } else if (request_buffer_overflowed_) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: request body overflow", *callbacks_);
   } else if (location == nullptr) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: missing location header", *callbacks_);
