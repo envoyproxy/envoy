@@ -263,7 +263,7 @@ class StaticTextHandler : public Admin::Handler {
       : response_text_(std::string(response_text)),
         code_(code) {}
 
-  Http::Code start(absl::string_view, Http::ResponseHeaderMap&
+  Http::Code start(/*absl::string_view, */ Http::ResponseHeaderMap&
                    /*, Buffer::Instance& response*/) override {
     return code_;
   }
@@ -282,19 +282,22 @@ class StaticTextHandler : public Admin::Handler {
 // that generates the entire admin output in one shot.
 class HandlerGasket : public Admin::Handler {
 public:
-  HandlerGasket(Admin::HandlerCb handler_cb, AdminStream& admin_stream)
-      : handler_cb_(handler_cb),
+  HandlerGasket(Admin::HandlerCb handler_cb, absl::string_view path_and_query,
+                AdminStream& admin_stream)
+      : path_and_query_(std::string(path_and_query)),
+        handler_cb_(handler_cb),
         admin_stream_(admin_stream) {}
 
   static Admin::GenHandlerCb makeGen(Admin::HandlerCb callback) {
-    return [callback](AdminStream& admin_stream) -> Server::Admin::HandlerPtr {
-      return std::make_unique<HandlerGasket>(callback, admin_stream);
+    return [callback](absl::string_view path_and_query,
+                      AdminStream& admin_stream) -> Server::Admin::HandlerPtr {
+      return std::make_unique<HandlerGasket>(callback, path_and_query, admin_stream);
     };
   }
 
-  Http::Code start(absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers
+  Http::Code start(/*absl::string_view path_and_query, */ Http::ResponseHeaderMap& response_headers
                    /*, Buffer::Instance& response*/) override {
-    return handler_cb_(path_and_query, response_headers, response_, admin_stream_);
+    return handler_cb_(path_and_query_, response_headers, response_, admin_stream_);
   }
 
   void nextChunk(Buffer::Instance& response) override {
@@ -304,6 +307,7 @@ public:
   }
 
 private:
+  std::string path_and_query_;
   Admin::HandlerCb handler_cb_;
   AdminStream& admin_stream_;
   Buffer::OwnedImpl response_;
@@ -320,7 +324,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream& admin_stream) {
   HandlerPtr handler = findHandler(path_and_query, admin_stream);
-  Http::Code code = handler->start(path_and_query, response_headers);
+  Http::Code code = handler->start(/*path_and_query, */response_headers);
   bool cont;
   uint64_t prev_length = 0;
   do {
@@ -352,7 +356,7 @@ Admin::HandlerPtr AdminImpl::findHandler(
         }
       }
 
-      return handler.handler_(admin_stream);
+      return handler.handler_(path_and_query, admin_stream);
     }
   }
 

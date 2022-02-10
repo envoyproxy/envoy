@@ -96,7 +96,7 @@ public:
      *        then this should be the entire response.
      * @return the HTTP status of the response.
      */
-    virtual Http::Code start(absl::string_view path_and_query,
+    virtual Http::Code start(//absl::string_view path_and_query,
                              Http::ResponseHeaderMap& response_headers
                              /*, Buffer::Instance& response */) PURE;
 
@@ -131,7 +131,7 @@ public:
   /**
    * Lambda to generate a Handler.
    */
-  using GenHandlerCb = std::function<HandlerPtr(AdminStream&)>;
+  using GenHandlerCb = std::function<HandlerPtr(absl::string_view path, AdminStream&)>;
 
   /**
    * Add a legacy admin handler where the entire response is written in
