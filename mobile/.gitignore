@@ -9,6 +9,7 @@
 /dist/*.aar
 /dist/*.jar
 /dist/*.objdump
+/dist/*.objdump.gz
 /dist/envoy_aar_sources.zip
 /dist/Envoy.framework
 /dist/*.asc
