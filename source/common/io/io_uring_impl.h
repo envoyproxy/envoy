@@ -9,7 +9,6 @@ namespace Io {
 
 class IoUringFactoryImpl : public IoUringFactoryBase {
 public:
-  IoUringFactoryImpl();
   void initialize();
 
   // IoUringFactory
@@ -26,8 +25,6 @@ private:
   uint32_t io_uring_size_{};
   bool use_submission_queue_polling_{};
   ThreadLocal::SlotPtr tls_;
-
-  static thread_local bool is_instantiated_;
 };
 
 class IoUringExtension : public Server::BootstrapExtension {
