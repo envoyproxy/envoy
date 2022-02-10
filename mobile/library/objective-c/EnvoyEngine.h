@@ -62,6 +62,16 @@ typedef envoy_final_stream_intel EnvoyFinalStreamIntel;
     EnvoyHeaders *trailers, EnvoyStreamIntel streamIntel);
 
 /**
+ * Called to signal there is buffer space available for continued request body upload.
+ *
+ * This is only ever called when the library is in explicit flow control mode. When enabled,
+ * the issuer should wait for this callback after calling sendData, before making another call
+ * to sendData.
+ * @param streamIntel internal HTTP stream metrics, context, and other details.
+ */
+@property (nonatomic, copy) void (^onSendWindowAvailable)(EnvoyStreamIntel streamIntel);
+
+/**
  * Called when the async HTTP stream has an error.
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  * @param finalStreamIntel one time HTTP stream metrics, context, and other details.

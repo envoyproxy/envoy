@@ -62,6 +62,17 @@ static void *ios_on_trailers(envoy_headers trailers, envoy_stream_intel stream_i
   return NULL;
 }
 
+static void *ios_on_send_window_available(envoy_stream_intel stream_intel, void *context) {
+  ios_context *c = (ios_context *)context;
+  EnvoyHTTPCallbacks *callbacks = c->callbacks;
+  dispatch_async(callbacks.dispatchQueue, ^{
+    if (callbacks.onSendWindowAvailable) {
+      callbacks.onSendWindowAvailable(stream_intel);
+    }
+  });
+  return NULL;
+}
+
 static void *ios_on_complete(envoy_stream_intel stream_intel,
                              envoy_final_stream_intel final_stream_intel, void *context) {
   ios_context *c = (ios_context *)context;
@@ -75,11 +86,6 @@ static void *ios_on_complete(envoy_stream_intel stream_intel,
     assert(stream);
     [stream cleanUp];
   });
-  return NULL;
-}
-
-// TODO(goaway) fix this up to call ios_on_send_window_available
-static void *ios_on_send_window_available(envoy_stream_intel stream_intel, void *context) {
   return NULL;
 }
 
