@@ -207,7 +207,23 @@ AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::st
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
+      return AssertionFailure() << fmt::format("timed out waiting for {} to be ge than {}", name,
+                                               value);
+    }
+  }
+  return AssertionSuccess();
+}
+
+AssertionResult TestUtility::waitForCounterDestroyedOrLe(Stats::Store& store,
+                                                         const std::string& name, uint64_t value,
+                                                         Event::TestTimeSystem& time_system,
+                                                         std::chrono::milliseconds timeout) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (findCounter(store, name) != nullptr && findCounter(store, name)->value() > value) {
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      return AssertionFailure() << fmt::format(
+                 "timed out waiting for {} to be destroyed or le than {}", name, value);
     }
   }
   return AssertionSuccess();

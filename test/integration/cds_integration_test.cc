@@ -207,8 +207,9 @@ TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
   codec_client_->sendReset(encoder_decoder.first);
   cleanupUpstreamAndDownstream();
-  // Make sure there was only one connection attempt.
-  EXPECT_LE(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+  // Make sure there was only one connection attempt or the cluster counter is destroyed before we
+  // observe it.
+  test_server_->waitForCounterDestroyedOrLe("cluster.cluster_1.upstream_cx_total", 1);
 }
 
 // Test the fast addition and removal of clusters when they use ThreadAwareLb.

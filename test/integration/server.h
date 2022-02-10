@@ -489,6 +489,13 @@ public:
     ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
   }
 
+  void waitForCounterDestroyedOrLe(
+      const std::string& name, uint64_t value,
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
+    ASSERT_TRUE(
+        TestUtility::waitForCounterDestroyedOrLe(statStore(), name, value, time_system_, timeout));
+  }
+
   void waitForGaugeEq(const std::string& name, uint64_t value,
                       std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
     ASSERT_TRUE(TestUtility::waitForGaugeEq(statStore(), name, value, time_system_, timeout));

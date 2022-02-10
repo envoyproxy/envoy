@@ -248,13 +248,28 @@ public:
    * @param value target value.
    * @param time_system the time system to use for waiting.
    * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
-   * @return AssertionSuccess() if the counter was >= to the value within the timeout, else
+   * @return AssertionSuccess() if the counter was >= the value within the timeout, else
    * AssertionFailure().
    */
   static AssertionResult
   waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
                    Event::TestTimeSystem& time_system,
                    std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+
+  /**
+   * Wait for a counter be destroyed or <= a given value.
+   * @param store supplies the stats store.
+   * @param name counter name.
+   * @param value target value.
+   * @param time_system the time system to use for waiting.
+   * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
+   * @return AssertionSuccess() if the counter was destroyed or <= the value within the timeout,
+   * else AssertionFailure().
+   */
+  static AssertionResult waitForCounterDestroyedOrLe(Stats::Store& store, const std::string& name,
+                                                     uint64_t value,
+                                                     Event::TestTimeSystem& time_system,
+                                                     std::chrono::milliseconds timeout);
 
   /**
    * Wait for a gauge to >= a given value.

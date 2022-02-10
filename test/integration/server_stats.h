@@ -33,6 +33,16 @@ public:
                    std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
 
   /**
+   * Wait for a counter destroyed or <= a given value.
+   * @param name counter name.
+   * @param value target value.
+   * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
+   */
+  virtual void waitForCounterDestroyedOrLe(
+      const std::string& name, uint64_t value,
+      std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
+
+  /**
    * Wait for a counter to exist.
    * @param name counter name.
    */
