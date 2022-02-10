@@ -6,52 +6,60 @@ namespace HttpFilters {
 namespace Cache {
 
 std::ostream& operator<<(std::ostream& os, const RequestCacheControl& request_cache_control) {
-  std::string s = "{";
-  s += request_cache_control.must_validate_ ? "must_validate, " : "";
-  s += request_cache_control.no_store_ ? "no_store, " : "";
-  s += request_cache_control.no_transform_ ? "no_transform, " : "";
-  s += request_cache_control.only_if_cached_ ? "only_if_cached, " : "";
+  std::vector<std::string> fields;
 
-  s += request_cache_control.max_age_.has_value()
-           ? "max-age=" + std::to_string(request_cache_control.max_age_.value().count()) + ", "
-           : "";
-  s += request_cache_control.min_fresh_.has_value()
-           ? "min-fresh=" + std::to_string(request_cache_control.min_fresh_.value().count()) + ", "
-           : "";
-  s += request_cache_control.max_stale_.has_value()
-           ? "max-stale=" + std::to_string(request_cache_control.max_stale_.value().count()) + ", "
-           : "";
-
-  // Remove any extra ", " at the end
-  if (s.size() > 1) {
-    s.pop_back();
-    s.pop_back();
+  if (request_cache_control.must_validate_) {
+    fields.push_back("must_validate");
+  }
+  if (request_cache_control.no_store_) {
+    fields.push_back("no_store");
+  }
+  if (request_cache_control.no_transform_) {
+    fields.push_back("no_transform");
+  }
+  if (request_cache_control.only_if_cached_) {
+    fields.push_back("only_if_cached");
+  }
+  if (request_cache_control.max_age_.has_value()) {
+    fields.push_back(
+        absl::StrCat("max-age=", std::to_string(request_cache_control.max_age_->count())));
+  }
+  if (request_cache_control.min_fresh_.has_value()) {
+    fields.push_back(
+        absl::StrCat("min-fresh=", std::to_string(request_cache_control.min_fresh_->count())));
+  }
+  if (request_cache_control.max_stale_.has_value()) {
+    fields.push_back(
+        absl::StrCat("max-stale=", std::to_string(request_cache_control.max_stale_->count())));
   }
 
-  s += "}";
-  return os << s;
+  return os << "{" << absl::StrJoin(fields, ", ") << "}";
 }
 
 std::ostream& operator<<(std::ostream& os, const ResponseCacheControl& response_cache_control) {
-  std::string s = "{";
-  s += response_cache_control.must_validate_ ? "must_validate, " : "";
-  s += response_cache_control.no_store_ ? "no_store, " : "";
-  s += response_cache_control.no_transform_ ? "no_transform, " : "";
-  s += response_cache_control.no_stale_ ? "no_stale, " : "";
-  s += response_cache_control.is_public_ ? "public, " : "";
+  std::vector<std::string> fields;
 
-  s += response_cache_control.max_age_.has_value()
-           ? "max-age=" + std::to_string(response_cache_control.max_age_.value().count()) + ", "
-           : "";
-
-  // Remove any extra ", " at the end
-  if (s.size() > 1) {
-    s.pop_back();
-    s.pop_back();
+  if (response_cache_control.must_validate_) {
+    fields.push_back("must_validate");
+  }
+  if (response_cache_control.no_store_) {
+    fields.push_back("no_store");
+  }
+  if (response_cache_control.no_transform_) {
+    fields.push_back("no_transform");
+  }
+  if (response_cache_control.no_stale_) {
+    fields.push_back("no_stale");
+  }
+  if (response_cache_control.is_public_) {
+    fields.push_back("public");
+  }
+  if (response_cache_control.max_age_.has_value()) {
+    fields.push_back(
+        absl::StrCat("max-age=", std::to_string(response_cache_control.max_age_->count())));
   }
 
-  s += "}";
-  return os << s;
+  return os << "{" << absl::StrJoin(fields, ", ") << "}";
 }
 
 std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range) {
