@@ -478,7 +478,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           vhost_.globalRouteConfig().maxDirectResponseBodySizeBytes())),
       per_filter_configs_(route.typed_per_filter_config(), optional_http_filters, factory_context,
                           validator),
-      route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()) {
+      route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()),
+      random_value_header_name_(route.route().weighted_clusters().header_name()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -1104,7 +1105,30 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
 RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMap& headers,
                                                             const uint64_t random_value,
                                                             const bool ignore_overflow) const {
-  const uint64_t selected_value = random_value % total_cluster_weight_;
+  absl::optional<uint64_t> random_value_from_header;
+  // Retrieve the random value from the header if corresponding header name is specified.
+  if (!random_value_header_name_.empty()) {
+    const auto header_value = headers.get(Envoy::Http::LowerCaseString(random_value_header_name_));
+    if (!header_value.empty() && header_value.size() == 1) {
+      // We expect single-valued header here, otherwise it will potentially cause inconsistent
+      // weighted cluster picking throughout the process because different values are used to
+      // compute the selected value. So, we treat multi-valued header as invalid input and fall back
+      // to use internally generated random number.
+      uint64_t random_value = 0;
+      if (absl::SimpleAtoi(header_value[0]->value().getStringView(), &random_value)) {
+        random_value_from_header = random_value;
+      }
+    } else {
+      // Random value should be found here. But if it is not found due to some errors, log the
+      // information and fallback to the random value that is set by stream id.
+      ENVOY_LOG(debug, "The random value can not be found from the header and it will fall back to "
+                       "the value that is set by stream id");
+    }
+  }
+
+  const uint64_t selected_value =
+      (random_value_from_header.has_value() ? random_value_from_header.value() : random_value) %
+      total_cluster_weight_;
   uint64_t begin = 0;
   uint64_t end = 0;
 

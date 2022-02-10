@@ -464,10 +464,6 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check
 
   exit 0
-elif [[ "$CI_TARGET" == "cve_scan" ]]; then
-  echo "scanning for CVEs in dependencies..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan
-  exit 0
 elif [[ "$CI_TARGET" == "tooling" ]]; then
   setup_clang_toolchain
 

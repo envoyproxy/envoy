@@ -19,8 +19,7 @@ namespace Quic {
 struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   PersistentQuicInfoImpl(Event::Dispatcher& dispatcher,
                          Network::TransportSocketFactory& transport_socket_factory,
-                         TimeSource& time_source,
-                         Network::Address::InstanceConstSharedPtr server_addr,
+                         TimeSource& time_source, uint32_t remote_port,
                          const quic::QuicConfig& quic_config, uint32_t buffer_limit);
 
   // Returns the most recent crypto config from transport_socket_factory_;
@@ -54,7 +53,8 @@ std::unique_ptr<Network::ClientConnection>
 createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& dispatcher,
                             Network::Address::InstanceConstSharedPtr server_addr,
                             Network::Address::InstanceConstSharedPtr local_addr,
-                            QuicStatNames& quic_stat_names, Stats::Scope& scope);
+                            QuicStatNames& quic_stat_names,
+                            OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope);
 
 } // namespace Quic
 } // namespace Envoy
