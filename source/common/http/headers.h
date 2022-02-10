@@ -52,6 +52,7 @@ class CustomHeaderValues {
 public:
   const LowerCaseString Accept{"accept"};
   const LowerCaseString AcceptEncoding{"accept-encoding"};
+  const LowerCaseString AccessControlRequestHeaders{"access-control-request-headers"};
   const LowerCaseString AccessControlRequestMethod{"access-control-request-method"};
   const LowerCaseString AccessControlAllowOrigin{"access-control-allow-origin"};
   const LowerCaseString AccessControlAllowHeaders{"access-control-allow-headers"};
