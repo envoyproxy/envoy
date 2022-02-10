@@ -243,6 +243,24 @@ TEST_P(ConnectTerminationIntegrationTest, BasicMaxStreamDuration) {
   }
 }
 
+// Verify Envoy ignores the Host field in HTTP/1.1 CONNECT message.
+TEST_P(ConnectTerminationIntegrationTest, IgnoreH11HostField) {
+  // This test is HTTP/1.1 specific.
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    return;
+  }
+  initialize();
+
+  std::string response;
+  const std::string full_request = "CONNECT www.foo.com:443 HTTP/1.1\r\n"
+                                   "Host: www.bar.com:443\r\n\r\n";
+  EXPECT_LOG_CONTAINS(
+      "",
+      "':authority', 'www.foo.com:443'\n"
+      "':method', 'CONNECT'",
+      sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false););
+}
+
 // For this class, forward the CONNECT request upstream
 class ProxyingConnectIntegrationTest : public HttpProtocolIntegrationTest {
 public:

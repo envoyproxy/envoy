@@ -3,8 +3,7 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
-"source/common:95.9" # Raise when QUIC coverage goes up
-"source/common:96.5"
+"source/common:96.0"
 "source/common/api:76.5"
 "source/common/api/posix:75.0"
 "source/common/common:96.2"
@@ -33,7 +32,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/exe:92.6"
 "source/extensions/common:95.8"
 "source/extensions/common/tap:94.2"
-"source/extensions/common/wasm:95.2" # flaky: be careful adjusting
+"source/extensions/common/wasm:95.1" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
 "source/extensions/filters/common:96.1"
 "source/extensions/filters/common/expr:96.2"
@@ -70,10 +69,10 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/stat_sinks/statsd:88.0"
 "source/extensions/tracers/opencensus:94.8"
 "source/extensions/tracers/xray:96.2"
-"source/extensions/tracers/zipkin:96.1"
-"source/extensions/transport_sockets:95.3"
-"source/extensions/transport_sockets/tls:94.5"
-"source/extensions/transport_sockets/tls/cert_validator:95.7"
+"source/extensions/tracers/zipkin:95.9"
+"source/extensions/transport_sockets:95.2"
+"source/extensions/transport_sockets/tls:94.2"
+"source/extensions/transport_sockets/tls/cert_validator:94.9"
 "source/extensions/transport_sockets/tls/ocsp:96.5"
 "source/extensions/transport_sockets/tls/private_key:77.8"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build

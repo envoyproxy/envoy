@@ -2,6 +2,7 @@
 
 #include "source/common/http/mixed_conn_pool.h"
 
+#include "quiche/quic/core/http/spdy_utils.h"
 #include "quiche/quic/core/quic_versions.h"
 
 namespace Envoy {
@@ -11,6 +12,9 @@ namespace {
 absl::string_view describePool(const ConnectionPool::Instance& pool) {
   return pool.protocolDescription();
 }
+
+static constexpr uint32_t kDefaultTimeoutMs = 300;
+
 } // namespace
 
 ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
@@ -185,17 +189,22 @@ ConnectivityGrid::ConnectivityGrid(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-    AlternateProtocolsCacheSharedPtr alternate_protocols,
-    std::chrono::milliseconds next_attempt_duration, ConnectivityOptions connectivity_options,
+    AlternateProtocolsCacheSharedPtr alternate_protocols, ConnectivityOptions connectivity_options,
     Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
-      state_(state), next_attempt_duration_(next_attempt_duration), time_source_(time_source),
-      http3_status_tracker_(dispatcher_), alternate_protocols_(alternate_protocols),
-      quic_stat_names_(quic_stat_names), scope_(scope) {
+      state_(state), next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
+      time_source_(time_source), http3_status_tracker_(dispatcher_),
+      alternate_protocols_(alternate_protocols), quic_stat_names_(quic_stat_names), scope_(scope) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
-  // TODO(#15649) support v6/v4, WiFi/cellular.
+  AlternateProtocolsCache::Origin origin("https", host_->hostname(),
+                                         host_->address()->ip()->port());
+  std::chrono::milliseconds rtt =
+      std::chrono::duration_cast<std::chrono::milliseconds>(alternate_protocols_->getSrtt(origin));
+  if (rtt.count() != 0) {
+    next_attempt_duration_ = std::chrono::milliseconds(rtt.count() * 2);
+  }
   ASSERT(connectivity_options.protocols_.size() == 3);
   ASSERT(alternate_protocols);
 }
@@ -228,10 +237,10 @@ absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool(
   // HTTP/3 is hard-coded as higher priority, H2 as secondary.
   ConnectionPool::InstancePtr pool;
   if (pools_.empty()) {
-    pool =
-        Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_, options_,
-                                transport_socket_options_, state_, time_source_, quic_stat_names_,
-                                scope_, makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this));
+    pool = Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_, options_,
+                                   transport_socket_options_, state_, time_source_,
+                                   quic_stat_names_, *alternate_protocols_, scope_,
+                                   makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this));
   } else {
     pool = std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
                                                    options_, transport_socket_options_, state_);
@@ -386,12 +395,14 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
 
     // TODO(RyanTheOptimist): Cache this mapping, but handle the supported versions list
     // changing dynamically.
-    for (const quic::ParsedQuicVersion& version : quic::CurrentSupportedVersions()) {
-      if (quic::AlpnForVersion(version) == protocol.alpn_) {
-        // TODO(RyanTheOptimist): Pass this version down to the HTTP/3 pool.
-        ENVOY_LOG(trace, "HTTP/3 advertised for host '{}'", host_->hostname());
-        return true;
-      }
+    spdy::SpdyAltSvcWireFormat::AlternativeService alt_svc(protocol.alpn_, protocol.hostname_,
+                                                           protocol.port_, 0, {});
+    quic::ParsedQuicVersion version = quic::SpdyUtils::ExtractQuicVersionFromAltSvcEntry(
+        alt_svc, quic::CurrentSupportedVersions());
+    if (version != quic::ParsedQuicVersion::Unsupported()) {
+      // TODO(RyanTheOptimist): Pass this version down to the HTTP/3 pool.
+      ENVOY_LOG(trace, "HTTP/3 advertised for host '{}'", host_->hostname());
+      return true;
     }
 
     ENVOY_LOG(trace, "Alternate protocol for host '{}' has unsupported ALPN '{}', skipping.",

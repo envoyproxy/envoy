@@ -243,7 +243,8 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
   return Quic::createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_,
-                                           server_addr, local_addr, quic_stat_names_, stats_store_);
+                                           server_addr, local_addr, quic_stat_names_, {},
+                                           stats_store_);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;
@@ -352,7 +353,8 @@ void HttpIntegrationTest::initialize() {
   // Needs to outlive all QUIC connections.
   quic::QuicConfig config;
   auto quic_connection_persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher_, *quic_transport_socket_factory_, timeSystem(), server_addr, config, 0);
+      *dispatcher_, *quic_transport_socket_factory_, timeSystem(), server_addr->ip()->port(),
+      config, 0);
   // Config IETF QUIC flow control window.
   quic_connection_persistent_info->quic_config_
       .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(
