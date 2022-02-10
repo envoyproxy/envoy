@@ -53,25 +53,26 @@ TransportSocketOptionsConstSharedPtr TransportSocketOptionsUtility::fromFilterSt
   std::vector<std::string> alpn_fallback;
   absl::optional<Network::ProxyProtocolData> proxy_protocol_options;
 
-  if (auto typed_data = filter_state.getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
+  if (auto typed_data =
+          filter_state->getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
       typed_data != nullptr) {
     server_name = typed_data->value();
   }
 
-  if (auto typed_data = filter_state.getDataReadOnly<Network::ApplicationProtocols>(
+  if (auto typed_data = filter_state->getDataReadOnly<Network::ApplicationProtocols>(
           Network::ApplicationProtocols::key());
       typed_data != nullptr) {
     application_protocols = typed_data->value();
   }
 
   if (auto typed_data =
-          filter_state.getDataReadOnly<UpstreamSubjectAltNames>(UpstreamSubjectAltNames::key());
+          filter_state->getDataReadOnly<UpstreamSubjectAltNames>(UpstreamSubjectAltNames::key());
       typed_data != nullptr) {
     subject_alt_names = typed_data->value();
   }
 
   if (auto typed_data =
-          filter_state.getDataReadOnly<ProxyProtocolFilterState>(ProxyProtocolFilterState::key());
+          filter_state->getDataReadOnly<ProxyProtocolFilterState>(ProxyProtocolFilterState::key());
       typed_data != nullptr) {
     proxy_protocol_options.emplace(typed_data->value());
   }
