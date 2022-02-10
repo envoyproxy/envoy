@@ -236,8 +236,7 @@ The Envoy runtime is also a part of the Envoy feature deprecation process.
 As described in the Envoy :repo:`breaking change policy <CONTRIBUTING.md#breaking-change-policy>`,
 feature deprecation in Envoy is in 3 phases: warn-by-default, fail-by-default, and code removal.
 
-In the first phase, Envoy logs a warning to the warning log that the feature is deprecated and
-increments the :ref:`deprecated_feature_use <runtime_stats>` runtime stat.
+In the first phase, Envoy logs a warning to the warning log that the feature is deprecated.
 Users are encouraged to go to :ref:`deprecated <deprecated>` to see how to
 migrate to the new code path and make sure it is suitable for their use case.
 
@@ -280,8 +279,6 @@ The file system runtime provider emits some statistics in the *runtime.* namespa
   :widths: 1, 1, 2
 
   admin_overrides_active, Gauge, 1 if any admin overrides are active otherwise 0
-  deprecated_feature_use, Counter, Total number of times deprecated features were used. Detailed information about the feature used will be logged to warning logs in the form "Using deprecated option 'X' from file Y".
-  deprecated_feature_seen_since_process_start, Gauge, Number of times deprecated features were used. This is not carried over during hot restarts.
   load_error, Counter, Total number of load attempts that resulted in an error in any layer
   load_success, Counter, Total number of load attempts that were successful at all layers
   num_keys, Gauge, Number of keys currently loaded
