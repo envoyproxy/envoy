@@ -25,16 +25,18 @@ def _impl(ctx):
         ctx.actions.run_shell(
             inputs = [lib],
             outputs = [objdump_output],
-            command = cc_toolchain.objdump_executable + " --dwarf=info --dwarf=rawline " + lib.path + ">" + objdump_output.path,
+            command = cc_toolchain.objdump_executable + " --syms " + lib.path + "| gzip -c >" + objdump_output.path,
             tools = [cc_toolchain.all_files],
+            progress_message = "Generating symbol map " + platform_name,
         )
 
         strip_output = ctx.actions.declare_file(platform_name + "/" + lib.basename)
         ctx.actions.run_shell(
             inputs = [lib],
             outputs = [strip_output],
-            command = cc_toolchain.strip_executable + " --strip-debug " + lib.path + " -o " + strip_output.path,
+            command = cc_toolchain.strip_executable + " --strip-all " + lib.path + " -o " + strip_output.path,
             tools = [cc_toolchain.all_files],
+            progress_message = "Stripping library " + lib.path,
         )
 
         library_outputs.append(strip_output)

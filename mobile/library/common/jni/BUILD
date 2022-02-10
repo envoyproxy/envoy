@@ -39,7 +39,7 @@ cc_library(
         "-ldl",
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
-        "//conditions:default": ["-Wl,-s"],
+        "//conditions:default": [],
     }),
     deps = [
         ":jni_utility_lib",
