@@ -257,8 +257,19 @@ void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) 
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream& admin_stream) {
+  HandlerPtr handler = findHandler(path_and_query, response_headers, response, admin_stream);
+  Http::Code code = handler->start(path_and_query, response_headers, response);
+  if (code == Http::Code::OK) {
+    while (handler->nextChunk(response)) {
+    }
+  }
+  return code;
+}
 
-  Http::Code code = Http::Code::OK;
+Admin::HandlerPtr AdminImpl::findHandler(absl::string_view path_and_query,
+                                         Http::ResponseHeaderMap& response_headers,
+                                         Buffer::Instance& /*response*/, AdminStream& admin_stream) {
+  //Http::Code code = Http::Code::OK;
   bool found_handler = false;
 
   std::string::size_type query_index = path_and_query.find('?');
@@ -274,36 +285,31 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
         if (method != Http::Headers::get().MethodValues.Post) {
           ENVOY_LOG(error, "admin path \"{}\" mutates state, method={} rather than POST",
                     handler.prefix_, method);
-          code = Http::Code::MethodNotAllowed;
-          response.add(fmt::format("Method {} not allowed, POST required.", method));
-          break;
+          return AdminFilter::StaticTextHandler::make(
+              fmt::format("Method {} not allowed, POST required.", method),
+              Http::Code::MethodNotAllowed);
         }
       }
 
-      // TODO(jmarantz): re-organize this loop so we release the thread after each
-      // chunk.
-      {
-        Admin::HandlerPtr admin_handler = handler.handler_();
+      return handler.handler_(admin_stream);
+      /*
         code = admin_handler->start(path_and_query, response_headers, response, admin_stream);
         if (code == Http::Code::OK) {
-          while (admin_handler->nextChunk(response)) {
-          }
+        while (admin_handler->nextChunk(response)) {
         }
-      }
-      Memory::Utils::tryShrinkHeap();
-      break;
+        }
+        }
+        Memory::Utils::tryShrinkHeap();
+      */
     }
   }
 
-  if (!found_handler) {
-    // Extra space is emitted below to have "invalid path." be a separate sentence in the
-    // 404 output from "admin commands are:" in handlerHelp.
-    response.add("invalid path. ");
-    handlerHelp(path_and_query, response_headers, response, admin_stream);
-    code = Http::Code::NotFound;
-  }
-
-  return code;
+  // Extra space is emitted below to have "invalid path." be a separate sentence in the
+  // 404 output from "admin commands are:" in handlerHelp.
+  Buffer::OwnedImpl response;
+  response.add("invalid path. ");
+  handlerHelp("", response_headers, response, admin_stream);
+  return AdminFilter::StaticTextHandler::make(response.toString(), Http::Code::NotFound);
 }
 
 std::vector<const AdminImpl::UrlHandler*> AdminImpl::sortedHandlers() const {
@@ -379,26 +385,33 @@ const Network::Address::Instance& AdminImpl::localAddress() {
   return *server_.localInfo().address();
 }
 
+namespace {
+
 class HandlerGasket : public Admin::Handler {
 public:
-  HandlerGasket(Admin::HandlerCb handler_cb) : handler_cb_(handler_cb) {}
+  HandlerGasket(Admin::HandlerCb handler_cb, AdminStream& admin_stream)
+      : handler_cb_(handler_cb),
+        admin_stream_(admin_stream) {}
 
   static Admin::GenHandlerCb makeGen(Admin::HandlerCb callback) {
-    return [callback]() -> Server::Admin::HandlerPtr {
-      return std::make_unique<HandlerGasket>(callback);
+    return [callback](AdminStream& admin_stream) -> Server::Admin::HandlerPtr {
+      return std::make_unique<HandlerGasket>(callback, admin_stream);
     };
   }
 
   Http::Code start(absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
-                   Buffer::Instance& response, AdminStream& admin_stream) override {
-    return handler_cb_(path_and_query, response_headers, response, admin_stream);
+                   Buffer::Instance& response) override {
+    return handler_cb_(path_and_query, response_headers, response, admin_stream_);
   }
 
   bool nextChunk(Buffer::Instance&) override { return false; }
 
 private:
   Admin::HandlerCb handler_cb_;
+  AdminStream& admin_stream_;
 };
+
+} // namespace
 
 AdminImpl::UrlHandler AdminImpl::makeHandler(const std::string& prefix,
                                              const std::string& help_text, HandlerCb callback,

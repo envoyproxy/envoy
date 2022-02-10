@@ -24,11 +24,11 @@ class AdminFilter : public Http::PassThroughFilter,
                     public AdminStream,
                     Logger::Loggable<Logger::Id::admin> {
 public:
-  using AdminServerCallbackFunction = std::function<Http::Code(
+  using AdminServerCallbackFunction = std::function<Admin::HandlerPtr(
       absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
       Buffer::OwnedImpl& response, AdminFilter& filter)>;
 
-  AdminFilter(AdminServerCallbackFunction admin_server_run_callback_func);
+  AdminFilter(AdminServerCallbackFunction admin_server_callback_func);
 
   // Http::StreamFilterBase
   // Handlers relying on the reference should use addOnDestroyCallback()
@@ -40,6 +40,7 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+  //Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
 
   // AdminStream
@@ -52,12 +53,37 @@ public:
     return encoder_callbacks_->http1StreamEncoderOptions();
   }
 
+  class StaticTextHandler : public Admin::Handler {
+   public:
+    static Admin::HandlerPtr make(absl::string_view response_text, Http::Code code) {
+      return std::make_unique<StaticTextHandler>(response_text, code);
+    }
+
+    StaticTextHandler(absl::string_view response_text, Http::Code code)
+        : response_text_(std::string(response_text)),
+          code_(code) {}
+
+    Http::Code start(absl::string_view, Http::ResponseHeaderMap&,
+                     Buffer::Instance& response) override {
+      response.add(response_text_);
+      return code_;
+    }
+    bool nextChunk(Buffer::Instance&) override { return false; }
+
+   private:
+    const std::string response_text_;
+    const Http::Code code_;
+  };
+
+
 private:
   /**
    * Called when an admin request has been completely received.
    */
   void onComplete();
+  void nextChunk();
   AdminServerCallbackFunction admin_server_callback_func_;
+  Admin::HandlerPtr handler_;
   Http::RequestHeaderMap* request_headers_{};
   std::list<std::function<void()>> on_destroy_callbacks_;
   bool end_stream_on_complete_ = true;

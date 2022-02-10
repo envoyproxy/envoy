@@ -204,10 +204,11 @@ public:
 
   AdminFilter::AdminServerCallbackFunction createCallbackFunction() {
     return [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
-                  Buffer::OwnedImpl& response, AdminFilter& filter) -> Http::Code {
-      return runCallback(path_and_query, response_headers, response, filter);
+                  Buffer::OwnedImpl& response, AdminFilter& filter) -> HandlerPtr {
+      return findHandler(path_and_query, response_headers, response, filter);
     };
   }
+
   uint64_t maxRequestsPerConnection() const override { return 0; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
@@ -224,6 +225,10 @@ private:
     const bool removable_;
     const bool mutates_server_state_;
   };
+
+  HandlerPtr findHandler(absl::string_view path_and_query,
+                         Http::ResponseHeaderMap& response_headers,
+                         Buffer::Instance& response, AdminStream& admin_stream);
 
   UrlHandler makeHandler(const std::string& prefix, const std::string& help_text,
                          HandlerCb callback, bool removable, bool mutates_state);

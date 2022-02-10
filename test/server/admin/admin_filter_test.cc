@@ -24,16 +24,15 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;
 
-  static Http::Code adminServerCallback(absl::string_view path_and_query,
-                                        Http::ResponseHeaderMap& response_headers,
-                                        Buffer::OwnedImpl& response, AdminFilter& filter) {
+  static Admin::HandlerPtr adminServerCallback(absl::string_view path_and_query,
+                                               Http::ResponseHeaderMap& response_headers,
+                                               Buffer::OwnedImpl& response, AdminFilter& filter) {
     // silence compiler warnings for unused params
     UNREFERENCED_PARAMETER(path_and_query);
     UNREFERENCED_PARAMETER(response_headers);
+    UNREFERENCED_PARAMETER(response);
     UNREFERENCED_PARAMETER(filter);
-
-    response.add("OK\n");
-    return Http::Code::OK;
+    return AdminFilter::StaticTextHandler::make("OK", Http::Code::OK);
   }
 };
 

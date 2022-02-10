@@ -125,8 +125,7 @@ TEST_P(AdminInstanceTest, CustomHandler) {
 
 class ChunkedHandler : public Admin::Handler {
 public:
-  Http::Code start(absl::string_view, Http::ResponseHeaderMap&, Buffer::Instance&,
-                   AdminStream&) override {
+  Http::Code start(absl::string_view, Http::ResponseHeaderMap&, Buffer::Instance&) override {
     return Http::Code::OK;
   }
 
@@ -139,6 +138,7 @@ private:
   uint32_t count_{0};
 };
 
+#if 1
 TEST_P(AdminInstanceTest, CustomChunkedHandler) {
   auto callback = []() -> Admin::HandlerPtr {
     Admin::HandlerPtr handler = Admin::HandlerPtr(new ChunkedHandler);
@@ -175,6 +175,7 @@ TEST_P(AdminInstanceTest, CustomChunkedHandler) {
     EXPECT_EQ("Text Text Text ", response.toString());
   }
 }
+#endif
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,

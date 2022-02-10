@@ -80,8 +80,8 @@ public:
   public:
     virtual ~Handler() = default;
     virtual Http::Code start(absl::string_view path_and_query,
-                             Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                             AdminStream& admin_stream) PURE;
+                             Http::ResponseHeaderMap& response_headers,
+                             Buffer::Instance& response) PURE;
     virtual bool nextChunk(Buffer::Instance& response) PURE;
   };
   using HandlerPtr = std::unique_ptr<Handler>;
@@ -100,7 +100,7 @@ public:
       absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
       Buffer::Instance& response, AdminStream& admin_stream)>;
 
-  using GenHandlerCb = std::function<HandlerPtr()>;
+  using GenHandlerCb = std::function<HandlerPtr(AdminStream& admin_stream)>;
 
   /**
    * Add an admin handler.
