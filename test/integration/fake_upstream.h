@@ -401,6 +401,12 @@ public:
     absl::MutexLock lock(&lock_);
     initialized_ = true;
   }
+
+  // Some upstream connection are supposed to be alive forever.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  virtual waitForNoPost(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   // The same caveats apply here as in SharedConnectionWrapper::connection().
   Network::Connection& connection() const { return shared_connection_.connection(); }
   bool connected() const { return shared_connection_.connected(); }

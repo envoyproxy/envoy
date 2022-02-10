@@ -710,6 +710,7 @@ TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorReuse) {
   ASSERT_TRUE(upstream_request_2->waitForEndStream(*dispatcher_));
   // If the upstream now sends 'end stream' the connection is fully closed.
   upstream_request_2->encodeData(0, true);
+  ASSERT_TRUE(fake_upstream_connection_->waitForNoPost());
 }
 
 // Verify that the header evaluator is updated without lifetime issue.
@@ -808,6 +809,7 @@ TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
   ASSERT_TRUE(upstream_request_2->waitForEndStream(*dispatcher_));
   // If the upstream now sends 'end stream' the connection is fully closed.
   upstream_request_2->encodeData(0, true);
+  ASSERT_TRUE(fake_upstream_connection_->waitForNoPost());
 }
 
 TEST_P(TcpTunnelingIntegrationTest, Goaway) {
