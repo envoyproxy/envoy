@@ -47,7 +47,13 @@ public:
 
 } // namespace
 
-int SslSocket::ssl_ex_data_index_ = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+int SslSocket::ssl_ex_data_config_index_ =
+    SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+int SslSocket::ssl_ex_data_callback_index_ =
+    SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+int SslSocket::ssl_ex_data_file_index_ =
+    SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
                      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                      Ssl::HandshakerFactoryCb handshaker_factory_cb, Ssl::ContextConfigPtr config)
@@ -78,20 +84,12 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   // Use custom BIO that reads from/writes to IoHandle
   BIO* bio = BIO_new_io_handle(&callbacks_->ioHandle());
   SSL_set_bio(rawSsl(), bio, bio);
-
-  auto runtime = Runtime::LoaderSingleton::getExisting();
-  if (runtime != nullptr) {
-    auto tls_keylog_enable = runtime->threadsafeSnapshot()->getBoolean("tls_keylog", false);
-    if (tls_keylog_enable) {
-      auto match =
-          tlsKeyLogMatch(callbacks_->connection().connectionInfoProvider().localAddress(),
-                         callbacks_->connection().connectionInfoProvider().remoteAddress());
-      if (match) {
-        ENVOY_LOG(debug, "Enable tls key log, log path: {}, index: {}",
-                  config_->getTlsKeyLogPath().c_str(), ssl_ex_data_index_);
-        enableTlsKeyLog();
-      }
-    }
+  auto tls_keylog_enable =
+      Runtime::LoaderSingleton::get().threadsafeSnapshot()->getBoolean("tls_keylog", false);
+  if (tls_keylog_enable) {
+    enableTlsKeyLog();
+  } else {
+    disableTlsKeyLog();
   }
 }
 
@@ -313,9 +311,20 @@ Ssl::ConnectionInfoConstSharedPtr SslSocket::ssl() const { return info_; }
 
 void SslSocket::keylogCallback(const SSL* ssl, const char* line) {
   ASSERT(ssl != nullptr);
-  BIO* bio_keylog = static_cast<BIO*>(SSL_get_ex_data(ssl, ssl_ex_data_index_));
-  BIO_printf(bio_keylog, "%s\n", line);
-  (void)BIO_flush(bio_keylog);
+  auto config = static_cast<Ssl::ContextConfig*>(SSL_get_ex_data(ssl, ssl_ex_data_config_index_));
+  auto callback = static_cast<Network::TransportSocketCallbacks*>(
+      SSL_get_ex_data(ssl, ssl_ex_data_callback_index_));
+  auto bio_keylog = static_cast<BIO*>(SSL_get_ex_data(ssl, ssl_ex_data_file_index_));
+  ASSERT(config != nullptr);
+  ASSERT(callback != nullptr);
+  ASSERT(bio_keylog != nullptr);
+  auto match =
+      tlsKeyLogMatch(callback->connection().connectionInfoProvider().localAddress(),
+                     callback->connection().connectionInfoProvider().remoteAddress(), config);
+  if (match) {
+    BIO_printf(bio_keylog, "%s\n", line);
+    BIO_flush(bio_keylog);
+  }
 }
 
 void SslSocket::disableTlsKeyLog(void) {
@@ -332,19 +341,15 @@ void SslSocket::disableTlsKeyLog(void) {
 void SslSocket::enableTlsKeyLog(void) {
   SSL_CTX* ctx = SSL_get_SSL_CTX(rawSsl());
   ASSERT(ctx != nullptr);
-  /*
-   * Append rather than write in order to allow concurrent modification.
-   * Furthermore, this preserves existing key log files which is useful when
-   * the tool is run multiple times.
-   */
-  bio_keylog_ = BIO_new_file(config_->getTlsKeyLogPath().c_str(), "a");
+  bio_keylog_ = BIO_new_file(config_->tlsKeyLogPath().c_str(), "a");
   if (bio_keylog_ == nullptr) {
-    ENVOY_LOG(warn, "Creating BIO file fails, log path: {}", config_->getTlsKeyLogPath().c_str());
+    ENVOY_LOG(warn, "Creating BIO file fails, log path: {}", config_->tlsKeyLogPath().c_str());
     return;
   }
-
-  SSL* ssl = rawSsl();
-  SSL_set_ex_data(ssl, SslSocket::ssl_ex_data_index_, bio_keylog_);
+  SSL_set_ex_data(rawSsl(), SslSocket::ssl_ex_data_file_index_, bio_keylog_);
+  SSL_set_ex_data(rawSsl(), SslSocket::ssl_ex_data_config_index_,
+                  static_cast<void*>(config_.get()));
+  SSL_set_ex_data(rawSsl(), SslSocket::ssl_ex_data_callback_index_, static_cast<void*>(callbacks_));
   SSL_CTX_set_keylog_callback(ctx, keylogCallback);
   enable_tls_keylog_ = true;
 }
@@ -478,9 +483,10 @@ Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {
 }
 
 bool SslSocket::tlsKeyLogMatch(const Network::Address::InstanceConstSharedPtr local,
-                               const Network::Address::InstanceConstSharedPtr remote) const {
-  auto local_ip = config_->getTlsKeyLogLocal();
-  auto remote_ip = config_->getTlsKeyLogRemote();
+                               const Network::Address::InstanceConstSharedPtr remote,
+                               Ssl::ContextConfig* config) {
+  auto local_ip = config->tlsKeyLogLocal();
+  auto remote_ip = config->tlsKeyLogRemote();
   bool match = false;
   bool match_local = false;
   bool enable_local = false;

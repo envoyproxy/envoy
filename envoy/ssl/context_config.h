@@ -95,18 +95,17 @@ public:
   /**
    * @return the TLS key log path.
    */
-
-  virtual const std::string& getTlsKeyLogPath() const PURE;
+  virtual const std::string& tlsKeyLogPath() const PURE;
 
   /**
    * @return the TLS key log local filter.
    */
-  virtual const Network::Address::IpList& getTlsKeyLogLocal() const PURE;
+  virtual const Network::Address::IpList& tlsKeyLogLocal() const PURE;
 
   /**
    * @return the TLS key log remote filter.
    */
-  virtual const Network::Address::IpList& getTlsKeyLogRemote() const PURE;
+  virtual const Network::Address::IpList& tlsKeyLogRemote() const PURE;
 };
 
 using ContextConfigPtr = std::shared_ptr<ContextConfig>;
