@@ -84,12 +84,15 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   // Use custom BIO that reads from/writes to IoHandle
   BIO* bio = BIO_new_io_handle(&callbacks_->ioHandle());
   SSL_set_bio(rawSsl(), bio, bio);
-  auto tls_keylog_enable =
-      Runtime::LoaderSingleton::get().threadsafeSnapshot()->getBoolean("tls_keylog", false);
-  if (tls_keylog_enable) {
-    enableTlsKeyLog();
-  } else {
-    disableTlsKeyLog();
+
+  auto loader = Runtime::LoaderSingleton::getExisting();
+  if (loader != nullptr) {
+    auto tls_keylog_enable = loader->threadsafeSnapshot()->getBoolean("tls_keylog", false);
+    if (tls_keylog_enable) {
+      enableTlsKeyLog();
+    } else {
+      disableTlsKeyLog();
+    }
   }
 }
 
