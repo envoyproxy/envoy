@@ -178,12 +178,12 @@ public:
     EXPECT_EQ(server_name,
               stream_info.filterState()
                   ->getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
-                  .value());
+                  ->value());
     if (should_validate_san) {
       EXPECT_EQ(alt_server_name, stream_info.filterState()
                                      ->getDataReadOnly<Network::UpstreamSubjectAltNames>(
                                          Network::UpstreamSubjectAltNames::key())
-                                     .value()[0]);
+                                     ->value()[0]);
     }
     EXPECT_CALL(cancellable_, cancel(_));
     router_.onDestroy();
@@ -4568,7 +4568,7 @@ TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {
   EXPECT_EQ(1, callbacks_.streamInfo()
                    .filterState()
                    ->getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
-                   .value());
+                   ->value());
 }
 
 TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
@@ -4631,7 +4631,7 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   EXPECT_EQ(3, callbacks_.streamInfo()
                    .filterState()
                    ->getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
-                   .value());
+                   ->value());
 }
 
 TEST_F(RouterTest, InternalRedirectStripsFragment) {
@@ -6008,7 +6008,7 @@ TEST_F(RouterTest, RedirectRecords) {
   router_.downstream_connection_.stream_info_.filterState()
       ->getDataMutable<Network::UpstreamSocketOptionsFilterState>(
           Network::UpstreamSocketOptionsFilterState::key())
-      .addOption(Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
+      ->addOption(Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   headers.setMethod("CONNECT");
