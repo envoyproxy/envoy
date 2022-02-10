@@ -5,8 +5,7 @@
 namespace Envoy {
 namespace Server {
 
-AdminFilter::AdminFilter(AdminHandlerFn admin_handler_fn)
-    : admin_handler_fn_(admin_handler_fn) {}
+AdminFilter::AdminFilter(AdminHandlerFn admin_handler_fn) : admin_handler_fn_(admin_handler_fn) {}
 
 Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                      bool end_stream) {
@@ -71,34 +70,19 @@ void AdminFilter::onComplete() {
   Http::Code code = handler->start(/*path, */ *header_map);
   Utility::populateFallbackResponseHeaders(code, *header_map);
   decoder_callbacks_->encodeHeaders(std::move(header_map), false,
-                                    //end_stream_on_complete_ && response.length() == 0,
                                     StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
 
-  bool done = false;
+  bool more_data;
   do {
     Buffer::OwnedImpl response;
-    handler->nextChunk(response);
-    done = response.length() == 0;
-    decoder_callbacks_->encodeData(response, end_stream_on_complete_ && done);
-  } while (!done);
-
-  /*
-  bool error = code != Http::Code::OK;
-  if (response.length() > 0) {
-    decoder_callbacks_->encodeData(response, end_stream_on_complete_ && error);
-  }
-
-  if (!error) {
-    // TODO(jmarantz): In https://github.com/envoyproxy/envoy/pull/19898 we'll
-    // take on using real flow-control, rather than simply aggregating the
-    // chunks together.
-    while (handler->nextChunk(response)) {
-      decoder_callbacks_->encodeData(response, false);
-      response.drain(response.length());
+    more_data = handler->nextChunk(response);
+    bool end_stream = end_stream_on_complete_ && !more_data;
+    ENVOY_LOG_MISC(error, "nextChunk: response.length={} more_data={} end_stream={}",
+                   response.length(), more_data, end_stream);
+    if (response.length() > 0 || end_stream) {
+      decoder_callbacks_->encodeData(response, end_stream);
     }
-    decoder_callbacks_->encodeData(response, end_stream_on_complete_);
-  }
-  */
+  } while (more_data);
 }
 
 } // namespace Server

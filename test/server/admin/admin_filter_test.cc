@@ -1,6 +1,5 @@
-#include "source/server/admin/admin_filter.h"
-
 #include "source/server/admin/admin.h"
+#include "source/server/admin/admin_filter.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"

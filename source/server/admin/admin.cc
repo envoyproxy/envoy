@@ -258,23 +258,18 @@ namespace {
 
 // Implements a chunked handler for static text.
 class StaticTextHandler : public Admin::Handler {
- public:
+public:
   StaticTextHandler(absl::string_view response_text, Http::Code code)
-      : response_text_(std::string(response_text)),
-        code_(code) {}
+      : response_text_(std::string(response_text)), code_(code) {}
 
-  Http::Code start(/*absl::string_view, */ Http::ResponseHeaderMap&
-                   /*, Buffer::Instance& response*/) override {
-    return code_;
-  }
-  /*bool*/ void nextChunk(Buffer::Instance& response) override {
+  Http::Code start(Http::ResponseHeaderMap&) override { return code_; }
+  bool nextChunk(Buffer::Instance& response) override {
     response.add(response_text_);
-    response_text_.clear();
-    //return false;
+    return false;
   }
 
- private:
-  std::string response_text_;
+private:
+  const std::string response_text_;
   const Http::Code code_;
 };
 
@@ -284,8 +279,7 @@ class HandlerGasket : public Admin::Handler {
 public:
   HandlerGasket(Admin::HandlerCb handler_cb, absl::string_view path_and_query,
                 AdminStream& admin_stream)
-      : path_and_query_(std::string(path_and_query)),
-        handler_cb_(handler_cb),
+      : path_and_query_(std::string(path_and_query)), handler_cb_(handler_cb),
         admin_stream_(admin_stream) {}
 
   static Admin::GenHandlerCb makeGen(Admin::HandlerCb callback) {
@@ -295,15 +289,13 @@ public:
     };
   }
 
-  Http::Code start(/*absl::string_view path_and_query, */ Http::ResponseHeaderMap& response_headers
-                   /*, Buffer::Instance& response*/) override {
+  Http::Code start(Http::ResponseHeaderMap& response_headers) override {
     return handler_cb_(path_and_query_, response_headers, response_, admin_stream_);
   }
 
-  void nextChunk(Buffer::Instance& response) override {
+  bool nextChunk(Buffer::Instance& response) override {
     response.move(response_);
-    ASSERT(response_.length() == 0);
-    //return false;
+    return false;
   }
 
 private:
@@ -319,26 +311,21 @@ Admin::HandlerPtr AdminImpl::makeStaticTextHandler(absl::string_view response, H
   return std::make_unique<StaticTextHandler>(response, code);
 }
 
-
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream& admin_stream) {
   HandlerPtr handler = findHandler(path_and_query, admin_stream);
-  Http::Code code = handler->start(/*path_and_query, */response_headers);
-  bool cont;
-  uint64_t prev_length = 0;
+  Http::Code code = handler->start(/*path_and_query, */ response_headers);
+  bool more_data;
   do {
-    handler->nextChunk(response);
-    uint64_t length = response.length();
-    cont = length > prev_length;
-    prev_length = length;
-  } while (cont);
+    more_data = handler->nextChunk(response);
+  } while (more_data);
   Memory::Utils::tryShrinkHeap();
   return code;
 }
 
-Admin::HandlerPtr AdminImpl::findHandler(
-    absl::string_view path_and_query, AdminStream& admin_stream) {
+Admin::HandlerPtr AdminImpl::findHandler(absl::string_view path_and_query,
+                                         AdminStream& admin_stream) {
   std::string::size_type query_index = path_and_query.find('?');
   if (query_index == std::string::npos) {
     query_index = path_and_query.size();

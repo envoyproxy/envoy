@@ -220,7 +220,7 @@ public:
 
   /**
    * Makes a chunked handler for static text.
-   * @param resposne_text the text to populate response wth
+   * @param resposne_text the text to populate response with
    * @param code the Http::Code for the response
    * @return the handler
    */

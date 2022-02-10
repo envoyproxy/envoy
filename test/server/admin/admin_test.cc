@@ -125,15 +125,11 @@ TEST_P(AdminInstanceTest, CustomHandler) {
 
 class ChunkedHandler : public Admin::Handler {
 public:
-  Http::Code start(/*absl::string_view, */ Http::ResponseHeaderMap&/*, Buffer::Instance&*/) override {
-    return Http::Code::OK;
-  }
+  Http::Code start(Http::ResponseHeaderMap&) override { return Http::Code::OK; }
 
-  void nextChunk(Buffer::Instance& response) override {
-    if (++count_ == 4) {
-      return;
-    }
+  bool nextChunk(Buffer::Instance& response) override {
     response.add("Text ");
+    return ++count_ < 3;
   }
 
 private:

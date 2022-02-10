@@ -82,35 +82,28 @@ public:
     virtual ~Handler() = default;
 
     /**
-     * Initiates a handler from a URL. If the URL is not well-formed the response
-     * can be rejected, and a non-OK status. The response_headers can be filled
-     * in an an initial response added, though the real content of a response to
-     * a valid request should be provided in nextChunk().
+     * Initiates a handler. The URL must be supplied to the constructor, where
+     * applicable.
      *
-     * @param path_and_query the path and query portions of the URL, without the
-     *        leading slash, e.g. "stats?format=json"
      * @param response_headers successful text responses don't need to modify this,
      *        but if we want to respond with (e.g.) JSON or HTML we can can set
      *        those here.
-     * @param response the initial part of the response. If the return is not OK
-     *        then this should be the entire response.
      * @return the HTTP status of the response.
      */
-    virtual Http::Code start(//absl::string_view path_and_query,
-                             Http::ResponseHeaderMap& response_headers
-                             /*, Buffer::Instance& response */) PURE;
+    virtual Http::Code start( // absl::string_view path_and_query,
+        Http::ResponseHeaderMap& response_headers
+        /*, Buffer::Instance& response */) PURE;
 
     /**
-     * Issues the next chunk of data.
+     * Adds the next chunk of data to the response. Note that nextChunk can
+     * return 'true' but not add any data to the response, in which case a chunk
+     * is not sent, and a subsequent call to nextChunk can be made later,
+     * e.g. after a post().
      *
      * @param response a buffer in which to write the chunk
      * @return whether or not any chunks follow this one.
-     *
-     * Note that a Handler returning false can include the final chunk in the
-     * response data, or the final respones can be empty. It is not valid
-     * to provide an empty response and return true.
      */
-    virtual void /* bool */ nextChunk(Buffer::Instance& response) PURE;
+    virtual bool nextChunk(Buffer::Instance& response) PURE;
   };
   using HandlerPtr = std::unique_ptr<Handler>;
 
