@@ -501,6 +501,12 @@ public:
   const UpstreamRequest* finalUpstreamRequest() const override { return final_upstream_request_; }
   TimeSource& timeSource() override { return config_.timeSource(); }
 
+protected:
+  void setRetryShadownBufferLimit(uint32_t retry_shadow_buffer_limit) {
+    ASSERT(retry_shadow_buffer_limit_ > retry_shadow_buffer_limit);
+    retry_shadow_buffer_limit_ = retry_shadow_buffer_limit;
+  }
+
 private:
   friend class UpstreamRequest;
 

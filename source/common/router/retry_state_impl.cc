@@ -25,13 +25,13 @@ bool clusterSupportsHttp3AndTcpFallback(const Upstream::ClusterInfo& cluster) {
          (cluster.features() & Upstream::ClusterInfo::Features::USE_ALPN);
 }
 
-RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
-                                     Http::RequestHeaderMap& request_headers,
-                                     const Upstream::ClusterInfo& cluster,
-                                     const VirtualCluster* vcluster, Runtime::Loader& runtime,
-                                     Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                                     TimeSource& time_source, Upstream::ResourcePriority priority) {
-  RetryStatePtr ret;
+std::unique_ptr<RetryStateImpl>
+RetryStateImpl::create(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
+                       const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
+                       Runtime::Loader& runtime, Random::RandomGenerator& random,
+                       Event::Dispatcher& dispatcher, TimeSource& time_source,
+                       Upstream::ResourcePriority priority) {
+  std::unique_ptr<RetryStateImpl> ret;
 
   const bool conn_pool_new_stream_with_early_data_and_http3 =
       Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3);
@@ -40,12 +40,15 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
   // response code), we want to give them a chance to retry as normal requests even though the retry
   // policy doesn't specify it. So always allocate retry state object.
   if (request_headers.EnvoyRetryOn() || request_headers.EnvoyRetryGrpcOn() ||
-      route_policy.retryOn() ||
-      (conn_pool_new_stream_with_early_data_and_http3 &&
-       (cluster.features() & Upstream::ClusterInfo::Features::HTTP3) &&
-       Http::Utility::isSafeRequest(request_headers))) {
+      route_policy.retryOn()) {
     ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, vcluster, runtime, random,
-                                 dispatcher, time_source, priority,
+                                 dispatcher, time_source, priority, false,
+                                 conn_pool_new_stream_with_early_data_and_http3));
+  } else if (conn_pool_new_stream_with_early_data_and_http3 &&
+             (cluster.features() & Upstream::ClusterInfo::Features::HTTP3) &&
+             Http::Utility::isSafeRequest(request_headers)) {
+    ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, vcluster, runtime, random,
+                                 dispatcher, time_source, priority, true,
                                  conn_pool_new_stream_with_early_data_and_http3));
   }
 
@@ -66,7 +69,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
                                const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
                                Runtime::Loader& runtime, Random::RandomGenerator& random,
                                Event::Dispatcher& dispatcher, TimeSource& time_source,
-                               Upstream::ResourcePriority priority,
+                               Upstream::ResourcePriority priority, bool auto_configured_for_http3,
                                bool conn_pool_new_stream_with_early_data_and_http3)
     : cluster_(cluster), vcluster_(vcluster), runtime_(runtime), random_(random),
       dispatcher_(dispatcher), time_source_(time_source), retry_on_(route_policy.retryOn()),
@@ -77,6 +80,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
       retriable_headers_(route_policy.retriableHeaders()),
       reset_headers_(route_policy.resetHeaders()),
       reset_max_interval_(route_policy.resetMaxInterval()),
+      auto_configured_for_http3_(auto_configured_for_http3),
       conn_pool_new_stream_with_early_data_and_http3_(
           conn_pool_new_stream_with_early_data_and_http3) {
   if (conn_pool_new_stream_with_early_data_and_http3_ &&

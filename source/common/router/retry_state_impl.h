@@ -25,12 +25,11 @@ namespace Router {
  */
 class RetryStateImpl : public RetryState {
 public:
-  static RetryStatePtr create(const RetryPolicy& route_policy,
-                              Http::RequestHeaderMap& request_headers,
-                              const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                              Runtime::Loader& runtime, Random::RandomGenerator& random,
-                              Event::Dispatcher& dispatcher, TimeSource& time_source,
-                              Upstream::ResourcePriority priority);
+  static std::unique_ptr<RetryStateImpl>
+  create(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
+         const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
+         Runtime::Loader& runtime, Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+         TimeSource& time_source, Upstream::ResourcePriority priority);
   ~RetryStateImpl() override;
 
   /**
@@ -94,12 +93,14 @@ public:
 
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
 
+  bool isAutomaticallyConfiguredForHttp3() const { return auto_configured_for_http3_; }
+
 private:
   RetryStateImpl(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
                  const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
                  Runtime::Loader& runtime, Random::RandomGenerator& random,
                  Event::Dispatcher& dispatcher, TimeSource& time_source,
-                 Upstream::ResourcePriority priority,
+                 Upstream::ResourcePriority priority, bool auto_configured_for_http3,
                  bool conn_pool_new_stream_with_early_data_and_http3);
 
   void enableBackoffTimer();
@@ -133,6 +134,7 @@ private:
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
   std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
   std::chrono::milliseconds reset_max_interval_{};
+  const bool auto_configured_for_http3_{};
   const bool conn_pool_new_stream_with_early_data_and_http3_{};
 };
 

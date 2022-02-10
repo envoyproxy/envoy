@@ -641,8 +641,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamGoaway) {
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, EarlyDataRejected) {
-  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) ||
-      upstreamProtocol() != Http::CodecType::HTTP3) {
+  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
     return;
   }
 
@@ -655,6 +654,13 @@ TEST_P(MultiplexedUpstreamIntegrationTest, EarlyDataRejected) {
 
   const Http::TestResponseHeaderMapImpl too_early_response_headers{{":status", "425"}};
   upstream_request_->encodeHeaders(too_early_response_headers, true);
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
+    ASSERT_TRUE(response->waitForEndStream());
+    // 425 response should be forwarded back to the client as HTTP/2 upstream doesn't support early
+    // data.
+    EXPECT_EQ("425", response->headers().getStatusValue());
+    return;
+  }
   // 425 response will be retried by Envoy, so expect another upstream request.
   waitForNextUpstreamRequest(0);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());

@@ -1814,8 +1814,16 @@ RetryStatePtr ProdFilter::createRetryState(const RetryPolicy& policy,
                                            Random::RandomGenerator& random,
                                            Event::Dispatcher& dispatcher, TimeSource& time_source,
                                            Upstream::ResourcePriority priority) {
-  return RetryStateImpl::create(policy, request_headers, cluster, vcluster, runtime, random,
-                                dispatcher, time_source, priority);
+  std::unique_ptr<RetryStateImpl> retry_state =
+      RetryStateImpl::create(policy, request_headers, cluster, vcluster, runtime, random,
+                             dispatcher, time_source, priority);
+  if (retry_state != nullptr && retry_state->isAutomaticallyConfiguredForHttp3()) {
+    // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the
+    // only reason for doing retry, set the retry shadow buffer limit to 0 so that we don't retry or
+    // buffer safe requests with body which is not common.
+    setRetryShadownBufferLimit(0);
+  }
+  return retry_state;
 }
 
 } // namespace Router
