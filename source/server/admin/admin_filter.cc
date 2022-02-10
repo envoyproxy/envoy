@@ -5,8 +5,8 @@
 namespace Envoy {
 namespace Server {
 
-AdminFilter::AdminFilter(AdminServerCallbackFunction admin_server_callback_func)
-    : admin_server_callback_func_(admin_server_callback_func) {}
+AdminFilter::AdminFilter(AdminHandlerFn admin_handler_fn)
+    : admin_handler_fn_(admin_handler_fn) {}
 
 Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                      bool end_stream) {
@@ -65,18 +65,40 @@ void AdminFilter::onComplete() {
   const absl::string_view path = request_headers_->getPathValue();
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *decoder_callbacks_, path);
 
-  Buffer::OwnedImpl response;
   auto header_map = Http::ResponseHeaderMapImpl::create();
   RELEASE_ASSERT(request_headers_, "");
-  Http::Code code = admin_server_callback_func_(path, *header_map, response, *this);
+  Admin::HandlerPtr handler = admin_handler_fn_(path, *this);
+  Http::Code code = handler->start(path, *header_map);
   Utility::populateFallbackResponseHeaders(code, *header_map);
-  decoder_callbacks_->encodeHeaders(std::move(header_map),
-                                    end_stream_on_complete_ && response.length() == 0,
+  decoder_callbacks_->encodeHeaders(std::move(header_map), false,
+                                    //end_stream_on_complete_ && response.length() == 0,
                                     StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
 
+  bool done = false;
+  do {
+    Buffer::OwnedImpl response;
+    handler->nextChunk(response);
+    done = response.length() == 0;
+    decoder_callbacks_->encodeData(response, end_stream_on_complete_ && done);
+  } while (!done);
+
+  /*
+  bool error = code != Http::Code::OK;
   if (response.length() > 0) {
+    decoder_callbacks_->encodeData(response, end_stream_on_complete_ && error);
+  }
+
+  if (!error) {
+    // TODO(jmarantz): In https://github.com/envoyproxy/envoy/pull/19898 we'll
+    // take on using real flow-control, rather than simply aggregating the
+    // chunks together.
+    while (handler->nextChunk(response)) {
+      decoder_callbacks_->encodeData(response, false);
+      response.drain(response.length());
+    }
     decoder_callbacks_->encodeData(response, end_stream_on_complete_);
   }
+  */
 }
 
 } // namespace Server

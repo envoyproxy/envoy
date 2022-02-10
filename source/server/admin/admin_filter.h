@@ -27,8 +27,9 @@ public:
   using AdminServerCallbackFunction = std::function<Http::Code(
       absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
       Buffer::OwnedImpl& response, AdminFilter& filter)>;
+  using AdminHandlerFn = std::function<Admin::HandlerPtr(absl::string_view, AdminFilter&)>;
 
-  AdminFilter(AdminServerCallbackFunction admin_server_run_callback_func);
+  AdminFilter(AdminHandlerFn admin_handler_func);
 
   // Http::StreamFilterBase
   // Handlers relying on the reference should use addOnDestroyCallback()
@@ -57,7 +58,7 @@ private:
    * Called when an admin request has been completely received.
    */
   void onComplete();
-  AdminServerCallbackFunction admin_server_callback_func_;
+  AdminHandlerFn admin_handler_fn_;
   Http::RequestHeaderMap* request_headers_{};
   std::list<std::function<void()>> on_destroy_callbacks_;
   bool end_stream_on_complete_ = true;

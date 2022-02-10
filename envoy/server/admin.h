@@ -76,13 +76,41 @@ class Admin {
 public:
   virtual ~Admin() = default;
 
+  // Represents a handler for admin endpoints, allowing for chunked responses.a
   class Handler {
   public:
     virtual ~Handler() = default;
+
+    /**
+     * Initiates a handler from a URL. If the URL is not well-formed the response
+     * can be rejected, and a non-OK status. The response_headers can be filled
+     * in an an initial response added, though the real content of a response to
+     * a valid request should be provided in nextChunk().
+     *
+     * @param path_and_query the path and query portions of the URL, without the
+     *        leading slash, e.g. "stats?format=json"
+     * @param response_headers successful text responses don't need to modify this,
+     *        but if we want to respond with (e.g.) JSON or HTML we can can set
+     *        those here.
+     * @param response the initial part of the response. If the return is not OK
+     *        then this should be the entire response.
+     * @return the HTTP status of the response.
+     */
     virtual Http::Code start(absl::string_view path_and_query,
-                             Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                             AdminStream& admin_stream) PURE;
-    virtual bool nextChunk(Buffer::Instance& response) PURE;
+                             Http::ResponseHeaderMap& response_headers
+                             /*, Buffer::Instance& response */) PURE;
+
+    /**
+     * Issues the next chunk of data.
+     *
+     * @param response a buffer in which to write the chunk
+     * @return whether or not any chunks follow this one.
+     *
+     * Note that a Handler returning false can include the final chunk in the
+     * response data, or the final respones can be empty. It is not valid
+     * to provide an empty response and return true.
+     */
+    virtual void /* bool */ nextChunk(Buffer::Instance& response) PURE;
   };
   using HandlerPtr = std::unique_ptr<Handler>;
 
@@ -100,10 +128,15 @@ public:
       absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
       Buffer::Instance& response, AdminStream& admin_stream)>;
 
-  using GenHandlerCb = std::function<HandlerPtr()>;
+  /**
+   * Lambda to generate a Handler.
+   */
+  using GenHandlerCb = std::function<HandlerPtr(AdminStream&)>;
 
   /**
-   * Add an admin handler.
+   * Add a legacy admin handler where the entire response is written in
+   * one chunk.
+   *
    * @param prefix supplies the URL prefix to handle.
    * @param help_text supplies the help text for the handler.
    * @param callback supplies the callback to invoke when the prefix matches.
@@ -114,6 +147,16 @@ public:
   virtual bool addHandler(const std::string& prefix, const std::string& help_text,
                           HandlerCb callback, bool removable, bool mutates_server_state) PURE;
 
+  /**
+   * Adds a an chunked admin handler.
+   *
+   * @param prefix supplies the URL prefix to handle.
+   * @param help_text supplies the help text for the handler.
+   * @param callback supplies the callback to generate a Handler.
+   * @param removable if true allows the handler to be removed via removeHandler.
+   * @param mutates_server_state indicates whether callback will mutate server state.
+   * @return bool true if the handler was added, false if it was not added.
+   */
   virtual bool addChunkedHandler(const std::string& prefix, const std::string& help_text,
                                  GenHandlerCb callback, bool removable,
                                  bool mutates_server_state) PURE;
