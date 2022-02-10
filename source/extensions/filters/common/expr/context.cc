@@ -276,8 +276,8 @@ absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
     return {};
   }
   auto value = key.StringOrDie().value();
-  if (filter_state_.hasDataWithName(value)) {
-    const StreamInfo::FilterState::Object* object = filter_state_.getDataReadOnlyGeneric(value);
+  if (const StreamInfo::FilterState::Object* object = filter_state_.getDataReadOnlyGeneric(value);
+      object != nullptr) {
     const CelState* cel_state = dynamic_cast<const CelState*>(object);
     if (cel_state) {
       return cel_state->exprValue(arena_, false);

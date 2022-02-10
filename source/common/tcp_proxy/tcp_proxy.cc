@@ -132,13 +132,11 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
 
 RouteConstSharedPtr Config::getRegularRouteFromEntries(Network::Connection& connection) {
   // First check if the per-connection state to see if we need to route to a pre-selected cluster
-  if (connection.streamInfo().filterState()->hasData<PerConnectionCluster>(
-          PerConnectionCluster::key())) {
-    const PerConnectionCluster& per_connection_cluster =
-        connection.streamInfo().filterState()->getDataReadOnly<PerConnectionCluster>(
-            PerConnectionCluster::key());
-
-    return std::make_shared<const SimpleRouteImpl>(*this, per_connection_cluster.value());
+  if (const auto* per_connection_cluster =
+          connection.streamInfo().filterState()->getDataReadOnly<PerConnectionCluster>(
+              PerConnectionCluster::key());
+      per_connection_cluster != nullptr) {
+    return std::make_shared<const SimpleRouteImpl>(*this, per_connection_cluster->value());
   }
 
   if (default_route_ != nullptr) {
@@ -363,7 +361,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  if (downstreamConnection()) {
+  if (auto downstream_connection = downstreamConnection(); downstream_connection != nullptr) {
     if (!read_callbacks_->connection()
              .streamInfo()
              .filterState()
@@ -371,29 +369,24 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
                  Network::ProxyProtocolFilterState::key())) {
       read_callbacks_->connection().streamInfo().filterState()->setData(
           Network::ProxyProtocolFilterState::key(),
-          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-              downstreamConnection()->connectionInfoProvider().remoteAddress(),
-              downstreamConnection()->connectionInfoProvider().localAddress()}),
+          std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
+              downstream_connection->connectionInfoProvider().remoteAddress(),
+              downstream_connection->connectionInfoProvider().localAddress()}),
           StreamInfo::FilterState::StateType::ReadOnly,
           StreamInfo::FilterState::LifeSpan::Connection);
     }
     transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-        downstreamConnection()->streamInfo().filterState());
+        downstream_connection->streamInfo().filterState());
 
-    auto has_options_from_downstream =
-        downstreamConnection() && downstreamConnection()
-                                      ->streamInfo()
-                                      .filterState()
-                                      .hasData<Network::UpstreamSocketOptionsFilterState>(
-                                          Network::UpstreamSocketOptionsFilterState::key());
-    if (has_options_from_downstream) {
-      auto downstream_options = downstreamConnection()
-                                    ->streamInfo()
-                                    .filterState()
-                                    .getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
-                                        Network::UpstreamSocketOptionsFilterState::key())
-                                    .value();
-      upstream_options_ = std::make_shared<Network::Socket::Options>();
+    if (auto typed_state = downstream_connection->streamInfo()
+                               .filterState()
+                               .getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
+                                   Network::UpstreamSocketOptionsFilterState::key());
+        typed_state != nullptr) {
+      auto downstream_options = typed_state->value();
+      if (!upstream_options_) {
+        upstream_options_ = std::make_shared<Network::Socket::Options>();
+      }
       Network::Socket::appendOptions(upstream_options_, downstream_options);
     }
   }
