@@ -16,6 +16,7 @@ namespace Extensions {
 namespace IoSocket {
 namespace UserSpace {
 
+// This factory creates the client connection to an envoy internal address.
 class InternalClientConnectionFactory : public Network::ClientConnectionFactory,
                                         Logger::Loggable<Logger::Id::connection> {
 public:

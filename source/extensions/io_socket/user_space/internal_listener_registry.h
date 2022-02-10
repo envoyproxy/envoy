@@ -13,6 +13,8 @@ namespace Envoy {
 namespace Extensions {
 namespace IoSocket {
 namespace UserSpace {
+
+// This InternalListenerRegistry implementation owns a thread local slot.
 class TlsInternalListenerRegistry : public Singleton::Instance,
                                     public Network::InternalListenerRegistry {
 public:
@@ -25,6 +27,10 @@ public:
 
   std::unique_ptr<ThreadLocal::TypedSlot<IoSocket::UserSpace::ThreadLocalRegistryImpl>> tls_slot_;
 };
+
+// This extension maintains maintain the life of the ``TlsInternalListenerRegistry`` singleton.
+// The ``TlsInternalListenerRegistry`` is functionally ready after the Envoy thread local system is
+// initialized.
 class InternalListenerExtension : public Server::BootstrapExtension {
 public:
   explicit InternalListenerExtension(Server::Configuration::ServerFactoryContext& server_context);
@@ -38,6 +44,7 @@ public:
   std::shared_ptr<TlsInternalListenerRegistry> tls_registry_;
 };
 
+// The factory creates the `InternalListenerExtension` instance when envoy starts.
 class InternalListenerRegistryFactory : public Server::Configuration::BootstrapExtensionFactory {
 public:
   // Server::Configuration::BootstrapExtensionFactory

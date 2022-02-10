@@ -39,6 +39,10 @@ void InternalListenerExtension::onServerInitialized() {
     return std::make_shared<IoSocket::UserSpace::ThreadLocalRegistryImpl>();
   });
 
+  // Now the thread local registry is available. This thread local object is published to
+  // ``InternalClientConnectionFactory``.
+  // Note that the per silo ``ConnectionHandler`` will add internal listeners into the per silo
+  // registry.
   Extensions::IoSocket::UserSpace::InternalClientConnectionFactory::registry_tls_slot_ =
       tls_registry_->tls_slot_.get();
 }
