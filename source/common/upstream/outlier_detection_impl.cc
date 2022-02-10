@@ -480,19 +480,19 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
               MaxEjectionTimeJitterMsRuntime, config_.maxEjectionTimeJitterMs()));
 
       // Generate random jitter so that not all hosts uneject at the same time,
-      // which could possibly generate a connection storm
+      // which could possibly generate a connection storm.
 
-      // std::chrono::milliseconds receives a signed integer as input, so we ensure that our random
-      // random value is in the range [0, std::numeric_limits<long>::max())
+      // std::chrono::milliseconds receives a signed integer as input, so we ensure that our
+      // random value is in the range [0, std::numeric_limits<long>::max()).
       long random_long =
           static_cast<long>(random_generator_() % (std::numeric_limits<long>::max()));
-      // cap the jitter at max_eject_time_jitter
-      // if max_eject_time_jitter is 0, the jitter will also equal 0 because we apply the
+      // Cap the jitter at max_eject_time_jitter.
+      // If max_eject_time_jitter is 0, the jitter will also equal 0 because we apply the
       // modulo operator with 1.
       const std::chrono::milliseconds jitter =
           std::chrono::milliseconds(random_long) %
           (max_eject_time_jitter + std::chrono::milliseconds(1));
-      // save the jitter on the current host_monitor
+      // Save the jitter on the current host_monitor.
       host_monitors_[host]->setJitter(jitter);
 
       if ((host_monitors_[host]->ejectTimeBackoff() * base_eject_time + jitter) <
