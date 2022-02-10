@@ -88,13 +88,14 @@ public:
         return pair.verifier_.get();
       }
     }
-    if (!filter_state_name_.empty() && !filter_state_verifiers_.empty() &&
-        filter_state.hasData<Router::StringAccessor>(filter_state_name_)) {
-      const auto& state = filter_state.getDataReadOnly<Router::StringAccessor>(filter_state_name_);
-      ENVOY_LOG(debug, "use filter state value {} to find verifier.", state.asString());
-      const auto& it = filter_state_verifiers_.find(state.asString());
-      if (it != filter_state_verifiers_.end()) {
-        return it->second.get();
+    if (!filter_state_name_.empty() && !filter_state_verifiers_.empty()) {
+      if (auto state = filter_state.getDataReadOnly<Router::StringAccessor>(filter_state_name_);
+          state != nullptr) {
+        ENVOY_LOG(debug, "use filter state value {} to find verifier.", state->asString());
+        const auto& it = filter_state_verifiers_.find(state->asString());
+        if (it != filter_state_verifiers_.end()) {
+          return it->second.get();
+        }
       }
     }
     return nullptr;
