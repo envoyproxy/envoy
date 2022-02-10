@@ -148,6 +148,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "interval_tree_test",
+    srcs = ["interval_tree_test.cc"],
+    deps = [
+        "//source/common/network:interval_tree_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "listen_socket_impl_test",
     srcs = ["listen_socket_impl_test.cc"],
     deps = [

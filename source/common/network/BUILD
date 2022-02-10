@@ -172,7 +172,13 @@ envoy_cc_library(
     name = "interval_tree_lib",
     srcs = ["interval_tree.cc"],
     hdrs = ["interval_tree.h"],
-    external_deps = ["abseil_optional", "abseil_span"],
+    external_deps = [
+        "abseil_optional",
+        "abseil_span",
+    ],
+    deps = [
+        "//source/common/common:assert_lib",
+    ],
 )
 
 envoy_cc_library(
