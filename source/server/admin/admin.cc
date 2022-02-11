@@ -294,6 +294,8 @@ public:
   }
 
   bool nextChunk(Buffer::Instance& response) override {
+    // Artificially make 1M chunks from the buffered admin output, to see if we
+    // can observe chunking in a live server.
 #if 0
     response.move(response_);
     return false;

@@ -75,7 +75,6 @@ void AdminFilter::onComplete() {
   Utility::populateFallbackResponseHeaders(code, *header_map);
   decoder_callbacks_->encodeHeaders(std::move(header_map), false,
                                     StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
-
   nextChunk();
 }
 
@@ -89,17 +88,17 @@ void AdminFilter::nextChunk() {
   bool more_data = handler_->nextChunk(response);
   bool end_stream = end_stream_on_complete_ && !more_data;
   if (response.length() > 0 || end_stream) {
-    ENVOY_LOG_MISC(error, "nextChunk sent data {}", response.length());
+    // ENVOY_LOG_MISC(error, "nextChunk sent data {}", response.length());
     decoder_callbacks_->encodeData(response, end_stream);
   } else {
-    ENVOY_LOG_MISC(error, "nextChunk no data");
+    // ENVOY_LOG_MISC(error, "nextChunk no data");
   }
 
   if (more_data) {
-    ENVOY_LOG_MISC(error, "nextChunk posting next");
+    // ENVOY_LOG_MISC(error, "nextChunk posting next");
     decoder_callbacks_->dispatcher().post([this]() { nextChunk(); });
   } else {
-    ENVOY_LOG_MISC(error, "nextChunk reset");
+    // ENVOY_LOG_MISC(error, "nextChunk reset");
     handler_.reset();
   }
 }

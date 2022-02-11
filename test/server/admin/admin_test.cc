@@ -136,7 +136,6 @@ private:
   uint32_t count_{0};
 };
 
-#if 1
 TEST_P(AdminInstanceTest, CustomChunkedHandler) {
   auto callback = [](absl::string_view, AdminStream&) -> Admin::HandlerPtr {
     Admin::HandlerPtr handler = Admin::HandlerPtr(new ChunkedHandler);
@@ -173,7 +172,6 @@ TEST_P(AdminInstanceTest, CustomChunkedHandler) {
     EXPECT_EQ("Text Text Text ", response.toString());
   }
 }
-#endif
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,

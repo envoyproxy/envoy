@@ -207,11 +207,6 @@ public:
       return findHandler(path_and_query, admin_stream);
     };
   }
-  AdminFilter::AdminServerCallbackFunction createCallbackFunction() {
-    return
-        [this](absl::string_view path_and_query, Http::ResponseHeaderMap&, Buffer::OwnedImpl&,
-               AdminFilter& filter) -> HandlerPtr { return findHandler(path_and_query, filter); };
-  }
 
   uint64_t maxRequestsPerConnection() const override { return 0; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
