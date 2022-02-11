@@ -47,6 +47,9 @@ private:
   void removeOldContext(std::shared_ptr<Envoy::Ssl::Context> old_context);
   TimeSource& time_source_;
   std::list<std::weak_ptr<Envoy::Ssl::Context>> contexts_;
+  // This stale contexts are the obsoleted contexts. They should not be provided to a new socket.
+  // These contexts will be removed after.
+  std::unordered_set<std::shared_ptr<Envoy::Ssl::Context>> stale_contexts_;
   PrivateKeyMethodManagerImpl private_key_method_manager_{};
 };
 
