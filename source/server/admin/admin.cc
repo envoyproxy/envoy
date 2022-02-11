@@ -294,8 +294,16 @@ public:
   }
 
   bool nextChunk(Buffer::Instance& response) override {
+#if 0
     response.move(response_);
     return false;
+#else
+    std::string str = response_.toString();
+    absl::string_view head(str.data(), std::min(size_t(1000000), str.size()));
+    response.add(head);
+    response_.drain(head.size());
+    return response_.length() > 0;
+#endif
   }
 
 private:

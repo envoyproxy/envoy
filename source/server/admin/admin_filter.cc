@@ -81,6 +81,7 @@ void AdminFilter::onComplete() {
 
 void AdminFilter::nextChunk() {
   if (!can_write_ || handler_ == nullptr) {
+    ENVOY_LOG_MISC(error, "nextChunk exit early");
     return;
   }
 
@@ -88,11 +89,17 @@ void AdminFilter::nextChunk() {
   bool more_data = handler_->nextChunk(response);
   bool end_stream = end_stream_on_complete_ && !more_data;
   if (response.length() > 0 || end_stream) {
+    ENVOY_LOG_MISC(error, "nextChunk sent data {}", response.length());
     decoder_callbacks_->encodeData(response, end_stream);
+  } else {
+    ENVOY_LOG_MISC(error, "nextChunk no data");
   }
+
   if (more_data) {
+    ENVOY_LOG_MISC(error, "nextChunk posting next");
     decoder_callbacks_->dispatcher().post([this]() { nextChunk(); });
   } else {
+    ENVOY_LOG_MISC(error, "nextChunk reset");
     handler_.reset();
   }
 }
