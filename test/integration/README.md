@@ -166,6 +166,14 @@ bazel test //test/integration:http2_upstream_integration_test \
 --jobs 60 --local_test_jobs=60 --runs_per_test=1000 --test_arg="-l trace"
 ```
 
+With regex: 
+
+```
+bazel test //test/integration:http2_upstream_integration_test \
+--test_arg=--gtest_filter="*RouterRequestAndResponseWithBodyNoBuffer*" \
+--jobs 60 --local_test_jobs=60 --runs_per_test=1000 --test_arg="-l trace"
+```
+
 ## Debugging test flakes
 
 Once you've managed to reproduce your test flake, you get to figure out what's
