@@ -1,6 +1,5 @@
 #include "test/extensions/filters/http/cache/http_cache_implementation_test_common.h"
 
-#include <future>
 #include <string>
 #include <utility>
 
@@ -112,33 +111,36 @@ absl::Status HttpCacheImplementationTest::insert(
 
   // For responses with body and trailers, wait for insertBody's callback before
   // calling insertTrailers.
-  std::promise<absl::Status> insert_promise;
   auto insert_mutex = std::make_shared<absl::Mutex>();
-  auto insert_cancelled = std::make_shared<absl::Notification>();
-  InsertCallback insert_callback = [&trailers, &inserter, &insert_promise, insert_mutex,
-                                    insert_cancelled](bool success_ready_for_more) {
+  bool insert_done = false;
+  auto insert_cancelled = std::make_shared<bool>(false);
+  absl::Status insert_status;
+  InsertCallback insert_callback = [&trailers, &inserter, insert_mutex, &insert_done,
+                                    insert_cancelled, &insert_status](bool success_ready_for_more) {
     absl::MutexLock lock(insert_mutex.get());
-    if (insert_cancelled->HasBeenNotified()) {
+    if (*insert_cancelled) {
       return;
     }
     if (!success_ready_for_more) {
-      insert_promise.set_value(absl::UnknownError("Insert was aborted by cache"));
+      insert_status = absl::UnknownError("Insert was aborted by cache");
+      insert_done = true;
+      return;
     }
     inserter->insertTrailers(trailers.value());
-    insert_promise.set_value(absl::OkStatus());
+    insert_status = absl::OkStatus();
+    insert_done = true;
   };
   inserter->insertBody(Buffer::OwnedImpl(body), insert_callback,
                        /*end_stream=*/!trailers.has_value());
 
-  std::future<absl::Status> insert_future = insert_promise.get_future();
-  if (insert_future.wait_for(timeout) != std::future_status::ready) {
+  {
     absl::MutexLock lock(insert_mutex.get());
-    if (!insert_future.valid()) {
-      insert_cancelled->Notify();
+    if (!time_source_.waitFor(*insert_mutex, absl::Condition(&insert_done), timeout)) {
+      *insert_cancelled = true;
       return absl::DeadlineExceededError("Timed out waiting for insertBody()");
     }
+    return insert_status;
   }
-  return insert_future.get();
 }
 
 absl::Status HttpCacheImplementationTest::insert(absl::string_view request_path,
