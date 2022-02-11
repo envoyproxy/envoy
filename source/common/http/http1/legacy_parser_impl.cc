@@ -199,7 +199,7 @@ int LegacyHttpParserImpl::statusToInt(const ParserStatus code) const {
   case ParserStatus::Paused:
     return 31;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 }
 

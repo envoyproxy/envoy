@@ -81,11 +81,12 @@ public:
         crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
             quic::test::crypto_test_utils::ProofVerifierForTesting())),
         quic_stat_names_(store_.symbolTable()),
-        envoy_quic_session_(
-            quic_config_, quic_version_,
-            std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
-            quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr, *dispatcher_,
-            /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_, quic_stat_names_, store_),
+        envoy_quic_session_(quic_config_, quic_version_,
+                            std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
+                            quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr,
+                            *dispatcher_,
+                            /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_,
+                            quic_stat_names_, {}, store_),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(store_, "http3."),
                                       POOL_GAUGE_PREFIX(store_, "http3."))}),
         http_connection_(envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_,

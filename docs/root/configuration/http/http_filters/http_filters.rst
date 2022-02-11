@@ -43,7 +43,7 @@ HTTP filters
   router_filter
   set_metadata_filter
   squash_filter
+  stateful_session_filter
   sxg_filter
   tap_filter
   wasm_filter
-  stateful_session_filter

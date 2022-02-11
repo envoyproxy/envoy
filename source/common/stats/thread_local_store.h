@@ -17,7 +17,7 @@
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
 #include "source/common/stats/null_text_readout.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -247,6 +247,8 @@ public:
   void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
   void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
   void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
+  void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override;
+  void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
@@ -448,6 +450,8 @@ private:
     findStatLockHeld(StatName name,
                      StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const;
 
+    StatName prefix() const override { return prefix_.statName(); }
+
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     StatNameStorage prefix_;
@@ -473,6 +477,12 @@ private:
   };
 
   template <class StatFn> bool iterHelper(StatFn fn) const {
+    // Note that any thread can delete a scope at any time, and so another
+    // thread may have initiated destruction when we enter `iterHelper`.
+    // However the first thing that happens is releaseScopeCrossThread, which
+    // takes lock_, and doesn't release it until scopes_.erase(scope) finishes.
+    // thus there is no race risk with iterating over scopes while another
+    // thread deletes them.
     Thread::LockGuard lock(lock_);
     for (ScopeImpl* scope : scopes_) {
       if (!scope->iterate(fn)) {
@@ -481,6 +491,8 @@ private:
     }
     return true;
   }
+
+  StatName prefix() const override { return StatName(); }
 
   std::string getTagsForName(const std::string& name, TagVector& tags) const;
   void clearScopesFromCaches();

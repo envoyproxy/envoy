@@ -207,6 +207,10 @@ private:
     }
     void finalizeRequestHeaders(Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                                 bool) const override {}
+    Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo&,
+                                                   bool) const override {
+      return {};
+    }
     void finalizeResponseHeaders(Http::ResponseHeaderMap&,
                                  const StreamInfo::StreamInfo&) const override {}
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,

@@ -396,9 +396,9 @@ TEST_F(XRayTracerTest, DontStartSpanOnNonSampledSpans) {
                 server_.timeSource(),
                 server_.api().randomGenerator()};
   Tracing::SpanPtr span;
-  ASSERT_DEATH(
+  EXPECT_ENVOY_BUG(
       span = tracer.startSpan(config_, "ingress", server_.timeSource().systemTime(), xray_header),
-      "panic: not reached");
+      "unexpected code path hit");
 }
 
 TEST_F(XRayTracerTest, UnknownSpanStillSampled) {
