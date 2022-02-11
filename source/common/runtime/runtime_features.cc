@@ -60,6 +60,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.allow_upstream_inline_write",
     "envoy.reloadable_features.append_or_truncate",
     "envoy.reloadable_features.conn_pool_delete_when_idle",
+    "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_http3",
     "envoy.reloadable_features.correct_scheme_and_xfp",
     "envoy.reloadable_features.correctly_validate_alpn",
     "envoy.reloadable_features.disable_tls_inspector_injection",
