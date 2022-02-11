@@ -81,7 +81,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
         Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
     return Network::FilterStatus::StopIteration;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM
 }
 
 ParseState Filter::onRead() {
@@ -113,7 +113,7 @@ ParseState Filter::onRead() {
     done(true);
     return ParseState::Done;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 ParseState Filter::parseHttpHeader(absl::string_view data) {
