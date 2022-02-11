@@ -516,20 +516,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-03-05",
         cpe = "N/A",
     ),
-    com_github_nodejs_http_parser = dict(
-        project_name = "HTTP Parser",
-        project_desc = "Parser for HTTP messages written in C",
-        project_url = "https://github.com/nodejs/http-parser",
-        # This SHA includes fix for https://github.com/nodejs/http-parser/issues/517 which allows (opt-in) to serve
-        # requests with both Content-Legth and Transfer-Encoding: chunked headers set.
-        version = "4f15b7d510dc7c6361a26a7c6d2f7c3a17f8d878",
-        sha256 = "6a12896313ce1ca630cf516a0ee43a79b5f13f5a5d8143f56560ac0b21c98fac",
-        strip_prefix = "http-parser-{version}",
-        urls = ["https://github.com/nodejs/http-parser/archive/{version}.tar.gz"],
-        use_category = ["controlplane", "dataplane_core"],
-        release_date = "2020-07-10",
-        cpe = "cpe:2.3:a:nodejs:node.js:*",
-    ),
     com_github_alibaba_hessian2_codec = dict(
         project_name = "hessian2-codec",
         project_desc = "hessian2-codec is a C++ library for hessian2 codec",
