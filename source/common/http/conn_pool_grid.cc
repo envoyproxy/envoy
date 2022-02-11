@@ -2,6 +2,7 @@
 
 #include "source/common/http/mixed_conn_pool.h"
 
+#include "quiche/quic/core/http/spdy_utils.h"
 #include "quiche/quic/core/quic_versions.h"
 
 namespace Envoy {
@@ -394,12 +395,14 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
 
     // TODO(RyanTheOptimist): Cache this mapping, but handle the supported versions list
     // changing dynamically.
-    for (const quic::ParsedQuicVersion& version : quic::CurrentSupportedVersions()) {
-      if (quic::AlpnForVersion(version) == protocol.alpn_) {
-        // TODO(RyanTheOptimist): Pass this version down to the HTTP/3 pool.
-        ENVOY_LOG(trace, "HTTP/3 advertised for host '{}'", host_->hostname());
-        return true;
-      }
+    spdy::SpdyAltSvcWireFormat::AlternativeService alt_svc(protocol.alpn_, protocol.hostname_,
+                                                           protocol.port_, 0, {});
+    quic::ParsedQuicVersion version = quic::SpdyUtils::ExtractQuicVersionFromAltSvcEntry(
+        alt_svc, quic::CurrentSupportedVersions());
+    if (version != quic::ParsedQuicVersion::Unsupported()) {
+      // TODO(RyanTheOptimist): Pass this version down to the HTTP/3 pool.
+      ENVOY_LOG(trace, "HTTP/3 advertised for host '{}'", host_->hostname());
+      return true;
     }
 
     ENVOY_LOG(trace, "Alternate protocol for host '{}' has unsupported ALPN '{}', skipping.",

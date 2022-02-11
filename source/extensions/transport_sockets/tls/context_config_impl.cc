@@ -476,15 +476,15 @@ Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePo
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::OcspStaplePolicy&
         policy) {
   switch (policy) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::LENIENT_STAPLING:
     return Ssl::ServerContextConfig::OcspStaplePolicy::LenientStapling;
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::STRICT_STAPLING:
     return Ssl::ServerContextConfig::OcspStaplePolicy::StrictStapling;
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::MUST_STAPLE:
     return Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace Tls
