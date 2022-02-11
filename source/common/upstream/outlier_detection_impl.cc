@@ -353,7 +353,7 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
       runtime_.snapshot().getInteger(MaxEjectionTimeMsRuntime, config_.maxEjectionTimeMs()));
   const std::chrono::milliseconds jitter = monitor->getJitter();
   ASSERT(monitor->numEjections() > 0);
-  if ((min(base_eject_time * monitor->ejectTimeBackoff() + jitter, max_eject_time + jitter)) <=
+  if ((min(base_eject_time * monitor->ejectTimeBackoff(), max_eject_time) + jitter) <=
       (now - monitor->lastEjectionTime().value())) {
     ejections_active_helper_.dec();
     host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
@@ -475,28 +475,22 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
           runtime_.snapshot().getInteger(BaseEjectionTimeMsRuntime, config_.baseEjectionTimeMs()));
       const std::chrono::milliseconds max_eject_time = std::chrono::milliseconds(
           runtime_.snapshot().getInteger(MaxEjectionTimeMsRuntime, config_.maxEjectionTimeMs()));
-      const std::chrono::milliseconds max_eject_time_jitter =
-          std::chrono::milliseconds(runtime_.snapshot().getInteger(
-              MaxEjectionTimeJitterMsRuntime, config_.maxEjectionTimeJitterMs()));
 
       // Generate random jitter so that not all hosts uneject at the same time,
       // which could possibly generate a connection storm.
 
-      // std::chrono::milliseconds receives a signed integer as input, so we ensure that our
-      // random value is in the range [0, std::numeric_limits<long>::max()).
-      long random_long =
-          static_cast<long>(random_generator_() % (std::numeric_limits<long>::max()));
-      // Cap the jitter at max_eject_time_jitter.
-      // If max_eject_time_jitter is 0, the jitter will also equal 0 because we apply the
-      // modulo operator with 1.
-      const std::chrono::milliseconds jitter =
-          std::chrono::milliseconds(random_long) %
-          (max_eject_time_jitter + std::chrono::milliseconds(1));
+      // First retrieve max_eject_time_jitter configuration and then calculate the jitter.
+      int64_t max_eject_time_jitter =
+          runtime_.snapshot().getInteger(MaxEjectionTimeJitterMsRuntime, config_.maxEjectionTimeJitterMs());
+
+      std::chrono::milliseconds jitter =
+          std::chrono::milliseconds(random_generator_() % (max_eject_time_jitter + 1));
+
       // Save the jitter on the current host_monitor.
       host_monitors_[host]->setJitter(jitter);
 
-      if ((host_monitors_[host]->ejectTimeBackoff() * base_eject_time + jitter) <
-          (max_eject_time + base_eject_time + jitter)) {
+      if ((host_monitors_[host]->ejectTimeBackoff() * base_eject_time) <
+          (max_eject_time + base_eject_time)) {
         host_monitors_[host]->ejectTimeBackoff()++;
       }
 
