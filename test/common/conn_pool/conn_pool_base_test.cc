@@ -20,7 +20,11 @@ using testing::Return;
 
 class TestActiveClient : public ActiveClient {
 public:
-  using ActiveClient::ActiveClient;
+  TestActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
+                   uint32_t concurrent_stream_limit, bool fail_on_enlisted)
+      : ActiveClient(parent, lifetime_stream_limit, concurrent_stream_limit),
+        fail_on_enlisted_(fail_on_enlisted) {}
+
   void close() override { onEvent(Network::ConnectionEvent::LocalClose); }
   uint64_t id() const override { return 1; }
   bool closingWithIncompleteStream() const override { return false; }
@@ -28,6 +32,11 @@ public:
   absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
   void onEvent(Network::ConnectionEvent event) override {
     parent_.onConnectionEvent(*this, "", event);
+  }
+  void onEnlisted() override {
+    if (fail_on_enlisted_) {
+      close();
+    }
   }
 
   static void incrementActiveStreams(ActiveClient& client) {
@@ -44,6 +53,7 @@ public:
 
   uint32_t active_streams_{};
   absl::optional<uint64_t> capacity_override_;
+  const bool fail_on_enlisted_{};
 };
 
 class TestPendingStream : public PendingStream {
@@ -78,8 +88,8 @@ public:
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
     ON_CALL(pool_, instantiateActiveClient).WillByDefault(Invoke([&]() -> ActiveClientPtr {
-      auto ret =
-          std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_, concurrent_streams_);
+      auto ret = std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_,
+                                                              concurrent_streams_, false);
       clients_.push_back(ret.get());
       ret->real_host_description_ = descr_;
       return ret;
@@ -120,8 +130,8 @@ public:
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
     ON_CALL(pool_, instantiateActiveClient).WillByDefault(Invoke([&]() -> ActiveClientPtr {
-      auto ret =
-          std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_, concurrent_streams_);
+      auto ret = std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_,
+                                                              concurrent_streams_, false);
       clients_.push_back(ret.get());
       ret->real_host_description_ = descr_;
       return ret;
@@ -499,6 +509,35 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredLocalClose) {
 
   EXPECT_CALL(idle_pool_callback, Call());
   pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+TEST_F(ConnPoolImplDispatcherBaseTest, onEnlistedFailed) {
+  // Create a new stream using the pool.
+  newConnectingClient();
+  // Limit the new connection capacity to 1 stream.
+  clients_.back()->capacity_override_ = 1;
+
+  // Creating the 2nd new stream would create another client.
+  EXPECT_CALL(pool_, instantiateActiveClient).WillOnce(Invoke([this]() -> ActiveClientPtr {
+    // This client would fail during onEnlisted().
+    auto ret = std::make_unique<NiceMock<TestActiveClient>>(
+        pool_, stream_limit_, concurrent_streams_, /*fail_on_enlisted=*/true);
+    ret->real_host_description_ = descr_;
+    return ret;
+  }));
+  EXPECT_CALL(pool_, onPoolFailure(_, _, _, _))
+      .WillRepeatedly(Invoke([](const Upstream::HostDescriptionConstSharedPtr&, absl::string_view,
+                                ConnectionPool::PoolFailureReason, AttachContext&) {}));
+  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+  CHECK_STATE(0 /*active*/,
+              (Runtime::runtimeFeatureEnabled(
+                   "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted")
+                   ? 0
+                   : 1) /*pending*/,
+              1 /*connecting capacity*/);
+
+  // Clean up.
+  pool_.destructAllConnections();
 }
 
 } // namespace ConnectionPool

@@ -35,6 +35,8 @@ void ActiveClient::onEnlisted() {
   MultiplexedActiveClientBase::onEnlisted();
   ASSERT(codec_client_);
   if (dynamic_cast<CodecClientProd*>(codec_client_.get()) == nullptr) {
+    ASSERT(Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted"));
     // Hasn't called connect() yet.
     codec_client_->connect();
   }
