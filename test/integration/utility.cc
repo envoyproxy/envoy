@@ -217,7 +217,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   quic::QuicConfig config;
   std::unique_ptr<Http::PersistentQuicInfo> persistent_info;
   persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher, *transport_socket_factory, time_system, addr, config, 0);
+      *dispatcher, *transport_socket_factory, time_system, addr->ip()->port(), config, 0);
 
   Network::Address::InstanceConstSharedPtr local_address;
   if (addr->ip()->version() == Network::Address::IpVersion::v4) {
@@ -227,7 +227,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
     local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
   }
   Network::ClientConnectionPtr connection = Quic::createQuicNetworkConnection(
-      *persistent_info, *dispatcher, addr, local_address, quic_stat_names, mock_stats_store);
+      *persistent_info, *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store);
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
   // Quic connection needs to finish handshake.

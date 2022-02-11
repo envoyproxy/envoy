@@ -81,7 +81,11 @@ public:
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }
   State state() const override;
-  bool connecting() const override { return connecting_; }
+  bool connecting() const override {
+    ENVOY_CONN_LOG_EVENT(debug, "connection_connecting_state", "current connecting state: {}",
+                         *this, connecting_);
+    return connecting_;
+  }
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
@@ -153,6 +157,9 @@ protected:
   // connected event is raised.
   virtual void onConnected() {}
 
+  void setFailureReason(absl::string_view failure_reason);
+  const std::string& failureReason() const { return failure_reason_; }
+
   TransportSocketPtr transport_socket_;
   ConnectionSocketPtr socket_;
   StreamInfo::StreamInfo& stream_info_;
@@ -172,7 +179,6 @@ protected:
   bool connecting_{false};
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
-  std::string failure_reason_;
 
 private:
   friend class HappyEyeballsConnectionImpl;
@@ -195,6 +201,8 @@ private:
   static std::atomic<uint64_t> next_global_id_;
 
   std::list<BytesSentCb> bytes_sent_callbacks_;
+  // Should be set with setFailureReason.
+  std::string failure_reason_;
   // Tracks the number of times reads have been disabled. If N different components call
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
   // has been called N times.

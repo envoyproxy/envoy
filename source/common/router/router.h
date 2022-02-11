@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/random_generator.h"
@@ -11,6 +12,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/stateful_session.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
@@ -26,12 +28,13 @@
 #include "source/common/common/hex.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
+#include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/context_impl.h"
 #include "source/common/router/upstream_request.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 
@@ -119,8 +122,7 @@ public:
    * - x-forwarded-proto header if valid
    * - security of downstream connection
    */
-  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure,
-                                bool upstream_secure);
+  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure);
 
   /**
    * Determine whether a request should be shadowed.
@@ -422,6 +424,20 @@ public:
 
   Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
     return transport_socket_options_;
+  }
+
+  absl::optional<OverrideHost> overrideHostToSelect() const override {
+    if (is_retry_) {
+      return {};
+    }
+
+    auto override_host = callbacks_->upstreamOverrideHost();
+    if (override_host.has_value()) {
+      // TODO(wbpcode): Currently we need to provide additional expected host status to the load
+      // balancer. This should be resolved after the `overrideHostToSelect()` refactoring.
+      return std::make_pair(std::string(override_host.value()), ~static_cast<uint32_t>(0));
+    }
+    return {};
   }
 
   /**

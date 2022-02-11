@@ -18,7 +18,7 @@
 #include "source/common/stats/histogram_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stats/store_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/timespan_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -298,6 +298,7 @@ public:
   MOCK_METHOD(void, forEachCounter, (SizeFn, StatFn<Counter>), (const));
   MOCK_METHOD(void, forEachGauge, (SizeFn, StatFn<Gauge>), (const));
   MOCK_METHOD(void, forEachTextReadout, (SizeFn, StatFn<TextReadout>), (const));
+  MOCK_METHOD(void, forEachHistogram, (SizeFn, StatFn<ParentHistogram>), (const));
 
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));

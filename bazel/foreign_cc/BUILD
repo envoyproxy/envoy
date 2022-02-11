@@ -159,9 +159,9 @@ envoy_cmake(
         "BUILD_TESTING": "off",
         "BUILD_SHARED_LIBS": "off",
         "CURL_HIDDEN_SYMBOLS": "off",
-        "CMAKE_USE_LIBSSH2": "off",
+        "CURL_USE_LIBSSH2": "off",
         "CURL_BROTLI": "off",
-        "CMAKE_USE_GSSAPI": "off",
+        "CURL_USE_GSSAPI": "off",
         "HTTP_ONLY": "on",
         "CMAKE_INSTALL_LIBDIR": "lib",
         # Explicitly enable Unix sockets, once afunix.h is correctly detected
@@ -176,7 +176,7 @@ envoy_cmake(
         # FindOpenSSL.cmake which fails at what looks like version parsing
         # (the libraries are found ok).
         "CURL_CA_PATH": "none",
-        "CMAKE_USE_OPENSSL": "off",
+        "CURL_USE_OPENSSL": "off",
         "OPENSSL_ROOT_DIR": "$EXT_BUILD_DEPS",
         # Avoid libidn2
         "USE_LIBIDN2": "off",
@@ -392,10 +392,11 @@ envoy_cmake(
 envoy_cmake(
     name = "wamr",
     cache_entries = {
-        "LLVM_DIR": "$EXT_BUILD_DEPS/copy_llvm/llvm/lib/cmake/llvm",
-        "WAMR_BUILD_INTERP": "0",
-        "WAMR_BUILD_JIT": "1",
-        "WAMR_BUILD_AOT": "1",
+        "WAMR_BUILD_INTERP": "1",
+        "WAMR_BUILD_FAST_INTERP": "1",
+        "WAMR_BUILD_JIT": "0",
+        "WAMR_BUILD_LAZY_JIT": "0",
+        "WAMR_BUILD_AOT": "0",
         "WAMR_BUILD_SIMD": "0",
         "WAMR_BUILD_MULTI_MODULE": "1",
         "WAMR_BUILD_LIBC_WASI": "0",
@@ -404,7 +405,6 @@ envoy_cmake(
     lib_source = "@com_github_wamr//:all",
     out_static_libs = ["libvmlib.a"],
     tags = ["skip_on_windows"],
-    deps = [":llvm"],
 )
 
 envoy_cmake(

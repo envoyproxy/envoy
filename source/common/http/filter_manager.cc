@@ -285,10 +285,11 @@ void FilterMatchState::evaluateMatchTreeWithNewData(MatchDataUpdateFunc update_f
   match_tree_evaluated_ = match_result.match_state_ == Matcher::MatchState::MatchComplete;
 
   if (match_tree_evaluated_ && match_result.result_) {
-    if (SkipAction().typeUrl() == match_result.result_->typeUrl()) {
+    const auto result = match_result.result_();
+    if (SkipAction().typeUrl() == result->typeUrl()) {
       skip_filter_ = true;
     } else {
-      filter_->onMatchCallback(*match_result.result_);
+      filter_->onMatchCallback(*result);
     }
   }
 }
@@ -746,9 +747,9 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
     // choose to buffer/stop iteration that's fine.
     decodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
-    // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
-    // throw an exception here.
-    PANIC("fatal error adding decoded data");
+    IS_ENVOY_BUG("Invalid request data");
+    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().FilterAddedInvalidRequestData);
   }
 }
 
@@ -1227,9 +1228,9 @@ void FilterManager::addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::In
     // choose to buffer/stop iteration that's fine.
     encodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
-    // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
-    // throw an exception here.
-    PANIC("fatal error adding decoded data");
+    IS_ENVOY_BUG("Invalid response data");
+    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().FilterAddedInvalidResponseData);
   }
 }
 
@@ -1663,6 +1664,14 @@ uint64_t ActiveStreamFilterBase::streamId() const { return parent_.streamId(); }
 
 Buffer::BufferMemoryAccountSharedPtr ActiveStreamDecoderFilter::account() const {
   return parent_.account();
+}
+
+void ActiveStreamDecoderFilter::setUpstreamOverrideHost(absl::string_view host) {
+  parent_.upstream_override_host_.emplace(std::move(host));
+}
+
+absl::optional<absl::string_view> ActiveStreamDecoderFilter::upstreamOverrideHost() const {
+  return parent_.upstream_override_host_;
 }
 
 } // namespace Http

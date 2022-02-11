@@ -27,29 +27,6 @@ struct HttpResponseCodeDetailValues {
 };
 using HttpResponseCodeDetails = ConstSingleton<HttpResponseCodeDetailValues>;
 
-const std::string DEPRECATED_LUA_NAME = "envoy.lua";
-
-std::atomic<bool>& deprecatedNameLogged() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<bool>, false);
-}
-
-// Checks if deprecated metadata names are allowed. On the first check only it will log either
-// a warning (indicating the name should be updated) or an error (the feature is off and the
-// name is not allowed). When warning, the deprecated feature stat is incremented. Subsequent
-// checks do not log since this check is done in potentially high-volume request paths.
-bool allowDeprecatedMetadataName() {
-  if (!deprecatedNameLogged().exchange(true)) {
-    // Have not logged yet, so use the logging test.
-    return Extensions::Common::Utility::ExtensionNameUtil::allowDeprecatedExtensionName(
-        "http filter", DEPRECATED_LUA_NAME, "envoy.filters.http.lua");
-  }
-
-  // We have logged (or another thread will do so momentarily), so just check whether the
-  // deprecated name is allowed.
-  auto status = Extensions::Common::Utility::ExtensionNameUtil::deprecatedExtensionNameStatus();
-  return status == Extensions::Common::Utility::ExtensionNameUtil::Status::Warn;
-}
-
 const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
   if (callbacks->route() == nullptr) {
     return ProtobufWkt::Struct::default_instance();
@@ -60,17 +37,6 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
     const auto& filter_it = metadata.filter_metadata().find("envoy.filters.http.lua");
     if (filter_it != metadata.filter_metadata().end()) {
       return filter_it->second;
-    }
-  }
-
-  // TODO(zuercher): Remove this block when deprecated filter names are removed.
-  {
-    const auto& filter_it = metadata.filter_metadata().find(DEPRECATED_LUA_NAME);
-    if (filter_it != metadata.filter_metadata().end()) {
-      // Use the non-throwing check here because this happens at request time.
-      if (allowDeprecatedMetadataName()) {
-        return filter_it->second;
-      }
     }
   }
 

@@ -120,9 +120,10 @@ public:
                  : absl::StrContains(value, matcher_.contains());
     case StringMatcherType::MatchPatternCase::kSafeRegex:
       return regex_->match(value);
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case StringMatcherType::MatchPatternCase::MATCH_PATTERN_NOT_SET:
+      break;
     }
+    PANIC("unexpected");
   }
   bool match(const ProtobufWkt::Value& value) const override {
 

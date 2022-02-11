@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package test.integration.filters;
 
-import "validate/validate.proto";
-
 message CrashFilterConfig {
   bool crash_in_encode_headers = 1;
   bool crash_in_encode_data = 2;

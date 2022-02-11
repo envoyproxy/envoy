@@ -99,6 +99,7 @@ public:
     return logical_host_->outlierDetector();
   }
   HostStats& stats() const override { return logical_host_->stats(); }
+  LoadMetricStats& loadMetricStats() const override { return logical_host_->loadMetricStats(); }
   const std::string& hostnameForHealthChecks() const override {
     return logical_host_->hostnameForHealthChecks();
   }
