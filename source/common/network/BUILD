@@ -170,7 +170,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "interval_tree_lib",
-    srcs = ["interval_tree.cc"],
     hdrs = ["interval_tree.h"],
     external_deps = [
         "abseil_optional",
