@@ -152,7 +152,7 @@ public:
       return it->second.get();
     }
     // Verifier::innerCreate function makes sure that all provider names are defined.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
   }
 
   JwtAuthnFilterStats& stats() override { return stats_; }
