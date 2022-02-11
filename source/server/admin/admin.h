@@ -202,10 +202,15 @@ public:
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
   Server::Instance& server() { return server_; }
 
+  GenHandlerCb createHandlerFunction() {
+    return [this](absl::string_view path_and_query, AdminStream& admin_stream) -> HandlerPtr {
+      return findHandler(path_and_query, admin_stream);
+    };
+  }
   AdminFilter::AdminServerCallbackFunction createCallbackFunction() {
-    return [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
-                  Buffer::OwnedImpl& response, AdminFilter& filter) -> HandlerPtr {
-      return findHandler(path_and_query, response_headers, response, filter);
+    return [this](absl::string_view path_and_query, Http::ResponseHeaderMap&,
+                  Buffer::OwnedImpl&, AdminFilter& filter) -> HandlerPtr {
+      return findHandler(path_and_query, filter);
     };
   }
 
@@ -213,6 +218,14 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
+
+  /**
+   * Makes a chunked handler for static text.
+   * @param resposne_text the text to populate response with
+   * @param code the Http::Code for the response
+   * @return the handler
+   */
+  static HandlerPtr makeStaticTextHandler(absl::string_view response_text, Http::Code code);
 
 private:
   /**
@@ -226,10 +239,14 @@ private:
     const bool mutates_server_state_;
   };
 
-  HandlerPtr findHandler(absl::string_view path_and_query,
-                         Http::ResponseHeaderMap& response_headers,
-                         Buffer::Instance& response, AdminStream& admin_stream);
+  /**
+   * Creates a Handler instance given a request.
+   */
+  HandlerPtr findHandler(absl::string_view path_and_query, AdminStream& admin_stream);
 
+  /**
+   * Creates a UrlHandler structure from a non-chunked callback.
+   */
   UrlHandler makeHandler(const std::string& prefix, const std::string& help_text,
                          HandlerCb callback, bool removable, bool mutates_state);
 
@@ -325,6 +342,7 @@ private:
   Http::Code handlerHelp(absl::string_view path_and_query,
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream&);
+  void getHelp(Buffer::Instance& response);
 
   class AdminListenSocketFactory : public Network::ListenSocketFactory {
   public:
