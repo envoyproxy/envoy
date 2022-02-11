@@ -60,6 +60,14 @@ getConfig(Network::TransportSocketFactory& transport_socket_factory) {
   return quic_socket_factory->clientContextConfig();
 }
 
+ConnectionPool::Cancellable* Http3ConnPoolImpl::newStream(Http::ResponseDecoder& response_decoder,
+                                                          ConnectionPool::Callbacks& callbacks,
+                                                          const Instance::StreamOptions& options) {
+  ENVOY_BUG(options.can_use_http3_,
+            "Trying to send request over h3 while alternate protocols is disabled.");
+  return FixedHttpConnPoolImpl::newStream(response_decoder, callbacks, options);
+}
+
 Http3ConnPoolImpl::Http3ConnPoolImpl(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,

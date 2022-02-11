@@ -2163,7 +2163,8 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
 
 class StreamErrorOnInvalidHttpMessageTest : public HttpConnectionManagerImplTest {
 public:
-  void sendInvalidRequestAndVerifyConnectionState(bool stream_error_on_invalid_http_message) {
+  void sendInvalidRequestAndVerifyConnectionState(bool stream_error_on_invalid_http_message,
+                                                  bool send_complete_request = true) {
     setup(false, "");
 
     EXPECT_CALL(*codec_, dispatch(_))
@@ -2173,7 +2174,7 @@ public:
           // These request headers are missing the necessary ":host"
           RequestHeaderMapPtr headers{
               new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
-          decoder_->decodeHeaders(std::move(headers), true);
+          decoder_->decodeHeaders(std::move(headers), send_complete_request);
           data.drain(0);
           return Http::okStatus();
         }));
@@ -2191,6 +2192,19 @@ public:
         .WillOnce(Return(stream_error_on_invalid_http_message));
     EXPECT_CALL(*filter, encodeComplete());
     EXPECT_CALL(*filter, encodeHeaders(_, true));
+    if (!stream_error_on_invalid_http_message) {
+      EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(AnyNumber());
+      if (send_complete_request) {
+        // The request is complete, so we should not flush close.
+        EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+            .Times(AnyNumber());
+      } else {
+        // If the request isn't complete, avoid a FIN/RST race with delay close.
+        EXPECT_CALL(filter_callbacks_.connection_,
+                    close(Network::ConnectionCloseType::FlushWriteAndDelay))
+            .Times(AnyNumber());
+      }
+    }
     EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
         .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
           EXPECT_EQ("400", headers.getStatusValue());
@@ -2214,6 +2228,12 @@ public:
 
 TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionTerminatedIfCodecStreamErrorIsFalse) {
   sendInvalidRequestAndVerifyConnectionState(false);
+}
+
+TEST_F(StreamErrorOnInvalidHttpMessageTest,
+       ConnectionTerminatedWithDelayIfCodecStreamErrorIsFalse) {
+  // Same as above, only with an incomplete request.
+  sendInvalidRequestAndVerifyConnectionState(false, false);
 }
 
 TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionOpenIfCodecStreamErrorIsTrue) {
@@ -3366,7 +3386,7 @@ TEST_F(HttpConnectionManagerImplTest, Http10Rejected) {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":method", "GET"}, {":path", "/"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
+    decoder_->decodeHeaders(std::move(headers), false);
     data.drain(4);
     return Http::okStatus();
   }));
@@ -3376,6 +3396,12 @@ TEST_F(HttpConnectionManagerImplTest, Http10Rejected) {
         EXPECT_EQ("426", headers.getStatusValue());
         EXPECT_EQ("close", headers.getConnectionValue());
       }));
+  // No delay close for HTTP/1.0, even if the request is not complete.
+  // Note there may be more than one close: the important thing is one does not
+  // kick off delay.
+  EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(AnyNumber());
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+      .Times(AnyNumber());
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
