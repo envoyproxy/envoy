@@ -88,17 +88,30 @@ void AdminFilter::onComplete() {
   decoder_callbacks_->encodeHeaders(std::move(header_map), false,
                                     StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
 
-  bool more_data;
-  do {
-    Buffer::OwnedImpl response;
-    more_data = handler_->nextChunk(response);
-    bool end_stream = end_stream_on_complete_ && !more_data;
-    ENVOY_LOG_MISC(error, "nextChunk: response.length={} more_data={} end_stream={}",
-                   response.length(), more_data, end_stream);
-    if (response.length() > 0 || end_stream) {
-      decoder_callbacks_->encodeData(response, end_stream);
-    }
-  } while (more_data);
+  nextChunk();
+}
+
+void AdminFilter::onDecoderFilterAboveWriteBufferLowWatermark() {
+  can_write_ = true;
+  nextChunk();
+}
+
+void AdminFilter::nextChunk() {
+  if (!can_write_ || handler_ == nullptr) {
+    return;
+  }
+
+  Buffer::OwnedImpl response;
+  bool more_data = handler_->nextChunk(response);
+  bool end_stream = end_stream_on_complete_ && !more_data;
+  if (response.length() > 0 || end_stream) {
+    decoder_callbacks_->encodeData(response, end_stream);
+  }
+  if (more_data) {
+    decoder_callbacks_->dispatcher().post([this](){ nextChunk(); });
+  } else {
+    handler_.reset();
+  }
 }
 
 } // namespace Server

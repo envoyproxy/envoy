@@ -53,16 +53,26 @@ public:
     return encoder_callbacks_->http1StreamEncoderOptions();
   }
 
+  void onDecoderFilterAboveWriteBufferLowWatermark();
+  void onDecoderFilterAboveWriteBufferHighWatermark() { can_write_ = false; }
+
 private:
   /**
    * Called when an admin request has been completely received.
    */
   void onComplete();
+
+  /**
+   * Called when the system is ready for admin to write the next chunk.
+   */
+  void nextChunk();
+
   Admin::GenHandlerCb admin_handler_fn_;
   Http::RequestHeaderMap* request_headers_{};
   std::list<std::function<void()>> on_destroy_callbacks_;
   bool end_stream_on_complete_ = true;
   Admin::HandlerPtr handler_;
+  bool can_write_{true};
 };
 
 } // namespace Server
