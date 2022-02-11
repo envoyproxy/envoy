@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
-#include "envoy/extensions/io_socket/user_space/v3/bootstrap.pb.h"
+#include "envoy/extensions/io_socket/user_space/v3/internal_listener.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 
