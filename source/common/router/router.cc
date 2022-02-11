@@ -684,8 +684,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
 
+  conn_pool_new_stream_with_early_data_and_http3_ =
+      Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3);
+  const bool can_send_early_data = conn_pool_new_stream_with_early_data_and_http3_ &&
+                                   Http::Utility::isSafeRequest(*downstream_headers_);
+
   UpstreamRequestPtr upstream_request =
-      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
+      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
+                                        /*can_use_http3=*/true);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
@@ -744,7 +750,10 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
                    (route_entry_ && route_entry_->internalRedirectPolicy().enabled());
   if (buffering &&
       getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
-    // The request is larger than we should buffer. Give up on the retry/shadow
+    ENVOY_LOG(debug,
+              "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
+              "up on the retry/shadow.",
+              getLength(callbacks_->decodingBuffer()) + data.length(), retry_shadow_buffer_limit_);
     cluster_->stats().retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
     buffering = false;
@@ -950,8 +959,13 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
   upstream_request.outlierDetectionTimeoutRecorded(true);
 
   if (!downstream_response_started_ && retry_state_) {
-    RetryStatus retry_status =
-        retry_state_->shouldHedgeRetryPerTryTimeout([this]() -> void { doRetry(); });
+    RetryStatus retry_status = retry_state_->shouldHedgeRetryPerTryTimeout(
+        [this, can_use_http3 = upstream_request.upstreamStreamOptions().can_use_http3_]() -> void {
+          // Without any knowledge about what's going on in the connection pool, retry the request
+          // with the safest settings which is no early data but keep using or not using alt-svc as
+          // before. In this way, QUIC won't be falsely marked as broken.
+          doRetry(/*can_send_early_data*/ false, can_use_http3);
+        });
 
     if (retry_status == RetryStatus::Yes) {
       runRetryOptionsPredicates(upstream_request);
@@ -1101,9 +1115,23 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
   if (downstream_response_started_ || !retry_state_ || upstream_request.retried()) {
     return false;
   }
-
-  const RetryStatus retry_status =
-      retry_state_->shouldRetryReset(reset_reason, [this]() -> void { doRetry(); });
+  RetryState::Http3Used was_using_http3 = RetryState::Http3Used::Unknown;
+  if (conn_pool_new_stream_with_early_data_and_http3_ && upstream_request.hadUpstream()) {
+    was_using_http3 = (upstream_request.streamInfo().protocol().has_value() &&
+                       upstream_request.streamInfo().protocol().value() == Http::Protocol::Http3)
+                          ? RetryState::Http3Used::Yes
+                          : RetryState::Http3Used::No;
+  }
+  const RetryStatus retry_status = retry_state_->shouldRetryReset(
+      reset_reason, was_using_http3,
+      [this, can_send_early_data = upstream_request.upstreamStreamOptions().can_send_early_data_,
+       can_use_http3 =
+           upstream_request.upstreamStreamOptions().can_use_http3_](bool disable_http3) -> void {
+        // This retry might be because of ConnectionFailure of 0-RTT handshake. In this case, though
+        // the original request is retried with the same can_send_early_data setting, it will not be
+        // sent as early data by the underlying connection pool grid.
+        doRetry(can_send_early_data, disable_http3 ? false : can_use_http3);
+      });
   if (retry_status == RetryStatus::Yes) {
     runRetryOptionsPredicates(upstream_request);
     pending_retries_++;
@@ -1165,9 +1193,9 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   const StreamInfo::ResponseFlag response_flags = streamResetReasonToResponseFlag(reset_reason);
 
   const std::string body =
-      absl::StrCat("upstream connect error or disconnect/reset before headers. reset reason: ",
-                   Http::Utility::resetReasonToString(reset_reason),
-
+      absl::StrCat("upstream connect error or disconnect/reset before headers. ",
+                   (is_retry_ ? "retried and the latest " : ""),
+                   "reset reason: ", Http::Utility::resetReasonToString(reset_reason),
                    !transport_failure_reason.empty() ? ", transport failure reason: " : "",
                    transport_failure_reason);
   const std::string& basic_details =
@@ -1328,10 +1356,18 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
       // We already retried this request (presumably for a per try timeout) so
       // we definitely won't retry it again. Check if we would have retried it
       // if we could.
-      could_not_retry = retry_state_->wouldRetryFromHeaders(*headers);
+      bool retry_as_early_data; // Not going to be used as we are not retrying.
+      could_not_retry = retry_state_->wouldRetryFromHeaders(*headers, *downstream_headers_,
+                                                            retry_as_early_data) !=
+                        RetryState::RetryDecision::NoRetry;
     } else {
-      const RetryStatus retry_status =
-          retry_state_->shouldRetryHeaders(*headers, [this]() -> void { doRetry(); });
+      const RetryStatus retry_status = retry_state_->shouldRetryHeaders(
+          *headers, *downstream_headers_,
+          [this, can_use_http3 = upstream_request.upstreamStreamOptions().can_use_http3_,
+           had_early_data = upstream_request.upstreamStreamOptions().can_send_early_data_](
+              bool disable_early_data) -> void {
+            doRetry((disable_early_data ? false : had_early_data), can_use_http3);
+          });
       if (retry_status == RetryStatus::Yes) {
         runRetryOptionsPredicates(upstream_request);
         pending_retries_++;
@@ -1698,7 +1734,7 @@ void Filter::runRetryOptionsPredicates(UpstreamRequest& retriable_request) {
   }
 }
 
-void Filter::doRetry() {
+void Filter::doRetry(bool can_send_early_data, bool can_use_http3) {
   ENVOY_STREAM_LOG(debug, "performing retry", *callbacks_);
 
   is_retry_ = true;
@@ -1720,8 +1756,8 @@ void Filter::doRetry() {
     cleanup();
     return;
   }
-  UpstreamRequestPtr upstream_request =
-      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
+  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
+      *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3);
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
@@ -1778,8 +1814,16 @@ RetryStatePtr ProdFilter::createRetryState(const RetryPolicy& policy,
                                            Random::RandomGenerator& random,
                                            Event::Dispatcher& dispatcher, TimeSource& time_source,
                                            Upstream::ResourcePriority priority) {
-  return RetryStateImpl::create(policy, request_headers, cluster, vcluster, runtime, random,
-                                dispatcher, time_source, priority);
+  std::unique_ptr<RetryStateImpl> retry_state =
+      RetryStateImpl::create(policy, request_headers, cluster, vcluster, runtime, random,
+                             dispatcher, time_source, priority);
+  if (retry_state != nullptr && retry_state->isAutomaticallyConfiguredForHttp3()) {
+    // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the
+    // only reason for doing retry, set the retry shadow buffer limit to 0 so that we don't retry or
+    // buffer safe requests with body which is not common.
+    setRetryShadownBufferLimit(0);
+  }
+  return retry_state;
 }
 
 } // namespace Router
