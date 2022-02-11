@@ -64,7 +64,7 @@ export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:${IMAGE_ID}"
 time docker pull "${ENVOY_BUILD_IMAGE}"
 
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
-docker run --rm --privileged \
+docker run --rm \
        "${ENVOY_DOCKER_OPTIONS[@]}" \
        -v "${ENVOY_DOCKER_BUILD_DIR}":"${BUILD_DIR_MOUNT_DEST}" \
        -v "${SOURCE_DIR}":"${SOURCE_DIR_MOUNT_DEST}" \
