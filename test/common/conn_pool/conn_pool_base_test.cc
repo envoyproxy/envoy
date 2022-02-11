@@ -511,7 +511,7 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredLocalClose) {
   pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 }
 
-TEST_F(ConnPoolImplDispatcherBaseTest, onEnlistedFailed) {
+TEST_F(ConnPoolImplDispatcherBaseTest, OnEnlistedFailed) {
   // Create a new stream using the pool.
   newConnectingClient();
   // Limit the new connection capacity to 1 stream.
