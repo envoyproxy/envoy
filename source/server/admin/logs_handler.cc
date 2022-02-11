@@ -7,6 +7,8 @@
 #include "source/common/common/utility.h"
 #include "source/server/admin/utils.h"
 
+#include "absl/strings/str_split.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -58,23 +60,19 @@ bool LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params) {
     return false;
   }
 
-  std::string key = params.begin()->first;
-  std::string value = params.begin()->second;
+  const auto it = params.begin();
+  std::string_view key = it->first;
+  std::string_view value = it->secondn;
 
   if (key == "paths") {
     // Bulk change log level by name:level pairs
+    std::vector<absl::string_view> pairs = absl::StrSplit(value, ',', absl::SkipWhitespace());
     bool ret = true;
-    auto pairs = StringUtil::splitToken(value, ",", /*keep_empty_string=*/false,
-                                        /*trim_whitespace=*/true);
-    for (const auto& s : pairs) {
-      size_t colon_index = s.find(':');
-      if (colon_index == absl::string_view::npos) {
-        continue;
-      }
+    for (const auto& name_value : pairs) {
+      std::pair<absl::string_view, absl::string_view> name_value_pair = absl::StrSplit(
+          name_value, absl::MaxSplits(':', 1), absl::SkipWhitespace());
 
-      std::string name(s.substr(0, colon_index));
-      std::string level(s.substr(colon_index + 1));
-      ret = changeLogLevelByName(name, level) && ret;
+      ret = changeLogLevelByName(name_value_pair.first, name_value_pair.second) && ret;
     }
 
     return ret;
@@ -87,9 +85,10 @@ bool LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params) {
   }
 }
 
-static bool parseLevel(const std::string& level, spdlog::level::level_enum& level_to_use) {
+static bool parseLevel(absl::string_view level, spdlog::level::level_enum& level_to_use) {
+  std::string_view level_string_view = toStdStringView(level);
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-    if (level == spdlog::level::level_string_views[i]) {
+    if (level_string_view == spdlog::level::level_string_views[i]) {
       level_to_use = static_cast<spdlog::level::level_enum>(i);
       return true;
     }
@@ -98,7 +97,7 @@ static bool parseLevel(const std::string& level, spdlog::level::level_enum& leve
   return false;
 }
 
-bool LogsHandler::changeAllLogLevels(const std::string& level) {
+bool LogsHandler::changeAllLogLevels(absl::string_view level) {
   spdlog::level::level_enum level_to_use;
   if (!parseLevel(level, level_to_use)) {
     return false;
@@ -118,7 +117,7 @@ bool LogsHandler::changeAllLogLevels(const std::string& level) {
   return true;
 }
 
-bool LogsHandler::changeLogLevelByName(const std::string& name, const std::string& level) {
+bool LogsHandler::changeLogLevelByName(absl::string_view name, absl::string_view level) {
   spdlog::level::level_enum level_to_use;
   if (!parseLevel(level, level_to_use)) {
     return false;
