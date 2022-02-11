@@ -538,13 +538,9 @@ def _com_github_nlohmann_json():
     )
 
 def _com_github_nodejs_http_parser():
-    external_http_archive(
-        name = "com_github_nodejs_http_parser",
-        build_file = "@envoy//bazel/external:http-parser.BUILD",
-    )
     native.bind(
         name = "http_parser",
-        actual = "@com_github_nodejs_http_parser//:http_parser",
+        actual = "@envoy//bazel/external/http_parser",
     )
 
 def _com_github_alibaba_hessian2_codec():
