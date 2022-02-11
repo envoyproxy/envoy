@@ -820,7 +820,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
   filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
                         StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
-  EXPECT_EQ("test_value", filter_state->getDataReadOnly<StringAccessor>("testing").asString());
+  EXPECT_EQ("test_value", filter_state->getDataReadOnly<StringAccessor>("testing")->asString());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
@@ -828,7 +828,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
 
   testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "test_value");
   testFormatting(stream_info, "PER_REQUEST_STATE(testing2)", "");
-  EXPECT_EQ("test_value", filter_state->getDataReadOnly<StringAccessor>("testing").asString());
+  EXPECT_EQ("test_value", filter_state->getDataReadOnly<StringAccessor>("testing")->asString());
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVariable) {
@@ -838,7 +838,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVari
   filter_state->setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1),
                         StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
-  EXPECT_EQ(1, filter_state->getDataReadOnly<StreamInfo::TestIntAccessor>("testing").access());
+  EXPECT_EQ(1, filter_state->getDataReadOnly<StreamInfo::TestIntAccessor>("testing")->access());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));

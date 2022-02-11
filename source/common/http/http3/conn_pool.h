@@ -125,6 +125,9 @@ public:
                     TimeSource& time_source, OptRef<PoolConnectResultCallback> connect_callback);
 
   ~Http3ConnPoolImpl() override;
+  ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
+                                         ConnectionPool::Callbacks& callbacks,
+                                         const Instance::StreamOptions& options) override;
 
   // Set relevant fields in quic_config based on the cluster configuration
   // supplied in cluster.

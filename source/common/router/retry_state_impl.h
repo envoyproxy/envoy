@@ -25,12 +25,11 @@ namespace Router {
  */
 class RetryStateImpl : public RetryState {
 public:
-  static RetryStatePtr create(const RetryPolicy& route_policy,
-                              Http::RequestHeaderMap& request_headers,
-                              const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                              Runtime::Loader& runtime, Random::RandomGenerator& random,
-                              Event::Dispatcher& dispatcher, TimeSource& time_source,
-                              Upstream::ResourcePriority priority);
+  static std::unique_ptr<RetryStateImpl>
+  create(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
+         const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
+         Runtime::Loader& runtime, Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+         TimeSource& time_source, Upstream::ResourcePriority priority);
   ~RetryStateImpl() override;
 
   /**
@@ -56,12 +55,15 @@ public:
   absl::optional<std::chrono::milliseconds>
   parseResetInterval(const Http::ResponseHeaderMap& response_headers) const override;
   RetryStatus shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
-                                 DoRetryCallback callback) override;
-  // Returns true if the retry policy would retry the passed headers. Does not
+                                 const Http::RequestHeaderMap& original_request,
+                                 DoRetryHeaderCallback callback) override;
+  // Returns if the retry policy would retry the passed headers and how. Does not
   // take into account circuit breaking or remaining tries.
-  bool wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) override;
-  RetryStatus shouldRetryReset(const Http::StreamResetReason reset_reason,
-                               DoRetryCallback callback) override;
+  RetryDecision wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers,
+                                      const Http::RequestHeaderMap& original_request,
+                                      bool& disable_early_data) override;
+  RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason, Http3Used http3_used,
+                               DoRetryResetCallback callback) override;
   RetryStatus shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) override;
 
   void onHostAttempted(Upstream::HostDescriptionConstSharedPtr host) override {
@@ -91,17 +93,25 @@ public:
 
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
 
+  bool isAutomaticallyConfiguredForHttp3() const { return auto_configured_for_http3_; }
+
 private:
   RetryStateImpl(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
                  const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
                  Runtime::Loader& runtime, Random::RandomGenerator& random,
                  Event::Dispatcher& dispatcher, TimeSource& time_source,
-                 Upstream::ResourcePriority priority);
+                 Upstream::ResourcePriority priority, bool auto_configured_for_http3,
+                 bool conn_pool_new_stream_with_early_data_and_http3);
 
   void enableBackoffTimer();
   void resetRetry();
-  bool wouldRetryFromReset(const Http::StreamResetReason reset_reason);
-  RetryStatus shouldRetry(bool would_retry, DoRetryCallback callback);
+  // Returns if the retry policy would retry the reset and how. Does not
+  // take into account circuit breaking or remaining tries.
+  // disable_http3: populated to tell the caller whether to disable http3 or not when the return
+  // value indicates retry.
+  RetryDecision wouldRetryFromReset(const Http::StreamResetReason reset_reason,
+                                    Http3Used http3_used, bool& disable_http3);
+  RetryStatus shouldRetry(RetryDecision would_retry, DoRetryCallback callback);
 
   const Upstream::ClusterInfo& cluster_;
   const VirtualCluster* vcluster_;
@@ -111,7 +121,8 @@ private:
   TimeSource& time_source_;
   uint32_t retry_on_{};
   uint32_t retries_remaining_{};
-  DoRetryCallback callback_;
+  DoRetryCallback backoff_callback_;
+  Event::SchedulableCallbackPtr next_loop_callback_;
   Event::TimerPtr retry_timer_;
   Upstream::ResourcePriority priority_;
   BackOffStrategyPtr backoff_strategy_;
@@ -123,6 +134,8 @@ private:
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
   std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
   std::chrono::milliseconds reset_max_interval_{};
+  const bool auto_configured_for_http3_{};
+  const bool conn_pool_new_stream_with_early_data_and_http3_{};
 };
 
 } // namespace Router
