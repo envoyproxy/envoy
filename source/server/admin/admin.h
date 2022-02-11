@@ -208,10 +208,9 @@ public:
     };
   }
   AdminFilter::AdminServerCallbackFunction createCallbackFunction() {
-    return [this](absl::string_view path_and_query, Http::ResponseHeaderMap&,
-                  Buffer::OwnedImpl&, AdminFilter& filter) -> HandlerPtr {
-      return findHandler(path_and_query, filter);
-    };
+    return
+        [this](absl::string_view path_and_query, Http::ResponseHeaderMap&, Buffer::OwnedImpl&,
+               AdminFilter& filter) -> HandlerPtr { return findHandler(path_and_query, filter); };
   }
 
   uint64_t maxRequestsPerConnection() const override { return 0; }

@@ -10,7 +10,7 @@ AdminFilter::AdminFilter(Admin::GenHandlerCb admin_handler_fn)
 
 Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                      bool end_stream) {
-  //ENVOY_LOG_MISC(error, "decodeHeaders({})", end_stream);
+  // ENVOY_LOG_MISC(error, "decodeHeaders({})", end_stream);
   request_headers_ = &headers;
   if (end_stream) {
     onComplete();
@@ -19,7 +19,6 @@ Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::RequestHeaderMap& hea
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-#if 1
 Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance& data, bool end_stream) {
   // Currently we generically buffer all admin request data in case a handler wants to use it.
   // If we ever support streaming admin requests we may need to revisit this. Note, we must use
@@ -33,18 +32,6 @@ Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance& data, bool end_
 
   return Http::FilterDataStatus::StopIterationNoBuffer;
 }
-
-#else
-
-Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance& data, bool end_stream) {
-  //ENVOY_LOG_MISC(error, "decodeData({})", end_stream);
-  ASSERT(handler_ != nullptr);
-  if (handler_->nextChunk(data)) {
-    return Http::FilterDataStatus::Continue;
-  }
-  return Http::FilterDataStatus::StopIterationNoBuffer;
-}
-#endif
 
 Http::FilterTrailersStatus AdminFilter::decodeTrailers(Http::RequestTrailerMap&) {
   onComplete();
@@ -75,8 +62,9 @@ const Http::RequestHeaderMap& AdminFilter::getRequestHeaders() const {
   return *request_headers_;
 }
 
-
 void AdminFilter::onComplete() {
+  decoder_callbacks_->addDownstreamWatermarkCallbacks(watermark_callbacks_);
+
   const absl::string_view path = request_headers_->getPathValue();
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *decoder_callbacks_, path);
 
@@ -88,11 +76,6 @@ void AdminFilter::onComplete() {
   decoder_callbacks_->encodeHeaders(std::move(header_map), false,
                                     StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
 
-  nextChunk();
-}
-
-void AdminFilter::onDecoderFilterAboveWriteBufferLowWatermark() {
-  can_write_ = true;
   nextChunk();
 }
 
@@ -108,7 +91,7 @@ void AdminFilter::nextChunk() {
     decoder_callbacks_->encodeData(response, end_stream);
   }
   if (more_data) {
-    decoder_callbacks_->dispatcher().post([this](){ nextChunk(); });
+    decoder_callbacks_->dispatcher().post([this]() { nextChunk(); });
   } else {
     handler_.reset();
   }

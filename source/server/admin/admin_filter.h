@@ -28,6 +28,20 @@ public:
       absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
       Buffer::OwnedImpl& response, AdminFilter& filter)>;
 
+  class WatermarkCallbacks : public Http::DownstreamWatermarkCallbacks {
+  public:
+    WatermarkCallbacks(AdminFilter& filter) : filter_(filter) {}
+    virtual ~WatermarkCallbacks() = default;
+    void onAboveWriteBufferHighWatermark() override { filter_.can_write_ = false; }
+    void onBelowWriteBufferLowWatermark() override {
+      filter_.can_write_ = true;
+      filter_.nextChunk();
+    }
+
+  private:
+    AdminFilter& filter_;
+  };
+
   AdminFilter(Admin::GenHandlerCb admin_handler_func);
 
   // Http::StreamFilterBase
@@ -40,7 +54,6 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  //Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
 
   // AdminStream
@@ -52,9 +65,6 @@ public:
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
     return encoder_callbacks_->http1StreamEncoderOptions();
   }
-
-  void onDecoderFilterAboveWriteBufferLowWatermark();
-  void onDecoderFilterAboveWriteBufferHighWatermark() { can_write_ = false; }
 
 private:
   /**
@@ -73,6 +83,7 @@ private:
   bool end_stream_on_complete_ = true;
   Admin::HandlerPtr handler_;
   bool can_write_{true};
+  WatermarkCallbacks watermark_callbacks_{*this};
 };
 
 } // namespace Server
