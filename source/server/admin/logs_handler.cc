@@ -61,18 +61,25 @@ bool LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params) {
   }
 
   const auto it = params.begin();
-  std::string_view key = it->first;
-  std::string_view value = it->secondn;
+  absl::string_view key = it->first;
+  absl::string_view value = it->secondn;
 
   if (key == "paths") {
     // Bulk change log level by name:level pairs
     std::vector<absl::string_view> pairs = absl::StrSplit(value, ',', absl::SkipWhitespace());
     bool ret = true;
     for (const auto& name_value : pairs) {
-      std::pair<absl::string_view, absl::string_view> name_value_pair = absl::StrSplit(
-          name_value, absl::MaxSplits(':', 1), absl::SkipWhitespace());
+      std::pair<absl::string_view, absl::string_view> name_value_pair =
+          absl::StrSplit(name_value, absl::MaxSplits(':', 1), absl::SkipWhitespace());
 
-      ret = changeLogLevelByName(name_value_pair.first, name_value_pair.second) && ret;
+      auto name = name_value_pair.first;
+      auto value = name_value_pair.second;
+
+      if (name.empty() || value.empty()) {
+        continue;
+      }
+
+      ret = changeLogLevelByName(name, value) && ret;
     }
 
     return ret;
