@@ -210,7 +210,7 @@ stages:
   - job: release
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-20.04"
+      vmImage: "ubuntu-18.04"
     steps:
     - template: bazel.yml
       parameters:
@@ -259,7 +259,7 @@ stages:
           CI_TARGET: "bazel.compile_time_options"
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-20.04"
+      vmImage: "ubuntu-18.04"
     steps:
     - template: bazel.yml
       parameters:
