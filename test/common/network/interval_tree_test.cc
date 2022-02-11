@@ -29,7 +29,7 @@ public:
         expected.push_back(label);
       }
     }
-    auto result = tree_->search(i);
+    auto result = tree_->getData(i);
     ASSERT_THAT(result, ::testing::ElementsAreArray(expected));
   }
   void checkAll(int32_t n) {
@@ -58,6 +58,8 @@ TEST_F(IntervalTreeTest, Nested) {
   setup({{0, 10}, {1, 9}, {2, 8}, {3, 7}, {4, 6}});
   checkAll(10);
   setup({{4, 6}, {3, 7}, {2, 8}, {1, 9}, {0, 10}});
+  checkAll(10);
+  setup({{1, 9}, {4, 6}, {0, 10}, {3, 7}, {2, 8}});
   checkAll(10);
 }
 

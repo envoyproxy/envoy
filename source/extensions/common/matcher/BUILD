@@ -35,3 +35,18 @@ envoy_cc_library(
         "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "range_matcher_lib",
+    srcs = ["range_matcher.cc"],
+    hdrs = ["range_matcher.h"],
+    deps = [
+        "//envoy/matcher:matcher_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:factory_context_interface",
+        "//source/common/matcher:matcher_lib",
+        "//source/common/network:interval_tree_lib",
+        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
+    ],
+)

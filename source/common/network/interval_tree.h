@@ -17,12 +17,12 @@ namespace IntervalTree {
 template <class Data, class N> class IntervalTree {
 public:
   /**
-   * @param data supplies a vector of data and possibly overlapping number intervals.
+   * @param data supplies a list of data and possibly overlapping number intervals [start, end).
    */
   IntervalTree(const std::vector<std::tuple<Data, N, N>>& data) {
     ASSERT(!data.empty(), "Must supply non-empty list.");
     // Create a scaffold tree from medians in the set of all start
-    // and end points of the intervals.
+    // and end points of the intervals to ensure the tree is balanced.
     std::vector<N> medians;
     medians.reserve(data.size() * 2);
     for (const auto [_, start, end] : data) {
@@ -32,19 +32,22 @@ public:
     }
     std::sort(medians.begin(), medians.end());
     root_ = std::make_unique<Node>();
-    populateNodes(root_.get(), medians);
+    root_->populate(medians);
     size_t rank = 0;
+    // Insert intervals and recursively prune and order intervals in each node.
     for (const auto& datum : data) {
-      insertInterval(datum, rank++, root_.get());
+      root_->insert(datum, rank++);
     }
-    root_->prune();
+    root_->pruneAndOrder();
   }
-  std::string asString() { return root_->asString(); }
-  std::vector<Data> search(N query) {
+  /**
+   * Returns the data of intervals containing the query number in the original list order.
+   **/
+  std::vector<Data> getData(N query) {
     std::vector<RankedInterval*> result;
     root_->search(query, result);
     std::sort(result.begin(), result.end(),
-              [](auto* lhs, auto* rhs) { return lhs->rank_ < rhs->rank_; });
+              [](const auto* lhs, const auto* rhs) { return lhs->rank_ < rhs->rank_; });
     std::vector<Data> out;
     out.reserve(result.size());
     for (auto* elt : result) {
@@ -63,9 +66,18 @@ private:
     size_t rank_;
     N start_;
     N end_;
+    // Intervals are linked in their increasing start order and decreasing end order.
     RankedInterval* next_start_{nullptr};
     RankedInterval* next_end_{nullptr};
   };
+  /**
+   * Nodes in the tree satisfy the following invariants:
+   * * Intervals in the node contain the median value.
+   * * Intervals in the left sub tree have the end less or equal to the median value.
+   * * Intervals in the right sub tree have the start greater than the median value.
+   * * Intervals in the node are linked from the lowest start in the ascending order.
+   * * Intervals in the node are linked from the highest end in the descending order.
+   **/
   struct Node {
     N median_;
     std::unique_ptr<Node> left_;
@@ -77,21 +89,51 @@ private:
     // Interval with the highest end.
     RankedInterval* high_end_;
 
-    std::string asString() {
-      return absl::StrCat(median_, "=", intervals_.size(), " (", left_ ? left_->asString() : "",
-                          ") [", right_ ? right_->asString() : "", "]");
+    void populate(absl::Span<const N> span) {
+      const size_t size = span.size();
+      const size_t mid = size >> 1;
+      median_ = span[mid];
+      // Last value equal to median on the left.
+      size_t left = mid;
+      while (left > 0 && span[left - 1] == median_) {
+        left--;
+      }
+      if (left > 0) {
+        left_ = std::make_unique<Node>();
+        left_->populate(span.subspan(0, left));
+      }
+      // Last value equal to median on the right.
+      size_t right = mid;
+      while (right < size - 1 && span[right + 1] == median_) {
+        right++;
+      }
+      if (right < size - 1) {
+        right_ = std::make_unique<Node>();
+        right_->populate(span.subspan(right + 1));
+      }
     }
-    bool prune() {
+    void insert(const Interval& datum, size_t rank) {
+      N start = std::get<1>(datum);
+      N end = std::get<2>(datum);
+      if (end <= median_) {
+        left_->insert(datum, rank);
+      } else if (median_ < start) {
+        right_->insert(datum, rank);
+      } else {
+        intervals_.emplace_back(datum, rank);
+      }
+    }
+    bool pruneAndOrder() {
       bool left_empty = true;
       if (left_) {
-        left_empty = left_->prune();
+        left_empty = left_->pruneAndOrder();
         if (left_empty) {
           left_ = nullptr;
         }
       }
       bool right_empty = true;
       if (right_) {
-        right_empty = right_->prune();
+        right_empty = right_->pruneAndOrder();
         if (right_empty) {
           right_ = nullptr;
         }
@@ -110,7 +152,7 @@ private:
         sorted.push_back(&elt);
       }
       std::sort(sorted.begin(), sorted.end(),
-                [](auto* lhs, auto* rhs) { return lhs->start_ < rhs->start_; });
+                [](const auto* lhs, const auto* rhs) { return lhs->start_ < rhs->start_; });
       for (size_t i = 0; i < sorted.size() - 1; i++) {
         sorted[i]->next_start_ = sorted[i + 1];
       }
@@ -123,7 +165,7 @@ private:
         sorted.push_back(&elt);
       }
       std::sort(sorted.begin(), sorted.end(),
-                [](auto* lhs, auto* rhs) { return lhs->end_ > rhs->end_; });
+                [](const auto* lhs, const auto* rhs) { return lhs->end_ > rhs->end_; });
       for (size_t i = 0; i < sorted.size() - 1; i++) {
         sorted[i]->next_end_ = sorted[i + 1];
       }
@@ -154,43 +196,6 @@ private:
   };
   using NodePtr = std::unique_ptr<Node>;
   NodePtr root_;
-
-  void populateNodes(Node* node, absl::Span<const N> span) {
-    const size_t size = span.size();
-    const size_t mid = size >> 1;
-    node->median_ = span[mid];
-
-    // Last value equal to median on the left.
-    size_t left = mid;
-    while (left > 0 && span[left - 1] == node->median_) {
-      left--;
-    }
-    if (left > 0) {
-      node->left_ = std::make_unique<Node>();
-      populateNodes(node->left_.get(), span.subspan(0, left));
-    }
-    // Last value equal to median on the right.
-    size_t right = mid;
-    while (right < size - 1 && span[right + 1] == node->median_) {
-      right++;
-    }
-    if (right < size - 1) {
-      node->right_ = std::make_unique<Node>();
-      populateNodes(node->right_.get(), span.subspan(right + 1));
-    }
-  }
-
-  void insertInterval(const Interval& datum, size_t rank, Node* node) {
-    N start = std::get<1>(datum);
-    N end = std::get<2>(datum);
-    if (end <= node->median_) {
-      insertInterval(datum, rank, node->left_.get());
-    } else if (node->median_ < start) {
-      insertInterval(datum, rank, node->right_.get());
-    } else {
-      node->intervals_.emplace_back(datum, rank);
-    }
-  }
 };
 
 } // namespace IntervalTree
