@@ -151,6 +151,23 @@ typed_config:
   void testConnectionTiming(IntegrationStreamDecoderPtr& response, bool cached_dns,
                             int64_t original_usec);
 
+  // Send bidirectional data for CONNECT termination with dynamic forward proxy test.
+  void sendBidirectionalData(FakeRawConnectionPtr& fake_raw_upstream_connection,
+                             IntegrationStreamDecoderPtr& response,
+                             const char* downstream_send_data = "hello",
+                             const char* upstream_received_data = "hello",
+                             const char* upstream_send_data = "there!",
+                             const char* downstream_received_data = "there!") {
+    // Send some data upstream.
+    codec_client_->sendData(*request_encoder_, downstream_send_data, false);
+    ASSERT_TRUE(fake_raw_upstream_connection->waitForData(
+        FakeRawConnection::waitForInexactMatch(upstream_received_data)));
+    // Send some data downstream.
+    ASSERT_TRUE(fake_raw_upstream_connection->write(upstream_send_data));
+    response->waitForBodyData(strlen(downstream_received_data));
+    EXPECT_EQ(downstream_received_data, response->body());
+  }
+
   bool upstream_tls_{};
   std::string upstream_cert_name_{"upstreamlocalhost"};
   CdsHelper cds_helper_;
@@ -577,23 +594,6 @@ TEST_P(ProxyFilterIntegrationTest, MultipleRequestsLowStreamLimit) {
   EXPECT_EQ("200", response2->headers().getStatusValue());
 }
 
-// The utility function to send bidirectional data used by
-// below 'CONNECT termination + dynamic forward proxy' test.
-void sendBidirectionalData(
-    IntegrationCodecClientPtr& codec_client, Http::RequestEncoder& request_encoder,
-    FakeRawConnectionPtr& fake_raw_upstream_connection, IntegrationStreamDecoderPtr& response,
-    const char* downstream_send_data = "hello", const char* upstream_received_data = "hello",
-    const char* upstream_send_data = "there!", const char* downstream_received_data = "there!") {
-  // Send some data upstream.
-  codec_client->sendData(request_encoder, downstream_send_data, false);
-  ASSERT_TRUE(fake_raw_upstream_connection->waitForData(
-      FakeRawConnection::waitForInexactMatch(upstream_received_data)));
-  // Send some data downstream.
-  ASSERT_TRUE(fake_raw_upstream_connection->write(upstream_send_data));
-  response->waitForBodyData(strlen(downstream_received_data));
-  EXPECT_EQ(downstream_received_data, response->body());
-}
-
 // Test Envoy CONNECT request termination works with dynamic forward proxy config.
 TEST_P(ProxyFilterIntegrationTest, ConnectRequestWithDFPConfig) {
   config_helper_.addConfigModifier(
@@ -618,11 +618,11 @@ TEST_P(ProxyFilterIntegrationTest, ConnectRequestWithDFPConfig) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection));
   response->waitForHeaders();
 
-  sendBidirectionalData(codec_client_, *request_encoder_, fake_raw_upstream_connection, response,
-                        "hello", "hello", "there!", "there!");
+  sendBidirectionalData(fake_raw_upstream_connection, response, "hello", "hello", "there!",
+                        "there!");
   // Send a second set of data to make sure for example headers are only sent once.
-  sendBidirectionalData(codec_client_, *request_encoder_, fake_raw_upstream_connection, response,
-                        ",bye", "hello,bye", "ack", "there!ack");
+  sendBidirectionalData(fake_raw_upstream_connection, response, ",bye", "hello,bye", "ack",
+                        "there!ack");
 
   // Send an end stream. This should result in half close upstream.
   codec_client_->sendData(*request_encoder_, "", true);
