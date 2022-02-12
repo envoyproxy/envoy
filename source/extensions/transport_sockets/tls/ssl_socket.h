@@ -107,7 +107,6 @@ private:
   SslHandshakerImplSharedPtr info_;
   Envoy::Ssl::ContextConfigPtr config_;
   bool enable_tls_keylog_;
-  BIO* bio_keylog_;
 };
 
 class ClientSslSocketFactory : public Network::CommonTransportSocketFactory,
