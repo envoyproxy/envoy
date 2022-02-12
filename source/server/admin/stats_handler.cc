@@ -235,16 +235,15 @@ private:
 
 class StatsHandler::Context : public Admin::Handler {
   using ScopeVec = std::vector<Stats::ConstScopeSharedPtr>;
-  using StatOrScopes =
-      absl::variant<ScopeVec, Stats::TextReadoutSharedPtr, Stats::CounterSharedPtr,
-      Stats::GaugeSharedPtr, Stats::HistogramSharedPtr>;
+  using StatOrScopes = absl::variant<ScopeVec, Stats::TextReadoutSharedPtr, Stats::CounterSharedPtr,
+                                     Stats::GaugeSharedPtr, Stats::HistogramSharedPtr>;
   enum class Phase {
     TextReadouts,
     CountersAndGauges,
     Histograms,
   };
 
- public:
+public:
   Context(Server::Instance& server, bool used_only, bool json, absl::optional<std::regex> regex)
       : used_only_(used_only), json_(json), regex_(regex), stats_(server.stats()) {}
 
@@ -277,17 +276,17 @@ class StatsHandler::Context : public Admin::Handler {
     while (!render_->nextChunk(response)) {
       while (stat_map_.empty()) {
         switch (phase_) {
-          case Phase::TextReadouts:
-            phase_ = Phase::CountersAndGauges;
-            startPhase();
-            break;
-          case Phase::CountersAndGauges:
-            phase_ = Phase::Histograms;
-            startPhase();
-            break;
-          case Phase::Histograms:
-            render_->render(response);
-            return false;
+        case Phase::TextReadouts:
+          phase_ = Phase::CountersAndGauges;
+          startPhase();
+          break;
+        case Phase::CountersAndGauges:
+          phase_ = Phase::Histograms;
+          startPhase();
+          break;
+        case Phase::Histograms:
+          render_->render(response);
+          return false;
         }
       }
 
@@ -295,27 +294,27 @@ class StatsHandler::Context : public Admin::Handler {
       const std::string& name = iter->first;
       StatOrScopes& variant = iter->second;
       switch (variant.index()) {
-        case 0:
-          populateStatsForCurrentPhase(absl::get<ScopeVec>(variant));
-          break;
-        case 1:
-          renderStat<Stats::TextReadoutSharedPtr>(name, response, variant);
-          break;
-        case 2:
-          renderStat<Stats::CounterSharedPtr>(name, response, variant);
-          break;
-        case 3:
-          renderStat<Stats::GaugeSharedPtr>(name, response, variant);
-          break;
-        case 4: {
-          auto histogram = absl::get<Stats::HistogramSharedPtr>(variant);
-          if (!skip(histogram, name)) {
-            auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
-            if (parent_histogram != nullptr) {
-              render_->generate(response, name, *parent_histogram);
-            }
+      case 0:
+        populateStatsForCurrentPhase(absl::get<ScopeVec>(variant));
+        break;
+      case 1:
+        renderStat<Stats::TextReadoutSharedPtr>(name, response, variant);
+        break;
+      case 2:
+        renderStat<Stats::CounterSharedPtr>(name, response, variant);
+        break;
+      case 3:
+        renderStat<Stats::GaugeSharedPtr>(name, response, variant);
+        break;
+      case 4: {
+        auto histogram = absl::get<Stats::HistogramSharedPtr>(variant);
+        if (!skip(histogram, name)) {
+          auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
+          if (parent_histogram != nullptr) {
+            render_->generate(response, name, *parent_histogram);
           }
         }
+      }
       }
       stat_map_.erase(iter);
     }
@@ -346,11 +345,50 @@ class StatsHandler::Context : public Admin::Handler {
     return StatsHandler::shouldShowMetric(stat, used_only_, regex_);
   }
 
-  void populateStatsForCurrentPhase(const ScopeVec& scope_vec);
-  template <class StatType> void populateStatsFromScopes(const ScopeVec& scope);
+  void populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
+    switch (phase_) {
+    case Phase::TextReadouts:
+      populateStatsFromScopes<Stats::TextReadout>(scope_vec);
+      break;
+    case Phase::CountersAndGauges:
+      populateStatsFromScopes<Stats::Counter>(scope_vec);
+      populateStatsFromScopes<Stats::Gauge>(scope_vec);
+      break;
+    case Phase::Histograms:
+      populateStatsFromScopes<Stats::Histogram>(scope_vec);
+      break;
+    }
+  }
+
+  template <class StatType> void populateStatsFromScopes(const ScopeVec& scope_vec) {
+    for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
+      Stats::IterateFn<StatType> fn = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
+        stat_map_[stat->name()] = stat;
+        return true;
+      };
+      scope->iterate(fn);
+    }
+  }
+
   template <class SharedStatType>
-      void renderStat(const std::string& name, Buffer::Instance& response, StatOrScopes& variant);
-  template <class SharedStatType> bool skip(const SharedStatType& stat, const std::string& name);
+  void renderStat(const std::string& name, Buffer::Instance& response, StatOrScopes& variant) {
+    auto stat = absl::get<SharedStatType>(variant);
+    if (skip(stat, name)) {
+      return;
+    }
+    render_->generate(response, name, stat->value());
+  }
+
+  template <class SharedStatType> bool skip(const SharedStatType& stat, const std::string& name) {
+    if (used_only_ && !stat->used()) {
+      return true;
+    }
+    if (regex_.has_value() && !std::regex_search(name, regex_.value())) {
+      return true;
+    }
+    return false;
+  }
+
   const bool used_only_;
   const bool json_;
   absl::optional<std::regex> regex_;
@@ -399,102 +437,6 @@ Admin::HandlerPtr StatsHandler::makeContext(absl::string_view path, AdminStream&
   }
 
   return std::make_unique<Context>(server_, used_only, json, regex);
-}
-
-#if 0
-Http::Code StatsHandler::handlerStats(absl::string_view url,
-                                      Http::ResponseHeaderMap& response_headers,
-                                      Buffer::Instance& response, AdminStream& admin_stream) {
-  if (server_.statsConfig().flushOnAdmin()) {
-    server_.flushStats();
-  }
-
-  const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(url);
-
-  const bool used_only = params.find("usedonly") != params.end();
-  absl::optional<std::regex> regex;
-  if (!Utility::filterParam(params, response, regex)) {
-    return Http::Code::BadRequest;
-  }
-
-  const absl::optional<std::string> format_value = Utility::formatParam(params);
-  bool json = false;
-  if (format_value.has_value()) {
-    if (format_value.value() == "prometheus") {
-      return handlerPrometheusStats(url, response_headers, response, admin_stream);
-    }
-    if (format_value.value() == "json") {
-      json = true;
-    } else {
-      response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
-      response.add("\n");
-      return Http::Code::BadRequest;
-    }
-  }
-
-  auto iter = context_map_.find(&admin_stream);
-  if (iter == context_map_.end()) {
-    auto insertion = context_map_.emplace(
-        &admin_stream,
-        std::make_unique<Context>(server_, used_only, regex, json, response_headers, response));
-    iter = insertion.first;
-  }
-  Context& context = *iter->second;
-
-  Http::Code code = context.eChunk(response);
-  if (code != Http::Code::Continue) {
-    context_map_.erase(iter);
-  }
-
-  return code;
-}
-#endif
-
-void StatsHandler::Context::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
-  switch (phase_) {
-  case Phase::TextReadouts:
-    populateStatsFromScopes<Stats::TextReadout>(scope_vec);
-    break;
-  case Phase::CountersAndGauges:
-    populateStatsFromScopes<Stats::Counter>(scope_vec);
-    populateStatsFromScopes<Stats::Gauge>(scope_vec);
-    break;
-  case Phase::Histograms:
-    populateStatsFromScopes<Stats::Histogram>(scope_vec);
-    break;
-  }
-}
-
-template <class StatType>
-void StatsHandler::Context::populateStatsFromScopes(const ScopeVec& scope_vec) {
-  for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
-    Stats::IterateFn<StatType> fn = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
-      stat_map_[stat->name()] = stat;
-      return true;
-    };
-    scope->iterate(fn);
-  }
-}
-
-template <class SharedStatType>
-void StatsHandler::Context::renderStat(const std::string& name, Buffer::Instance& response,
-                                       StatOrScopes& variant) {
-  auto stat = absl::get<SharedStatType>(variant);
-  if (skip(stat, name)) {
-    return;
-  }
-  render_->generate(response, name, stat->value());
-}
-
-template <class SharedStatType>
-bool StatsHandler::Context::skip(const SharedStatType& stat, const std::string& name) {
-  if (used_only_ && !stat->used()) {
-    return true;
-  }
-  if (regex_.has_value() && !std::regex_search(name, regex_.value())) {
-    return true;
-  }
-  return false;
 }
 
 #if 0

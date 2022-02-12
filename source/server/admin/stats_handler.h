@@ -58,7 +58,6 @@ public:
   class Render;
   class TextRender;
   class Context;
-  using ContextPtr = std::unique_ptr<Context>;
 
 private:
   template <class StatType>
