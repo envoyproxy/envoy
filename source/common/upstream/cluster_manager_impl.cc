@@ -1830,8 +1830,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
-        transport_socket_options, state, source, alternate_protocols_cache,
-        std::chrono::milliseconds(300), coptions, quic_stat_names_, stats_);
+        transport_socket_options, state, source, alternate_protocols_cache, coptions,
+        quic_stat_names_, stats_);
 #else
     // Should be blocked by configuration checking at an earlier point.
     PANIC("unexpected");
