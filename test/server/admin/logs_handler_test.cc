@@ -30,7 +30,7 @@ TEST_P(AdminInstanceTest, LogLevelSetting) {
   postCallback("/logging", header_map, response);
   FANCY_LOG(error, response.toString());
 
-  postCallback("/logging?level=warning", header_map, response);
+  EXPECT_EQ(Http::Code::OK, postCallback("/logging?level=warning", header_map, response));
   FANCY_LOG(warn, "After post 1: all level is warning now!");
   EXPECT_EQ(getFancyContext().getFancyLogEntry(__FILE__)->level(), spdlog::level::warn);
 

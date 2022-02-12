@@ -8,6 +8,7 @@
 #include "source/server/admin/utils.h"
 
 #include "absl/strings/str_split.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -21,7 +22,7 @@ Http::Code LogsHandler::handlerLogging(absl::string_view url, Http::ResponseHead
   Http::Code rc = Http::Code::OK;
   if (!query_params.empty() && !changeLogLevel(query_params)) {
     response.add("usage: /logging?<name>=<level> (change single level)\n");
-    response.add("usage: /logging?paths=name1:level1,name2,level2,... (change multiple levels)\n");
+    response.add("usage: /logging?paths=name1:level1,name2:level2,... (change multiple levels)\n");
     response.add("usage: /logging?level=<level> (change all levels)\n");
     response.add("levels: ");
     for (auto level_string_view : spdlog::level::level_string_views) {
@@ -60,73 +61,83 @@ bool LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params) {
     return false;
   }
 
-  const auto it = params.begin();
-  absl::string_view key = it->first;
-  absl::string_view value = it->secondn;
+  const auto& it = params.begin();
+  absl::string_view key{it.first};
+  absl::string_view value{it.second};
 
-  if (key == "paths") {
-    // Bulk change log level by name:level pairs
+  if (key == "all") {
+    // Change all log levels.
+    return changeAllLogLevels(value);
+  } else if (key == "paths") {
+    // Bulk change log level by name:level pairs, separated by comma.
+
+    // Build a map of name:level pairs, a few allocations is ok here since it's
+    // not common to call this function at a high rate.
+    absl::flat_hash_map<absl::string_view, absl::string_view> name_levels;
     std::vector<absl::string_view> pairs = absl::StrSplit(value, ',', absl::SkipWhitespace());
-    bool ret = true;
     for (const auto& name_value : pairs) {
       std::pair<absl::string_view, absl::string_view> name_value_pair =
           absl::StrSplit(name_value, absl::MaxSplits(':', 1), absl::SkipWhitespace());
-
-      auto name = name_value_pair.first;
-      auto value = name_value_pair.second;
-
+      auto [name, value] = name_value_pair;
       if (name.empty() || value.empty()) {
         continue;
       }
 
-      ret = changeLogLevelByName(name, value) && ret;
+      name_levels.insert({name, value});
     }
 
-    return ret;
-  } else if (key == "level") {
-    // Change all log levels
-    return changeAllLogLevels(value);
+    return changeLogLevels(name_levels);
   } else {
-    // Change specific log level by its name
+    // Change particular log level by name.
     return changeLogLevelByName(key, value);
   }
 }
 
-static bool parseLevel(absl::string_view level, spdlog::level::level_enum& level_to_use) {
-  std::string_view level_string_view = toStdStringView(level);
+static absl::optional<spdlog::level::level_enum> parseLevel(absl::string_view level) {
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-    if (level_string_view == spdlog::level::level_string_views[i]) {
-      level_to_use = static_cast<spdlog::level::level_enum>(i);
-      return true;
+    spdlog::string_view_t spd_log_level{spdlog::level::level_string_views[i]};
+    if (level == absl::string_view{spd_log_level.data(), spd_log_level.size()}) {
+      return static_cast<spdlog::level::level_enum>(i);
     }
   }
 
-  return false;
+  return absl::nullopt;
 }
 
 bool LogsHandler::changeAllLogLevels(absl::string_view level) {
-  spdlog::level::level_enum level_to_use;
-  if (!parseLevel(level, level_to_use)) {
+  auto level_to_use = parseLevel(level);
+  if (!level_to_use.has_value()) {
+    ENVOY_LOG(error, "invalid log level specified: level='{}'", level);
     return false;
   }
 
   if (!Logger::Context::useFancyLogger()) {
     ENVOY_LOG(debug, "change all log levels: level='{}'", level);
     for (Logger::Logger& logger : Logger::Registry::loggers()) {
-      logger.setLevel(level_to_use);
+      logger.setLevel(*level_to_use);
     }
   } else {
     // Level setting with Fancy Logger.
     FANCY_LOG(info, "change all log levels: level='{}'", level);
-    getFancyContext().setAllFancyLoggers(level_to_use);
+    getFancyContext().setAllFancyLoggers(*level_to_use);
   }
 
   return true;
 }
 
+bool LogsHandler::changeLogLevels(
+    const absl::flat_hash_map<absl::string_view, absl::string_view>& changes) {
+  bool ret = true;
+  for (auto [name, level] : changes) {
+    ret = changeLogLevelByName(name, level) && ret;
+  }
+  return ret;
+}
+
 bool LogsHandler::changeLogLevelByName(absl::string_view name, absl::string_view level) {
-  spdlog::level::level_enum level_to_use;
-  if (!parseLevel(level, level_to_use)) {
+  auto level_to_use = parseLevel(level);
+  if (!level_to_use.has_value()) {
+    ENVOY_LOG(error, "invalid log level specified: name='{}' level='{}'", name, level);
     return false;
   }
 
@@ -144,11 +155,11 @@ bool LogsHandler::changeLogLevelByName(absl::string_view name, absl::string_view
       return false;
     }
 
-    logger_to_change->setLevel(level_to_use);
+    logger_to_change->setLevel(*level_to_use);
   } else {
     // Level setting with Fancy Logger.
     FANCY_LOG(info, "change log level: name='{}' level='{}'", name, level);
-    bool res = getFancyContext().setFancyLogger(name, level_to_use);
+    bool res = getFancyContext().setFancyLogger(std::string(name), *level_to_use);
     return res;
   }
 

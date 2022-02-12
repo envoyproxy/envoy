@@ -8,6 +8,7 @@
 
 #include "source/server/admin/handler_ctx.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -34,6 +35,7 @@ private:
    */
   bool changeLogLevel(const Http::Utility::QueryParams& params);
   bool changeAllLogLevels(absl::string_view level);
+  bool changeLogLevels(const absl::flat_hash_map<absl::string_view, absl::string_view>& changes);
   bool changeLogLevelByName(absl::string_view name, absl::string_view level);
 };
 
