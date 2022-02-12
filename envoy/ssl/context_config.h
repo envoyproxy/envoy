@@ -106,6 +106,11 @@ public:
    * @return the TLS key log remote filter.
    */
   virtual const Network::Address::IpList& tlsKeyLogRemote() const PURE;
+
+  /**
+   * @return the access log object
+   */
+  virtual const AccessLog::AccessLogFileSharedPtr accessLog() const PURE;
 };
 
 using ContextConfigPtr = std::shared_ptr<ContextConfig>;

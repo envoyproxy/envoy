@@ -102,6 +102,7 @@ public:
   MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogLocal, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogRemote, (), (const));
+  MOCK_METHOD(const AccessLog::AccessLogFileSharedPtr, accessLog, (), (const));
   Ssl::HandshakerCapabilities capabilities_;
   std::string sni_{"default_sni.example.com"};
   std::string ciphers_{"RSA"};
@@ -137,6 +138,7 @@ public:
   MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogLocal, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogRemote, (), (const));
+  MOCK_METHOD(const AccessLog::AccessLogFileSharedPtr, accessLog, (), (const));
 };
 
 class MockTlsCertificateConfig : public TlsCertificateConfig {

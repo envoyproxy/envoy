@@ -62,7 +62,7 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
       info_(std::dynamic_pointer_cast<SslHandshakerImpl>(
           handshaker_factory_cb(ctx_->newSsl(transport_socket_options_.get()),
                                 ctx_->sslExtendedSocketInfoIndex(), this))),
-      config_(config), enable_tls_keylog_(false), bio_keylog_(nullptr) {
+      config_(config), enable_tls_keylog_(false) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(rawSsl());
   } else {
@@ -88,7 +88,7 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   auto loader = Runtime::LoaderSingleton::getExisting();
   if (loader != nullptr) {
     auto tls_keylog_enable = loader->threadsafeSnapshot()->getBoolean("tls_keylog", false);
-    if (tls_keylog_enable) {
+    if (tls_keylog_enable && config_->accessLog() != nullptr) {
       enableTlsKeyLog();
     } else {
       disableTlsKeyLog();
@@ -317,24 +317,20 @@ void SslSocket::keylogCallback(const SSL* ssl, const char* line) {
   auto config = static_cast<Ssl::ContextConfig*>(SSL_get_ex_data(ssl, ssl_ex_data_config_index_));
   auto callback = static_cast<Network::TransportSocketCallbacks*>(
       SSL_get_ex_data(ssl, ssl_ex_data_callback_index_));
-  auto bio_keylog = static_cast<BIO*>(SSL_get_ex_data(ssl, ssl_ex_data_file_index_));
+  auto access_log =
+      static_cast<AccessLog::AccessLogFile*>(SSL_get_ex_data(ssl, ssl_ex_data_file_index_));
   ASSERT(config != nullptr);
   ASSERT(callback != nullptr);
-  ASSERT(bio_keylog != nullptr);
+  ASSERT(access_log != nullptr);
   auto match =
       tlsKeyLogMatch(callback->connection().connectionInfoProvider().localAddress(),
                      callback->connection().connectionInfoProvider().remoteAddress(), *config);
   if (match) {
-    BIO_printf(bio_keylog, "%s\n", line);
-    BIO_flush(bio_keylog);
+    access_log->write(line);
   }
 }
 
 void SslSocket::disableTlsKeyLog(void) {
-  if (bio_keylog_ != nullptr) {
-    BIO_free_all(bio_keylog_);
-    bio_keylog_ = nullptr;
-  }
   SSL_CTX* ctx = SSL_get_SSL_CTX(rawSsl());
   ASSERT(ctx != nullptr);
   SSL_CTX_set_keylog_callback(ctx, nullptr);
@@ -344,12 +340,8 @@ void SslSocket::disableTlsKeyLog(void) {
 void SslSocket::enableTlsKeyLog(void) {
   SSL_CTX* ctx = SSL_get_SSL_CTX(rawSsl());
   ASSERT(ctx != nullptr);
-  bio_keylog_ = BIO_new_file(config_->tlsKeyLogPath().c_str(), "a");
-  if (bio_keylog_ == nullptr) {
-    ENVOY_LOG(warn, "Creating BIO file fails, log path: {}", config_->tlsKeyLogPath().c_str());
-    return;
-  }
-  SSL_set_ex_data(rawSsl(), SslSocket::ssl_ex_data_file_index_, bio_keylog_);
+  SSL_set_ex_data(rawSsl(), SslSocket::ssl_ex_data_file_index_,
+                  static_cast<void*>(config_->accessLog().get()));
   SSL_set_ex_data(rawSsl(), SslSocket::ssl_ex_data_config_index_,
                   static_cast<void*>(config_.get()));
   SSL_set_ex_data(rawSsl(), SslSocket::ssl_ex_data_callback_index_, static_cast<void*>(callbacks_));

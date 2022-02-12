@@ -186,7 +186,15 @@ ContextConfigImpl::ContextConfigImpl(
                                                 default_max_protocol_version)),
       factory_context_(factory_context), tls_keylog_path_(config.tls_keylog().logfile_path()),
       tls_keylog_local_(config.tls_keylog().local_address_range()),
-      tls_keylog_remote_(config.tls_keylog().remote_address_range()) {
+      tls_keylog_remote_(config.tls_keylog().remote_address_range()), access_log_(nullptr) {
+  if (!config.tls_keylog().logfile_path().empty()) {
+    if (config.tls_keylog().local_address_range_size() == 0 &&
+        config.tls_keylog().remote_address_range_size() == 0) {
+      throw EnvoyException(fmt::format("At least one of src or dst should be set for TLS key log"));
+    }
+    access_log_ = factory_context.accessLogManager().createAccessLog(
+        Filesystem::FilePathAndType{Filesystem::DestinationType::File, tls_keylog_path_});
+  }
   if (certificate_validation_context_provider_ != nullptr) {
     if (default_cvc_) {
       // We need to validate combined certificate validation context.
@@ -241,11 +249,6 @@ ContextConfigImpl::ContextConfigImpl(
   }
   capabilities_ = handshaker_factory->capabilities();
   sslctx_cb_ = handshaker_factory->sslctxCb(handshaker_factory_context);
-  if (!config.tls_keylog().logfile_path().empty() &&
-      config.tls_keylog().local_address_range_size() == 0 &&
-      config.tls_keylog().remote_address_range_size() == 0) {
-    throw EnvoyException(fmt::format("At least one of src or dst should be set for TLS key log"));
-  }
 }
 
 Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(

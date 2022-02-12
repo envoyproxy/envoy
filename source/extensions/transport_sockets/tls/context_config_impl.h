@@ -45,6 +45,7 @@ public:
   const std::string& tlsKeyLogPath() const override { return tls_keylog_path_; };
   const Network::Address::IpList& tlsKeyLogLocal() const override { return tls_keylog_local_; };
   const Network::Address::IpList& tlsKeyLogRemote() const override { return tls_keylog_remote_; };
+  const AccessLog::AccessLogFileSharedPtr accessLog() const override { return access_log_; };
 
   bool isReady() const override {
     const bool tls_is_ready =
@@ -108,6 +109,7 @@ private:
   const std::string tls_keylog_path_;
   const Network::Address::IpList tls_keylog_local_;
   const Network::Address::IpList tls_keylog_remote_;
+  AccessLog::AccessLogFileSharedPtr access_log_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {
