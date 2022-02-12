@@ -72,87 +72,6 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
   return Http::Code::OK;
 }
 
-Admin::HandlerPtr StatsHandler::makeContext(absl::string_view path, AdminStream& /*admin_stream*/) {
-  if (server_.statsConfig().flushOnAdmin()) {
-    server_.flushStats();
-  }
-
-  const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(path);
-
-  const bool used_only = params.find("usedonly") != params.end();
-  absl::optional<std::regex> regex;
-  Buffer::OwnedImpl response;
-  if (!Utility::filterParam(params, response, regex)) {
-    return Admin::makeStaticTextHandler(response, Http::Code::BadRequest);
-  }
-
-  const absl::optional<std::string> format_value = Utility::formatParam(params);
-  bool json = false;
-  if (format_value.has_value()) {
-    if (format_value.value() == "prometheus") {
-      Buffer::OwnedImpl response;
-      Http::Code code = prometheusStats(path, response);
-      return Admin::makeStaticTextHandler(response, code);
-    } else if (format_value.value() == "json") {
-      json = true;
-    } else {
-      return Admin::makeStaticTextHandler(
-          "usage: /stats?format=json  or /stats?format=prometheus \n\n", Http::Code::BadRequest);
-    }
-  }
-
-  return std::make_unique<Context>(server_, used_only, json, regex);
-}
-
-#if 0
-Http::Code StatsHandler::handlerStats(absl::string_view url,
-                                      Http::ResponseHeaderMap& response_headers,
-                                      Buffer::Instance& response, AdminStream& admin_stream) {
-  if (server_.statsConfig().flushOnAdmin()) {
-    server_.flushStats();
-  }
-
-  const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(url);
-
-  const bool used_only = params.find("usedonly") != params.end();
-  absl::optional<std::regex> regex;
-  if (!Utility::filterParam(params, response, regex)) {
-    return Http::Code::BadRequest;
-  }
-
-  const absl::optional<std::string> format_value = Utility::formatParam(params);
-  bool json = false;
-  if (format_value.has_value()) {
-    if (format_value.value() == "prometheus") {
-      return handlerPrometheusStats(url, response_headers, response, admin_stream);
-    }
-    if (format_value.value() == "json") {
-      json = true;
-    } else {
-      response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
-      response.add("\n");
-      return Http::Code::BadRequest;
-    }
-  }
-
-  auto iter = context_map_.find(&admin_stream);
-  if (iter == context_map_.end()) {
-    auto insertion = context_map_.emplace(
-        &admin_stream,
-        std::make_unique<Context>(server_, used_only, regex, json, response_headers, response));
-    iter = insertion.first;
-  }
-  Context& context = *iter->second;
-
-  Http::Code code = context.eChunk(response);
-  if (code != Http::Code::Continue) {
-    context_map_.erase(iter);
-  }
-
-  return code;
-}
-#endif
-
 class StatsHandler::Render {
 public:
   virtual ~Render() = default;
@@ -314,50 +233,222 @@ private:
   bool first_{true};
 };
 
-StatsHandler::Context::Context(Server::Instance& server, bool used_only, bool json,
-                               absl::optional<std::regex> regex)
-    : used_only_(used_only), json_(json), regex_(regex), stats_(server.stats()) {}
+class StatsHandler::Context : public Admin::Handler {
+  using ScopeVec = std::vector<Stats::ConstScopeSharedPtr>;
+  using StatOrScopes =
+      absl::variant<ScopeVec, Stats::TextReadoutSharedPtr, Stats::CounterSharedPtr,
+      Stats::GaugeSharedPtr, Stats::HistogramSharedPtr>;
+  enum class Phase {
+    TextReadouts,
+    CountersAndGauges,
+    Histograms,
+  };
 
-Http::Code StatsHandler::Context::start(Http::ResponseHeaderMap& response_headers) {
-  if (json_) {
-    render_ = std::make_unique<JsonRender>(response_headers, response_);
-  } else {
-    render_ = std::make_unique<TextRender>();
-  }
+ public:
+  Context(Server::Instance& server, bool used_only, bool json, absl::optional<std::regex> regex)
+      : used_only_(used_only), json_(json), regex_(regex), stats_(server.stats()) {}
 
-  // Populate the top-level scopes and the stats underneath any scopes with an empty name.
-  // We will have to de-dup, but we can do that after sorting.
-  //
-  // First capture all the scopes and hold onto them with a SharedPtr so they
-  // can't be deleted after the initial iteration.
-  stats_.forEachScope(
-      [this](size_t s) { scopes_.reserve(s); },
-      [this](const Stats::Scope& scope) { scopes_.emplace_back(scope.makeConstShared()); });
-
-  startPhase();
-  return Http::Code::OK;
-}
-
-void StatsHandler::Context::startPhase() {
-  ASSERT(stat_map_.empty());
-  for (const Stats::ConstScopeSharedPtr& scope : scopes_) {
-    StatOrScopes& variant = stat_map_[stats_.symbolTable().toString(scope->prefix())];
-    if (variant.index() == absl::variant_npos) {
-      variant = ScopeVec();
+  // Admin::Handler
+  Http::Code start(Http::ResponseHeaderMap& response_headers) override {
+    if (json_) {
+      render_ = std::make_unique<JsonRender>(response_headers, response_);
+    } else {
+      render_ = std::make_unique<TextRender>();
     }
-    absl::get<ScopeVec>(variant).emplace_back(scope);
+
+    // Populate the top-level scopes and the stats underneath any scopes with an empty name.
+    // We will have to de-dup, but we can do that after sorting.
+    //
+    // First capture all the scopes and hold onto them with a SharedPtr so they
+    // can't be deleted after the initial iteration.
+    stats_.forEachScope(
+        [this](size_t s) { scopes_.reserve(s); },
+        [this](const Stats::Scope& scope) { scopes_.emplace_back(scope.makeConstShared()); });
+
+    startPhase();
+    return Http::Code::OK;
   }
 
-  // Populate stat_map with all the counters found in all the scopes with an
-  // empty prefix.
-  auto iter = stat_map_.find("");
-  if (iter != stat_map_.end()) {
-    StatOrScopes variant = std::move(iter->second);
-    stat_map_.erase(iter);
-    auto& scope_vec = absl::get<ScopeVec>(variant);
-    populateStatsForCurrentPhase(scope_vec);
+  bool nextChunk(Buffer::Instance& response) override {
+    if (response_.length() > 0) {
+      ASSERT(response.length() == 0);
+      response.move(response_);
+    }
+    while (!render_->nextChunk(response)) {
+      while (stat_map_.empty()) {
+        switch (phase_) {
+          case Phase::TextReadouts:
+            phase_ = Phase::CountersAndGauges;
+            startPhase();
+            break;
+          case Phase::CountersAndGauges:
+            phase_ = Phase::Histograms;
+            startPhase();
+            break;
+          case Phase::Histograms:
+            render_->render(response);
+            return false;
+        }
+      }
+
+      auto iter = stat_map_.begin();
+      const std::string& name = iter->first;
+      StatOrScopes& variant = iter->second;
+      switch (variant.index()) {
+        case 0:
+          populateStatsForCurrentPhase(absl::get<ScopeVec>(variant));
+          break;
+        case 1:
+          renderStat<Stats::TextReadoutSharedPtr>(name, response, variant);
+          break;
+        case 2:
+          renderStat<Stats::CounterSharedPtr>(name, response, variant);
+          break;
+        case 3:
+          renderStat<Stats::GaugeSharedPtr>(name, response, variant);
+          break;
+        case 4: {
+          auto histogram = absl::get<Stats::HistogramSharedPtr>(variant);
+          if (!skip(histogram, name)) {
+            auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
+            if (parent_histogram != nullptr) {
+              render_->generate(response, name, *parent_histogram);
+            }
+          }
+        }
+      }
+      stat_map_.erase(iter);
+    }
+    return true;
   }
+  void startPhase() {
+    ASSERT(stat_map_.empty());
+    for (const Stats::ConstScopeSharedPtr& scope : scopes_) {
+      StatOrScopes& variant = stat_map_[stats_.symbolTable().toString(scope->prefix())];
+      if (variant.index() == absl::variant_npos) {
+        variant = ScopeVec();
+      }
+      absl::get<ScopeVec>(variant).emplace_back(scope);
+    }
+
+    // Populate stat_map with all the counters found in all the scopes with an
+    // empty prefix.
+    auto iter = stat_map_.find("");
+    if (iter != stat_map_.end()) {
+      StatOrScopes variant = std::move(iter->second);
+      stat_map_.erase(iter);
+      auto& scope_vec = absl::get<ScopeVec>(variant);
+      populateStatsForCurrentPhase(scope_vec);
+    }
+  }
+
+  template <class StatType> bool shouldShowMetric(const StatType& stat) {
+    return StatsHandler::shouldShowMetric(stat, used_only_, regex_);
+  }
+
+  void populateStatsForCurrentPhase(const ScopeVec& scope_vec);
+  template <class StatType> void populateStatsFromScopes(const ScopeVec& scope);
+  template <class SharedStatType>
+      void renderStat(const std::string& name, Buffer::Instance& response, StatOrScopes& variant);
+  template <class SharedStatType> bool skip(const SharedStatType& stat, const std::string& name);
+  const bool used_only_;
+  const bool json_;
+  absl::optional<std::regex> regex_;
+  absl::optional<std::string> format_value_;
+
+  std::unique_ptr<Render> render_;
+
+  static constexpr uint32_t num_stats_per_chunk_ = 1000;
+  Stats::Store& stats_;
+  ScopeVec scopes_;
+  using StatMap = std::map<std::string, StatOrScopes>;
+  StatMap stat_map_;
+  uint32_t stats_and_scopes_index_{0};
+  uint32_t chunk_index_{0};
+  Phase phase_{Phase::TextReadouts};
+  Buffer::OwnedImpl response_;
+};
+
+Admin::HandlerPtr StatsHandler::makeContext(absl::string_view path, AdminStream& /*admin_stream*/) {
+  if (server_.statsConfig().flushOnAdmin()) {
+    server_.flushStats();
+  }
+
+  const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(path);
+
+  const bool used_only = params.find("usedonly") != params.end();
+  absl::optional<std::regex> regex;
+  Buffer::OwnedImpl response;
+  if (!Utility::filterParam(params, response, regex)) {
+    return Admin::makeStaticTextHandler(response, Http::Code::BadRequest);
+  }
+
+  const absl::optional<std::string> format_value = Utility::formatParam(params);
+  bool json = false;
+  if (format_value.has_value()) {
+    if (format_value.value() == "prometheus") {
+      Buffer::OwnedImpl response;
+      Http::Code code = prometheusStats(path, response);
+      return Admin::makeStaticTextHandler(response, code);
+    } else if (format_value.value() == "json") {
+      json = true;
+    } else {
+      return Admin::makeStaticTextHandler(
+          "usage: /stats?format=json  or /stats?format=prometheus \n\n", Http::Code::BadRequest);
+    }
+  }
+
+  return std::make_unique<Context>(server_, used_only, json, regex);
 }
+
+#if 0
+Http::Code StatsHandler::handlerStats(absl::string_view url,
+                                      Http::ResponseHeaderMap& response_headers,
+                                      Buffer::Instance& response, AdminStream& admin_stream) {
+  if (server_.statsConfig().flushOnAdmin()) {
+    server_.flushStats();
+  }
+
+  const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(url);
+
+  const bool used_only = params.find("usedonly") != params.end();
+  absl::optional<std::regex> regex;
+  if (!Utility::filterParam(params, response, regex)) {
+    return Http::Code::BadRequest;
+  }
+
+  const absl::optional<std::string> format_value = Utility::formatParam(params);
+  bool json = false;
+  if (format_value.has_value()) {
+    if (format_value.value() == "prometheus") {
+      return handlerPrometheusStats(url, response_headers, response, admin_stream);
+    }
+    if (format_value.value() == "json") {
+      json = true;
+    } else {
+      response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
+      response.add("\n");
+      return Http::Code::BadRequest;
+    }
+  }
+
+  auto iter = context_map_.find(&admin_stream);
+  if (iter == context_map_.end()) {
+    auto insertion = context_map_.emplace(
+        &admin_stream,
+        std::make_unique<Context>(server_, used_only, regex, json, response_headers, response));
+    iter = insertion.first;
+  }
+  Context& context = *iter->second;
+
+  Http::Code code = context.eChunk(response);
+  if (code != Http::Code::Continue) {
+    context_map_.erase(iter);
+  }
+
+  return code;
+}
+#endif
 
 void StatsHandler::Context::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
   switch (phase_) {
@@ -406,59 +497,6 @@ bool StatsHandler::Context::skip(const SharedStatType& stat, const std::string& 
   return false;
 }
 
-bool StatsHandler::Context::nextChunk(Buffer::Instance& response) {
-  if (response_.length() > 0) {
-    ASSERT(response.length() == 0);
-    response.move(response_);
-  }
-  while (!render_->nextChunk(response)) {
-    while (stat_map_.empty()) {
-      switch (phase_) {
-      case Phase::TextReadouts:
-        phase_ = Phase::CountersAndGauges;
-        startPhase();
-        break;
-      case Phase::CountersAndGauges:
-        phase_ = Phase::Histograms;
-        startPhase();
-        break;
-      case Phase::Histograms:
-        render_->render(response);
-        return false;
-      }
-    }
-
-    auto iter = stat_map_.begin();
-    const std::string& name = iter->first;
-    StatOrScopes& variant = iter->second;
-    switch (variant.index()) {
-    case 0:
-      populateStatsForCurrentPhase(absl::get<ScopeVec>(variant));
-      break;
-    case 1:
-      renderStat<Stats::TextReadoutSharedPtr>(name, response, variant);
-      break;
-    case 2:
-      renderStat<Stats::CounterSharedPtr>(name, response, variant);
-      break;
-    case 3:
-      renderStat<Stats::GaugeSharedPtr>(name, response, variant);
-      break;
-    case 4: {
-      auto histogram = absl::get<Stats::HistogramSharedPtr>(variant);
-      if (!skip(histogram, name)) {
-        auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
-        if (parent_histogram != nullptr) {
-          render_->generate(response, name, *parent_histogram);
-        }
-      }
-    }
-    }
-    stat_map_.erase(iter);
-  }
-  return true;
-}
-
 #if 0
 struct CompareStatsAndScopes {
   CompareStatsAndScopes(Stats::SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
@@ -480,8 +518,6 @@ struct CompareStatsAndScopes {
   Stats::SymbolTable& symbol_table_;
 };
 #endif
-
-StatsHandler::Context::~Context() = default;
 
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
                                                 Http::ResponseHeaderMap&,
