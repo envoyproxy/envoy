@@ -58,7 +58,9 @@ private:
     CallbackProxy(Network::TransportSocketCallbacks* callbacks) : parent_(callbacks) {}
 
     Network::IoHandle& ioHandle() override { return parent_->ioHandle(); }
-    const Network::IoHandle& ioHandle() const override { return parent_->ioHandle(); }
+    const Network::IoHandle& ioHandle() const override {
+      return const_cast<const Network::TransportSocketCallbacks*>(parent_)->ioHandle();
+    }
     Network::Connection& connection() override { return parent_->connection(); }
     bool shouldDrainReadBuffer() override { return parent_->shouldDrainReadBuffer(); }
     void setTransportSocketIsReadable() override { return parent_->setTransportSocketIsReadable(); }
