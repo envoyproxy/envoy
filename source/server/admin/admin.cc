@@ -199,8 +199,11 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerServerInfo), false, false),
           makeHandler("/ready", "print server state, return 200 if LIVE, otherwise return 503",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerReady), false, false),
-          makeHandler("/stats", "print server stats",
-                      MAKE_ADMIN_HANDLER(stats_handler_.handlerStats), false, false),
+          {"/stats", "print server stats",
+           [this](absl::string_view path, AdminStream& admin_stream) -> Admin::HandlerPtr {
+             return stats_handler_.makeContext(path, admin_stream);
+           },
+           false, false},
           makeHandler("/stats/prometheus", "print server stats in prometheus format",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerPrometheusStats), false, false),
           makeHandler("/stats/recentlookups", "Show recent stat-name lookups",
@@ -259,17 +262,21 @@ namespace {
 // Implements a chunked handler for static text.
 class StaticTextHandler : public Admin::Handler {
 public:
-  StaticTextHandler(absl::string_view response_text, Http::Code code)
-      : response_text_(std::string(response_text)), code_(code) {}
+  StaticTextHandler(absl::string_view response_text, Http::Code code) : code_(code) {
+    response_text_.add(response_text);
+  }
+  StaticTextHandler(Buffer::Instance& response_text, Http::Code code) : code_(code) {
+    response_text_.move(response_text);
+  }
 
   Http::Code start(Http::ResponseHeaderMap&) override { return code_; }
   bool nextChunk(Buffer::Instance& response) override {
-    response.add(response_text_);
+    response.move(response_text_);
     return false;
   }
 
 private:
-  const std::string response_text_;
+  Buffer::OwnedImpl response_text_;
   const Http::Code code_;
 };
 
@@ -307,7 +314,11 @@ private:
 
 } // namespace
 
-Admin::HandlerPtr AdminImpl::makeStaticTextHandler(absl::string_view response, Http::Code code) {
+Admin::HandlerPtr Admin::makeStaticTextHandler(absl::string_view response, Http::Code code) {
+  return std::make_unique<StaticTextHandler>(response, code);
+}
+
+Admin::HandlerPtr Admin::makeStaticTextHandler(Buffer::Instance& response, Http::Code code) {
   return std::make_unique<StaticTextHandler>(response, code);
 }
 
@@ -338,8 +349,9 @@ Admin::HandlerPtr AdminImpl::findHandler(absl::string_view path_and_query,
         if (method != Http::Headers::get().MethodValues.Post) {
           ENVOY_LOG(error, "admin path \"{}\" mutates state, method={} rather than POST",
                     handler.prefix_, method);
-          return makeStaticTextHandler(fmt::format("Method {} not allowed, POST required.", method),
-                                       Http::Code::MethodNotAllowed);
+          return Admin::makeStaticTextHandler(
+              fmt::format("Method {} not allowed, POST required.", method),
+              Http::Code::MethodNotAllowed);
         }
       }
 
@@ -352,7 +364,7 @@ Admin::HandlerPtr AdminImpl::findHandler(absl::string_view path_and_query,
   Buffer::OwnedImpl error_response;
   error_response.add("invalid path. ");
   getHelp(error_response);
-  return makeStaticTextHandler(error_response.toString(), Http::Code::NotFound);
+  return Admin::makeStaticTextHandler(error_response, Http::Code::NotFound);
 }
 
 std::vector<const AdminImpl::UrlHandler*> AdminImpl::sortedHandlers() const {

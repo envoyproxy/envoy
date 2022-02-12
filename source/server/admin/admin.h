@@ -218,14 +218,6 @@ public:
     return proxy_status_config_.get();
   }
 
-  /**
-   * Makes a chunked handler for static text.
-   * @param resposne_text the text to populate response with
-   * @param code the Http::Code for the response
-   * @return the handler
-   */
-  static HandlerPtr makeStaticTextHandler(absl::string_view response_text, Http::Code code);
-
 private:
   /**
    * Individual admin handler including prefix, help text, and callback.

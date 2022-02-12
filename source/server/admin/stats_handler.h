@@ -3,12 +3,12 @@
 #include <regex>
 #include <string>
 
-#include "envoy/buffer/buffer.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/stats/histogram_impl.h"
 #include "source/server/admin/handler_ctx.h"
 
@@ -39,21 +39,26 @@ public:
   Http::Code handlerStatsRecentLookupsEnable(absl::string_view path_and_query,
                                              Http::ResponseHeaderMap& response_headers,
                                              Buffer::Instance& response, AdminStream&);
+#if 0
   Http::Code handlerStats(absl::string_view path_and_query,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                           AdminStream&);
+#endif
   Http::Code handlerPrometheusStats(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
+  Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response);
   Http::Code handlerContention(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
+
+  Admin::HandlerPtr makeContext(absl::string_view path, AdminStream& admin_stream);
 
   class JsonRender;
   class Render;
   class TextRender;
 
-  class Context {
+  class Context : public Admin::Handler {
     using ScopeVec = std::vector<Stats::ConstScopeSharedPtr>;
     using StatOrScopes =
         absl::variant<ScopeVec, Stats::TextReadoutSharedPtr, Stats::CounterSharedPtr,
@@ -65,12 +70,14 @@ public:
     };
 
   public:
-    Context(Server::Instance& server, bool used_only, absl::optional<std::regex> regex, bool json,
-            Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
+    Context(Server::Instance& server, bool used_only, bool json, absl::optional<std::regex> regex);
     ~Context();
 
+    // Admin::Handler
+    Http::Code start(Http::ResponseHeaderMap& response_headers) override;
+    bool nextChunk(Buffer::Instance& response) override;
+
     void startPhase();
-    Http::Code writeChunk(Buffer::Instance& response);
 
     template <class StatType> bool shouldShowMetric(const StatType& stat) {
       return StatsHandler::shouldShowMetric(stat, used_only_, regex_);
@@ -82,6 +89,7 @@ public:
     void renderStat(const std::string& name, Buffer::Instance& response, StatOrScopes& variant);
     template <class SharedStatType> bool skip(const SharedStatType& stat, const std::string& name);
     const bool used_only_;
+    const bool json_;
     absl::optional<std::regex> regex_;
     absl::optional<std::string> format_value_;
 
@@ -96,6 +104,7 @@ public:
     uint32_t stats_and_scopes_index_{0};
     uint32_t chunk_index_{0};
     Phase phase_{Phase::TextReadouts};
+    Buffer::OwnedImpl response_;
   };
   using ContextPtr = std::unique_ptr<Context>;
 

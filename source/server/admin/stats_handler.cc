@@ -72,6 +72,39 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
   return Http::Code::OK;
 }
 
+Admin::HandlerPtr StatsHandler::makeContext(absl::string_view path, AdminStream& /*admin_stream*/) {
+  if (server_.statsConfig().flushOnAdmin()) {
+    server_.flushStats();
+  }
+
+  const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(path);
+
+  const bool used_only = params.find("usedonly") != params.end();
+  absl::optional<std::regex> regex;
+  Buffer::OwnedImpl response;
+  if (!Utility::filterParam(params, response, regex)) {
+    return Admin::makeStaticTextHandler(response, Http::Code::BadRequest);
+  }
+
+  const absl::optional<std::string> format_value = Utility::formatParam(params);
+  bool json = false;
+  if (format_value.has_value()) {
+    if (format_value.value() == "prometheus") {
+      Buffer::OwnedImpl response;
+      Http::Code code = prometheusStats(path, response);
+      return Admin::makeStaticTextHandler(response, code);
+    } else if (format_value.value() == "json") {
+      json = true;
+    } else {
+      return Admin::makeStaticTextHandler(
+          "usage: /stats?format=json  or /stats?format=prometheus \n\n", Http::Code::BadRequest);
+    }
+  }
+
+  return std::make_unique<Context>(server_, used_only, json, regex);
+}
+
+#if 0
 Http::Code StatsHandler::handlerStats(absl::string_view url,
                                       Http::ResponseHeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream& admin_stream) {
@@ -111,13 +144,14 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   }
   Context& context = *iter->second;
 
-  Http::Code code = context.writeChunk(response);
+  Http::Code code = context.eChunk(response);
   if (code != Http::Code::Continue) {
     context_map_.erase(iter);
   }
 
   return code;
 }
+#endif
 
 class StatsHandler::Render {
 public:
@@ -280,13 +314,13 @@ private:
   bool first_{true};
 };
 
-StatsHandler::Context::Context(Server::Instance& server, bool used_only,
-                               absl::optional<std::regex> regex, bool json,
-                               Http::ResponseHeaderMap& response_headers,
-                               Buffer::Instance& response)
-    : used_only_(used_only), regex_(regex), stats_(server.stats()) {
-  if (json) {
-    render_ = std::make_unique<JsonRender>(response_headers, response);
+StatsHandler::Context::Context(Server::Instance& server, bool used_only, bool json,
+                               absl::optional<std::regex> regex)
+    : used_only_(used_only), json_(json), regex_(regex), stats_(server.stats()) {}
+
+Http::Code StatsHandler::Context::start(Http::ResponseHeaderMap& response_headers) {
+  if (json_) {
+    render_ = std::make_unique<JsonRender>(response_headers, response_);
   } else {
     render_ = std::make_unique<TextRender>();
   }
@@ -301,6 +335,7 @@ StatsHandler::Context::Context(Server::Instance& server, bool used_only,
       [this](const Stats::Scope& scope) { scopes_.emplace_back(scope.makeConstShared()); });
 
   startPhase();
+  return Http::Code::OK;
 }
 
 void StatsHandler::Context::startPhase() {
@@ -371,7 +406,11 @@ bool StatsHandler::Context::skip(const SharedStatType& stat, const std::string& 
   return false;
 }
 
-Http::Code StatsHandler::Context::writeChunk(Buffer::Instance& response) {
+bool StatsHandler::Context::nextChunk(Buffer::Instance& response) {
+  if (response_.length() > 0) {
+    ASSERT(response.length() == 0);
+    response.move(response_);
+  }
   while (!render_->nextChunk(response)) {
     while (stat_map_.empty()) {
       switch (phase_) {
@@ -385,7 +424,7 @@ Http::Code StatsHandler::Context::writeChunk(Buffer::Instance& response) {
         break;
       case Phase::Histograms:
         render_->render(response);
-        return Http::Code::OK;
+        return false;
       }
     }
 
@@ -417,7 +456,7 @@ Http::Code StatsHandler::Context::writeChunk(Buffer::Instance& response) {
     }
     stat_map_.erase(iter);
   }
-  return Http::Code::Continue;
+  return true;
 }
 
 #if 0
@@ -447,6 +486,11 @@ StatsHandler::Context::~Context() = default;
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
                                                 Http::ResponseHeaderMap&,
                                                 Buffer::Instance& response, AdminStream&) {
+  return prometheusStats(path_and_query, response);
+}
+
+Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
+                                         Buffer::Instance& response) {
   const Http::Utility::QueryParams params =
       Http::Utility::parseAndDecodeQueryString(path_and_query);
   const bool used_only = params.find("usedonly") != params.end();

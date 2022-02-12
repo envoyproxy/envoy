@@ -207,6 +207,17 @@ public:
    * @return the number of worker threads to run in the server.
    */
   virtual uint32_t concurrency() const PURE;
+
+  /**
+   * Makes a chunked handler for static text. The version that takes the
+   * Buffer::Instance& transfers the content from the passed-in buffer.
+   *
+   * @param resposne_text the text to populate response with
+   * @param code the Http::Code for the response
+   * @return the handler
+   */
+  static HandlerPtr makeStaticTextHandler(absl::string_view response_text, Http::Code code);
+  static HandlerPtr makeStaticTextHandler(Buffer::Instance& response_text, Http::Code code);
 };
 
 } // namespace Server
