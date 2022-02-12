@@ -51,8 +51,8 @@ public:
   bool startSecureTransport() override;
 
 private:
-  // This is a proxy for wrapping the transport callback object passed from the consumer
-  // Its primary purpose is to filter Connected events to ensure they only happen once per open
+  // This is a proxy for wrapping the transport callback object passed from the consumer.
+  // Its primary purpose is to filter Connected events to ensure they only happen once per open.
   class CallbackProxy : public Network::TransportSocketCallbacks {
   public:
     CallbackProxy(Network::TransportSocketCallbacks* callbacks) : parent_(callbacks) {}
@@ -65,12 +65,12 @@ private:
     void raiseEvent(Network::ConnectionEvent event) override {
       if (event == Network::ConnectionEvent::Connected) {
         // Don't send the connected event if we're already open
-        if (isopen_) {
+        if (is_open_) {
           return;
         }
-        isopen_ = true;
+        is_open_ = true;
       } else {
-        isopen_ = false;
+        is_open_ = false;
       }
 
       parent_->raiseEvent(event);
@@ -79,7 +79,7 @@ private:
 
   private:
     Network::TransportSocketCallbacks* parent_;
-    bool isopen_{false};
+    bool is_open_{false};
   };
 
   // Socket used in all transport socket operations.
