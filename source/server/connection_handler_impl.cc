@@ -111,8 +111,10 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         // Remove this check when runtime flag
         // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
         if (v4_compatible_addr.ok()) {
-          tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr.value()->asStringView(),
-                                                        details);
+          // Since both "::" with ipv4_compat and "0.0.0.0" can be supported.
+          // So use `emplace` here, if there already one for compatible addr, then
+          // won't insert a new one.
+          tcp_listener_map_by_address_.emplace(v4_compatible_addr.value()->asStringView(), details);
         }
       }
     }
@@ -140,14 +142,27 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
           address->ip()->version() == Network::Address::IpVersion::v6 &&
           !address->ip()->ipv6()->v6only()) {
         if (address->ip()->isAnyAddress()) {
-          tcp_listener_map_by_address_.erase(
+          auto ipv4_any_addr_iter = tcp_listener_map_by_address_.find(
               Network::Address::Ipv4Instance(address->ip()->port()).asStringView());
+          // Since both "::" with ipv4_compat and "0.0.0.0" can be supported, ensure they are same
+          // listener.
+          if (ipv4_any_addr_iter != tcp_listener_map_by_address_.end() &&
+              ipv4_any_addr_iter->second->listener_tag_ == listener_iter->second->listener_tag_) {
+            tcp_listener_map_by_address_.erase(ipv4_any_addr_iter);
+          }
         } else {
           auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
           // Remove this check when runtime flag
           // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
           if (v4_compatible_addr.ok()) {
-            tcp_listener_map_by_address_.erase(v4_compatible_addr.value()->asStringView());
+            auto v4_compatible_iter =
+                tcp_listener_map_by_address_.find(v4_compatible_addr.value()->asStringView());
+            // Since both "::FFFF:<ipv4-addr>" with ipv4_compat and "<ipv4-addr>" can be supported,
+            // ensure they are same listener.
+            if (v4_compatible_iter != tcp_listener_map_by_address_.end() &&
+                v4_compatible_iter->second->listener_tag_ == listener_iter->second->listener_tag_) {
+              tcp_listener_map_by_address_.erase(v4_compatible_iter);
+            }
           }
         }
       }
