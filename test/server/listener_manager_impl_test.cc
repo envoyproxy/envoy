@@ -558,7 +558,8 @@ TEST_F(ListenerManagerImplTest, RejectIpv4CompatOnIpv4Address) {
     - filters: []
   )EOF";
 
-  EXPECT_DEATH(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), ".*");
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException, "Only Ipv6 address can be set ipv4_compat as true");
 }
 
 TEST_F(ListenerManagerImplTest, AcceptIpv4CompatOnIpv4Address) {
@@ -591,7 +592,9 @@ TEST_F(ListenerManagerImplTest, RejectIpv4CompatOnNonIpv4MappedIpv6address) {
     - filters: []
   )EOF";
 
-  EXPECT_DEATH(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), ".*");
+  EXPECT_THROW_WITH_MESSAGE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), EnvoyException,
+      "Only the Ipv6 any address and Ipv4-mapped Ipv6 address can be set ipv4_compat as true");
 }
 
 TEST_F(ListenerManagerImplTest, AcceptIpv4CompatOnNonIpv4MappedIpv6address) {
