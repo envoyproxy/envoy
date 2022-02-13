@@ -348,6 +348,19 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
               validation_visitor_, parent_.server_.api(), parent_.server_.options())),
       quic_stat_names_(parent_.quicStatNames()) {
 
+  if (address_->type() == Network::Address::Type::Ip &&
+      config.address().socket_address().ipv4_compat() &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_check_on_ipv4_compat")) {
+    if (address_->ip()->version() == Network::Address::IpVersion::v6) {
+      if (!address_->ip()->ipv6()->v4CompatibleAddress().ok()) {
+        throw EnvoyException("Only the Ipv6 any address and Ipv4-mapped Ipv6 address can be set "
+                             "ipv4_compat as true");
+      }
+    } else {
+      throw EnvoyException("Only Ipv6 address can be set ipv4_compat as true");
+    }
+  }
+
   const absl::optional<std::string> runtime_val =
       listener_factory_context_->runtime().snapshot().get(cx_limit_runtime_key_);
   if (runtime_val && runtime_val->empty()) {

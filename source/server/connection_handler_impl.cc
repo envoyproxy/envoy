@@ -108,13 +108,12 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
             Network::Address::Ipv4Instance(address->ip()->port()).asStringView(), details);
       } else {
         auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
-        if (!v4_compatible_addr.ok() && !v4_compatible_addr.status().ok()) {
-          throw EnvoyException(fmt::format("Can't get v4 compatible address for {}: {}",
-                                           address->asStringView(),
-                                           v4_compatible_addr.status().ToString()));
+        // Remove this check when runtime flag
+        // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
+        if (v4_compatible_addr.ok()) {
+          tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr.value()->asStringView(),
+                                                        details);
         }
-        tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr.value()->asStringView(),
-                                                      details);
       }
     }
   } else if (absl::holds_alternative<std::reference_wrapper<ActiveInternalListener>>(
@@ -145,9 +144,11 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
               Network::Address::Ipv4Instance(address->ip()->port()).asStringView());
         } else {
           auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
-          // When add listener, already ensure this is a valid v4 compatible address.
-          ASSERT(v4_compatible_addr.ok());
-          tcp_listener_map_by_address_.erase(v4_compatible_addr.value()->asStringView());
+          // Remove this check when runtime flag
+          // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
+          if (v4_compatible_addr.ok()) {
+            tcp_listener_map_by_address_.erase(v4_compatible_addr.value()->asStringView());
+          }
         }
       }
     } else if (internal_listener_map_by_address_.contains(address_view) &&

@@ -243,7 +243,7 @@ StatusOr<InstanceConstSharedPtr> Ipv6Instance::Ipv6Helper::v4CompatibleAddress()
     ipv6ToIpv4CompatibleAddress(&address_, &sin);
     return Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sin);
   }
-  return absl::InvalidArgumentError(fmt::format("It isn't v4 compatible address"));
+  return absl::InvalidArgumentError(fmt::format("It isn't Ipv4-mapped Ipv6 address"));
 }
 
 Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only,
