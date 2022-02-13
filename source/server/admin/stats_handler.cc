@@ -204,6 +204,7 @@ private:
     addStatJson(response, str);
   }
 
+#if 0
   void emitStats(Buffer::Instance& response) {
     auto str = MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::listValue(stats_array_),
                                                           false /* pretty */, true);
@@ -212,6 +213,7 @@ private:
     chunk_count_ = 0;
     stats_array_.clear();
   }
+#endif
 
   void addStatJson(Buffer::Instance& response, const std::string& json) {
     if (first_) {
@@ -222,7 +224,7 @@ private:
     }
   }
 
-  uint32_t chunk_count_{0};
+  // uint32_t chunk_count_{0};
   ProtobufWkt::Struct document_;
   std::vector<ProtobufWkt::Value> stats_array_;
   std::vector<ProtobufWkt::Value> scope_array_;
@@ -244,8 +246,8 @@ class StatsHandler::Context : public Admin::Handler {
   };
 
 public:
-  Context(Server::Instance& server, bool used_only, bool json, absl::optional<std::regex> regex)
-      : used_only_(used_only), json_(json), regex_(regex), stats_(server.stats()) {}
+  Context(Stats::Store& stats, bool used_only, bool json, absl::optional<std::regex> regex)
+      : used_only_(used_only), json_(json), regex_(regex), stats_(stats) {}
 
   // Admin::Handler
   Http::Code start(Http::ResponseHeaderMap& response_headers) override {
@@ -436,7 +438,12 @@ Admin::HandlerPtr StatsHandler::makeContext(absl::string_view path, AdminStream&
     }
   }
 
-  return std::make_unique<Context>(server_, used_only, json, regex);
+  return makeContext(server_.stats(), used_only, json, regex);
+}
+
+Admin::HandlerPtr StatsHandler::makeContext(Stats::Store& stats, bool used_only, bool json,
+                                            const absl::optional<std::regex>& regex) {
+  return std::make_unique<Context>(stats, used_only, json, regex);
 }
 
 #if 0

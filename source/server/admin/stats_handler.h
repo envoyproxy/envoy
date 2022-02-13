@@ -53,6 +53,8 @@ public:
                                Buffer::Instance& response, AdminStream&);
 
   Admin::HandlerPtr makeContext(absl::string_view path, AdminStream& admin_stream);
+  static Admin::HandlerPtr makeContext(Stats::Store& stats, bool used_only, bool json,
+                                       const absl::optional<std::regex>& regex);
 
   class JsonRender;
   class Render;
