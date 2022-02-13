@@ -39,7 +39,7 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
   // (2) the custom CEL vocabulary, registered using fillActivation.
   // The envoy native vocabulary is registered first and the custom cel vocabulary second.
   // In the event of overlap in the names of the vocabulary ("request", "response", etc.),
-  // the fillActivation implementor can remove the envoy native version and
+  // the fillActivation implementer can remove the envoy native version and
   // register a custom version.
   if (custom_cel_vocabulary) {
     custom_cel_vocabulary->fillActivation(activation.get(), arena, info, request_headers,

@@ -38,7 +38,7 @@ public:
   // (2) the custom CEL vocabulary, which is added to the activation in fillActivation.
   // The envoy native vocabulary is registered first and the custom CEL vocabulary second.
   // In the event of overlap in the names of the vocabulary (e.g. "request", "response", etc.),
-  // the fillActivation implementor can choose to remove the envoy native registration and
+  // the fillActivation implementer can choose to remove the envoy native registration and
   // register a custom version in its place.
   // It is not possible to remove function entries from the registry which exists for the life of
   // the application. But it is possible to remove them from the activation for the life of the
