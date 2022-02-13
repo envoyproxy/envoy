@@ -6,7 +6,8 @@
 #include "eval/public/cel_value.h"
 
 // Toy functions for the Example Custom CEL Vocabulary
-// Receiver style: If set to true, function calls have the form 4.getSquareOf instead of getSquareOf(4)
+// Receiver style: If set to true, function calls have the form 4.getSquareOf instead of
+// getSquareOf(4)
 
 namespace Envoy {
 namespace Extensions {

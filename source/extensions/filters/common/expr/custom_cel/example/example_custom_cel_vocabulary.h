@@ -1,17 +1,16 @@
 #pragma once
 
+#include "envoy/extensions/expr/custom_cel_vocabulary/example/v3/config.pb.h"
 #include "envoy/protobuf/message_validator.h"
+
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/expr/context.h"
+#include "source/extensions/filters/common/expr/custom_cel/custom_cel_vocabulary.h"
+#include "source/extensions/filters/common/expr/custom_cel/example/custom_cel_functions.h"
 
 #include "absl/strings/string_view.h"
 #include "eval/public/activation.h"
 #include "eval/public/cel_function_registry.h"
-
-#include "envoy/extensions/expr/custom_cel_vocabulary/example/v3/config.pb.h"
-
-#include "source/extensions/filters/common/expr/context.h"
-#include "source/extensions/filters/common/expr/custom_cel/custom_cel_vocabulary.h"
-#include "source/extensions/filters/common/expr/custom_cel/example/custom_cel_functions.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +26,7 @@ using envoy::extensions::expr::custom_cel_vocabulary::example::v3::ExampleCustom
 using google::api::expr::runtime::Activation;
 using google::api::expr::runtime::CelFunctionRegistry;
 
-//variable set / activation value producer names
+// variable set / activation value producer names
 constexpr absl::string_view CustomVariablesName = "custom";
 constexpr absl::string_view SourceVariablesName = "source";
 constexpr absl::string_view ExtendedRequestVariablesName = "request";
@@ -42,7 +41,7 @@ constexpr absl::string_view EagerEvalFuncNameGetSquareOf = "getSquareOf";
 class ExampleCustomCELVocabulary : public CustomCELVocabulary {
 public:
   ExampleCustomCELVocabulary(bool return_url_query_string_as_map)
-  : return_url_query_string_as_map_(return_url_query_string_as_map) {}
+      : return_url_query_string_as_map_(return_url_query_string_as_map) {}
 
   void fillActivation(Activation* activation, Protobuf::Arena& arena,
                       const StreamInfo::StreamInfo& info,
@@ -55,7 +54,7 @@ public:
 
   ~ExampleCustomCELVocabulary() override = default;
 
- private:
+private:
   bool return_url_query_string_as_map_;
 };
 

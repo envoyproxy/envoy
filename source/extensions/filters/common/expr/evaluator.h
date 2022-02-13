@@ -24,8 +24,8 @@ using BuilderPtr = std::unique_ptr<Builder>;
 using Expression = google::api::expr::runtime::CelExpression;
 using ExpressionPtr = std::unique_ptr<Expression>;
 
-using google::api::expr::runtime::CelValue;
 using Envoy::Extensions::Filters::Common::Expr::Custom_CEL::CustomCELVocabulary;
+using google::api::expr::runtime::CelValue;
 
 // Creates an activation providing the common context attributes.
 // The activation lazily creates wrappers during an evaluation using the evaluation arena.

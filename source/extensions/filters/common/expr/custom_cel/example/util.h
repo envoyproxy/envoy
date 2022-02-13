@@ -13,12 +13,14 @@ namespace Example {
 using google::api::expr::runtime::ContainerBackedListImpl;
 
 class Utility {
- public:
+public:
   Utility() = default;
 
   // appendList: Appends one ContainerBackedListImpl to another.
   // Memory is allocated for it on the arena.
-  static ContainerBackedListImpl* appendList(Protobuf::Arena& arena, const ContainerBackedListImpl* list1, const ContainerBackedListImpl* list2) {
+  static ContainerBackedListImpl* appendList(Protobuf::Arena& arena,
+                                             const ContainerBackedListImpl* list1,
+                                             const ContainerBackedListImpl* list2) {
     std::vector<CelValue> keys;
 
     for (int i = 0; i < list1->size(); ++i) {

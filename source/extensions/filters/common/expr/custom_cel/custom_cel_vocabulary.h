@@ -40,8 +40,9 @@ public:
   // In the event of overlap in the names of the vocabulary (e.g. "request", "response", etc.),
   // the fillActivation implementor can choose to remove the envoy native registration and
   // register a custom version in its place.
-  // It is not possible to remove function entries from the registry which exists for the life of the application.
-  // But it is possible to remove them from the activation for the life of the request.
+  // It is not possible to remove function entries from the registry which exists for the life of
+  // the application. But it is possible to remove them from the activation for the life of the
+  // request.
   virtual void fillActivation(Activation* activation, Protobuf::Arena& arena,
                               const StreamInfo::StreamInfo& info,
                               const Http::RequestHeaderMap* request_headers,

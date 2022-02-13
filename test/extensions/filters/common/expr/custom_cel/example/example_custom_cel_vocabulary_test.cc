@@ -1,11 +1,11 @@
-#include "envoy/protobuf/message_validator.h"
 #include "envoy/config/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/expr/custom_cel_vocabulary/example/v3/config.pb.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "source/extensions/filters/common/expr/custom_cel/custom_cel_vocabulary.h"
 #include "source/extensions/filters/common/expr/custom_cel/example/custom_cel_variables.h"
 #include "source/extensions/filters/common/expr/custom_cel/example/example_custom_cel_vocabulary.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
-#include "envoy/extensions/expr/custom_cel_vocabulary/example/v3/config.pb.h"
 
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
@@ -34,7 +34,7 @@ TEST(ExampleCustomCELVocabularyFactoryTests, CreateCustomCELVocabularyFromProtoT
   // the object should be created from the config without an exception being thrown by
   // validation visitor
   EXPECT_NO_THROW(custom_cel_vocabulary = factory.createCustomCELVocabulary(
-      config, ProtobufMessage::getStrictValidationVisitor()));
+                      config, ProtobufMessage::getStrictValidationVisitor()));
   ASSERT_TRUE(custom_cel_vocabulary);
   ExampleCustomCELVocabulary* example_custom_cel_vocabulary =
       dynamic_cast<ExampleCustomCELVocabulary*>(custom_cel_vocabulary.get());
@@ -64,12 +64,12 @@ TEST(ExampleCustomCELVocabularyFactoryTests, FactoryNameTest) {
 
 class ExampleCustomCELVocabularyTests : public testing::Test {
 public:
-  std::array<absl::string_view, 3> variable_set_names =
-      {CustomVariablesName, SourceVariablesName, ExtendedRequestVariablesName};
+  std::array<absl::string_view, 3> variable_set_names = {CustomVariablesName, SourceVariablesName,
+                                                         ExtendedRequestVariablesName};
   std::array<absl::string_view, 3> lazy_eval_function_names = {
       LazyEvalFuncNameGetDouble, LazyEvalFuncNameGetProduct, LazyEvalFuncNameGet99};
-  std::array<absl::string_view, 2> eager_eval_function_names =
-      {EagerEvalFuncNameGetNextInt, EagerEvalFuncNameGetSquareOf};
+  std::array<absl::string_view, 2> eager_eval_function_names = {EagerEvalFuncNameGetNextInt,
+                                                                EagerEvalFuncNameGetSquareOf};
 };
 
 TEST_F(ExampleCustomCELVocabularyTests, FillActivationTest) {
@@ -78,8 +78,8 @@ TEST_F(ExampleCustomCELVocabularyTests, FillActivationTest) {
   Protobuf::Arena arena;
   Activation activation;
 
-  custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info,
-                                                       nullptr, nullptr, nullptr);
+  custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, nullptr, nullptr,
+                                       nullptr);
 
   // verify that the variable sets are in the activation
   for (int i = 0; static_cast<size_t>(i) < variable_set_names.size(); ++i) {
@@ -123,45 +123,59 @@ const std::string SOURCE_HAS_DESCRIPTION_EXPR = R"EOF(
 // Given an activation with mappings for vocabulary,
 // create a RBAC policy with a condition derived from the given yaml,
 // create a CEL expression, and evaluate it.
-absl::StatusOr<CelValue> EvaluateExpressionWithCustomCelVocabulary(Activation& activation, Protobuf::Arena& arena,
-                                                const std::string& expr_yaml, ExampleCustomCELVocabulary& custom_cel_vocabulary) {
+absl::StatusOr<CelValue>
+EvaluateExpressionWithCustomCelVocabulary(Activation& activation, Protobuf::Arena& arena,
+                                          const std::string& expr_yaml,
+                                          ExampleCustomCELVocabulary& custom_cel_vocabulary) {
   envoy::config::rbac::v3::Policy policy;
-  policy.mutable_condition()->MergeFrom(TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(expr_yaml));
+  policy.mutable_condition()->MergeFrom(
+      TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(expr_yaml));
 
   using Envoy::Extensions::Filters::Common::Expr::BuilderPtr;
   using Envoy::Extensions::Filters::Common::Expr::ExpressionPtr;
   using Envoy::Extensions::Filters::Common::Expr::Custom_CEL::Example::ExampleCustomCELVocabulary;
-  BuilderPtr builder = Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr, &custom_cel_vocabulary);
+  BuilderPtr builder =
+      Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr, &custom_cel_vocabulary);
   ExpressionPtr expr = Expr::createExpression(*builder, policy.condition());
   return expr->Evaluate(activation, &arena);
 }
 
 TEST_F(ExampleCustomCELVocabularyTests, ReplaceDefaultMappingsWithCustomMappingsInActivationTest) {
   ExampleCustomCELVocabulary custom_cel_vocabulary(true);
-  Http::TestRequestHeaderMapImpl request_headers{{":path", "/query?a=apple&a=apricot&b=banana&=&c=cranberry"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/query?a=apple&a=apricot&b=banana&=&c=cranberry"}};
   StreamInfo::MockStreamInfo mock_stream_info;
   Protobuf::Arena arena;
   Activation activation;
 
   activation.InsertValueProducer(Source, std::make_unique<PeerWrapper>(mock_stream_info, false));
-  activation.InsertValueProducer(Request, std::make_unique<RequestWrapper>(arena, &request_headers, mock_stream_info));
+  activation.InsertValueProducer(
+      Request, std::make_unique<RequestWrapper>(arena, &request_headers, mock_stream_info));
 
   // The activation does not contain the mappings for the custom CEL vocabulary yet.
   // The check for custom CEL fields should evaluate to false.
-  auto has_custom_field_status = EvaluateExpressionWithCustomCelVocabulary(activation, arena, SOURCE_HAS_DESCRIPTION_EXPR, custom_cel_vocabulary);
-  ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() && !has_custom_field_status.value().BoolOrDie());
-  has_custom_field_status = EvaluateExpressionWithCustomCelVocabulary(activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
-  ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() && !has_custom_field_status.value().BoolOrDie());
+  auto has_custom_field_status = EvaluateExpressionWithCustomCelVocabulary(
+      activation, arena, SOURCE_HAS_DESCRIPTION_EXPR, custom_cel_vocabulary);
+  ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() &&
+              !has_custom_field_status.value().BoolOrDie());
+  has_custom_field_status = EvaluateExpressionWithCustomCelVocabulary(
+      activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
+  ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() &&
+              !has_custom_field_status.value().BoolOrDie());
 
   custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
                                        nullptr, nullptr);
 
   // The activation now contains the mappings for the custom CEL vocabulary.
   // The check for custom CEL fields should evaluate to true.
-  has_custom_field_status = EvaluateExpressionWithCustomCelVocabulary(activation, arena, SOURCE_HAS_DESCRIPTION_EXPR, custom_cel_vocabulary);
-  ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() && has_custom_field_status.value().BoolOrDie());
-  has_custom_field_status = EvaluateExpressionWithCustomCelVocabulary(activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
-  ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() && has_custom_field_status.value().BoolOrDie());
+  has_custom_field_status = EvaluateExpressionWithCustomCelVocabulary(
+      activation, arena, SOURCE_HAS_DESCRIPTION_EXPR, custom_cel_vocabulary);
+  ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() &&
+              has_custom_field_status.value().BoolOrDie());
+  has_custom_field_status = EvaluateExpressionWithCustomCelVocabulary(
+      activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
+  ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() &&
+              has_custom_field_status.value().BoolOrDie());
 }
 
 TEST_F(ExampleCustomCELVocabularyTests, AddCustomMappingsToActivationTwiceTest) {
@@ -171,17 +185,22 @@ TEST_F(ExampleCustomCELVocabularyTests, AddCustomMappingsToActivationTwiceTest) 
   absl::Status status;
   Activation activation;
 
-  activation.InsertValueProducer(CustomVariablesName, std::make_unique<CustomWrapper>(arena, mock_stream_info));
-  activation.InsertValueProducer(SourceVariablesName, std::make_unique<SourceWrapper>(arena, mock_stream_info));
-  activation.InsertValueProducer(ExtendedRequestVariablesName,
-                                 std::make_unique<ExtendedRequestWrapper>(arena, nullptr, mock_stream_info, false));
+  activation.InsertValueProducer(CustomVariablesName,
+                                 std::make_unique<CustomWrapper>(arena, mock_stream_info));
+  activation.InsertValueProducer(SourceVariablesName,
+                                 std::make_unique<SourceWrapper>(arena, mock_stream_info));
+  activation.InsertValueProducer(
+      ExtendedRequestVariablesName,
+      std::make_unique<ExtendedRequestWrapper>(arena, nullptr, mock_stream_info, false));
 
-  status = activation.InsertFunction(std::make_unique<GetDoubleCELFunction>(LazyEvalFuncNameGetDouble));
-  status = activation.InsertFunction(std::make_unique<GetProductCELFunction>(LazyEvalFuncNameGetProduct));
+  status =
+      activation.InsertFunction(std::make_unique<GetDoubleCELFunction>(LazyEvalFuncNameGetDouble));
+  status = activation.InsertFunction(
+      std::make_unique<GetProductCELFunction>(LazyEvalFuncNameGetProduct));
   status = activation.InsertFunction(std::make_unique<Get99CELFunction>(LazyEvalFuncNameGet99));
 
-  custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info,
-                                       nullptr, nullptr, nullptr);
+  custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, nullptr, nullptr,
+                                       nullptr);
 
   // verify that the variable sets are in the activation
   for (int i = 0; static_cast<size_t>(i) < variable_set_names.size(); ++i) {
@@ -237,9 +256,9 @@ TEST_F(ExampleCustomCELVocabularyTests, AddRegistrationsToRegistryTwiceTest) {
       GetProductCELFunction::createDescriptor(LazyEvalFuncNameGetProduct));
   status = registry.RegisterLazyFunction(Get99CELFunction::createDescriptor(LazyEvalFuncNameGet99));
   status = google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
-          EagerEvalFuncNameGetNextInt, false, getNextInt, &registry);
+      EagerEvalFuncNameGetNextInt, false, getNextInt, &registry);
   status = google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
-          EagerEvalFuncNameGetSquareOf, true, getSquareOf, &registry);
+      EagerEvalFuncNameGetSquareOf, true, getSquareOf, &registry);
 
   custom_cel_vocabulary.registerFunctions(&registry);
   auto functions = registry.ListFunctions();
@@ -267,8 +286,6 @@ TEST_F(ExampleCustomCELVocabularyTests, AddRegistrationsToRegistryTwiceTest) {
               1);
   }
 }
-
-
 
 } // namespace Example
 } // namespace Custom_CEL

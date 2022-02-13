@@ -23,8 +23,6 @@ public:
 };
 
 using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
-using CustomCelVocabulary =
-    Envoy::Extensions::Filters::Common::Expr::Custom_CEL::CustomCELVocabulary;
 using Expr::Custom_CEL::CustomCELVocabularyPtr;
 
 enum class EnforcementMode { Enforced, Shadow };

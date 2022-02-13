@@ -4,9 +4,9 @@
 
 #include "source/extensions/filters/common/expr/custom_cel/custom_cel_vocabulary.h"
 
+#include "eval/public/activation.h"
 #include "eval/public/builtin_func_registrar.h"
 #include "eval/public/cel_expr_builder_factory.h"
-#include "eval/public/activation.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -80,10 +80,9 @@ BuilderPtr createBuilder(Protobuf::Arena* arena, CustomCELVocabulary* custom_cel
   // RegisterBuiltinFunctions (up above).
   // These are functions that people would most likely not want to override.
   // Any custom CEL functions are registered second.
-  // In the event of overlap in names of built-in functions and custom functions (there shouldn't be any),
-  // CEL's built-in functions will take precedence over any custom CEL functions.
-  // The registry retains the first instance of a registration of a name and
-  // will not allow it to be overwritten.
+  // In the event of overlap in names of built-in functions and custom functions (there shouldn't be
+  // any), CEL's built-in functions will take precedence over any custom CEL functions. The registry
+  // retains the first instance of a registration of a name and will not allow it to be overwritten.
   if (custom_cel_vocabulary) {
     custom_cel_vocabulary->registerFunctions(builder->GetRegistry());
   }

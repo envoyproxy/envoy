@@ -8,9 +8,7 @@
 
 #include "absl/types/optional.h"
 #include "eval/public/cel_value.h"
-
 #include "eval/public/containers/container_backed_map_impl.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -73,7 +71,7 @@ class SourceVariablesTests : public VariablesTest {};
 TEST_F(SourceVariablesTests, ListKeysTest) {
   SourceWrapper source_vars(arena, mock_stream_info);
   PeerWrapper peer_vars(mock_stream_info, false);
-  EXPECT_EQ(source_vars.ListKeys()->size(), SourceList.size()+peer_vars.ListKeys()->size());
+  EXPECT_EQ(source_vars.ListKeys()->size(), SourceList.size() + peer_vars.ListKeys()->size());
 }
 
 TEST_F(SourceVariablesTests, AddressPortDescriptionTest) {
@@ -97,26 +95,30 @@ TEST_F(SourceVariablesTests, AddressPortDescriptionTest) {
 }
 
 class ExtendedRequestVariablesTests : public VariablesTest {
- public:
+public:
 };
 
 TEST_F(ExtendedRequestVariablesTests, ListKeysTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, false);
   RequestWrapper request_vars(arena, &request_headers, mock_stream_info);
-  EXPECT_EQ(extended_request_vars.ListKeys()->size(), ExtendedRequestList.size()+request_vars.ListKeys()->size());
+  EXPECT_EQ(extended_request_vars.ListKeys()->size(),
+            ExtendedRequestList.size() + request_vars.ListKeys()->size());
 }
 
 TEST_F(ExtendedRequestVariablesTests, QueryAsStringTest) {
-  Http::TestRequestHeaderMapImpl request_headers{{":path", "/query?a=apple&a=apricot&b=banana&=&c=cranberry"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/query?a=apple&a=apricot&b=banana&=&c=cranberry"}};
   ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, false);
   RequestWrapper request_vars(arena, &request_headers, mock_stream_info);
-  absl::string_view value = extended_request_vars[CelValue::CreateStringView("query")]->StringOrDie().value();
+  absl::string_view value =
+      extended_request_vars[CelValue::CreateStringView("query")]->StringOrDie().value();
   EXPECT_EQ(value, "a=apple&a=apricot&b=banana&=&c=cranberry");
 }
 
 TEST_F(ExtendedRequestVariablesTests, QueryAsMapTest) {
-  Http::TestRequestHeaderMapImpl request_headers{{":path", "/query?a=apple&a=apricot&b=banana&=&c=cranberry"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/query?a=apple&a=apricot&b=banana&=&c=cranberry"}};
   ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, true);
   auto cel_map = extended_request_vars[CelValue::CreateStringView("query")]->MapOrDie();
   auto value = (*cel_map)[CelValue::CreateStringView("a")]->StringOrDie().value();

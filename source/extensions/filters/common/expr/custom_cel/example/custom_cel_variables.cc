@@ -75,8 +75,8 @@ absl::optional<CelValue> ExtendedRequestWrapper::getMapFromQueryStr(absl::string
     // look for ampersands in "key=value&key=value..."
     ampersand_pos = query.find('&', start);
     if (ampersand_pos != std::string::npos) {
-      key_equals_value = query.substr(start, ampersand_pos-start);
-      start = ampersand_pos+1;
+      key_equals_value = query.substr(start, ampersand_pos - start);
+      start = ampersand_pos + 1;
     } else {
       key_equals_value = query.substr(start);
       start = query.length();
@@ -84,11 +84,11 @@ absl::optional<CelValue> ExtendedRequestWrapper::getMapFromQueryStr(absl::string
     equal_pos = 0;
     key = "";
     value = "";
-  std::cout << "********* key_equals_value: " << key_equals_value << std::endl;
+    std::cout << "********* key_equals_value: " << key_equals_value << std::endl;
     if ((equal_pos = key_equals_value.find('=')) != std::string::npos) {
       key = key_equals_value.substr(0, equal_pos);
       // skip if key is empty (e.g. "=value" or "=")
-      if (key.length()==0) {
+      if (key.length() == 0) {
         continue;
       }
       // search key_value_pairs to see if key already exists
@@ -104,20 +104,16 @@ absl::optional<CelValue> ExtendedRequestWrapper::getMapFromQueryStr(absl::string
         continue;
       }
       value = key_equals_value.substr(equal_pos + 1);
-  std::cout << "********* key: " << key << " value: " << value << std::endl;
-      auto key_value_pair = std::make_pair
-          (CelValue::CreateString(Protobuf::Arena::Create<std::string>(&arena_,
-                                                                       key)),
-           CelValue::CreateString(Protobuf::Arena::Create<std::string>(&arena_,
-                                                                       value)));
+      std::cout << "********* key: " << key << " value: " << value << std::endl;
+      auto key_value_pair = std::make_pair(
+          CelValue::CreateString(Protobuf::Arena::Create<std::string>(&arena_, key)),
+          CelValue::CreateString(Protobuf::Arena::Create<std::string>(&arena_, value)));
       key_value_pairs.push_back(key_value_pair);
     }
   }
   // create ContainerBackedMapIml
   std::unique_ptr<CelMap> query_str_map =
-      CreateContainerBackedMap(
-          absl::Span<std::pair<CelValue, CelValue>>(key_value_pairs))
-          .value();
+      CreateContainerBackedMap(absl::Span<std::pair<CelValue, CelValue>>(key_value_pairs)).value();
 
   // transfer ownership of map from unique_ptr to arena
   CelMap* query_str_map_raw_ptr = query_str_map.release();
