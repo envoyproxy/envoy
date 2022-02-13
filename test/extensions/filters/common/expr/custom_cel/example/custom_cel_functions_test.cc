@@ -11,12 +11,12 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace Custom_Cel {
+namespace Custom_CEL {
 namespace Example {
 
 using google::api::expr::runtime::CelValue;
 
-class CustomCelFunctionsTests : public testing::Test {
+class CustomCELFunctionsTests : public testing::Test {
 public:
   Protobuf::Arena arena;
   CelValue result;
@@ -28,8 +28,8 @@ void matchDescriptorsTest(CelFunctionDescriptor descriptor1, CelFunctionDescript
   EXPECT_EQ(descriptor1.types(), descriptor2.types());
 }
 
-TEST_F(CustomCelFunctionsTests, GetProductCelFunctionTest) {
-  GetProductCelFunction function("GetProduct");
+TEST_F(CustomCELFunctionsTests, GetProductCELFunctionTest) {
+  GetProductCELFunction function("GetProduct");
   std::vector<CelValue> input_values = {CelValue::CreateInt64(2), CelValue::CreateInt64(3)};
   auto args = absl::Span<CelValue>(input_values);
   absl::Status status = function.Evaluate(args, &result, &arena);
@@ -38,8 +38,8 @@ TEST_F(CustomCelFunctionsTests, GetProductCelFunctionTest) {
   matchDescriptorsTest(function.createDescriptor("GetProduct"), function.descriptor());
 }
 
-TEST_F(CustomCelFunctionsTests, GetDoubleCelFunctionTest) {
-  GetDoubleCelFunction function("GetDouble");
+TEST_F(CustomCELFunctionsTests, GetDoubleCELFunctionTest) {
+  GetDoubleCELFunction function("GetDouble");
   std::vector<CelValue> input_values = {CelValue::CreateInt64(2)};
   auto args = absl::Span<CelValue>(input_values);
   absl::Status status = function.Evaluate(args, &result, &arena);
@@ -48,8 +48,8 @@ TEST_F(CustomCelFunctionsTests, GetDoubleCelFunctionTest) {
   matchDescriptorsTest(function.createDescriptor("GetDouble"), function.descriptor());
 }
 
-TEST_F(CustomCelFunctionsTests, Get99CelFunctionTest) {
-  Get99CelFunction function("Get99");
+TEST_F(CustomCELFunctionsTests, Get99CELFunctionTest) {
+  Get99CELFunction function("Get99");
   std::vector<CelValue> input_values = {};
   auto args = absl::Span<CelValue>(input_values);
   absl::Status status = function.Evaluate(args, &result, &arena);
@@ -58,16 +58,16 @@ TEST_F(CustomCelFunctionsTests, Get99CelFunctionTest) {
   matchDescriptorsTest(function.createDescriptor("Get99"), function.descriptor());
 }
 
-TEST_F(CustomCelFunctionsTests, GetSquareOfTest) {
+TEST_F(CustomCELFunctionsTests, GetSquareOfTest) {
   EXPECT_EQ(getSquareOf(&arena, 4).Int64OrDie(), 16);
 }
 
-TEST_F(CustomCelFunctionsTests, GetNextIntTest) {
+TEST_F(CustomCELFunctionsTests, GetNextIntTest) {
   EXPECT_EQ(getNextInt(&arena, 10).Int64OrDie(), 11);
 }
 
 } // namespace Example
-} // namespace Custom_Cel
+} // namespace Custom_CEL
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

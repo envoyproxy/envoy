@@ -28,6 +28,8 @@ envoy_cc_library(
     srcs = ["custom_cel_variables.cc"],
     hdrs = ["custom_cel_variables.h"],
     deps = [
+        ":util_lib",
+        "//source/common/common:logger_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
@@ -35,7 +37,15 @@ envoy_cc_library(
         "//source/extensions/filters/common/expr:context_lib",
         "//source/extensions/filters/common/expr/custom_cel:custom_cel_vocabulary_lib",
         "@com_google_cel_cpp//eval/public:cel_value",
+        "@com_google_cel_cpp//eval/public/containers:container_backed_list_impl",
+        "@com_google_cel_cpp//eval/public/containers:container_backed_map_impl",
     ],
+)
+
+envoy_cc_library(
+    name = "util_lib",
+    hdrs = ["util.h"],
+    deps = ["@com_google_cel_cpp//eval/public/containers:container_backed_list_impl"],
 )
 
 envoy_cc_extension(

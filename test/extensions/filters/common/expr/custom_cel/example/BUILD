@@ -27,6 +27,7 @@ envoy_cc_test(
         "@com_google_cel_cpp//eval/public:cel_function_adapter",
         "@com_google_cel_cpp//eval/public:cel_function_registry",
         "@com_google_cel_cpp//eval/public:cel_value",
+        "@com_google_cel_cpp//eval/public/containers:container_backed_map_impl",
     ],
 )
 
@@ -52,6 +53,7 @@ envoy_cc_test(
     srcs = ["example_custom_cel_vocabulary_test.cc"],
     deps = [
         "//source/common/protobuf:message_validator_lib",
+        "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/common/expr/custom_cel:custom_cel_vocabulary_lib",
         "//source/extensions/filters/common/expr/custom_cel/example:custom_cel_variables_lib",
         "//source/extensions/filters/common/expr/custom_cel/example:example_custom_cel_vocabulary_lib",
@@ -61,5 +63,7 @@ envoy_cc_test(
         "@com_google_cel_cpp//eval/public:activation",
         "@com_google_cel_cpp//eval/public:cel_function_adapter",
         "@com_google_cel_cpp//eval/public:cel_function_registry",
+        "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/expr/custom_cel_vocabulary/example/v3:pkg_cc_proto",
     ],
 )

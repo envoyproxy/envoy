@@ -8,6 +8,9 @@
 
 #include "absl/types/optional.h"
 #include "eval/public/cel_value.h"
+
+#include "eval/public/containers/container_backed_map_impl.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -16,14 +19,16 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace Custom_Cel {
+namespace Custom_CEL {
 namespace Example {
 
-class CustomVariablesTests : public testing::Test {
+class VariablesTest : public testing::Test {
 public:
   Protobuf::Arena arena;
   StreamInfo::MockStreamInfo mock_stream_info;
 };
+
+class CustomVariablesTests : public VariablesTest {};
 
 TEST_F(CustomVariablesTests, ListKeysTest) {
   CustomWrapper custom_vars(arena, mock_stream_info);
@@ -42,7 +47,7 @@ TEST_F(CustomVariablesTests, TeamTest) {
   EXPECT_EQ(value->StringOrDie().value(), "spirit");
 }
 
-TEST_F(CustomVariablesTests, NonexistentTest) {
+TEST_F(CustomVariablesTests, NonexistentKeyTest) {
   CustomWrapper custom_vars(arena, mock_stream_info);
   auto value = custom_vars[CelValue::CreateStringView("nonexistent")];
   ASSERT_FALSE(value.has_value());
@@ -63,15 +68,12 @@ TEST_F(CustomVariablesTests, ProtocolIsHttp10Test) {
   EXPECT_EQ(value->StringOrDie().value(), "HTTP/1.0");
 }
 
-class SourceVariablesTests : public testing::Test {
-public:
-  Protobuf::Arena arena;
-  StreamInfo::MockStreamInfo mock_stream_info;
-};
+class SourceVariablesTests : public VariablesTest {};
 
 TEST_F(SourceVariablesTests, ListKeysTest) {
   SourceWrapper source_vars(arena, mock_stream_info);
-  EXPECT_EQ(source_vars.ListKeys()->size(), SourceList.size());
+  PeerWrapper peer_vars(mock_stream_info, false);
+  EXPECT_EQ(source_vars.ListKeys()->size(), SourceList.size()+peer_vars.ListKeys()->size());
 }
 
 TEST_F(SourceVariablesTests, AddressPortDescriptionTest) {
@@ -94,8 +96,37 @@ TEST_F(SourceVariablesTests, AddressPortDescriptionTest) {
   EXPECT_EQ(value->StringOrDie().value(), "description: has address, port values");
 }
 
+class ExtendedRequestVariablesTests : public VariablesTest {
+ public:
+};
+
+TEST_F(ExtendedRequestVariablesTests, ListKeysTest) {
+  Http::TestRequestHeaderMapImpl request_headers;
+  ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, false);
+  RequestWrapper request_vars(arena, &request_headers, mock_stream_info);
+  EXPECT_EQ(extended_request_vars.ListKeys()->size(), ExtendedRequestList.size()+request_vars.ListKeys()->size());
+}
+
+TEST_F(ExtendedRequestVariablesTests, QueryAsStringTest) {
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/query?a=apple&a=apricot&b=banana&=&c=cranberry"}};
+  ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, false);
+  RequestWrapper request_vars(arena, &request_headers, mock_stream_info);
+  absl::string_view value = extended_request_vars[CelValue::CreateStringView("query")]->StringOrDie().value();
+  EXPECT_EQ(value, "a=apple&a=apricot&b=banana&=&c=cranberry");
+}
+
+TEST_F(ExtendedRequestVariablesTests, QueryAsMapTest) {
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/query?a=apple&a=apricot&b=banana&=&c=cranberry"}};
+  ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, true);
+  auto cel_map = extended_request_vars[CelValue::CreateStringView("query")]->MapOrDie();
+  auto value = (*cel_map)[CelValue::CreateStringView("a")]->StringOrDie().value();
+  EXPECT_EQ(value, "apple");
+  value = (*cel_map)[CelValue::CreateStringView("c")]->StringOrDie().value();
+  EXPECT_EQ(value, "cranberry");
+}
+
 } // namespace Example
-} // namespace Custom_Cel
+} // namespace Custom_CEL
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

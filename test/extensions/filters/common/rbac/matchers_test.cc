@@ -483,13 +483,12 @@ TEST(PolicyMatcherWithCustomCelVocabulary, PolicyMatcherWithCustomCelVocabulary)
       fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "spirit")));
 
   using Envoy::Extensions::Filters::Common::Expr::BuilderPtr;
-  using Envoy::Extensions::Filters::Common::Expr::Custom_Cel::Example::ExampleCustomCelVocabulary;
-  std::unique_ptr<ExampleCustomCelVocabulary> custom_cel_vocabulary =
-      std::make_unique<ExampleCustomCelVocabulary>();
+  using Envoy::Extensions::Filters::Common::Expr::Custom_CEL::Example::ExampleCustomCELVocabulary;
+  ExampleCustomCELVocabulary custom_cel_vocabulary(true);
   BuilderPtr builder =
-      Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr, custom_cel_vocabulary.get());
+      Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr, &custom_cel_vocabulary);
   RBAC::PolicyMatcher matcher(policy, builder.get(), ProtobufMessage::getStrictValidationVisitor(),
-                              custom_cel_vocabulary.get());
+                              &custom_cel_vocabulary);
 
   // condition should return true
   checkMatcher(matcher, true, conn, headers, info);
@@ -502,7 +501,7 @@ TEST(PolicyMatcherWithCustomCelVocabulary, PolicyMatcherWithCustomCelVocabulary)
 
   RBAC::PolicyMatcher matcher2(policy2, builder.get(),
                                ProtobufMessage::getStrictValidationVisitor(),
-                               custom_cel_vocabulary.get());
+                               &custom_cel_vocabulary);
 
   // condition should return false
   checkMatcher(matcher2, false, conn, headers, info);

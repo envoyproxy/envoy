@@ -13,8 +13,8 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-using CustomCelVocabularyFactory =
-    Envoy::Extensions::Filters::Common::Expr::Custom_Cel::CustomCelVocabularyFactory;
+using CustomCELVocabularyFactory =
+    Envoy::Extensions::Filters::Common::Expr::Custom_CEL::CustomCELVocabularyFactory;
 
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     const envoy::config::rbac::v3::RBAC& rules,
@@ -23,11 +23,12 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
   // guard expression builder by presence of a condition in policies
 
   if (rules.has_custom_cel_vocabulary_config()) {
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<CustomCelVocabularyFactory>(
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<CustomCELVocabularyFactory>(
         rules.custom_cel_vocabulary_config());
     auto config = Config::Utility::translateToFactoryConfig(rules.custom_cel_vocabulary_config(),
                                                             validation_visitor, factory);
-    custom_cel_vocabulary_ = factory.createCustomCelVocabulary(*config, validation_visitor);
+    custom_cel_vocabulary_ =
+        factory.createCustomCELVocabulary(*config, validation_visitor);
   } else {
     custom_cel_vocabulary_ = nullptr;
   }

@@ -5,25 +5,26 @@
 #include "eval/public/cel_function.h"
 #include "eval/public/cel_value.h"
 
-// Toy functions for the example custom cel vocabulary
+// Toy functions for the Example Custom CEL Vocabulary
+// Receiver style: If set to true, function calls have the form 4.getSquareOf instead of getSquareOf(4)
 
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace Custom_Cel {
+namespace Custom_CEL {
 namespace Example {
 
 using google::api::expr::runtime::CelFunction;
 using google::api::expr::runtime::CelFunctionDescriptor;
 using google::api::expr::runtime::CelValue;
 
-class GetProductCelFunction : public CelFunction {
+class GetProductCELFunction : public CelFunction {
 public:
-  explicit GetProductCelFunction(absl::string_view name)
+  explicit GetProductCELFunction(absl::string_view name)
       : CelFunction({std::string(name), false, {CelValue::Type::kInt64, CelValue::Type::kInt64}}) {}
-  explicit GetProductCelFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
+  explicit GetProductCELFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
 
   static CelFunctionDescriptor createDescriptor(absl::string_view name) {
     return CelFunctionDescriptor{name, false, {CelValue::Type::kInt64, CelValue::Type::kInt64}};
@@ -33,11 +34,11 @@ public:
                         Protobuf::Arena* arena) const override;
 };
 
-class GetDoubleCelFunction : public CelFunction {
+class GetDoubleCELFunction : public CelFunction {
 public:
-  explicit GetDoubleCelFunction(absl::string_view name)
+  explicit GetDoubleCELFunction(absl::string_view name)
       : CelFunction({std::string(name), false, {CelValue::Type::kInt64}}) {}
-  explicit GetDoubleCelFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
+  explicit GetDoubleCELFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
 
   static CelFunctionDescriptor createDescriptor(absl::string_view name) {
     return CelFunctionDescriptor{name, false, {CelValue::Type::kInt64}};
@@ -47,10 +48,10 @@ public:
                         Protobuf::Arena* arena) const override;
 };
 
-class Get99CelFunction : public CelFunction {
+class Get99CELFunction : public CelFunction {
 public:
-  explicit Get99CelFunction(absl::string_view name) : CelFunction({std::string(name), false, {}}) {}
-  explicit Get99CelFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
+  explicit Get99CELFunction(absl::string_view name) : CelFunction({std::string(name), false, {}}) {}
+  explicit Get99CELFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
 
   static CelFunctionDescriptor createDescriptor(absl::string_view name) {
     return CelFunctionDescriptor{name, false, {}};
@@ -65,7 +66,7 @@ CelValue getSquareOf(Protobuf::Arena* arena, int64_t i);
 CelValue getNextInt(Protobuf::Arena* arena, int64_t i);
 
 } // namespace Example
-} // namespace Custom_Cel
+} // namespace Custom_CEL
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

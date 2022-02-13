@@ -24,8 +24,8 @@ public:
 
 using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
 using CustomCelVocabulary =
-    Envoy::Extensions::Filters::Common::Expr::Custom_Cel::CustomCelVocabulary;
-using Expr::Custom_Cel::CustomCelVocabularyPtr;
+    Envoy::Extensions::Filters::Common::Expr::Custom_CEL::CustomCELVocabulary;
+using Expr::Custom_CEL::CustomCELVocabularyPtr;
 
 enum class EnforcementMode { Enforced, Shadow };
 
@@ -56,7 +56,7 @@ private:
   Protobuf::Arena constant_arena_;
   Expr::BuilderPtr builder_;
 
-  CustomCelVocabularyPtr custom_cel_vocabulary_;
+  CustomCELVocabularyPtr custom_cel_vocabulary_;
 };
 
 } // namespace RBAC

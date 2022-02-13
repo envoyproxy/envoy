@@ -24,8 +24,8 @@ namespace RBAC {
 
 class Matcher;
 using MatcherConstSharedPtr = std::shared_ptr<const Matcher>;
-using Envoy::Extensions::Filters::Common::Expr::Custom_Cel::CustomCelVocabulary;
-using Expr::Custom_Cel::CustomCelVocabularyPtr;
+using Envoy::Extensions::Filters::Common::Expr::Custom_CEL::CustomCELVocabulary;
+using Expr::Custom_CEL::CustomCELVocabularyPtr;
 
 /**
  *  Matchers describe the rules for matching either a permission action or principal.
@@ -218,7 +218,7 @@ public:
 
   PolicyMatcher(const envoy::config::rbac::v3::Policy& policy, Expr::Builder* builder,
                 ProtobufMessage::ValidationVisitor& validation_visitor,
-                CustomCelVocabulary* custom_cel_vocabulary)
+                CustomCELVocabulary* custom_cel_vocabulary)
       : permissions_(policy.permissions(), validation_visitor), principals_(policy.principals()),
         condition_(policy.condition()), custom_cel_vocabulary_(custom_cel_vocabulary) {
     if (policy.has_condition()) {
@@ -234,7 +234,7 @@ private:
   const OrMatcher principals_;
   const google::api::expr::v1alpha1::Expr condition_;
   Expr::ExpressionPtr expr_;
-  CustomCelVocabulary* custom_cel_vocabulary_;
+  CustomCELVocabulary* custom_cel_vocabulary_;
 };
 
 class MetadataMatcher : public Matcher {

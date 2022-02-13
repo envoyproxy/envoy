@@ -6,6 +6,7 @@
 
 #include "eval/public/builtin_func_registrar.h"
 #include "eval/public/cel_expr_builder_factory.h"
+#include "eval/public/activation.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,20 +18,8 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
                                const Http::RequestHeaderMap* request_headers,
                                const Http::ResponseHeaderMap* response_headers,
                                const Http::ResponseTrailerMap* response_trailers,
-                               CustomCelVocabulary* custom_cel_vocabulary) {
+                               CustomCELVocabulary* custom_cel_vocabulary) {
   auto activation = std::make_unique<Activation>();
-
-  // There are two set of variables and functions: (1) the default vocabulary (Request, Response,
-  // Connection, etc.) and (2) the custom cel vocabulary. The custom cel vocabulary's variables and
-  // functions will take precedence over the default variables and functions (Request, Response,
-  // Connection etc.), in the event of any overlap of names. The custom cel vocabulary's variables
-  // and functions are registered first. The default variables and functions (Request, Response,
-  // Connection, etc.) are registered second. The activation mapping will retain the first
-  // registration of a name and not allow it to be overwritten.
-  if (custom_cel_vocabulary) {
-    custom_cel_vocabulary->fillActivation(activation.get(), arena, info, request_headers,
-                                          response_headers, response_trailers);
-  }
 
   activation->InsertValueProducer(Request,
                                   std::make_unique<RequestWrapper>(arena, request_headers, info));
@@ -45,12 +34,24 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
   activation->InsertValueProducer(FilterState,
                                   std::make_unique<FilterStateWrapper>(info.filterState()));
 
+  // fillActivation: There are two sets of vocabulary (variables and functions):
+  // (1) the envoy native CEL vocabulary (Request, Response, Connection, etc.) registered above and
+  // (2) the custom CEL vocabulary, registered using fillActivation.
+  // The envoy native vocabulary is registered first and the custom cel vocabulary second.
+  // In the event of overlap in the names of the vocabulary ("request", "response", etc.),
+  // the fillActivation implementor can remove the envoy native version and
+  // register a custom version.
+  if (custom_cel_vocabulary) {
+    custom_cel_vocabulary->fillActivation(activation.get(), arena, info, request_headers,
+                                          response_headers, response_trailers);
+  }
+
   return activation;
 }
 
 BuilderPtr createBuilder(Protobuf::Arena* arena) { return createBuilder(arena, nullptr); }
 
-BuilderPtr createBuilder(Protobuf::Arena* arena, CustomCelVocabulary* custom_cel_vocabulary) {
+BuilderPtr createBuilder(Protobuf::Arena* arena, CustomCELVocabulary* custom_cel_vocabulary) {
   google::api::expr::runtime::InterpreterOptions options;
 
   // Security-oriented defaults
@@ -71,15 +72,18 @@ BuilderPtr createBuilder(Protobuf::Arena* arena, CustomCelVocabulary* custom_cel
   auto register_status =
       google::api::expr::runtime::RegisterBuiltinFunctions(builder->GetRegistry(), options);
   if (!register_status.ok()) {
-    throw CelException(
+    throw CELException(
         absl::StrCat("failed to register built-in functions: ", register_status.message()));
   }
 
-  // Cel's built-in functions (e.g. +, -, !, *, etc.) are registered first using
-  // RegisterBuiltinFunctions. These are functions that people would most likely not want to
-  // override. Cel's built-in functions will take precedence over any custom cel functions. The
-  // custom cel functions are registered second. The registration retains the first instance of a
-  // registration of a name and will not allow it to be overwritten.
+  // CEL's built-in functions (e.g. +, -, !, *, etc.) are registered first using
+  // RegisterBuiltinFunctions (up above).
+  // These are functions that people would most likely not want to override.
+  // Any custom CEL functions are registered second.
+  // In the event of overlap in names of built-in functions and custom functions (there shouldn't be any),
+  // CEL's built-in functions will take precedence over any custom CEL functions.
+  // The registry retains the first instance of a registration of a name and
+  // will not allow it to be overwritten.
   if (custom_cel_vocabulary) {
     custom_cel_vocabulary->registerFunctions(builder->GetRegistry());
   }
@@ -91,7 +95,7 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
   google::api::expr::v1alpha1::SourceInfo source_info;
   auto cel_expression_status = builder.CreateExpression(&expr, &source_info);
   if (!cel_expression_status.ok()) {
-    throw CelException(
+    throw CELException(
         absl::StrCat("failed to create an expression: ", cel_expression_status.status().message()));
   }
   return std::move(cel_expression_status.value());
@@ -110,12 +114,16 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
                                   const Http::RequestHeaderMap* request_headers,
                                   const Http::ResponseHeaderMap* response_headers,
                                   const Http::ResponseTrailerMap* response_trailers,
-                                  CustomCelVocabulary* custom_cel_vocabulary) {
+                                  CustomCELVocabulary* custom_cel_vocabulary) {
   auto activation = createActivation(arena, info, request_headers, response_headers,
                                      response_trailers, custom_cel_vocabulary);
   auto eval_status = expr.Evaluate(*activation, &arena);
   if (!eval_status.ok()) {
     return {};
+  }
+  if (eval_status->IsError()) {
+    auto error = eval_status->ErrorOrDie();
+    ENVOY_LOG_MISC(debug, "evaluate error: ", error->message());
   }
 
   return eval_status.value();
@@ -127,7 +135,7 @@ bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
 }
 
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
-             const Http::RequestHeaderMap& headers, CustomCelVocabulary* custom_cel_vocabulary) {
+             const Http::RequestHeaderMap& headers, CustomCELVocabulary* custom_cel_vocabulary) {
   Protobuf::Arena arena;
   auto eval_status =
       Expr::evaluate(expr, arena, info, &headers, nullptr, nullptr, custom_cel_vocabulary);

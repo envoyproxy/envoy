@@ -18,5 +18,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // This is an implementation of the category envoy.expr.custom_cel_vocabulary
 // This is empty but any necessary fields can be added.
 // [#extension: envoy.expr.custom_cel_vocabulary.example]
-message ExampleCustomCelVocabularyConfig {
+message ExampleCustomCELVocabularyConfig {
+  bool return_url_query_string_as_map = 1;
 }
