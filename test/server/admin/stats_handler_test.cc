@@ -801,8 +801,7 @@ TEST_P(AdminInstanceTest, RecentLookups) {
 class StatsHandlerPrometheusTest : public StatsHandlerTest {
 public:
   Http::TestResponseHeaderMapImpl response_headers;
-  Buffer::OwnedImpl data;
-  MockAdminStream admin_stream;
+  std::string data;
 
   void createTestStats() {
     Stats::StatNameTagVector c1Tags{{makeStat("cluster"), makeStat("c1")}};
@@ -828,7 +827,6 @@ public:
   }
 };
 
-#if 0
 class StatsHandlerPrometheusDefaultTest
     : public StatsHandlerPrometheusTest,
       public testing::TestWithParam<Network::Address::IpVersion> {};
@@ -853,9 +851,9 @@ envoy_cluster_upstream_cx_active{cluster="c2"} 12
 
 )EOF";
 
-  Http::Code code = handlerStats(*instance, url, response_headers, data, admin_stream);
+  Http::Code code = handlerStats(*instance, url, data);
   EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_THAT(expected_response, data.toString());
+  EXPECT_THAT(expected_response, data);
 
   shutdownThreading();
 }
@@ -877,7 +875,6 @@ TEST_P(StatsHandlerPrometheusWithTextReadoutsTest, StatsHandlerPrometheusWithTex
 
   createTestStats();
   std::shared_ptr<MockInstance> instance = setupMockedInstance();
-  StatsHandler handler(*instance);
 
   const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
 envoy_cluster_upstream_cx_total{cluster="c1"} 10
@@ -892,13 +889,12 @@ envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
 
 )EOF";
 
-  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  Http::Code code = handlerStats(*instance, url, data);
   EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_THAT(expected_response, data.toString());
+  EXPECT_THAT(expected_response, data);
 
   shutdownThreading();
 }
-#endif
 
 } // namespace Server
 } // namespace Envoy

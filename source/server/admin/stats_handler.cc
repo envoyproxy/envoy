@@ -157,7 +157,6 @@ public:
   }
 
   void render(Buffer::Instance& response) override {
-    // emitStats(response);
     if (found_used_histogram_) {
       auto* histograms_obj_fields = histograms_obj_.mutable_fields();
       (*histograms_obj_fields)["computed_quantiles"] =
@@ -166,29 +165,12 @@ public:
       (*histograms_obj_container_fields)["histograms"] = ValueUtil::structValue(histograms_obj_);
       auto str = MessageUtil::getJsonStringFromMessageOrDie(
           ValueUtil::structValue(histograms_obj_container_), false /* pretty */, true);
-      // stats_array_.push_back();
-      // ENVOY_LOG_MISC(error, "histograms: {}", str);
-      // response.addFragments({"  ", str, "\n"});
       addStatJson(response, str);
     }
-
-    // auto* document_fields = document_.mutable_fields();
-    //(*document_fields)["stats"] = ValueUtil::listValue(stats_array_);
-    // response.add(MessageUtil::getJsonStringFromMessageOrDie(document_, false /* pretty */,
-    // true));
     response.add("]}");
   }
 
-  bool nextChunk(Buffer::Instance& response) override {
-    return response.length() > ChunkSize;
-    /*
-    if (++chunk_count_ == 10000) {
-      emitStats(response);
-      return true;
-    }
-    return false;
-    */
-  }
+  bool nextChunk(Buffer::Instance& response) override { return response.length() > ChunkSize; }
 
 private:
   template <class Value>
@@ -197,23 +179,9 @@ private:
     auto* stat_obj_fields = stat_obj.mutable_fields();
     (*stat_obj_fields)["name"] = ValueUtil::stringValue(name);
     (*stat_obj_fields)["value"] = value;
-    // stats_array_.push_back(ValueUtil::structValue(stat_obj));
     auto str = MessageUtil::getJsonStringFromMessageOrDie(stat_obj, false /* pretty */, true);
-    // ENVOY_LOG_MISC(error, "emitting: {}", str);
-    // response.addFragments({"  ", str, ",\n"});
     addStatJson(response, str);
   }
-
-#if 0
-  void emitStats(Buffer::Instance& response) {
-    auto str = MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::listValue(stats_array_),
-                                                          false /* pretty */, true);
-    // ENVOY_LOG_MISC(error, "emitting: {}", str);
-    response.add(str);
-    chunk_count_ = 0;
-    stats_array_.clear();
-  }
-#endif
 
   void addStatJson(Buffer::Instance& response, const std::string& json) {
     if (first_) {
@@ -224,7 +192,6 @@ private:
     }
   }
 
-  // uint32_t chunk_count_{0};
   ProtobufWkt::Struct document_;
   std::vector<ProtobufWkt::Value> stats_array_;
   std::vector<ProtobufWkt::Value> scope_array_;
