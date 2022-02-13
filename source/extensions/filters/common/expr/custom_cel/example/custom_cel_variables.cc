@@ -111,7 +111,7 @@ absl::optional<CelValue> ExtendedRequestWrapper::getMapFromQueryStr(absl::string
       key_value_pairs.push_back(key_value_pair);
     }
   }
-  // create ContainerBackedMapIml
+  // create ContainerBackedMapImpl
   std::unique_ptr<CelMap> query_str_map =
       CreateContainerBackedMap(absl::Span<std::pair<CelValue, CelValue>>(key_value_pairs)).value();
 
