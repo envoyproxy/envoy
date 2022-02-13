@@ -1218,7 +1218,11 @@ void ConfigHelper::initializeTlsKeyLog(
     return;
   }
   auto tls_keylog_path = tls_context.mutable_tls_keylog()->mutable_logfile_path();
+#ifdef _MSC_VER
+  *tls_keylog_path = std::string("nul");
+#else
   *tls_keylog_path = std::string("/dev/null");
+#endif
   if (mode & 0x1) {
     auto tls_keylog_local = tls_context.mutable_tls_keylog()->mutable_local_address_range();
     auto new_element_local = tls_keylog_local->Add();
