@@ -58,7 +58,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
           filter_state
               .getDataMutable<Network::UpstreamSocketOptionsFilterState>(
                   Network::UpstreamSocketOptionsFilterState::key())
-              .addOption(
+              ->addOption(
                   Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
         }
       }
