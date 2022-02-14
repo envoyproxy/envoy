@@ -436,7 +436,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptorStatus) {
                             *descriptors_.Add());
   initializeWithDescriptor(std::chrono::milliseconds(3000), 2, 2);
 
-  /// 2 -> 1 tokens
+  // 2 -> 1 tokens
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(3000), nullptr));
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
   EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
