@@ -56,7 +56,7 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
 
   // This is going to stomp over custom log levels that are set on the command line.
   EXPECT_EQ("200", request("admin", "POST", "/logging?level=warning", response));
-  for (auto&& [_, logger] : Logger::Registry::loggers()) {
+  for (const Logger::Logger& logger : Logger::Registry::loggers()) {
     EXPECT_EQ("warning", logger.levelString());
   }
 
