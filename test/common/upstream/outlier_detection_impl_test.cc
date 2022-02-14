@@ -1842,6 +1842,8 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTime) {
 // the maximum ejection time will be equal to
 // max_ejection_time + base_ejection_time.
 TEST_F(OutlierDetectorImplTest, MaxEjectTimeNotAlligned) {
+
+
   // Setup interval time to 10 secs.
   ON_CALL(runtime_.snapshot_, getInteger(IntervalMsRuntime, _)).WillByDefault(Return(10000UL));
   ON_CALL(runtime_.snapshot_, getInteger(BaseEjectionTimeMsRuntime, _))
@@ -1924,6 +1926,46 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTimeNotAlligned) {
     EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
   }
 }
+
+// Test verifies that detector is properly initialized with
+//  max_ejection_time_jitter when such value is specified in
+// the config
+TEST_F(OutlierDetectorImplTest, DetectorStaticConfigMaxEjectionTimeJitter) {
+  const std::string yaml = R"EOF(
+interval: 0.1s
+base_ejection_time: 10s
+max_ejection_time_jitter: 13s
+  )EOF";
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, outlier_detection, dispatcher_, runtime_, time_system_, event_logger_, random_));
+
+  EXPECT_EQ(100UL, detector->config().intervalMs());
+  EXPECT_EQ(10000UL, detector->config().baseEjectionTimeMs());
+  EXPECT_EQ(13000UL, detector->config().maxEjectionTimeJitterMs());
+}
+
+// Test verifies that detector is properly initialized with
+// default max_ejection_time_jitter when such value is
+// not specified in config.
+TEST_F(OutlierDetectorImplTest, DetectorStaticConfigDefaultMaxEjectionTimeJitter) {
+  const std::string yaml = R"EOF(
+interval: 0.1s
+base_ejection_time: 10s
+  )EOF";
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, outlier_detection, dispatcher_, runtime_, time_system_, event_logger_, random_));
+
+  EXPECT_EQ(100UL, detector->config().intervalMs());
+  EXPECT_EQ(10000UL, detector->config().baseEjectionTimeMs());
+  EXPECT_EQ(0UL, detector->config().maxEjectionTimeJitterMs());
+}
+
 
 TEST(DetectorHostMonitorNullImplTest, All) {
   DetectorHostMonitorNullImpl null_sink;
