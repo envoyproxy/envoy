@@ -277,12 +277,14 @@ TEST_P(AdminStatsTest, HandlerStatsJsonNoHistograms) {
 
   EXPECT_THAT(expected_json, JsonStringEq(data.toString()));
 
-  code = handler.handlerStats(url + "&histogram_buckets=cumulative", cumulative_response_headers, cumulative_data, admin_stream);
+  code = handler.handlerStats(url + "&histogram_buckets=cumulative", cumulative_response_headers,
+                              cumulative_data, admin_stream);
   EXPECT_EQ(Http::Code::OK, code);
 
   EXPECT_THAT(expected_json, JsonStringEq(cumulative_data.toString()));
 
-  code = handler.handlerStats(url + "&histogram_buckets=disjoint", disjoint_response_headers, disjoint_data, admin_stream);
+  code = handler.handlerStats(url + "&histogram_buckets=disjoint", disjoint_response_headers,
+                              disjoint_data, admin_stream);
   EXPECT_EQ(Http::Code::OK, code);
 
   EXPECT_THAT(expected_json, JsonStringEq(disjoint_data.toString()));
@@ -303,7 +305,7 @@ TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsCumulative) {
   EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
   EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
   StatsHandler handler(instance);
-  
+
   store_->counterFromString("c1");
   Stats::Counter& c2 = store_->counterFromString("c2");
 
@@ -1108,7 +1110,8 @@ TEST_P(AdminStatsTest, StatsAsJsonHistogramBucketsMultipleHistograms) {
                const Stats::ParentHistogramSharedPtr& b) -> bool { return a->name() < b->name(); });
   std::map<std::string, uint64_t> all_stats;
   std::map<std::string, std::string> all_text_readouts;
-  std::string actual_json_cumulative = statsAsJsonHandler(all_stats, all_text_readouts, histograms, false, absl::optional<std::string>("cumulative"));
+  std::string actual_json_cumulative = statsAsJsonHandler(
+      all_stats, all_text_readouts, histograms, false, absl::optional<std::string>("cumulative"));
 
   const std::string expected_json_cumulative = R"EOF({
     "stats": [
@@ -1325,7 +1328,8 @@ TEST_P(AdminStatsTest, StatsAsJsonHistogramBucketsMultipleHistograms) {
 
   EXPECT_THAT(expected_json_cumulative, JsonStringEq(actual_json_cumulative));
 
-  std::string actual_json_disjoint = statsAsJsonHandler(all_stats, all_text_readouts, histograms, false, absl::optional<std::string>("disjoint"));
+  std::string actual_json_disjoint = statsAsJsonHandler(
+      all_stats, all_text_readouts, histograms, false, absl::optional<std::string>("disjoint"));
 
   const std::string expected_json_disjoint = R"EOF({
     "stats": [
@@ -1541,7 +1545,7 @@ TEST_P(AdminStatsTest, StatsAsJsonHistogramBucketsMultipleHistograms) {
 })EOF";
 
   EXPECT_THAT(expected_json_disjoint, JsonStringEq(actual_json_disjoint));
-  
+
   shutdownThreading();
 }
 

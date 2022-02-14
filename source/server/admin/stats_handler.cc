@@ -206,9 +206,9 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
       } else if (histogram_buckets_value.value() == "cumulative") {
         success = all_histograms.emplace(histogram->name(), histogram->bucketSummary()).second;
       } else {
-        // "disjoint" should be only possible value at this point. Other values should already have caused a bad request response.
-        ASSERT(histogram_buckets_value.value() ==
-               "disjoint");
+        // "disjoint" should be only possible value at this point. Other values should already have
+        // caused a bad request response.
+        ASSERT(histogram_buckets_value.value() == "disjoint");
         success = all_histograms.emplace(histogram->name(), computeDisjointBucketSummary(histogram))
                       .second;
       }
@@ -251,13 +251,17 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   // Display bucket data if histogram_buckets query parameter is used, otherwise output contains
   // quantile summary data.
   if (!histogram_buckets_value.has_value()) {
-    statsAsJsonQuantileSummaryHelper(*histograms_obj_container_fields, all_histograms, used_only, regex);
+    statsAsJsonQuantileSummaryHelper(*histograms_obj_container_fields, all_histograms, used_only,
+                                     regex);
   } else if (histogram_buckets_value.value() == "cumulative") {
-    statsAsJsonCumulativeHistogramBucketsHelper(*histograms_obj_container_fields, all_histograms, used_only, regex);
+    statsAsJsonCumulativeHistogramBucketsHelper(*histograms_obj_container_fields, all_histograms,
+                                                used_only, regex);
   } else {
-    // "disjoint" should be only possible value at this point. Other values should already have caused a bad request response.
+    // "disjoint" should be only possible value at this point. Other values should already have
+    // caused a bad request response.
     ASSERT(histogram_buckets_value.value() == "disjoint");
-    statsAsJsonDisjointHistogramBucketsHelper(*histograms_obj_container_fields, all_histograms, used_only, regex);
+    statsAsJsonDisjointHistogramBucketsHelper(*histograms_obj_container_fields, all_histograms,
+                                              used_only, regex);
   }
 
   // Add histograms to output if used histogram found.
@@ -298,7 +302,8 @@ StatsHandler::computeDisjointBucketSummary(const Stats::ParentHistogramSharedPtr
   }
 }
 
-void StatsHandler::statsAsJsonQuantileSummaryHelper(Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
+void StatsHandler::statsAsJsonQuantileSummaryHelper(
+    Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
     const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
     const absl::optional<std::regex>& regex) {
   std::vector<ProtobufWkt::Value> computed_quantile_array;
@@ -327,27 +332,27 @@ void StatsHandler::statsAsJsonQuantileSummaryHelper(Protobuf::Map<std::string, P
   }
 
   if (!computed_quantile_array.empty()) { // If used histogram found.
-      ProtobufWkt::Struct histograms_obj;
-      auto* histograms_obj_fields = histograms_obj.mutable_fields();
+    ProtobufWkt::Struct histograms_obj;
+    auto* histograms_obj_fields = histograms_obj.mutable_fields();
 
-      // It is not possible for the supported quantiles to differ across histograms, so it is ok
-      // to send them once.
-      Stats::HistogramStatisticsImpl empty_statistics;
-      std::vector<ProtobufWkt::Value> supported_quantile_array;
-      for (double quantile : empty_statistics.supportedQuantiles()) {
-        supported_quantile_array.push_back(ValueUtil::numberValue(quantile * 100));
-      }
-      (*histograms_obj_fields)["supported_quantiles"] =
-          ValueUtil::listValue(supported_quantile_array);
+    // It is not possible for the supported quantiles to differ across histograms, so it is ok
+    // to send them once.
+    Stats::HistogramStatisticsImpl empty_statistics;
+    std::vector<ProtobufWkt::Value> supported_quantile_array;
+    for (double quantile : empty_statistics.supportedQuantiles()) {
+      supported_quantile_array.push_back(ValueUtil::numberValue(quantile * 100));
+    }
+    (*histograms_obj_fields)["supported_quantiles"] =
+        ValueUtil::listValue(supported_quantile_array);
 
-      (*histograms_obj_fields)["computed_quantiles"] =
-          ValueUtil::listValue(computed_quantile_array);
+    (*histograms_obj_fields)["computed_quantiles"] = ValueUtil::listValue(computed_quantile_array);
 
-      histograms_obj_container_fields["histograms"] = ValueUtil::structValue(histograms_obj);
+    histograms_obj_container_fields["histograms"] = ValueUtil::structValue(histograms_obj);
   }
 }
 
-void StatsHandler::statsAsJsonCumulativeHistogramBucketsHelper(Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
+void StatsHandler::statsAsJsonCumulativeHistogramBucketsHelper(
+    Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
     const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
     const absl::optional<std::regex>& regex) {
   std::vector<ProtobufWkt::Value> histogram_obj_array;
@@ -364,7 +369,8 @@ void StatsHandler::statsAsJsonCumulativeHistogramBucketsHelper(Protobuf::Map<std
   }
 }
 
-void StatsHandler::statsAsJsonDisjointHistogramBucketsHelper(Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
+void StatsHandler::statsAsJsonDisjointHistogramBucketsHelper(
+    Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
     const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
     const absl::optional<std::regex>& regex) {
   std::vector<ProtobufWkt::Value> histogram_obj_array;

@@ -73,20 +73,24 @@ private:
 
   static std::string computeDisjointBucketSummary(const Stats::ParentHistogramSharedPtr& histogram);
 
-  static void statsAsJsonQuantileSummaryHelper(Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
+  static void statsAsJsonQuantileSummaryHelper(
+      Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
       const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
       const absl::optional<std::regex>& regex);
 
-  static void statsAsJsonCumulativeHistogramBucketsHelper(Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
+  static void statsAsJsonCumulativeHistogramBucketsHelper(
+      Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
       const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
       const absl::optional<std::regex>& regex);
 
-  static void statsAsJsonDisjointHistogramBucketsHelper(Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
+  static void statsAsJsonDisjointHistogramBucketsHelper(
+      Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
       const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
       const absl::optional<std::regex>& regex);
 
   static ProtobufWkt::Value statsAsJsonHistogramBucketsCreateHistogramElementHelper(
-      Stats::ConstSupportedBuckets& supported_buckets, const std::vector<uint64_t>& interval_buckets,
+      Stats::ConstSupportedBuckets& supported_buckets,
+      const std::vector<uint64_t>& interval_buckets,
       const std::vector<uint64_t>& cumulative_buckets, const std::string& name);
 };
 
