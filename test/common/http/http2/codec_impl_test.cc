@@ -49,7 +49,7 @@ namespace Http {
 namespace Http2 {
 
 using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
-using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool>;
+using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool, bool>;
 namespace CommonUtility = ::Envoy::Http2::Utility;
 
 class Http2CodecImplTestFixture {
@@ -101,11 +101,10 @@ public:
 
   Http2CodecImplTestFixture() = default;
   Http2CodecImplTestFixture(Http2SettingsTuple client_settings, Http2SettingsTuple server_settings,
-                            bool enable_new_codec_wrapper)
+                            bool enable_new_codec_wrapper, bool defer_processing_backedup_streams)
       : client_settings_(client_settings), server_settings_(server_settings),
         enable_new_codec_wrapper_(enable_new_codec_wrapper),
-        defer_processing_backedup_streams_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.defer_processing_backedup_streams")) {
+        defer_processing_backedup_streams_(defer_processing_backedup_streams) {
     // Make sure we explicitly test for stream flush timer creation.
     EXPECT_CALL(client_connection_.dispatcher_, createTimer_(_)).Times(0);
     EXPECT_CALL(server_connection_.dispatcher_, createTimer_(_)).Times(0);
@@ -140,6 +139,9 @@ public:
     Runtime::LoaderSingleton::getExisting()->mergeValues(
         {{"envoy.reloadable_features.http2_new_codec_wrapper",
           enable_new_codec_wrapper_ ? "true" : "false"}});
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.defer_processing_backedup_streams",
+          defer_processing_backedup_streams_ ? "true" : "false"}});
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<TestClientConnectionImpl>(
@@ -369,7 +371,7 @@ class Http2CodecImplTest : public ::testing::TestWithParam<Http2SettingsTestPara
 public:
   Http2CodecImplTest()
       : Http2CodecImplTestFixture(::testing::get<0>(GetParam()), ::testing::get<1>(GetParam()),
-                                  ::testing::get<2>(GetParam())) {}
+                                  ::testing::get<2>(GetParam()), ::testing::get<3>(GetParam())) {}
 
 protected:
   void priorityFlood() {
@@ -2123,12 +2125,14 @@ TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsConsumeErr
 // Deferred reset tests use only small windows so that we can test certain conditions.
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplDeferredResetTest, Http2CodecImplDeferredResetTest,
                          ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
-                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE, ::testing::Bool()));
+                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE, ::testing::Bool(),
+                                            ::testing::Bool()));
 
 // Flow control tests only use only small windows so that we can test certain conditions.
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowControlTest,
                          ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
-                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE, ::testing::Bool()));
+                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE, ::testing::Bool(),
+                                            ::testing::Bool()));
 
 // we separate default/edge cases here to avoid combinatorial explosion
 #define HTTP2SETTINGS_DEFAULT_COMBINE                                                              \
@@ -2142,11 +2146,13 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowContro
 // edge settings allow for the number of streams needed by the test.
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplStreamLimitTest, Http2CodecImplStreamLimitTest,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool()));
+                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool(),
+                                            ::testing::Bool()));
 
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool()));
+                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool(),
+                                            ::testing::Bool()));
 
 #define HTTP2SETTINGS_EDGE_COMBINE                                                                 \
   ::testing::Combine(                                                                              \
@@ -2159,17 +2165,18 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
       ::testing::Values(CommonUtility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE,          \
                         CommonUtility::OptionsLimits::MAX_INITIAL_CONNECTION_WINDOW_SIZE))
 
-// Make sure we have coverage for high and low values for various  combinations and permutations
+// Make sure we have coverage for high and low values for various combinations and permutations
 // of HTTP settings in at least one test fixture.
 // Use with caution as any test using this runs 255 times.
 using Http2CodecImplTestAll = Http2CodecImplTest;
 
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTestAll,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool()));
+                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool(),
+                                            ::testing::Bool()));
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTestAll,
                          ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE, HTTP2SETTINGS_EDGE_COMBINE,
-                                            ::testing::Bool()));
+                                            ::testing::Bool(), ::testing::Bool()));
 
 TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {
@@ -2223,8 +2230,9 @@ public:
 
   Http2CustomSettingsTestBase(Http2SettingsTuple client_settings,
                               Http2SettingsTuple server_settings, bool use_new_codec_wrapper,
-                              bool validate_client)
-      : Http2CodecImplTestFixture(client_settings, server_settings, use_new_codec_wrapper),
+                              bool defer_processing_backedup_streams, bool validate_client)
+      : Http2CodecImplTestFixture(client_settings, server_settings, use_new_codec_wrapper,
+                                  defer_processing_backedup_streams),
         validate_client_(validate_client) {}
 
   ~Http2CustomSettingsTestBase() override = default;
@@ -2268,16 +2276,17 @@ protected:
 class Http2CustomSettingsTest
     : public Http2CustomSettingsTestBase,
       public ::testing::TestWithParam<
-          ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool, bool>> {
+          ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool, bool, bool>> {
 public:
   Http2CustomSettingsTest()
       : Http2CustomSettingsTestBase(::testing::get<0>(GetParam()), ::testing::get<1>(GetParam()),
-                                    ::testing::get<2>(GetParam()), ::testing::get<3>(GetParam())) {}
+                                    ::testing::get<2>(GetParam()), ::testing::get<3>(GetParam()),
+                                    ::testing::get<4>(GetParam())) {}
 };
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CustomSettingsTest,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
                                             HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool(),
-                                            ::testing::Bool()));
+                                            ::testing::Bool(), ::testing::Bool()));
 
 // Validates that custom parameters (those which are not explicitly named in the
 // envoy::config::core::v3::Http2ProtocolOptions proto) are properly sent and processed by
@@ -3256,9 +3265,14 @@ TEST_P(Http2CodecImplTest, ConnectTest) {
 }
 
 TEST_P(Http2CodecImplTest, ShouldWaitForDeferredBodyToProcessBeforeProcessingTrailers) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.defer_processing_backedup_streams", "true"}});
+  // We must initialize before dtor, otherwise we'll touch uninitialized
+  // members in dtor.
   initialize();
+
+  // Test only makes sense if we have defer processing enabled.
+  if (!defer_processing_backedup_streams_) {
+    return;
+  }
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
@@ -3422,6 +3436,9 @@ protected:
     Runtime::LoaderSingleton::getExisting()->mergeValues(
         {{"envoy.reloadable_features.http2_new_codec_wrapper",
           enable_new_codec_wrapper_ ? "true" : "false"}});
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.defer_processing_backedup_streams",
+          defer_processing_backedup_streams_ ? "true" : "false"}});
     allow_metadata_ = true;
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);

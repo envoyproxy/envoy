@@ -33,11 +33,13 @@ const uint32_t AllFrameFloodLimit = 1000;
 } // namespace
 
 std::string testParamsToString(
-    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>> params) {
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool, bool>> params) {
   const bool is_v4 = (std::get<0>(params.param) == Network::Address::IpVersion::v4);
   const bool http2_new_codec_wrapper = std::get<1>(params.param);
-  return absl::StrCat(is_v4 ? "IPv4" : "IPv6",
-                      http2_new_codec_wrapper ? "WrappedHttp2" : "BareHttp2");
+  const bool defer_processing_backedup_streams = std::get<2>(params.param);
+  return absl::StrCat(
+      is_v4 ? "IPv4" : "IPv6", http2_new_codec_wrapper ? "WrappedHttp2" : "BareHttp2",
+      defer_processing_backedup_streams ? "WithDeferredProcessing" : "NoDeferredProcessing");
 }
 
 // It is important that the new socket interface is installed before any I/O activity starts and
@@ -47,7 +49,7 @@ std::string testParamsToString(
 // Http2FrameIntegrationTest destructor completes.
 class Http2FloodMitigationTest
     : public SocketInterfaceSwap,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool, bool>>,
       public Http2RawFrameIntegrationTest {
 public:
   Http2FloodMitigationTest() : Http2RawFrameIntegrationTest(std::get<0>(GetParam())) {
@@ -58,6 +60,9 @@ public:
     const bool enable_new_wrapper = std::get<1>(GetParam());
     config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
                                       enable_new_wrapper ? "true" : "false");
+    const bool defer_processing_backedup_streams = std::get<2>(GetParam());
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.defer_processing_backedup_streams",
+                                      defer_processing_backedup_streams ? "true" : "false");
   }
 
 protected:
@@ -78,8 +83,8 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, Http2FloodMitigationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::ValuesIn({false, true})),
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), ::testing::Bool(),
+                     ::testing::Bool()),
     testParamsToString);
 
 void Http2FloodMitigationTest::initializeUpstreamFloodTest() {
