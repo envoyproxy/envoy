@@ -160,14 +160,11 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
 
 TEST_P(AdminStatsTest, HandlerStatsJson) {
   const std::string url = "/stats?format=json";
-  Buffer::OwnedImpl data;
-  MockAdminStream admin_stream;
   EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
   MockInstance instance;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
   EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
   EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
-  StatsHandler handler(instance);
 
   Stats::Counter& c1 = store_->counterFromString("c1");
   Stats::Counter& c2 = store_->counterFromString("c2");
@@ -185,7 +182,8 @@ TEST_P(AdminStatsTest, HandlerStatsJson) {
 
   store_->mergeHistograms([]() -> void {});
 
-  Http::Code code = handler.handlerStats(url, response_headers_, data, admin_stream);
+  std::string out;
+  Http::Code code = handlerStats(instance, url, out);
   EXPECT_EQ(Http::Code::OK, code);
 
   const std::string expected_json_old = R"EOF({
@@ -268,7 +266,7 @@ TEST_P(AdminStatsTest, HandlerStatsJson) {
     ]
 })EOF";
 
-  EXPECT_THAT(expected_json_old, JsonStringEq(data.toString()));
+  EXPECT_THAT(expected_json_old, JsonStringEq(out));
 
   shutdownThreading();
 }
@@ -851,7 +849,6 @@ TEST_P(StatsHandlerPrometheusWithTextReadoutsTest, StatsHandlerPrometheusWithTex
 
   createTestStats();
   std::shared_ptr<MockInstance> instance = setupMockedInstance();
-  StatsHandler handler(*instance);
 
   const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
 envoy_cluster_upstream_cx_total{cluster="c1"} 10
