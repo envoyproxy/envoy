@@ -34,7 +34,8 @@ static void BM_CompiledGoogleReMatcher(benchmark::State& state) {
   }
   RELEASE_ASSERT(passes > 0, "");
 }
-BENCHMARK(BM_CompiledGoogleReMatcher);
+BENCHMARK(BM_CompiledGoogleReMatcher)->Threads(20)->MeasureProcessCPUTime();
+BENCHMARK(BM_CompiledGoogleReMatcher)->Threads(200)->MeasureProcessCPUTime();
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_HyperscanMatcher(benchmark::State& state) {
@@ -52,6 +53,7 @@ static void BM_HyperscanMatcher(benchmark::State& state) {
   }
   RELEASE_ASSERT(passes > 0, "");
 }
-BENCHMARK(BM_HyperscanMatcher);
+BENCHMARK(BM_HyperscanMatcher)->Threads(20)->MeasureProcessCPUTime();
+BENCHMARK(BM_HyperscanMatcher)->Threads(200)->MeasureProcessCPUTime();
 
 } // namespace Envoy
