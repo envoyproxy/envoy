@@ -99,19 +99,6 @@ typed_config:
   '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
   stat_prefix: foo
   matcher:
-    matcher_tree:
-      input:
-        name: source-ip
-        typed_config:
-          '@type': type.googleapis.com/envoy.type.matcher.v3.SourceIpMatchInput
-      exact_match_map:
-        map:
-          "0.0.0.0":
-            action:
-              name: route
-              typed_config:
-                '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-                cluster: cluster_0
     on_no_match:
       action:
         name: route
@@ -129,19 +116,6 @@ typed_config:
   '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
   stat_prefix: foo
   matcher:
-    matcher_tree:
-      input:
-        name: source-ip
-        typed_config:
-          '@type': type.googleapis.com/envoy.type.matcher.v3.SourceIpMatchInput
-      exact_match_map:
-        map:
-          "0.0.0.0":
-            action:
-              name: route
-              typed_config:
-                '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-                cluster: cluster_0
     on_no_match:
       action:
         name: route
@@ -165,19 +139,6 @@ typed_config:
   '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
   stat_prefix: foo
   matcher:
-    matcher_tree:
-      input:
-        name: source-ip
-        typed_config:
-          '@type': type.googleapis.com/envoy.type.matcher.v3.SourceIpMatchInput
-      exact_match_map:
-        map:
-          "0.0.0.0":
-            action:
-              name: route
-              typed_config:
-                '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-                cluster: cluster_0
     on_no_match:
       action:
         name: route
