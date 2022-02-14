@@ -91,7 +91,7 @@ bool Matcher::match(absl::optional<absl::string_view> input) {
         &matched);
   }
   if (err != HS_SUCCESS && err != HS_SCAN_TERMINATED) {
-    throw EnvoyException(fmt::format("unable to scan, error code {}.", err));
+    ENVOY_LOG_MISC(error, "unable to scan, error code {}.", err);
   }
 
   return matched;
