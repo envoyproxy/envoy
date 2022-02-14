@@ -306,8 +306,8 @@ StatsHandler::computeDisjointBucketSummary(const Stats::ParentHistogramSharedPtr
         histogram->cumulativeStatistics().computeDisjointBuckets();
     bucket_summary.reserve(supported_buckets.size());
     // Make sure all vectors are the same size.
-    ASSERT(disjoint_interval_buckets.size() == disjoint_cumulative_buckets.size() &&
-           disjoint_cumulative_buckets.size() == supported_buckets.size());
+    ASSERT(disjoint_interval_buckets.size() == disjoint_cumulative_buckets.size());
+    ASSERT(disjoint_cumulative_buckets.size() == supported_buckets.size());
     size_t min_size = std::min({disjoint_interval_buckets.size(),
                                 disjoint_cumulative_buckets.size(), supported_buckets.size()});
     for (size_t i = 0; i < min_size; ++i) {
@@ -389,8 +389,8 @@ ProtobufWkt::Value StatsHandler::statsAsJsonHistogramBucketsCreateHistogramEleme
   (*histogram_obj_fields)["name"] = ValueUtil::stringValue(name);
 
   // Make sure all vectors are the same size.
-  ASSERT(interval_buckets.size() == cumulative_buckets.size() &&
-         cumulative_buckets.size() == supported_buckets.size());
+  ASSERT(interval_buckets.size() == cumulative_buckets.size());
+  ASSERT(cumulative_buckets.size() == supported_buckets.size());
   size_t min_size =
       std::min({interval_buckets.size(), cumulative_buckets.size(), supported_buckets.size()});
 
