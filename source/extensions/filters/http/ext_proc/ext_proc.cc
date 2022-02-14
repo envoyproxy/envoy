@@ -371,7 +371,7 @@ Filter::processBufferedPartial(ProcessorState& state, Buffer::Instance& data, bo
       // Prior, we'd rely on eager processing to kick off sending the data to
       // the external processor, instead we kick it off here.
       Buffer::OwnedImpl empty_buffer{};
-      return processBufferedPartial(state, empty_buffer, end_stream);
+      return processBufferedPartial(state, empty_buffer, false);
     } else {
       result = FilterDataStatus::Continue;
     }

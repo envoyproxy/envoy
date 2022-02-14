@@ -388,7 +388,13 @@ protected:
     // Avoid inversion in the case where we saw trailers, acquiring the
     // remote_end_stream_ being set to true, but the trailers ended up being
     // buffered.
-    bool sendEndStream() const { return remote_end_stream_ && !stream_manager_.trailers_buffered_; }
+    // All buffered body must be consumed before we send end stream.
+    bool sendEndStream() const {
+      return remote_end_stream_ && !stream_manager_.trailers_buffered_ &&
+             !stream_manager_.body_buffered_;
+    }
+
+    void scheduleProcessingOfBufferedData();
   };
 
   using StreamImplPtr = std::unique_ptr<StreamImpl>;

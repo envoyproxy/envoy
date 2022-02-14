@@ -364,6 +364,7 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
   if (stream_manager_.trailers_buffered_ && continueProcessingBufferedData()) {
     ASSERT(!stream_manager_.body_buffered_);
     decodeTrailers();
+    ASSERT(!stream_manager_.trailers_buffered_);
   }
 
   // Reset cases are handled by resetStream and directly invoke onStreamClose,
@@ -388,17 +389,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
     ASSERT(read_disable_count_ > 0);
     --read_disable_count_;
     if (!buffersOverrun()) {
-      if (defer_processing_backedup_streams_) {
-        if (!process_buffered_data_callback_) {
-          process_buffered_data_callback_ =
-              parent_.connection_.dispatcher().createSchedulableCallback(
-                  [this]() { processBufferedData(); });
-        }
-
-        // We schedule processing to occur in another callback to avoid
-        // reentrant and deep call stacks.
-        process_buffered_data_callback_->scheduleCallbackCurrentIteration();
-      }
+      scheduleProcessingOfBufferedData();
 
       if (parent_.use_new_codec_wrapper_) {
         parent_.adapter_->MarkDataConsumedForStream(stream_id_, unconsumed_bytes_);
@@ -411,6 +402,19 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
         return;
       }
     }
+  }
+}
+
+void ConnectionImpl::StreamImpl::scheduleProcessingOfBufferedData() {
+  if (defer_processing_backedup_streams_) {
+    if (!process_buffered_data_callback_) {
+      process_buffered_data_callback_ = parent_.connection_.dispatcher().createSchedulableCallback(
+          [this]() { processBufferedData(); });
+    }
+
+    // We schedule processing to occur in another callback to avoid
+    // reentrant and deep call stacks.
+    process_buffered_data_callback_->scheduleCallbackCurrentIteration();
   }
 }
 
