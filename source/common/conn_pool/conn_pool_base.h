@@ -98,8 +98,18 @@ public:
     // streams and pool and cluster capacity.
     if (state == State::DRAINING) {
       drain();
+    } else if (state == State::BUSY && state_ != State::BUSY) {
+      last_state_before_busy_ = state_;
+    }
+    if (state_ == State::BUSY && state != State::BUSY) {
+      last_state_before_busy_ = absl::nullopt;
     }
     state_ = state;
+  }
+
+  State lastStateBeforeBusy() const {
+    ASSERT(last_state_before_busy_.has_value());
+    return last_state_before_busy_.value();
   }
 
   // Sets the remaining streams to 0, and updates pool and cluster capacity.
@@ -131,6 +141,9 @@ public:
 
 private:
   State state_{State::CONNECTING};
+  // Retain the state before this client becomes busy. When the client is under its current
+  // concurrent stream limit, switch to this state.
+  absl::optional<State> last_state_before_busy_;
 };
 
 // PendingStream is the base class tracking streams for which a connection has been created but not
@@ -363,6 +376,8 @@ protected:
   uint32_t connecting_stream_capacity_{0};
 
 private:
+  friend class ConnPoolImplBasePeer;
+
   std::list<PendingStreamPtr> pending_streams_;
 
   // The number of streams currently attached to clients.

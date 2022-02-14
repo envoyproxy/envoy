@@ -18,12 +18,17 @@ using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Return;
 
+class ConnPoolImplBasePeer {
+public:
+  static void setConnectingStreamCapacity(ConnPoolImplBase& pool,
+                                          uint64_t connecting_stream_capacity) {
+    pool.connecting_stream_capacity_ = connecting_stream_capacity;
+  }
+};
+
 class TestActiveClient : public ActiveClient {
 public:
-  TestActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
-                   uint32_t concurrent_stream_limit, bool fail_on_enlisted)
-      : ActiveClient(parent, lifetime_stream_limit, concurrent_stream_limit),
-        fail_on_enlisted_(fail_on_enlisted) {}
+  using ActiveClient::ActiveClient;
 
   void close() override { onEvent(Network::ConnectionEvent::LocalClose); }
   uint64_t id() const override { return 1; }
@@ -33,11 +38,7 @@ public:
   void onEvent(Network::ConnectionEvent event) override {
     parent_.onConnectionEvent(*this, "", event);
   }
-  void onEnlisted() override {
-    if (fail_on_enlisted_) {
-      close();
-    }
-  }
+  MOCK_METHOD(void, onEnlisted, ());
 
   static void incrementActiveStreams(ActiveClient& client) {
     TestActiveClient* testClient = dynamic_cast<TestActiveClient*>(&client);
@@ -52,8 +53,14 @@ public:
   }
 
   uint32_t active_streams_{};
+
+  void overrideCurrentCapacity(uint64_t capacity) {
+    capacity_override_ = capacity;
+    ConnPoolImplBasePeer::setConnectingStreamCapacity(parent_, capacity);
+  }
+
+private:
   absl::optional<uint64_t> capacity_override_;
-  const bool fail_on_enlisted_{};
 };
 
 class TestPendingStream : public PendingStream {
@@ -88,8 +95,8 @@ public:
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
     ON_CALL(pool_, instantiateActiveClient).WillByDefault(Invoke([&]() -> ActiveClientPtr {
-      auto ret = std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_,
-                                                              concurrent_streams_, false);
+      auto ret =
+          std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_, concurrent_streams_);
       clients_.push_back(ret.get());
       ret->real_host_description_ = descr_;
       return ret;
@@ -130,14 +137,15 @@ public:
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
     ON_CALL(pool_, instantiateActiveClient).WillByDefault(Invoke([&]() -> ActiveClientPtr {
-      auto ret = std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_,
-                                                              concurrent_streams_, false);
+      auto ret =
+          std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_, concurrent_streams_);
       clients_.push_back(ret.get());
       ret->real_host_description_ = descr_;
       return ret;
     }));
     ON_CALL(pool_, onPoolReady(_, _))
         .WillByDefault(Invoke([](ActiveClient& client, AttachContext&) {
+          std::cerr << "========= onPoolReady\n";
           TestActiveClient::incrementActiveStreams(client);
         }));
   }
@@ -195,8 +203,10 @@ public:
 
   // Close the active stream
   void closeStream() {
-    clients_.back()->active_streams_ = 0;
-    pool_.onStreamClosed(*clients_.back(), false);
+    while (clients_.back()->active_streams_ > 0) {
+      --clients_.back()->active_streams_;
+      pool_.onStreamClosed(*clients_.back(), false);
+    }
   }
 
   void closeStreamAndDrainClient() {
@@ -440,7 +450,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, NoAvailableStreams) {
   // Start with a concurrent stream limit of 0.
   stream_limit_ = 1;
   newConnectingClient();
-  clients_.back()->capacity_override_ = 0;
+  clients_.back()->overrideCurrentCapacity(0);
   pool_.decrClusterStreamCapacity(stream_limit_);
 
   // Make sure that when the connected event is raised, there is no call to
@@ -511,17 +521,19 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredLocalClose) {
   pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 }
 
-TEST_F(ConnPoolImplDispatcherBaseTest, onEnlistedFailed) {
+TEST_F(ConnPoolImplDispatcherBaseTest, OnEnlistedFailed) {
   // Create a new stream using the pool.
   newConnectingClient();
   // Limit the new connection capacity to 1 stream.
-  clients_.back()->capacity_override_ = 1;
+  clients_.back()->overrideCurrentCapacity(1);
 
-  // Creating the 2nd new stream would create another client.
+  // Creating the 2nd new stream would create another client which would fail during onEnlisted().
   EXPECT_CALL(pool_, instantiateActiveClient).WillOnce(Invoke([this]() -> ActiveClientPtr {
-    // This client would fail during onEnlisted().
-    auto ret = std::make_unique<NiceMock<TestActiveClient>>(
-        pool_, stream_limit_, concurrent_streams_, /*fail_on_enlisted=*/true);
+    auto ret =
+        std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_, concurrent_streams_);
+    EXPECT_CALL(*ret, onEnlisted()).WillOnce(Invoke([&client_ref = *ret]() {
+      client_ref.close();
+    }));
     ret->real_host_description_ = descr_;
     return ret;
   }));
@@ -538,6 +550,34 @@ TEST_F(ConnPoolImplDispatcherBaseTest, onEnlistedFailed) {
 
   // Clean up.
   pool_.destructAllConnections();
+}
+
+TEST_F(ConnPoolImplDispatcherBaseTest, OnEnlistedSendEarlyData) {
+  concurrent_streams_ = 2u;
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
+  EXPECT_CALL(pool_, instantiateActiveClient).WillOnce(Invoke([this]() -> ActiveClientPtr {
+    // This client would fail during onEnlisted().
+    auto ret =
+        std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_, concurrent_streams_);
+    ret->real_host_description_ = descr_;
+    clients_.push_back(ret.get());
+    EXPECT_CALL(*ret, onEnlisted()).WillOnce(Invoke([&client_ref = *ret]() {
+      client_ref.onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+      ;
+    }));
+    return ret;
+  }));
+  EXPECT_CALL(pool_, onPoolReady);
+  pool_.newStreamImpl(context_, /*can_send_early_data=*/true);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, concurrent_streams_ - 1 /*connecting capacity*/);
+
+  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+  CHECK_STATE(1 /*active*/, 1 /*pending*/, concurrent_streams_ - 1 /*connecting capacity*/);
+  EXPECT_CALL(pool_, onPoolReady);
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, 0 /*connecting capacity*/);
+  // Clean up.
+  closeStreamAndDrainClient();
 }
 
 } // namespace ConnectionPool
