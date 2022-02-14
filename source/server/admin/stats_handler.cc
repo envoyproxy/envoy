@@ -241,6 +241,7 @@ public:
     if (response_.length() > 0) {
       ASSERT(response.length() == 0);
       response.move(response_);
+      ASSERT(response_.length() == 0);
     }
     while (!render_->nextChunk(response)) {
       while (stat_map_.empty()) {
@@ -365,13 +366,10 @@ public:
 
   std::unique_ptr<Render> render_;
 
-  static constexpr uint32_t num_stats_per_chunk_ = 1000;
   Stats::Store& stats_;
   ScopeVec scopes_;
   using StatMap = std::map<std::string, StatOrScopes>;
   StatMap stat_map_;
-  uint32_t stats_and_scopes_index_{0};
-  uint32_t chunk_index_{0};
   Phase phase_{Phase::TextReadouts};
   Buffer::OwnedImpl response_;
 };
