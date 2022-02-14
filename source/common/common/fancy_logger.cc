@@ -87,7 +87,7 @@ absl::flat_hash_set<absl::string_view> FancyContext::getFancyLoggerKeys()
   absl::ReaderMutexLock l(&fancy_log_lock_);
 
   absl::flat_hash_set<absl::string_view> keys;
-  for (const auto& it : = *fancy_log_map_) {
+  for (const auto& it : *fancy_log_map_) {
     keys.insert(it.first);
   }
   return keys;
