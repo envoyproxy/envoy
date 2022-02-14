@@ -17,11 +17,6 @@ LogsHandler::LogsHandler(Server::Instance& server) : HandlerContextBase(server) 
 Http::Code LogsHandler::handlerLogging(absl::string_view url,
                                        Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance& response, AdminStream&) {
-  // Always set Content-Type and X-Content-Type-Options to prevent XSS attacks
-  response_headers.addReference(Http::Headers::get().XContentTypeOptions,
-                                Http::Headers::get().XContentTypeOptionValues.Nosniff);
-  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
-
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
 
   Http::Code rc = Http::Code::OK;
