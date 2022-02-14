@@ -164,6 +164,9 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
       ENVOY_LOG(trace, "created connection failed immediately");
       return ConnectionResult::FailedToCreateConnection;
     }
+    if (client_ref.allows_early_data_) {
+      onUpstreamReadyForEarlyData(client_ref);
+    }
     return can_create_connection ? ConnectionResult::CreatedNewConnection
                                  : ConnectionResult::CreatedButRateLimited;
   } else {
@@ -174,8 +177,10 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
 
 void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient& client,
                                             AttachContext& context) {
-  ASSERT(client.state() == Envoy::ConnectionPool::ActiveClient::State::READY ||
-         client.allows_early_data_);
+  if (client.state() != Envoy::ConnectionPool::ActiveClient::State::READY) {
+    ASSERT(client.allows_early_data_);
+    host_->cluster().stats().upstream_rq_0rtt_.inc();
+  }
 
   if (enforceMaxRequests() && !host_->cluster().resourceManager(priority_).requests().canCreate()) {
     ENVOY_LOG(debug, "max streams overflow");
@@ -189,6 +194,7 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
   // Latch capacity before updating remaining streams.
   uint64_t capacity = client.currentUnusedCapacity();
   client.remaining_streams_--;
+  ActiveClient::State old_state = client.state();
   if (client.remaining_streams_ == 0) {
     ENVOY_CONN_LOG(debug, "maximum streams per connection, DRAINING", client);
     host_->cluster().stats().upstream_cx_max_requests_.inc();
@@ -201,7 +207,12 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
   // Decrement the capacity, as there's one less stream available for serving.
   // For HTTP/3, the capacity is updated in newStreamEncoder.
   if (trackStreamCapacity()) {
-    state_.decrConnectingAndConnectedStreamCapacity(1);
+    if (old_state == Envoy::ConnectionPool::ActiveClient::State::READY) {
+      state_.decrConnectingAndConnectedStreamCapacity(1);
+    } else {
+      ASSERT(old_state == Envoy::ConnectionPool::ActiveClient::State::CONNECTING);
+      decrConnectingAndConnectedStreamCapacity(1);
+    }
   }
   // Track the new active stream.
   state_.incrActiveStreams(1);
@@ -270,7 +281,6 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
     for (auto& client : connecting_clients_) {
       if (client->allows_early_data_) {
         attachStreamToClient(*client, context);
-        --connecting_stream_capacity_;
         // Even if there's an available client, we may want to preconnect to handle the next
         // incoming stream.
         tryCreateNewConnections();
@@ -314,7 +324,11 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
     }
     return nullptr;
   }
-
+  if (pending_streams_.empty()) {
+    // All pending streams have been sent as early data. As they are consumed FIFO, the latest must
+    // have been consumed already.
+    return nullptr;
+  }
   return pending;
 }
 
@@ -457,7 +471,9 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
                                          Network::ConnectionEvent event) {
   if (event != Network::ConnectionEvent::ConnectedZeroRtt) {
     if (client.state() == ActiveClient::State::CONNECTING) {
-      ASSERT(connecting_stream_capacity_ >= client.currentUnusedCapacity());
+      ASSERT(connecting_stream_capacity_ >= client.currentUnusedCapacity(),
+             fmt::format("connecting_stream_capacity_ {}, currentUnusedCapacity {}",
+                         connecting_stream_capacity_, client.currentUnusedCapacity()));
       connecting_stream_capacity_ -= client.currentUnusedCapacity();
     }
 
@@ -540,7 +556,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
   case Network::ConnectionEvent::Connected: {
     client.conn_connect_ms_->complete();
     client.conn_connect_ms_.reset();
-    ASSERT(client.state() == ActiveClient::State::CONNECTING);
+    ASSERT(client.state() == ActiveClient::State::CONNECTING ||
+           client.state() == ActiveClient::State::BUSY);
     transitionActiveClientState(client, ActiveClient::State::READY);
     bool streams_available = client.currentUnusedCapacity() > 0;
     if (!streams_available) {
@@ -571,28 +588,6 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     ASSERT(client.state() == ActiveClient::State::CONNECTING);
     host()->cluster().stats().upstream_cx_connect_with_0_rtt_.inc();
     client.allows_early_data_ = true;
-    // Check pending streams backward for safe request.
-    auto it = pending_streams_.end();
-    if (it == pending_streams_.begin()) {
-      break;
-    }
-    --it;
-    while (client.currentUnusedCapacity() > 0) {
-      PendingStream& stream = **it;
-      if (it != pending_streams_.begin()) {
-        --it;
-      }
-
-      if (stream.can_send_early_data_) {
-        attachStreamToClient(client, stream.context());
-        state_.decrPendingStreams(1);
-        --connecting_stream_capacity_;
-        stream.removeFromList(pending_streams_);
-      }
-      if (pending_streams_.empty()) {
-        break;
-      }
-    }
     break;
   }
   }
@@ -665,6 +660,34 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
 
   host_->cluster().stats().upstream_rq_cancelled_.inc();
   checkForIdleAndCloseIdleConnsIfDraining();
+}
+
+void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
+  ASSERT(client.allows_early_data_ && client.state() == ActiveClient::State::CONNECTING);
+  // Check pending streams backward for safe request.
+  auto it = pending_streams_.end();
+  if (it == pending_streams_.begin()) {
+    return;
+  }
+  --it;
+  while (client.currentUnusedCapacity() > 0) {
+    PendingStream& stream = **it;
+    bool stop_iteration{false};
+    if (it != pending_streams_.begin()) {
+      --it;
+    } else {
+      stop_iteration = true;
+    }
+
+    if (stream.can_send_early_data_) {
+      attachStreamToClient(client, stream.context());
+      state_.decrPendingStreams(1);
+      stream.removeFromList(pending_streams_);
+    }
+    if (stop_iteration) {
+      return;
+    }
+  }
 }
 
 namespace {

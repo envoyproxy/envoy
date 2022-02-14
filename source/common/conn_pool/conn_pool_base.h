@@ -303,6 +303,8 @@ public:
   // Called when an upstream is ready to serve pending streams.
   void onUpstreamReady();
 
+  void onUpstreamReadyForEarlyData(ActiveClient& client);
+
 protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
 

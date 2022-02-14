@@ -258,7 +258,8 @@ void MultiplexedUpstreamIntegrationTest::manySimultaneousRequests(uint32_t reque
         {":scheme", "http"},
         {":authority", "host"},
         {AutonomousStream::RESPONSE_SIZE_BYTES, std::to_string(response_bytes[i])},
-        {AutonomousStream::EXPECT_REQUEST_SIZE_BYTES, std::to_string(request_bytes)}};
+        {AutonomousStream::EXPECT_REQUEST_SIZE_BYTES, std::to_string(request_bytes)},
+        {"request-id", absl::StrCat("", i)}};
     if (i % 2 == 0) {
       headers.addCopy(AutonomousStream::RESET_AFTER_REQUEST, "yes");
     }
@@ -269,7 +270,7 @@ void MultiplexedUpstreamIntegrationTest::manySimultaneousRequests(uint32_t reque
   }
 
   for (uint32_t i = 0; i < num_requests; ++i) {
-    ASSERT_TRUE(responses[i]->waitForEndStream());
+    ASSERT(responses[i]->waitForEndStream(), absl::StrCat("i = ", i));
     if (i % 2 != 0) {
       EXPECT_TRUE(responses[i]->complete());
       EXPECT_EQ("200", responses[i]->headers().getStatusValue());
@@ -711,8 +712,48 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamCachesZeroRttKeys) {
   waitForNextUpstreamRequest();
 
   EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response2->waitForEndStream());
+}
+
+TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
+    return;
+  }
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  upstream_request_.reset();
+
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  fake_upstream_connection_.reset();
+
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+
+  default_request_headers_.addCopy("second_request", "1");
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+
+  // TooEarly response should be retried automatically.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "425"}}, true);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response2->waitForEndStream());
+  // The retry request shouldn't be sent as early data.
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
 }
 
 } // namespace Envoy

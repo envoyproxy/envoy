@@ -204,7 +204,7 @@ void EnvoyQuicClientSession::OnNewEncryptionKeyAvailable(
     quic::EncryptionLevel level, std::unique_ptr<quic::QuicEncrypter> encrypter) {
   quic::QuicSpdyClientSession::OnNewEncryptionKeyAvailable(level, std::move(encrypter));
   if (level == quic::ENCRYPTION_ZERO_RTT) {
-    std::cerr << "========== ENCRYPTION_ZERO_RTT\n";
+    ENVOY_CONN_LOG(trace, "able to send early data", *this);
     raiseConnectionEvent(Network::ConnectionEvent::ConnectedZeroRtt);
   }
 }

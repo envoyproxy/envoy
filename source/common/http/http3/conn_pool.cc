@@ -45,7 +45,7 @@ void ActiveClient::onEnlisted() {
 void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
   updateCapacity(num_streams);
   if (state() == ActiveClient::State::BUSY && currentUnusedCapacity() != 0) {
-    parent_.transitionActiveClientState(*this, ActiveClient::State::READY);
+    parent_.transitionActiveClientState(*this, lastStateBeforeBusy());
     // If there's waiting streams, make sure the pool will now serve them.
     parent_.onUpstreamReady();
   } else if (currentUnusedCapacity() == 0 && state() == ActiveClient::State::READY) {

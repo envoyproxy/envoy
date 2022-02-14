@@ -563,19 +563,21 @@ TEST_F(ConnPoolImplDispatcherBaseTest, OnEnlistedSendEarlyData) {
     clients_.push_back(ret.get());
     EXPECT_CALL(*ret, onEnlisted()).WillOnce(Invoke([&client_ref = *ret]() {
       client_ref.onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
-      ;
     }));
     return ret;
   }));
   EXPECT_CALL(pool_, onPoolReady);
   pool_.newStreamImpl(context_, /*can_send_early_data=*/true);
   CHECK_STATE(1 /*active*/, 0 /*pending*/, concurrent_streams_ - 1 /*connecting capacity*/);
+  EXPECT_EQ(1, pool_.host()->cluster().stats().upstream_rq_0rtt_.value());
 
   pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
   CHECK_STATE(1 /*active*/, 1 /*pending*/, concurrent_streams_ - 1 /*connecting capacity*/);
   EXPECT_CALL(pool_, onPoolReady);
   clients_.back()->onEvent(Network::ConnectionEvent::Connected);
   CHECK_STATE(2 /*active*/, 0 /*pending*/, 0 /*connecting capacity*/);
+  EXPECT_EQ(1, pool_.host()->cluster().stats().upstream_rq_0rtt_.value());
+
   // Clean up.
   closeStreamAndDrainClient();
 }
