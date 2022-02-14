@@ -427,10 +427,6 @@ imagesize==1.2.0 \
     --hash=sha256:6965f19a6a2039c7d48bca7dba2473069ff854c36ae6f19d2cde309d998228a1 \
     --hash=sha256:b1f6b5a4eab1f73479a50fb79fcf729514a900c341d8503d62a62dbc4127a2b1
     # via sphinx
-importlib-metadata==4.10.1 \
-    --hash=sha256:899e2a40a8c4a1aec681feef45733de8a6c58f3f6a0dbed2eb6574b4387a77b6 \
-    --hash=sha256:951f0d8a5b7260e9db5e41d429285b5f451e928479f19d80818878527d36e95e
-    # via sphinx
 iniconfig==1.1.1 \
     --hash=sha256:011e24c64b7f47f6ebd835bb12a743f2fbe9a26d4cecaa7f53bc4f35ee9da8b3 \
     --hash=sha256:bc3af051d7d14b2ee5ef9969666def0cd1a000e121eaea580d4a313df4b37f32
@@ -702,9 +698,9 @@ pyparsing==2.4.7 \
 pyreadline==2.1 \
     --hash=sha256:4530592fc2e85b25b1a9f79664433da09237c1a270e4d78ea5aa3a2c7229e2d1
     # via -r requirements.in
-pytest==7.0.0 \
-    --hash=sha256:42901e6bd4bd4a0e533358a86e848427a49005a3256f657c5c8f8dd35ef137a9 \
-    --hash=sha256:dad48ffda394e5ad9aa3b7d7ddf339ed502e5e365b1350e0af65f4a602344b11
+pytest==7.0.1 \
+    --hash=sha256:9ce3ff477af913ecf6321fe337b93a2c0dcf2a0a1439c43f5452112c1e4280db \
+    --hash=sha256:e30905a0c131d3d94b89624a1cc5afec3e0ba2fbdb151867d8e0ebd49850f171
     # via
     #   -r requirements.in
     #   pytest-asyncio
@@ -990,10 +986,6 @@ yarl==1.6.3 \
     --hash=sha256:f0b059678fd549c66b89bed03efcabb009075bd131c248ecdf087bdb6faba24a \
     --hash=sha256:fcbb48a93e8699eae920f8d92f7160c03567b421bc17362a9ffbbd706a816f71
     # via aiohttp
-zipp==3.7.0 \
-    --hash=sha256:9f50f446828eb9d45b267433fd3e9da8d801f614129124863f9c51ebceafb87d \
-    --hash=sha256:b47250dd24f92b7dd6a0a8fc5244da14608f3ca90a5efcd37a3b1642fac9a375
-    # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
 setuptools==60.8.2 \
