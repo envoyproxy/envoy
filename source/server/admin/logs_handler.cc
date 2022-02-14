@@ -86,12 +86,12 @@ std::pair<bool, std::string> LogsHandler::changeLogLevel(const Http::Utility::Qu
 
   if (key == "all") {
     // Change all log levels.
-    auto level_to_use = parseLevel(level);
+    auto level_to_use = parseLevel(value);
     if (!level_to_use.has_value()) {
       return std::make_pair(false, "unknown log level");
     }
 
-    changeAllLogLevels(value);
+    changeAllLogLevels(valulevel_to_usee);
     return std::make_pair(true, "");
   }
 
@@ -119,7 +119,7 @@ std::pair<bool, std::string> LogsHandler::changeLogLevel(const Http::Utility::Qu
     }
   } else {
     // Change particular log level by name.
-    auto level_to_use = parseLevel(level);
+    auto level_to_use = parseLevel(value);
     if (!level_to_use.has_value()) {
       return std::make_pair(false, "unknown log level");
     }
