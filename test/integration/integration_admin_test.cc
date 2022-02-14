@@ -81,17 +81,15 @@ TEST_P(IntegrationAdminTest, Admin) {
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("404", request("admin", "GET", "/notfound", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  EXPECT_NE(std::string::npos, response->body().find("invalid path. admin commands are:"))
-      << response->body();
+  EXPECT_THAT(response->body(), HasSubstr("invalid path. admin commands are:"));
 
   EXPECT_EQ("200", request("admin", "GET", "/help", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  EXPECT_NE(std::string::npos, response->body().find("admin commands are:")) << response->body();
+  EXPECT_THAT(response->body(), HasSubstr("admin commands are:"));
 
   EXPECT_EQ("200", request("admin", "GET", "/", response));
   EXPECT_EQ("text/html; charset=UTF-8", ContentType(response));
-  EXPECT_NE(std::string::npos, response->body().find("<title>Envoy Admin</title>"))
-      << response->body();
+  EXPECT_THAT(response->body(), HasSubstr("<title>Envoy Admin</title>"));
 
   EXPECT_EQ("200", request("admin", "GET", "/server_info", response));
   EXPECT_EQ("application/json", ContentType(response));
@@ -106,7 +104,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   // are off by default.
   EXPECT_EQ("200", request("admin", "GET", "/stats/recentlookups", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  EXPECT_THAT(response->body(), testing::HasSubstr("Lookup tracking is not enabled"));
+  EXPECT_THAT(response->body(), HasSubstr("Lookup tracking is not enabled"));
 
   // Now enable recent-lookups tracking and check that we get a count.
   EXPECT_EQ("200", request("admin", "POST", "/stats/recentlookups/enable", response));
@@ -119,7 +117,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", request("admin", "POST", "/stats/recentlookups/disable", response));
   EXPECT_EQ("200", request("admin", "GET", "/stats/recentlookups", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  EXPECT_THAT(response->body(), testing::HasSubstr("Lookup tracking is not enabled"));
+  EXPECT_THAT(response->body(), HasSubstr("Lookup tracking is not enabled"));
 
   EXPECT_EQ("200", request("admin", "GET", "/stats?usedonly", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
@@ -251,7 +249,7 @@ TEST_P(IntegrationAdminTest, Admin) {
               response->body());
     break;
   case Http::CodecType::HTTP3:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 
   EXPECT_EQ("200", request("admin", "GET", "/certs", response));

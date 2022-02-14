@@ -77,7 +77,7 @@ template <typename LogRequest, typename LogResponse> class GrpcAccessLogClient {
 public:
   GrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
                       const Protobuf::MethodDescriptor& service_method,
-                      const envoy::config::core::v3::RetryPolicy& retry_policy)
+                      OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy)
       : client_(client), service_method_(service_method), grpc_stream_retry_policy_(retry_policy) {}
 
 public:
@@ -177,7 +177,7 @@ public:
                    uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                    Stats::Scope& scope, std::string access_log_prefix,
                    const Protobuf::MethodDescriptor& service_method,
-                   const envoy::config::core::v3::RetryPolicy& retry_policy)
+                   OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy)
       : client_(client, service_method, retry_policy),
         buffer_flush_interval_msec_(buffer_flush_interval_msec),
         flush_timer_(dispatcher.createTimer([this]() {

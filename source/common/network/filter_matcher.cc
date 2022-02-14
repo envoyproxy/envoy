@@ -23,9 +23,10 @@ ListenerFilterMatcherPtr ListenerFilterMatcherBuilder::buildListenerFilterMatche
   case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::
       kDestinationPortRange:
     return std::make_unique<ListenerFilterDstPortMatcher>(match_config.destination_port_range());
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::RULE_NOT_SET:
+    PANIC_DUE_TO_PROTO_UNSET;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 ListenerFilterSetLogicMatcher::ListenerFilterSetLogicMatcher(

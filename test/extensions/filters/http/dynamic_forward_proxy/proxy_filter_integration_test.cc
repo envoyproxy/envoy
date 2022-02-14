@@ -9,18 +9,23 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
 
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace {
 
 class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                    public HttpIntegrationTest {
 public:
-  ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+  ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    upstream_tls_ = true;
+  }
 
   void initializeWithArgs(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024,
                           const std::string& override_auto_sni_header = "") {
     setUpstreamProtocol(Http::CodecType::HTTP1);
     const std::string filename = TestEnvironment::temporaryPath("dns_cache.txt");
+    ::unlink(filename.c_str());
 
     const std::string filter = fmt::format(R"EOF(
 name: dynamic_forward_proxy
@@ -43,6 +48,10 @@ typed_config:
                                            max_hosts, max_pending_requests, filename);
     config_helper_.prependFilter(filter);
 
+    config_helper_.prependFilter(fmt::format(R"EOF(
+name: stream-info-to-headers-filter
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty)EOF"));
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to CDS filesystem sourcing.
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
@@ -139,6 +148,9 @@ typed_config:
     }
   }
 
+  void testConnectionTiming(IntegrationStreamDecoderPtr& response, bool cached_dns,
+                            int64_t original_usec);
+
   bool upstream_tls_{};
   std::string upstream_cert_name_{"upstreamlocalhost"};
   CdsHelper cds_helper_;
@@ -146,6 +158,42 @@ typed_config:
   std::string cache_file_value_contents_;
   bool use_cache_file_{};
 };
+
+int64_t getHeaderValue(const Http::ResponseHeaderMap& headers, absl::string_view name) {
+  EXPECT_FALSE(headers.get(Http::LowerCaseString(name)).empty());
+  int64_t val;
+  if (!headers.get(Http::LowerCaseString(name)).empty() &&
+      absl::SimpleAtoi(headers.get(Http::LowerCaseString(name))[0]->value().getStringView(),
+                       &val)) {
+    return val;
+  }
+  return 0;
+}
+
+void ProxyFilterIntegrationTest::testConnectionTiming(IntegrationStreamDecoderPtr& response,
+                                                      bool cached_dns, int64_t original_usec) {
+  int64_t dns_start = getHeaderValue(response->headers(), "dns_start");
+  int64_t dns_end = getHeaderValue(response->headers(), "dns_end");
+  int64_t connect_start = getHeaderValue(response->headers(), "upstream_connect_start");
+  int64_t connect_end = getHeaderValue(response->headers(), "upstream_connect_complete");
+  int64_t handshake_end = getHeaderValue(response->headers(), "upstream_handshake_complete");
+  int64_t request_send_end = getHeaderValue(response->headers(), "request_send_end");
+  int64_t response_begin = getHeaderValue(response->headers(), "response_begin");
+  Event::DispatcherImpl dispatcher("foo", *api_, timeSystem());
+
+  ASSERT_LT(original_usec, dns_start);
+  ASSERT_LE(dns_start, dns_end);
+  if (cached_dns) {
+    ASSERT_GE(dns_end, connect_start);
+  } else {
+    ASSERT_LE(dns_end, connect_start);
+  }
+  ASSERT_LE(connect_start, connect_end);
+  ASSERT_LE(connect_end, handshake_end);
+  ASSERT_LE(handshake_end, request_send_end);
+  ASSERT_LE(request_send_end, response_begin);
+  ASSERT_LT(handshake_end, timeSystem().monotonicTime().time_since_epoch().count());
+}
 
 class ProxyFilterWithSimtimeIntegrationTest : public Event::TestUsingSimulatedTime,
                                               public ProxyFilterIntegrationTest {};
@@ -160,6 +208,13 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterIntegrationTest,
 // A basic test where we pause a request to lookup localhost, and then do another request which
 // should hit the TLS cache.
 TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
+  int64_t original_usec = dispatcher_->timeSource().monotonicTime().time_since_epoch().count();
+
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty)EOF"));
+
   initializeWithArgs();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
@@ -172,19 +227,30 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
   auto response =
       sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
   checkSimpleRequestSuccess(1024, 1024, response.get());
+  testConnectionTiming(response, false, original_usec);
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 
   // Now send another request. This should hit the DNS cache.
   response = sendRequestAndWaitForResponse(request_headers, 512, default_response_headers_, 512);
   checkSimpleRequestSuccess(512, 512, response.get());
+  testConnectionTiming(response, true, original_usec);
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+  // Make sure dns timings are tracked for cache-hits.
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("dns_start")).empty());
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("dns_end")).empty());
+
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+          fake_upstream_connection_->connection().ssl().get());
+  EXPECT_STREQ("localhost", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 }
 
 // Currently if the first DNS resolution fails, the filter will continue with
 // a null address. Make sure this mode fails gracefully.
 TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
   initializeWithArgs();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
@@ -195,6 +261,7 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("dns_resolution_failure"));
 }
 
 // Verify that after we populate the cache and reload the cluster we reattach to the cache with
@@ -287,8 +354,8 @@ TEST_P(ProxyFilterIntegrationTest, DNSCacheHostOverflow) {
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_overflow")->value());
 }
 
-// Verify that upstream TLS works with auto verification for SAN as well as auto setting SNI.
-TEST_P(ProxyFilterIntegrationTest, UpstreamTls) {
+// Verify that the filter works without TLS.
+TEST_P(ProxyFilterIntegrationTest, UpstreamCleartext) {
   upstream_tls_ = true;
   initializeWithArgs();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -301,11 +368,6 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTls) {
 
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
-
-  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
-      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
-          fake_upstream_connection_->connection().ssl().get());
-  EXPECT_STREQ("localhost", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
@@ -423,6 +485,7 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFile) {
 }
 
 TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
+  upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
 
   config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_multiple_dns_addresses",
@@ -451,6 +514,8 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
 }
 
 TEST_P(ProxyFilterIntegrationTest, MultipleRequestsLowStreamLimit) {
+  upstream_tls_ = false; // config below uses bootstrap, tls config is in cluster_
+
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 

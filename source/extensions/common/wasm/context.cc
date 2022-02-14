@@ -88,6 +88,13 @@ Http::RequestHeaderMapPtr buildRequestHeaderMapFromPairs(const Pairs& pairs) {
 
 template <typename P> static uint32_t headerSize(const P& p) { return p ? p->size() : 0; }
 
+Upstream::HostDescriptionConstSharedPtr getHost(const StreamInfo::StreamInfo* info) {
+  if (info && info->upstreamInfo() && info->upstreamInfo().value().get().upstreamHost()) {
+    return info->upstreamInfo().value().get().upstreamHost();
+  }
+  return nullptr;
+}
+
 } // namespace
 
 // Test support.
@@ -194,8 +201,8 @@ void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::Resoluti
   //    N * null-terminated addresses
   uint32_t s = 4; // length
   for (auto& e : response) {
-    s += 4;                                     // for TTL
-    s += e.address_->asStringView().size() + 1; // null terminated.
+    s += 4;                                                // for TTL
+    s += e.addrInfo().address_->asStringView().size() + 1; // null terminated.
   }
   auto buffer = std::unique_ptr<char[]>(new char[s]);
   char* b = buffer.get();
@@ -203,14 +210,14 @@ void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::Resoluti
   safeMemcpyUnsafeDst(b, &n);
   b += sizeof(uint32_t);
   for (auto& e : response) {
-    uint32_t ttl = e.ttl_.count();
+    uint32_t ttl = e.addrInfo().ttl_.count();
     safeMemcpyUnsafeDst(b, &ttl);
     b += sizeof(uint32_t);
   };
   for (auto& e : response) {
-    memcpy(b, e.address_->asStringView().data(), // NOLINT(safe-memcpy)
-           e.address_->asStringView().size());
-    b += e.address_->asStringView().size();
+    memcpy(b, e.addrInfo().address_->asStringView().data(), // NOLINT(safe-memcpy)
+           e.addrInfo().address_->asStringView().size());
+    b += e.addrInfo().address_->asStringView().size();
     *b++ = 0;
   };
   buffer_.set(std::move(buffer), s);
@@ -440,16 +447,18 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   if (part_token == property_tokens.end()) {
     if (info) {
       std::string key = absl::StrCat(CelStateKeyPrefix, name);
-      const CelState* state;
-      if (info->filterState().hasData<CelState>(key)) {
-        state = &info->filterState().getDataReadOnly<CelState>(key);
-      } else if (info->upstreamFilterState() &&
-                 info->upstreamFilterState()->hasData<CelState>(key)) {
-        state = &info->upstreamFilterState()->getDataReadOnly<CelState>(key);
-      } else {
-        return {};
+      const CelState* state = info->filterState().getDataReadOnly<CelState>(key);
+      if (state == nullptr) {
+        if (info->upstreamInfo().has_value() &&
+            info->upstreamInfo().value().get().upstreamFilterState() != nullptr) {
+          state =
+              info->upstreamInfo().value().get().upstreamFilterState()->getDataReadOnly<CelState>(
+                  key);
+        }
       }
-      return state->exprValue(arena, last);
+      if (state != nullptr) {
+        return state->exprValue(arena, last);
+      }
     }
     return {};
   }
@@ -522,8 +531,8 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     }
     break;
   case PropertyToken::CLUSTER_NAME:
-    if (info && info->upstreamHost()) {
-      return CelValue::CreateString(&info->upstreamHost()->cluster().name());
+    if (getHost(info)) {
+      return CelValue::CreateString(&getHost(info)->cluster().name());
     } else if (info && info->route() && info->route()->routeEntry()) {
       return CelValue::CreateString(&info->route()->routeEntry()->clusterName());
     } else if (info && info->upstreamClusterInfo().has_value() &&
@@ -532,8 +541,8 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     }
     break;
   case PropertyToken::CLUSTER_METADATA:
-    if (info && info->upstreamHost()) {
-      return CelProtoWrapper::CreateMessage(&info->upstreamHost()->cluster().metadata(), arena);
+    if (getHost(info)) {
+      return CelProtoWrapper::CreateMessage(&getHost(info)->cluster().metadata(), arena);
     } else if (info && info->upstreamClusterInfo().has_value() &&
                info->upstreamClusterInfo().value()) {
       return CelProtoWrapper::CreateMessage(&info->upstreamClusterInfo().value()->metadata(),
@@ -541,8 +550,8 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     }
     break;
   case PropertyToken::UPSTREAM_HOST_METADATA:
-    if (info && info->upstreamHost() && info->upstreamHost()->metadata()) {
-      return CelProtoWrapper::CreateMessage(info->upstreamHost()->metadata().get(), arena);
+    if (getHost(info)) {
+      return CelProtoWrapper::CreateMessage(getHost(info)->metadata().get(), arena);
     }
     break;
   case PropertyToken::ROUTE_NAME:
@@ -565,9 +574,12 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   case PropertyToken::PLUGIN_VM_ID:
     return CelValue::CreateStringView(toAbslStringView(wasm()->vm_id()));
   case PropertyToken::FILTER_STATE:
-    return Protobuf::Arena::Create<Filters::Common::Expr::FilterStateWrapper>(arena,
-                                                                              info->filterState())
-        ->Produce(arena);
+    if (info) {
+      return Protobuf::Arena::Create<Filters::Common::Expr::FilterStateWrapper>(arena,
+                                                                                info->filterState())
+          ->Produce(arena);
+    }
+    break;
   }
   return {};
 }
@@ -1115,10 +1127,8 @@ WasmResult Context::setProperty(std::string_view path, std::string_view value) {
   }
   std::string key;
   absl::StrAppend(&key, CelStateKeyPrefix, toAbslStringView(path));
-  CelState* state;
-  if (stream_info->filterState()->hasData<CelState>(key)) {
-    state = &stream_info->filterState()->getDataMutable<CelState>(key);
-  } else {
+  CelState* state = stream_info->filterState()->getDataMutable<CelState>(key);
+  if (state == nullptr) {
     const auto& it = rootContext()->state_prototypes_.find(toAbslStringView(path));
     const CelStatePrototype& prototype =
         it == rootContext()->state_prototypes_.end()
@@ -1636,7 +1646,8 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
     // sendLocalReply() will fail. Net net, this is safe.
     wasm()->addAfterVmCallAction([this, response_code, body_text = std::string(body_text),
                                   modify_headers = std::move(modify_headers), grpc_status,
-                                  details = std::string(details)] {
+                                  details = StringUtil::replaceAllEmptySpace(
+                                      absl::string_view(details.data(), details.size()))] {
       decoder_callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(response_code), body_text,
                                          modify_headers, grpc_status, details);
     });

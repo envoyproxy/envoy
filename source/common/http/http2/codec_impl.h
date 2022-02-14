@@ -601,8 +601,6 @@ private:
 
   // Adds buffer fragment for a new outbound frame to the supplied Buffer::OwnedImpl.
   void addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
-  virtual ProtocolConstraints::ReleasorProc
-  trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) PURE;
   virtual Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
   void onKeepaliveResponse();
   void onKeepaliveResponseTimeout();
@@ -649,19 +647,11 @@ private:
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   Status onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
-
-  // Tracking of frames for flood and abuse mitigation for upstream connections is presently enabled
-  // by the `envoy.reloadable_features.upstream_http2_flood_checks` flag.
-  // TODO(yanavlasov): move to the base class once the runtime flag is removed.
-  ProtocolConstraints::ReleasorProc trackOutboundFrames(bool) override;
   Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override;
-
   void dumpStreams(std::ostream& os, int indent_level) const override;
   StreamResetReason getMessagingErrorResetReason() const override;
   Http::ConnectionCallbacks& callbacks_;
   std::chrono::milliseconds idle_session_requires_ping_interval_;
-  // Latched value of "envoy.reloadable_features.upstream_http2_flood_checks" runtime feature.
-  bool enable_upstream_http2_flood_checks_;
 };
 
 /**
@@ -682,8 +672,6 @@ private:
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   Status onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
-  ProtocolConstraints::ReleasorProc
-  trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) override;
   Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
   StreamResetReason getMessagingErrorResetReason() const override {

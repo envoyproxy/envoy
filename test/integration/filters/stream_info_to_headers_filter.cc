@@ -9,6 +9,11 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace {
+
+std::string toUsec(MonotonicTime time) { return absl::StrCat(time.time_since_epoch().count()); }
+
+} // namespace
 
 // A filter that sticks stream info into headers for integration testing.
 class StreamInfoToHeadersFilter : public Http::PassThroughFilter {
@@ -20,9 +25,49 @@ public:
   }
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override {
-    if (decoder_callbacks_->streamInfo().upstreamSslConnection()) {
-      headers.addCopy(Http::LowerCaseString("alpn"),
-                      decoder_callbacks_->streamInfo().upstreamSslConnection()->alpn());
+    const std::string dns_start = "envoy.dynamic_forward_proxy.dns_start_ms";
+    const std::string dns_end = "envoy.dynamic_forward_proxy.dns_end_ms";
+    StreamInfo::StreamInfo& stream_info = decoder_callbacks_->streamInfo();
+
+    if (stream_info.downstreamTiming().getValue(dns_start).has_value()) {
+      headers.addCopy(Http::LowerCaseString("dns_start"),
+                      toUsec(stream_info.downstreamTiming().getValue(dns_start).value()));
+    }
+    if (stream_info.downstreamTiming().getValue(dns_end).has_value()) {
+      headers.addCopy(Http::LowerCaseString("dns_end"),
+                      toUsec(stream_info.downstreamTiming().getValue(dns_end).value()));
+    }
+    if (decoder_callbacks_->streamInfo().upstreamInfo()) {
+      if (decoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()) {
+        headers.addCopy(
+            Http::LowerCaseString("alpn"),
+            decoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()->alpn());
+      }
+      headers.addCopy(Http::LowerCaseString("num_streams"),
+                      decoder_callbacks_->streamInfo().upstreamInfo()->upstreamNumStreams());
+
+      StreamInfo::UpstreamTiming& upstream_timing =
+          decoder_callbacks_->streamInfo().upstreamInfo()->upstreamTiming();
+      if (upstream_timing.upstream_connect_start_.has_value()) {
+        headers.addCopy(Http::LowerCaseString("upstream_connect_start"),
+                        toUsec(upstream_timing.upstream_connect_start_.value()));
+      }
+      if (upstream_timing.upstream_connect_complete_.has_value()) {
+        headers.addCopy(Http::LowerCaseString("upstream_connect_complete"),
+                        toUsec(upstream_timing.upstream_connect_complete_.value()));
+      }
+      if (upstream_timing.upstream_handshake_complete_.has_value()) {
+        headers.addCopy(Http::LowerCaseString("upstream_handshake_complete"),
+                        toUsec(upstream_timing.upstream_handshake_complete_.value()));
+      }
+      if (upstream_timing.last_upstream_tx_byte_sent_.has_value()) {
+        headers.addCopy(Http::LowerCaseString("request_send_end"),
+                        toUsec(upstream_timing.last_upstream_tx_byte_sent_.value()));
+      }
+      if (upstream_timing.first_upstream_rx_byte_received_.has_value()) {
+        headers.addCopy(Http::LowerCaseString("response_begin"),
+                        toUsec(upstream_timing.first_upstream_rx_byte_received_.value()));
+      }
     }
     return Http::FilterHeadersStatus::Continue;
   }

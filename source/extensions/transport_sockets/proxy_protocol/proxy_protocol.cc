@@ -107,7 +107,7 @@ void UpstreamProxyProtocolSocket::onConnected() {
 
 UpstreamProxyProtocolSocketFactory::UpstreamProxyProtocolSocketFactory(
     Network::TransportSocketFactoryPtr transport_socket_factory, ProxyProtocolConfig config)
-    : transport_socket_factory_(std::move(transport_socket_factory)), config_(config) {}
+    : PassthroughFactory(std::move(transport_socket_factory)), config_(config) {}
 
 Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsConstSharedPtr options) const {
@@ -117,10 +117,6 @@ Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportS
   }
   return std::make_unique<UpstreamProxyProtocolSocket>(std::move(inner_socket), options,
                                                        config_.version());
-}
-
-bool UpstreamProxyProtocolSocketFactory::implementsSecureTransport() const {
-  return transport_socket_factory_->implementsSecureTransport();
 }
 
 } // namespace ProxyProtocol

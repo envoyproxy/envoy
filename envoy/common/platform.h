@@ -284,7 +284,7 @@ constexpr absl::string_view null_device_path{"/dev/null"};
 // Note: chromium disabled recvmmsg regardless of ndk version. However, the only Android target
 // currently actively using Envoy is Envoy Mobile, where recvmmsg is not actively disabled. In fact,
 // defining mmsghdr here caused a conflicting definition with the ndk's definition of the struct
-// (https://github.com/lyft/envoy-mobile/pull/772/checks?check_run_id=534152886#step:4:64).
+// (https://github.com/envoyproxy/envoy-mobile/pull/772/checks?check_run_id=534152886#step:4:64).
 // Therefore, we decided to remove the Android check introduced here in
 // https://github.com/envoyproxy/envoy/pull/10120. If someone out there encounters problems with
 // this please bring up in Envoy's slack channel #envoy-udp-quic-dev.
@@ -300,18 +300,6 @@ struct mmsghdr {
   unsigned int msg_len;
 };
 #endif
-
-#define SUPPORTS_GETIFADDRS
-#ifdef WIN32
-#undef SUPPORTS_GETIFADDRS
-#endif
-
-// https://android.googlesource.com/platform/prebuilts/ndk/+/dev/platform/sysroot/usr/include/ifaddrs.h
-#ifdef __ANDROID_API__
-#if __ANDROID_API__ < 24
-#undef SUPPORTS_GETIFADDRS
-#endif // __ANDROID_API__ < 24
-#endif // ifdef __ANDROID_API__
 
 // TODO: Remove once bazel supports NDKs > 21
 #define SUPPORTS_CPP_17_CONTIGUOUS_ITERATOR

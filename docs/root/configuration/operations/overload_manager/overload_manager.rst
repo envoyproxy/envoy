@@ -7,9 +7,9 @@ The :ref:`overload manager <arch_overview_overload_manager>` is configured in th
 :ref:`overload_manager <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.overload_manager>`
 field.
 
-An example configuration of the overload manager is shown below. It shows a configuration to
-disable HTTP/1.x keepalive when heap memory usage reaches 95% and to stop accepting
-requests when heap memory usage reaches 99%.
+An example configuration of the overload manager is shown below. It shows a
+configuration to drain HTTP/X connections when heap memory usage reaches 95%
+and to stop accepting requests when heap memory usage reaches 99%.
 
 .. code-block:: yaml
 
@@ -81,7 +81,9 @@ The following overload actions are supported:
     - Envoy will immediately respond with a 503 response code to new requests
 
   * - envoy.overload_actions.disable_http_keepalive
-    - Envoy will stop accepting streams on incoming HTTP connections
+    - Envoy will drain HTTP/2 and HTTP/3 connections using ``GOAWAY`` with a
+      drain grace period. For HTTP/1, Envoy will set a drain timer to close the
+      more idle recently used connections.
 
   * - envoy.overload_actions.stop_accepting_connections
     - Envoy will stop accepting new network connections on its configured listeners
@@ -143,6 +145,8 @@ Note in the example that the minimum idle time is specified as an absolute durat
 would be computed based on the maximum (specified elsewhere). So if ``idle_timeout`` is
 again 600 seconds, then the minimum timer value would be :math:`10\% \cdot 600s = 60s`.
 
+.. _config_overload_manager_limiting_connections:
+
 Limiting Active Connections
 ---------------------------
 
@@ -155,6 +159,13 @@ If the value is unspecified, there is no global limit on the number of active do
 and Envoy will emit a warning indicating this at startup. To disable the warning without setting a
 limit on the number of active downstream connections, the runtime value may be set to a very large
 limit (~2e9).
+Listeners can opt out of this global connection limit by setting
+:ref:`Listener.ignore_global_conn_limit <envoy_v3_api_field_config.listener.v3.Listener.ignore_global_conn_limit>`
+to true. Similarly, you can opt out the admin listener by setting
+:ref:`Admin.ignore_global_conn_limit <envoy_v3_api_field_config.bootstrap.v3.Admin.ignore_global_conn_limit>`.
+You may want to opt out a listener to be able to probe Envoy or collect stats while it is otherwise at its
+connection limit. Note that connections to listeners that opt out are still tracked and count towards the
+global limit.
 
 If it is desired to only limit the number of downstream connections for a particular listener,
 per-listener limits can be set via the :ref:`listener configuration <config_listeners>`.

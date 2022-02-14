@@ -23,7 +23,7 @@ InjectedResourceMonitor::InjectedResourceMonitor(
 
 void InjectedResourceMonitor::onFileChanged() { file_changed_ = true; }
 
-void InjectedResourceMonitor::updateResourceUsage(Server::ResourceMonitor::Callbacks& callbacks) {
+void InjectedResourceMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
   if (file_changed_) {
     file_changed_ = false;
     TRY_ASSERT_MAIN_THREAD {

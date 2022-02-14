@@ -204,9 +204,9 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
     ENVOY_LOG(debug, "upstream local close");
     onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
-  default:
+  case Network::ConnectionEvent::Connected:
     // Connected is consumed by the connection pool.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("reached unexpectedly");
   }
 
   releaseConnection(false);
@@ -270,7 +270,7 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     stats_.incResponseLocalException(parent_.cluster());
     parent_.sendLocalReply(AppException(AppExceptionType::InternalError,
                                         "thrift upstream request: too many connections"),
-                           true);
+                           false /* Don't close the downstream connection. */);
     break;
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     upstream_host_->outlierDetector().putResult(
@@ -303,8 +303,6 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     // Error occurred after a partial response, propagate the reset to the downstream.
     parent_.resetDownstreamConnection();
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

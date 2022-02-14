@@ -1,5 +1,6 @@
 #include "source/common/quic/envoy_quic_client_session.h"
 
+#include "source/common/event/dispatcher_impl.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
@@ -14,14 +15,17 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
     quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
-    QuicStatNames& quic_stat_names, Stats::Scope& scope)
+    QuicStatNames& quic_stat_names, OptRef<Http::AlternateProtocolsCache> rtt_cache,
+    Stats::Scope& scope)
     : QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
                                       send_buffer_limit,
                                       std::make_shared<QuicSslConnectionInfo>(*this)),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get(), push_promise_index),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
-      quic_stat_names_(quic_stat_names), scope_(scope) {}
+      quic_stat_names_(quic_stat_names), rtt_cache_(rtt_cache), scope_(scope) {
+  streamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+}
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());
@@ -31,6 +35,7 @@ EnvoyQuicClientSession::~EnvoyQuicClientSession() {
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return server_id().host(); }
 
 void EnvoyQuicClientSession::connect() {
+  streamInfo().upstreamInfo()->upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
   dynamic_cast<EnvoyQuicClientConnection*>(network_connection_)
       ->setUpConnectionSocket(
           *static_cast<EnvoyQuicClientConnection*>(connection())->connectionSocket(), *this);
@@ -41,6 +46,14 @@ void EnvoyQuicClientSession::connect() {
 
 void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                 quic::ConnectionCloseSource source) {
+  // Latch latest srtt.
+  if (OneRttKeysAvailable() && rtt_cache_) {
+    const quic::QuicConnectionStats& stats = connection()->GetStats();
+    if (stats.srtt_us > 0) {
+      Http::AlternateProtocolsCache::Origin origin("https", server_id().host(), server_id().port());
+      rtt_cache_->setSrtt(origin, std::chrono::microseconds(stats.srtt_us));
+    }
+  }
   quic::QuicSpdyClientSession::OnConnectionClosed(frame, source);
   quic_stat_names_.chargeQuicConnectionCloseStats(scope_, frame.quic_error_code, source, true);
   onConnectionCloseEvent(frame, source, version());
@@ -103,7 +116,8 @@ quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStr
 quic::QuicSpdyStream*
 EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
   // Envoy doesn't support server push.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("unexpectes server push call");
+  return nullptr;
 }
 
 bool EnvoyQuicClientSession::hasDataToWrite() { return HasDataToWrite(); }
@@ -132,6 +146,10 @@ void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
   // before use. This may result in OnCanCreateNewOutgoingStream with zero
   // available streams.
   OnCanCreateNewOutgoingStream(false);
+  streamInfo().upstreamInfo()->upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
+  streamInfo().upstreamInfo()->upstreamTiming().onUpstreamHandshakeComplete(
+      dispatcher_.timeSource());
+
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 

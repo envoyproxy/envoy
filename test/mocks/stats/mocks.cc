@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -69,6 +69,9 @@ MockMetricSnapshot::~MockMetricSnapshot() = default;
 
 MockSink::MockSink() = default;
 MockSink::~MockSink() = default;
+
+MockSinkPredicates::MockSinkPredicates() = default;
+MockSinkPredicates::~MockSinkPredicates() = default;
 
 MockStore::MockStore() {
   ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));

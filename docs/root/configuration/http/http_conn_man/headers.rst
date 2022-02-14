@@ -363,6 +363,25 @@ A few very important notes about XFF:
      XFF is parsed to determine if a request is internal. In this scenario, do not forward XFF and
      allow Envoy to generate a new one with a single internal origin IP.
 
+.. _config_http_conn_man_headers_x-forwarded-host:
+
+x-forwarded-host
+----------------
+
+The *x-forwarded-host* header is a de-facto standard proxy header which indicates the original host
+requested by the client in the *:authority* (*host* in HTTP1) header. A compliant proxy *appends*
+the original value of the *:authority* header to *x-forwarded-host* only if the *:authority* header
+is modified.
+
+Envoy updates the *:authority* header if a host rewrite option (one of
+:ref:`host_rewrite_literal <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>`,
+:ref:`auto_host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>`,
+:ref:`host_rewrite_header <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_header>`, or
+:ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_path_regex>`)
+is used and appends its original value to *x-forwarded-host* if
+:ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
+is set.
+
 .. _config_http_conn_man_headers_x-forwarded-proto:
 
 x-forwarded-proto
@@ -568,11 +587,60 @@ Supported variable names are:
       <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
-    Same as **%DOWNSTREAM_REMOTE_ADDRESS%** excluding port if the address is an IP address.
+    Remote address of the downstream connection, without any port component.
+    IP addresses are the only address type with a port component.
+
+    .. note::
+
+      This may not be the physical remote address of the peer if the address has been inferred from
+      :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
+      <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_REMOTE_PORT%
+    Remote port of the downstream connection.
+    IP addresses are the only address type with a port component.
+
+    .. note::
+
+      This may not be the physical remote address of the peer if the address has been inferred from
+      :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
+      <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_DIRECT_REMOTE_ADDRESS%
+    Direct remote address of the downstream connection. If the address is an IP address it includes both
+    address and port.
+
+    .. note::
+
+      This is always the physical remote address of the peer even if the downstream remote address has
+      been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
+      or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%
+    Direct remote address of the downstream connection, without any port component.
+    IP addresses are the only address type with a port component.
+
+    .. note::
+
+      This is always the physical remote address of the peer even if the downstream remote address has
+      been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
+      or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_DIRECT_REMOTE_PORT%
+    Direct remote port of the downstream connection.
+    IP addresses are the only address type with a port component.
+
+    .. note::
+
+      This is always the physical remote address of the peer even if the downstream remote address has
+      been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
+      or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+
 
 %DOWNSTREAM_LOCAL_ADDRESS%
     Local address of the downstream connection. If the address is an IP address it includes both
     address and port.
+
     If the original connection was redirected by iptables REDIRECT, this represents
     the original destination address restored by the
     :ref:`Original Destination Filter <config_listener_filters_original_dst>` using SO_ORIGINAL_DST socket option.
@@ -580,10 +648,12 @@ Supported variable names are:
     option was set to true, this represents the original destination address and port.
 
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
-    Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+    Local address of the downstream connection, without any port component.
+    IP addresses are the only address type with a port component.
 
 %DOWNSTREAM_LOCAL_PORT%
-    Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
+    Local port of the downstream connection.
+    IP addresses are the only address type with a port component.
 
 %DOWNSTREAM_LOCAL_URI_SAN%
   HTTP
@@ -682,6 +752,12 @@ Supported variable names are:
     The original protocol which is already added by Envoy as a
     :ref:`x-forwarded-proto <config_http_conn_man_headers_x-forwarded-proto>` request header.
 
+%REQUESTED_SERVER_NAME%
+  HTTP
+    String value set on ssl connection socket for Server Name Indication (SNI)
+  TCP
+    String value set on ssl connection socket for Server Name Indication (SNI)
+
 %UPSTREAM_METADATA(["namespace", "key", ...])%
     Populates the header with :ref:`EDS endpoint metadata <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.metadata>` from the
     upstream host selected by the router. Metadata may be selected from any namespace. In general,
@@ -701,10 +777,35 @@ Supported variable names are:
 
     This works both on request and response headers.
 
+%UPSTREAM_LOCAL_ADDRESS%
+    Local address of the upstream connection. If the address is an IP address it includes both
+    address and port.
+
+    The upstream local address cannot be added to request headers as the upstream host
+    hremote as not been selected when custom request headers are generated.
+
+%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
+    Local address of the upstream connection, without any port component.
+    IP addresses are the only address type with a port component.
+
+%UPSTREAM_LOCAL_PORT%
+    Local port of the upstream connection.
+    IP addresses are the only address type with a port component.
+
 %UPSTREAM_REMOTE_ADDRESS%
-    Remote address of the upstream host. If the address is an IP address it includes both address
-    and port. The upstream remote address cannot be added to request headers as the upstream host
+    Remote address of the upstream connection. If the address is an IP address it includes both
+    address and port.
+
+    The upstream remote address cannot be added to request headers as the upstream host
     has not been selected when custom request headers are generated.
+
+%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
+    Remote address of the upstream connection, without any port component.
+    IP addresses are the only address type with a port component.
+
+%UPSTREAM_REMOTE_PORT%
+    Remote port of the upstream connection.
+    IP addresses are the only address type with a port component.
 
 %PER_REQUEST_STATE(reverse.dns.data.name)%
     Populates the header with values set on the stream info filterState() object. To be
@@ -738,3 +839,6 @@ Supported variable names are:
 %RESPONSE_CODE_DETAILS%
     Response code details provides additional information about the HTTP response code, such as
     who set it (the upstream or envoy) and why.
+
+%VIRTUAL_CLUSTER_NAME%
+  Name of the Virtual Cluster which gets matched (if any).

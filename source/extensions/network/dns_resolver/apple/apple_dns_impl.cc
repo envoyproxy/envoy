@@ -164,10 +164,11 @@ AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
   }
 }
 
-void AppleDnsResolverImpl::PendingResolution::cancel(Network::ActiveDnsQuery::CancelReason) {
+void AppleDnsResolverImpl::PendingResolution::cancel(Network::ActiveDnsQuery::CancelReason reason) {
   // TODO(mattklein123): If cancel reason is timeout, do something more aggressive about destroying
   // and recreating the DNS system to maximize the chance of success in following queries.
-  ENVOY_LOG(debug, "Cancelling PendingResolution for {}", dns_name_);
+  ENVOY_LOG_EVENT(debug, "apple_dns_resolution_cancelled",
+                  "dns resolution cancelled for {} with reason={}", dns_name_, reason);
   ASSERT(owned_);
   // Because the query is self-owned, delete now.
   delete this;
@@ -217,7 +218,7 @@ std::list<DnsResponse>& AppleDnsResolverImpl::PendingResolution::finalAddressLis
                                             pending_response_.v6_responses_.end());
     return pending_response_.all_responses_;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void AppleDnsResolverImpl::PendingResolution::finishResolve() {
@@ -320,11 +321,11 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     ASSERT(address, "invalid to add null address");
     auto dns_response = buildDnsResponse(address, ttl);
     ENVOY_LOG(debug, "Address to add address={}, ttl={}",
-              dns_response.address_->ip()->addressAsString(), ttl);
-    if (dns_response.address_->ip()->ipv4()) {
+              dns_response.addrInfo().address_->ip()->addressAsString(), ttl);
+    if (dns_response.addrInfo().address_->ip()->ipv4()) {
       pending_response_.v4_responses_.push_back(dns_response);
     } else {
-      ASSERT(dns_response.address_->ip()->ipv6());
+      ASSERT(dns_response.addrInfo().address_->ip()->ipv6());
       pending_response_.v6_responses_.push_back(dns_response);
     }
   }
@@ -376,9 +377,8 @@ AppleDnsResolverImpl::PendingResolution::buildDnsResponse(const struct sockaddr*
     address_in6.sin6_port = 0;
     address_in6.sin6_addr = reinterpret_cast<const sockaddr_in6*>(address)->sin6_addr;
     return {std::make_shared<const Address::Ipv6Instance>(address_in6), std::chrono::seconds(ttl)};
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 // apple DNS resolver factory

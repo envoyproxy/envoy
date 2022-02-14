@@ -89,8 +89,10 @@ enum ResponseFlag {
   NoClusterFound = 0x1000000,
   // Overload Manager terminated the stream.
   OverloadManager = 0x2000000,
+  // DNS resolution failed.
+  DnsResolutionFailed = 0x4000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = OverloadManager,
+  LastFlag = DnsResolutionFailed,
 };
 
 /**
@@ -192,7 +194,11 @@ struct ResponseCodeDetailValues {
   const std::string FilterRemovedRequiredResponseHeaders =
       "filter_removed_required_response_headers";
   // The request was rejected because the original IP couldn't be detected.
-  const std::string OriginalIPDetectionFailed = "rejecting because detection failed";
+  const std::string OriginalIPDetectionFailed = "rejecting_because_detection_failed";
+  // A filter called addDecodedData at the wrong point in the filter chain.
+  const std::string FilterAddedInvalidRequestData = "filter_added_invalid_request_data";
+  // A filter called addDecodedData at the wrong point in the filter chain.
+  const std::string FilterAddedInvalidResponseData = "filter_added_invalid_response_data";
   // Changes or additions to details should be reflected in
   // docs/root/configuration/http/http_conn_man/response_code_details.rst
 };
@@ -232,14 +238,41 @@ struct UpstreamTiming {
     last_upstream_rx_byte_received_ = time_source.monotonicTime();
   }
 
+  void onUpstreamConnectStart(TimeSource& time_source) {
+    ASSERT(!upstream_connect_start_);
+    upstream_connect_start_ = time_source.monotonicTime();
+  }
+
+  void onUpstreamConnectComplete(TimeSource& time_source) {
+    upstream_connect_complete_ = time_source.monotonicTime();
+  }
+
+  void onUpstreamHandshakeComplete(TimeSource& time_source) {
+    upstream_handshake_complete_ = time_source.monotonicTime();
+  }
+
   absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
   absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
+
+  absl::optional<MonotonicTime> upstream_connect_start_;
+  absl::optional<MonotonicTime> upstream_connect_complete_;
+  absl::optional<MonotonicTime> upstream_handshake_complete_;
 };
 
 class DownstreamTiming {
 public:
+  void setValue(absl::string_view key, MonotonicTime value) { timings_[key] = value; }
+
+  absl::optional<MonotonicTime> getValue(absl::string_view value) const {
+    auto ret = timings_.find(value);
+    if (ret == timings_.end()) {
+      return {};
+    }
+    return ret->second;
+  }
+
   absl::optional<MonotonicTime> lastDownstreamRxByteReceived() const {
     return last_downstream_rx_byte_received_;
   }
@@ -293,6 +326,112 @@ private:
 
 using BytesMeterSharedPtr = std::shared_ptr<BytesMeter>;
 
+// TODO(alyssawilk) after landing this, remove all the duplicate getters and
+// setters from StreamInfo.
+class UpstreamInfo {
+public:
+  virtual ~UpstreamInfo() = default;
+
+  /**
+   * Dump the upstream info to the specified ostream.
+   *
+   * @param os the ostream to dump state to
+   * @param indent_level the depth, for pretty-printing.
+   *
+   * This function is called on Envoy fatal errors so should avoid memory allocation.
+   */
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  /**
+   * @param connection ID of the upstream connection.
+   */
+  virtual void setUpstreamConnectionId(uint64_t id) PURE;
+
+  /**
+   * @return the ID of the upstream connection, or absl::nullopt if not available.
+   */
+  virtual absl::optional<uint64_t> upstreamConnectionId() const PURE;
+
+  /**
+   * @param interface name of the upstream connection's local socket.
+   */
+  virtual void setUpstreamInterfaceName(absl::string_view interface_name) PURE;
+
+  /**
+   * @return interface name of the upstream connection's local socket, or absl::nullopt if not
+   * available.
+   */
+  virtual absl::optional<absl::string_view> upstreamInterfaceName() const PURE;
+
+  /**
+   * @param connection_info sets the upstream ssl connection.
+   */
+  virtual void
+  setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
+
+  /**
+   * @return the upstream SSL connection. This will be nullptr if the upstream
+   * connection does not use SSL.
+   */
+  virtual Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const PURE;
+
+  /*
+   * @return the upstream timing for this stream
+   * */
+  virtual UpstreamTiming& upstreamTiming() PURE;
+  virtual const UpstreamTiming& upstreamTiming() const PURE;
+
+  /**
+   * @param upstream_local_address sets the local address of the upstream connection. Note that it
+   * can be different than the local address of the downstream connection.
+   */
+  virtual void setUpstreamLocalAddress(
+      const Network::Address::InstanceConstSharedPtr& upstream_local_address) PURE;
+
+  /**
+   * @return the upstream local address.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const PURE;
+
+  /**
+   * @param failure_reason the upstream transport failure reason.
+   */
+  virtual void setUpstreamTransportFailureReason(absl::string_view failure_reason) PURE;
+
+  /**
+   * @return const std::string& the upstream transport failure reason, e.g. certificate validation
+   *         failed.
+   */
+  virtual const std::string& upstreamTransportFailureReason() const PURE;
+
+  /**
+   * @param host the selected upstream host for the request.
+   */
+  virtual void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * @return upstream host description.
+   */
+  virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;
+
+  /**
+   * Filter State object to be shared between upstream and downstream filters.
+   * @param pointer to upstream connections filter state.
+   * @return pointer to filter state to be used by upstream connections.
+   */
+  virtual const FilterStateSharedPtr& upstreamFilterState() const PURE;
+  virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
+
+  /**
+   * Getters and setters for the number of streams started on this connection.
+   * For upstream connections this is updated as streams are created.
+   * For downstream connections this is latched at the time the upstream stream
+   * is assigned.
+   */
+  virtual void setUpstreamNumStreams(uint64_t num_streams) PURE;
+  virtual uint64_t upstreamNumStreams() const PURE;
+};
+
 /**
  * Additional information about a completed request for logging.
  */
@@ -312,8 +451,9 @@ public:
   virtual void setResponseCode(uint32_t code) PURE;
 
   /**
-   * @param rc_details the response code details string to set for this request.
-   * See ResponseCodeDetailValues above for well-known constants.
+   * @param rc_details the response code details string to set for this request. It should not
+   * contain any empty or space characters (' ', '\t', '\f', '\v', '\n', '\r'). See
+   * ResponseCodeDetailValues above for well-known constants.
    */
   virtual void setResponseCodeDetails(absl::string_view rc_details) PURE;
 
@@ -332,11 +472,6 @@ public:
   virtual bool intersectResponseFlags(uint64_t response_flags) const PURE;
 
   /**
-   * @param host the selected upstream host for the request.
-   */
-  virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
-
-  /**
    * @param std::string name denotes the name of the route.
    */
   virtual void setRouteName(absl::string_view name) PURE;
@@ -345,6 +480,16 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& getRouteName() const PURE;
+
+  /**
+   * @param std::string name denotes the name of the virtual cluster.
+   */
+  virtual void setVirtualClusterName(const absl::optional<std::string>& name) PURE;
+
+  /**
+   * @return std::string& the name of the virtual cluster which got matched.
+   */
+  virtual const absl::optional<std::string>& virtualClusterName() const PURE;
 
   /**
    * @param bytes_received denotes number of bytes to add to total received bytes.
@@ -393,54 +538,15 @@ public:
   virtual MonotonicTime startTimeMonotonic() const PURE;
 
   /**
-   * @return the duration between the last byte of the request was received and the start of the
-   * request.
+   * Sets the upstream information for this stream.
    */
-  virtual absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const PURE;
+  virtual void setUpstreamInfo(std::shared_ptr<UpstreamInfo>) PURE;
 
   /**
-   * Sets the upstream timing information for this stream. This is useful for
-   * when multiple upstream requests are issued and we want to save timing
-   * information for the one that "wins".
+   * Returns the upstream information for this stream.
    */
-  virtual void setUpstreamTiming(const UpstreamTiming& upstream_timing) PURE;
-
-  /**
-   * @return the duration between the first byte of the request was sent upstream and the start of
-   * the request. There may be a considerable delta between lastDownstreamByteReceived and this
-   * value due to filters.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const PURE;
-
-  /**
-   * @return the duration between the last byte of the request was sent upstream and the start of
-   * the request.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const PURE;
-
-  /**
-   * @return the duration between the first byte of the response is received from upstream and the
-   * start of the request.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const PURE;
-
-  /**
-   * @return the duration between the last byte of the response is received from upstream and the
-   * start of the request.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const PURE;
-  /**
-   * @return the duration between the first byte of the response is sent downstream and the start of
-   * the request. There may be a considerable delta between lastUpstreamByteReceived and this value
-   * due to filters.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const PURE;
-
-  /**
-   * @return the duration between the last byte of the response is sent downstream and the start of
-   * the request.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const PURE;
+  virtual std::shared_ptr<UpstreamInfo> upstreamInfo() PURE;
+  virtual OptRef<const UpstreamInfo> upstreamInfo() const PURE;
 
   /**
    * @return the total duration of the request (i.e., when the request's ActiveStream is destroyed)
@@ -458,6 +564,7 @@ public:
    * @return the downstream timing information.
    */
   virtual DownstreamTiming& downstreamTiming() PURE;
+  virtual OptRef<const DownstreamTiming> downstreamTiming() const PURE;
 
   /**
    * @param bytes_sent denotes the number of bytes to add to total sent bytes.
@@ -485,23 +592,6 @@ public:
   virtual uint64_t responseFlags() const PURE;
 
   /**
-   * @return upstream host description.
-   */
-  virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;
-
-  /**
-   * @param upstream_local_address sets the local address of the upstream connection. Note that it
-   * can be different than the local address of the downstream connection.
-   */
-  virtual void setUpstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& upstream_local_address) PURE;
-
-  /**
-   * @return the upstream local address.
-   */
-  virtual const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const PURE;
-
-  /**
    * @return whether the request is a health check request or not.
    */
   virtual bool healthCheck() const PURE;
@@ -515,18 +605,6 @@ public:
    * @return the downstream connection info provider.
    */
   virtual const Network::ConnectionInfoProvider& downstreamAddressProvider() const PURE;
-
-  /**
-   * @param connection_info sets the upstream ssl connection.
-   */
-  virtual void
-  setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
-
-  /**
-   * @return the upstream SSL connection. This will be nullptr if the upstream
-   * connection does not use SSL.
-   */
-  virtual Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const PURE;
 
   /**
    * @return const Router::RouteConstSharedPtr Get the route selected for this request.
@@ -556,25 +634,6 @@ public:
    */
   virtual const FilterStateSharedPtr& filterState() PURE;
   virtual const FilterState& filterState() const PURE;
-
-  /**
-   * Filter State object to be shared between upstream and downstream filters.
-   * @param pointer to upstream connections filter state.
-   * @return pointer to filter state to be used by upstream connections.
-   */
-  virtual const FilterStateSharedPtr& upstreamFilterState() const PURE;
-  virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
-
-  /**
-   * @param failure_reason the upstream transport failure reason.
-   */
-  virtual void setUpstreamTransportFailureReason(absl::string_view failure_reason) PURE;
-
-  /**
-   * @return const std::string& the upstream transport failure reason, e.g. certificate validation
-   *         failed.
-   */
-  virtual const std::string& upstreamTransportFailureReason() const PURE;
 
   /**
    * @param headers request headers.
@@ -631,16 +690,6 @@ public:
   virtual const std::string& filterChainName() const PURE;
 
   /**
-   * @param connection ID of the upstream connection.
-   */
-  virtual void setUpstreamConnectionId(uint64_t id) PURE;
-
-  /**
-   * @return the ID of the upstream connection, or absl::nullopt if not available.
-   */
-  virtual absl::optional<uint64_t> upstreamConnectionId() const PURE;
-
-  /**
    * @param attempt_count, the number of times the request was attempted upstream.
    */
   virtual void setAttemptCount(uint32_t attempt_count) PURE;
@@ -676,6 +725,44 @@ public:
     downstream_info.setUpstreamBytesMeter(upstream_info.getUpstreamBytesMeter());
     upstream_info.setDownstreamBytesMeter(downstream_info.getDownstreamBytesMeter());
   }
+};
+
+// An enum representation of the Proxy-Status error space.
+enum class ProxyStatusError {
+  DnsTimeout,
+  DnsError,
+  DestinationNotFound,
+  DestinationUnavailable,
+  DestinationIpProhibited,
+  DestinationIpUnroutable,
+  ConnectionRefused,
+  ConnectionTerminated,
+  ConnectionTimeout,
+  ConnectionReadTimeout,
+  ConnectionWriteTimeout,
+  ConnectionLimitReached,
+  TlsProtocolError,
+  TlsCertificateError,
+  TlsAlertReceived,
+  HttpRequestError,
+  HttpRequestDenied,
+  HttpResponseIncomplete,
+  HttpResponseHeaderSectionSize,
+  HttpResponseHeaderSize,
+  HttpResponseBodySize,
+  HttpResponseTrailerSectionSize,
+  HttpResponseTrailerSize,
+  HttpResponseTransferCoding,
+  HttpResponseContentCoding,
+  HttpResponseTimeout,
+  HttpUpgradeFailed,
+  HttpProtocolError,
+  ProxyInternalResponse,
+  ProxyInternalError,
+  ProxyConfigurationError,
+  ProxyLoopDetected,
+  // ATTENTION: MAKE SURE THAT THIS REMAINS EQUAL TO THE LAST FLAG.
+  LastProxyStatus = ProxyLoopDetected,
 };
 
 } // namespace StreamInfo

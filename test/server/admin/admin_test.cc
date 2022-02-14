@@ -67,7 +67,7 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 
 TEST_P(AdminInstanceTest, AdminAddress) {
   std::string address_out_path = TestEnvironment::temporaryPath("admin.address");
-  AdminImpl admin_address_out_path(cpu_profile_path_, server_);
+  AdminImpl admin_address_out_path(cpu_profile_path_, server_, false);
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
@@ -82,7 +82,7 @@ TEST_P(AdminInstanceTest, AdminAddress) {
 
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
-  AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_);
+  AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_, false);
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
@@ -121,6 +121,56 @@ TEST_P(AdminInstanceTest, CustomHandler) {
   // Try to remove non removable handler, and make sure it is not removed.
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
+}
+
+class ChunkedHandler : public Admin::Handler {
+public:
+  Http::Code start(Http::ResponseHeaderMap&) override { return Http::Code::OK; }
+
+  bool nextChunk(Buffer::Instance& response) override {
+    response.add("Text ");
+    return ++count_ < 3;
+  }
+
+private:
+  uint32_t count_{0};
+};
+
+TEST_P(AdminInstanceTest, CustomChunkedHandler) {
+  auto callback = [](absl::string_view, AdminStream&) -> Admin::HandlerPtr {
+    Admin::HandlerPtr handler = Admin::HandlerPtr(new ChunkedHandler);
+    return handler;
+  };
+
+  // Test removable handler.
+  EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addChunkedHandler("/foo/bar", "hello", callback, true, false)));
+  Http::TestResponseHeaderMapImpl header_map;
+  {
+    Buffer::OwnedImpl response;
+    EXPECT_EQ(Http::Code::OK, getCallback("/foo/bar", header_map, response));
+    EXPECT_EQ("Text Text Text ", response.toString());
+  }
+
+  // Test that removable handler gets removed.
+  EXPECT_TRUE(admin_.removeHandler("/foo/bar"));
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(Http::Code::NotFound, getCallback("/foo/bar", header_map, response));
+  EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
+
+  // Add non removable handler.
+  EXPECT_TRUE(admin_.addChunkedHandler("/foo/bar", "hello", callback, false, false));
+  EXPECT_EQ(Http::Code::OK, getCallback("/foo/bar", header_map, response));
+
+  // Add again and make sure it is not there twice.
+  EXPECT_FALSE(admin_.addChunkedHandler("/foo/bar", "hello", callback, false, false));
+
+  // Try to remove non removable handler, and make sure it is not removed.
+  EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
+  {
+    Buffer::OwnedImpl response;
+    EXPECT_EQ(Http::Code::OK, getCallback("/foo/bar", header_map, response));
+    EXPECT_EQ("Text Text Text ", response.toString());
+  }
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {

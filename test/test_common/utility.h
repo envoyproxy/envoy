@@ -24,7 +24,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
@@ -773,7 +773,7 @@ public:
     case envoy::config::core::v3::ApiVersion::V3:
       return "V3";
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("reached unexpected code");
     }
   }
 };

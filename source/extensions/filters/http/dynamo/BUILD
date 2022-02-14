@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # AWS DynamoDB L7 HTTP filter (observability): https://aws.amazon.com/dynamodb/
-# Public docs: docs/root/configuration/http_filters/dynamodb_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/dynamodb_filter
 
 envoy_extension_package()
 

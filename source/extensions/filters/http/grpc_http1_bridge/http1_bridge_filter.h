@@ -1,8 +1,11 @@
 #pragma once
 
+#include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.h"
+#include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/grpc/context_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -11,11 +14,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 /**
- * See docs/configuration/http_filters/grpc_http1_bridge_filter.rst
+ * See
+ * https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/grpc_http1_bridge_filter
  */
-class Http1BridgeFilter : public Http::StreamFilter {
+class Http1BridgeFilter : public Http::StreamFilter, Logger::Loggable<Logger::Id::http> {
 public:
-  explicit Http1BridgeFilter(Grpc::Context& context) : context_(context) {}
+  explicit Http1BridgeFilter(
+      Grpc::Context& context,
+      const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config)
+      : context_(context), upgrade_protobuf_(proto_config.upgrade_protobuf_to_grpc()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -23,9 +30,8 @@ public:
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
-  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
-    return Http::FilterDataStatus::Continue;
-  }
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
@@ -48,24 +54,16 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
-  bool doStatTracking() const {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_bridge_stats_disabled")) {
-      return false;
-    }
-    return request_stat_names_.has_value();
-  }
-
 private:
-  void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
   void setupStatTracking(const Http::RequestHeaderMap& headers);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::ResponseHeaderMap* response_headers_{};
   bool do_bridging_{};
-  Upstream::ClusterInfoConstSharedPtr cluster_;
-  absl::optional<Grpc::Context::RequestStatNames> request_stat_names_;
+  bool do_framing_{};
   Grpc::Context& context_;
+  bool upgrade_protobuf_{};
 };
 
 } // namespace GrpcHttp1Bridge

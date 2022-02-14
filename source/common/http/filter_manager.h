@@ -227,7 +227,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
   bool has1xxheaders() override { return false; }
-  void do1xxHeaders() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  void do1xxHeaders() override { IS_ENVOY_BUG("unexpected 1xx headers"); }
   void doHeaders(bool end_stream) override;
   void doData(bool end_stream) override;
   void doMetadata() override {
@@ -281,6 +281,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override;
   Buffer::BufferMemoryAccountSharedPtr account() const override;
+  void setUpstreamOverrideHost(absl::string_view host) override;
+  absl::optional<absl::string_view> upstreamOverrideHost() const override;
 
   // Each decoder filter instance checks if the request passed to the filter is gRPC
   // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
@@ -575,11 +577,6 @@ public:
    * Returns the tracked scope to use for this stream.
    */
   virtual const ScopeTrackedObject& scope() PURE;
-
-  /**
-   * Returns whether internal redirects with request bodies is enabled.
-   */
-  virtual bool enableInternalRedirectsWithBody() const PURE;
 };
 
 /**
@@ -628,11 +625,11 @@ public:
   absl::optional<uint64_t> connectionID() const override {
     return StreamInfoImpl::downstreamAddressProvider().connectionID();
   }
+  absl::optional<absl::string_view> interfaceName() const override {
+    return StreamInfoImpl::downstreamAddressProvider().interfaceName();
+  }
   Ssl::ConnectionInfoConstSharedPtr sslConnection() const override {
     return StreamInfoImpl::downstreamAddressProvider().sslConnection();
-  }
-  Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
-    return StreamInfoImpl::upstreamSslConnection();
   }
   void dumpState(std::ostream& os, int indent_level) const override {
     StreamInfoImpl::dumpState(os, indent_level);
@@ -642,6 +639,9 @@ public:
        << DUMP_MEMBER_AS(remoteAddress(), remoteAddress()->asStringView())
        << DUMP_MEMBER_AS(directRemoteAddress(), directRemoteAddress()->asStringView())
        << DUMP_MEMBER_AS(localAddress(), localAddress()->asStringView()) << "\n";
+  }
+  absl::string_view ja3Hash() const override {
+    return StreamInfoImpl::downstreamAddressProvider().ja3Hash();
   }
 
 private:
@@ -936,11 +936,9 @@ public:
 
   Buffer::InstancePtr& bufferedRequestData() { return buffered_request_data_; }
 
-  bool enableInternalRedirectsWithBody() const {
-    return filter_manager_callbacks_.enableInternalRedirectsWithBody();
-  }
-
   void contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack);
+
+  void onDownstreamReset() { state_.saw_downstream_reset_ = true; }
 
 private:
   // Indicates which filter to start the iteration with.
@@ -1025,6 +1023,7 @@ private:
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
   Network::Socket::OptionsSharedPtr upstream_options_ =
       std::make_shared<Network::Socket::Options>();
+  absl::optional<absl::string_view> upstream_override_host_;
 
   FilterChainFactory& filter_chain_factory_;
   const LocalReply::LocalReply& local_reply_;
@@ -1062,7 +1061,8 @@ private:
         : remote_complete_(false), local_complete_(false), has_1xx_headers_(false),
           created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
           non_100_response_headers_encoded_(false), under_on_local_reply_(false),
-          decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false) {}
+          decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false),
+          saw_downstream_reset_(false) {}
 
     uint32_t filter_call_state_{0};
 
@@ -1085,6 +1085,7 @@ private:
     // True when the filter chain iteration was aborted with local reply.
     bool decoder_filter_chain_aborted_ : 1;
     bool encoder_filter_chain_aborted_ : 1;
+    bool saw_downstream_reset_ : 1;
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield

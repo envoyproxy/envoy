@@ -56,17 +56,21 @@ TEST_F(AlternateProtocolsCacheImplTest, Init) {
   EXPECT_EQ(0, protocols_->size());
 }
 
-TEST_F(AlternateProtocolsCacheImplTest, SetAlternatives) {
+TEST_F(AlternateProtocolsCacheImplTest, SetAlternativesAndSrtt) {
   initialize();
   EXPECT_EQ(0, protocols_->size());
-  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5"));
+  EXPECT_EQ(std::chrono::microseconds(0), protocols_->getSrtt(origin1_));
+  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0"));
   protocols_->setAlternatives(origin1_, protocols1_);
+  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|5"));
+  protocols_->setSrtt(origin1_, std::chrono::microseconds(5));
   EXPECT_EQ(1, protocols_->size());
+  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
 }
 
 TEST_F(AlternateProtocolsCacheImplTest, FindAlternatives) {
   initialize();
-  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5"));
+  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0"));
   protocols_->setAlternatives(origin1_, protocols1_);
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
@@ -76,9 +80,9 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternatives) {
 
 TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterReplacement) {
   initialize();
-  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5"));
+  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0"));
   protocols_->setAlternatives(origin1_, protocols1_);
-  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn2=\"hostname2:2\"; ma=10"));
+  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn2=\"hostname2:2\"; ma=10|0"));
   protocols_->setAlternatives(origin1_, protocols2_);
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
@@ -89,9 +93,9 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterReplacement) {
 
 TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesForMultipleOrigins) {
   initialize();
-  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5"));
+  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0"));
   protocols_->setAlternatives(origin1_, protocols1_);
-  EXPECT_CALL(*store_, addOrUpdate("https://hostname2:2", "alpn2=\"hostname2:2\"; ma=10"));
+  EXPECT_CALL(*store_, addOrUpdate("https://hostname2:2", "alpn2=\"hostname2:2\"; ma=10|0"));
   protocols_->setAlternatives(origin2_, protocols2_);
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
@@ -104,7 +108,7 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesForMultipleOrigins) {
 
 TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterExpiration) {
   initialize();
-  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5"));
+  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0"));
   protocols_->setAlternatives(origin1_, protocols1_);
   simTime().setMonotonicTime(expiration1_ + Seconds(1));
   EXPECT_CALL(*store_, remove("https://hostname1:1"));
@@ -117,11 +121,11 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterExpiration) {
 TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterPartialExpiration) {
   initialize();
   EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1",
-                                   "alpn1=\"hostname1:1\"; ma=5,alpn2=\"hostname2:2\"; ma=10"));
+                                   "alpn1=\"hostname1:1\"; ma=5,alpn2=\"hostname2:2\"; ma=10|0"));
   std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> both = {protocol1_, protocol2_};
   protocols_->setAlternatives(origin1_, both);
   simTime().setMonotonicTime(expiration1_ + Seconds(1));
-  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn2=\"hostname2:2\"; ma=10"));
+  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn2=\"hostname2:2\"; ma=10|0"));
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
   ASSERT_TRUE(protocols.has_value());
@@ -189,7 +193,7 @@ TEST_F(AlternateProtocolsCacheImplTest, MaxEntries) {
     AlternateProtocolsCache::AlternateProtocol protocol = {alpn1_, hostname, i, expiration1_};
     std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {protocol};
     EXPECT_CALL(*store_, addOrUpdate(absl::StrCat("https://hostname:", i),
-                                     absl::StrCat("alpn1=\"hostname:", i, "\"; ma=5")));
+                                     absl::StrCat("alpn1=\"hostname:", i, "\"; ma=5|0")));
     if (i == max_entries_) {
       EXPECT_CALL(*store_, remove("https://hostname:0"));
     }
@@ -201,12 +205,14 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
   initialize();
   auto testAltSvc = [&](const std::string& original_alt_svc,
                         const std::string& expected_alt_svc) -> void {
-    absl::optional<std::vector<AlternateProtocolsCache::AlternateProtocol>> protocols =
-        AlternateProtocolsCacheImpl::protocolsFromString(original_alt_svc, simTime(), true);
-    ASSERT(protocols.has_value());
-    ASSERT_GE(protocols.value().size(), 1);
+    absl::optional<AlternateProtocolsCacheImpl::OriginData> origin_data =
+        AlternateProtocolsCacheImpl::originDataFromString(original_alt_svc, simTime(), true);
+    ASSERT(origin_data.has_value());
+    std::vector<AlternateProtocolsCache::AlternateProtocol>& protocols =
+        origin_data.value().protocols;
+    ASSERT_GE(protocols.size(), 1);
 
-    AlternateProtocolsCache::AlternateProtocol& protocol = protocols.value()[0];
+    AlternateProtocolsCache::AlternateProtocol& protocol = protocols[0];
     EXPECT_EQ("h3-29", protocol.alpn_);
     EXPECT_EQ("", protocol.hostname_);
     EXPECT_EQ(443, protocol.port_);
@@ -214,8 +220,8 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
                                                                      simTime().monotonicTime());
     EXPECT_EQ(86400, duration.count());
 
-    if (protocols.value().size() == 2) {
-      AlternateProtocolsCache::AlternateProtocol& protocol2 = protocols.value()[1];
+    if (protocols.size() == 2) {
+      AlternateProtocolsCache::AlternateProtocol& protocol2 = protocols[1];
       EXPECT_EQ("h3", protocol2.alpn_);
       EXPECT_EQ("", protocol2.hostname_);
       EXPECT_EQ(443, protocol2.port_);
@@ -224,26 +230,46 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
       EXPECT_EQ(60, duration.count());
     }
 
-    std::string alt_svc =
-        AlternateProtocolsCacheImpl::protocolsToStringForCache(protocols.value(), simTime());
+    std::string alt_svc = AlternateProtocolsCacheImpl::originDataToStringForCache(
+        protocols, origin_data.value().srtt);
     EXPECT_EQ(expected_alt_svc, alt_svc);
   };
 
-  testAltSvc("h3-29=\":443\"; ma=86400", "h3-29=\":443\"; ma=86400");
-  testAltSvc("h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60",
-             "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60");
+  testAltSvc("h3-29=\":443\"; ma=86400|0", "h3-29=\":443\"; ma=86400|0");
+  testAltSvc("h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|2",
+             "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|2");
 
   // Test once more to make sure we handle time advancing correctly.
   // the absolute expiration time in testAltSvc is expected to be 86400 so add
   // 60s to the default max age.
   simTime().setMonotonicTime(simTime().monotonicTime() + std::chrono::seconds(60));
-  testAltSvc("h3-29=\":443\"; ma=86460", "h3-29=\":443\"; ma=86460");
+  testAltSvc("h3-29=\":443\"; ma=86460|2000", "h3-29=\":443\"; ma=86460|2000");
 }
 
+TEST_F(AlternateProtocolsCacheImplTest, InvalidString) {
+  initialize();
+  // Too many numbers
+  EXPECT_FALSE(AlternateProtocolsCacheImpl::originDataFromString(
+                   "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1|2|3", simTime(), true)
+                   .has_value());
+  // Non-numeric rtt
+  EXPECT_FALSE(AlternateProtocolsCacheImpl::originDataFromString(
+                   "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|a", simTime(), true)
+                   .has_value());
+
+  // Standard entry with rtt.
+  EXPECT_TRUE(AlternateProtocolsCacheImpl::originDataFromString(
+                  "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1", simTime(), true)
+                  .has_value());
+  // Standard entry without rtt.
+  EXPECT_TRUE(AlternateProtocolsCacheImpl::originDataFromString(
+                  "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60", simTime(), true)
+                  .has_value());
+}
 TEST_F(AlternateProtocolsCacheImplTest, CacheLoad) {
   EXPECT_CALL(*store_, iterate(_)).WillOnce(Invoke([&](KeyValueStore::ConstIterateCb fn) {
     fn("foo", "bar");
-    fn("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5");
+    fn("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0");
   }));
 
   // When the cache is created, there should be a warning log for the bad cache

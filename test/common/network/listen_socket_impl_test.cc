@@ -24,13 +24,23 @@ namespace Envoy {
 namespace Network {
 namespace {
 
-TEST(ConnectionSocketImplTest, LowerCaseRequestedServerName) {
+class ConnectionSocketImplTest : public testing::TestWithParam<Address::IpVersion> {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionSocketImplTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(ConnectionSocketImplTest, LowerCaseRequestedServerName) {
   absl::string_view serverName("www.EXAMPLE.com");
   absl::string_view expectedServerName("www.example.com");
   auto loopback_addr = Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4);
   auto conn_socket_ = ConnectionSocketImpl(Socket::Type::Stream, loopback_addr, loopback_addr, {});
   conn_socket_.setRequestedServerName(serverName);
   EXPECT_EQ(expectedServerName, conn_socket_.requestedServerName());
+}
+
+TEST_P(ConnectionSocketImplTest, IpVersion) {
+  ClientSocketImpl socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr);
+  EXPECT_EQ(socket.ipVersion(), GetParam());
 }
 
 template <Network::Socket::Type Type>

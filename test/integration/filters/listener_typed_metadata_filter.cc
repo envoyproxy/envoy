@@ -47,7 +47,7 @@ public:
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "", nullptr, absl::nullopt,
-                                       "Successfully handled request.");
+                                       "successfully_handled_request");
     return Http::FilterHeadersStatus::Continue;
   }
 };

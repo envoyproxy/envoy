@@ -23,8 +23,6 @@ namespace Network {
 // avoid #ifdef proliferation.
 struct SocketOptionName {
   SocketOptionName() = default;
-  SocketOptionName(const SocketOptionName&) = default;
-  SocketOptionName& operator=(const SocketOptionName&) = default;
   SocketOptionName(int level, int option, const std::string& name)
       : value_(std::make_tuple(level, option, name)) {}
 
@@ -86,6 +84,12 @@ public:
   virtual absl::optional<uint64_t> connectionID() const PURE;
 
   /**
+   * @return the name of the network interface used by local end of the connection, or unset if not
+   *available.
+   **/
+  virtual absl::optional<absl::string_view> interfaceName() const PURE;
+
+  /**
    * Dumps the state of the ConnectionInfoProvider to the given ostream.
    *
    * @param os the std::ostream to dump to.
@@ -98,6 +102,11 @@ public:
    * connection does not use SSL.
    */
   virtual Ssl::ConnectionInfoConstSharedPtr sslConnection() const PURE;
+
+  /**
+   * @return ja3 fingerprint hash of the downstream connection, if any.
+   */
+  virtual absl::string_view ja3Hash() const PURE;
 };
 
 class ConnectionInfoSetter : public ConnectionInfoProvider {
@@ -139,9 +148,20 @@ public:
   virtual void setConnectionID(uint64_t id) PURE;
 
   /**
+   * @param interface_name the name of the network interface used by the local end of the
+   *connection.
+   **/
+  virtual void setInterfaceName(absl::string_view interface_name) PURE;
+
+  /**
    * @param connection_info sets the downstream ssl connection.
    */
   virtual void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
+
+  /**
+   * @param JA3 fingerprint.
+   */
+  virtual void setJA3Hash(const absl::string_view ja3_hash) PURE;
 };
 
 using ConnectionInfoSetterSharedPtr = std::shared_ptr<ConnectionInfoSetter>;

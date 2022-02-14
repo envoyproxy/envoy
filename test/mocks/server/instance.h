@@ -6,7 +6,7 @@
 #include "source/common/http/context_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
@@ -87,6 +87,7 @@ public:
   MOCK_METHOD(Configuration::ServerFactoryContext&, serverFactoryContext, ());
   MOCK_METHOD(Configuration::TransportSocketFactoryContext&, transportSocketFactoryContext, ());
   MOCK_METHOD(bool, enableReusePortDefault, ());
+  MOCK_METHOD(void, setSinkPredicates, (std::unique_ptr<Envoy::Stats::SinkPredicates> &&));
 
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
@@ -141,6 +142,7 @@ public:
   MOCK_METHOD(const std::list<Stats::SinkPtr>&, sinks, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, flushInterval, (), (const));
   MOCK_METHOD(bool, flushOnAdmin, (), (const));
+  MOCK_METHOD(const Stats::SinkPredicates*, sinkPredicates, (), (const));
 };
 
 class MockServerFactoryContext : public virtual ServerFactoryContext {

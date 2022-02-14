@@ -1,7 +1,8 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 
-#include "source/common/quic/envoy_quic_session_cache.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
+
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 
 namespace Envoy {
 namespace Quic {
@@ -34,7 +35,7 @@ std::shared_ptr<quic::QuicCryptoClientConfig> PersistentQuicInfoImpl::cryptoConf
     client_context_ = context;
     client_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
         std::make_unique<EnvoyQuicProofVerifier>(getContext(transport_socket_factory_)),
-        std::make_unique<EnvoyQuicSessionCache>((time_source_)));
+        std::make_unique<quic::QuicClientSessionCache>());
   }
   // Return the latest client config.
   return client_config_;
@@ -42,11 +43,11 @@ std::shared_ptr<quic::QuicCryptoClientConfig> PersistentQuicInfoImpl::cryptoConf
 
 PersistentQuicInfoImpl::PersistentQuicInfoImpl(
     Event::Dispatcher& dispatcher, Network::TransportSocketFactory& transport_socket_factory,
-    TimeSource& time_source, Network::Address::InstanceConstSharedPtr server_addr,
-    const quic::QuicConfig& quic_config, uint32_t buffer_limit)
+    TimeSource& time_source, uint32_t remote_port, const quic::QuicConfig& quic_config,
+    uint32_t buffer_limit)
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
       server_id_{getConfig(transport_socket_factory).serverNameIndication(),
-                 static_cast<uint16_t>(server_addr->ip()->port()), false},
+                 static_cast<uint16_t>(remote_port)},
       transport_socket_factory_(transport_socket_factory), time_source_(time_source),
       quic_config_(quic_config), buffer_limit_(buffer_limit) {
   quiche::FlagRegistry::getInstance();
@@ -56,7 +57,8 @@ std::unique_ptr<Network::ClientConnection>
 createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& dispatcher,
                             Network::Address::InstanceConstSharedPtr server_addr,
                             Network::Address::InstanceConstSharedPtr local_addr,
-                            QuicStatNames& quic_stat_names, Stats::Scope& scope) {
+                            QuicStatNames& quic_stat_names,
+                            OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope) {
   ASSERT(GetQuicReloadableFlag(quic_single_ack_in_packet2));
   PersistentQuicInfoImpl* info_impl = reinterpret_cast<PersistentQuicInfoImpl*>(&info);
   auto config = info_impl->cryptoConfig();
@@ -69,11 +71,21 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
       quic::QuicUtils::CreateRandomConnectionId(), server_addr, info_impl->conn_helper_,
       info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, nullptr);
 
+  // Update config with latest srtt, if available.
+  if (rtt_cache.has_value()) {
+    quic::QuicServerId& server_id = info_impl->server_id_;
+    Http::AlternateProtocolsCache::Origin origin("https", server_id.host(), server_id.port());
+    std::chrono::microseconds rtt = rtt_cache.value().get().getSrtt(origin);
+    if (rtt.count() != 0) {
+      info_impl->quic_config_.SetInitialRoundTripTimeUsToSend(rtt.count());
+    }
+  }
+
   // QUICHE client session always use the 1st version to start handshake.
   auto ret = std::make_unique<EnvoyQuicClientSession>(
       info_impl->quic_config_, quic_versions, std::move(connection), info_impl->server_id_,
       std::move(config), &info_impl->push_promise_index_, dispatcher, info_impl->buffer_limit_,
-      info_impl->crypto_stream_factory_, quic_stat_names, scope);
+      info_impl->crypto_stream_factory_, quic_stat_names, rtt_cache, scope);
   return ret;
 }
 

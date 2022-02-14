@@ -145,7 +145,7 @@ public:
     return drain_manager_->drainClose() || server_.drainManager().drainClose();
   }
   Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("Unexpected function call");
     return nullptr;
   }
   Server::DrainManager& drainManager();
@@ -326,6 +326,10 @@ public:
     return udp_listener_config_ != nullptr ? *udp_listener_config_
                                            : Network::UdpListenerConfigOptRef();
   }
+  Network::InternalListenerConfigOptRef internalListenerConfig() override {
+    return internal_listener_config_ != nullptr ? *internal_listener_config_
+                                                : Network::InternalListenerConfigOptRef();
+  }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
   ResourceLimit& openConnections() override { return *open_connections_; }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
@@ -333,6 +337,7 @@ public:
   }
   uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
   Init::Manager& initManager() override;
+  bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return config().traffic_direction();
   }
@@ -372,6 +377,13 @@ private:
     Network::UdpListenerWorkerRouterPtr listener_worker_router_;
   };
 
+  struct InternalListenerConfigImpl : public Network::InternalListenerConfig {
+    InternalListenerConfigImpl(
+        const envoy::config::listener::v3::Listener_InternalListenerConfig config)
+        : config_(config) {}
+    const envoy::config::listener::v3::Listener_InternalListenerConfig config_;
+  };
+
   /**
    * Create a new listener from an existing listener and the new config message if the in place
    * filter chain update is decided. Should be called only by newListenerWithFilterChain().
@@ -381,6 +393,7 @@ private:
                const std::string& name, bool added_via_api, bool workers_started, uint64_t hash);
   // Helpers for constructor.
   void buildAccessLog();
+  void buildInternalListener();
   void validateConfig(Network::Socket::Type socket_type);
   void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
   void buildListenSocketOptions(Network::Socket::Type socket_type);
@@ -411,6 +424,7 @@ private:
   const uint64_t hash_;
   const uint32_t tcp_backlog_size_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  const bool ignore_global_conn_limit_;
 
   // A target is added to Server's InitManager if workers_started_ is false.
   Init::TargetImpl listener_init_target_;
@@ -428,6 +442,7 @@ private:
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
   std::shared_ptr<UdpListenerConfigImpl> udp_listener_config_;
+  std::unique_ptr<Network::InternalListenerConfig> internal_listener_config_;
   Network::ConnectionBalancerSharedPtr connection_balancer_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;

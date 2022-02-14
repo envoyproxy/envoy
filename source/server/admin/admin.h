@@ -68,7 +68,8 @@ class AdminImpl : public Admin,
                   public Http::ConnectionManagerConfig,
                   Logger::Loggable<Logger::Id::admin> {
 public:
-  AdminImpl(const std::string& profile_path, Server::Instance& server);
+  AdminImpl(const std::string& profile_path, Server::Instance& server,
+            bool ignore_global_conn_limit);
 
   Http::Code runCallback(absl::string_view path_and_query,
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
@@ -83,6 +84,8 @@ public:
   // The prefix must start with "/" and contain at least one additional character.
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
                   bool removable, bool mutates_server_state) override;
+  bool addChunkedHandler(const std::string& prefix, const std::string& help_text,
+                         GenHandlerCb callback, bool removable, bool mutates_server_state) override;
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
@@ -199,6 +202,11 @@ public:
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
   Server::Instance& server() { return server_; }
 
+  GenHandlerCb createHandlerFunction() {
+    return [this](absl::string_view path_and_query, AdminStream& admin_stream) -> HandlerPtr {
+      return findHandler(path_and_query, admin_stream);
+    };
+  }
   AdminFilter::AdminServerCallbackFunction createCallbackFunction() {
     return [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
                   Buffer::OwnedImpl& response, AdminFilter& filter) -> Http::Code {
@@ -206,6 +214,17 @@ public:
     };
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
+  const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
+    return proxy_status_config_.get();
+  }
+
+  /**
+   * Makes a chunked handler for static text.
+   * @param resposne_text the text to populate response with
+   * @param code the Http::Code for the response
+   * @return the handler
+   */
+  static HandlerPtr makeStaticTextHandler(absl::string_view response_text, Http::Code code);
 
 private:
   /**
@@ -214,10 +233,20 @@ private:
   struct UrlHandler {
     const std::string prefix_;
     const std::string help_text_;
-    const HandlerCb handler_;
+    const GenHandlerCb handler_;
     const bool removable_;
     const bool mutates_server_state_;
   };
+
+  /**
+   * Creates a Handler instance given a request.
+   */
+  HandlerPtr findHandler(absl::string_view path_and_query, AdminStream& admin_stream);
+  /**
+   * Creates a UrlHandler structure from a non-chunked callback.
+   */
+  UrlHandler makeHandler(const std::string& prefix, const std::string& help_text,
+                         HandlerCb callback, bool removable, bool mutates_state);
 
   /**
    * Implementation of RouteConfigProvider that returns a static null route config.
@@ -231,9 +260,7 @@ private:
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
     void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
-                                   std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
+                                   std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {}
 
     Router::ConfigConstSharedPtr config_;
     TimeSource& time_source_;
@@ -269,6 +296,9 @@ private:
     struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
       NullThreadLocalOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
+      bool tryAllocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
+      bool tryDeallocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
+      bool isResourceMonitorEnabled(OverloadProactiveResourceName) override { return false; }
       Event::Dispatcher& dispatcher_;
       const OverloadActionState inactive_ = OverloadActionState::inactive();
     };
@@ -290,7 +320,7 @@ private:
 
     bool registerForAction(const std::string&, Event::Dispatcher&, OverloadActionCb) override {
       // This method shouldn't be called by the admin listener
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      IS_ENVOY_BUG("Unexpected function call");
       return false;
     }
 
@@ -310,6 +340,7 @@ private:
   Http::Code handlerHelp(absl::string_view path_and_query,
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream&);
+  void getHelp(Buffer::Instance& response);
 
   class AdminListenSocketFactory : public Network::ListenSocketFactory {
   public:
@@ -340,7 +371,7 @@ private:
     AdminListener(AdminImpl& parent, Stats::ScopePtr&& listener_scope)
         : parent_(parent), name_("admin"), scope_(std::move(listener_scope)),
           stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)),
-          init_manager_(nullptr) {}
+          init_manager_(nullptr), ignore_global_conn_limit_(parent.ignore_global_conn_limit_) {}
 
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
@@ -359,6 +390,9 @@ private:
     Network::UdpListenerConfigOptRef udpListenerConfig() override {
       return Network::UdpListenerConfigOptRef();
     }
+    Network::InternalListenerConfigOptRef internalListenerConfig() override {
+      return Network::InternalListenerConfigOptRef();
+    }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }
@@ -369,6 +403,7 @@ private:
     }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
     Init::Manager& initManager() override { return *init_manager_; }
+    bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
 
     AdminImpl& parent_;
     const std::string name_;
@@ -380,6 +415,7 @@ private:
   private:
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
     std::unique_ptr<Init::Manager> init_manager_;
+    const bool ignore_global_conn_limit_;
   };
   using AdminListenerPtr = std::unique_ptr<AdminListener>;
 
@@ -452,6 +488,8 @@ private:
   const LocalReply::LocalReplyPtr local_reply_;
   const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
   const absl::optional<std::string> scheme_{};
+  const bool ignore_global_conn_limit_;
+  std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
 };
 
 } // namespace Server

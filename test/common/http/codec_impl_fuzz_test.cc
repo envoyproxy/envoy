@@ -225,7 +225,8 @@ public:
           auto headers =
               fromSanitizedHeaders<TestResponseHeaderMapImpl>(directional_action.headers());
           ConnectionManagerUtility::mutateResponseHeaders(headers, &request_.request_headers_,
-                                                          *conn_manager_config_, "");
+                                                          *conn_manager_config_, /*via=*/"",
+                                                          stream_info_, /*node_id=*/"");
           if (headers.Status() == nullptr) {
             headers.setReferenceKey(Headers::get().Status, "200");
           }
@@ -399,6 +400,7 @@ public:
   int32_t stream_index_{-1};
   StreamResetCallbackFn stream_reset_callback_;
   MockConnectionManagerConfig* conn_manager_config_;
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 // Buffer between client and server H1/H2 codecs. This models each write operation
@@ -683,6 +685,10 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     dynamic_cast<Http2::ClientConnectionImpl&>(*client).goAway();
     dynamic_cast<Http2::ServerConnectionImpl&>(*server).goAway();
   }
+
+  // Run deletion as would happen on the dispatchers to avoid inversion of
+  // lifetimes of dispatcher and connection.
+  server_connection.dispatcher_.to_delete_.clear();
 }
 
 } // namespace

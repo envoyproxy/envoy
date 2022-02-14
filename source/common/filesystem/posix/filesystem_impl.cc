@@ -16,6 +16,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/filesystem/filesystem_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -63,6 +64,9 @@ FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
 
   if (in.test(File::Operation::Append)) {
     out |= O_APPEND;
+  } else if (in.test(File::Operation::Write) &&
+             Runtime::runtimeFeatureEnabled("envoy.reloadable_features.append_or_truncate")) {
+    out |= O_TRUNC;
   }
 
   if (in.test(File::Operation::Read) && in.test(File::Operation::Write)) {
@@ -85,7 +89,7 @@ FilePtr InstanceImplPosix::createFile(const FilePathAndType& file_info) {
   case DestinationType::Stdout:
     return std::make_unique<FileImplPosix>(FilePathAndType{DestinationType::Stdout, "/dev/stdout"});
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return nullptr; // for gcc
 }
 
 bool InstanceImplPosix::fileExists(const std::string& path) {

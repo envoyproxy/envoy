@@ -7,6 +7,8 @@
 #include "benchmark/benchmark.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
 
+using testing::NiceMock;
+
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
@@ -54,7 +56,8 @@ std::unique_ptr<OpenTelemetryFormatter> makeOpenTelemetryFormatter() {
 }
 
 std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo() {
-  auto stream_info = std::make_unique<Envoy::TestStreamInfo>();
+  NiceMock<MockTimeSystem> time_source;
+  auto stream_info = std::make_unique<Envoy::TestStreamInfo>(time_source);
   stream_info->downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Envoy::Network::Address::Ipv4Instance>("203.0.113.1"));
   return stream_info;

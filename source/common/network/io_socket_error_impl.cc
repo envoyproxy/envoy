@@ -18,6 +18,12 @@ IoSocketError* IoSocketError::getIoSocketInvalidAddressInstance() {
   return instance;
 }
 
+IoSocketError* IoSocketError::getIoSocketEbadfInstance() {
+  static auto* instance =
+      new IoSocketError(SOCKET_ERROR_BADF, Api::IoError::IoErrorCode::NoSupport);
+  return instance;
+}
+
 IoSocketError* IoSocketError::getIoSocketEagainInstance() {
   static auto* instance = new IoSocketError(SOCKET_ERROR_AGAIN, Api::IoError::IoErrorCode::Again);
   return instance;

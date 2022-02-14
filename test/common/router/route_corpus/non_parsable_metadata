@@ -1,0 +1,8 @@
+config {
+  request_headers_to_add {
+    header {
+      key: "l"
+      value: "%UPSTREAM_METADATA(1)%"
+    }
+  }
+}

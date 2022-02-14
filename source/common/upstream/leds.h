@@ -55,8 +55,6 @@ public:
 private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const std::vector<Config::DecodedResourceRef>&, const std::string&) override {
-    // LEDS is not used in SotW mode.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,

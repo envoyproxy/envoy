@@ -5,6 +5,7 @@ package envoy.extensions.access_loggers.grpc.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/grpc_service.proto";
+import "envoy/type/tracing/v3/custom_tag.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -16,6 +17,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.access_loggers.grpc.v3";
 option java_outer_classname = "AlsProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/grpc/v3;grpcv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: gRPC Access Log Service (ALS)]
@@ -55,7 +57,7 @@ message TcpGrpcAccessLogConfig {
 }
 
 // Common configuration for gRPC access logs.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message CommonGrpcAccessLogConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.accesslog.v2.CommonGrpcAccessLogConfig";
@@ -96,4 +98,7 @@ message CommonGrpcAccessLogConfig {
   // will be used in this configuration. This feature is used only when you are using
   // :ref:`Envoy gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.envoy_grpc>`.
   config.core.v3.RetryPolicy grpc_stream_retry_policy = 7;
+
+  // A list of custom tags with unique tag name to create tags for the logs.
+  repeated type.tracing.v3.CustomTag custom_tags = 8;
 }
