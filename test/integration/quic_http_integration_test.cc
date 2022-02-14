@@ -190,6 +190,7 @@ public:
     quic_connection_ = connection.get();
     ASSERT(quic_connection_persistent_info_ != nullptr);
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
+    OptRef<Http::AlternateProtocolsCache> cache;
     auto session = std::make_unique<EnvoyQuicClientSession>(
         persistent_info.quic_config_, supported_versions_, std::move(connection),
         (host.empty() ? persistent_info.server_id_
@@ -198,7 +199,7 @@ public:
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
-        persistent_info.crypto_stream_factory_, quic_stat_names_, stats_store_);
+        persistent_info.crypto_stream_factory_, quic_stat_names_, cache, stats_store_);
     return session;
   }
 
@@ -398,8 +399,10 @@ TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
 }
 
 TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
-  // Make sure both connections use the same PersistentQuicInfoImpl.
+  // Make sure all connections use the same PersistentQuicInfoImpl.
   concurrency_ = 1;
+  const Http::TestResponseHeaderMapImpl too_early_response_headers{{":status", "425"}};
+
   initialize();
   // Start the first connection.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -412,6 +415,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   ASSERT_TRUE(response1->waitForEndStream());
   // Close the first connection.
   codec_client_->close();
+
   // Start a second connection.
   codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), absl::nullopt,
                                          /*wait_for_1rtt_key*/ false);
@@ -450,10 +454,10 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
   EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
-  const Http::TestResponseHeaderMapImpl response_headers{{":status", "425"}};
-  upstream_request_->encodeHeaders(response_headers, true);
+  upstream_request_->encodeHeaders(too_early_response_headers, true);
   ASSERT_TRUE(response3->waitForEndStream());
-  // Without retry, 425 should be forwarded back to the client.
+  // This is downstream sending early data, so the 425 response should be forwarded back to the
+  // client.
   EXPECT_EQ("425", response3->headers().getStatusValue());
   codec_client_->close();
 
@@ -470,10 +474,10 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   // If the request already has Early-Data header, no additional Early-Data header should be added
   // and the header should be forwarded as is.
   EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "2"));
-  upstream_request_->encodeHeaders(response_headers, true);
-  ASSERT_TRUE(response3->waitForEndStream());
+  upstream_request_->encodeHeaders(too_early_response_headers, true);
+  ASSERT_TRUE(response4->waitForEndStream());
   // 425 response should be forwarded back to the client.
-  EXPECT_EQ("425", response3->headers().getStatusValue());
+  EXPECT_EQ("425", response4->headers().getStatusValue());
   codec_client_->close();
 }
 

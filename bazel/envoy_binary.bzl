@@ -78,6 +78,7 @@ def _envoy_linkopts():
             "-Wl,--hash-style=gnu",
         ],
     }) + select({
+        "@envoy//bazel:apple": [],
         "@envoy//bazel:boringssl_fips": [],
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": ["-pie"],

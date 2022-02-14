@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -126,21 +127,22 @@ const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConne
   const auto* config = getConfig();
   ASSERT(config->rateLimitPerConnection());
 
-  if (!decoder_callbacks_->streamInfo().filterState()->hasData<PerConnectionRateLimiter>(
-          PerConnectionRateLimiter::key())) {
+  auto typed_state =
+      decoder_callbacks_->streamInfo().filterState()->getDataReadOnly<PerConnectionRateLimiter>(
+          PerConnectionRateLimiter::key());
+
+  if (typed_state == nullptr) {
+    auto limiter = std::make_shared<PerConnectionRateLimiter>(
+        config->fillInterval(), config->maxTokens(), config->tokensPerFill(),
+        decoder_callbacks_->dispatcher(), config->descriptors());
+
     decoder_callbacks_->streamInfo().filterState()->setData(
-        PerConnectionRateLimiter::key(),
-        std::make_unique<PerConnectionRateLimiter>(
-            config->fillInterval(), config->maxTokens(), config->tokensPerFill(),
-            decoder_callbacks_->dispatcher(), config->descriptors()),
-        StreamInfo::FilterState::StateType::ReadOnly,
+        PerConnectionRateLimiter::key(), limiter, StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
+    return limiter->value();
   }
 
-  return decoder_callbacks_->streamInfo()
-      .filterState()
-      ->getDataReadOnly<PerConnectionRateLimiter>(PerConnectionRateLimiter::key())
-      .value();
+  return typed_state->value();
 }
 
 void Filter::populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
