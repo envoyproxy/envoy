@@ -1,5 +1,8 @@
 #pragma once
 
+#include "source/common/protobuf/protobuf.h"
+
+#include "eval/public/cel_value.h"
 #include "eval/public/containers/container_backed_list_impl.h"
 
 namespace Envoy {
@@ -10,6 +13,7 @@ namespace Expr {
 namespace Custom_CEL {
 namespace Example {
 
+using google::api::expr::runtime::CelValue;
 using google::api::expr::runtime::ContainerBackedListImpl;
 
 class Utility {

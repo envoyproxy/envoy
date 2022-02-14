@@ -67,11 +67,11 @@ absl::optional<CelValue> ExtendedRequestWrapper::operator[](CelValue key) const 
 
 absl::optional<CelValue> ExtendedRequestWrapper::getMapFromQueryStr(absl::string_view query) const {
   size_t equal_pos = 0, ampersand_pos = 0, start = 0;
-  absl::string_view key_equals_value, key, value;
+  absl::string_view key_equals_value = "", key = "", value = "";
   std::vector<std::pair<CelValue, CelValue>> key_value_pairs;
-  std::cout << "********* query: " << query << std::endl;
+  absl::flat_hash_map<absl::string_view, absl::string_view> parameters_map;
   // loop while there are still equal signs in the query string "key=value&key=value&key=value..."
-  while ((equal_pos = query.find('=', start)) != std::string::npos) {
+  while (query.find('=', start) != std::string::npos) {
     // look for ampersands in "key=value&key=value..."
     ampersand_pos = query.find('&', start);
     if (ampersand_pos != std::string::npos) {
@@ -81,37 +81,26 @@ absl::optional<CelValue> ExtendedRequestWrapper::getMapFromQueryStr(absl::string
       key_equals_value = query.substr(start);
       start = query.length();
     }
-    equal_pos = 0;
-    key = "";
-    value = "";
-    std::cout << "********* key_equals_value: " << key_equals_value << std::endl;
     if ((equal_pos = key_equals_value.find('=')) != std::string::npos) {
       key = key_equals_value.substr(0, equal_pos);
-      // skip if key is empty (e.g. "=value" or "=")
+      // continue if key is empty (e.g. "=value" or "=")
       if (key.length() == 0) {
         continue;
       }
-      // search key_value_pairs to see if key already exists
-      bool duplicate_key_found = false;
-      for (size_t i = 0; i < key_value_pairs.size(); ++i) {
-        if ((key_value_pairs)[i].first.StringOrDie().value() == key) {
-          duplicate_key_found = true;
-          break;
-        }
-      }
-      // skip duplicate keys
-      if (duplicate_key_found) {
+      // continue if key already exists and this is a duplicate
+      if (parameters_map.contains(key)) {
         continue;
       }
       value = key_equals_value.substr(equal_pos + 1);
-      std::cout << "********* key: " << key << " value: " << value << std::endl;
+      // store key value pair twice, in the parameters hash map and the vector of key value pairs
+      parameters_map[key] = value;
       auto key_value_pair = std::make_pair(
           CelValue::CreateString(Protobuf::Arena::Create<std::string>(&arena_, key)),
           CelValue::CreateString(Protobuf::Arena::Create<std::string>(&arena_, value)));
       key_value_pairs.push_back(key_value_pair);
     }
   }
-  // create ContainerBackedMapImpl
+  // create ContainerBackedMapImpl from vector of key value pairs
   std::unique_ptr<CelMap> query_str_map =
       CreateContainerBackedMap(absl::Span<std::pair<CelValue, CelValue>>(key_value_pairs)).value();
 

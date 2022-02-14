@@ -45,7 +45,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "util_lib",
     hdrs = ["util.h"],
-    deps = ["@com_google_cel_cpp//eval/public/containers:container_backed_list_impl"],
+    deps = [
+        "//source/common/protobuf:utility_lib",
+        "@com_google_cel_cpp//eval/public:cel_value",
+        "@com_google_cel_cpp//eval/public/containers:container_backed_list_impl",
+    ],
 )
 
 envoy_cc_extension(

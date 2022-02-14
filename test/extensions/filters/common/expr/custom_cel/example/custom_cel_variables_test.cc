@@ -106,25 +106,45 @@ TEST_F(ExtendedRequestVariablesTests, ListKeysTest) {
             ExtendedRequestList.size() + request_vars.ListKeys()->size());
 }
 
-TEST_F(ExtendedRequestVariablesTests, QueryAsStringTest) {
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":path", "/query?a=apple&a=apricot&b=banana&=&c=cranberry"}};
+TEST_F(ExtendedRequestVariablesTests, EmptyQueryStringTest) {
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/query?"}};
   ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, false);
-  RequestWrapper request_vars(arena, &request_headers, mock_stream_info);
   absl::string_view value =
       extended_request_vars[CelValue::CreateStringView("query")]->StringOrDie().value();
-  EXPECT_EQ(value, "a=apple&a=apricot&b=banana&=&c=cranberry");
+  EXPECT_EQ(value, "");
+}
+
+TEST_F(ExtendedRequestVariablesTests, GetMethodTest) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}};
+  ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, false);
+  // Should go to RequestWrapper for "method"
+  absl::string_view value =
+      extended_request_vars[CelValue::CreateStringView("method")]->StringOrDie().value();
+  EXPECT_EQ(value, "GET");
+}
+
+TEST_F(ExtendedRequestVariablesTests, QueryAsStringTest) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/query?a=apple&a=apricot&b=banana&=&cantaloupe&=mango&m=&c=cranberry&"}};
+  ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, false);
+  absl::string_view value =
+      extended_request_vars[CelValue::CreateStringView("query")]->StringOrDie().value();
+  EXPECT_EQ(value, "a=apple&a=apricot&b=banana&=&cantaloupe&=mango&m=&c=cranberry&");
 }
 
 TEST_F(ExtendedRequestVariablesTests, QueryAsMapTest) {
   Http::TestRequestHeaderMapImpl request_headers{
-      {":path", "/query?a=apple&a=apricot&b=banana&=&c=cranberry"}};
+      {":path", "/query?a=apple&a=apricot&b=banana&=&cantaloupe&=mango&m=&c=cranberry&"}};
   ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, true);
   auto cel_map = extended_request_vars[CelValue::CreateStringView("query")]->MapOrDie();
   auto value = (*cel_map)[CelValue::CreateStringView("a")]->StringOrDie().value();
   EXPECT_EQ(value, "apple");
+  value = (*cel_map)[CelValue::CreateStringView("b")]->StringOrDie().value();
+  EXPECT_EQ(value, "banana");
   value = (*cel_map)[CelValue::CreateStringView("c")]->StringOrDie().value();
   EXPECT_EQ(value, "cranberry");
+  value = (*cel_map)[CelValue::CreateStringView("m")]->StringOrDie().value();
+  EXPECT_EQ(value, "");
 }
 
 } // namespace Example
