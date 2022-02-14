@@ -514,6 +514,144 @@ modify different aspects of the server:
   Outputs statistics that Envoy has updated (counters incremented at least once,
   gauges changed at least once, and histograms added to at least once) in JSON format.
 
+  .. http:get:: /stats?format=json&histogram_buckets=cumulative
+
+  Changes histogram output to display cumulative buckets with upper bounds.
+  All values below the upper bound are included even if they are placed into other buckets.
+  Compatible with ``usedonly`` and ``filter``.
+
+  Example histogram output:
+
+  .. code-block:: json
+
+    {
+      "histograms": [
+        {
+          "name": "example_histogram",
+          "supported_buckets": [
+            0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000, 600000, 1800000, 3600000
+          ],
+          "computed_buckets": [
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 1, "cumulative": 2},
+            {"interval": 1, "cumulative": 2},
+            {"interval": 1, "cumulative": 2},
+            {"interval": 1, "cumulative": 2},
+            {"interval": 1, "cumulative": 2},
+            {"interval": 1, "cumulative": 2},
+            {"interval": 1, "cumulative": 2},
+            {"interval": 1, "cumulative": 2},
+            {"interval": 1, "cumulative": 2},
+            {"interval": 1, "cumulative": 2},
+            {"interval": 1, "cumulative": 2},
+            {"interval": 1, "cumulative": 2}
+          ]
+        },
+        {
+          "name": "other_example_histogram",
+          "supported_buckets": [
+            0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000, 600000, 1800000, 3600000
+          ],
+          "computed_buckets": [
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 100},
+            {"interval": 0, "cumulative": 300},
+            {"interval": 0, "cumulative": 600},
+            {"interval": 0, "cumulative": 600},
+            {"interval": 0, "cumulative": 600},
+            {"interval": 0, "cumulative": 600},
+            {"interval": 0, "cumulative": 600},
+            {"interval": 0, "cumulative": 600},
+            {"interval": 0, "cumulative": 600}
+          ]
+        }
+      ]
+    }
+
+  .. http:get:: /stats?format=json&histogram_buckets=disjoint
+
+  Changes histogram output to display disjoint buckets with upper bounds.
+  Buckets do not include values from other buckets with smaller upper bounds;
+  the previous bucket's upper bound acts as a lower bound. Compatible with ``usedonly`` and ``filter``.
+
+  Example histogram output:
+
+  .. code-block:: json
+
+    {
+      "histograms": [
+        {
+          "name": "example_histogram",
+          "supported_buckets": [
+            0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000, 600000, 1800000, 3600000
+          ],
+          "computed_buckets": [
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 1, "cumulative": 2},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0}
+          ]
+        },
+        {
+          "name": "other_example_histogram",
+          "supported_buckets": [
+            0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000, 600000, 1800000, 3600000
+          ],
+          "computed_buckets": [
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 100},
+            {"interval": 0, "cumulative": 200},
+            {"interval": 0, "cumulative": 300},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0}
+          ]
+        }
+      ]
+    }
+
 .. http:get:: /stats?format=prometheus
 
   or alternatively,
