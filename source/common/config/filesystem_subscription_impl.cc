@@ -12,18 +12,35 @@
 namespace Envoy {
 namespace Config {
 
+envoy::config::core::v3::PathConfigSource makePathConfigSource(const std::string& path) {
+  envoy::config::core::v3::PathConfigSource path_config_source;
+  path_config_source.set_path(path);
+  return path_config_source;
+}
+
 FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
-    Event::Dispatcher& dispatcher, absl::string_view path, SubscriptionCallbacks& callbacks,
-    OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
-    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
-    : path_(path), watcher_(dispatcher.createFilesystemWatcher()), callbacks_(callbacks),
-      resource_decoder_(resource_decoder), stats_(stats), api_(api),
-      validation_visitor_(validation_visitor) {
-  watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
-    if (started_) {
-      refresh();
-    }
-  });
+    Event::Dispatcher& dispatcher,
+    const envoy::config::core::v3::PathConfigSource& path_config_source,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    SubscriptionStats stats, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+    : path_(path_config_source.path()), callbacks_(callbacks), resource_decoder_(resource_decoder),
+      stats_(stats), api_(api), validation_visitor_(validation_visitor) {
+  if (!path_config_source.has_watched_directory()) {
+    file_watcher_ = dispatcher.createFilesystemWatcher();
+    file_watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
+      if (started_) {
+        refresh();
+      }
+    });
+  } else {
+    directory_watcher_ =
+        std::make_unique<WatchedDirectory>(path_config_source.watched_directory(), dispatcher);
+    directory_watcher_->setCallback([this]() {
+      if (started_) {
+        refresh();
+      }
+    });
+  }
 }
 
 // Config::Subscription
@@ -80,18 +97,19 @@ void FilesystemSubscriptionImpl::refresh() {
     } else {
       ENVOY_LOG(warn, "Filesystem config update failure: {}", e.what());
       stats_.update_failure_.inc();
-      // This could happen due to filesystem issues or a bad configuration (e.g. proto validation).
-      // Since the latter is more likely, for now we will treat it as rejection.
+      // This could happen due to filesystem issues or a bad configuration (e.g. proto
+      // validation). Since the latter is more likely, for now we will treat it as rejection.
       callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     }
   }
 }
 
 FilesystemCollectionSubscriptionImpl::FilesystemCollectionSubscriptionImpl(
-    Event::Dispatcher& dispatcher, absl::string_view path, SubscriptionCallbacks& callbacks,
-    OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
-    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
-    : FilesystemSubscriptionImpl(dispatcher, path, callbacks, resource_decoder, stats,
+    Event::Dispatcher& dispatcher,
+    const envoy::config::core::v3::PathConfigSource& path_config_source,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    SubscriptionStats stats, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+    : FilesystemSubscriptionImpl(dispatcher, path_config_source, callbacks, resource_decoder, stats,
                                  validation_visitor, api) {}
 
 std::string

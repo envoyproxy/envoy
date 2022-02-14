@@ -12,7 +12,7 @@ namespace {
 
 // TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
 //               work restores it here.
-std::string tdsBootstrapConfig(absl::string_view api_type) {
+std::string rtdsBootstrapConfig(absl::string_view api_type) {
   return fmt::format(R"EOF(
 static_resources:
   clusters:
@@ -85,10 +85,10 @@ public:
   RtdsIntegrationTest()
       : HttpIntegrationTest(
             Http::CodecType::HTTP2, ipVersion(),
-            tdsBootstrapConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
-                                       sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw
-                                   ? "GRPC"
-                                   : "DELTA_GRPC")) {
+            rtdsBootstrapConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+                                        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw
+                                    ? "GRPC"
+                                    : "DELTA_GRPC")) {
     if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
         sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
       config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
@@ -98,7 +98,11 @@ public:
     sotw_or_delta_ = sotwOrDelta();
   }
 
-  void TearDown() override { cleanUpXdsConnection(); }
+  void TearDown() override {
+    if (xds_connection_ != nullptr) {
+      cleanUpXdsConnection();
+    }
+  }
 
   void initialize() override {
     // The tests infra expects the xDS server to be the second fake upstream, so
@@ -139,6 +143,63 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, RtdsIntegrationTest,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// This test mimics what K8s does when it swaps a ConfigMap.
+TEST_P(RtdsIntegrationTest, FileRtdsReload) {
+  // Create an initial setup that looks similar to a K8s ConfigMap deployment. This is a file
+  // contained in a directory and referenced via an intermediate symlink on the directory.
+  const std::string temp_path{TestEnvironment::temporaryDirectory() + "/rtds_test"};
+  TestEnvironment::createPath(temp_path + "/data_1");
+  TestEnvironment::writeStringToFileForTest(temp_path + "/data_1/rtds.yaml", R"EOF(
+resources:
+- "@type": type.googleapis.com/envoy.service.runtime.v3.Runtime
+  name: file_rtds
+  layer:
+ )EOF",
+                                            true);
+  TestEnvironment::createSymlink(temp_path + "/data_1", temp_path + "/..data");
+  TestEnvironment::createSymlink(temp_path + "/..data/rtds.yaml", temp_path + "/rtds.yaml");
+
+  // Create a file based RTDS xDS watch that watches the owning directory for symlink swaps,
+  // similar to what would be done when watching a K8s ConfigMap for a swap.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Clear existing layers before adding the file based layer.
+    bootstrap.mutable_layered_runtime()->Clear();
+
+    auto* layer = bootstrap.mutable_layered_runtime()->add_layers();
+    layer->set_name("file_rtds");
+    auto* rtds_layer = layer->mutable_rtds_layer();
+    rtds_layer->set_name("file_rtds");
+    auto* path_config_source = rtds_layer->mutable_rtds_config()->mutable_path_config_source();
+    path_config_source->set_path(temp_path + "/rtds.yaml");
+    path_config_source->mutable_watched_directory()->set_path(temp_path);
+  });
+
+  initialize();
+
+  EXPECT_EQ(0, test_server_->counter("runtime.load_error")->value());
+  EXPECT_EQ(1, test_server_->gauge("runtime.num_layers")->value());
+
+  // Create a new directory and file and then swap at the directory level.
+  TestEnvironment::createPath(temp_path + "/data_2");
+  TestEnvironment::writeStringToFileForTest(temp_path + "/data_2/rtds.yaml", R"EOF(
+resources:
+- "@type": type.googleapis.com/envoy.service.runtime.v3.Runtime
+  name: file_rtds
+  layer:
+    foo: bar
+ )EOF",
+                                            true);
+  TestEnvironment::createSymlink(temp_path + "/data_2", temp_path + "/..data.new");
+  TestEnvironment::renameFile(temp_path + "/..data.new", temp_path + "/..data");
+
+  test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
+  EXPECT_EQ(1, test_server_->gauge("runtime.num_layers")->value());
+  EXPECT_EQ(1, test_server_->gauge("runtime.num_keys")->value());
+  EXPECT_EQ("bar", getRuntimeKey("foo"));
+
+  TestEnvironment::removePath(temp_path);
+}
 
 TEST_P(RtdsIntegrationTest, RtdsReload) {
   initialize();
