@@ -36,18 +36,15 @@ public:
     tls_.shutdownThread();
   }
 
-  std::shared_ptr<MockInstance> setupMockedInstance() {
-    auto instance = std::make_shared<MockInstance>();
-    EXPECT_CALL(*instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
-    EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
-    EXPECT_CALL(*instance, stats()).WillRepeatedly(ReturnRef(*store_));
-    EXPECT_CALL(*instance, api()).WillRepeatedly(ReturnRef(api_));
-    EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
-    return instance;
-  }
-
   using CodeResponse = std::pair<Http::Code, std::string>;
 
+  /**
+   * Issues a request for stat as json.
+   *
+   * @param used_only only include stats that have been written.
+   * @param filter string interpreted as regex to filter stats
+   * @return the Http Code and the response body as a string.
+   */
   CodeResponse statsAsJsonHandler(const bool used_only,
                                   const absl::optional<std::string> filter = absl::nullopt) {
 
@@ -61,9 +58,20 @@ public:
     return handlerStats(url);
   }
 
+  /**
+   * Issues an admin request against the stats saved in store_.
+   *
+   * @param url the admin endpoint to query.
+   * @return the Http Code and the response body as a string.
+   */
   CodeResponse handlerStats(absl::string_view url) {
-    std::shared_ptr<MockInstance> instance = setupMockedInstance();
-    StatsHandler handler(*instance);
+    MockInstance instance;
+    EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
+    EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
+    EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
+    EXPECT_CALL(instance, api()).WillRepeatedly(ReturnRef(api_));
+    EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
+    StatsHandler handler(instance);
     Buffer::OwnedImpl data;
     Http::TestResponseHeaderMapImpl response_headers;
     Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream_);
@@ -720,16 +728,16 @@ TEST_P(AdminInstanceTest, TracingStatsDisabled) {
 }
 
 TEST_P(AdminInstanceTest, GetRequestJson) {
-  std::string body;
   Http::TestResponseHeaderMapImpl response_headers;
+  std::string body;
   EXPECT_EQ(Http::Code::OK, admin_.request("/stats?format=json", "GET", response_headers, body));
   EXPECT_THAT(body, HasSubstr("{\"stats\":["));
   EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
 }
 
 TEST_P(AdminInstanceTest, RecentLookups) {
-  std::string body;
   Http::TestResponseHeaderMapImpl response_headers;
+  std::string body;
 
   // Recent lookup tracking is disabled by default.
   EXPECT_EQ(Http::Code::OK, admin_.request("/stats/recentlookups", "GET", response_headers, body));
