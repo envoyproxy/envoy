@@ -91,8 +91,8 @@ public:
     }
   }
 
-  const std::string route(Network::Address::InstanceConstSharedPtr address) const {
-    return router_->route(address);
+  const std::string route(Network::Address::InstanceConstSharedPtr source_address) const {
+    return router_->route(source_address);
   }
   const std::vector<std::string>& allClusterNames() const { return router_->allClusterNames(); }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }

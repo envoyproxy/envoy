@@ -55,7 +55,7 @@ public:
              Server::Configuration::ServerFactoryContext& context);
 
   // Router::Router
-  const std::string route(Network::Address::InstanceConstSharedPtr address) const override;
+  const std::string route(Network::Address::InstanceConstSharedPtr source_address) const override;
   const std::vector<std::string>& allClusterNames() const override;
 
 private:

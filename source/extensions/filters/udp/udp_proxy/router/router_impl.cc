@@ -65,13 +65,13 @@ RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::Udp
   }
 }
 
-const std::string RouterImpl::route(Network::Address::InstanceConstSharedPtr address) const {
+const std::string RouterImpl::route(Network::Address::InstanceConstSharedPtr source_address) const {
   if (cluster_.has_value()) {
     return cluster_.value();
   }
 
-  if (address->ip()) {
-    Network::Matching::NetworkMatchingDataImpl data(address->ip());
+  if (source_address->ip()) {
+    Network::Matching::NetworkMatchingDataImpl data(source_address->ip());
 
     auto result = matcher_->match(data);
     if (result.match_state_ == Matcher::MatchState::MatchComplete) {
