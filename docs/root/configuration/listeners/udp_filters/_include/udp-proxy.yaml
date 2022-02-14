@@ -21,19 +21,6 @@ static_resources:
         '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
         stat_prefix: service
         matcher:
-          matcher_tree:
-            input:
-              name: source-ip
-              typed_config:
-                '@type': type.googleapis.com/envoy.type.matcher.v3.SourceIpMatchInput
-            exact_match_map:
-              map:
-                "127.0.0.1":
-                  action:
-                    name: route
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-                      cluster: service_udp
           on_no_match:
             action:
               name: route
