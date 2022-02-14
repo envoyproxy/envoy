@@ -382,8 +382,8 @@ std::vector<ProtobufWkt::Value> StatsHandler::statsAsJsonDisjointHistogramBucket
 }
 
 ProtobufWkt::Value StatsHandler::statsAsJsonHistogramBucketsCreateHistogramElementHelper(
-    Stats::ConstSupportedBuckets& supported_buckets, const std::vector<uint64_t> interval_buckets,
-    const std::vector<uint64_t> cumulative_buckets, const std::string& name) {
+    Stats::ConstSupportedBuckets& supported_buckets, const std::vector<uint64_t>& interval_buckets,
+    const std::vector<uint64_t>& cumulative_buckets, const std::string& name) {
   ProtobufWkt::Struct histogram_obj;
   auto* histogram_obj_fields = histogram_obj.mutable_fields();
   (*histogram_obj_fields)["name"] = ValueUtil::stringValue(name);

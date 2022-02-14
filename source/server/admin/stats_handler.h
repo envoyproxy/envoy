@@ -86,8 +86,8 @@ private:
       const absl::optional<std::regex>& regex);
 
   static ProtobufWkt::Value statsAsJsonHistogramBucketsCreateHistogramElementHelper(
-      Stats::ConstSupportedBuckets& supported_buckets, const std::vector<uint64_t> interval_buckets,
-      const std::vector<uint64_t> cumulative_buckets, const std::string& name);
+      Stats::ConstSupportedBuckets& supported_buckets, const std::vector<uint64_t>& interval_buckets,
+      const std::vector<uint64_t>& cumulative_buckets, const std::string& name);
 };
 
 } // namespace Server
