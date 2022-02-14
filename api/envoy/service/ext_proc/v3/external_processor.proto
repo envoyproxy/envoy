@@ -298,7 +298,8 @@ message ImmediateResponse {
   GrpcStatus grpc_status = 4;
 
   // A string detailing why this local reply was sent, which may be included
-  // in log and debug output.
+  // in log and debug output (e.g. this populates the %RESPONSE_CODE_DETAILS%
+  // command operator field for use in access logging).
   string details = 5;
 }
 

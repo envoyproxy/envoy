@@ -202,16 +202,6 @@ public:
   virtual void copyOut(size_t start, uint64_t size, void* data) const PURE;
 
   /**
-   * Copy out a section of the buffer to  dynamic array of slices.
-   * @param size supplies the size of the data that will be copied.
-   * @param slices supplies the output slices to fill.
-   * @param num_slice supplies the number of slices to fill.
-   * @return the number of bytes copied.
-   */
-  virtual uint64_t copyOutToSlices(uint64_t size, Buffer::RawSlice* slices,
-                                   uint64_t num_slice) const PURE;
-
-  /**
    * Drain data from the buffer.
    * @param size supplies the length of data to drain.
    */
@@ -479,8 +469,11 @@ public:
    * Set the buffer's high watermark. The buffer's low watermark is implicitly set to half the high
    * watermark. Setting the high watermark to 0 disables watermark functionality.
    * @param watermark supplies the buffer high watermark size threshold, in bytes.
+   * @param watermark supplies the overflow multiplier, in bytes.
+   *        If set to non-zero, overflow callbacks will be called if the
+   *        buffered data exceeds watermark * overflow_multiplier.
    */
-  virtual void setWatermarks(uint32_t watermark) PURE;
+  virtual void setWatermarks(uint32_t watermark, uint32_t overflow_multiplier = 0) PURE;
 
   /**
    * Returns the configured high watermark. A return value of 0 indicates that watermark
