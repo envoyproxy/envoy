@@ -32,7 +32,7 @@ public:
                      std::map<std::string, std::string>& all_text_readouts,
                      const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
                      const bool used_only,
-                     const absl::optional<std::string>& histogram_buckets_value = absl::nullopt,
+                     const absl::optional<std::string> histogram_buckets_value = absl::nullopt,
                      const absl::optional<std::regex> regex = absl::nullopt) {
     return StatsHandler::statsAsJson(all_stats, all_text_readouts, all_histograms, used_only,
                                      histogram_buckets_value, regex, true /*pretty_print*/);
@@ -239,6 +239,1310 @@ TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsInvalid) {
   EXPECT_EQ(Http::Code::BadRequest, code);
   EXPECT_EQ("usage: /stats?histogram_buckets=cumulative  or /stats?histogram_buckets=disjoint \n",
             data.toString());
+}
+
+TEST_P(AdminStatsTest, HandlerStatsJsonNoHistograms) {
+  const std::string url = "/stats?format=json&usedonly";
+  Http::TestResponseHeaderMapImpl response_headers, cumulative_response_headers,
+      disjoint_response_headers;
+  Buffer::OwnedImpl data, cumulative_data, disjoint_data;
+  MockAdminStream admin_stream;
+  Configuration::MockStatsConfig stats_config;
+  EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
+  MockInstance instance;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
+  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
+  StatsHandler handler(instance);
+
+  Stats::Counter& c1 = store_->counterFromString("c1");
+
+  c1.add(10);
+
+  store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+
+  store_->mergeHistograms([]() -> void {});
+
+  const std::string expected_json = R"EOF({
+    "stats": [
+        {
+            "name":"c1",
+            "value":10,
+        }
+    ]
+})EOF";
+
+  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+
+  EXPECT_THAT(expected_json, JsonStringEq(data.toString()));
+
+  code = handler.handlerStats(url + "&histogram_buckets=cumulative", cumulative_response_headers, cumulative_data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+
+  EXPECT_THAT(expected_json, JsonStringEq(cumulative_data.toString()));
+
+  code = handler.handlerStats(url + "&histogram_buckets=disjoint", disjoint_response_headers, disjoint_data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+
+  EXPECT_THAT(expected_json, JsonStringEq(disjoint_data.toString()));
+
+  shutdownThreading();
+}
+
+TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsCumulative) {
+  const std::string url = "/stats?histogram_buckets=cumulative&format=json";
+  Http::TestResponseHeaderMapImpl response_headers, used_response_headers,
+      used_and_filter_response_headers;
+  Buffer::OwnedImpl data, used_data, used_and_filter_data;
+  MockAdminStream admin_stream;
+  Configuration::MockStatsConfig stats_config;
+  EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
+  MockInstance instance;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
+  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
+  StatsHandler handler(instance);
+  
+  store_->counterFromString("c1");
+  Stats::Counter& c2 = store_->counterFromString("c2");
+
+  c2.add(20);
+
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
+  h1.recordValue(200);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
+  h1.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
+  h1.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+
+  const std::string expected_json = R"EOF({
+    "stats": [
+        {
+            "name":"c1",
+            "value":0
+        },
+        {
+            "name":"c2",
+            "value":20
+        },
+        {
+            "histograms": [
+                {
+                    "name": "h1",
+                    "supported_buckets": [
+                        0.5,
+                        1,
+                        5,
+                        10,
+                        25,
+                        50,
+                        100,
+                        250,
+                        500,
+                        1000,
+                        2500,
+                        5000,
+                        10000,
+                        30000,
+                        60000,
+                        300000,
+                        600000,
+                        1800000,
+                        3600000
+                    ],
+                    "computed_buckets": [
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json, JsonStringEq(data.toString()));
+
+  code = handler.handlerStats(url + "&usedonly", used_response_headers, used_data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+  const std::string expected_json_used = R"EOF({
+    "stats": [
+        {
+            "name":"c2",
+            "value":20
+        },
+        {
+            "histograms": [
+                {
+                    "name": "h1",
+                    "supported_buckets": [
+                        0.5,
+                        1,
+                        5,
+                        10,
+                        25,
+                        50,
+                        100,
+                        250,
+                        500,
+                        1000,
+                        2500,
+                        5000,
+                        10000,
+                        30000,
+                        60000,
+                        300000,
+                        600000,
+                        1800000,
+                        3600000
+                    ],
+                    "computed_buckets": [
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json_used, JsonStringEq(used_data.toString()));
+
+  code = handler.handlerStats(url + "&usedonly&filter=h1", used_and_filter_response_headers,
+                              used_and_filter_data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+  const std::string expected_json_used_and_filter = R"EOF({
+    "stats": [
+        {
+            "histograms": [
+                {
+                    "name": "h1",
+                    "supported_buckets": [
+                        0.5,
+                        1,
+                        5,
+                        10,
+                        25,
+                        50,
+                        100,
+                        250,
+                        500,
+                        1000,
+                        2500,
+                        5000,
+                        10000,
+                        30000,
+                        60000,
+                        300000,
+                        600000,
+                        1800000,
+                        3600000
+                    ],
+                    "computed_buckets": [
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 3
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json_used_and_filter, JsonStringEq(used_and_filter_data.toString()));
+
+  shutdownThreading();
+}
+
+TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsDisjoint) {
+  const std::string url = "/stats?histogram_buckets=disjoint&format=json";
+  Http::TestResponseHeaderMapImpl response_headers, used_response_headers,
+      used_and_filter_response_headers;
+  Buffer::OwnedImpl data, used_data, used_and_filter_data;
+  MockAdminStream admin_stream;
+  Configuration::MockStatsConfig stats_config;
+  EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
+  MockInstance instance;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
+  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
+  StatsHandler handler(instance);
+
+  store_->counterFromString("c1");
+  Stats::Counter& c2 = store_->counterFromString("c2");
+
+  c2.add(20);
+
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
+  h1.recordValue(200);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
+  h1.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
+  h1.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+
+  const std::string expected_json = R"EOF({
+    "stats": [
+        {
+            "name":"c1",
+            "value":0
+        },
+        {
+            "name":"c2",
+            "value":20
+        },
+        {
+            "histograms": [
+                {
+                    "name": "h1",
+                    "supported_buckets": [
+                        0.5,
+                        1,
+                        5,
+                        10,
+                        25,
+                        50,
+                        100,
+                        250,
+                        500,
+                        1000,
+                        2500,
+                        5000,
+                        10000,
+                        30000,
+                        60000,
+                        300000,
+                        600000,
+                        1800000,
+                        3600000
+                    ],
+                    "computed_buckets": [
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 2
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json, JsonStringEq(data.toString()));
+
+  code = handler.handlerStats(url + "&usedonly", used_response_headers, used_data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+  const std::string expected_json_used = R"EOF({
+    "stats": [
+        {
+            "name":"c2",
+            "value":20
+        },
+        {
+            "histograms": [
+                {
+                    "name": "h1",
+                    "supported_buckets": [
+                        0.5,
+                        1,
+                        5,
+                        10,
+                        25,
+                        50,
+                        100,
+                        250,
+                        500,
+                        1000,
+                        2500,
+                        5000,
+                        10000,
+                        30000,
+                        60000,
+                        300000,
+                        600000,
+                        1800000,
+                        3600000
+                    ],
+                    "computed_buckets": [
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 2
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json_used, JsonStringEq(used_data.toString()));
+
+  code = handler.handlerStats(url + "&usedonly&filter=h1", used_and_filter_response_headers,
+                              used_and_filter_data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+  const std::string expected_json_used_and_filter = R"EOF({
+    "stats": [
+        {
+            "histograms": [
+                {
+                    "name": "h1",
+                    "supported_buckets": [
+                        0.5,
+                        1,
+                        5,
+                        10,
+                        25,
+                        50,
+                        100,
+                        250,
+                        500,
+                        1000,
+                        2500,
+                        5000,
+                        10000,
+                        30000,
+                        60000,
+                        300000,
+                        600000,
+                        1800000,
+                        3600000
+                    ],
+                    "computed_buckets": [
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 2
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json_used_and_filter, JsonStringEq(used_and_filter_data.toString()));
+
+  shutdownThreading();
+}
+
+TEST_P(AdminStatsTest, StatsAsJsonHistogramBucketsMultipleHistograms) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
+  h1.recordValue(200);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 100));
+  h2.recordValue(100);
+
+  store_->mergeHistograms([]() -> void {});
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
+  h1.recordValue(100);
+
+  store_->mergeHistograms([]() -> void {});
+
+  std::vector<Stats::ParentHistogramSharedPtr> histograms = store_->histograms();
+  std::sort(histograms.begin(), histograms.end(),
+            [](const Stats::ParentHistogramSharedPtr& a,
+               const Stats::ParentHistogramSharedPtr& b) -> bool { return a->name() < b->name(); });
+  std::map<std::string, uint64_t> all_stats;
+  std::map<std::string, std::string> all_text_readouts;
+  std::string actual_json_cumulative = statsAsJsonHandler(all_stats, all_text_readouts, histograms, false, absl::optional<std::string>("cumulative"));
+
+  const std::string expected_json_cumulative = R"EOF({
+    "stats": [
+        {
+            "histograms": [
+                {
+                    "name": "h1",
+                    "supported_buckets": [
+                        0.5,
+                        1,
+                        5,
+                        10,
+                        25,
+                        50,
+                        100,
+                        250,
+                        500,
+                        1000,
+                        2500,
+                        5000,
+                        10000,
+                        30000,
+                        60000,
+                        300000,
+                        600000,
+                        1800000,
+                        3600000
+                    ],
+                    "computed_buckets": [
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 2
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 2
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 2
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 2
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 2
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 2
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 2
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 2
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 2
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 2
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 2
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 2
+                        }
+                    ]
+                },
+                {
+                    "name": "h2",
+                    "supported_buckets": [
+                        0.5,
+                        1,
+                        5,
+                        10,
+                        25,
+                        50,
+                        100,
+                        250,
+                        500,
+                        1000,
+                        2500,
+                        5000,
+                        10000,
+                        30000,
+                        60000,
+                        300000,
+                        600000,
+                        1800000,
+                        3600000
+                    ],
+                    "computed_buckets": [
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json_cumulative, JsonStringEq(actual_json_cumulative));
+
+  std::string actual_json_disjoint = statsAsJsonHandler(all_stats, all_text_readouts, histograms, false, absl::optional<std::string>("disjoint"));
+
+  const std::string expected_json_disjoint = R"EOF({
+    "stats": [
+        {
+            "histograms": [
+                {
+                    "name": "h1",
+                    "supported_buckets": [
+                        0.5,
+                        1,
+                        5,
+                        10,
+                        25,
+                        50,
+                        100,
+                        250,
+                        500,
+                        1000,
+                        2500,
+                        5000,
+                        10000,
+                        30000,
+                        60000,
+                        300000,
+                        600000,
+                        1800000,
+                        3600000
+                    ],
+                    "computed_buckets": [
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 1,
+                            "cumulative": 2
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        }
+                    ]
+                },
+                {
+                    "name": "h2",
+                    "supported_buckets": [
+                        0.5,
+                        1,
+                        5,
+                        10,
+                        25,
+                        50,
+                        100,
+                        250,
+                        500,
+                        1000,
+                        2500,
+                        5000,
+                        10000,
+                        30000,
+                        60000,
+                        300000,
+                        600000,
+                        1800000,
+                        3600000
+                    ],
+                    "computed_buckets": [
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 1
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        },
+                        {
+                            "interval": 0,
+                            "cumulative": 0
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json_disjoint, JsonStringEq(actual_json_disjoint));
+  
+  shutdownThreading();
 }
 
 TEST_P(AdminStatsTest, HandlerStatsJson) {
