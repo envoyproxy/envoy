@@ -166,12 +166,6 @@ The following table shows the available Docker images
      -
      -
      -
-   * - `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_
-     - Release binary with symbols stripped on top of a **glibc** alpine base.
-     - |DOCKER_IMAGE_TAG_NAME|
-     -
-     -
-     -
    * - `envoyproxy/envoy-windows <https://hub.docker.com/r/envoyproxy/envoy-windows/tags/>`_
      - Release binary with symbols stripped on top of a Windows Server 1809 base.
      - |DOCKER_IMAGE_TAG_NAME|
@@ -204,12 +198,6 @@ The following table shows the available Docker images
      - latest
    * - `envoyproxy/envoy-distroless-dev <https://hub.docker.com/r/envoyproxy/envoy-distroless-dev/tags/>`_
      - Release binary with symbols stripped on top of a distroless base.
-     -
-     -
-     - latest
-     -
-   * - `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_
-     - Release binary with symbols stripped on top of a **glibc** alpine base.
      -
      -
      - latest

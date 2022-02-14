@@ -53,7 +53,7 @@ CURRENT=configs
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
 
 CURRENT=python
-bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:python_check -- --diff-file="$DIFF_OUTPUT" --fix
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:python_check -- --diff-file="$DIFF_OUTPUT" -werror --fix
 
 CURRENT=extensions
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:extensions_check

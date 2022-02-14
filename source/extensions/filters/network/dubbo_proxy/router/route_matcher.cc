@@ -79,7 +79,7 @@ bool ParameterRouteEntryImpl::matchParameter(absl::string_view request_data,
            value < config_data.range_.end();
   }
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not handled");
   }
 }
 

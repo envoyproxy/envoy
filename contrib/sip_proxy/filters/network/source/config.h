@@ -28,10 +28,12 @@ public:
 
   bool sessionAffinity() const override;
   bool registrationAffinity() const override;
+  const std::vector<CustomizedAffinity>& customizedAffinityList() const override;
 
 private:
   bool session_affinity_;
   bool registration_affinity_;
+  std::vector<CustomizedAffinity> customized_affinity_list_;
 };
 
 /**
@@ -42,7 +44,7 @@ class SipProxyFilterConfigFactory
           envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy,
           envoy::extensions::filters::network::sip_proxy::v3alpha::SipProtocolOptions> {
 public:
-  SipProxyFilterConfigFactory() : FactoryBase(SipProxy, true) {}
+  SipProxyFilterConfigFactory() : FactoryBase(SipFilters::SipFilterNames::get().SipProxy, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
