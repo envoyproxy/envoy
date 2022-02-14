@@ -216,6 +216,7 @@ void Router::onEvent(Network::ConnectionEvent event) {
     upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
   case Network::ConnectionEvent::Connected:
+  case Network::ConnectionEvent::ConnectedZeroRtt:
     // Connected is consumed by the connection pool.
     IS_ENVOY_BUG("unexpected");
   }
