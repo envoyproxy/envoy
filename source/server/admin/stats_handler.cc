@@ -115,9 +115,7 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   std::vector<Stats::ParentHistogramSharedPtr> histograms = stats.histograms();
   stats.symbolTable().sortByStatNames<Stats::ParentHistogramSharedPtr>(
       histograms.begin(), histograms.end(),
-      [](const Stats::ParentHistogramSharedPtr& a) -> Stats::StatName {
-        return a->statName();
-      });
+      [](const Stats::ParentHistogramSharedPtr& a) -> Stats::StatName { return a->statName(); });
 
   if (!format_value.has_value()) {
     // Display plain stats if format query param is not there.
@@ -127,8 +125,7 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
 
   if (format_value.value() == "json") {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-    response.add(
-        statsAsJson(all_stats, text_readouts, histograms, used_only, regex));
+    response.add(statsAsJson(all_stats, text_readouts, histograms, used_only, regex));
     return Http::Code::OK;
   }
 
