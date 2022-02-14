@@ -207,7 +207,7 @@ AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::st
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
+      return AssertionFailure() << fmt::format("timed out waiting for {} to be >= {}", name, value);
     }
   }
   return AssertionSuccess();
