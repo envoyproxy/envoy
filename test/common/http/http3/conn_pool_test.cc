@@ -153,7 +153,10 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
   EXPECT_CALL(callbacks.pool_failure_, ready());
-  EXPECT_EQ(pool->newStream(decoder, callbacks), nullptr);
+  EXPECT_EQ(pool->newStream(decoder, callbacks,
+                            {/*can_send_early_data_=*/false,
+                             /*can_use_http3_=*/true}),
+            nullptr);
 }
 
 TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
