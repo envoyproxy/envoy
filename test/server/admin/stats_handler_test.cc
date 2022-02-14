@@ -59,8 +59,9 @@ public:
   Http::Code handlerStats(Server::Instance& instance, absl::string_view url, std::string& out) {
     StatsHandler handler(instance);
     Http::TestResponseHeaderMapImpl response_headers;
-    Http::Code code = handler.handlerStats(url, response_headers_, data_, admin_stream_);
-    out = data_.toString();
+    Buffer::OwnedImpl data;
+    Http::Code code = handler.handlerStats(url, response_headers_, data, admin_stream_);
+    out = data.toString();
     return code;
   }
 
@@ -83,7 +84,7 @@ public:
   Stats::ThreadLocalStoreImplPtr store_;
   Stats::CustomStatNamespacesImpl custom_namespaces_;
   Http::TestResponseHeaderMapImpl response_headers_;
-  Buffer::OwnedImpl data_;
+  //Buffer::OwnedImpl data_;
   MockAdminStream admin_stream_;
   Configuration::MockStatsConfig stats_config_;
 };
@@ -109,15 +110,11 @@ TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
 
 TEST_P(AdminStatsTest, HandlerStatsPlainText) {
   const std::string url = "/stats";
-  Http::TestResponseHeaderMapImpl used_response_headers;
-  Buffer::OwnedImpl used_data;
-  MockAdminStream admin_stream;
   EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
   MockInstance instance;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
   EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
   EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
-  StatsHandler handler(instance);
 
   Stats::Counter& c1 = store_->counterFromString("c1");
   Stats::Counter& c2 = store_->counterFromString("c2");
@@ -139,7 +136,8 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
 
   store_->mergeHistograms([]() -> void {});
 
-  Http::Code code = handler.handlerStats(url, response_headers_, data_, admin_stream);
+  std::string out;
+  Http::Code code = handlerStats(instance, url, out);
   EXPECT_EQ(Http::Code::OK, code);
   constexpr char expected[] =
       "t: \"hello world\"\n"
@@ -151,11 +149,11 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
       "h2: P0(100.0,100.0) P25(102.5,102.5) P50(105.0,105.0) P75(107.5,107.5) "
       "P90(109.0,109.0) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
       "P99.9(109.99,109.99) P100(110.0,110.0)\n";
-  EXPECT_EQ(expected, data_.toString());
+  EXPECT_EQ(expected, out);
 
-  code = handler.handlerStats(url + "?usedonly", used_response_headers, used_data, admin_stream_);
+  code = handlerStats(instance, url + "?usedonly", out);
   EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_EQ(expected, used_data.toString());
+  EXPECT_EQ(expected, out);
 
   shutdownThreading();
 }
@@ -828,9 +826,10 @@ envoy_cluster_upstream_cx_active{cluster="c2"} 12
 
 )EOF";
 
-  Http::Code code = handler.handlerStats(url, response_headers_, data_, admin_stream_);
+  std::string out;
+  Http::Code code = handlerStats(*instance, url, out);
   EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_THAT(expected_response, data_.toString());
+  EXPECT_THAT(expected_response, out);
 
   shutdownThreading();
 }
@@ -867,9 +866,10 @@ envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
 
 )EOF";
 
-  Http::Code code = handler.handlerStats(url, response_headers_, data_, admin_stream_);
+  std::string out;
+  Http::Code code = handlerStats(*instance, url, out);
   EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_THAT(expected_response, data_.toString());
+  EXPECT_THAT(expected_response, out);
 
   shutdownThreading();
 }
