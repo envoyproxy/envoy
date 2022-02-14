@@ -404,8 +404,6 @@ VerifierConstPtr innerCreate(const JwtRequirement& requirement,
                                                       parent);
   case JwtRequirement::RequiresTypeCase::REQUIRES_TYPE_NOT_SET:
     return std::make_unique<AllowAllVerifierImpl>(parent);
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const auto& it = providers.find(provider_name);

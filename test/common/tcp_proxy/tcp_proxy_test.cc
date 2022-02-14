@@ -116,7 +116,7 @@ public:
             .filterState()
             ->getDataMutable<Network::UpstreamSocketOptionsFilterState>(
                 Network::UpstreamSocketOptionsFilterState::key())
-            .addOption(
+            ->addOption(
                 Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
       }
       filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
@@ -852,19 +852,6 @@ TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
   EXPECT_EQ(access_log_data_, "127.0.0.1:80 observability_name");
 }
 
-// Test that access log fields %UPSTREAM_HOST% and %UPSTREAM_CLUSTER% are correctly logged with the
-// cluster name.
-TEST_F(TcpProxyTest, AccessLogUpstreamHostLegacyName) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.use_observable_cluster_name", "false"}});
-  setup(1, accessLogConfig("%UPSTREAM_HOST% %UPSTREAM_CLUSTER%"));
-  raiseEventUpstreamConnected(0);
-  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-  filter_.reset();
-  EXPECT_EQ(access_log_data_, "127.0.0.1:80 fake_cluster");
-}
-
 // Test that access log field %UPSTREAM_LOCAL_ADDRESS% is correctly logged.
 TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   setup(1, accessLogConfig("%UPSTREAM_LOCAL_ADDRESS%"));
@@ -1085,7 +1072,7 @@ TEST_F(TcpProxyTest, ShareFilterState) {
                 .upstreamInfo()
                 ->upstreamFilterState()
                 ->getDataReadOnly<PerConnectionCluster>("envoy.tcp_proxy.cluster")
-                .value());
+                ->value());
 }
 
 // Tests that filter callback can access downstream and upstream address and ssl properties.

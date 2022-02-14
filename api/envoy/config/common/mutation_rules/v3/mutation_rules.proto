@@ -14,6 +14,8 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/common/mutation_rules/v3;mutation_rulesv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
+// [#protodoc-title: Header Mutation Rules]
+
 // The HeaderMutationRules structure specifies what headers may be
 // manipulated by a processing filter. This set of rules makes it
 // possible to control which modifications a filter may make.
@@ -32,11 +34,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // tested against the rules here. Disallowed header mutations will be
 // ignored unless *disallow_is_error* is set to true.
 //
+// Attempts to remove headers are further constrained -- regardless of the
+// settings, system-defined headers (that start with ":") and the "host"
+// header may never be removed.
+//
 // In addition, a counter will be incremented whenever a mutation is
 // rejected. In the ext_proc filter, that counter is named
 // "rejected_header_mutations".
 // [#next-free-field: 8]
-// [#not-implemented-hide:]
 message HeaderMutationRules {
   // By default, certain headers that could affect processing of subsequent
   // filters or request routing cannot be modified. These headers are

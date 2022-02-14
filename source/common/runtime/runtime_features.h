@@ -15,6 +15,9 @@ bool isRuntimeFeature(absl::string_view feature);
 bool runtimeFeatureEnabled(absl::string_view feature);
 uint64_t getInteger(absl::string_view feature, uint64_t default_value);
 
+constexpr absl::string_view conn_pool_new_stream_with_early_data_and_http3 =
+    "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_http3";
+
 class RuntimeFeatures {
 public:
   RuntimeFeatures();

@@ -364,8 +364,14 @@ void Field::buildJsonDocument(const Field& field, nlohmann::json& value) {
   case Type::Null: {
     break;
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case Type::Boolean:
+    FALLTHRU;
+  case Type::Double:
+    FALLTHRU;
+  case Type::Integer:
+    FALLTHRU;
+  case Type::String:
+    PANIC("not implemented");
   }
 }
 
@@ -571,14 +577,16 @@ bool ObjectHandler::start_object(std::size_t) {
     stack_.push(object);
     state_ = State::ExpectKeyOrEndObject;
     return true;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case State::ExpectKeyOrEndObject:
+    FALLTHRU;
+  case State::ExpectFinished:
+    PANIC("not implemented");
   }
+  return false;
 }
 
 bool ObjectHandler::end_object() {
-  switch (state_) {
-  case State::ExpectKeyOrEndObject:
+  if (state_ == State::ExpectKeyOrEndObject) {
     stack_.top()->setLineNumberEnd(line_number_);
     stack_.pop();
 
@@ -590,20 +598,17 @@ bool ObjectHandler::end_object() {
       state_ = State::ExpectArrayValueOrEndArray;
     }
     return true;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC("parsing error not handled");
 }
 
 bool ObjectHandler::key(std::string& val) {
-  switch (state_) {
-  case State::ExpectKeyOrEndObject:
+  if (state_ == State::ExpectKeyOrEndObject) {
     key_ = val;
     state_ = State::ExpectValueOrStartObjectArray;
     return true;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC("parsing error not handled");
 }
 
 bool ObjectHandler::start_array(std::size_t) {
@@ -626,7 +631,7 @@ bool ObjectHandler::start_array(std::size_t) {
     state_ = State::ExpectArrayValueOrEndArray;
     return true;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("parsing error not handled");
   }
 }
 
@@ -646,7 +651,7 @@ bool ObjectHandler::end_array() {
 
     return true;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("parsing error not handled");
   }
 }
 

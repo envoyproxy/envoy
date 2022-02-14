@@ -190,6 +190,7 @@ public:
     quic_connection_ = connection.get();
     ASSERT(quic_connection_persistent_info_ != nullptr);
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
+    OptRef<Http::AlternateProtocolsCache> cache;
     auto session = std::make_unique<EnvoyQuicClientSession>(
         persistent_info.quic_config_, supported_versions_, std::move(connection),
         (host.empty() ? persistent_info.server_id_
@@ -198,7 +199,7 @@ public:
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
-        persistent_info.crypto_stream_factory_, quic_stat_names_, stats_store_);
+        persistent_info.crypto_stream_factory_, quic_stat_names_, cache, stats_store_);
     return session;
   }
 
@@ -221,7 +222,6 @@ public:
       cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
           http2_options.value(), quic::kStreamReceiveWindowLimit);
     }
-    cluster->http3_options_.set_allow_extended_connect(true);
     *cluster->http3_options_.mutable_quic_protocol_options() = client_quic_options_;
     Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
         cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
@@ -399,8 +399,10 @@ TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
 }
 
 TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
-  // Make sure both connections use the same PersistentQuicInfoImpl.
+  // Make sure all connections use the same PersistentQuicInfoImpl.
   concurrency_ = 1;
+  const Http::TestResponseHeaderMapImpl too_early_response_headers{{":status", "425"}};
+
   initialize();
   // Start the first connection.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -413,6 +415,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   ASSERT_TRUE(response1->waitForEndStream());
   // Close the first connection.
   codec_client_->close();
+
   // Start a second connection.
   codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), absl::nullopt,
                                          /*wait_for_1rtt_key*/ false);
@@ -451,10 +454,10 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
   EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
-  const Http::TestResponseHeaderMapImpl response_headers{{":status", "425"}};
-  upstream_request_->encodeHeaders(response_headers, true);
+  upstream_request_->encodeHeaders(too_early_response_headers, true);
   ASSERT_TRUE(response3->waitForEndStream());
-  // Without retry, 425 should be forwarded back to the client.
+  // This is downstream sending early data, so the 425 response should be forwarded back to the
+  // client.
   EXPECT_EQ("425", response3->headers().getStatusValue());
   codec_client_->close();
 
@@ -471,10 +474,10 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   // If the request already has Early-Data header, no additional Early-Data header should be added
   // and the header should be forwarded as is.
   EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "2"));
-  upstream_request_->encodeHeaders(response_headers, true);
-  ASSERT_TRUE(response3->waitForEndStream());
+  upstream_request_->encodeHeaders(too_early_response_headers, true);
+  ASSERT_TRUE(response4->waitForEndStream());
   // 425 response should be forwarded back to the client.
-  EXPECT_EQ("425", response3->headers().getStatusValue());
+  EXPECT_EQ("425", response4->headers().getStatusValue());
   codec_client_->close();
 }
 
@@ -704,41 +707,6 @@ TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
   EXPECT_EQ(failure_reason, codec_client_->connection()->transportFailureReason());
 }
 
-// HTTP3 doesn't support 101 SwitchProtocol response code, the client should
-// reset the request.
-TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void { hcm.set_proxy_100_continue(true); });
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                                                 {":path", "/dynamo/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"},
-                                                                 {"expect", "100-continue"}});
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  // Wait for the request headers to be received upstream.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "101"}}, false);
-  ASSERT_TRUE(response->waitForReset());
-  codec_client_->close();
-  EXPECT_FALSE(response->complete());
-
-  // Verify stream error counters are correctly incremented.
-  std::string counter_scope = GetParam() == Network::Address::IpVersion::v4
-                                  ? "listener.127.0.0.1_0.http3.downstream.rx."
-                                  : "listener.[__1]_0.http3.downstream.rx.";
-  std::string error_code = "quic_reset_stream_error_code_QUIC_STREAM_GENERAL_PROTOCOL_ERROR";
-  test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1U);
-}
-
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
   initialize();
 
@@ -767,6 +735,14 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
   auto response = std::move(encoder_decoder.second);
 
   ASSERT_TRUE(response->waitForReset());
+  EXPECT_FALSE(response->complete());
+
+  // Verify stream error counters are correctly incremented.
+  std::string counter_scope = GetParam() == Network::Address::IpVersion::v4
+                                  ? "listener.127.0.0.1_0.http3.downstream.tx."
+                                  : "listener.[__1]_0.http3.downstream.tx.";
+  std::string error_code = "quic_connection_close_error_code_QUIC_HTTP_FRAME_ERROR";
+  test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1U);
 }
 
 TEST_P(QuicHttpIntegrationTest, Http3ClientKeepalive) {
@@ -861,36 +837,6 @@ TEST_P(QuicHttpIntegrationTest, Http3DownstreamKeepalive) {
                                    true);
   EXPECT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
-}
-
-TEST_P(QuicHttpIntegrationTest, NoInitialStreams) {
-  // Set the fake upstream to start with 0 streams available.
-  setUpstreamProtocol(Http::CodecType::HTTP3);
-  envoy::config::listener::v3::QuicProtocolOptions options;
-  options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(0);
-  mergeOptions(options);
-  initialize();
-
-  // Create the client connection and send a request.
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
-  IntegrationStreamDecoderPtr response =
-      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-
-  // There should now be an upstream connection, but no upstream stream.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_FALSE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_,
-                                                           std::chrono::milliseconds(100)));
-
-  // Update the upstream to have 1 stream available. Now Envoy should ship the
-  // original request upstream.
-  fake_upstream_connection_->updateConcurrentStreams(1);
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-  // Make sure the standard request/response pipeline works as expected.
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 TEST_P(QuicHttpIntegrationTest, NoStreams) {

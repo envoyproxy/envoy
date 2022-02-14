@@ -16,8 +16,9 @@ build --color=yes
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --incompatible_strict_action_env
 build --host_force_python=PY3
-build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
-build --javabase=@bazel_tools//tools/jdk:remote_jdk11
+build --java_runtime_version=remotejdk_11
+build --tool_java_runtime_version=remotejdk_11
+
 build --enable_platform_specific_config
 
 # Allow tags to influence execution requirements
@@ -26,6 +27,7 @@ common --experimental_allow_tags_propagation
 # Enable position independent code (this is the default on macOS and Windows)
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
 build:linux --copt=-fPIC
+build:linux --copt=-Wno-deprecated-declarations
 build:linux --cxxopt=-std=c++17
 build:linux --conlyopt=-fexceptions
 build:linux --fission=dbg,opt
@@ -69,6 +71,7 @@ build:asan --linkopt -fsanitize=address,undefined
 build:asan --copt -fno-sanitize=vptr,function
 build:asan --linkopt -fno-sanitize=vptr,function
 build:asan --copt -DADDRESS_SANITIZER=1
+build:asan --copt -DUNDEFINED_SANITIZER=1
 build:asan --copt -D__SANITIZE_ADDRESS__
 build:asan --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true:detect_odr_violation=1
 build:asan --test_env=UBSAN_OPTIONS=halt_on_error=true:print_stacktrace=1
@@ -107,6 +110,7 @@ build:clang-tsan --define ENVOY_CONFIG_TSAN=1
 build:clang-tsan --copt -fsanitize=thread
 build:clang-tsan --linkopt -fsanitize=thread
 build:clang-tsan --linkopt -fuse-ld=lld
+build:clang-tsan --copt -DTHREAD_SANITIZER=1
 build:clang-tsan --build_tag_filters=-no_san,-no_tsan
 build:clang-tsan --test_tag_filters=-no_san,-no_tsan
 # Needed due to https://github.com/libevent/libevent/issues/777
@@ -125,6 +129,7 @@ build:clang-msan --copt -fsanitize=memory
 build:clang-msan --linkopt -fsanitize=memory
 build:clang-msan --linkopt -fuse-ld=lld
 build:clang-msan --copt -fsanitize-memory-track-origins=2
+build:clang-msan --copt -DMEMORY_SANITIZER=1
 build:clang-msan --test_env=MSAN_SYMBOLIZER_PATH
 # MSAN needs -O1 to get reasonable performance.
 build:clang-msan --copt -O1
@@ -165,7 +170,7 @@ build:coverage --strategy=CoverageReport=sandboxed,local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
-build:coverage --instrumentation_filter="//source(?!/common/quic/platform)[/:],//include[/:]"
+build:coverage --instrumentation_filter="//source(?!/common/quic/platform)[/:],//include[/:],//contrib(?!/.*/test)[/:]"
 build:test-coverage --test_arg="-l trace"
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
