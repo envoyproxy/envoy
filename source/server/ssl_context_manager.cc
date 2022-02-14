@@ -36,6 +36,12 @@ class SslContextManagerNoTlsStub final : public Envoy::Ssl::ContextManager {
 
   Ssl::PrivateKeyMethodManager& privateKeyMethodManager() override { throwException(); }
 
+  void removeContext(const std::shared_ptr<Envoy::Ssl::Context>& old_context) override {
+    if (old_context) {
+      throw EnvoyException("SSL is not supported in this configuration");
+    }
+  }
+
 private:
   [[noreturn]] void throwException() {
     throw EnvoyException("SSL is not supported in this configuration");

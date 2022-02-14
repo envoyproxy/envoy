@@ -499,8 +499,9 @@ std::vector<Envoy::Ssl::CertificateDetailsPtr> ContextImpl::getCertChainInformat
 
 ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
                                      const Envoy::Ssl::ClientContextConfig& config,
-                                     TimeSource& time_source)
-    : ContextImpl(scope, config, time_source),
+                                     TimeSource& time_source,
+                                     Envoy::Ssl::ContextManager& context_manager)
+    : ContextImpl(scope, config, time_source), ManagedContext(context_manager, *this),
       server_name_indication_(config.serverNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()),
       max_session_keys_(config.maxSessionKeys()) {
@@ -649,8 +650,10 @@ uint16_t ClientContextImpl::parseSigningAlgorithmsForTest(const std::string& sig
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      const Envoy::Ssl::ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
-                                     TimeSource& time_source)
-    : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()),
+                                     TimeSource& time_source,
+                                     Envoy::Ssl::ContextManager& context_manager)
+    : ContextImpl(scope, config, time_source), ManagedContext(context_manager, *this),
+      session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()) {
   if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");

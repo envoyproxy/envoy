@@ -387,10 +387,12 @@ bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
 void ClientSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
+  auto ctx = manager_.createSslClientContext(stats_scope_, *config_, nullptr);
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
-    ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_, ssl_ctx_);
+    std::swap(ctx, ssl_ctx_);
   }
+  manager_.removeContext(ctx);
   stats_.ssl_context_update_by_sds_.inc();
 }
 
@@ -433,10 +435,13 @@ bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
 
 void ServerSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
+  auto ctx = manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr);
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
-    ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_, ssl_ctx_);
+    std::swap(ctx, ssl_ctx_);
   }
+  manager_.removeContext(ctx);
+
   stats_.ssl_context_update_by_sds_.inc();
 }
 

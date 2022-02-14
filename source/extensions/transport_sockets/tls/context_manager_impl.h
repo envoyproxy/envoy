@@ -24,7 +24,7 @@ namespace Tls {
  */
 class ContextManagerImpl final : public Envoy::Ssl::ContextManager {
 public:
-  ContextManagerImpl(TimeSource& time_source) : time_source_(time_source) {}
+  explicit ContextManagerImpl(TimeSource& time_source);
   ~ContextManagerImpl() override;
 
   // Ssl::ContextManager
@@ -41,15 +41,13 @@ public:
   Ssl::PrivateKeyMethodManager& privateKeyMethodManager() override {
     return private_key_method_manager_;
   };
+  void removeContext(const std::shared_ptr<Envoy::Ssl::Context>& old_context) override;
 
 private:
   void removeEmptyContexts();
   void removeOldContext(std::shared_ptr<Envoy::Ssl::Context> old_context);
   TimeSource& time_source_;
-  std::list<std::weak_ptr<Envoy::Ssl::Context>> contexts_;
-  // This stale contexts are the obsoleted contexts. They should not be provided to a new socket.
-  // These contexts will be removed after.
-  std::unordered_set<std::shared_ptr<Envoy::Ssl::Context>> stale_contexts_;
+  absl::flat_hash_set<std::shared_ptr<Envoy::Ssl::Context>> contexts_;
   PrivateKeyMethodManagerImpl private_key_method_manager_{};
 };
 

@@ -134,10 +134,26 @@ protected:
 
 using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;
 
-class ClientContextImpl : public ContextImpl, public Envoy::Ssl::ClientContext {
+class ManagedContext : public std::enable_shared_from_this<ManagedContext>,
+                       public virtual Envoy::Ssl::Context {
+public:
+  ManagedContext(Envoy::Ssl::ContextManager& context_manager, Envoy::Ssl::Context& context)
+      : context_manager_(context_manager), context_(context) {}
+
+  ~ManagedContext() override { context_manager_.removeContext(shared_from_this()); }
+  Envoy::Ssl::Context& getContext() { return context_; }
+
+private:
+  Envoy::Ssl::ContextManager& context_manager_;
+  Envoy::Ssl::Context& context_;
+};
+
+class ClientContextImpl : public ContextImpl,
+                          public Envoy::Ssl::ClientContext,
+                          public ManagedContext {
 public:
   ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
-                    TimeSource& time_source);
+                    TimeSource& time_source, Envoy::Ssl::ContextManager& context_manager);
 
   bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptions* options) override;
 
@@ -155,10 +171,13 @@ private:
 
 enum class OcspStapleAction { Staple, NoStaple, Fail, ClientNotCapable };
 
-class ServerContextImpl : public ContextImpl, public Envoy::Ssl::ServerContext {
+class ServerContextImpl : public ContextImpl,
+                          public Envoy::Ssl::ServerContext,
+                          public ManagedContext {
 public:
   ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-                    const std::vector<std::string>& server_names, TimeSource& time_source);
+                    const std::vector<std::string>& server_names, TimeSource& time_source,
+                    Envoy::Ssl::ContextManager& context_manager);
 
   // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
   // ClientHello details. This is made public for use by custom TLS extensions who want to

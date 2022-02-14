@@ -55,6 +55,11 @@ public:
    * expire, or `absl::nullopt` if no OCSP responses exist.
    */
   virtual absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const PURE;
+
+  /**
+   * Remove an existing ssl context.
+   */
+  virtual void removeContext(const std::shared_ptr<Envoy::Ssl::Context>& old_context) PURE;
 };
 
 using ContextManagerPtr = std::unique_ptr<ContextManager>;
