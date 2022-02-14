@@ -62,9 +62,9 @@ public:
   virtual ~Scope() = default;
 
   /** @return a shared_ptr for this */
-  ScopeSharedPtr makeShared() { return shared_from_this(); }
+  ScopeSharedPtr getShared() { return shared_from_this(); }
   /** @return a const shared_ptr for this */
-  ConstScopeSharedPtr makeConstShared() const { return shared_from_this(); }
+  ConstScopeSharedPtr getConstShared() const { return shared_from_this(); }
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes

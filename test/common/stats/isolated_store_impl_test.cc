@@ -276,7 +276,7 @@ TEST_F(StatsIsolatedStoreImplTest, SharedScopes) {
     ScopeSharedPtr scope2 = store_->createScope("scope2.");
     store_->forEachScope(
         [](size_t) {},
-        [&scopes](const Scope& scope) { scopes.push_back(scope.makeConstShared()); });
+        [&scopes](const Scope& scope) { scopes.push_back(scope.getConstShared()); });
   }
   ASSERT_EQ(3, scopes.size());
   store_->symbolTable().sortByStatNames<ConstScopeSharedPtr>(

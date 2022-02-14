@@ -741,7 +741,7 @@ TEST_F(StatsThreadLocalStoreTest, SharedScopes) {
     ScopeSharedPtr scope2 = store_->createScope("scope2.");
     store_->forEachScope(
         [](size_t) {},
-        [&scopes](const Scope& scope) { scopes.push_back(scope.makeConstShared()); });
+        [&scopes](const Scope& scope) { scopes.push_back(scope.getConstShared()); });
   }
   ASSERT_EQ(3,
             scopes.size()); // For some reason there are two scopes created with name "" by default.
