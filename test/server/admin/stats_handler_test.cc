@@ -15,6 +15,8 @@ using testing::EndsWith;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Ref;
+using testing::Return;
+using testing::ReturnRef;
 using testing::StartsWith;
 
 namespace Envoy {
@@ -22,9 +24,20 @@ namespace Server {
 
 class StatsHandlerTest {
 public:
-  StatsHandlerTest() : alloc_(symbol_table_), pool_(symbol_table_) {
+  StatsHandlerTest() : pool_(symbol_table_), alloc_(symbol_table_) {
     store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(alloc_);
     store_->addSink(sink_);
+  }
+
+  std::shared_ptr<MockInstance> setupMockedInstance() {
+    auto instance = std::make_shared<MockInstance>();
+    EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
+    store_->initializeThreading(main_thread_dispatcher_, tls_);
+    EXPECT_CALL(*instance, stats()).WillRepeatedly(ReturnRef(*store_));
+    EXPECT_CALL(*instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
+    EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
+    EXPECT_CALL(*instance, api()).WillRepeatedly(ReturnRef(api_));
+    return instance;
   }
 
   static std::string
@@ -46,14 +59,18 @@ public:
   }
 
   Stats::SymbolTableImpl symbol_table_;
+  Stats::StatNamePool pool_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;
   Stats::AllocatorImpl alloc_;
   Stats::MockSink sink_;
   Stats::ThreadLocalStoreImplPtr store_;
-  Stats::StatNamePool pool_;
   Stats::CustomStatNamespacesImpl custom_namespaces_;
+  Http::TestResponseHeaderMapImpl response_headers_;
+  Buffer::OwnedImpl data_;
+  MockAdminStream admin_stream_;
+  Configuration::MockStatsConfig stats_config_;
 };
 
 class AdminStatsTest : public StatsHandlerTest,
@@ -65,31 +82,26 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
 
 TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
   const std::string url = "/stats?format=blergh";
-  Http::TestResponseHeaderMapImpl response_headers;
-  Buffer::OwnedImpl data;
-  MockAdminStream admin_stream;
-  Configuration::MockStatsConfig stats_config;
-  EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
+  EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
   MockInstance instance;
-  EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
-  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
+  EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
+  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
   StatsHandler handler(instance);
-  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  Http::Code code = handler.handlerStats(url, response_headers_, data_, admin_stream_);
   EXPECT_EQ(Http::Code::NotFound, code);
-  EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", data.toString());
+  EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", data_.toString());
 }
 
 TEST_P(AdminStatsTest, HandlerStatsPlainText) {
   const std::string url = "/stats";
-  Http::TestResponseHeaderMapImpl response_headers, used_response_headers;
-  Buffer::OwnedImpl data, used_data;
+  Http::TestResponseHeaderMapImpl used_response_headers;
+  Buffer::OwnedImpl used_data;
   MockAdminStream admin_stream;
-  Configuration::MockStatsConfig stats_config;
-  EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
+  EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
   MockInstance instance;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
-  EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
-  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
+  EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
+  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
   StatsHandler handler(instance);
 
   Stats::Counter& c1 = store_->counterFromString("c1");
@@ -112,7 +124,7 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
 
   store_->mergeHistograms([]() -> void {});
 
-  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  Http::Code code = handler.handlerStats(url, response_headers_, data_, admin_stream);
   EXPECT_EQ(Http::Code::OK, code);
   constexpr char expected[] =
       "t: \"hello world\"\n"
@@ -124,9 +136,9 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
       "h2: P0(100.0,100.0) P25(102.5,102.5) P50(105.0,105.0) P75(107.5,107.5) "
       "P90(109.0,109.0) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
       "P99.9(109.99,109.99) P100(110.0,110.0)\n";
-  EXPECT_EQ(expected, data.toString());
+  EXPECT_EQ(expected, data_.toString());
 
-  code = handler.handlerStats(url + "?usedonly", used_response_headers, used_data, admin_stream);
+  code = handler.handlerStats(url + "?usedonly", used_response_headers, used_data, admin_stream_);
   EXPECT_EQ(Http::Code::OK, code);
   EXPECT_EQ(expected, used_data.toString());
 
@@ -135,15 +147,13 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
 
 TEST_P(AdminStatsTest, HandlerStatsJson) {
   const std::string url = "/stats?format=json";
-  Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl data;
   MockAdminStream admin_stream;
-  Configuration::MockStatsConfig stats_config;
-  EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
+  EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
   MockInstance instance;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
-  EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
-  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
+  EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
+  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
   StatsHandler handler(instance);
 
   Stats::Counter& c1 = store_->counterFromString("c1");
@@ -162,7 +172,7 @@ TEST_P(AdminStatsTest, HandlerStatsJson) {
 
   store_->mergeHistograms([]() -> void {});
 
-  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  Http::Code code = handler.handlerStats(url, response_headers_, data, admin_stream);
   EXPECT_EQ(Http::Code::OK, code);
 
   const std::string expected_json_old = R"EOF({
@@ -753,16 +763,16 @@ TEST_P(AdminInstanceTest, TracingStatsDisabled) {
 }
 
 TEST_P(AdminInstanceTest, GetRequestJson) {
-  Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
+  Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::Code::OK, admin_.request("/stats?format=json", "GET", response_headers, body));
   EXPECT_THAT(body, HasSubstr("{\"stats\":["));
   EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
 }
 
 TEST_P(AdminInstanceTest, RecentLookups) {
-  Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
+  Http::TestResponseHeaderMapImpl response_headers;
 
   // Recent lookup tracking is disabled by default.
   EXPECT_EQ(Http::Code::OK, admin_.request("/stats/recentlookups", "GET", response_headers, body));
@@ -775,23 +785,6 @@ TEST_P(AdminInstanceTest, RecentLookups) {
 
 class StatsHandlerPrometheusTest : public StatsHandlerTest {
 public:
-  Http::TestResponseHeaderMapImpl response_headers;
-  Buffer::OwnedImpl data;
-  MockAdminStream admin_stream;
-  Configuration::MockStatsConfig stats_config;
-  Api::MockApi api;
-
-  std::shared_ptr<MockInstance> setupMockedInstance() {
-    auto instance = std::make_shared<MockInstance>();
-    EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
-    store_->initializeThreading(main_thread_dispatcher_, tls_);
-    EXPECT_CALL(*instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
-    EXPECT_CALL(*instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
-    EXPECT_CALL(api, customStatNamespaces()).WillRepeatedly(testing::ReturnRef(customNamespaces()));
-    EXPECT_CALL(*instance, api()).WillRepeatedly(testing::ReturnRef(api));
-    return instance;
-  }
-
   void createTestStats() {
     Stats::StatNameTagVector c1Tags{{makeStat("cluster"), makeStat("c1")}};
     Stats::StatNameTagVector c2Tags{{makeStat("cluster"), makeStat("c2")}};
@@ -841,9 +834,9 @@ envoy_cluster_upstream_cx_active{cluster="c2"} 12
 
 )EOF";
 
-  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  Http::Code code = handler.handlerStats(url, response_headers_, data_, admin_stream_);
   EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_THAT(expected_response, data.toString());
+  EXPECT_THAT(expected_response, data_.toString());
 
   shutdownThreading();
 }
@@ -880,9 +873,9 @@ envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
 
 )EOF";
 
-  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  Http::Code code = handler.handlerStats(url, response_headers_, data_, admin_stream_);
   EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_THAT(expected_response, data.toString());
+  EXPECT_THAT(expected_response, data_.toString());
 
   shutdownThreading();
 }
