@@ -14,8 +14,7 @@ namespace Server {
 
 LogsHandler::LogsHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
-Http::Code LogsHandler::handlerLogging(absl::string_view url,
-                                       Http::ResponseHeaderMap& response_headers,
+Http::Code LogsHandler::handlerLogging(absl::string_view url, Http::ResponseHeaderMap&,
                                        Buffer::Instance& response, AdminStream&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
 
@@ -91,7 +90,7 @@ std::pair<bool, std::string> LogsHandler::changeLogLevel(const Http::Utility::Qu
       return std::make_pair(false, "unknown log level");
     }
 
-    changeAllLogLevels(valulevel_to_usee);
+    changeAllLogLevels(level_to_use);
     return std::make_pair(true, "");
   }
 

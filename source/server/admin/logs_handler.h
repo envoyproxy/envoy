@@ -40,7 +40,7 @@ private:
    * @return (TRUE, "") if level change succeeded, (FALSE, "error message") otherwise.
    */
   std::pair<bool, std::string> changeLogLevel(const Http::Utility::QueryParams& params);
-  void changeAllLogLevels(spdlog::level::level_enum level));
+  void changeAllLogLevels(spdlog::level::level_enum level);
   std::pair<bool, std::string> changeLogLevels(const LogLevelMap& changes);
 };
 
