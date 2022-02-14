@@ -82,6 +82,17 @@ std::string FancyContext::listFancyLoggers() ABSL_LOCKS_EXCLUDED(fancy_log_lock_
   return info;
 }
 
+absl::flat_hash_set<absl::string_view> FancyContext::getFancyLoggerKeys()
+    ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
+  absl::ReaderMutexLock l(&fancy_log_lock_);
+
+  absl::flat_hash_set<absl::string_view> keys;
+  for (const auto& it : = *fancy_log_map_) {
+    keys.insert(it.first);
+  }
+  return keys;
+}
+
 void FancyContext::setAllFancyLoggers(spdlog::level::level_enum level)
     ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
   absl::ReaderMutexLock l(&fancy_log_lock_);

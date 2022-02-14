@@ -46,20 +46,16 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   EXPECT_EQ("400", request("admin", "POST", "/logging?level=blah", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().XContentTypeOptions, "nosniff"));
-  EXPECT_NE(
-      std::string::npos,
-      response->body().find("errors:\n- change all log levels: invalid log level: level='blah'"))
+  EXPECT_NE(std::string::npos, response->body().find("error: unknown log level\n"))
       << response->body();
 
   // Bad logger
   EXPECT_EQ("400", request("admin", "POST", "/logging?blah=info", response));
-  EXPECT_NE(std::string::npos,
-            response->body().find("change log level: unknown logger: name='blah'"))
+  EXPECT_NE(std::string::npos, response->body().find("error: unknown log name\n"))
       << response->body();
 
   // This is going to stomp over custom log levels that are set on the command line.
   EXPECT_EQ("200", request("admin", "POST", "/logging?level=warning", response));
-  EXPECT_EQ(std::string::npos, response->body().find("errors:\n- ")) << response->body();
   for (auto&& [_, logger] : Logger::Registry::loggers()) {
     EXPECT_EQ("warning", logger.levelString());
   }
@@ -67,16 +63,13 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   EXPECT_EQ("200", request("admin", "POST", "/logging?assert=trace", response));
   EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
 
-  // Multiple loggers at once with bad logger (partial success).
+  // Multiple loggers at once with bad logger.
   EXPECT_EQ("400",
             request("admin", "POST",
                     "/logging?paths=blah:debug,assert:debug,admin:debug,config:debug", response));
-  EXPECT_NE(std::string::npos,
-            response->body().find("errors\n- change log level: unknown logger: name='blah'"))
+  EXPECT_NE(std::string::npos, response->body().find("error: unknown log name\n"))
       << response->body();
-  EXPECT_EQ(spdlog::level::debug, Logger::Registry::getLog(Logger::Id::assert).level());
-  EXPECT_EQ(spdlog::level::debug, Logger::Registry::getLog(Logger::Id::admin).level());
-  EXPECT_EQ(spdlog::level::debug, Logger::Registry::getLog(Logger::Id::config).level());
+  EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
 
   // Multiple loggers at once
   EXPECT_EQ("200", request("admin", "POST", "/logging?paths=assert:trace,admin:trace,config:trace",

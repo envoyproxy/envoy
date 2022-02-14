@@ -20,26 +20,25 @@ Http::Code LogsHandler::handlerLogging(absl::string_view url,
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
 
   Http::Code rc = Http::Code::OK;
-  ErrorMessages errors;
-  if (!changeLogLevel(query_params, errors)) {
-    rc = Http::Code::BadRequest;
-    if (!errors.empty()) {
-      response.add("errors:\n");
-      for (const auto& err : errors) {
-        response.add(fmt::format("- {}\n", err));
+  if (!query_params.empty()) {
+    const auto& [success, error] = changeLogLevel(query_params);
+    if (!success) {
+      rc = Http::Code::BadRequest;
+      if (!error.empty()) {
+        response.add(fmt::format("error: {}\n\n", error));
       }
-      response.add("\n")
-    }
 
-    response.add("usage: /logging?<name>=<level> (change single level)\n");
-    response.add("usage: /logging?paths=name1:level1,name2:level2,... (change multiple levels)\n");
-    response.add("usage: /logging?level=<level> (change all levels)\n");
-    response.add("levels: ");
-    for (auto level_string_view : spdlog::level::level_string_views) {
-      response.add(fmt::format("{} ", level_string_view));
-    }
+      response.add("usage: /logging?<name>=<level> (change single level)\n");
+      response.add(
+          "usage: /logging?paths=name1:level1,name2:level2,... (change multiple levels)\n");
+      response.add("usage: /logging?level=<level> (change all levels)\n");
+      response.add("levels: ");
+      for (auto level_string_view : spdlog::level::level_string_views) {
+        response.add(fmt::format("{} ", level_string_view));
+      }
 
-    response.add("\n");
+      response.add("\n");
+    }
   }
 
   if (!Logger::Context::useFancyLogger()) {
@@ -76,9 +75,9 @@ static absl::optional<spdlog::level::level_enum> parseLevel(absl::string_view le
   return absl::nullopt;
 }
 
-bool LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params, ErrorMessages& errors) {
+std::pair<bool, std::string> LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params) {
   if (params.size() != 1) {
-    return absl::make_optional({});
+    return std::make_pair(false, "invalid number of parameters");
   }
 
   const auto it = params.begin();
@@ -89,19 +88,16 @@ bool LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params, Error
     // Change all log levels.
     auto level_to_use = parseLevel(level);
     if (!level_to_use.has_value()) {
-      errors.emplace_back(
-          fmt::format("change all log levels: invalid log level: level='{}'", name, level));
-      return false;
+      return std::make_pair(false, "unknown log level");
     }
 
     changeAllLogLevels(value);
-    return true;
+    return std::make_pair(true, "");
   }
 
   // Build a map of name:level pairs, a few allocations is ok here since it's
   // not common to call this function at a high rate.
   LogLevelMap name_levels;
-  ErrorMessages errors;
 
   if (key == "paths") {
     // Bulk change log level by name:level pairs, separated by comma.
@@ -110,12 +106,13 @@ bool LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params, Error
       std::pair<absl::string_view, absl::string_view> name_level_pair =
           absl::StrSplit(name_level, absl::MaxSplits(':', 1), absl::SkipWhitespace());
       auto [name, level] = name_level_pair;
+      if (name.empty() || level.empty()) {
+        return std::make_pair(false, "empty log name or empty log level");
+      }
 
       auto level_to_use = parseLevel(level);
       if (!level_to_use.has_value()) {
-        errors.emplace_back(fmt::format(
-            "bulk change log level: invalid log level: name='{}' level='{}'", name, level));
-        continue;
+        return std::make_pair(false, "unknown log level");
       }
 
       name_levels[name] = *level_to_use;
@@ -124,8 +121,7 @@ bool LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params, Error
     // Change particular log level by name.
     auto level_to_use = parseLevel(level);
     if (!level_to_use.has_value()) {
-      return absl.make_optional(
-          {fmt::format("change particular log level: invalid log level: level='{}'", level});
+      return std::make_pair(false, "unknown log level");
     }
 
     name_levels[name] = *level_to_use;
@@ -145,9 +141,7 @@ void LogsHandler::changeAllLogLevels(spdlog::level::level_enum level) {
   }
 }
 
-bool LogsHandler::changeLogLevels(const LogLevelMap& changes, ErrorMessages errors) {
-  bool all_success = true;
-
+std::pair<bool, std::string> LogsHandler::changeLogLevels(const LogLevelMap& changes) {
   if (!Logger::Context::useFancyLogger()) {
     // Build a map of name to logger.
     absl::flat_hash_map<std::string, Logger::Logger*> loggers;
@@ -155,33 +149,38 @@ bool LogsHandler::changeLogLevels(const LogLevelMap& changes, ErrorMessages erro
       loggers[logger.name()] = &logger;
     }
 
+    // Validate first
     for (const auto [name, level] : changes) {
-      auto it = loggers.find(name);
-      if (it == loggers.end()) {
-        all_success = false;
-        errors.emplace_back(fmt::format("change log level: unknown logger: name='{}'", name));
-        continue;
+      if (loggers.find(name) == loggers.end()) {
+        return std::make_pair(false, fmt::format("unknown log name"));
       }
+    }
 
+    for (const auto [name, level] : changes) {
       ENVOY_LOG(debug, "change log level: name='{}' level='{}'", name,
                 spdlog::level::level_string_views[level]);
-      it->second->setLevel(level);
+      loggers[name]->setLevel(level);
     }
   } else {
     // Level setting with Fancy Logger.
+    auto names = getFancyContext().getFancyLoggerKeys();
+
+    // Validate first
+    for (const auto [name, level] : changes) {
+      if (names.find(name) == names.end()) {
+        return std::make_pair(false, fmt::format("unknown log name"));
+      }
+    }
+
     for (const auto [name, level] : changes) {
       FANCY_LOG(info, "change log level: name='{}' level='{}'", name,
                 spdlog::level::level_string_views[level]);
 
-      bool res = getFancyContext().setFancyLogger(std::string(name), *level_to_use);
-      if (!res) {
-        all_success = false;
-        errors.emplace_back(fmt::format("change log level: unknown logger: name='{}'", name));
-      }
+      getFancyContext().setFancyLogger(std::string(name), *level_to_use);
     }
   }
 
-  return all_success;
+  return std::make_pair(true, "");
 }
 
 } // namespace Server

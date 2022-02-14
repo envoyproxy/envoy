@@ -1,5 +1,7 @@
 #pragma once
 
+#include <utility>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
@@ -30,17 +32,16 @@ public:
                                Buffer::Instance& response, AdminStream&);
 
 private:
-  using ErrorMessages = std::vector<std::string>;
   using LogLevelMap = absl::flat_hash_map<absl::string_view, spdlog::level::level_enum>;
 
   /**
    * Attempt to change the log level of a logger or all loggers
    * @param params supplies the incoming endpoint query params.
-   * @return TRUE if level change succeeded, FALSE otherwise.
+   * @return (TRUE, "") if level change succeeded, (FALSE, "error message") otherwise.
    */
-  bool changeLogLevel(const Http::Utility::QueryParams& params, ErrorMessages& errors);
+  std::pair<bool, std::string> changeLogLevel(const Http::Utility::QueryParams& params);
   void changeAllLogLevels(spdlog::level::level_enum level));
-  bool changeLogLevels(const LogLevelMap& changes, ErrorMessages& errors);
+  std::pair<bool, std::string> changeLogLevels(const LogLevelMap& changes);
 };
 
 } // namespace Server

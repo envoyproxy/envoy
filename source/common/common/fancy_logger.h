@@ -5,6 +5,8 @@
 #include "source/common/common/macros.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
 #include "spdlog/spdlog.h"
 
@@ -50,6 +52,11 @@ public:
    * Lists keys and levels of all loggers in a string for admin page usage.
    */
   std::string listFancyLoggers() ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
+
+  /**
+   * Returns all logger keys for admin page usage.
+   */
+  absl::flat_hash_set<absl::string_view> getFancyLoggerKeys() ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
   /**
    * Sets the levels of all loggers.
