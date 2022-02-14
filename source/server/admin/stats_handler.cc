@@ -206,8 +206,9 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
       } else if (histogram_buckets_value.value() == "cumulative") {
         success = all_histograms.emplace(histogram->name(), histogram->bucketSummary()).second;
       } else {
+        // "disjoint" should be only possible value at this point. Other values should already have caused a bad request response.
         ASSERT(histogram_buckets_value.value() ==
-               "disjoint"); // disjoint should be only possible value
+               "disjoint");
         success = all_histograms.emplace(histogram->name(), computeDisjointBucketSummary(histogram))
                       .second;
       }
@@ -279,7 +280,8 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
       stats_array.push_back(ValueUtil::structValue(histograms_obj_container));
     }
   } else {
-    ASSERT(histogram_buckets_value.value() == "disjoint"); // disjoint should be only possible value
+    // "disjoint" should be only possible value at this point. Other values should already have caused a bad request response.
+    ASSERT(histogram_buckets_value.value() == "disjoint");
     std::vector<ProtobufWkt::Value> histogram_obj_array =
         statsAsJsonDisjointHistogramBucketsHelper(all_histograms, used_only, regex);
     if (!histogram_obj_array.empty()) { // If used histogram found.
