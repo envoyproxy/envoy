@@ -10,6 +10,8 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
+#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Server {
@@ -28,15 +30,17 @@ public:
                                Buffer::Instance& response, AdminStream&);
 
 private:
+  using ErrorMessages = std::vector<std::string>;
+  using LogLevelMap = absl::flat_hash_map<absl::string_view, spdlog::level::level_enum>;
+
   /**
    * Attempt to change the log level of a logger or all loggers
    * @param params supplies the incoming endpoint query params.
    * @return TRUE if level change succeeded, FALSE otherwise.
    */
-  bool changeLogLevel(const Http::Utility::QueryParams& params);
-  bool changeAllLogLevels(absl::string_view level);
-  bool changeLogLevels(const absl::flat_hash_map<absl::string_view, absl::string_view>& changes);
-  bool changeLogLevelByName(absl::string_view name, absl::string_view level);
+  bool changeLogLevel(const Http::Utility::QueryParams& params, ErrorMessages& errors);
+  void changeAllLogLevels(spdlog::level::level_enum level));
+  bool changeLogLevels(const LogLevelMap& changes, ErrorMessages& errors);
 };
 
 } // namespace Server
