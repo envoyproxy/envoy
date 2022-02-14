@@ -40,13 +40,28 @@ public:
     return instance;
   }
 
-  static std::string
-  statsAsJsonHandler(std::map<std::string, uint64_t>& all_stats,
-                     std::map<std::string, std::string>& all_text_readouts,
-                     const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                     const bool used_only, const absl::optional<std::regex> regex = absl::nullopt) {
-    return StatsHandler::statsAsJson(all_stats, all_text_readouts, all_histograms, used_only, regex,
-                                     true /*pretty_print*/);
+  std::string statsAsJsonHandler(const bool used_only,
+                                 const absl::optional<std::string> filter = absl::nullopt) {
+
+    std::shared_ptr<MockInstance> instance = setupMockedInstance();
+    std::string url = "stats?format=json";
+    if (used_only) {
+      url += "&usedonly";
+    }
+    if (filter.has_value()) {
+      absl::StrAppend(&url, "&filter=", filter.value());
+    }
+    std::string out;
+    EXPECT_EQ(Http::Code::OK, handlerStats(*instance, url, out));
+    return out;
+  }
+
+  Http::Code handlerStats(Server::Instance& instance, absl::string_view url, std::string& out) {
+    StatsHandler handler(instance);
+    Http::TestResponseHeaderMapImpl response_headers;
+    Http::Code code = handler.handlerStats(url, response_headers_, data_, admin_stream_);
+    out = data_.toString();
+    return code;
   }
 
   Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
@@ -70,7 +85,7 @@ public:
   Http::TestResponseHeaderMapImpl response_headers_;
   Buffer::OwnedImpl data_;
   MockAdminStream admin_stream_;
-  Configuration::MockStatsConfig stats_config_;
+  NiceMock<Configuration::MockStatsConfig> stats_config_;
 };
 
 class AdminStatsTest : public StatsHandlerTest,
@@ -86,10 +101,10 @@ TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
   MockInstance instance;
   EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
   EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
-  StatsHandler handler(instance);
-  Http::Code code = handler.handlerStats(url, response_headers_, data_, admin_stream_);
+  std::string out;
+  Http::Code code = handlerStats(instance, url, out);
   EXPECT_EQ(Http::Code::NotFound, code);
-  EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", data_.toString());
+  EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", out);
 }
 
 TEST_P(AdminStatsTest, HandlerStatsPlainText) {
@@ -261,34 +276,36 @@ TEST_P(AdminStatsTest, HandlerStatsJson) {
 }
 
 TEST_P(AdminStatsTest, StatsAsJson) {
-  InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  {
+    InSequence s;
+    store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
-  Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
+    Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+    Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
-  h1.recordValue(200);
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
+    h1.recordValue(200);
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 100));
-  h2.recordValue(100);
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 100));
+    h2.recordValue(100);
 
-  store_->mergeHistograms([]() -> void {});
+    store_->mergeHistograms([]() -> void {});
 
-  // Again record a new value in h1 so that it has both interval and cumulative values.
-  // h2 should only have cumulative values.
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
-  h1.recordValue(100);
+    // Again record a new value in h1 so that it has both interval and cumulative values.
+    // h2 should only have cumulative values.
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
+    h1.recordValue(100);
 
-  store_->mergeHistograms([]() -> void {});
+    store_->mergeHistograms([]() -> void {});
+  }
 
+  /*
   std::vector<Stats::ParentHistogramSharedPtr> histograms = store_->histograms();
   std::sort(histograms.begin(), histograms.end(),
             [](const Stats::ParentHistogramSharedPtr& a,
                const Stats::ParentHistogramSharedPtr& b) -> bool { return a->name() < b->name(); });
-  std::map<std::string, uint64_t> all_stats;
-  std::map<std::string, std::string> all_text_readouts;
-  std::string actual_json = statsAsJsonHandler(all_stats, all_text_readouts, histograms, false);
+  */
+  std::string actual_json = statsAsJsonHandler(false);
 
   const std::string expected_json = R"EOF({
     "stats": [
@@ -408,31 +425,29 @@ TEST_P(AdminStatsTest, StatsAsJson) {
 }
 
 TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
-  InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  {
+    InSequence s;
+    store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
-  Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
+    Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+    Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
 
-  EXPECT_EQ("h1", h1.name());
-  EXPECT_EQ("h2", h2.name());
+    EXPECT_EQ("h1", h1.name());
+    EXPECT_EQ("h2", h2.name());
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
-  h1.recordValue(200);
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
+    h1.recordValue(200);
 
-  store_->mergeHistograms([]() -> void {});
+    store_->mergeHistograms([]() -> void {});
 
-  // Again record a new value in h1 so that it has both interval and cumulative values.
-  // h2 should only have cumulative values.
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
-  h1.recordValue(100);
+    // Again record a new value in h1 so that it has both interval and cumulative values.
+    // h2 should only have cumulative values.
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
+    h1.recordValue(100);
 
-  store_->mergeHistograms([]() -> void {});
-
-  std::map<std::string, uint64_t> all_stats;
-  std::map<std::string, std::string> all_text_readouts;
-  std::string actual_json =
-      statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(), true);
+    store_->mergeHistograms([]() -> void {});
+  }
+  std::string actual_json = statsAsJsonHandler(/*store_->histograms(), */ true);
 
   // Expected JSON should not have h2 values as it is not used.
   const std::string expected_json = R"EOF({
@@ -508,32 +523,29 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
 }
 
 TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
-  InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  {
+    InSequence s;
+    store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
-  Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
+    Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+    Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
-  h1.recordValue(200);
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
+    h1.recordValue(200);
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 100));
-  h2.recordValue(100);
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 100));
+    h2.recordValue(100);
 
-  store_->mergeHistograms([]() -> void {});
+    store_->mergeHistograms([]() -> void {});
 
-  // Again record a new value in h1 so that it has both interval and cumulative values.
-  // h2 should only have cumulative values.
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
-  h1.recordValue(100);
+    // Again record a new value in h1 so that it has both interval and cumulative values.
+    // h2 should only have cumulative values.
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
+    h1.recordValue(100);
 
-  store_->mergeHistograms([]() -> void {});
-
-  std::map<std::string, uint64_t> all_stats;
-  std::map<std::string, std::string> all_text_readouts;
-  std::string actual_json =
-      statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(), false,
-                         absl::optional<std::regex>{std::regex("[a-z]1")});
+    store_->mergeHistograms([]() -> void {});
+  }
+  std::string actual_json = statsAsJsonHandler(/*store_->histograms(),*/ false, "[a-z]1");
 
   // Because this is a filter case, we don't expect to see any stats except for those containing
   // "h1" in their name.
@@ -610,41 +622,38 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
 }
 
 TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
-  InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  {
+    InSequence s;
+    store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogramFromString(
-      "h1_matches", Stats::Histogram::Unit::Unspecified); // Will match, be used, and print
-  Stats::Histogram& h2 = store_->histogramFromString(
-      "h2_matches", Stats::Histogram::Unit::Unspecified); // Will match but not be used
-  Stats::Histogram& h3 = store_->histogramFromString(
-      "h3_not", Stats::Histogram::Unit::Unspecified); // Will be used but not match
+    Stats::Histogram& h1 = store_->histogramFromString(
+        "h1_matches", Stats::Histogram::Unit::Unspecified); // Will match, be used, and print
+    Stats::Histogram& h2 = store_->histogramFromString(
+        "h2_matches", Stats::Histogram::Unit::Unspecified); // Will match but not be used
+    Stats::Histogram& h3 = store_->histogramFromString(
+        "h3_not", Stats::Histogram::Unit::Unspecified); // Will be used but not match
 
-  EXPECT_EQ("h1_matches", h1.name());
-  EXPECT_EQ("h2_matches", h2.name());
-  EXPECT_EQ("h3_not", h3.name());
+    EXPECT_EQ("h1_matches", h1.name());
+    EXPECT_EQ("h2_matches", h2.name());
+    EXPECT_EQ("h3_not", h3.name());
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
-  h1.recordValue(200);
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h3), 200));
-  h3.recordValue(200);
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
+    h1.recordValue(200);
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h3), 200));
+    h3.recordValue(200);
 
-  store_->mergeHistograms([]() -> void {});
+    store_->mergeHistograms([]() -> void {});
 
-  // Again record a new value in h1 and h3 so that they have both interval and cumulative values.
-  // h2 should only have cumulative values.
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
-  h1.recordValue(100);
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h3), 100));
-  h3.recordValue(100);
+    // Again record a new value in h1 and h3 so that they have both interval and cumulative values.
+    // h2 should only have cumulative values.
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
+    h1.recordValue(100);
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h3), 100));
+    h3.recordValue(100);
 
-  store_->mergeHistograms([]() -> void {});
-
-  std::map<std::string, uint64_t> all_stats;
-  std::map<std::string, std::string> all_text_readouts;
-  std::string actual_json =
-      statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(), true,
-                         absl::optional<std::regex>{std::regex("h[12]")});
+    store_->mergeHistograms([]() -> void {});
+  }
+  std::string actual_json = statsAsJsonHandler(/*store_->histograms(),*/ true, "h[12]");
 
   // Expected JSON should not have h2 values as it is not used, and should not have h3 values as
   // they are used but do not match.
