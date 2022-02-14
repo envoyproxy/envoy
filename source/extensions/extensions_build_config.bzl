@@ -292,7 +292,7 @@ EXTENSIONS = {
     "envoy.network.dns_resolver.apple": "//source/extensions/network/dns_resolver/apple:config",
 
     #
-    # custom cel vocabulary
+    # custom CEL vocabulary
     #
     "envoy.expr.custom_cel_vocabulary.example": "//source/extensions/filters/common/expr/custom_cel/example:example_custom_cel_vocabulary_lib",
 }

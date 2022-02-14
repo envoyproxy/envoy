@@ -119,12 +119,12 @@ const std::string SOURCE_HAS_DESCRIPTION_EXPR = R"EOF(
                bool_value: true
 )EOF";
 
-// EvaluateExpressionWithCustomCelVocabulary:
+// EvaluateExpressionWithCustomCELVocabulary:
 // Given an activation with mappings for vocabulary,
 // create a RBAC policy with a condition derived from the given yaml,
 // create a CEL expression, and evaluate it.
 absl::StatusOr<CelValue>
-EvaluateExpressionWithCustomCelVocabulary(Activation& activation, Protobuf::Arena& arena,
+EvaluateExpressionWithCustomCELVocabulary(Activation& activation, Protobuf::Arena& arena,
                                           const std::string& expr_yaml,
                                           ExampleCustomCELVocabulary& custom_cel_vocabulary) {
   envoy::config::rbac::v3::Policy policy;
@@ -154,11 +154,11 @@ TEST_F(ExampleCustomCELVocabularyTests, ReplaceDefaultMappingsWithCustomMappings
 
   // The activation does not contain the mappings for the custom CEL vocabulary yet.
   // The check for custom CEL fields should evaluate to false.
-  auto has_custom_field_status = EvaluateExpressionWithCustomCelVocabulary(
+  auto has_custom_field_status = EvaluateExpressionWithCustomCELVocabulary(
       activation, arena, SOURCE_HAS_DESCRIPTION_EXPR, custom_cel_vocabulary);
   ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() &&
               !has_custom_field_status.value().BoolOrDie());
-  has_custom_field_status = EvaluateExpressionWithCustomCelVocabulary(
+  has_custom_field_status = EvaluateExpressionWithCustomCELVocabulary(
       activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
   ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() &&
               !has_custom_field_status.value().BoolOrDie());
@@ -168,11 +168,11 @@ TEST_F(ExampleCustomCELVocabularyTests, ReplaceDefaultMappingsWithCustomMappings
 
   // The activation now contains the mappings for the custom CEL vocabulary.
   // The check for custom CEL fields should evaluate to true.
-  has_custom_field_status = EvaluateExpressionWithCustomCelVocabulary(
+  has_custom_field_status = EvaluateExpressionWithCustomCELVocabulary(
       activation, arena, SOURCE_HAS_DESCRIPTION_EXPR, custom_cel_vocabulary);
   ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() &&
               has_custom_field_status.value().BoolOrDie());
-  has_custom_field_status = EvaluateExpressionWithCustomCelVocabulary(
+  has_custom_field_status = EvaluateExpressionWithCustomCELVocabulary(
       activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
   ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() &&
               has_custom_field_status.value().BoolOrDie());

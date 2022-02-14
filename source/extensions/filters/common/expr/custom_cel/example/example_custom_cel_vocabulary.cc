@@ -82,7 +82,7 @@ void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view 
                                CelFunctionDescriptor descriptor) {
   absl::Status status = registry->RegisterLazyFunction(descriptor);
   if (!status.ok()) {
-    ENVOY_LOG_MISC(debug, "Failed to register lazy function {}  in cel function registry: {}",
+    ENVOY_LOG_MISC(debug, "Failed to register lazy function {}  in CEL function registry: {}",
                    function_name, status.message());
   }
 }
@@ -94,7 +94,7 @@ void addEagerFunctionToRegistry(absl::string_view function_name, bool receiver_t
   absl::Status status = FunctionAdapter<ReturnType, Arguments...>::CreateAndRegister(
       function_name, receiver_type, function, registry);
   if (!status.ok()) {
-    ENVOY_LOG_MISC(debug, "Failed to register eager function {}  in cel function registry: {}",
+    ENVOY_LOG_MISC(debug, "Failed to register eager function {}  in CEL function registry: {}",
                    function_name, status.message());
   }
 }

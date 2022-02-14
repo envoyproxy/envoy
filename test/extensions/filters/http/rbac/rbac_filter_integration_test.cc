@@ -774,7 +774,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, RBACWithCustomCelVocabularyIntegrationTests,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-// Custom Cel Vocabulary - DENY if custom[team]==spirit
+// Custom CEL Vocabulary - DENY if custom[team]==spirit
 TEST_P(RBACWithCustomCelVocabularyIntegrationTests, CustomCelVariableExprIfMatchDeny) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
@@ -793,7 +793,7 @@ TEST_P(RBACWithCustomCelVocabularyIntegrationTests, CustomCelVariableExprIfMatch
               testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
 }
 
-// Custom Cel Vocabulary - NO DENY if custom[team]!=spirit
+// Custom CEL Vocabulary - NO DENY if custom[team]!=spirit
 TEST_P(RBACWithCustomCelVocabularyIntegrationTests, CustomCelVariableExprIfNoMatchNoDeny) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(
@@ -812,7 +812,7 @@ TEST_P(RBACWithCustomCelVocabularyIntegrationTests, CustomCelVariableExprIfNoMat
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// Custom Cel Vocabulary - DENY if GetSquareOf(4)==16
+// Custom CEL Vocabulary - DENY if GetSquareOf(4)==16
 TEST_P(RBACWithCustomCelVocabularyIntegrationTests, CustomCelFunctionExprIfMatchDeny) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
@@ -831,7 +831,7 @@ TEST_P(RBACWithCustomCelVocabularyIntegrationTests, CustomCelFunctionExprIfMatch
               testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
 }
 
-// Custom Cel Vocabulary - NO DENY if GetSquareOf(4)==-1
+// Custom CEL Vocabulary - NO DENY if GetSquareOf(4)==-1
 TEST_P(RBACWithCustomCelVocabularyIntegrationTests, CustomCelFunctionExprIfNoMatchNoDeny) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,

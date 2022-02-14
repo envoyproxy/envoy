@@ -482,16 +482,17 @@ const std::string CUSTOM_CEL_VARIABLE_EXPR = R"EOF(
              string_value: {}
 )EOF";
 
-TEST(RoleBasedAccessControlEngineImpl, CustomCelVocabularyTest) {
+TEST(RoleBasedAccessControlEngineImpl, CustomCELVocabularyTest) {
   using envoy::extensions::expr::custom_cel_vocabulary::example::v3::
-      ExampleCustomCelVocabularyConfig;
+      ExampleCustomCELVocabularyConfig;
 
   envoy::config::rbac::v3::RBAC rbac;
   rbac.set_action(envoy::config::rbac::v3::RBAC::DENY);
   *rbac.mutable_custom_cel_vocabulary_config()->mutable_name() =
       "envoy.expr.custom_cel_vocabulary.example";
-  rbac.mutable_custom_cel_vocabulary_config()->mutable_typed_config()->PackFrom(
-      ExampleCustomCelVocabularyConfig());
+  ExampleCustomCELVocabularyConfig config;
+  config.set_return_url_query_string_as_map(true);
+  rbac.mutable_custom_cel_vocabulary_config()->mutable_typed_config()->PackFrom(config);
   envoy::config::rbac::v3::Policy policy;
   policy.add_permissions()->set_any(true);
   policy.add_principals()->set_any(true);
