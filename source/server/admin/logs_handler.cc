@@ -87,16 +87,16 @@ std::pair<bool, std::string> LogsHandler::changeLogLevel(const Http::Utility::Qu
     // Change all log levels.
     auto level_to_use = parseLevel(value);
     if (!level_to_use.has_value()) {
-      return std::make_pair(false, "unknown log level");
+      return std::make_pair(false, "unknown logger level");
     }
 
-    changeAllLogLevels(level_to_use);
+    changeAllLogLevels(*level_to_use);
     return std::make_pair(true, "");
   }
 
   // Build a map of name:level pairs, a few allocations is ok here since it's
   // not common to call this function at a high rate.
-  LogLevelMap name_levels;
+  absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> name_levels;
 
   if (key == "paths") {
     // Bulk change log level by name:level pairs, separated by comma.
@@ -111,7 +111,7 @@ std::pair<bool, std::string> LogsHandler::changeLogLevel(const Http::Utility::Qu
 
       auto level_to_use = parseLevel(level);
       if (!level_to_use.has_value()) {
-        return std::make_pair(false, "unknown log level");
+        return std::make_pair(false, "unknown logger level");
       }
 
       name_levels[name] = *level_to_use;
@@ -120,62 +120,73 @@ std::pair<bool, std::string> LogsHandler::changeLogLevel(const Http::Utility::Qu
     // Change particular log level by name.
     auto level_to_use = parseLevel(value);
     if (!level_to_use.has_value()) {
-      return std::make_pair(false, "unknown log level");
+      return std::make_pair(false, "unknown logger level");
     }
 
-    name_levels[name] = *level_to_use;
+    name_levels[key] = *level_to_use;
   }
 
-  return changeLogLevels(name_levels, errors);
+  return changeLogLevels(name_levels);
 }
 
 void LogsHandler::changeAllLogLevels(spdlog::level::level_enum level) {
   if (!Logger::Context::useFancyLogger()) {
     ENVOY_LOG(debug, "change all log levels: level='{}'", spdlog::level::level_string_views[level]);
-    Logger::Registry::setLogLevel(*level_to_use);
+    Logger::Registry::setLogLevel(level);
   } else {
     // Level setting with Fancy Logger.
     FANCY_LOG(info, "change all log levels: level='{}'", spdlog::level::level_string_views[level]);
-    getFancyContext().setAllFancyLoggers(*level_to_use);
+    getFancyContext().setAllFancyLoggers(level);
   }
 }
 
-std::pair<bool, std::string> LogsHandler::changeLogLevels(const LogLevelMap& changes) {
+std::pair<bool, std::string> LogsHandler::changeLogLevels(
+    const absl::flat_hash_map<absl::string_view, spdlog::level::level_enum>& changes) {
   if (!Logger::Context::useFancyLogger()) {
-    // Build a map of name to logger.
-    absl::flat_hash_map<std::string, Logger::Logger*> loggers;
-    for (auto&& logger : Logger::Registry::loggers()) {
-      loggers[logger.name()] = &logger;
-    }
-
-    // Validate first
-    for (const auto [name, level] : changes) {
-      if (loggers.find(name) == loggers.end()) {
-        return std::make_pair(false, fmt::format("unknown log name"));
+    std::vector<std::pair<*Logger, spdlog::level::level_enum>> loggers_to_change;
+    for (Logger::Logger& logger : Logger::Registry::loggers()) {
+      auto name_level_itr = changes.find(logger.name);
+      if (name_level_itr == changes.end()) {
+        continue;
       }
+
+      loggers_to_change.emplace_back(std::make_pair(&logger, name_level_itr->second));
     }
 
-    for (const auto [name, level] : changes) {
-      ENVOY_LOG(debug, "change log level: name='{}' level='{}'", name,
+    // Check if we have any invalid logger in changes.
+    if (loggers_to_change.size() != changes.size()) {
+      return std::make_pair(false, "unknown logger name");
+    }
+
+    for (auto it : loggers_to_change) {
+      Logger::Logger* logger = it->first;
+      spdlog::level::level_enum level = it->second;
+
+      ENVOY_LOG(debug, "change log level: name='{}' level='{}'", logger->name(),
                 spdlog::level::level_string_views[level]);
-      loggers[name]->setLevel(level);
+      logger.setLevel(level);
     }
   } else {
-    // Level setting with Fancy Logger.
-    auto names = getFancyContext().getFancyLoggerKeys();
+    std::vector<std::pair<SpdLoggerSharedPtr, spdlog::level::level_enum>> loggers_to_change;
+    for (auto it : changes) {
+      absl::string_view name = it->first;
+      spdlog::level::level_enum level = it->second;
 
-    // Validate first
-    for (const auto [name, level] : changes) {
-      if (names.find(name) == names.end()) {
-        return std::make_pair(false, fmt::format("unknown log name"));
+      auto logger = getFancyContext().getFancyLogger(name);
+      if (!logger) {
+        return std::make_pair(false, "unknown logger name");
       }
+
+      loggers_to_change.emplace_back(std::make_pair(logger, level));
     }
 
-    for (const auto [name, level] : changes) {
-      FANCY_LOG(info, "change log level: name='{}' level='{}'", name,
-                spdlog::level::level_string_views[level]);
+    for (auto it : loggers_to_change) {
+      SpdLoggerSharedPtr logger = it->first;
+      spdlog::level::level_enum level = it->second;
 
-      getFancyContext().setFancyLogger(std::string(name), *level_to_use);
+      FANCY_LOG(info, "change log level: name='{}' level='{}'", logger->name(),
+                spdlog::level::level_string_views[level]);
+      logger->set_level(level);
     }
   }
 

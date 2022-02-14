@@ -46,12 +46,12 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   EXPECT_EQ("400", request("admin", "POST", "/logging?level=blah", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().XContentTypeOptions, "nosniff"));
-  EXPECT_NE(std::string::npos, response->body().find("error: unknown log level\n"))
+  EXPECT_NE(std::string::npos, response->body().find("error: unknown logger level\n"))
       << response->body();
 
   // Bad logger
   EXPECT_EQ("400", request("admin", "POST", "/logging?blah=info", response));
-  EXPECT_NE(std::string::npos, response->body().find("error: unknown log name\n"))
+  EXPECT_NE(std::string::npos, response->body().find("error: unknown logger name\n"))
       << response->body();
 
   // This is going to stomp over custom log levels that are set on the command line.
@@ -67,7 +67,7 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   EXPECT_EQ("400",
             request("admin", "POST",
                     "/logging?paths=blah:debug,assert:debug,admin:debug,config:debug", response));
-  EXPECT_NE(std::string::npos, response->body().find("error: unknown log name\n"))
+  EXPECT_NE(std::string::npos, response->body().find("error: unknown logger name\n"))
       << response->body();
   EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
 

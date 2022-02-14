@@ -54,11 +54,6 @@ public:
   std::string listFancyLoggers() ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
   /**
-   * Returns all logger keys for admin page usage.
-   */
-  absl::flat_hash_set<absl::string_view> getFancyLoggerKeys() ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
-
-  /**
    * Sets the levels of all loggers.
    */
   void setAllFancyLoggers(spdlog::level::level_enum level) ABSL_LOCKS_EXCLUDED(fancy_log_lock_);

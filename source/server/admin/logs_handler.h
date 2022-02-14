@@ -32,8 +32,6 @@ public:
                                Buffer::Instance& response, AdminStream&);
 
 private:
-  using LogLevelMap = absl::flat_hash_map<absl::string_view, spdlog::level::level_enum>;
-
   /**
    * Attempt to change the log level of a logger or all loggers
    * @param params supplies the incoming endpoint query params.
@@ -41,7 +39,8 @@ private:
    */
   std::pair<bool, std::string> changeLogLevel(const Http::Utility::QueryParams& params);
   void changeAllLogLevels(spdlog::level::level_enum level);
-  std::pair<bool, std::string> changeLogLevels(const LogLevelMap& changes);
+  std::pair<bool, std::string>
+  changeLogLevels(const absl::flat_hash_map<absl::string_view, spdlog::level::level_enum>& changes);
 };
 
 } // namespace Server
