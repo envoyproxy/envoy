@@ -27,23 +27,30 @@ public:
   StatsHandlerTest() : pool_(symbol_table_), alloc_(symbol_table_) {
     store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(alloc_);
     store_->addSink(sink_);
+    store_->initializeThreading(main_thread_dispatcher_, tls_);
+  }
+
+  ~StatsHandlerTest() {
+    tls_.shutdownGlobalThreading();
+    store_->shutdownThreading();
+    tls_.shutdownThread();
   }
 
   std::shared_ptr<MockInstance> setupMockedInstance() {
     auto instance = std::make_shared<MockInstance>();
     EXPECT_CALL(*instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
     EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
-    store_->initializeThreading(main_thread_dispatcher_, tls_);
     EXPECT_CALL(*instance, stats()).WillRepeatedly(ReturnRef(*store_));
     EXPECT_CALL(*instance, api()).WillRepeatedly(ReturnRef(api_));
     EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
     return instance;
   }
 
-  std::string statsAsJsonHandler(const bool used_only,
-                                 const absl::optional<std::string> filter = absl::nullopt) {
+  using CodeResponse = std::pair<Http::Code, std::string>;
 
-    std::shared_ptr<MockInstance> instance = setupMockedInstance();
+  CodeResponse statsAsJsonHandler(const bool used_only,
+                                  const absl::optional<std::string> filter = absl::nullopt) {
+
     std::string url = "stats?format=json";
     if (used_only) {
       url += "&usedonly";
@@ -51,27 +58,22 @@ public:
     if (filter.has_value()) {
       absl::StrAppend(&url, "&filter=", filter.value());
     }
-    std::string out;
-    EXPECT_EQ(Http::Code::OK, handlerStats(*instance, url, out));
-    return out;
+    return handlerStats(url);
   }
 
-  Http::Code handlerStats(Server::Instance& instance, absl::string_view url, std::string& out) {
-    StatsHandler handler(instance);
+  CodeResponse handlerStats(absl::string_view url) {
+    std::shared_ptr<MockInstance> instance = setupMockedInstance();
+    StatsHandler handler(*instance);
     Http::TestResponseHeaderMapImpl response_headers;
     Buffer::OwnedImpl data;
     Http::Code code = handler.handlerStats(url, response_headers_, data, admin_stream_);
-    out = data.toString();
-    return code;
+    return std::make_pair(code, data.toString());
   }
 
   Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
   Stats::CustomStatNamespaces& customNamespaces() { return custom_namespaces_; }
 
   void shutdownThreading() {
-    tls_.shutdownGlobalThreading();
-    store_->shutdownThreading();
-    tls_.shutdownThread();
   }
 
   Stats::SymbolTableImpl symbol_table_;
@@ -98,23 +100,26 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
 
 TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
   const std::string url = "/stats?format=blergh";
+  /*
   EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
-  MockInstance instance;
+  //MockInstance instance;
   EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
   EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
-  std::string out;
-  Http::Code code = handlerStats(instance, url, out);
-  EXPECT_EQ(Http::Code::NotFound, code);
-  EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", out);
+  */
+  CodeResponse code_response(handlerStats(url));
+  EXPECT_EQ(Http::Code::NotFound, code_response.first);
+  EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", code_response.second);
 }
 
 TEST_P(AdminStatsTest, HandlerStatsPlainText) {
   const std::string url = "/stats";
   EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
+  /*
   MockInstance instance;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
   EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
   EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
+  */
 
   Stats::Counter& c1 = store_->counterFromString("c1");
   Stats::Counter& c2 = store_->counterFromString("c2");
@@ -136,9 +141,8 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
 
   store_->mergeHistograms([]() -> void {});
 
-  std::string out;
-  Http::Code code = handlerStats(instance, url, out);
-  EXPECT_EQ(Http::Code::OK, code);
+  CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
   constexpr char expected[] =
       "t: \"hello world\"\n"
       "c1: 10\n"
@@ -149,11 +153,11 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
       "h2: P0(100.0,100.0) P25(102.5,102.5) P50(105.0,105.0) P75(107.5,107.5) "
       "P90(109.0,109.0) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
       "P99.9(109.99,109.99) P100(110.0,110.0)\n";
-  EXPECT_EQ(expected, out);
+  EXPECT_EQ(expected, code_response.second);
 
-  code = handlerStats(instance, url + "?usedonly", out);
-  EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_EQ(expected, out);
+  code_response = handlerStats(url + "?usedonly");
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_EQ(expected, code_response.second);
 
   shutdownThreading();
 }
@@ -182,9 +186,8 @@ TEST_P(AdminStatsTest, HandlerStatsJson) {
 
   store_->mergeHistograms([]() -> void {});
 
-  std::string out;
-  Http::Code code = handlerStats(instance, url, out);
-  EXPECT_EQ(Http::Code::OK, code);
+  CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
 
   const std::string expected_json_old = R"EOF({
     "stats": [
@@ -266,7 +269,7 @@ TEST_P(AdminStatsTest, HandlerStatsJson) {
     ]
 })EOF";
 
-  EXPECT_THAT(expected_json_old, JsonStringEq(out));
+  EXPECT_THAT(expected_json_old, JsonStringEq(code_response.second));
 
   shutdownThreading();
 }
@@ -292,7 +295,7 @@ TEST_P(AdminStatsTest, StatsAsJson) {
   h1.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-  std::string actual_json = statsAsJsonHandler(false);
+  std::string actual_json = statsAsJsonHandler(false).second;
 
   const std::string expected_json = R"EOF({
     "stats": [
@@ -432,7 +435,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
   h1.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-  std::string actual_json = statsAsJsonHandler(/*store_->histograms(), */ true);
+  std::string actual_json = statsAsJsonHandler(/*store_->histograms(), */ true).second;
 
   // Expected JSON should not have h2 values as it is not used.
   const std::string expected_json = R"EOF({
@@ -528,7 +531,7 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
   h1.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-  std::string actual_json = statsAsJsonHandler(/*store_->histograms(),*/ false, "[a-z]1");
+  std::string actual_json = statsAsJsonHandler(/*store_->histograms(),*/ false, "[a-z]1").second;
 
   // Because this is a filter case, we don't expect to see any stats except for those containing
   // "h1" in their name.
@@ -634,7 +637,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
   h3.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-  std::string actual_json = statsAsJsonHandler(/*store_->histograms(),*/ true, "h[12]");
+  std::string actual_json = statsAsJsonHandler(/*store_->histograms(),*/ true, "h[12]").second;
 
   // Expected JSON should not have h2 values as it is not used, and should not have h3 values as
   // they are used but do not match.
@@ -824,10 +827,9 @@ envoy_cluster_upstream_cx_active{cluster="c2"} 12
 
 )EOF";
 
-  std::string out;
-  Http::Code code = handlerStats(*instance, url, out);
-  EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_THAT(expected_response, out);
+  CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_THAT(expected_response, code_response.second);
 
   shutdownThreading();
 }
@@ -863,10 +865,9 @@ envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
 
 )EOF";
 
-  std::string out;
-  Http::Code code = handlerStats(*instance, url, out);
-  EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_THAT(expected_response, out);
+  CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_THAT(expected_response, code_response.second);
 
   shutdownThreading();
 }
