@@ -59,11 +59,16 @@ genrule(
     set -- $(SRCS)
     chmod 755 $$1
     chmod 755 $$2
-    chmod 755 dist/*.objdump
     cp $$1 dist/envoy.aar
     cp $$2 dist/envoy-pom.xml
     shift 2
-    cp $$@ dist/
+
+    mkdir -p dist/symbols
+    if [[ -n "$$@" ]]; then
+        chmod 755 $$@
+        cp $$@ dist/symbols
+        tar -cvf dist/symbols.tar dist/symbols
+    fi
     touch $@
     """,
     stamp = True,
