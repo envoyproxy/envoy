@@ -64,17 +64,13 @@ public:
   CodeResponse handlerStats(absl::string_view url) {
     std::shared_ptr<MockInstance> instance = setupMockedInstance();
     StatsHandler handler(*instance);
-    Http::TestResponseHeaderMapImpl response_headers;
     Buffer::OwnedImpl data;
-    Http::Code code = handler.handlerStats(url, response_headers_, data, admin_stream_);
+    Http::TestResponseHeaderMapImpl response_headers;
+    Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream_);
     return std::make_pair(code, data.toString());
   }
 
   Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
-  Stats::CustomStatNamespaces& customNamespaces() { return custom_namespaces_; }
-
-  void shutdownThreading() {
-  }
 
   Stats::SymbolTableImpl symbol_table_;
   Stats::StatNamePool pool_;
@@ -85,8 +81,6 @@ public:
   Stats::MockSink sink_;
   Stats::ThreadLocalStoreImplPtr store_;
   Stats::CustomStatNamespacesImpl custom_namespaces_;
-  Http::TestResponseHeaderMapImpl response_headers_;
-  //Buffer::OwnedImpl data_;
   MockAdminStream admin_stream_;
   Configuration::MockStatsConfig stats_config_;
 };
@@ -100,12 +94,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
 
 TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
   const std::string url = "/stats?format=blergh";
-  /*
-  EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
-  //MockInstance instance;
-  EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
-  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
-  */
   CodeResponse code_response(handlerStats(url));
   EXPECT_EQ(Http::Code::NotFound, code_response.first);
   EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", code_response.second);
@@ -113,13 +101,6 @@ TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
 
 TEST_P(AdminStatsTest, HandlerStatsPlainText) {
   const std::string url = "/stats";
-  EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
-  /*
-  MockInstance instance;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
-  EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
-  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
-  */
 
   Stats::Counter& c1 = store_->counterFromString("c1");
   Stats::Counter& c2 = store_->counterFromString("c2");
@@ -158,17 +139,10 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
   code_response = handlerStats(url + "?usedonly");
   EXPECT_EQ(Http::Code::OK, code_response.first);
   EXPECT_EQ(expected, code_response.second);
-
-  shutdownThreading();
 }
 
 TEST_P(AdminStatsTest, HandlerStatsJson) {
   const std::string url = "/stats?format=json";
-  EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
-  MockInstance instance;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
-  EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
-  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
 
   Stats::Counter& c1 = store_->counterFromString("c1");
   Stats::Counter& c2 = store_->counterFromString("c2");
@@ -270,13 +244,10 @@ TEST_P(AdminStatsTest, HandlerStatsJson) {
 })EOF";
 
   EXPECT_THAT(expected_json_old, JsonStringEq(code_response.second));
-
-  shutdownThreading();
 }
 
 TEST_P(AdminStatsTest, StatsAsJson) {
   InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
   Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
@@ -411,12 +382,10 @@ TEST_P(AdminStatsTest, StatsAsJson) {
 })EOF";
 
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
-  shutdownThreading();
 }
 
 TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
   InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
   Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
@@ -507,12 +476,10 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
 })EOF";
 
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
-  shutdownThreading();
 }
 
 TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
   InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
   Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
@@ -604,12 +571,10 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
 })EOF";
 
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
-  shutdownThreading();
 }
 
 TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
   InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   Stats::Histogram& h1 = store_->histogramFromString(
       "h1_matches", Stats::Histogram::Unit::Unspecified); // Will match, be used, and print
@@ -710,7 +675,6 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
 })EOF";
 
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
-  shutdownThreading();
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
@@ -814,8 +778,6 @@ TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusDefaultTest) {
   std::string url = "/stats?format=prometheus";
 
   createTestStats();
-  std::shared_ptr<MockInstance> instance = setupMockedInstance();
-  StatsHandler handler(*instance);
 
   const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
 envoy_cluster_upstream_cx_total{cluster="c1"} 10
@@ -830,8 +792,6 @@ envoy_cluster_upstream_cx_active{cluster="c2"} 12
   CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::OK, code_response.first);
   EXPECT_THAT(expected_response, code_response.second);
-
-  shutdownThreading();
 }
 
 class StatsHandlerPrometheusWithTextReadoutsTest
@@ -850,7 +810,6 @@ TEST_P(StatsHandlerPrometheusWithTextReadoutsTest, StatsHandlerPrometheusWithTex
   std::string url = std::get<1>(GetParam());
 
   createTestStats();
-  std::shared_ptr<MockInstance> instance = setupMockedInstance();
 
   const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
 envoy_cluster_upstream_cx_total{cluster="c1"} 10
@@ -868,8 +827,6 @@ envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
   CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::OK, code_response.first);
   EXPECT_THAT(expected_response, code_response.second);
-
-  shutdownThreading();
 }
 
 } // namespace Server
