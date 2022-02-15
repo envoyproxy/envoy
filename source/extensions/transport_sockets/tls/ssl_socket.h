@@ -104,7 +104,7 @@ public:
                          Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope);
 
   ~ClientSslSocketFactory() override;
-  
+
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;

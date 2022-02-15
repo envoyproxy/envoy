@@ -45,6 +45,7 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
   EXPECT_TRUE(client_ctx->getCertChainInformation().empty());
   EXPECT_EQ(Http::Code::OK, getCallback("/certs", header_map, response));
   EXPECT_EQ(expected_empty_json, response.toString());
+  server_.sslContextManager().removeContext(client_ctx);
 }
 
 TEST_P(AdminInstanceTest, Memory) {

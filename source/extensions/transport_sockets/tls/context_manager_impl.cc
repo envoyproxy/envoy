@@ -87,7 +87,9 @@ void ContextManagerImpl::iterateContexts(std::function<void(const Envoy::Ssl::Co
 void ContextManagerImpl::removeContext(const std::shared_ptr<Envoy::Ssl::Context>& old_context) {
   ENVOY_LOG_MISC(debug, "in removeContext and remove context {}",
                  static_cast<void*>(old_context.get()));
-  ASSERT(contexts_.erase(old_context) == 1);
+  if (old_context != nullptr) {
+    ASSERT(contexts_.erase(old_context) == 1);
+  }
 }
 
 } // namespace Tls

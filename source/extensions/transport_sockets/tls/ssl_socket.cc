@@ -363,9 +363,7 @@ ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPt
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
-ClientSslSocketFactory::~ClientSslSocketFactory() {
-  manager_.removeContext(ssl_ctx_);
-}
+ClientSslSocketFactory::~ClientSslSocketFactory() { manager_.removeContext(ssl_ctx_); }
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
@@ -410,9 +408,7 @@ ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPt
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
-ServerSslSocketFactory::~ServerSslSocketFactory() {
-  manager_.removeContext(ssl_ctx_);
-}
+ServerSslSocketFactory::~ServerSslSocketFactory() { manager_.removeContext(ssl_ctx_); }
 
 Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {
   absl::ReaderMutexLock l(&ssl_ctx_mu_);
