@@ -315,7 +315,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream& admin_stream) {
   HandlerPtr handler = findHandler(path_and_query, admin_stream);
-  Http::Code code = handler->start(/*path_and_query, */ response_headers);
+  Http::Code code = handler->start(response_headers);
   bool more_data;
   do {
     more_data = handler->nextChunk(response);
