@@ -71,7 +71,7 @@ private:
 };
 
 // SourceWrapper extends PeerWrapper(with local=false)
-// SourceWrapper contains custom defined keys and all the keys of PeerWrapper (with locazl=false).
+// SourceWrapper contains custom defined keys and all the keys of PeerWrapper (with local=false).
 class SourceWrapper : public PeerWrapper {
 public:
   SourceWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info)
