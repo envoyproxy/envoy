@@ -163,7 +163,7 @@ customized_affinity:
   entries:
   - key_name: test
     subscribe: true
-    query: true 
+    query: true
   - key_name: test1
   stop_load_balance: false
 )EOF";
