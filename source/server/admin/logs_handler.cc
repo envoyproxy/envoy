@@ -142,7 +142,7 @@ void LogsHandler::changeAllLogLevels(spdlog::level::level_enum level) {
 std::pair<bool, std::string> LogsHandler::changeLogLevels(
     const absl::flat_hash_map<absl::string_view, spdlog::level::level_enum>& changes) {
   if (!Logger::Context::useFancyLogger()) {
-    std::vector<std::pair<*Logger::Logger, spdlog::level::level_enum>> loggers_to_change;
+    std::vector<std::pair<Logger::Logger*, spdlog::level::level_enum>> loggers_to_change;
     for (Logger::Logger& logger : Logger::Registry::loggers()) {
       auto name_level_itr = changes.find(logger.name());
       if (name_level_itr == changes.end()) {

@@ -35,7 +35,7 @@ private:
   /**
    * Attempt to change the log level of a logger or all loggers
    * @param params supplies the incoming endpoint query params.
-   * @return (TRUE, "") if level change succeeded, (FALSE, "error message") otherwise.
+   * @return (true, "") if level change succeeded, (false, "error message") otherwise.
    */
   std::pair<bool, std::string> changeLogLevel(const Http::Utility::QueryParams& params);
   void changeAllLogLevels(spdlog::level::level_enum level);
