@@ -426,6 +426,10 @@ public:
                                const std::vector<HostSuccessRatePair>& valid_success_rate_hosts,
                                double success_rate_stdev_factor);
 
+  const absl::node_hash_map<HostSharedPtr, DetectorHostMonitorImpl*>& getHostMonitors() {
+    return host_monitors_;
+  }
+
 private:
   DetectorImpl(const Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,

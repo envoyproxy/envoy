@@ -1843,7 +1843,6 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTime) {
 // max_ejection_time + base_ejection_time.
 TEST_F(OutlierDetectorImplTest, MaxEjectTimeNotAlligned) {
 
-
   // Setup interval time to 10 secs.
   ON_CALL(runtime_.snapshot_, getInteger(IntervalMsRuntime, _)).WillByDefault(Return(10000UL));
   ON_CALL(runtime_.snapshot_, getInteger(BaseEjectionTimeMsRuntime, _))
@@ -1966,6 +1965,67 @@ base_ejection_time: 10s
   EXPECT_EQ(0UL, detector->config().maxEjectionTimeJitterMs());
 }
 
+// Test verifies that jitter is between 0s and 10s
+// when max_ejection_time_jitter is set to 10s.
+TEST_F(OutlierDetectorImplTest, EjectionTimeJitterIsInRange) {
+  // Setup max_ejection_time_jitter time to 10 secs.
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionTimeJitterMsRuntime, _))
+      .WillByDefault(Return(10000UL));
+  // Add host.
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_));
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+  // Set the return value of random().
+  EXPECT_CALL(random_, random()).WillOnce(Return(123456789UL));
+  // Trigger host eject.
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
+  loadRq(hosts_[0], 5, 500);
+  // Make sure that the host has been ejected.
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+  // Get the jitter from the host monitor
+  // and make sure that it is strictly between
+  // 0 and 10000. We know that it shouldn't equal 0 or 10000
+  // since we chose the parameters.
+  auto host_monitor = detector->getHostMonitors().find(hosts_[0])->second;
+  uint64_t jitter = host_monitor->getJitter().count();
+  EXPECT_THAT(jitter, testing::AllOf(testing::Gt(0UL), testing::Lt(10000UL)));
+}
+
+// Test verifies that jitter is 0 when the
+// max_ejection_time_jitter configuration is absent.
+TEST_F(OutlierDetectorImplTest, EjectionTimeJitterIsZeroWhenNotConfigured) {
+  // Add host with empty configurations. Max_eject_time_jitter will
+  // default to 0.
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_));
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+  // Set the return value of random().
+  EXPECT_CALL(random_, random()).WillOnce(Return(1234567890UL));
+  // Trigger host eject.
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
+  loadRq(hosts_[0], 5, 500);
+  // Make sure that the host has been ejected.
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+  // Get the jitter from the host monitor
+  // and make sure that it is zero.
+  auto host_monitor = detector->getHostMonitors().find(hosts_[0])->second;
+  uint64_t jitter = host_monitor->getJitter().count();
+  EXPECT_EQ(0UL, jitter);
+}
 
 TEST(DetectorHostMonitorNullImplTest, All) {
   DetectorHostMonitorNullImpl null_sink;
