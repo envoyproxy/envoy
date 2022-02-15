@@ -38,7 +38,6 @@ public:
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
     EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
-    EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
     EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
     EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(req_info_));
     EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
@@ -301,7 +300,6 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(ssl_));
-  EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
   EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(callbacks_, decodingBuffer());
   EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));

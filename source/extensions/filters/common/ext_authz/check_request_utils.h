@@ -77,12 +77,11 @@ private:
   static void setRequestTime(envoy::service::auth::v3::AttributeContext::Request& req,
                              const StreamInfo::StreamInfo& stream_info);
   static void setHttpRequest(envoy::service::auth::v3::AttributeContext::HttpRequest& httpreq,
-                             const uint64_t stream_id, const StreamInfo::StreamInfo& stream_info,
+                             const StreamInfo::StreamInfo& stream_info,
                              const Buffer::Instance* decoding_buffer,
                              const Envoy::Http::RequestHeaderMap& headers,
                              uint64_t max_request_bytes, bool pack_as_bytes);
   static void setAttrContextRequest(envoy::service::auth::v3::AttributeContext::Request& req,
-                                    const uint64_t stream_id,
                                     const StreamInfo::StreamInfo& stream_info,
                                     const Buffer::Instance* decoding_buffer,
                                     const Envoy::Http::RequestHeaderMap& headers,

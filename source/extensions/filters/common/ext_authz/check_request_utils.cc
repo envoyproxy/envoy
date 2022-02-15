@@ -103,10 +103,10 @@ void CheckRequestUtils::setRequestTime(envoy::service::auth::v3::AttributeContex
 }
 
 void CheckRequestUtils::setHttpRequest(
-    envoy::service::auth::v3::AttributeContext::HttpRequest& httpreq, uint64_t stream_id,
+    envoy::service::auth::v3::AttributeContext::HttpRequest& httpreq,
     const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
     const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes, bool pack_as_bytes) {
-  httpreq.set_id(std::to_string(stream_id));
+  httpreq.set_id(getHeaderStr(headers.RequestId()));
   httpreq.set_method(getHeaderStr(headers.Method()));
   httpreq.set_path(getHeaderStr(headers.Path()));
   httpreq.set_host(getHeaderStr(headers.Host()));
@@ -155,12 +155,12 @@ void CheckRequestUtils::setHttpRequest(
 }
 
 void CheckRequestUtils::setAttrContextRequest(
-    envoy::service::auth::v3::AttributeContext::Request& req, const uint64_t stream_id,
+    envoy::service::auth::v3::AttributeContext::Request& req,
     const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
     const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes, bool pack_as_bytes) {
   setRequestTime(req, stream_info);
-  setHttpRequest(*req.mutable_http(), stream_id, stream_info, decoding_buffer, headers,
-                 max_request_bytes, pack_as_bytes);
+  setHttpRequest(*req.mutable_http(), stream_info, decoding_buffer, headers, max_request_bytes,
+                 pack_as_bytes);
 }
 
 void CheckRequestUtils::createHttpCheck(
@@ -182,8 +182,8 @@ void CheckRequestUtils::createHttpCheck(
                      include_peer_certificate);
   setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), EMPTY_STRING, true,
                      include_peer_certificate);
-  setAttrContextRequest(*attrs->mutable_request(), cb->streamId(), cb->streamInfo(),
-                        cb->decodingBuffer(), headers, max_request_bytes, pack_as_bytes);
+  setAttrContextRequest(*attrs->mutable_request(), cb->streamInfo(), cb->decodingBuffer(), headers,
+                        max_request_bytes, pack_as_bytes);
 
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
   // Fill in the context extensions and metadata context.
