@@ -28,7 +28,7 @@ ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
   }
 
   Envoy::Ssl::ClientContextSharedPtr context =
-      std::make_shared<ClientContextImpl>(scope, config, time_source_, *this);
+      std::make_shared<ClientContextImpl>(scope, config, time_source_);
   ASSERT(contexts_.insert(context).second);
   return context;
 }
@@ -42,7 +42,7 @@ ContextManagerImpl::createSslServerContext(Stats::Scope& scope,
   }
 
   Envoy::Ssl::ServerContextSharedPtr context =
-      std::make_shared<ServerContextImpl>(scope, config, server_names, time_source_, *this);
+      std::make_shared<ServerContextImpl>(scope, config, server_names, time_source_);
   // Insert new context should never fail.
   ASSERT(contexts_.insert(context).second);
   return context;

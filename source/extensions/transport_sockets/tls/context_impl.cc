@@ -499,12 +499,11 @@ std::vector<Envoy::Ssl::CertificateDetailsPtr> ContextImpl::getCertChainInformat
 
 ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
                                      const Envoy::Ssl::ClientContextConfig& config,
-                                     TimeSource& time_source,
-                                     Envoy::Ssl::ContextManager& context_manager)
+                                     TimeSource& time_source)
     : ContextImpl(scope, config, time_source),
       server_name_indication_(config.serverNameIndication()),
-      allow_renegotiation_(config.allowRenegotiation()), max_session_keys_(config.maxSessionKeys()),
-      context_manager_(context_manager) {
+      allow_renegotiation_(config.allowRenegotiation()),
+      max_session_keys_(config.maxSessionKeys()) {
   // This should be guaranteed during configuration ingestion for client contexts.
   ASSERT(tls_contexts_.size() == 1);
   if (!parsed_alpn_protocols_.empty()) {
@@ -650,10 +649,9 @@ uint16_t ClientContextImpl::parseSigningAlgorithmsForTest(const std::string& sig
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      const Envoy::Ssl::ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
-                                     TimeSource& time_source,
-                                     Envoy::Ssl::ContextManager& context_manager)
+                                     TimeSource& time_source)
     : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()),
-      ocsp_staple_policy_(config.ocspStaplePolicy()), context_manager_(context_manager) {
+      ocsp_staple_policy_(config.ocspStaplePolicy()) {
   if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }

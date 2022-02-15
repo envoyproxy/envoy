@@ -3,7 +3,6 @@
 #include <array>
 #include <deque>
 #include <functional>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -138,9 +137,7 @@ using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;
 class ClientContextImpl : public ContextImpl, public Envoy::Ssl::ClientContext {
 public:
   ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
-                    TimeSource& time_source, Envoy::Ssl::ContextManager& context_manager);
-
-  ~ClientContextImpl() override { UNREFERENCED_PARAMETER(context_manager_); }
+                    TimeSource& time_source);
 
   bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptions* options) override;
 
@@ -154,7 +151,6 @@ private:
   absl::Mutex session_keys_mu_;
   std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ ABSL_GUARDED_BY(session_keys_mu_);
   bool session_keys_single_use_{false};
-  Envoy::Ssl::ContextManager& context_manager_;
 };
 
 enum class OcspStapleAction { Staple, NoStaple, Fail, ClientNotCapable };
@@ -162,12 +158,7 @@ enum class OcspStapleAction { Staple, NoStaple, Fail, ClientNotCapable };
 class ServerContextImpl : public ContextImpl, public Envoy::Ssl::ServerContext {
 public:
   ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-                    const std::vector<std::string>& server_names, TimeSource& time_source,
-                    Envoy::Ssl::ContextManager& context_manager);
-  ~ServerContextImpl() override {
-    // context_manager_.removeContext(shared_from_this());
-    UNREFERENCED_PARAMETER(context_manager_);
-  }
+                    const std::vector<std::string>& server_names, TimeSource& time_source);
 
   // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
   // ClientHello details. This is made public for use by custom TLS extensions who want to
@@ -189,7 +180,6 @@ private:
 
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
-  Envoy::Ssl::ContextManager& context_manager_;
 };
 
 } // namespace Tls
