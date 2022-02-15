@@ -13,21 +13,11 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
 #include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_sent_packet_manager_peer.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
 
 #include "source/common/quic/active_quic_listener.h"
 #include "source/common/quic/client_connection_factory_impl.h"

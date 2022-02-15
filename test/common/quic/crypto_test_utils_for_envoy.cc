@@ -3,18 +3,7 @@
 // This file defines platform dependent test utility functions which is declared
 // in quiche/quic/test_tools/crypto_test_utils.h.
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#pragma GCC diagnostic ignored "-Wtype-limits"
-#endif
-
 #include "quiche/quic/test_tools/crypto_test_utils.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
 
 #include <memory>
 #include "test/common/quic/test_proof_verifier.h"

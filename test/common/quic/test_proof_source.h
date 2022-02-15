@@ -1,17 +1,6 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#pragma GCC diagnostic ignored "-Wtype-limits"
-#endif
-
 #include "quiche/quic/test_tools/test_certificates.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
 
 #include <memory>
 
