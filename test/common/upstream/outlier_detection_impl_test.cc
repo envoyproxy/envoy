@@ -1926,9 +1926,9 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTimeNotAlligned) {
   }
 }
 
-// Test verifies that detector is properly initialized with
-//  max_ejection_time_jitter when such value is specified in
-// the config
+// Test verifies that the detector is properly initialized with
+// max_ejection_time_jitter when it is specified in the
+// the static config
 TEST_F(OutlierDetectorImplTest, DetectorStaticConfigMaxEjectionTimeJitter) {
   const std::string yaml = R"EOF(
 interval: 0.1s
@@ -1947,7 +1947,7 @@ max_ejection_time_jitter: 13s
 }
 
 // Test verifies that detector is properly initialized with
-// default max_ejection_time_jitter when such value is
+// default max_ejection_time_jitter when it is
 // not specified in config.
 TEST_F(OutlierDetectorImplTest, DetectorStaticConfigDefaultMaxEjectionTimeJitter) {
   const std::string yaml = R"EOF(
