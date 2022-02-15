@@ -42,8 +42,8 @@ RUNTIME_GUARD(envoy_reloadable_features_listener_wildcard_match_ip_family);
 RUNTIME_GUARD(envoy_reloadable_features_new_tcp_connection_pool);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_102_103);
 RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_json);
-RUNTIME_GUARD(envoy_reloadable_features_skip_delay_close);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_http_header_referer);
+RUNTIME_GUARD(envoy_reloadable_features_skip_delay_close);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dispatching_frames_for_closed_connection);
 RUNTIME_GUARD(envoy_reloadable_features_support_locality_update_on_eds_cluster_endpoints);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
@@ -148,8 +148,8 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_new_tcp_connection_pool,
   &FLAGS_envoy_reloadable_features_proxy_102_103,
   &FLAGS_envoy_reloadable_features_remove_legacy_json,
-  &FLAGS_envoy_reloadable_features_skip_delay_close,
   &FLAGS_envoy_reloadable_features_sanitize_http_header_referer,
+  &FLAGS_envoy_reloadable_features_skip_delay_close,
   &FLAGS_envoy_reloadable_features_skip_dispatching_frames_for_closed_connection,
   &FLAGS_envoy_reloadable_features_support_locality_update_on_eds_cluster_endpoints,
   &FLAGS_envoy_reloadable_features_udp_listener_updates_filter_chain_in_place,
