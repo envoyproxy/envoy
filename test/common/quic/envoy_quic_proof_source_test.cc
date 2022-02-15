@@ -69,7 +69,7 @@ public:
     const absl::optional<envoy::config::core::v3::TypedExtensionConfig> nullopt = absl::nullopt;
     ON_CALL(cert_validation_ctx_config_, customValidatorConfig()).WillByDefault(ReturnRef(nullopt));
     auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
-        store_, client_context_config_, time_system_);
+        store_, client_context_config_, time_system_, tls_context_manager_);
     verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(context));
   }
 
@@ -102,6 +102,7 @@ private:
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;
   NiceMock<Ssl::MockCertificateValidationContextConfig> cert_validation_ctx_config_;
   std::unique_ptr<EnvoyQuicProofVerifier> verifier_;
+  NiceMock<Ssl::MockContextManager> tls_context_manager_;
 };
 
 class TestSignatureCallback : public quic::ProofSource::SignatureCallback {

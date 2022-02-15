@@ -1027,4 +1027,93 @@ TEST_P(TcpTunnelingIntegrationTest, TransferEncodingHeaderIgnoredHttp1) {
       fake_upstream_connection->write("HTTP/1.1 200 OK\r\nTransfer-encoding: chunked\r\n\r\n"));
 
   // Now send some data and close the TCP client.
-  ASSERT_TRUE(tcp_clien
+  ASSERT_TRUE(tcp_client_->write("hello"));
+  ASSERT_TRUE(
+      fake_upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("hello")));
+
+  // Close connections.
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client_->close();
+}
+
+TEST_P(TcpTunnelingIntegrationTest, DeferTransmitDataUntilSuccessConnectResponseIsReceived) {
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Send some data straight away.
+  ASSERT_TRUE(tcp_client_->write("hello", false));
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Wait a bit, no data should go through.
+  ASSERT_FALSE(upstream_request_->waitForData(*dispatcher_, 1, std::chrono::milliseconds(100)));
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+  tcp_client_->close();
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    // If the upstream now sends 'end stream' the connection is fully closed.
+    upstream_request_->encodeData(0, true);
+  }
+}
+
+TEST_P(TcpTunnelingIntegrationTest, NoDataTransmittedIfConnectFailureResponseIsReceived) {
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Send some data straight away.
+  ASSERT_TRUE(tcp_client_->write("hello", false));
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  default_response_headers_.setStatus(enumToInt(Http::Code::ServiceUnavailable));
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Wait a bit, no data should go through.
+  ASSERT_FALSE(upstream_request_->waitForData(*dispatcher_, 1, std::chrono::milliseconds(100)));
+
+  tcp_client_->close();
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+}
+
+TEST_P(TcpTunnelingIntegrationTest, UpstreamDisconnectBeforeResponseReceived) {
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  tcp_client_->waitForHalfClose();
+  tcp_client_->close();
+}
+
+INSTANTIATE_TEST_SUITE_P(IpAndHttpVersions, TcpTunnelingIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP1},
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2,
+                              Http::CodecType::HTTP3})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+} // namespace
+} // namespace Envoy

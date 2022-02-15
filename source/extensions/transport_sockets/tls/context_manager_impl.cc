@@ -17,25 +17,7 @@ namespace Tls {
 ContextManagerImpl::ContextManagerImpl(TimeSource& time_source) : time_source_(time_source) {}
 
 ContextManagerImpl::~ContextManagerImpl() {
-  // removeEmptyContexts();
   KNOWN_ISSUE_ASSERT(contexts_.empty(), "https://github.com/envoyproxy/envoy/issues/10030");
-}
-
-void ContextManagerImpl::removeEmptyContexts() {
-  // contexts_.remove_if([](const std::weak_ptr<Envoy::Ssl::Context>& n) { return n.expired(); });
-}
-
-void ContextManagerImpl::removeOldContext(
-    [[maybe_unused]] std::shared_ptr<Envoy::Ssl::Context> old_context) {
-  // if (old_context) {
-  //   contexts_.remove_if([old_context](const std::weak_ptr<Envoy::Ssl::Context>& n) {
-  //     std::shared_ptr<Envoy::Ssl::Context> sp = n.lock();
-  //     if (sp) {
-  //       return old_context == sp;
-  //     }
-  //     return false;
-  //   });
-  // }
 }
 
 Envoy::Ssl::ClientContextSharedPtr ContextManagerImpl::createSslClientContext(
@@ -47,9 +29,9 @@ Envoy::Ssl::ClientContextSharedPtr ContextManagerImpl::createSslClientContext(
 
   Envoy::Ssl::ClientContextSharedPtr context =
       std::make_shared<ClientContextImpl>(scope, config, time_source_, *this);
-  // removeOldContext(old_context);
-  // removeEmptyContexts();
-  contexts_.insert(context);
+  ENVOY_LOG_MISC(debug, "in createSslClientContext and create context {}",
+                 static_cast<void*>(context.get()));
+  ASSERT(contexts_.insert(context).second);
   return context;
 }
 
@@ -63,9 +45,10 @@ Envoy::Ssl::ServerContextSharedPtr ContextManagerImpl::createSslServerContext(
 
   Envoy::Ssl::ServerContextSharedPtr context =
       std::make_shared<ServerContextImpl>(scope, config, server_names, time_source_, *this);
-  // removeOldContext(old_context);
-  // removeEmptyContexts();
-  contexts_.insert(context);
+  ENVOY_LOG_MISC(debug, "in createSslServerContext and create context {}",
+                 static_cast<void*>(context.get()));
+  // Insert new context should never fail.
+  ASSERT(contexts_.insert(context).second);
   return context;
 }
 
@@ -102,6 +85,8 @@ void ContextManagerImpl::iterateContexts(std::function<void(const Envoy::Ssl::Co
 }
 
 void ContextManagerImpl::removeContext(const std::shared_ptr<Envoy::Ssl::Context>& old_context) {
+  ENVOY_LOG_MISC(debug, "in removeContext and remove context {}",
+                 static_cast<void*>(old_context.get()));
   ASSERT(contexts_.erase(old_context) == 1);
 }
 

@@ -363,6 +363,10 @@ ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPt
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
+ClientSslSocketFactory::~ClientSslSocketFactory() {
+  manager_.removeContext(ssl_ctx_);
+}
+
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
@@ -404,6 +408,10 @@ ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPt
       config_(std::move(config)), server_names_(server_names),
       ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
+}
+
+ServerSslSocketFactory::~ServerSslSocketFactory() {
+  manager_.removeContext(ssl_ctx_);
 }
 
 Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {

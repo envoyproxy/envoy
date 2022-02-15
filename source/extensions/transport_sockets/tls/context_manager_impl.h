@@ -44,8 +44,6 @@ public:
   void removeContext(const std::shared_ptr<Envoy::Ssl::Context>& old_context) override;
 
 private:
-  void removeEmptyContexts();
-  void removeOldContext(std::shared_ptr<Envoy::Ssl::Context> old_context);
   TimeSource& time_source_;
   absl::flat_hash_set<std::shared_ptr<Envoy::Ssl::Context>> contexts_;
   PrivateKeyMethodManagerImpl private_key_method_manager_{};

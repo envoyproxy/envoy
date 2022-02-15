@@ -67,7 +67,7 @@ public:
     EXPECT_CALL(cert_validation_ctx_config_, customValidatorConfig())
         .WillRepeatedly(ReturnRef(custom_validator_config_));
     auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
-        store_, client_context_config_, time_system_);
+        store_, client_context_config_, time_system_, tls_context_manager_);
     verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(context));
   }
 
@@ -89,6 +89,7 @@ protected:
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;
   Ssl::MockCertificateValidationContextConfig cert_validation_ctx_config_;
   std::unique_ptr<EnvoyQuicProofVerifier> verifier_;
+  NiceMock<Ssl::MockContextManager> tls_context_manager_;
 };
 
 TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainSuccess) {

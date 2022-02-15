@@ -501,10 +501,10 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
                                      const Envoy::Ssl::ClientContextConfig& config,
                                      TimeSource& time_source,
                                      Envoy::Ssl::ContextManager& context_manager)
-    : ContextImpl(scope, config, time_source), ManagedContext(context_manager, *this),
+    : ContextImpl(scope, config, time_source),
       server_name_indication_(config.serverNameIndication()),
-      allow_renegotiation_(config.allowRenegotiation()),
-      max_session_keys_(config.maxSessionKeys()) {
+      allow_renegotiation_(config.allowRenegotiation()), max_session_keys_(config.maxSessionKeys()),
+      context_manager_(context_manager) {
   // This should be guaranteed during configuration ingestion for client contexts.
   ASSERT(tls_contexts_.size() == 1);
   if (!parsed_alpn_protocols_.empty()) {
@@ -652,9 +652,11 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      const std::vector<std::string>& server_names,
                                      TimeSource& time_source,
                                      Envoy::Ssl::ContextManager& context_manager)
-    : ContextImpl(scope, config, time_source), ManagedContext(context_manager, *this),
-      session_ticket_keys_(config.sessionTicketKeys()),
-      ocsp_staple_policy_(config.ocspStaplePolicy()) {
+    : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()),
+      ocsp_staple_policy_(config.ocspStaplePolicy()), context_manager_(context_manager) {
+  ENVOY_LOG_MISC(debug, "in ServerContextImpl ctor the context address of this is {}",
+                 static_cast<void*>(this));
+
   if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
