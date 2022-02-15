@@ -65,6 +65,7 @@ static_resources:
                     principals:
                     - any: true
                   "policy-rbac-deny-if-extended-request-query-key-contains-value":
+                    # curl -v -G -d key1=value1 -d key2=value2 localhost:7777/certs
                     # deny if request[query][key].contains("value")
                     condition:
                       call_expr:

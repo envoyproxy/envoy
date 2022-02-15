@@ -48,7 +48,8 @@ static_resources:
                 action: DENY
                 policies:
                   "deny-admin-clusters-endpoint-policy":
-                    # deny if request.path.endsWith("/clusters")
+                    # curl -v "localhost:7777/clusters"
+                    # deny if request[path].endsWith("/clusters")
                     condition:
                       call_expr:
                         function: endsWith
