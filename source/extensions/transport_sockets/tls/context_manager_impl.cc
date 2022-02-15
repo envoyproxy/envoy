@@ -20,9 +20,9 @@ ContextManagerImpl::~ContextManagerImpl() {
   KNOWN_ISSUE_ASSERT(contexts_.empty(), "https://github.com/envoyproxy/envoy/issues/10030");
 }
 
-Envoy::Ssl::ClientContextSharedPtr ContextManagerImpl::createSslClientContext(
-    Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
-    [[maybe_unused]] Envoy::Ssl::ClientContextSharedPtr old_context) {
+Envoy::Ssl::ClientContextSharedPtr
+ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
+                                           const Envoy::Ssl::ClientContextConfig& config) {
   if (!config.isReady()) {
     return nullptr;
   }
@@ -33,10 +33,10 @@ Envoy::Ssl::ClientContextSharedPtr ContextManagerImpl::createSslClientContext(
   return context;
 }
 
-Envoy::Ssl::ServerContextSharedPtr ContextManagerImpl::createSslServerContext(
-    Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-    const std::vector<std::string>& server_names,
-    [[maybe_unused]] Envoy::Ssl::ServerContextSharedPtr old_context) {
+Envoy::Ssl::ServerContextSharedPtr
+ContextManagerImpl::createSslServerContext(Stats::Scope& scope,
+                                           const Envoy::Ssl::ServerContextConfig& config,
+                                           const std::vector<std::string>& server_names) {
   if (!config.isReady()) {
     return nullptr;
   }

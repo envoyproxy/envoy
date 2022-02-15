@@ -57,7 +57,7 @@ public:
 class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   Http3ConnPoolImplTest() {
-    EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _, _))
+    EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _))
         .WillRepeatedly(Return(ssl_context_));
     factory_.emplace(std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
                          new NiceMock<Ssl::MockClientContextConfig>),

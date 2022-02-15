@@ -22,17 +22,15 @@ public:
   /**
    * Builds a ClientContext from a ClientContextConfig.
    */
-  virtual ClientContextSharedPtr
-  createSslClientContext(Stats::Scope& scope, const ClientContextConfig& config,
-                         Envoy::Ssl::ClientContextSharedPtr old_context) PURE;
+  virtual ClientContextSharedPtr createSslClientContext(Stats::Scope& scope,
+                                                        const ClientContextConfig& config) PURE;
 
   /**
    * Builds a ServerContext from a ServerContextConfig.
    */
   virtual ServerContextSharedPtr
   createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
-                         const std::vector<std::string>& server_names,
-                         Envoy::Ssl::ServerContextSharedPtr old_context) PURE;
+                         const std::vector<std::string>& server_names) PURE;
 
   /**
    * @return the number of days until the next certificate being managed will expire.
