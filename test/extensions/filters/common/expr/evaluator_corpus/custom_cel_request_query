@@ -24,7 +24,7 @@ expression {
 
 request_headers {
   headers{key: ":method" value : "GET"}
-  headers{key: ":path" value : "/query?a=apple"}
+  headers{key: ":path" value : "/query?a=apple&b=banana"}
   headers{key: ":scheme" value : "http"}
   headers{key: ":authority" value : "foo.com"}
   headers {}
