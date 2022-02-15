@@ -200,7 +200,8 @@ class StatefulProcessor:
                 if child is not None:
                     fields.append(child)
             # Some structures share the same name, use request/response as prefix.
-            if type_name in ['EntityData', 'EntryData', 'PartitionData', 'PartitionSnapshot', 'SnapshotId', 'TopicData', 'TopicSnapshot']:
+            if type_name in ['EntityData', 'EntryData', 'PartitionData', 'PartitionSnapshot',
+                             'SnapshotId', 'TopicData', 'TopicSnapshot']:
                 type_name = self.type.capitalize() + type_name
             # Some of the types repeat multiple times (e.g. AlterableConfig).
             # In such a case, every second or later occurrence of the same name is going to be prefixed

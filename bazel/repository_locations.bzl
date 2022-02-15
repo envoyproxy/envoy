@@ -943,7 +943,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/apache/kafka/archive/{version}.zip"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.network.kafka_broker", "envoy.filters.network.kafka_mesh"],
-        release_date = "2022-01-21",
+        release_date = "2022-01-12",
         cpe = "cpe:2.3:a:apache:kafka:*",
     ),
     edenhill_librdkafka = dict(
