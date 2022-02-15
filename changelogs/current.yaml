@@ -147,6 +147,8 @@ new_features:
   change: |
     made the :ref:`admission control <envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl>` work as an upstream filter.
   change: |
+- area: http
+  change: |
     added default-false ``envoy.reloadable_features.http1_use_balsa_parser`` for experimental BalsaParser.
   change: |
     added ``envoy.reloadable_features.allow_upstream_filters`` for experimental upstream filters.
@@ -238,6 +240,12 @@ new_features:
 - area: grpc_json_transcoder
   change: |
     added support for parsing enum value case insensitively enabled by the config :ref:`case_insensitive_enum_parsing <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.case_insensitive_enum_parsing>`.
+- area: generic_proxy
+  change: |
+    added an new network filter :ref:`generic_proxy filter <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxy>`.
+- area: tls
+  change: |
+    added support for SNI-based cert selection in tls downstream transport socket. Detailed documentation is available :ref:`cert selection<arch_overview_ssl_cert_select>`.
 
 deprecated:
 - area: http

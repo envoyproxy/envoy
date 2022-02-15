@@ -24,6 +24,7 @@
 #include "envoy/tracing/http_tracer.h"
 
 #include "source/common/access_log/access_log_manager_impl.h"
+#include "source/common/certificate_provider/certificate_provider_manager_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
 #include "source/common/common/logger_delegates.h"
@@ -200,6 +201,9 @@ public:
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
   Secret::SecretManager& secretManager() override { return server_.secretManager(); }
+  CertificateProvider::CertificateProviderManager& certificateProviderManager() override {
+    return server_.certificateProviderManager();
+  }
   Stats::Store& stats() override { return server_.stats(); }
   Init::Manager& initManager() override { return server_.initManager(); }
   AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
@@ -259,6 +263,9 @@ public:
   ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
+  CertificateProvider::CertificateProviderManager& certificateProviderManager() override {
+    return *certificate_provider_manager_;
+  }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
   Runtime::Loader& runtime() override;
@@ -331,6 +338,7 @@ private:
   // - There may be active clusters referencing it in config_.cluster_manager_.
   // - There may be active connections referencing it.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
+  std::unique_ptr<CertificateProvider::CertificateProviderManager> certificate_provider_manager_;
   bool workers_started_;
   std::atomic<bool> live_;
   bool shutdown_;

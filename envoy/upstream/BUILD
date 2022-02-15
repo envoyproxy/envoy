@@ -20,6 +20,7 @@ envoy_cc_library(
         ":thread_local_cluster_interface",
         ":upstream_interface",
         "//envoy/access_log:access_log_interface",
+        "//envoy/certificate_provider:certificate_provider_manager_interface",
         "//envoy/common:random_generator_interface",
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_factory_interface",

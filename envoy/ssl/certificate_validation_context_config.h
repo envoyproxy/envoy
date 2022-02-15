@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/certificate_provider/certificate_provider.h"
 #include "envoy/common/pure.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
@@ -94,6 +95,18 @@ public:
    * @return the max depth used when verifying the certificate-chain
    */
   virtual absl::optional<uint32_t> maxVerifyDepth() const PURE;
+
+  /**
+   * @return the CA provider which can provide CA certificate to use for peer validation
+   */
+  virtual Envoy::CertificateProvider::CertificateProviderSharedPtr caProvider() const PURE;
+
+  /**
+   * Add ca callback into validation context config. When trusted ca is refreshed from
+   * ca provider, this callback is invoked to update config.
+   * @param callback callback that is executed by validation context config.
+   */
+  virtual void setCAUpdateCallback(std::function<void()> callback) PURE;
 };
 
 using CertificateValidationContextConfigPtr = std::unique_ptr<CertificateValidationContextConfig>;

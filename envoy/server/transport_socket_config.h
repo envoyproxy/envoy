@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/certificate_provider/certificate_provider_manager.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/event/dispatcher.h"
@@ -104,6 +105,11 @@ public:
    * @return reference to the access log manager object
    */
   virtual AccessLog::AccessLogManager& accessLogManager() PURE;
+
+  /**
+   * @return the instance of certificate provider manager.
+   */
+  virtual CertificateProvider::CertificateProviderManager& certificateProviderManager() PURE;
 };
 
 using TransportSocketFactoryContextPtr = std::unique_ptr<TransportSocketFactoryContext>;

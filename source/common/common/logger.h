@@ -33,6 +33,7 @@ namespace Logger {
   FUNCTION(assert)                                                                                 \
   FUNCTION(backtrace)                                                                              \
   FUNCTION(cache_filter)                                                                           \
+  FUNCTION(cert_provider)                                                                          \
   FUNCTION(client)                                                                                 \
   FUNCTION(config)                                                                                 \
   FUNCTION(connection)                                                                             \

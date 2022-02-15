@@ -65,7 +65,8 @@ public:
   Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket,
-                         StreamInfo::StreamInfo& stream_info) override;
+                         StreamInfo::StreamInfo& stream_info,
+                         const Network::DownstreamTransportSocketFactory& transport_socket_factory) override;
   Network::ClientConnectionPtr createClientConnection(
       Network::Address::InstanceConstSharedPtr address,
       Network::Address::InstanceConstSharedPtr source_address,

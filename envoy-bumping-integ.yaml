@@ -1,0 +1,95 @@
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 1234
+    listener_filters:
+    - name: envoy.filters.listener.tls_inspector
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+    filter_chains:
+    - filter_chain_match:
+        server_names: ["www.baidu.com", "www.google.com", "www.linkedin.com"]  # bumping w/ connect or w/o connect
+      filters:
+      - name: envoy.filters.network.sni_dynamic_forward_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
+          port_value: 443
+          dns_cache_config:
+            name: dynamic_forward_proxy_cache_config
+            dns_lookup_family: V4_ONLY
+      - name: envoy.filters.network.bumping
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.bumping.v3.Bumping
+          stat_prefix: destination
+          cluster: dynamic_forward_proxy_cluster_bumping
+          tls_certificate_provider_instance:
+            instance_name: "local_cert_provider"
+            certificate_name: "ALL_IDENTITY_CERTS"
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: dynamic_forward_proxy_cluster_bumping
+          http_filters:
+          - name: envoy.filters.http.dynamic_forward_proxy
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
+              dns_cache_config:
+                name: dynamic_forward_proxy_cache_config
+                dns_lookup_family: V4_ONLY
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificate_provider_instance:
+              instance_name: "local_cert_provider"
+              certificate_name: "ALL_IDENTITY_CERTS"
+  clusters:
+  - name: dynamic_forward_proxy_cluster_bumping
+    connect_timeout: 1s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.dynamic_forward_proxy
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+        dns_cache_config:
+          name: dynamic_forward_proxy_cache_config
+          dns_lookup_family: V4_ONLY
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          validation_context:
+            trusted_ca:
+              filename: /etc/ssl/certs/ca-certificates.crt
+certificate_provider_instances:
+  local_cert_provider:
+    name: envoy.certificate_providers.local_certificate
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.certificate_providers.local_certificate.v3.LocalCertificate
+      rootca_cert:
+        filename: root-ca.pem
+      rootca_key:
+        filename: root-ca.key
+      default_identity_cert:
+        filename: baidu.com.pem
+      default_identity_key:
+        filename: baidu.com.key

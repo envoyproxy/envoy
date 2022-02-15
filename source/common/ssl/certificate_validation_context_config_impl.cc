@@ -19,8 +19,9 @@ static const std::string INLINE_STRING = "<inline>";
 
 CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config,
-    Api::Api& api)
-    : ca_cert_(Config::DataSource::read(config.trusted_ca(), true, api)),
+    Api::Api& api, Server::Configuration::TransportSocketFactoryContext& factory_context)
+    : ca_cert_(config.has_trusted_ca() ? Config::DataSource::read(config.trusted_ca(), true, api)
+                                       : EMPTY_STRING),
       ca_cert_path_(Config::DataSource::getPath(config.trusted_ca())
                         .value_or(ca_cert_.empty() ? EMPTY_STRING : INLINE_STRING)),
       certificate_revocation_list_(Config::DataSource::read(config.crl(), true, api)),
@@ -43,7 +44,14 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       max_verify_depth_(config.has_max_verify_depth()
                             ? absl::optional<uint32_t>(config.max_verify_depth().value())
                             : absl::nullopt) {
-  if (ca_cert_.empty() && custom_validator_config_ == absl::nullopt) {
+
+  if (config.has_ca_certificate_provider_instance()) {
+    ca_provider_instance_ = factory_context.certificateProviderManager().getCertificateProvider(
+        config.ca_certificate_provider_instance().instance_name());
+    ca_provider_cert_name_ = config.ca_certificate_provider_instance().certificate_name();
+  }
+  if (ca_cert_.empty() && ca_provider_instance_ == nullptr &&
+      custom_validator_config_ == absl::nullopt) {
     if (!certificate_revocation_list_.empty()) {
       throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",
                                        certificateRevocationListPath()));
@@ -58,6 +66,15 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
   }
 }
 
+void CertificateValidationContextConfigImpl::setCAUpdateCallback(std::function<void()> callback) {
+  if (ca_provider_instance_) {
+    ca_update_callback_handle_ =
+        ca_provider_instance_->addUpdateCallback(ca_provider_cert_name_, [this, callback]() {
+          ca_cert_ = ca_provider_instance_->trustedCA(ca_provider_cert_name_);
+          callback();
+        });
+  }
+}
 std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
 CertificateValidationContextConfigImpl::getSubjectAltNameMatchers(
     const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config) {

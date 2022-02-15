@@ -3,9 +3,11 @@
 #include <openssl/ssl.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "envoy/admin/v3/certs.pb.h"
@@ -90,7 +92,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       ssl_versions_(stat_name_set_->add("ssl.versions")),
       ssl_curves_(stat_name_set_->add("ssl.curves")),
       ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")), capabilities_(config.capabilities()),
-      tls_keylog_local_(config.tlsKeyLogLocal()), tls_keylog_remote_(config.tlsKeyLogRemote()) {
+      cert_provider_caps_(config.certProviderCaps()), tls_keylog_local_(config.tlsKeyLogLocal()),
+      tls_keylog_remote_(config.tlsKeyLogRemote()) {
 
   auto cert_validator_name = getCertValidatorName(config.certificateValidationContext());
   auto cert_validator_factory =
@@ -189,7 +192,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 #endif
 
-  absl::node_hash_set<int> cert_pkey_ids;
   if (!capabilities_.provides_certificates) {
     for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
       auto& ctx = tls_contexts_[i];
@@ -214,11 +216,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
       bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
       const int pkey_id = EVP_PKEY_id(public_key.get());
-      if (!cert_pkey_ids.insert(pkey_id).second) {
-        throw EnvoyException(fmt::format("Failed to load certificate chain from {}, at most one "
-                                         "certificate of a given type may be specified",
-                                         ctx.cert_chain_file_path_));
-      }
       ctx.is_ecdsa_ = pkey_id == EVP_PKEY_EC;
       switch (pkey_id) {
       case EVP_PKEY_EC: {
@@ -783,8 +780,17 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      TimeSource& time_source)
     : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()) {
-  if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
+  if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates &&
+      !config.certProviderCaps().provide_on_demand_identity_certs) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
+  }
+
+  for (auto& ctx : tls_contexts_) {
+    bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
+    const int pkey_id = EVP_PKEY_id(public_key.get());
+    // Load DNS SAN entries and Subject Common Name as server name patterns after certificate
+    // chain loaded, and populate ServerNamesMap which will be used to match SNI.
+    populateServerNamesMap(ctx, pkey_id);
   }
 
   // Compute the session context ID hash. We use all the certificate identities,
@@ -865,6 +871,61 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
         throw EnvoyException("OCSP response does not match its TLS certificate");
       }
       ctx.ocsp_response_ = std::move(response);
+    }
+  }
+}
+
+void ServerContextImpl::populateServerNamesMap(TlsContext& ctx, int pkey_id) {
+  if (ctx.cert_chain_ == nullptr) {
+    return;
+  }
+
+  auto populate = [&](const std::string& sn) {
+    std::string sn_pattern = sn;
+    if (absl::StartsWith(sn, "*.")) {
+      sn_pattern = sn.substr(1);
+    }
+    PkeyTypesMap pkey_types_map;
+    auto sn_match = server_names_map_.try_emplace(sn_pattern, pkey_types_map).first;
+    auto pt_match = sn_match->second.find(pkey_id);
+    if (pt_match != sn_match->second.end()) {
+      throw EnvoyException(fmt::format(
+          "Failed to load certificate chain from {}, at most one "
+          "certificate of a given type may be specified for each DNS SAN entry or Subject CN: {}",
+          ctx.cert_chain_file_path_, sn_match->first));
+    }
+    sn_match->second.emplace(std::pair<int, std::reference_wrapper<TlsContext>>(pkey_id, ctx));
+  };
+
+  bssl::UniquePtr<GENERAL_NAMES> san_names(static_cast<GENERAL_NAMES*>(
+      X509_get_ext_d2i(ctx.cert_chain_.get(), NID_subject_alt_name, nullptr, nullptr)));
+  auto dns_sans = Utility::getSubjectAltNames(*ctx.cert_chain_, GEN_DNS);
+  // https://www.rfc-editor.org/rfc/rfc6066#section-3
+  // Currently, the only server names supported are DNS hostnames, so we
+  // only save dns san entries to match SNI.
+  for (const auto& san : dns_sans) {
+    populate(san);
+  }
+
+  // https://www.rfc-editor.org/rfc/rfc6125#section-6.4.4
+  // As noted, a client MUST NOT seek a match for a reference identifier
+  // of CN-ID if the presented identifiers include a DNS-ID, SRV-ID,
+  // URI-ID, or any application-specific identifier types supported by the
+  // client.
+  if (san_names.get() == nullptr) {
+    X509_NAME* cert_subject = X509_get_subject_name(ctx.cert_chain_.get());
+    const int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
+    if (cn_index >= 0) {
+      X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
+      if (cn_entry) {
+        ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
+        if (ASN1_STRING_length(cn_asn1) > 0) {
+          std::string subject_cn;
+          subject_cn.assign(reinterpret_cast<char const*>(ASN1_STRING_data(cn_asn1)),
+                            ASN1_STRING_length(cn_asn1));
+          populate(subject_cn);
+        }
+      }
     }
   }
 }
@@ -1160,23 +1221,63 @@ enum ssl_select_cert_result_t
 ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   const bool client_ecdsa_capable = isClientEcdsaCapable(ssl_client_hello);
   const bool client_ocsp_capable = isClientOcspCapable(ssl_client_hello);
+  absl::string_view sni = absl::NullSafeStringView(
+      SSL_get_servername(ssl_client_hello->ssl, TLSEXT_NAMETYPE_host_name));
 
-  // Fallback on first certificate.
-  const TlsContext* selected_ctx = &tls_contexts_[0];
-  auto ocsp_staple_action = ocspStapleAction(*selected_ctx, client_ocsp_capable);
-  for (const auto& ctx : tls_contexts_) {
+  const TlsContext* selected_ctx = nullptr;
+  OcspStapleAction ocsp_staple_action;
+
+  auto selected = [&](const TlsContext& ctx) -> bool {
     if (client_ecdsa_capable != ctx.is_ecdsa_) {
-      continue;
+      return false;
     }
 
     auto action = ocspStapleAction(ctx, client_ocsp_capable);
     if (action == OcspStapleAction::Fail) {
-      continue;
+      return false;
     }
 
     selected_ctx = &ctx;
     ocsp_staple_action = action;
-    break;
+    return true;
+  };
+
+  // Do SNI matching and pkey type matching if SNI exists.
+  if (!sni.empty()) {
+    // Match on exact server name, i.e. "www.example.com" for "www.example.com".
+    auto server_name_it = server_names_map_.find(sni);
+    if (server_name_it == server_names_map_.end()) {
+      // Match on wildcard domain, i.e. ".example.com" for "www.example.com".
+      // https://datatracker.ietf.org/doc/html/rfc6125#section-6.4
+      size_t pos = sni.find('.', 1);
+      if (pos < sni.size() - 1 && pos != std::string::npos) {
+        absl::string_view wildcard = sni.substr(pos);
+        server_name_it = server_names_map_.find(static_cast<std::string>(wildcard));
+      }
+    }
+
+    if (server_name_it != server_names_map_.end()) {
+      const auto& pkey_types_map = server_name_it->second;
+      // Fallback on first SNI-matched certificate.
+      selected_ctx = &pkey_types_map.begin()->second.get();
+      ocsp_staple_action = ocspStapleAction(*selected_ctx, client_ocsp_capable);
+      for (const auto& entry : pkey_types_map) {
+        if (selected(entry.second.get())) {
+          break;
+        }
+      }
+    }
+  }
+  // Do pkey type matching if SNI does Not exist or no ctx matched for SNI.
+  if (selected_ctx == nullptr) {
+    // Fallback on first certificate.
+    selected_ctx = &tls_contexts_[0];
+    ocsp_staple_action = ocspStapleAction(*selected_ctx, client_ocsp_capable);
+    for (const auto& ctx : tls_contexts_) {
+      if (selected(ctx)) {
+        break;
+      }
+    }
   }
 
   // Apply the selected context. This must be done before OCSP stapling below

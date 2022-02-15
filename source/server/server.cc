@@ -561,6 +561,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   loadServerFlags(initial_config.flagsPath());
 
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin_->getConfigTracker());
+  certificate_provider_manager_ =
+      std::make_unique<CertificateProvider::CertificateProviderManagerImpl>(*api_);
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
@@ -686,7 +688,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       serverFactoryContext(), *admin_, runtime(), stats_store_, thread_local_, dns_resolver_,
       *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
       messageValidationContext(), *api_, http_context_, grpc_context_, router_context_,
-      access_log_manager_, *singleton_manager_, options_, quic_stat_names_, *this);
+      access_log_manager_, *singleton_manager_, options_, quic_stat_names_,
+      *certificate_provider_manager_, *this);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl

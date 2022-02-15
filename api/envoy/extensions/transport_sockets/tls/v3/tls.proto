@@ -227,12 +227,9 @@ message CommonTlsContext {
   // TLS protocol versions, cipher suites etc.
   TlsParameters tls_params = 1;
 
+  // Only a single TLS certificate is supported in client contexts. In server contexts,
   // :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>` can be associated with the
-  // same context to allow both RSA and ECDSA certificates.
-  //
-  // Only a single TLS certificate is supported in client contexts. In server contexts, the first
-  // RSA certificate is used for clients that only support RSA and the first ECDSA certificate is
-  // used for clients that support ECDSA.
+  // same context to allow both RSA and ECDSA certificates and support SNI-based selection.
   //
   // Only one of ``tls_certificates``, ``tls_certificate_sds_secret_configs``,
   // and ``tls_certificate_provider_instance`` may be used.
@@ -257,9 +254,8 @@ message CommonTlsContext {
 
   // Certificate provider instance for fetching TLS certs.
   //
-  // Only one of ``tls_certificates``, ``tls_certificate_sds_secret_configs``,
-  // and ``tls_certificate_provider_instance`` may be used.
-  // [#not-implemented-hide:]
+  // Only one of *tls_certificates*, *tls_certificate_sds_secret_configs*,
+  // and *tls_certificate_provider_instance* may be used.
   CertificateProviderPluginInstance tls_certificate_provider_instance = 14;
 
   // Certificate provider for fetching TLS certificates.

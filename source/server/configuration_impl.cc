@@ -94,6 +94,13 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
     server.secretManager().addStaticSecret(secrets[i]);
   }
 
+  const auto& certificate_providers = bootstrap.certificate_provider_instances();
+  for (auto iter = certificate_providers.begin(); iter != certificate_providers.end(); iter++) {
+    ENVOY_LOG(debug, "add certificate provider: {}", iter->first);
+    server.certificateProviderManager().addCertificateProvider(
+        iter->first, iter->second, server.transportSocketFactoryContext());
+  }
+
   ENVOY_LOG(info, "loading {} cluster(s)", bootstrap.static_resources().clusters().size());
   cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(bootstrap);
 

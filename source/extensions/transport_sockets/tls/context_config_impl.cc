@@ -187,6 +187,19 @@ ContextConfigImpl::ContextConfigImpl(
       factory_context_(factory_context), tls_keylog_path_(config.key_log().path()),
       tls_keylog_local_(config.key_log().local_address_range()),
       tls_keylog_remote_(config.key_log().remote_address_range()) {
+
+  if (tls_certificate_providers_.empty()) {
+    if (config.has_tls_certificate_provider_instance()) {
+      tls_certificates_hybrid_provider_ =
+          factory_context.certificateProviderManager().getCertificateProvider(
+              config.tls_certificate_provider_instance().instance_name());
+      tls_certificate_name_ = config.tls_certificate_provider_instance().certificate_name();
+      if (tls_certificates_hybrid_provider_) {
+        cert_provider_caps_ = tls_certificates_hybrid_provider_->capabilities();
+      }
+    }
+  }
+
   if (certificate_validation_context_provider_ != nullptr) {
     if (default_cvc_) {
       // We need to validate combined certificate validation context.
@@ -209,7 +222,7 @@ ContextConfigImpl::ContextConfigImpl(
             getCombinedValidationContextConfig(*certificate_validation_context_provider_->secret());
       } else {
         validation_context_config_ = std::make_unique<Ssl::CertificateValidationContextConfigImpl>(
-            *certificate_validation_context_provider_->secret(), api_);
+            *certificate_validation_context_provider_->secret(), api_, factory_context);
       }
     }
   }
@@ -219,6 +232,11 @@ ContextConfigImpl::ContextConfigImpl(
       if (provider->secret() != nullptr) {
         tls_certificate_configs_.emplace_back(*provider->secret(), factory_context, api_);
       }
+    }
+  } else if (tls_certificates_hybrid_provider_ != nullptr) {
+    for (auto tls_certificate :
+         tls_certificates_hybrid_provider_->tlsCertificates(tls_certificate_name_)) {
+      tls_certificate_configs_.emplace_back(tls_certificate.get(), factory_context, api_);
     }
   }
 
@@ -250,10 +268,14 @@ Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidat
   envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext combined_cvc =
       *default_cvc_;
   combined_cvc.MergeFrom(dynamic_cvc);
-  return std::make_unique<Envoy::Ssl::CertificateValidationContextConfigImpl>(combined_cvc, api_);
+  return std::make_unique<Envoy::Ssl::CertificateValidationContextConfigImpl>(combined_cvc, api_,
+                                                                              factory_context_);
 }
 
 void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {
+  if (validation_context_config_) {
+    validation_context_config_->setCAUpdateCallback(callback);
+  }
   // When any of tls_certificate_providers_ receives a new secret, this callback updates
   // ContextConfigImpl::tls_certificate_configs_ with new secret.
   for (const auto& tls_certificate_provider : tls_certificate_providers_) {
@@ -279,6 +301,7 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
           certificate_validation_context_provider_->addUpdateCallback([this, callback]() {
             validation_context_config_ = getCombinedValidationContextConfig(
                 *certificate_validation_context_provider_->secret());
+            validation_context_config_->setCAUpdateCallback(callback);
             callback();
           });
     } else {
@@ -288,10 +311,22 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
           certificate_validation_context_provider_->addUpdateCallback([this, callback]() {
             validation_context_config_ =
                 std::make_unique<Ssl::CertificateValidationContextConfigImpl>(
-                    *certificate_validation_context_provider_->secret(), api_);
+                    *certificate_validation_context_provider_->secret(), api_, factory_context_);
+            validation_context_config_->setCAUpdateCallback(callback);
             callback();
           });
     }
+  }
+  if (tls_certificates_hybrid_provider_) {
+    tc_update_callback_handles_.push_back(tls_certificates_hybrid_provider_->addUpdateCallback(
+        tls_certificate_name_, [this, callback]() {
+          tls_certificate_configs_.clear();
+          for (auto& tls_certificate :
+               tls_certificates_hybrid_provider_->tlsCertificates(tls_certificate_name_)) {
+            tls_certificate_configs_.emplace_back(tls_certificate.get(), factory_context_, api_);
+          }
+          callback();
+        }));
   }
 }
 
@@ -405,7 +440,8 @@ ServerContextConfigImpl::ServerContextConfigImpl(
 
   if (!capabilities().provides_certificates) {
     if ((config.common_tls_context().tls_certificates().size() +
-         config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0) {
+         config.common_tls_context().tls_certificate_sds_secret_configs().size()) +
+         config.common_tls_context().has_tls_certificate_provider_instance() == 0) {
       throw EnvoyException("No TLS certificates found for server context");
     } else if (!config.common_tls_context().tls_certificates().empty() &&
                !config.common_tls_context().tls_certificate_sds_secret_configs().empty()) {

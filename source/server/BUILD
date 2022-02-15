@@ -599,6 +599,7 @@ envoy_cc_library(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/api:api_lib",
+        "//source/common/certificate_provider:certificate_provider_manager_impl_lib",
         "//source/common/common:cleanup_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:mutex_tracer_lib",

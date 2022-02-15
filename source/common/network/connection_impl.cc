@@ -588,7 +588,9 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
   }
 
   if (events & Event::FileReadyType::Write) {
-    onWriteReady();
+    if (!write_disable) {
+      onWriteReady();
+    }
   }
 
   // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
@@ -811,9 +813,11 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
 ServerConnectionImpl::ServerConnectionImpl(Event::Dispatcher& dispatcher,
                                            ConnectionSocketPtr&& socket,
                                            TransportSocketPtr&& transport_socket,
-                                           StreamInfo::StreamInfo& stream_info, bool connected)
+                                           StreamInfo::StreamInfo& stream_info,
+                                           const Network::DownstreamTransportSocketFactory& transport_socket_factory,
+                                           bool connected)
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info,
-                     connected) {}
+                     connected), transport_socket_factory_(transport_socket_factory) {}
 
 void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,
                                                             Stats::Counter& timeout_stat) {
@@ -849,6 +853,16 @@ void ServerConnectionImpl::onTransportSocketConnectTimeout() {
   closeConnectionImmediately();
   transport_socket_timeout_stat_->inc();
   setFailureReason("connect timeout");
+}
+
+void ServerConnectionImpl::refreshTransportSocket() {
+  ENVOY_CONN_LOG(info, "refresh transport socket", *this);
+  auto transport_socket = transport_socket_factory_.createDownstreamTransportSocket();
+  std::swap(transport_socket, transport_socket_);
+  transport_socket_->setTransportSocketCallbacks(*this);
+  // Currently setSslConnection doesn't allow swapping connectioninfo if old connection info exists
+  // Revisit this when related issues are discovered.
+  //socket_->connectionInfoProvider().setSslConnection(transport_socket_->ssl());
 }
 
 ClientConnectionImpl::ClientConnectionImpl(

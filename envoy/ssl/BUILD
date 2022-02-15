@@ -63,6 +63,7 @@ envoy_cc_library(
     hdrs = ["certificate_validation_context_config.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        "//envoy/certificate_provider:certificate_provider_interface",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],

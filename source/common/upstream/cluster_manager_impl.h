@@ -58,7 +58,9 @@ public:
       Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
       Router::Context& router_context, AccessLog::AccessLogManager& log_manager,
       Singleton::Manager& singleton_manager, const Server::Options& options,
-      Quic::QuicStatNames& quic_stat_names, const Server::Instance& server)
+      Quic::QuicStatNames& quic_stat_names,
+      CertificateProvider::CertificateProviderManager& certificate_provider_manager,
+      const Server::Instance& server)
       : server_context_(server_context),
         context_(options, main_thread_dispatcher, api, local_info, admin, runtime,
                  singleton_manager, validation_context.staticValidationVisitor(), stats, tls),
@@ -66,6 +68,7 @@ public:
         grpc_context_(grpc_context), router_context_(router_context), admin_(admin), stats_(stats),
         tls_(tls), dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
         local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
+        certificate_provider_manager_(certificate_provider_manager),
         quic_stat_names_(quic_stat_names),
         alternate_protocols_cache_manager_factory_(singleton_manager, tls_, {context_}),
         alternate_protocols_cache_manager_(alternate_protocols_cache_manager_factory_.get()),
@@ -97,6 +100,9 @@ public:
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
   Singleton::Manager& singletonManager() override { return server_context_.singletonManager(); }
+  CertificateProvider::CertificateProviderManager& certificateProviderManager() override {
+    return certificate_provider_manager_;
+  }
 
 protected:
   Server::Configuration::ServerFactoryContext& server_context_;
@@ -113,6 +119,7 @@ protected:
   const LocalInfo::LocalInfo& local_info_;
   Secret::SecretManager& secret_manager_;
   AccessLog::AccessLogManager& log_manager_;
+  CertificateProvider::CertificateProviderManager& certificate_provider_manager_;
   Quic::QuicStatNames& quic_stat_names_;
   Http::HttpServerPropertiesCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
   Http::HttpServerPropertiesCacheManagerSharedPtr alternate_protocols_cache_manager_;

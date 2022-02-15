@@ -100,6 +100,9 @@ public:
     }
     return *runtime_;
   }
+  CertificateProvider::CertificateProviderManager& certificateProviderManager() override {
+    return *certificate_provider_manager_;
+  }
   void shutdown() override;
   bool isShutdown() override { return false; }
   void shutdownAdmin() override {}
@@ -209,6 +212,7 @@ private:
   // - There may be active clusters referencing it in config_.cluster_manager_.
   // - There may be active connections referencing it.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
+  std::unique_ptr<CertificateProvider::CertificateProviderManager> certificate_provider_manager_;
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;
   Stats::IsolatedStoreImpl& stats_store_;

@@ -114,21 +114,35 @@ Certificate selection
 ---------------------
 
 :ref:`DownstreamTlsContexts <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` support multiple TLS
-certificates. These may be a mix of RSA and P-256 ECDSA certificates. The following rules apply:
+certificates. These may be a mix of RSA and P-256 ECDSA certificates for multiple SANs.
 
-* Only one certificate of a particular type (RSA or ECDSA) may be specified.
+Certificate config/loading rules:
+
+* DNS SANs or Subject Common Name is extracted as server name pattern to match SNI during handshake.
+* FQDN like "test.example.com" and wildcard like "\*.example.com" are valid at the same time, which will be loaded
+  as two different server name pattern.
+* Only one certificate of a particular type (RSA or ECDSA) may be specified for each server name pattern.
 * Non-P-256 server ECDSA certificates are rejected.
-* If the client supports P-256 ECDSA, a P-256 ECDSA certificate will be selected if one is present in the
-  :ref:`DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`
-  and it is in compliance with the OCSP policy.
-* If the client only supports RSA certificates, a RSA certificate will be selected if present in the
-  :ref:`DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`.
-* Otherwise, the first certificate listed is used. This will result in a failed handshake if the
-  client only supports RSA certificates and the server only has ECDSA certificates.
 * Static and SDS certificates may not be mixed in a given :ref:`DownstreamTlsContext
   <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`.
-* The selected certificate must adhere to the OCSP policy. If no
-  such certificate is found, the connection is refused.
+
+Certificate selection rules, including SNI matching, Public Key Type matching and OCSP:
+
+* If the client supports SNI, a certificate with proper DNS SANs or Subject Common Name should be selected
+* It matches on exact server name first, then matches on wildcard server name if an exact name match isn't found, e.g. if SNI is
+  "test.example.com", a certificate with "test.example.com" will be preferred over for "\*.example.com".
+* If no certificate is matched to SNI or the client does not support SNI, subsequent particular type (RSA or ECDSA)
+  matching will be executed with all certificates as candidates.
+* Otherwise, particular type (RSA or ECDSA) matching will be executed with SNI-matched certificates as candidates.
+* Key type matching is based on SNI matching results
+* If the client supports P-256 ECDSA, the first P-256 ECDSA certificate is selected if it is present and the OCSP check is passed.
+* If the client only supports RSA, the first RSA certificate is selected if it is present.
+* If no exact match, fallback to the first certificate in the candidates.
+* The certificate that it fallbacks to might result in a failed handshake. For instance, a client only supports
+  RSA certificates and the certificate only support ECDSA, or a client only supports ECDSA certificate and the
+  certificate only support RSA.
+* After key type matching, one certificate is selected, and the selected certificate must adhere to the OCSP policy.
+  If no such certificate is found, the connection is refused.
 
 Only a single TLS certificate is supported today for :ref:`UpstreamTlsContexts
 <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`.

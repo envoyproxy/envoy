@@ -200,7 +200,8 @@ public:
   virtual Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket,
-                         StreamInfo::StreamInfo& stream_info) PURE;
+                         StreamInfo::StreamInfo& stream_info,
+                         const Network::DownstreamTransportSocketFactory& transport_socket_factory) PURE;
 
   /**
    * Creates an instance of Envoy's Network::ClientConnection. Does NOT initiate the connection;

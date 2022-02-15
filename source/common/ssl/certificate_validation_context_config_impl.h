@@ -5,6 +5,7 @@
 #include "envoy/api/api.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
@@ -15,7 +16,7 @@ class CertificateValidationContextConfigImpl : public CertificateValidationConte
 public:
   CertificateValidationContextConfigImpl(
       const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config,
-      Api::Api& api);
+      Api::Api& api, Server::Configuration::TransportSocketFactoryContext& factory_context);
 
   const std::string& caCert() const override { return ca_cert_; }
   const std::string& caCertPath() const override { return ca_cert_path_; }
@@ -53,11 +54,17 @@ public:
 
   absl::optional<uint32_t> maxVerifyDepth() const override { return max_verify_depth_; }
 
+  Envoy::CertificateProvider::CertificateProviderSharedPtr caProvider() const override {
+    return ca_provider_instance_;
+  };
+
+  void setCAUpdateCallback(std::function<void()> callback) override;
+
 private:
   static std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
   getSubjectAltNameMatchers(
       const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config);
-  const std::string ca_cert_;
+  std::string ca_cert_;
   const std::string ca_cert_path_;
   const std::string certificate_revocation_list_;
   const std::string certificate_revocation_list_path_;
@@ -72,6 +79,9 @@ private:
   Api::Api& api_;
   const bool only_verify_leaf_cert_crl_;
   absl::optional<uint32_t> max_verify_depth_;
+  Envoy::CertificateProvider::CertificateProviderSharedPtr ca_provider_instance_;
+  std::string ca_provider_cert_name_;
+  Envoy::Common::CallbackHandlePtr ca_update_callback_handle_;
 };
 
 } // namespace Ssl
