@@ -55,7 +55,9 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
   }
 
   policies_ = {{
-      decoder_callbacks_->route()->routeEntry() != nullptr ? decoder_callbacks_->route()->routeEntry()->corsPolicy() : decoder_callbacks_->route()->directResponseEntry()->corsPolicy(),
+      decoder_callbacks_->route()->routeEntry() != nullptr
+          ? decoder_callbacks_->route()->routeEntry()->corsPolicy()
+          : decoder_callbacks_->route()->directResponseEntry()->corsPolicy(),
       decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy(),
   }};
 

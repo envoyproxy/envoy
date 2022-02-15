@@ -525,7 +525,8 @@ TEST_F(CorsFilterTest, RedirectRoute) {
   ON_CALL(*decoder_callbacks_.route_, directResponseEntry())
       .WillByDefault(Return(&direct_response_entry_));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(true, IsCorsRequest());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));

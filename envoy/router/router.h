@@ -70,6 +70,8 @@ public:
                                                           bool do_formatting = true) const PURE;
 };
 
+class CorsPolicy;
+
 /**
  * A routing primitive that specifies a direct (non-proxied) HTTP response.
  */
