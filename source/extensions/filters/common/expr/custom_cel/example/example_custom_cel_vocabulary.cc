@@ -29,6 +29,8 @@ template <typename T>
 void addValueProducerToActivation(Activation* activation,
                                   const absl::string_view value_producer_name,
                                   std::unique_ptr<T> value_producer);
+void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view function_name,
+                               CelFunctionDescriptor descriptor);
 
 void ExampleCustomCELVocabulary::fillActivation(Activation* activation, Protobuf::Arena& arena,
                                                 const StreamInfo::StreamInfo& info,
@@ -49,18 +51,18 @@ void ExampleCustomCELVocabulary::fillActivation(Activation* activation, Protobuf
                                    arena, request_headers, info, return_url_query_string_as_map_));
   // Lazily evaluated functions only
   addLazyFunctionToActivation(activation,
-                              std::make_unique<GetDoubleCELFunction>(LazyEvalFuncNameGetDouble),
-                              GetDoubleCELFunction::createDescriptor(LazyEvalFuncNameGetDouble));
+                              std::make_unique<GetDoubleCELFunction>(LazyFuncNameGetDouble),
+                              GetDoubleCELFunction::createDescriptor(LazyFuncNameGetDouble));
   addLazyFunctionToActivation(activation,
-                              std::make_unique<GetProductCELFunction>(LazyEvalFuncNameGetProduct),
-                              GetProductCELFunction::createDescriptor(LazyEvalFuncNameGetProduct));
-  addLazyFunctionToActivation(activation, std::make_unique<Get99CELFunction>(LazyEvalFuncNameGet99),
-                              Get99CELFunction::createDescriptor(LazyEvalFuncNameGet99));
+                              std::make_unique<GetProductCELFunction>(LazyFuncNameGetProduct),
+                              GetProductCELFunction::createDescriptor(LazyFuncNameGetProduct));
+  addLazyFunctionToActivation(activation, std::make_unique<Get99CELFunction>(LazyFuncNameGet99),
+                              Get99CELFunction::createDescriptor(LazyFuncNameGet99));
 }
 
-// addValueProducerToActivation: Removes any envoy native version of a value producer
-// with the same name from the activation.
-// Adds the custom version to the activation.
+// addValueProducerToActivation:
+// Removes any envoy native value producer mapping of the same name from the activation.
+// Replaces it with custom version.
 template <typename T>
 void addValueProducerToActivation(Activation* activation,
                                   const absl::string_view value_producer_name,
@@ -69,15 +71,20 @@ void addValueProducerToActivation(Activation* activation,
   activation->InsertValueProducer(value_producer_name, std::move(value_producer));
 }
 
-// addLazyFunctionToActivation: Removes any envoy native version of a function
-// with the same function descriptor from the activation.
-// Adds the custom version to the activation.
+// addLazyFunctionToActivation:
+// Removes any envoy native version of a function with the same function descriptor from the
+// activation. Adds the custom version to the activation.
 void addLazyFunctionToActivation(Activation* activation, std::unique_ptr<CelFunction> function,
                                  CelFunctionDescriptor descriptor) {
   activation->RemoveFunctionEntries(descriptor);
   absl::Status status = activation->InsertFunction(std::move(function));
 }
 
+// addLazyFunctionToRegistry:
+// There is no way to remove previous function registrations with the same
+// function descriptor from the registry.
+// If there is an existing registration with the same name, the registration will not be
+// overwritten. A message will be printed to the log.
 void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view function_name,
                                CelFunctionDescriptor descriptor) {
   absl::Status status = registry->RegisterLazyFunction(descriptor);
@@ -88,38 +95,34 @@ void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view 
 }
 
 template <typename ReturnType, typename... Arguments>
-void addEagerFunctionToRegistry(absl::string_view function_name, bool receiver_type,
-                                std::function<ReturnType(Protobuf::Arena*, Arguments...)> function,
-                                CelFunctionRegistry* registry) {
+void addStaticFunctionToRegistry(absl::string_view function_name, bool receiver_type,
+                                 std::function<ReturnType(Protobuf::Arena*, Arguments...)> function,
+                                 CelFunctionRegistry* registry) {
   absl::Status status = FunctionAdapter<ReturnType, Arguments...>::CreateAndRegister(
       function_name, receiver_type, function, registry);
   if (!status.ok()) {
-    ENVOY_LOG_MISC(debug, "Failed to register eager function {}  in CEL function registry: {}",
+    ENVOY_LOG_MISC(debug, "Failed to register static function {}  in CEL function registry: {}",
                    function_name, status.message());
   }
 }
 
-// registerFunctions:
-// There is no way to remove previous entries from the registry.
-// If there is an existing entry with the same name, the registration will not be overwritten.
-// A message will be printed to the log.
 void ExampleCustomCELVocabulary::registerFunctions(CelFunctionRegistry* registry) {
   absl::Status status;
 
   // lazily evaluated functions
-  addLazyFunctionToRegistry(registry, LazyEvalFuncNameGetDouble,
-                            GetDoubleCELFunction::createDescriptor(LazyEvalFuncNameGetDouble));
-  addLazyFunctionToRegistry(registry, LazyEvalFuncNameGetProduct,
-                            GetProductCELFunction::createDescriptor(LazyEvalFuncNameGetProduct));
-  addLazyFunctionToRegistry(registry, LazyEvalFuncNameGet99,
-                            Get99CELFunction::createDescriptor(LazyEvalFuncNameGet99));
+  addLazyFunctionToRegistry(registry, LazyFuncNameGetDouble,
+                            GetDoubleCELFunction::createDescriptor(LazyFuncNameGetDouble));
+  addLazyFunctionToRegistry(registry, LazyFuncNameGetProduct,
+                            GetProductCELFunction::createDescriptor(LazyFuncNameGetProduct));
+  addLazyFunctionToRegistry(registry, LazyFuncNameGet99,
+                            Get99CELFunction::createDescriptor(LazyFuncNameGet99));
 
-  addEagerFunctionToRegistry(EagerEvalFuncNameGetNextInt, false,
-                             std::function<CelValue(Protobuf::Arena*, int64_t)>(getNextInt),
-                             registry);
-  addEagerFunctionToRegistry(EagerEvalFuncNameGetSquareOf, true,
-                             std::function<CelValue(Protobuf::Arena*, int64_t)>(getSquareOf),
-                             registry);
+  addStaticFunctionToRegistry(StaticFuncNameGetNextInt, false,
+                              std::function<CelValue(Protobuf::Arena*, int64_t)>(getNextInt),
+                              registry);
+  addStaticFunctionToRegistry(StaticFuncNameGetSquareOf, true,
+                              std::function<CelValue(Protobuf::Arena*, int64_t)>(getSquareOf),
+                              registry);
 }
 
 CustomCELVocabularyPtr ExampleCustomCELVocabularyFactory::createCustomCELVocabulary(

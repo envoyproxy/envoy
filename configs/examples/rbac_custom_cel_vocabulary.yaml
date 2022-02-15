@@ -47,23 +47,23 @@ static_resources:
                     "@type": type.googleapis.com/envoy.extensions.expr.custom_cel_vocabulary.example.v3.ExampleCustomCELVocabularyConfig
                     return_url_query_string_as_map: true
                 policies:
-#                  "policy-rbac-deny-if-custom-team-is-spirit":
-#                    # deny if custom[team].contains("spirit")
-#                    condition:
-#                      call_expr:
-#                        function: contains
-#                        args:
-#                        - select_expr:
-#                            operand:
-#                              ident_expr:
-#                                name: custom
-#                            field: team
-#                        - const_expr:
-#                            string_value: spirit
-#                    permissions:
-#                    - any: true
-#                    principals:
-#                    - any: true
+                  "policy-rbac-deny-if-custom-team-is-spirit":
+                    # deny if custom[team].contains("spirit")
+                    condition:
+                      call_expr:
+                        function: contains
+                        args:
+                        - select_expr:
+                            operand:
+                              ident_expr:
+                                name: custom
+                            field: team
+                        - const_expr:
+                            string_value: spirit
+                    permissions:
+                    - any: true
+                    principals:
+                    - any: true
                   "policy-rbac-deny-if-extended-request-query-key-contains-value":
                     # deny if request[query][key].contains("value")
                     condition:
@@ -84,160 +84,140 @@ static_resources:
                     - any: true
                     principals:
                     - any: true
-#                  "policy-rbac-deny-if-extended-request-query-contains-hi":
-#                    # deny if request[query].contains("hi")
-#                    condition:
-#                      call_expr:
-#                        function: contains
-#                        args:
-#                        - select_expr:
-#                            operand:
-#                              select_expr:
-#                                operand:
-#                                  ident_expr:
-#                                    name: request
-#                                field: query
-#                            field: greeting
-#                        - const_expr:
-#                            string_value: hello
-#                    permissions:
-#                    - any: true
-#                    principals:
-#                    - any: true
-#                  "policy-rbac-deny-if-custom-source-description-contains-description":
-#                    # deny if source[description].contains("description")
-#                    condition:
-#                      call_expr:
-#                        function: contains
-#                        args:
-#                        - select_expr:
-#                            operand:
-#                              ident_expr:
-#                                name: source
-#                            field: description
-#                        - const_expr:
-#                            string_value: description
-#                    permissions:
-#                    - any: true
-#                    principals:
-#                    - any: true
-#                  "policy-rbac-deny-if-receiver-style-GetSquareOf-4-equals-16":
-#                    # deny if 4.GetSquareOf == 16
-#                    condition:
-#                      call_expr:
-#                        function: _==_
-#                        args:
-#                        - call_expr:
-#                            target:
-#                              const_expr:
-#                                int64_value: 4
-#                            function: getSquareOf
-#                        - const_expr:
-#                            int64_value: 16
-#                    permissions:
-#                    - any: true
-#                    principals:
-#                    - any: true
-#                  "policy-rbac-deny-if-GetDouble-2-equals-4":
-#                    # deny if GetDouble(2) == 4
-#                    condition:
-#                      call_expr:
-#                        function: _==_
-#                        args:
-#                        - call_expr:
-#                            function: GetDouble
-#                            args:
-#                            - const_expr:
-#                                int64_value: 2
-#                        - const_expr:
-#                            int64_value: 4
-#                    permissions:
-#                    - any: true
-#                    principals:
-#                    - any: true
-#                  "policy-rbac-deny-if-GetProduct-2-times-4-equals-4":
-#                    # deny if GetProduct(2,4) == 8
-#                    condition:
-#                      call_expr:
-#                        function: _==_
-#                        args:
-#                        - call_expr:
-#                            function: GetProduct
-#                            args:
-#                            - const_expr:
-#                                int64_value: 2
-#                            - const_expr:
-#                                int64_value: 4
-#                        - const_expr:
-#                            int64_value: 8
-#                    permissions:
-#                    - any: true
-#                    principals:
-#                    - any: true
-#                  "policy-rbac-deny-if-Get99-equals-99":
-#                    # deny if Get99() == 99
-#                    condition:
-#                      call_expr:
-#                        function: _==_
-#                        args:
-#                        - call_expr:
-#                            function: Get99
-#                        - const_expr:
-#                            int64_value: 99
-#                    permissions:
-#                    - any: true
-#                    principals:
-#                    - any: true
-#                  "policy-deny-if-GetNextInt-is-2":
-#                    # deny if GetNextInt(1) == 2
-#                    condition:
-#                      call_expr:
-#                        function: _==_
-#                        args:
-#                        - call_expr:
-#                            function: getNextInt
-#                            args:
-#                            - const_expr:
-#                                int64_value: 1
-#                        - const_expr:
-#                            int64_value: 2
-#                    permissions:
-#                    - any: true
-#                    principals:
-#                    - any: true
-#                  "policy-rbac-deny-if-ip-is-localhost":
-#                    # deny if custom[ip].equals("127.0.0.1")
-#                    condition:
-#                      call_expr:
-#                        function: _==_
-#                        args:
-#                        - select_expr:
-#                            operand:
-#                              ident_expr:
-#                                name: custom
-#                            field: ip
-#                        - const_expr:
-#                            string_value: 127.0.0.1
-#                    permissions:
-#                    - any: true
-#                    principals:
-#                    - any: true
-#                  "policy-rbac-deny-if-protocol-contains-http":
-#                    condition:
-#                      call_expr:
-#                        function: contains
-#                        args:
-#                        - select_expr:
-#                            operand:
-#                              ident_expr:
-#                                name: custom
-#                            field: protocol
-#                        - const_expr:
-#                            string_value: HTTP
-#                    permissions:
-#                    - any: true
-#                    principals:
-#                    - any: true
+                  "policy-rbac-deny-if-custom-source-description-contains-description":
+                    # deny if source[description].contains("description")
+                    condition:
+                      call_expr:
+                        function: contains
+                        args:
+                        - select_expr:
+                            operand:
+                              ident_expr:
+                                name: source
+                            field: description
+                        - const_expr:
+                            string_value: description
+                    permissions:
+                    - any: true
+                    principals:
+                    - any: true
+                  "policy-rbac-deny-if-receiver-style-getSquareOf-4-equals-16":
+                    # deny if 4.getSquareOf == 16
+                    condition:
+                      call_expr:
+                        function: _==_
+                        args:
+                        - call_expr:
+                            target:
+                              const_expr:
+                                int64_value: 4
+                            function: getSquareOf
+                        - const_expr:
+                            int64_value: 16
+                    permissions:
+                    - any: true
+                    principals:
+                    - any: true
+                  "policy-rbac-deny-if-GetDouble-2-equals-4":
+                    # deny if GetDouble(2) == 4
+                    condition:
+                      call_expr:
+                        function: _==_
+                        args:
+                        - call_expr:
+                            function: GetDouble
+                            args:
+                            - const_expr:
+                                int64_value: 2
+                        - const_expr:
+                            int64_value: 4
+                    permissions:
+                    - any: true
+                    principals:
+                    - any: true
+                  "policy-rbac-deny-if-GetProduct-2-times-4-equals-4":
+                    # deny if GetProduct(2,4) == 8
+                    condition:
+                      call_expr:
+                        function: _==_
+                        args:
+                        - call_expr:
+                            function: GetProduct
+                            args:
+                            - const_expr:
+                                int64_value: 2
+                            - const_expr:
+                                int64_value: 4
+                        - const_expr:
+                            int64_value: 8
+                    permissions:
+                    - any: true
+                    principals:
+                    - any: true
+                  "policy-rbac-deny-if-Get99-equals-99":
+                    # deny if Get99() == 99
+                    condition:
+                      call_expr:
+                        function: _==_
+                        args:
+                        - call_expr:
+                            function: Get99
+                        - const_expr:
+                            int64_value: 0
+                    permissions:
+                    - any: true
+                    principals:
+                    - any: true
+                  "policy-deny-if-getNextInt-is-2":
+                    # deny if getNextInt(1) == 2
+                    condition:
+                      call_expr:
+                        function: _==_
+                        args:
+                        - call_expr:
+                            function: getNextInt
+                            args:
+                            - const_expr:
+                                int64_value: 1
+                        - const_expr:
+                            int64_value: 2
+                    permissions:
+                    - any: true
+                    principals:
+                    - any: true
+                  "policy-rbac-deny-if-ip-is-localhost":
+                    # deny if custom[ip].equals("127.0.0.1")
+                    condition:
+                      call_expr:
+                        function: _==_
+                        args:
+                        - select_expr:
+                            operand:
+                              ident_expr:
+                                name: custom
+                            field: ip
+                        - const_expr:
+                            string_value: 127.0.0.1
+                    permissions:
+                    - any: true
+                    principals:
+                    - any: true
+                  "policy-rbac-deny-if-protocol-contains-http":
+                    condition:
+                      call_expr:
+                        function: contains
+                        args:
+                        - select_expr:
+                            operand:
+                              ident_expr:
+                                name: custom
+                            field: protocol
+                        - const_expr:
+                            string_value: HTTP
+                    permissions:
+                    - any: true
+                    principals:
+                    - any: true
           - name: envoy.filters.http.router
   clusters:
   - name: admin_cluster

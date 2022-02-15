@@ -32,11 +32,11 @@ constexpr absl::string_view SourceVariablesName = "source";
 constexpr absl::string_view ExtendedRequestVariablesName = "request";
 
 // function names
-constexpr absl::string_view LazyEvalFuncNameGetDouble = "GetDouble";
-constexpr absl::string_view LazyEvalFuncNameGetProduct = "GetProduct";
-constexpr absl::string_view LazyEvalFuncNameGet99 = "Get99";
-constexpr absl::string_view EagerEvalFuncNameGetNextInt = "getNextInt";
-constexpr absl::string_view EagerEvalFuncNameGetSquareOf = "getSquareOf";
+constexpr absl::string_view LazyFuncNameGetDouble = "GetDouble";
+constexpr absl::string_view LazyFuncNameGetProduct = "GetProduct";
+constexpr absl::string_view LazyFuncNameGet99 = "Get99";
+constexpr absl::string_view StaticFuncNameGetNextInt = "getNextInt";
+constexpr absl::string_view StaticFuncNameGetSquareOf = "getSquareOf";
 
 class ExampleCustomCELVocabulary : public CustomCELVocabulary {
 public:

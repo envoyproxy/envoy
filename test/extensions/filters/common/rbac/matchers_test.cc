@@ -490,20 +490,15 @@ TEST(PolicyMatcherWithCustomCelVocabulary, PolicyMatcherWithCustomCelVocabulary)
   RBAC::PolicyMatcher matcher(policy, builder.get(), ProtobufMessage::getStrictValidationVisitor(),
                               &custom_cel_vocabulary);
 
-  // condition should return true
+  // the policy condition should evaluate to true and checkMatcher should return true
   checkMatcher(matcher, true, conn, headers, info);
 
-  envoy::config::rbac::v3::Policy policy2;
-  policy2.add_permissions()->set_any(true);
-  policy2.add_principals()->set_any(true);
-  policy2.mutable_condition()->MergeFrom(TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(
+  policy.mutable_condition()->Clear();
+  policy.mutable_condition()->MergeFrom(TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(
       fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "wrong")));
-
-  RBAC::PolicyMatcher matcher2(policy2, builder.get(),
-                               ProtobufMessage::getStrictValidationVisitor(),
+  RBAC::PolicyMatcher matcher2(policy, builder.get(), ProtobufMessage::getStrictValidationVisitor(),
                                &custom_cel_vocabulary);
-
-  // condition should return false
+  // the policy condition should evaluate to false and checkMatcher should return false
   checkMatcher(matcher2, false, conn, headers, info);
 }
 

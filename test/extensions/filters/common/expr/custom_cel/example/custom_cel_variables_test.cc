@@ -23,7 +23,7 @@ namespace Example {
 class VariablesTest : public testing::Test {
 public:
   Protobuf::Arena arena;
-  StreamInfo::MockStreamInfo mock_stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
 };
 
 class CustomVariablesTests : public VariablesTest {};

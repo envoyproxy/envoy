@@ -24,7 +24,6 @@ namespace Example {
 
 using Envoy::Extensions::Filters::Common::Expr::Custom_CEL::Example::Utility;
 using google::api::expr::runtime::CelList;
-using google::api::expr::runtime::CelMap;
 using google::api::expr::runtime::ContainerBackedListImpl;
 
 // variable names for CustomWrapper

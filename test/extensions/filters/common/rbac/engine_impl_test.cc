@@ -504,8 +504,8 @@ TEST(RoleBasedAccessControlEngineImpl, CustomCELVocabularyTest) {
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac,
                                                 ProtobufMessage::getStrictValidationVisitor());
   // checkEngine:
-  // if the action is ALLOW, it will return the result of the evaluated expr
-  // if the action is DENY, it will return the opposite
+  // if the action is ALLOW, handleAction will return the result of the evaluated expr
+  // if the action is DENY, handleAction will return the opposite
   // the above expr with "spirit" is "true", so we expect to get "false" from checkEngine
   checkEngine(engine, false, LogResult::Undecided);
 
@@ -516,6 +516,9 @@ TEST(RoleBasedAccessControlEngineImpl, CustomCELVocabularyTest) {
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine2(rbac,
                                                  ProtobufMessage::getStrictValidationVisitor());
+  // checkEngine:
+  // if the action is ALLOW, handleAction will return the result of the evaluated expr
+  // if the action is DENY, handleAction will return the opposite
   // the above expr with "wrong" is "false", so we expect to get "true" from checkEngine
   checkEngine(engine2, true, LogResult::Undecided);
 }

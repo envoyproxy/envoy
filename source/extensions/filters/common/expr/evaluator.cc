@@ -82,7 +82,8 @@ BuilderPtr createBuilder(Protobuf::Arena* arena, CustomCELVocabulary* custom_cel
   // Any custom CEL functions are registered second.
   // In the event of overlap in names of built-in functions and custom functions (there shouldn't be
   // any), CEL's built-in functions will take precedence over any custom CEL functions. The registry
-  // retains the first instance of a registration of a name and will not allow it to be overwritten.
+  // retains the first instance of the registration of a name and will not allow it to be
+  // overwritten.
   if (custom_cel_vocabulary) {
     custom_cel_vocabulary->registerFunctions(builder->GetRegistry());
   }

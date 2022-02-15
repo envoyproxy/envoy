@@ -66,15 +66,15 @@ class ExampleCustomCELVocabularyTests : public testing::Test {
 public:
   std::array<absl::string_view, 3> variable_set_names = {CustomVariablesName, SourceVariablesName,
                                                          ExtendedRequestVariablesName};
-  std::array<absl::string_view, 3> lazy_eval_function_names = {
-      LazyEvalFuncNameGetDouble, LazyEvalFuncNameGetProduct, LazyEvalFuncNameGet99};
-  std::array<absl::string_view, 2> eager_eval_function_names = {EagerEvalFuncNameGetNextInt,
-                                                                EagerEvalFuncNameGetSquareOf};
+  std::array<absl::string_view, 3> lazy_function_names = {
+      LazyFuncNameGetDouble, LazyFuncNameGetProduct, LazyFuncNameGet99};
+  std::array<absl::string_view, 2> static_function_names = {StaticFuncNameGetNextInt,
+                                                            StaticFuncNameGetSquareOf};
 };
 
 TEST_F(ExampleCustomCELVocabularyTests, FillActivationTest) {
   ExampleCustomCELVocabulary custom_cel_vocabulary(false);
-  StreamInfo::MockStreamInfo mock_stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   Protobuf::Arena arena;
   Activation activation;
 
@@ -86,8 +86,8 @@ TEST_F(ExampleCustomCELVocabularyTests, FillActivationTest) {
     ASSERT_TRUE(activation.FindValue(variable_set_names[i], &arena).has_value());
   }
   // verify that the functions are in the activation
-  for (int i = 0; static_cast<size_t>(i) < lazy_eval_function_names.size(); ++i) {
-    EXPECT_EQ(activation.FindFunctionOverloads(lazy_eval_function_names[i]).size(), 1);
+  for (int i = 0; static_cast<size_t>(i) < lazy_function_names.size(); ++i) {
+    EXPECT_EQ(activation.FindFunctionOverloads(lazy_function_names[i]).size(), 1);
   }
 }
 
@@ -144,7 +144,7 @@ TEST_F(ExampleCustomCELVocabularyTests, ReplaceDefaultMappingsWithCustomMappings
   ExampleCustomCELVocabulary custom_cel_vocabulary(true);
   Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/query?a=apple&a=apricot&b=banana&=&c=cranberry"}};
-  StreamInfo::MockStreamInfo mock_stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   Protobuf::Arena arena;
   Activation activation;
 
@@ -180,7 +180,7 @@ TEST_F(ExampleCustomCELVocabularyTests, ReplaceDefaultMappingsWithCustomMappings
 
 TEST_F(ExampleCustomCELVocabularyTests, AddCustomMappingsToActivationTwiceTest) {
   ExampleCustomCELVocabulary custom_cel_vocabulary(true);
-  StreamInfo::MockStreamInfo mock_stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   Protobuf::Arena arena;
   absl::Status status;
   Activation activation;
@@ -193,11 +193,10 @@ TEST_F(ExampleCustomCELVocabularyTests, AddCustomMappingsToActivationTwiceTest) 
       ExtendedRequestVariablesName,
       std::make_unique<ExtendedRequestWrapper>(arena, nullptr, mock_stream_info, false));
 
+  status = activation.InsertFunction(std::make_unique<GetDoubleCELFunction>(LazyFuncNameGetDouble));
   status =
-      activation.InsertFunction(std::make_unique<GetDoubleCELFunction>(LazyEvalFuncNameGetDouble));
-  status = activation.InsertFunction(
-      std::make_unique<GetProductCELFunction>(LazyEvalFuncNameGetProduct));
-  status = activation.InsertFunction(std::make_unique<Get99CELFunction>(LazyEvalFuncNameGet99));
+      activation.InsertFunction(std::make_unique<GetProductCELFunction>(LazyFuncNameGetProduct));
+  status = activation.InsertFunction(std::make_unique<Get99CELFunction>(LazyFuncNameGet99));
 
   custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, nullptr, nullptr,
                                        nullptr);
@@ -207,8 +206,8 @@ TEST_F(ExampleCustomCELVocabularyTests, AddCustomMappingsToActivationTwiceTest) 
     ASSERT_TRUE(activation.FindValue(variable_set_names[i], &arena).has_value());
   }
   // verify that the functions are in the activation
-  for (int i = 0; static_cast<size_t>(i) < lazy_eval_function_names.size(); ++i) {
-    EXPECT_EQ(activation.FindFunctionOverloads(lazy_eval_function_names[i]).size(), 1);
+  for (int i = 0; static_cast<size_t>(i) < lazy_function_names.size(); ++i) {
+    EXPECT_EQ(activation.FindFunctionOverloads(lazy_function_names[i]).size(), 1);
   }
 }
 
@@ -221,23 +220,21 @@ TEST_F(ExampleCustomCELVocabularyTests, RegisterFunctionsTest) {
   auto functions = registry.ListFunctions();
 
   // verify that functions are in the registry
-  for (int i = 0; static_cast<size_t>(i) < lazy_eval_function_names.size(); ++i) {
-    EXPECT_EQ(functions.count(lazy_eval_function_names[i]), 1);
-    function_descriptor = functions[lazy_eval_function_names[i]].front();
+  for (int i = 0; static_cast<size_t>(i) < lazy_function_names.size(); ++i) {
+    EXPECT_EQ(functions.count(lazy_function_names[i]), 1);
+    function_descriptor = functions[lazy_function_names[i]].front();
     EXPECT_EQ(registry
-                  .FindLazyOverloads(lazy_eval_function_names[i],
-                                     function_descriptor->receiver_style(),
+                  .FindLazyOverloads(lazy_function_names[i], function_descriptor->receiver_style(),
                                      function_descriptor->types())
                   .size(),
               1);
   }
 
-  for (int i = 0; static_cast<size_t>(i) < eager_eval_function_names.size(); ++i) {
-    EXPECT_EQ(functions.count(eager_eval_function_names[i]), 1);
-    function_descriptor = functions[eager_eval_function_names[i]].front();
+  for (int i = 0; static_cast<size_t>(i) < static_function_names.size(); ++i) {
+    EXPECT_EQ(functions.count(static_function_names[i]), 1);
+    function_descriptor = functions[static_function_names[i]].front();
     EXPECT_EQ(registry
-                  .FindOverloads(eager_eval_function_names[i],
-                                 function_descriptor->receiver_style(),
+                  .FindOverloads(static_function_names[i], function_descriptor->receiver_style(),
                                  function_descriptor->types())
                   .size(),
               1);
@@ -250,37 +247,35 @@ TEST_F(ExampleCustomCELVocabularyTests, AddRegistrationsToRegistryTwiceTest) {
   const CelFunctionDescriptor* function_descriptor;
   absl::Status status;
 
+  status =
+      registry.RegisterLazyFunction(GetDoubleCELFunction::createDescriptor(LazyFuncNameGetDouble));
   status = registry.RegisterLazyFunction(
-      GetDoubleCELFunction::createDescriptor(LazyEvalFuncNameGetDouble));
-  status = registry.RegisterLazyFunction(
-      GetProductCELFunction::createDescriptor(LazyEvalFuncNameGetProduct));
-  status = registry.RegisterLazyFunction(Get99CELFunction::createDescriptor(LazyEvalFuncNameGet99));
+      GetProductCELFunction::createDescriptor(LazyFuncNameGetProduct));
+  status = registry.RegisterLazyFunction(Get99CELFunction::createDescriptor(LazyFuncNameGet99));
   status = google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
-      EagerEvalFuncNameGetNextInt, false, getNextInt, &registry);
+      StaticFuncNameGetNextInt, false, getNextInt, &registry);
   status = google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
-      EagerEvalFuncNameGetSquareOf, true, getSquareOf, &registry);
+      StaticFuncNameGetSquareOf, true, getSquareOf, &registry);
 
   custom_cel_vocabulary.registerFunctions(&registry);
   auto functions = registry.ListFunctions();
 
   // verify that functions are in the registry
-  for (int i = 0; static_cast<size_t>(i) < lazy_eval_function_names.size(); ++i) {
-    EXPECT_EQ(functions.count(lazy_eval_function_names[i]), 1);
-    function_descriptor = functions[lazy_eval_function_names[i]].front();
+  for (int i = 0; static_cast<size_t>(i) < lazy_function_names.size(); ++i) {
+    EXPECT_EQ(functions.count(lazy_function_names[i]), 1);
+    function_descriptor = functions[lazy_function_names[i]].front();
     EXPECT_EQ(registry
-                  .FindLazyOverloads(lazy_eval_function_names[i],
-                                     function_descriptor->receiver_style(),
+                  .FindLazyOverloads(lazy_function_names[i], function_descriptor->receiver_style(),
                                      function_descriptor->types())
                   .size(),
               1);
   }
 
-  for (int i = 0; static_cast<size_t>(i) < eager_eval_function_names.size(); ++i) {
-    EXPECT_EQ(functions.count(eager_eval_function_names[i]), 1);
-    function_descriptor = functions[eager_eval_function_names[i]].front();
+  for (int i = 0; static_cast<size_t>(i) < static_function_names.size(); ++i) {
+    EXPECT_EQ(functions.count(static_function_names[i]), 1);
+    function_descriptor = functions[static_function_names[i]].front();
     EXPECT_EQ(registry
-                  .FindOverloads(eager_eval_function_names[i],
-                                 function_descriptor->receiver_style(),
+                  .FindOverloads(static_function_names[i], function_descriptor->receiver_style(),
                                  function_descriptor->types())
                   .size(),
               1);
