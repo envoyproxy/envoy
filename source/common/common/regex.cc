@@ -19,8 +19,8 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
 
   if (do_program_size_check) {
     const uint32_t regex_program_size = static_cast<uint32_t>(regex_.ProgramSize());
-    const uint32_t max_program_size_error_level = Runtime::getInteger(
-        "re2.max_program_size.error_level", 100);
+    const uint32_t max_program_size_error_level =
+        Runtime::getInteger("re2.max_program_size.error_level", 100);
     if (regex_program_size > max_program_size_error_level) {
       throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
                                        "{} set for the error level threshold. Increase "
@@ -31,11 +31,10 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
     const uint32_t max_program_size_warn_level =
         Runtime::getInteger("re2.max_program_size.warn_level", UINT32_MAX);
     if (regex_program_size > max_program_size_warn_level) {
-      ENVOY_LOG_MISC(
-          warn,
-          "regex '{}' RE2 program size of {} > max program size of {} set for the warn "
-          "level threshold. Increase configured max program size if necessary.",
-          regex, regex_program_size, max_program_size_warn_level);
+      ENVOY_LOG_MISC(warn,
+                     "regex '{}' RE2 program size of {} > max program size of {} set for the warn "
+                     "level threshold. Increase configured max program size if necessary.",
+                     regex, regex_program_size, max_program_size_warn_level);
     }
   }
 }

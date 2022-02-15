@@ -22,8 +22,7 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
 }
 
 uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
-  ASSERT(absl::StartsWith(feature, "envoy.") ||
-         absl::StartsWith(feature, "re2."));
+  ASSERT(absl::StartsWith(feature, "envoy.") || absl::StartsWith(feature, "re2."));
   if (Runtime::LoaderSingleton::getExisting()) {
     return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->getInteger(
         std::string(feature), default_value);
