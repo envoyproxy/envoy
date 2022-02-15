@@ -29,8 +29,6 @@ Envoy::Ssl::ClientContextSharedPtr ContextManagerImpl::createSslClientContext(
 
   Envoy::Ssl::ClientContextSharedPtr context =
       std::make_shared<ClientContextImpl>(scope, config, time_source_, *this);
-  ENVOY_LOG_MISC(debug, "in createSslClientContext and create context {}",
-                 static_cast<void*>(context.get()));
   ASSERT(contexts_.insert(context).second);
   return context;
 }
@@ -45,8 +43,6 @@ Envoy::Ssl::ServerContextSharedPtr ContextManagerImpl::createSslServerContext(
 
   Envoy::Ssl::ServerContextSharedPtr context =
       std::make_shared<ServerContextImpl>(scope, config, server_names, time_source_, *this);
-  ENVOY_LOG_MISC(debug, "in createSslServerContext and create context {}",
-                 static_cast<void*>(context.get()));
   // Insert new context should never fail.
   ASSERT(contexts_.insert(context).second);
   return context;
@@ -85,8 +81,6 @@ void ContextManagerImpl::iterateContexts(std::function<void(const Envoy::Ssl::Co
 }
 
 void ContextManagerImpl::removeContext(const std::shared_ptr<Envoy::Ssl::Context>& old_context) {
-  ENVOY_LOG_MISC(debug, "in removeContext and remove context {}",
-                 static_cast<void*>(old_context.get()));
   if (old_context != nullptr) {
     ASSERT(contexts_.erase(old_context) == 1);
   }

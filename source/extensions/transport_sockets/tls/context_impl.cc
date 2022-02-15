@@ -654,9 +654,6 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      Envoy::Ssl::ContextManager& context_manager)
     : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()), context_manager_(context_manager) {
-  ENVOY_LOG_MISC(debug, "in ServerContextImpl ctor the context address of this is {}",
-                 static_cast<void*>(this));
-
   if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
