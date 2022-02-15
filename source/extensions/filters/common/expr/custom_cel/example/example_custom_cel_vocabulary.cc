@@ -1,3 +1,10 @@
+// The pragma directive has been added to deal with the following problem:
+// The github pipeline uses a gcc compiler which generates an error about an unused parameters
+// in cel_function_adapter.h
+// The problem of the unused parameters has been fixed in more recent version of the cel-cpp library.
+// However, it is not possible to upgrade the cel-cpp currently as it is waiting on the release of the one of its dependencies: ANTLR.
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 #include "source/extensions/filters/common/expr/custom_cel/example/example_custom_cel_vocabulary.h"
 
 #include "envoy/extensions/expr/custom_cel_vocabulary/example/v3/config.pb.h"
