@@ -772,15 +772,9 @@ void ConnectionManagerImpl::ActiveStream::onRequestHeaderTimeout() {
 void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_response_for_timeout")) {
-    sendLocalReply(Http::Code::RequestTimeout, "downstream duration timeout", nullptr,
-                   Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
-                   StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
-  } else {
-    filter_manager_.streamInfo().setResponseCodeDetails(
-        StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
-    connection_manager_.doEndStream(*this);
-  }
+  sendLocalReply(Http::Code::RequestTimeout, "downstream duration timeout", nullptr,
+                 Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
+                 StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& headers) {
