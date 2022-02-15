@@ -26,7 +26,7 @@ public:
                                              const ContainerBackedListImpl* list1,
                                              const ContainerBackedListImpl* list2) {
     std::vector<CelValue> keys;
-
+    keys.reserve(list1->size() + list2->size());
     for (int i = 0; i < list1->size(); ++i) {
       keys.push_back(((*list1)[i]));
     }

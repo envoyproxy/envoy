@@ -65,11 +65,15 @@ absl::optional<CelValue> ExtendedRequestWrapper::operator[](CelValue key) const 
   return RequestWrapper::operator[](key);
 }
 
+// getMapFromQueryStr:
+// In the event of duplicate keys in the query string, the first key value pair is retained.
 absl::optional<CelValue> ExtendedRequestWrapper::getMapFromQueryStr(absl::string_view query) const {
   size_t equal_pos = 0, ampersand_pos = 0, start = 0;
   absl::string_view key_equals_value = "", key = "", value = "";
   std::vector<std::pair<CelValue, CelValue>> key_value_pairs;
+  size_t max_parameters = std::count(query.begin(), query.end(), '=');
   absl::flat_hash_map<absl::string_view, absl::string_view> parameters_map;
+  parameters_map.reserve(max_parameters);
   // loop while there are still equal signs in the query string "key=value&key=value&key=value..."
   while (query.find('=', start) != std::string::npos) {
     // look for ampersands in "key=value&key=value..."

@@ -25,11 +25,13 @@ class CustomCELVocabulary {
 public:
   CustomCELVocabulary() = default;
 
-  // fillActivation - adds variables/value producers and lazy function to the current request's
+  // fillActivation - Adds variables/value producers and lazy functions to the current request's
   // activation, an activation being a mapping of names to their reference implementations.
   // Lazily evaluated functions require a two part registration:
   // (1) fillActivation will add the name of the function to the activation, and
   // (2) registerFunctions will add it to the CEL function registry.
+  // The function mapping for a lazy function which is added to the activation in fillActivation
+  // must be compatible with the function descriptor added to the registry in registerFunctions.
   // Static (eagerly evaluated) functions do not need to be registered with the activation,
   // only with the CEL function registry.
   // There are two sets of vocabulary (variables and functions):
@@ -50,8 +52,24 @@ public:
                               const Http::ResponseHeaderMap* response_headers,
                               const Http::ResponseTrailerMap* response_trailers) PURE;
 
-  // registerFunctions: registers both lazily evaluated and static functions
+  // registerFunctions:
+  // Registers both lazily evaluated and static (eagerly evaluated) functions
   // in the CEL function registry.
+  // The registry, with its functions, is used by the CEL expression builder to
+  // build CEL expressions.
+  // There are two groups of functions.
+  // (1) Native CEL built-in functions. These are functions like "+", "-" "*", "!".
+  // (2) Custom CEL functions.
+  // The Native CEL build-in functions are registered using the evaluator's
+  // createBuilder function.
+  // The custom CEL functions are registered here using registerFunctions.
+  // Custom CEL functions may be (1) static (eagerly evaluated) or (2) lazy.
+  // Lazy functions must also be added to the activation using fillActivation.
+  // Static functions do not.
+  // The lazy function activation mapping must match its counterpart lazy function
+  // descriptor in the registry.
+  // Once registered, the function registration cannot be removed from the registry
+  // or overridden, as it can for an activation mappings.
   virtual void registerFunctions(CelFunctionRegistry* registry) PURE;
 
   virtual ~CustomCELVocabulary() = default;
@@ -64,6 +82,8 @@ protected:
 
 using CustomCELVocabularyPtr = std::unique_ptr<CustomCELVocabulary>;
 
+// CustomCELVocabularyFactory
+// Creates a CustomCELVocabulary implementation instance.
 class CustomCELVocabularyFactory : public Envoy::Config::TypedFactory {
 public:
   std::string category() const override { return "envoy.expr.custom_cel_vocabulary_config"; }

@@ -20,6 +20,8 @@ namespace Expr {
 namespace Custom_CEL {
 namespace Example {
 
+// tests for the custom CEL variables in the example implementation
+
 class VariablesTest : public testing::Test {
 public:
   Protobuf::Arena arena;
@@ -133,6 +135,7 @@ TEST_F(ExtendedRequestVariablesTests, QueryAsStringTest) {
 }
 
 TEST_F(ExtendedRequestVariablesTests, QueryAsMapTest) {
+  // path - query portion - contains correct key value parameters and incorrect key value parameters
   Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/query?a=apple&a=apricot&b=banana&=&cantaloupe&=mango&m=&c=cranberry&"}};
   ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, true);

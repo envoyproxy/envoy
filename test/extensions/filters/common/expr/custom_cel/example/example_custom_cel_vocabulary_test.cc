@@ -26,6 +26,8 @@ namespace Example {
 using google::api::expr::runtime::CelFunctionDescriptor;
 using google::api::expr::runtime::CelFunctionRegistry;
 
+// tests example custom CEL vocabulary implementation and factory
+
 TEST(ExampleCustomCELVocabularyFactoryTests, CreateCustomCELVocabularyFromProtoTest) {
   ExampleCustomCELVocabularyConfig config;
   config.set_return_url_query_string_as_map(true);

@@ -70,6 +70,8 @@ private:
   const StreamInfo::StreamInfo& info_;
 };
 
+// SourceWrapper extends PeerWrapper(with local=false)
+// SourceWrapper contains custom defined keys and all the keys of PeerWrapper (with locazl=false).
 class SourceWrapper : public PeerWrapper {
 public:
   SourceWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info)
@@ -84,9 +86,12 @@ public:
 
 private:
   Protobuf::Arena& arena_;
+  // keys of base class and the derived class
   const ContainerBackedListImpl* keys_;
 };
 
+// ExtendedRequestWrapper extends RequestWrapper
+// ExtendedRequestWrapper contains custom defined keys and all the keys of RequestWrapper.
 class ExtendedRequestWrapper : public RequestWrapper {
 public:
   ExtendedRequestWrapper(Protobuf::Arena& arena, const Http::RequestHeaderMap* headers,
@@ -106,6 +111,7 @@ private:
   Protobuf::Arena& arena_;
   const bool return_url_query_string_as_map_;
   const Http::RequestHeaderMap* request_header_map_;
+  // keys of base class and the derived class
   const ContainerBackedListImpl* keys_;
 };
 

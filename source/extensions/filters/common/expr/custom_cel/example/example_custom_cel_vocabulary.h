@@ -50,6 +50,9 @@ public:
                       const Http::ResponseTrailerMap* response_trailers) override;
 
   void registerFunctions(CelFunctionRegistry* registry) override;
+
+  // return_url_query_string_as_map: url query string be returned as string or map.
+  // This is user provided and comes from the configuration.
   bool returnUrlQueryStringAsMap() { return return_url_query_string_as_map_; }
 
   ~ExampleCustomCELVocabulary() override = default;

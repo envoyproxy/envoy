@@ -16,6 +16,8 @@ namespace Example {
 
 using google::api::expr::runtime::CelValue;
 
+// tests for the custom CEL functions in the example implementation
+
 class CustomCELFunctionsTests : public testing::Test {
 public:
   Protobuf::Arena arena;
