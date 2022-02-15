@@ -4936,6 +4936,8 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                    std::vector<std::string>{});
   auto transport_socket = server_ssl_socket_factory.createTransportSocket(nullptr);
+  EXPECT_FALSE(transport_socket->startSecureTransport());                                  // Noop
+  transport_socket->configureInitialCongestionWindow(200, std::chrono::microseconds(223)); // Noop
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
   EXPECT_EQ(nullptr, transport_socket->ssl());
   EXPECT_EQ(true, transport_socket->canFlushClose());
