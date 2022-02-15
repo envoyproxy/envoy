@@ -982,7 +982,6 @@ TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedAnyAddressListener) {
 }
 
 TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedAnyAddressListenerOnOldBehavior) {
-  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.listener_wildcard_match_ip_family", "false"}});
 
@@ -1104,8 +1103,6 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
 }
 
 TEST_F(ConnectionHandlerTest, OldBehaviorWildcardListener) {
-  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
-
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.listener_wildcard_match_ip_family", "false"}});
 
@@ -1170,8 +1167,6 @@ TEST_F(ConnectionHandlerTest, OldBehaviorWildcardListener) {
 }
 
 TEST_F(ConnectionHandlerTest, MatchIPv6WildcardListener) {
-  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
-
   Network::TcpListenerCallbacks* listener_callbacks1;
   auto listener1 = new NiceMock<Network::MockListener>();
   TestListener* test_listener1 =
