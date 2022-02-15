@@ -20,6 +20,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/listener_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -64,7 +65,7 @@ public:
     EXPECT_CALL(socket_factory_, localAddress())
         .WillRepeatedly(ReturnRef(socket_->connectionInfoProvider().localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket(_)).WillOnce(Return(socket_));
-    connection_handler_->addListener(absl::nullopt, *this);
+    connection_handler_->addListener(absl::nullopt, *this, runtime_);
     conn_ = dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);
@@ -187,6 +188,7 @@ public:
     EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto_error").value(), 1);
   }
 
+  testing::NiceMock<Runtime::MockLoader> runtime_;
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   BasicResourceLimitImpl open_connections_;
@@ -1371,7 +1373,7 @@ public:
     EXPECT_CALL(socket_factory_, localAddress())
         .WillRepeatedly(ReturnRef(socket_->connectionInfoProvider().localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket(_)).WillOnce(Return(socket_));
-    connection_handler_->addListener(absl::nullopt, *this);
+    connection_handler_->addListener(absl::nullopt, *this, runtime_);
     conn_ = dispatcher_->createClientConnection(local_dst_address_,
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);
@@ -1466,6 +1468,7 @@ public:
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
+  testing::NiceMock<Runtime::MockLoader> runtime_;
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;

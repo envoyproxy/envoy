@@ -28,7 +28,8 @@ public:
   Http::TestRequestHeaderMapImpl downstream_request_header_map_{};
   NiceMock<MockRouterFilterInterface> router_filter_interface_;
   UpstreamRequest upstream_request_{router_filter_interface_,
-                                    std::make_unique<NiceMock<Router::MockGenericConnPool>>()};
+                                    std::make_unique<NiceMock<Router::MockGenericConnPool>>(),
+                                    false, true};
 };
 
 // UpstreamRequest is responsible processing for passing 101 upgrade headers to onUpstreamHeaders.

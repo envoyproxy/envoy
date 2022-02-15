@@ -377,9 +377,8 @@ AppleDnsResolverImpl::PendingResolution::buildDnsResponse(const struct sockaddr*
     address_in6.sin6_port = 0;
     address_in6.sin6_addr = reinterpret_cast<const sockaddr_in6*>(address)->sin6_addr;
     return {std::make_shared<const Address::Ipv6Instance>(address_in6), std::chrono::seconds(ttl)};
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 // apple DNS resolver factory

@@ -24,6 +24,9 @@ public:
   MOCK_METHOD(bool, addHandler,
               (const std::string& prefix, const std::string& help_text, HandlerCb callback,
                bool removable, bool mutates_server_state));
+  MOCK_METHOD(bool, addChunkedHandler,
+              (const std::string& prefix, const std::string& help_text, GenHandlerCb callback,
+               bool removable, bool mutates_server_state));
   MOCK_METHOD(bool, removeHandler, (const std::string& prefix));
   MOCK_METHOD(Network::Socket&, socket, ());
   MOCK_METHOD(ConfigTracker&, getConfigTracker, ());
