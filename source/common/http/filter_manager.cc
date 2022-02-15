@@ -747,9 +747,9 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
     // choose to buffer/stop iteration that's fine.
     decodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
-    // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
-    // throw an exception here.
-    PANIC("fatal error adding decoded data");
+    IS_ENVOY_BUG("Invalid request data");
+    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().FilterAddedInvalidRequestData);
   }
 }
 
@@ -1228,9 +1228,9 @@ void FilterManager::addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::In
     // choose to buffer/stop iteration that's fine.
     encodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
-    // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
-    // throw an exception here.
-    PANIC("fatal error adding decoded data");
+    IS_ENVOY_BUG("Invalid response data");
+    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().FilterAddedInvalidResponseData);
   }
 }
 
@@ -1483,8 +1483,7 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
   // Because the filter's and the HCM view of if the stream has a body and if
   // the stream is complete may differ, re-check bytesReceived() to make sure
   // there was no body from the HCM's point of view.
-  if (!complete() ||
-      (!parent_.enableInternalRedirectsWithBody() && parent_.stream_info_.bytesReceived() != 0)) {
+  if (!complete()) {
     return false;
   }
 

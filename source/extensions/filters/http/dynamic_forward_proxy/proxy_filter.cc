@@ -168,7 +168,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
                                        absl::nullopt, RcDetails::get().DnsCacheOverflow);
     return Http::FilterHeadersStatus::StopIteration;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void ProxyFilter::addHostAddressToFilterState(

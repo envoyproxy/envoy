@@ -73,6 +73,7 @@ public:
       EXPECT_TRUE(was_set_);
       parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); }, main_callback);
     }
+    bool isShutdown() const override { return parent_.shutdown_; }
 
     void set(InitializeCb cb) override {
       was_set_ = true;
