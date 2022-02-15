@@ -78,7 +78,7 @@ void AdminFilter::onComplete() {
     Buffer::OwnedImpl response;
     more_data = handler->nextChunk(response);
     bool end_stream = end_stream_on_complete_ && !more_data;
-    ENVOY_LOG_MISC(error, "nextChunk: response.length={} more_data={} end_stream={}",
+    ENVOY_LOG_MISC(info, "nextChunk: response.length={} more_data={} end_stream={}",
                    response.length(), more_data, end_stream);
     if (response.length() > 0 || end_stream) {
       decoder_callbacks_->encodeData(response, end_stream);
