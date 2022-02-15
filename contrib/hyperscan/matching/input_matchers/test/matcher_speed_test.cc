@@ -23,7 +23,7 @@ static void BM_CompiledGoogleReMatcher(benchmark::State& state) {
   envoy::type::matcher::v3::RegexMatcher config;
   config.mutable_google_re2();
   config.set_regex(ClusterRePattern);
-  const auto matcher = Regex::CompiledGoogleReMatcher(config);
+  static const auto matcher = Regex::CompiledGoogleReMatcher(config);
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
     for (const std::string& cluster_input : ClusterInputs) {
@@ -34,6 +34,7 @@ static void BM_CompiledGoogleReMatcher(benchmark::State& state) {
   }
   RELEASE_ASSERT(passes > 0, "");
 }
+BENCHMARK(BM_CompiledGoogleReMatcher)->Threads(1)->MeasureProcessCPUTime();
 BENCHMARK(BM_CompiledGoogleReMatcher)->Threads(20)->MeasureProcessCPUTime();
 BENCHMARK(BM_CompiledGoogleReMatcher)->Threads(200)->MeasureProcessCPUTime();
 
@@ -42,7 +43,7 @@ static void BM_HyperscanMatcher(benchmark::State& state) {
   envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan config;
   auto regex = config.add_regexes();
   regex->set_regex(ClusterRePattern);
-  auto matcher = Extensions::Matching::InputMatchers::Hyperscan::Matcher(config);
+  static auto matcher = Extensions::Matching::InputMatchers::Hyperscan::Matcher(config);
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
     for (const std::string& cluster_input : ClusterInputs) {
@@ -53,6 +54,7 @@ static void BM_HyperscanMatcher(benchmark::State& state) {
   }
   RELEASE_ASSERT(passes > 0, "");
 }
+BENCHMARK(BM_HyperscanMatcher)->Threads(1)->MeasureProcessCPUTime();
 BENCHMARK(BM_HyperscanMatcher)->Threads(20)->MeasureProcessCPUTime();
 BENCHMARK(BM_HyperscanMatcher)->Threads(200)->MeasureProcessCPUTime();
 
