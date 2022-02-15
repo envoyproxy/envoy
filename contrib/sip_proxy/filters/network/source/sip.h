@@ -1,11 +1,14 @@
 #pragma once
+#include <map>
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace SipProxy {
 
-enum class HeaderType {
+enum HeaderType {
   TopLine,
   CallId,
   Via,
@@ -22,7 +25,8 @@ enum class HeaderType {
   Auth,
   PCookieIPMap,
   Other,
-  InvalidFormat
+  InvalidFormat,
+  HeaderMaxNum
 };
 
 enum class MsgType { Request, Response, ErrorMsg };
@@ -62,6 +66,33 @@ enum class AppExceptionType {
   ChecksumMismatch = 14,
   Interruption = 15,
 };
+
+class HeaderTypeMap {
+public:
+  HeaderTypeMap() {
+    sip_header_type_map_.insert({"Call-ID", HeaderType::CallId});
+    sip_header_type_map_.insert({"Via", HeaderType::Via});
+    sip_header_type_map_.insert({"To", HeaderType::To});
+    sip_header_type_map_.insert({"From", HeaderType::From});
+    sip_header_type_map_.insert({"Contact", HeaderType::Contact});
+    sip_header_type_map_.insert({"Record-Route", HeaderType::RRoute});
+    sip_header_type_map_.insert({"CSeq", HeaderType::Cseq});
+    sip_header_type_map_.insert({"Route", HeaderType::Route});
+    sip_header_type_map_.insert({"Path", HeaderType::Path});
+    sip_header_type_map_.insert({"Event", HeaderType::Event});
+    sip_header_type_map_.insert({"Service-Route", HeaderType::SRoute});
+    sip_header_type_map_.insert({"WWW-Authenticate", HeaderType::WAuth});
+    sip_header_type_map_.insert({"Authorization", HeaderType::Auth});
+    sip_header_type_map_.insert({"P-Nokia-Cookie-IP-Mapping", HeaderType::PCookieIPMap});
+    sip_header_type_map_.insert({"", HeaderType::Other});
+  }
+  std::map<absl::string_view, HeaderType> headerTypeMap() { return sip_header_type_map_; }
+
+private:
+  std::map<absl::string_view, HeaderType> sip_header_type_map_{};
+};
+
+static HeaderTypeMap type_map;
 
 } // namespace SipProxy
 } // namespace NetworkFilters

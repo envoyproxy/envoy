@@ -138,8 +138,8 @@ sip_filters:
   - name: envoy.filters.sip.router
 settings:
   transaction_timeout: 32s
-  own_domain: pcsf-cfed.cncs.svc.cluster.local
-  domain_match_parameter_name: x-suri
+  local_services:
+  - domain: pcsf-cfed.cncs.svc.cluster.local
 )EOF";
 
   SipFilters::MockFilterConfigFactory factory;
@@ -159,6 +159,13 @@ TEST_F(SipFilterConfigTest, SipProtocolOptions) {
   const std::string yaml = R"EOF(
 session_affinity: true
 registration_affinity: true
+customized_affinity:
+  entries:
+  - key_name: test
+    subscribe: true
+    query: true 
+  - key_name: test1
+  stop_load_balance: false
 )EOF";
 
   envoy::extensions::filters::network::sip_proxy::v3alpha::SipProtocolOptions config;
