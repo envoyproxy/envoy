@@ -3,7 +3,7 @@
 // in cel_function_adapter.h
 // The problem of the unused parameters has been fixed in more recent version of the cel-cpp
 // library. However, it is not possible to upgrade the cel-cpp in envoy currently
-// as it is waiting on the release of the one of its dependencies: ANTLR.
+// as it is waiting on the release of the one of its dependencies A N T L R.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
 #include "source/extensions/filters/common/expr/custom_cel/example/example_custom_cel_vocabulary.h"
