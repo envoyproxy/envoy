@@ -23,7 +23,7 @@ QUIC in a robust and production ready way.
 ------------------------------------------------------------------------------------------------------------
 
 proxygen is Facebook's high performance HTTP proxy library, written on top of a Finagle like
-C++ library called wangle. mvst is Facebook's recently open sourced QUIC implementation. Both
+C++ library called wangle. mvfst is Facebook's recently open sourced QUIC implementation. Both
 libraries are used by Facebook in their mobile applications, but none of the mobile integration
 code has been open sourced. Like Cronet, Envoy Mobile's goals are a superset of what proxygen and
 mvfst provide.
