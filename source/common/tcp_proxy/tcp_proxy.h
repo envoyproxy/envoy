@@ -129,7 +129,13 @@ public:
     const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectinDuration() const {
       return max_downstream_connection_duration_;
     }
-    const TunnelingConfigHelper* tunnelingConfigHelper() { return tunneling_config_helper_.get(); }
+    TunnelingConfigHelperOptConstRef tunnelingConfigHelper() {
+      if (tunneling_config_helper_) {
+        return TunnelingConfigHelperOptConstRef(*tunneling_config_helper_);
+      } else {
+        return TunnelingConfigHelperOptConstRef();
+      }
+    }
 
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
@@ -170,7 +176,7 @@ public:
     return shared_config_->maxDownstreamConnectinDuration();
   }
   // Return nullptr if there is no tunneling config.
-  const TunnelingConfigHelper* tunnelingConfigHelper() {
+  TunnelingConfigHelperOptConstRef tunnelingConfigHelper() {
     return shared_config_->tunnelingConfigHelper();
   }
   UpstreamDrainManager& drainManager();

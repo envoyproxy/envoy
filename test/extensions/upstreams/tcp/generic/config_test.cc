@@ -38,8 +38,9 @@ TEST_F(TcpConnPoolTest, TestNoConnPool) {
   config_proto.set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(config_proto);
   EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
-  EXPECT_EQ(nullptr, factory_.createGenericConnPool(thread_local_cluster_, &config, &lb_context_,
-                                                    callbacks_));
+  EXPECT_EQ(nullptr, factory_.createGenericConnPool(
+                         thread_local_cluster_, TcpProxy::TunnelingConfigHelperOptConstRef(config),
+                         &lb_context_, callbacks_));
 }
 
 TEST_F(TcpConnPoolTest, Http2Config) {
@@ -51,8 +52,9 @@ TEST_F(TcpConnPoolTest, Http2Config) {
   const TcpProxy::TunnelingConfigHelperImpl config(config_proto);
 
   EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
-  EXPECT_EQ(nullptr, factory_.createGenericConnPool(thread_local_cluster_, &config, &lb_context_,
-                                                    callbacks_));
+  EXPECT_EQ(nullptr, factory_.createGenericConnPool(
+                         thread_local_cluster_, TcpProxy::TunnelingConfigHelperOptConstRef(config),
+                         &lb_context_, callbacks_));
 }
 
 TEST_F(TcpConnPoolTest, Http3Config) {
@@ -65,8 +67,9 @@ TEST_F(TcpConnPoolTest, Http3Config) {
   config_proto.set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(config_proto);
   EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
-  EXPECT_EQ(nullptr, factory_.createGenericConnPool(thread_local_cluster_, &config, &lb_context_,
-                                                    callbacks_));
+  EXPECT_EQ(nullptr, factory_.createGenericConnPool(
+                         thread_local_cluster_, TcpProxy::TunnelingConfigHelperOptConstRef(config),
+                         &lb_context_, callbacks_));
 }
 
 } // namespace Generic

@@ -282,7 +282,7 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
                           Http::Headers::get().ProtocolValues.Bytestream);
   }
 
-  config_.headerEvaluator().evaluateHeaders(*headers, &downstream_info_);
+  config_.headerEvaluator().evaluateHeaders(*headers, downstream_info_);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
   ASSERT(status.ok());
@@ -309,7 +309,7 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
     headers->addReference(Http::Headers::get().Path, "/");
   }
 
-  config_.headerEvaluator().evaluateHeaders(*headers, &downstream_info_);
+  config_.headerEvaluator().evaluateHeaders(*headers, downstream_info_);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
   ASSERT(status.ok());

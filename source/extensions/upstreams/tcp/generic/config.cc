@@ -13,9 +13,9 @@ namespace Generic {
 
 TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
     Upstream::ThreadLocalCluster& thread_local_cluster,
-    const TcpProxy::TunnelingConfigHelper* config, Upstream::LoadBalancerContext* context,
+    TcpProxy::TunnelingConfigHelperOptConstRef config, Upstream::LoadBalancerContext* context,
     Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const {
-  if (config != nullptr) {
+  if (config.has_value()) {
     Http::CodecType pool_type;
     if ((thread_local_cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2) != 0) {
       pool_type = Http::CodecType::HTTP2;

@@ -19,7 +19,7 @@ public:
    * @param stream_info the source of values that can be used in the evaluation.
    */
   virtual void evaluateHeaders(Http::HeaderMap& headers,
-                               const StreamInfo::StreamInfo* stream_info) const PURE;
+                               const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 } // namespace Http
 } // namespace Envoy

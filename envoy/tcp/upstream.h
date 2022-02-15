@@ -19,13 +19,23 @@ namespace TcpProxy {
 class GenericConnectionPoolCallbacks;
 class GenericUpstream;
 
+/**
+ * A configuration for an individual tunneling TCP over HTTP protocols.
+ */
 class TunnelingConfigHelper {
 public:
   virtual ~TunnelingConfigHelper() = default;
+  // The host name of the tunneling upstream HTTP request.
   virtual const std::string& hostname() const PURE;
+
+  // The method of the upstream HTTP request. True if using POST method, CONNECT otherwise.
   virtual bool usePost() const PURE;
+
+  // The evaluator to add additional HTTP request headers to the upstream request.
   virtual Envoy::Http::HeaderEvaluator& headerEvaluator() const PURE;
 };
+
+using TunnelingConfigHelperOptConstRef = OptRef<TunnelingConfigHelper>;
 
 // An API for wrapping either a TCP or an HTTP connection pool.
 class GenericConnPool : public Logger::Loggable<Logger::Id::router> {
@@ -131,7 +141,8 @@ public:
    */
   virtual GenericConnPoolPtr
   createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-                        const TunnelingConfigHelper* config, Upstream::LoadBalancerContext* context,
+                        TunnelingConfigHelperOptConstRef config,
+                        Upstream::LoadBalancerContext* context,
                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const PURE;
 };
 
