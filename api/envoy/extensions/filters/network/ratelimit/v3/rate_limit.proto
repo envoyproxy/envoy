@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.ratelimit.v3;
 
+import "envoy/config/core/v3/substitution_format_string.proto";
 import "envoy/config/ratelimit/v3/rls.proto";
 import "envoy/extensions/common/ratelimit/v3/ratelimit.proto";
 
@@ -21,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Rate limit :ref:`configuration overview <config_network_filters_rate_limit>`.
 // [#extension: envoy.filters.network.ratelimit]
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.rate_limit.v2.RateLimit";
@@ -32,9 +33,12 @@ message RateLimit {
   // The rate limit domain to use in the rate limit service request.
   string domain = 2 [(validate.rules).string = {min_len: 1}];
 
-  // The rate limit descriptor list to use in the rate limit service request.
+  // The rate limit descriptor list of static values to use in the rate limit service request.
   repeated common.ratelimit.v3.RateLimitDescriptor descriptors = 3
       [(validate.rules).repeated = {min_items: 1}];
+
+  // The rate limit descriptor list of dynamic values to use in the rate limit service request
+  repeated DynamicNetworkRateLimitDescriptor dynamic_descriptors = 7;
 
   // The timeout in milliseconds for the rate limit service RPC. If not
   // set, this defaults to 20ms.
@@ -51,4 +55,12 @@ message RateLimit {
   // success.
   config.ratelimit.v3.RateLimitServiceConfig rate_limit_service = 6
       [(validate.rules).message = {required: true}];
+}
+
+message DynamicNetworkRateLimitDescriptor {
+  // Descriptor key.
+  string key = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Descriptor value.
+  config.core.v3.SubstitutionFormatString value = 2 [(validate.rules).message = {required: true}];
 }
