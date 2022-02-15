@@ -316,7 +316,7 @@ build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
 # Shared fuzzing configuration.
 build:fuzzing --define=ENVOY_CONFIG_ASAN=1
 build:fuzzing --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-#build:fuzzing --config=libc++
+build:fuzzing --config=libc++
 
 # Fuzzing without ASAN. This is useful for profiling fuzzers without any ASAN artifacts.
 build:plain-fuzzer --config=fuzzing
