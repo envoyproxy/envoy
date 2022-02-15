@@ -43,7 +43,9 @@ public:
     return std::chrono::time_point_cast<std::chrono::milliseconds>(edf_lb.latest_host_added_time_)
         .time_since_epoch();
   }
-  static double minWeightPercent(EdfLoadBalancerBase& edf_lb) { return edf_lb.min_weight_percent_; }
+  static double slowStartMinWeightPercent(EdfLoadBalancerBase& edf_lb) {
+    return edf_lb.slow_start_min_weight_percent_;
+  }
 };
 
 namespace {
@@ -1591,9 +1593,9 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithDefaultParams) {
   const auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);
-  const auto min_weight_percent =
-      EdfLoadBalancerBasePeer::minWeightPercent(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_DOUBLE_EQ(min_weight_percent, 0.1);
+  const auto slow_start_min_weight_percent =
+      EdfLoadBalancerBasePeer::slowStartMinWeightPercent(static_cast<EdfLoadBalancerBase&>(*lb_));
+  EXPECT_DOUBLE_EQ(slow_start_min_weight_percent, 0.1);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithMinWeightPercent) {
@@ -1608,9 +1610,9 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithMinWeightPercent) {
   const auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);
-  const auto min_weight_percent =
-      EdfLoadBalancerBasePeer::minWeightPercent(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_DOUBLE_EQ(min_weight_percent, 0.3);
+  const auto slow_start_min_weight_percent =
+      EdfLoadBalancerBasePeer::slowStartMinWeightPercent(static_cast<EdfLoadBalancerBase&>(*lb_));
+  EXPECT_DOUBLE_EQ(slow_start_min_weight_percent, 0.3);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
@@ -2262,9 +2264,9 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWithDefaultParams) {
   const auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(lb_2));
   EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);
-  const auto min_weight_percent =
-      EdfLoadBalancerBasePeer::minWeightPercent(static_cast<EdfLoadBalancerBase&>(lb_2));
-  EXPECT_DOUBLE_EQ(min_weight_percent, 0.1);
+  const auto slow_start_min_weight_percent =
+      EdfLoadBalancerBasePeer::slowStartMinWeightPercent(static_cast<EdfLoadBalancerBase&>(lb_2));
+  EXPECT_DOUBLE_EQ(slow_start_min_weight_percent, 0.1);
 }
 
 TEST_P(LeastRequestLoadBalancerTest, SlowStartNoWait) {

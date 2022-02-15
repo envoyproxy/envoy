@@ -459,7 +459,7 @@ protected:
   const absl::optional<Runtime::Double> aggression_runtime_;
   TimeSource& time_source_;
   MonotonicTime latest_host_added_time_;
-  double min_weight_percent_;
+  double slow_start_min_weight_percent_;
 };
 
 /**
