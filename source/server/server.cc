@@ -538,6 +538,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   loadServerFlags(initial_config.flagsPath());
 
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin_->getConfigTracker());
+  certificate_provider_manager_ =
+      std::make_unique<CertificateProvider::CertificateProviderManagerImpl>(*api_);
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(

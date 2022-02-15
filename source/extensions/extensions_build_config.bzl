@@ -323,6 +323,9 @@ EXTENSIONS = {
 
     # apple DNS resolver extension is only needed in MacOS build plus one want to use apple library for DNS resolving.
     "envoy.network.dns_resolver.apple":                "//source/extensions/network/dns_resolver/apple:config",
+
+    # Certificate Providers
+    "envoy.cert_providers.default_cert_provider":                   "//source/extensions/certificate_providers/default_cert_provider:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

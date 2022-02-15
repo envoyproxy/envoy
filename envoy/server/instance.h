@@ -7,6 +7,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/certificate_provider/certificate_provider_manager.h"
 #include "envoy/common/mutex_tracer.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
@@ -136,6 +137,11 @@ public:
    * @return the server's secret manager
    */
   virtual Secret::SecretManager& secretManager() PURE;
+
+  /**
+   * @return the certificate provider manager
+   */
+  virtual CertificateProvider::CertificateProviderManager& certificateProviderManager() PURE;
 
   /**
    * @return the server's CLI options.

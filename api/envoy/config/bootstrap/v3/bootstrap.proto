@@ -317,7 +317,6 @@ message Bootstrap {
   // :ref:`CommonTlsContext.CertificateProviderInstance.instance_name
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.CertificateProviderInstance.instance_name>`
   // field.
-  // [#not-implemented-hide:]
   map<string, core.v3.TypedExtensionConfig> certificate_provider_instances = 25;
 
   // Specifies a set of headers that need to be registered as inline header. This configuration

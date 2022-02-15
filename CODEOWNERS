@@ -9,6 +9,8 @@
 /*/extensions/access_loggers/filters/cel @dio @douglas-reid
 /*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov
 /*/extensions/access_loggers/stream @mattklein123 @davinci26
+# certificate providers extensions
+/*/extensions/certificate_providers/default_cert_provider @LuyaoZhong @lizan
 # compression extensions
 /*/extensions/compression/common/compressor @rojkov @junr03
 /*/extensions/compression/gzip/compressor @rojkov @junr03

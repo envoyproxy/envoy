@@ -103,6 +103,8 @@ void ValidationInstance::initialize(const Options& options,
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin().getConfigTracker());
+  certificate_provider_manager_ =
+      std::make_unique<CertificateProvider::CertificateProviderManagerImpl>(*api_);
   ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), dnsResolver(), sslContextManager(), dispatcher(),

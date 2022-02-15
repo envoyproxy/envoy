@@ -745,3 +745,8 @@ envoy.http.stateful_session.cookie:
   - envoy.http.stateful_session
   security_posture: unknown
   status: alpha
+envoy.cert_providers.default_cert_provider:
+  categories:
+  - envoy.cert_providers
+  security_posture: unknown
+  status: alpha

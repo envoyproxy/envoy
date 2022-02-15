@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package envoy.extensions.certificate_providers.default_cert_provider.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.certificate_providers.default_cert_provider.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/certificate_providers/default_cert_provider/v3;default_cert_providerv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Default Certificate Provider]
+// [#extension: envoy.cert_providers.default_cert_provider]
+
+// A DefaultCertProvider provides static TLS identity certificate
+// [#extension-category: envoy.cert_providers]
+
+message DefaultCertProviderConfig {
+  config.core.v3.DataSource certificate = 1;
+
+  config.core.v3.DataSource private_key = 2;
+}
