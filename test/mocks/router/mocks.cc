@@ -145,6 +145,7 @@ MockRoute::~MockRoute() = default;
 
 MockRouteConfigProvider::MockRouteConfigProvider() {
   ON_CALL(*this, config()).WillByDefault(Return(route_config_));
+  ON_CALL(*this, configCast()).WillByDefault(Return(route_config_));
 }
 MockRouteConfigProvider::~MockRouteConfigProvider() = default;
 
