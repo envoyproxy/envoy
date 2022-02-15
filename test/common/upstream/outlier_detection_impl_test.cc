@@ -662,6 +662,13 @@ TEST_F(OutlierDetectorImplTest, BasicFlowLocalOriginFailure) {
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
+  // Simulate additional number of failures to ensure they don't affect future ejections.
+  n = runtime_.snapshot_.getInteger(ConsecutiveLocalOriginFailureRuntime,
+                                    detector->config().consecutiveLocalOriginFailure());
+  while (n--) {
+    hosts_[0]->outlierDetector().putResult(Result::LocalOriginConnectFailed);
+  }
+
   // Wait short time - not enough to be unejected
   time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
@@ -677,6 +684,31 @@ TEST_F(OutlierDetectorImplTest, BasicFlowLocalOriginFailure) {
   interval_timer_->invokeCallback();
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime());
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+
+  // Simulate connection failures to trigger another ejection
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+                       envoy::data::cluster::v3::CONSECUTIVE_LOCAL_ORIGIN_FAILURE, true));
+
+  n = runtime_.snapshot_.getInteger(ConsecutiveLocalOriginFailureRuntime,
+                                    detector->config().consecutiveLocalOriginFailure());
+  while (n--) {
+    hosts_[0]->outlierDetector().putResult(Result::LocalOriginConnectFailed);
+  }
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(40000));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(90002));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
   EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
 
   // Simulate few connect failures, not enough for ejection and then simulate connect success
@@ -696,13 +728,13 @@ TEST_F(OutlierDetectorImplTest, BasicFlowLocalOriginFailure) {
 
   // Check stats
   EXPECT_EQ(
-      1UL,
+      2UL,
       cluster_.info_->stats_store_.counter("outlier_detection.ejections_enforced_total").value());
-  EXPECT_EQ(1UL,
+  EXPECT_EQ(2UL,
             cluster_.info_->stats_store_
                 .counter("outlier_detection.ejections_detected_consecutive_local_origin_failure")
                 .value());
-  EXPECT_EQ(1UL,
+  EXPECT_EQ(2UL,
             cluster_.info_->stats_store_
                 .counter("outlier_detection.ejections_enforced_consecutive_local_origin_failure")
                 .value());
