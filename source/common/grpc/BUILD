@@ -206,3 +206,22 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "buffered_async_client_lib",
+    hdrs = ["buffered_async_client.h"],
+    deps = [
+        ":buffered_message_ttl_manager_lib",
+        ":typed_async_client_lib",
+        "//source/common/protobuf:utility_lib",
+        "@com_google_absl//absl/container:btree",
+    ],
+)
+
+envoy_cc_library(
+    name = "buffered_message_ttl_manager_lib",
+    hdrs = ["buffered_message_ttl_manager.h"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+    ],
+)

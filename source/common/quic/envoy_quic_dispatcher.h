@@ -25,7 +25,8 @@ public:
                             const quic::QuicSocketAddress& /*peer_address*/,
                             const quic::QuicSocketAddress& /*self_address*/,
                             std::string* /*error_details*/) const override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("Unexpected call to CanAcceptClientHello");
+    return false;
   }
 };
 
@@ -51,12 +52,10 @@ public:
 
 protected:
   // quic::QuicDispatcher
-  std::unique_ptr<quic::QuicSession> CreateQuicSession(quic::QuicConnectionId server_connection_id,
-                                                       const quic::QuicSocketAddress& self_address,
-                                                       const quic::QuicSocketAddress& peer_address,
-                                                       absl::string_view alpn,
-                                                       const quic::ParsedQuicVersion& version,
-                                                       absl::string_view sni) override;
+  std::unique_ptr<quic::QuicSession> CreateQuicSession(
+      quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
+      const quic::QuicSocketAddress& peer_address, absl::string_view alpn,
+      const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo) override;
   // Overridden to restore the first 4 bytes of the connection ID because our BPF filter only looks
   // at the first 4 bytes. This ensures that the replacement routes to the same quic dispatcher.
   quic::QuicConnectionId

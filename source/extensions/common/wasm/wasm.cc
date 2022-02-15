@@ -6,7 +6,7 @@
 #include "envoy/event/deferred_deletable.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/network/dns_resolver/dns_factory.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/common/wasm/stats_handler.h"
 
@@ -308,7 +308,7 @@ WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm) {
   case FailState::RuntimeError:
     return WasmEvent::RuntimeError;
   }
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("corrupt enum");
 }
 
 bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,

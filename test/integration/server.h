@@ -9,6 +9,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/server/options.h"
 #include "envoy/server/process_context.h"
+#include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
 #include "source/common/common/assert.h"
@@ -162,6 +163,7 @@ public:
   bool iterate(const IterateFn<TextReadout>& fn) const override {
     return wrapped_scope_->iterate(fn);
   }
+  StatName prefix() const override { return wrapped_scope_->prefix(); }
 
 private:
   Thread::MutexBasicLockable& lock_;
@@ -281,21 +283,43 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.counterFromStatNameWithTags(name, tags);
   }
-  void forEachCounter(std::function<void(std::size_t)> f_size,
-                      std::function<void(Stats::Counter&)> f_stat) const override {
+  void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachCounter(f_size, f_stat);
   }
-  void forEachGauge(std::function<void(std::size_t)> f_size,
-                    std::function<void(Stats::Gauge&)> f_stat) const override {
+  void forEachGauge(Stats::SizeFn f_size, StatFn<Gauge> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachGauge(f_size, f_stat);
   }
-  void forEachTextReadout(std::function<void(std::size_t)> f_size,
-                          std::function<void(Stats::TextReadout&)> f_stat) const override {
+  void forEachTextReadout(Stats::SizeFn f_size, StatFn<TextReadout> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachTextReadout(f_size, f_stat);
   }
+  void forEachHistogram(Stats::SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachHistogram(f_size, f_stat);
+  }
+  void forEachScope(std::function<void(std::size_t)> f_size,
+                    StatFn<const Scope> f_scope) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachScope(f_size, f_scope);
+  }
+  void forEachSinkedCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachSinkedCounter(f_size, f_stat);
+  }
+  void forEachSinkedGauge(Stats::SizeFn f_size, StatFn<Gauge> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachSinkedGauge(f_size, f_stat);
+  }
+  void forEachSinkedTextReadout(Stats::SizeFn f_size, StatFn<TextReadout> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachSinkedTextReadout(f_size, f_stat);
+  }
+  void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override {
+    UNREFERENCED_PARAMETER(sink_predicates);
+  }
+
   Counter& counterFromString(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.counterFromString(name);
@@ -373,6 +397,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.textReadouts();
   }
+  StatName prefix() const override { return store_.prefix(); }
 
   bool iterate(const IterateFn<Counter>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return store_.iterate(fn); }
@@ -500,6 +525,10 @@ public:
     // When using the thread local store, only gauges() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
     return TestUtility::findGauge(statStore(), name);
+  }
+
+  Stats::ParentHistogramSharedPtr histogram(const std::string& name) {
+    return TestUtility::findHistogram(statStore(), name);
   }
 
   std::vector<Stats::CounterSharedPtr> counters() override { return statStore().counters(); }

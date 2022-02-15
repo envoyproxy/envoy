@@ -14,10 +14,11 @@
 namespace Envoy {
 namespace {
 
-class WeightedClusterIntegrationTest : public testing::Test, public HttpIntegrationTest {
+class WeightedClusterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                       public HttpIntegrationTest {
 public:
   WeightedClusterIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, Network::Address::IpVersion::v6) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
   void createUpstreams() override {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
@@ -101,8 +102,12 @@ private:
   std::vector<uint64_t> default_weights_ = {20, 30};
 };
 
+INSTANTIATE_TEST_SUITE_P(IpVersions, WeightedClusterIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 // Steer the traffic (i.e. send the request) to the weighted cluster with `name` specified.
-TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithName) {
+TEST_P(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithName) {
   setDeterministicValue();
   initializeConfig(getDefaultWeights());
 
@@ -116,7 +121,7 @@ TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithName) {
 
 // Steer the traffic (i.e. send the request) to the weighted cluster with `cluster_header`
 // specified.
-TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithHeader) {
+TEST_P(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithHeader) {
   const std::vector<uint64_t>& default_weights = getDefaultWeights();
 
   // The index of the cluster with `cluster_header` specified is 1.
@@ -139,7 +144,7 @@ TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithHeader) {
 }
 
 // Steer the traffic (i.e. send the request) to the weighted clusters randomly based on weight.
-TEST_F(WeightedClusterIntegrationTest, SplitTrafficRandomly) {
+TEST_P(WeightedClusterIntegrationTest, SplitTrafficRandomly) {
   std::vector<uint64_t> weights = {50, 50};
   int upstream_count = weights.size();
   initializeConfig(weights);

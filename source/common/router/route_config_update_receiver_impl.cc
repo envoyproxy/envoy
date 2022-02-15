@@ -1,6 +1,7 @@
 #include "source/common/router/route_config_update_receiver_impl.h"
 
 #include <string>
+#include <utility>
 
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -15,31 +16,27 @@
 namespace Envoy {
 namespace Router {
 
-std::string ConfigTraitsImpl::resourceType() const {
-  return Envoy::Config::getResourceName<envoy::config::route::v3::RouteConfiguration>();
+namespace {
+
+// Resets 'route_config::virtual_hosts' by merging VirtualHost contained in
+// 'rds_vhosts' and 'vhds_vhosts'.
+void rebuildRouteConfigVirtualHosts(
+    const std::map<std::string, envoy::config::route::v3::VirtualHost>& rds_vhosts,
+    const std::map<std::string, envoy::config::route::v3::VirtualHost>& vhds_vhosts,
+    envoy::config::route::v3::RouteConfiguration& route_config) {
+  route_config.clear_virtual_hosts();
+  for (const auto& vhost : rds_vhosts) {
+    route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
+  }
+  for (const auto& vhost : vhds_vhosts) {
+    route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
+  }
 }
 
-Rds::ConfigConstSharedPtr ConfigTraitsImpl::createConfig() const {
+} // namespace
+
+Rds::ConfigConstSharedPtr ConfigTraitsImpl::createNullConfig() const {
   return std::make_shared<NullConfigImpl>();
-}
-
-ProtobufTypes::MessagePtr ConfigTraitsImpl::createProto() const {
-  return std::make_unique<envoy::config::route::v3::RouteConfiguration>();
-}
-
-const Protobuf::Message& ConfigTraitsImpl::validateResourceType(const Protobuf::Message& rc) const {
-  return dynamic_cast<const envoy::config::route::v3::RouteConfiguration&>(rc);
-}
-
-const Protobuf::Message& ConfigTraitsImpl::validateConfig(const Protobuf::Message& rc) const {
-  // TODO(lizan): consider cache the config here until onConfigUpdate.
-  createConfig(rc);
-  return rc;
-}
-
-const std::string& ConfigTraitsImpl::resourceName(const Protobuf::Message& rc) const {
-  ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(&rc));
-  return static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc).name();
 }
 
 Rds::ConfigConstSharedPtr ConfigTraitsImpl::createConfig(const Protobuf::Message& rc) const {
@@ -49,27 +46,26 @@ Rds::ConfigConstSharedPtr ConfigTraitsImpl::createConfig(const Protobuf::Message
       factory_context_, validator_, validate_clusters_default_);
 }
 
-ProtobufTypes::MessagePtr ConfigTraitsImpl::cloneProto(const Protobuf::Message& rc) const {
-  ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(&rc));
-  return std::make_unique<envoy::config::route::v3::RouteConfiguration>(
-      static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc));
-}
-
 bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
                                                 const std::string& version_info) {
-  if (!base_.updateHash(rc)) {
+  uint64_t new_hash = base_.getHash(rc);
+  if (!base_.checkHash(new_hash)) {
     return false;
   }
-  auto route_config_proto = std::make_unique<envoy::config::route::v3::RouteConfiguration>(
-      static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc));
+  auto new_route_config = std::make_unique<envoy::config::route::v3::RouteConfiguration>();
+  new_route_config->CopyFrom(rc);
   const uint64_t new_vhds_config_hash =
-      route_config_proto->has_vhds() ? MessageUtil::hash(route_config_proto->vhds()) : 0ul;
+      new_route_config->has_vhds() ? MessageUtil::hash(new_route_config->vhds()) : 0ul;
+  std::map<std::string, envoy::config::route::v3::VirtualHost> rds_virtual_hosts;
+  for (const auto& vhost : new_route_config->virtual_hosts()) {
+    rds_virtual_hosts.emplace(vhost.name(), vhost);
+  }
+  rebuildRouteConfigVirtualHosts(rds_virtual_hosts, *vhds_virtual_hosts_, *new_route_config);
+  base_.updateConfig(std::move(new_route_config));
+  base_.updateHash(new_hash);
+  rds_virtual_hosts_ = std::move(rds_virtual_hosts);
   vhds_configuration_changed_ = new_vhds_config_hash != last_vhds_config_hash_;
   last_vhds_config_hash_ = new_vhds_config_hash;
-  initializeRdsVhosts(*route_config_proto);
-
-  rebuildRouteConfig(rds_virtual_hosts_, *vhds_virtual_hosts_, *route_config_proto);
-  base_.updateConfig(std::move(route_config_proto));
 
   base_.onUpdateCommon(version_info);
   return true;
@@ -89,8 +85,8 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   auto route_config_after_this_update =
       std::make_unique<envoy::config::route::v3::RouteConfiguration>();
   route_config_after_this_update->CopyFrom(base_.protobufConfiguration());
-  rebuildRouteConfig(rds_virtual_hosts_, *vhosts_after_this_update,
-                     *route_config_after_this_update);
+  rebuildRouteConfigVirtualHosts(rds_virtual_hosts_, *vhosts_after_this_update,
+                                 *route_config_after_this_update);
 
   base_.updateConfig(std::move(route_config_after_this_update));
   // No exception, route_config_after_this_update is valid, can update the state.
@@ -99,14 +95,6 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   base_.onUpdateCommon(version_info);
 
   return removed || updated || !resource_ids_in_last_update_.empty();
-}
-
-void RouteConfigUpdateReceiverImpl::initializeRdsVhosts(
-    const envoy::config::route::v3::RouteConfiguration& route_configuration) {
-  rds_virtual_hosts_.clear();
-  for (const auto& vhost : route_configuration.virtual_hosts()) {
-    rds_virtual_hosts_.emplace(vhost.name(), vhost);
-  }
 }
 
 bool RouteConfigUpdateReceiverImpl::removeVhosts(
@@ -136,19 +124,6 @@ bool RouteConfigUpdateReceiverImpl::updateVhosts(
     vhosts_added = true;
   }
   return vhosts_added;
-}
-
-void RouteConfigUpdateReceiverImpl::rebuildRouteConfig(
-    const std::map<std::string, envoy::config::route::v3::VirtualHost>& rds_vhosts,
-    const std::map<std::string, envoy::config::route::v3::VirtualHost>& vhds_vhosts,
-    envoy::config::route::v3::RouteConfiguration& route_config) {
-  route_config.clear_virtual_hosts();
-  for (const auto& vhost : rds_vhosts) {
-    route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
-  }
-  for (const auto& vhost : vhds_vhosts) {
-    route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
-  }
 }
 
 } // namespace Router

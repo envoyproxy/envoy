@@ -177,16 +177,16 @@ LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_jso
 }
 
 bool LocalizedSamplingStrategy::shouldTrace(const SamplingRequest& sampling_request) {
-  if (!custom_manifest_.hasCustomRules()) {
-    return shouldTrace(default_manifest_.defaultRule());
+  if (!manifest_.hasCustomRules()) {
+    return shouldTrace(manifest_.defaultRule());
   }
 
-  for (auto&& rule : custom_manifest_.customRules()) {
+  for (auto&& rule : manifest_.customRules()) {
     if (rule.appliesTo(sampling_request)) {
       return shouldTrace(rule);
     }
   }
-  return shouldTrace(custom_manifest_.defaultRule());
+  return shouldTrace(manifest_.defaultRule());
 }
 
 bool LocalizedSamplingStrategy::shouldTrace(LocalizedSamplingRule& rule) {

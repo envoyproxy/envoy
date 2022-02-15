@@ -76,7 +76,7 @@ Example configuration
 
 */etc/ssl/certs/ca-certificates.crt* is the default path for the system CA bundle on Debian systems.
 :ref:`trusted_ca <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>` along with
-:ref:`match_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>`
+:ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`
 makes Envoy verify the server identity of *127.0.0.1:1234* as "foo" in the same way as e.g. cURL
 does on standard Debian installations. Common paths for system CA bundles on Linux and BSD are:
 

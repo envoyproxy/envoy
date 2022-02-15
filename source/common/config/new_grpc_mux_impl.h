@@ -81,10 +81,9 @@ public:
 
   struct SubscriptionStuff {
     SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
-                      const bool use_namespace_matching, Event::Dispatcher& dispatcher,
-                      const bool wildcard)
+                      const bool use_namespace_matching, Event::Dispatcher& dispatcher)
         : watch_map_(use_namespace_matching),
-          sub_state_(type_url, watch_map_, local_info, dispatcher, wildcard) {}
+          sub_state_(type_url, watch_map_, local_info, dispatcher) {}
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
@@ -138,8 +137,7 @@ private:
                    const SubscriptionOptions& options);
 
   // Adds a subscription for the type_url to the subscriptions map and order list.
-  void addSubscription(const std::string& type_url, bool use_namespace_matching,
-                       const bool wildcard);
+  void addSubscription(const std::string& type_url, bool use_namespace_matching);
 
   void trySendDiscoveryRequests();
 

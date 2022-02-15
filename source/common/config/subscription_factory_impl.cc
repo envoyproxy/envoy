@@ -9,6 +9,7 @@
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/type_to_endpoint.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -43,6 +44,11 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                                                             api_config_source);
     Utility::checkTransportVersion(api_config_source);
     switch (api_config_source.api_type()) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC:
+      throw EnvoyException("Unsupported config source AGGREGATED_GRPC");
+    case envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC:
+      throw EnvoyException("Unsupported config source AGGREGATED_DELTA_GRPC");
     case envoy::config::core::v3::ApiConfigSource::DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE:
       throw EnvoyException(
           "REST_LEGACY no longer a supported ApiConfigSource. "
@@ -55,33 +61,55 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(type_url), type_url,
           callbacks, resource_decoder, stats, Utility::configSourceInitialFetchTimeout(config),
           validation_visitor_);
-    case envoy::config::core::v3::ApiConfigSource::GRPC:
+    case envoy::config::core::v3::ApiConfigSource::GRPC: {
+      GrpcMuxSharedPtr mux;
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+        mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
+            Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
+                                                   scope, true)
+                ->createUncachedRawAsyncClient(),
+            dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
+            Utility::parseRateLimitSettings(api_config_source), local_info_,
+            api_config_source.set_node_on_first_message_only());
+      } else {
+        mux = std::make_shared<Config::GrpcMuxImpl>(
+            local_info_,
+            Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
+                                                   scope, true)
+                ->createUncachedRawAsyncClient(),
+            dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
+            Utility::parseRateLimitSettings(api_config_source),
+            api_config_source.set_node_on_first_message_only());
+      }
       return std::make_unique<GrpcSubscriptionImpl>(
-          std::make_shared<Config::GrpcMuxImpl>(
-              local_info_,
-              Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
-                                                     api_config_source, scope, true)
-                  ->createUncachedRawAsyncClient(),
-              dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
-              Utility::parseRateLimitSettings(api_config_source),
-              api_config_source.set_node_on_first_message_only()),
-          callbacks, resource_decoder, stats, type_url, dispatcher_,
+          std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated*/ false, options);
+    }
     case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
+      GrpcMuxSharedPtr mux;
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+        mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
+            Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
+                                                   scope, true)
+                ->createUncachedRawAsyncClient(),
+            dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
+            Utility::parseRateLimitSettings(api_config_source), local_info_,
+            api_config_source.set_node_on_first_message_only());
+      } else {
+        mux = std::make_shared<Config::NewGrpcMuxImpl>(
+            Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
+                                                           api_config_source, scope, true)
+                ->createUncachedRawAsyncClient(),
+            dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
+            Utility::parseRateLimitSettings(api_config_source), local_info_);
+      }
       return std::make_unique<GrpcSubscriptionImpl>(
-          std::make_shared<Config::NewGrpcMuxImpl>(
-              Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
-                                                             api_config_source, scope, true)
-                  ->createUncachedRawAsyncClient(),
-              dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
-              Utility::parseRateLimitSettings(api_config_source), local_info_),
-          callbacks, resource_decoder, stats, type_url, dispatcher_,
+          std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config), /*is_aggregated*/ false, options);
     }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
     return std::make_unique<GrpcSubscriptionImpl>(
@@ -92,7 +120,6 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     throw EnvoyException(
         "Missing config source specifier in envoy::config::core::v3::ConfigSource");
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
@@ -168,9 +195,8 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
   }
   default:
     // TODO(htuch): Implement HTTP semantics for collection ResourceLocators.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    throw EnvoyException("Unsupported code path");
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Config

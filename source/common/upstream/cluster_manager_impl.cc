@@ -23,6 +23,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/grpc/async_client_manager_impl.h"
 #include "source/common/http/async_client_impl.h"
@@ -339,28 +340,56 @@ ClusterManagerImpl::ClusterManagerImpl(
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
-      ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
-          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                         dyn_resources.ads_config(), stats, false)
-              ->createUncachedRawAsyncClient(),
-          main_thread_dispatcher,
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
-          random_, stats_,
-          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+        ads_mux_ = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->createUncachedRawAsyncClient(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                "envoy.service.discovery.v3.AggregatedDiscoveryService."
+                "DeltaAggregatedResources"),
+            random_, stats_,
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
+            dyn_resources.ads_config().set_node_on_first_message_only());
+      } else {
+        ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->createUncachedRawAsyncClient(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
+            random_, stats_,
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
+      }
     } else {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
-      ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
-          local_info,
-          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                         dyn_resources.ads_config(), stats, false)
-              ->createUncachedRawAsyncClient(),
-          main_thread_dispatcher,
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_,
-          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
-          bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+        ads_mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->createUncachedRawAsyncClient(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                "envoy.service.discovery.v3.AggregatedDiscoveryService."
+                "StreamAggregatedResources"),
+            random_, stats_,
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
+            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+      } else {
+        ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
+            local_info,
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->createUncachedRawAsyncClient(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+            random_, stats_,
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
+            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+      }
     }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
@@ -1013,6 +1042,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
 
   HostMapConstSharedPtr host_map = cm_cluster.cluster().prioritySet().crossPriorityHostMap();
 
+  pending_cluster_creations_.erase(cm_cluster.cluster().info()->name());
   tls_.runOnAllThreads([info = cm_cluster.cluster().info(), params = std::move(params),
                         add_or_update_cluster, load_balancer_factory, map = std::move(host_map)](
                            OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
@@ -1103,7 +1133,129 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainConnP
 ClusterUpdateCallbacksHandlePtr
 ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
   ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
-  return std::make_unique<ClusterUpdateCallbacksHandleImpl>(cb, cluster_manager.update_callbacks_);
+  return cluster_manager.addClusterUpdateCallbacks(cb);
+}
+
+OdCdsApiHandlePtr
+ClusterManagerImpl::allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
+                                     OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
+                                     ProtobufMessage::ValidationVisitor& validation_visitor) {
+  // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
+  // return an already existing one if the config or locator matches. Note that this may need a way
+  // to clean up the unused handles, so we can close the unnecessary connections.
+  auto odcds = OdCdsApiImpl::create(odcds_config, odcds_resources_locator, *this, *this, stats_,
+                                    validation_visitor);
+  return OdCdsApiHandleImpl::create(*this, std::move(odcds));
+}
+
+ClusterDiscoveryCallbackHandlePtr
+ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std::string name,
+                                                    ClusterDiscoveryCallbackPtr callback,
+                                                    std::chrono::milliseconds timeout) {
+  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
+
+  auto [handle, discovery_in_progress, invoker] =
+      cluster_manager.cdm_.addCallback(name, std::move(callback));
+  // This check will catch requests for discoveries from this thread only. If other thread requested
+  // the same discovery, we will detect it in the main thread later.
+  if (discovery_in_progress) {
+    ENVOY_LOG(debug,
+              "cm odcds: on-demand discovery for cluster {} is already in progress, something else "
+              "in thread {} has already requested it",
+              name, cluster_manager.thread_local_dispatcher_.name());
+    // This worker thread has already requested a discovery of a cluster with this name, so nothing
+    // more left to do here.
+    //
+    // We can't "just" return handle here, because handle is a part of the structured binding done
+    // above. So it's not really a ClusterDiscoveryCallbackHandlePtr, but more like
+    // ClusterDiscoveryCallbackHandlePtr&, so named return value optimization does not apply here -
+    // it needs to be moved.
+    return std::move(handle);
+  }
+  ENVOY_LOG(
+      debug,
+      "cm odcds: forwarding the on-demand discovery request for cluster {} to the main thread",
+      name);
+  // This seems to be the first request for discovery of this cluster in this worker thread. Rest of
+  // the process may only happen in the main thread.
+  dispatcher_.post([this, odcds = std::move(odcds), timeout, name = std::move(name),
+                    invoker = std::move(invoker),
+                    &thread_local_dispatcher = cluster_manager.thread_local_dispatcher_] {
+    // Check for the cluster here too. It might have been added between the time when this closure
+    // was posted and when it is being executed.
+    if (getThreadLocalCluster(name) != nullptr) {
+      ENVOY_LOG(
+          debug,
+          "cm odcds: the requested cluster {} is already known, posting the callback back to {}",
+          name, thread_local_dispatcher.name());
+      thread_local_dispatcher.post([invoker = std::move(invoker)] {
+        invoker.invokeCallback(ClusterDiscoveryStatus::Available);
+      });
+      return;
+    }
+
+    if (auto it = pending_cluster_creations_.find(name); it != pending_cluster_creations_.end()) {
+      ENVOY_LOG(debug, "cm odcds: on-demand discovery for cluster {} is already in progress", name);
+      // We already began the discovery process for this cluster, nothing to do. If we got here, it
+      // means that it was other worker thread that requested the discovery.
+      return;
+    }
+    // Start the discovery. If the cluster gets discovered, cluster manager will warm it up and
+    // invoke the cluster lifecycle callbacks, that will in turn invoke our callback.
+    odcds->updateOnDemand(name);
+    // Setup the discovery timeout timer to avoid keeping callbacks indefinitely.
+    auto timer = dispatcher_.createTimer([this, name] { notifyExpiredDiscovery(name); });
+    timer->enableTimer(timeout);
+    // Keep odcds handle alive for the duration of the discovery process.
+    pending_cluster_creations_.insert(
+        {std::move(name), ClusterCreation{std::move(odcds), std::move(timer)}});
+  });
+
+  // We can't "just" return handle here, because handle is a part of the structured binding done
+  // above. So it's not really a ClusterDiscoveryCallbackHandlePtr, but more like
+  // ClusterDiscoveryCallbackHandlePtr&, so named return value optimization does not apply here - it
+  // needs to be moved.
+  return std::move(handle);
+}
+
+void ClusterManagerImpl::notifyMissingCluster(absl::string_view name) {
+  ENVOY_LOG(debug, "cm odcds: cluster {} not found during on-demand discovery", name);
+  notifyClusterDiscoveryStatus(name, ClusterDiscoveryStatus::Missing);
+}
+
+void ClusterManagerImpl::notifyExpiredDiscovery(absl::string_view name) {
+  ENVOY_LOG(debug, "cm odcds: on-demand discovery for cluster {} timed out", name);
+  notifyClusterDiscoveryStatus(name, ClusterDiscoveryStatus::Timeout);
+}
+
+void ClusterManagerImpl::notifyClusterDiscoveryStatus(absl::string_view name,
+                                                      ClusterDiscoveryStatus status) {
+  auto map_node_handle = pending_cluster_creations_.extract(name);
+  if (map_node_handle.empty()) {
+    // Not a cluster we are interested in. This may happen when ODCDS
+    // receives some cluster name in removed resources field and
+    // notifies the cluster manager about it.
+    return;
+  }
+  // Let all the worker threads know that the discovery timed out.
+  tls_.runOnAllThreads(
+      [name = std::string(name), status](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+        ENVOY_LOG(
+            trace,
+            "cm cdm: starting processing cluster name {} (status {}) from the expired timer in {}",
+            name, enumToInt(status), cluster_manager->thread_local_dispatcher_.name());
+        cluster_manager->cdm_.processClusterName(name, status);
+      });
+}
+
+ClusterDiscoveryManager
+ClusterManagerImpl::createAndSwapClusterDiscoveryManager(std::string thread_name) {
+  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
+  ClusterDiscoveryManager cdm(std::move(thread_name), cluster_manager);
+
+  cluster_manager.cdm_.swap(cdm);
+
+  return cdm;
 }
 
 ProtobufTypes::MessagePtr
@@ -1147,7 +1299,7 @@ ClusterManagerImpl::dumpClusterConfigs(const Matchers::StringMatcher& name_match
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl(
     ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
     const absl::optional<LocalClusterParams>& local_cluster_params)
-    : parent_(parent), thread_local_dispatcher_(dispatcher) {
+    : parent_(parent), thread_local_dispatcher_(dispatcher), cdm_(dispatcher.name(), *this) {
   // If local cluster is defined then we need to initialize it first.
   if (local_cluster_params.has_value()) {
     const auto& local_cluster_name = local_cluster_params->info_->name();
@@ -1320,6 +1472,12 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
   }
 
   return &container_iter->second;
+}
+
+ClusterUpdateCallbacksHandlePtr
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::addClusterUpdateCallbacks(
+    ClusterUpdateCallbacks& cb) {
+  return std::make_unique<ClusterUpdateCallbacksHandleImpl>(cb, update_callbacks_);
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
@@ -1672,11 +1830,11 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
-        transport_socket_options, state, source, alternate_protocols_cache,
-        std::chrono::milliseconds(300), coptions, quic_stat_names_, stats_);
+        transport_socket_options, state, source, alternate_protocols_cache, coptions,
+        quic_stat_names_, stats_);
 #else
     // Should be blocked by configuration checking at an earlier point.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
 #endif
   }
   if (protocols.size() >= 2) {
@@ -1695,11 +1853,11 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #ifdef ENVOY_ENABLE_QUIC
     return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
                                          priority, options, transport_socket_options, state, source,
-                                         quic_stat_names_, stats_);
+                                         quic_stat_names_, {}, stats_, {});
 #else
     UNREFERENCED_PARAMETER(source);
     // Should be blocked by configuration checking at an earlier point.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
 #endif
   }
   ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);

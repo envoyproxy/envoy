@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # L7 HTTP filter that implements health check responses
-# Public docs: docs/root/configuration/http_filters/health_check_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/health_check_filter
 
 envoy_extension_package()
 

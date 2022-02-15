@@ -22,11 +22,9 @@ public:
     // the caller of configInfo()'s scope.
     const Protobuf::Message& config_;
 
-    const std::string& name_;
-
     // The discovery version that supplied this route. This will be set to "" in the case of
     // static clusters.
-    std::string version_;
+    const std::string version_;
   };
 
   virtual ~RouteConfigProvider() = default;
@@ -36,14 +34,14 @@ public:
    * returned config may be different on a subsequent call, so a new config should be acquired for
    * each request flow.
    */
-  virtual ConfigConstSharedPtr config() PURE;
+  virtual ConfigConstSharedPtr config() const PURE;
 
   /**
    * @return the configuration information for the currently loaded route configuration. Note that
    * if the provider has not yet performed an initial configuration load, no information will be
    * returned.
    */
-  virtual absl::optional<ConfigInfo> configInfo() const PURE;
+  virtual const absl::optional<ConfigInfo>& configInfo() const PURE;
 
   /**
    * @return the last time this RouteConfigProvider was updated. Used for config dumps.

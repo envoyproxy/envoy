@@ -214,9 +214,8 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
   // to be used for a request, with e.g. "Accept-Encoding: deflate;q=0.75, gzip;q=0.5", and caches
   // it in the state. All other compression filters in the sequence use the cached decision.
   const StreamInfo::FilterStateSharedPtr& filter_state = callbacks.streamInfo().filterState();
-  if (filter_state->hasData<CompressorRegistry>(key)) {
-    CompressorRegistry& registry = filter_state->getDataMutable<CompressorRegistry>(key);
-    registry.filter_configs_.push_back(config_);
+  if (auto registry = filter_state->getDataMutable<CompressorRegistry>(key); registry != nullptr) {
+    registry->filter_configs_.push_back(config_);
   } else {
     auto registry_ptr = std::make_unique<CompressorRegistry>();
     registry_ptr->filter_configs_.push_back(config_);
@@ -309,11 +308,13 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   // Find all compressors enabled for the filter chain.
   std::map<std::string, uint32_t> allowed_compressors;
   uint32_t registration_count{0};
-  for (const auto& filter_config :
-       decoder_callbacks_->streamInfo()
-           .filterState()
-           ->getDataReadOnly<CompressorRegistry>(compressorRegistryKey())
-           .filter_configs_) {
+
+  auto typed_state =
+      decoder_callbacks_->streamInfo().filterState()->getDataReadOnly<CompressorRegistry>(
+          compressorRegistryKey());
+  ASSERT(typed_state != nullptr);
+
+  for (const auto& filter_config : (*typed_state).filter_configs_) {
     // A compressor filter may be limited to compress certain Content-Types. If the response's
     // content type doesn't match the list of content types this filter is enabled for then
     // it must be excluded from the decision process.
@@ -464,10 +465,10 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& he
   // Check if we have already cached our decision on encoding.
   const StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
-  if (filter_state->hasData<CompressorFilter::EncodingDecision>(encoding_decision_key)) {
-    const CompressorFilter::EncodingDecision& decision =
-        filter_state->getDataReadOnly<CompressorFilter::EncodingDecision>(encoding_decision_key);
-    return shouldCompress(decision);
+  if (auto typed_state =
+          filter_state->getDataReadOnly<CompressorFilter::EncodingDecision>(encoding_decision_key);
+      typed_state != nullptr) {
+    return shouldCompress(*typed_state);
   }
 
   // No cached decision found, so decide now.

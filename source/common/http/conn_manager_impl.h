@@ -214,7 +214,7 @@ private:
 
     // FilterManagerCallbacks
     void encodeHeaders(ResponseHeaderMap& response_headers, bool end_stream) override;
-    void encode100ContinueHeaders(ResponseHeaderMap& response_headers) override;
+    void encode1xxHeaders(ResponseHeaderMap& response_headers) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(ResponseTrailerMap& trailers) override;
     void encodeMetadata(MetadataMapVector& metadata) override;
@@ -222,9 +222,9 @@ private:
       ASSERT(!request_trailers_);
       request_trailers_ = std::move(request_trailers);
     }
-    void setContinueHeaders(Http::ResponseHeaderMapPtr&& continue_headers) override {
-      ASSERT(!continue_headers_);
-      continue_headers_ = std::move(continue_headers);
+    void setInformationalHeaders(Http::ResponseHeaderMapPtr&& informational_headers) override {
+      ASSERT(!informational_headers_);
+      informational_headers_ = std::move(informational_headers);
     }
     void setResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers) override {
       // We'll overwrite the headers in the case where we fail the stream after upstream headers
@@ -242,8 +242,8 @@ private:
     Http::RequestTrailerMapOptRef requestTrailers() override {
       return makeOptRefFromPtr(request_trailers_.get());
     }
-    Http::ResponseHeaderMapOptRef continueHeaders() override {
-      return makeOptRefFromPtr(continue_headers_.get());
+    Http::ResponseHeaderMapOptRef informationalHeaders() override {
+      return makeOptRefFromPtr(informational_headers_.get());
     }
     Http::ResponseHeaderMapOptRef responseHeaders() override {
       return makeOptRefFromPtr(response_headers_.get());
@@ -255,7 +255,8 @@ private:
     void endStream() override {
       ASSERT(!state_.codec_saw_local_complete_);
       state_.codec_saw_local_complete_ = true;
-      filter_manager_.streamInfo().onLastDownstreamTxByteSent();
+      filter_manager_.streamInfo().downstreamTiming().onLastDownstreamTxByteSent(
+          connection_manager_.time_source_);
       request_response_timespan_->complete();
       connection_manager_.doEndStream(*this);
     }
@@ -283,10 +284,6 @@ private:
     void onLocalReply(Code code) override;
     Tracing::Config& tracingConfig() override;
     const ScopeTrackedObject& scope() override;
-
-    bool enableInternalRedirectsWithBody() const override {
-      return connection_manager_.enable_internal_redirects_with_body_;
-    }
 
     void traceRequest();
 
@@ -353,7 +350,7 @@ private:
     RequestHeaderMapPtr request_headers_;
     RequestTrailerMapPtr request_trailers_;
 
-    ResponseHeaderMapPtr continue_headers_;
+    ResponseHeaderMapPtr informational_headers_;
     ResponseHeaderMapPtr response_headers_;
     ResponseTrailerMapPtr response_trailers_;
 
@@ -396,7 +393,7 @@ private:
    * Check to see if the connection can be closed after gracefully waiting to send pending codec
    * data.
    */
-  void checkForDeferredClose();
+  void checkForDeferredClose(bool skip_deferred_close);
 
   /**
    * Do a delayed destruction of a stream to allow for stack unwind. Also calls onDestroy() for
@@ -453,12 +450,12 @@ private:
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
   bool remote_close_{};
-  bool enable_internal_redirects_with_body_{};
   // Hop by hop headers should always be cleared for Envoy-as-a-proxy but will
   // not be for Envoy-mobile.
   bool clear_hop_by_hop_response_headers_{true};
   // The number of requests accumulated on the current connection.
   uint64_t accumulated_requests_{};
+  const std::string proxy_name_; // for Proxy-Status.
 };
 
 } // namespace Http

@@ -75,7 +75,8 @@ protected:
   const std::string path_string_{"some_path"};
   const std::string alpn_{"h2,http/1.1"};
   const std::string sig_algs_{"rsa_pss_rsae_sha256"};
-  const std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers_;
+  const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
+      san_matchers_;
   const std::string empty_string_;
   const std::vector<std::string> empty_string_list_;
   const std::string cert_chain_{quic::test::kTestCertificateChainPem};
@@ -97,11 +98,16 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainSuccess) {
   const std::string ocsp_response;
   const std::string cert_sct;
   std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_SUCCESS,
             verifier_->VerifyCertChain(std::string(cert_view->subject_alt_name_domains()[0]), 54321,
                                        {leaf_cert_}, ocsp_response, cert_sct, nullptr,
-                                       &error_details, nullptr, nullptr, nullptr))
+                                       &error_details, &verify_details, nullptr, nullptr))
       << error_details;
+  EXPECT_NE(verify_details, nullptr);
+  EXPECT_TRUE(static_cast<CertVerifyResult&>(*verify_details).isValid());
+  std::unique_ptr<CertVerifyResult> cloned(static_cast<CertVerifyResult*>(verify_details->Clone()));
+  EXPECT_TRUE(cloned->isValid());
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureFromSsl) {
@@ -111,13 +117,16 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureFromSsl) {
   const std::string ocsp_response;
   const std::string cert_sct;
   std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
             verifier_->VerifyCertChain(std::string(cert_view->subject_alt_name_domains()[0]), 54321,
                                        {leaf_cert_}, ocsp_response, cert_sct, nullptr,
-                                       &error_details, nullptr, nullptr, nullptr))
+                                       &error_details, &verify_details, nullptr, nullptr))
       << error_details;
   EXPECT_EQ("X509_verify_cert: certificate verification error at depth 1: certificate has expired",
             error_details);
+  EXPECT_NE(verify_details, nullptr);
+  EXPECT_FALSE(static_cast<CertVerifyResult&>(*verify_details).isValid());
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidCA) {
@@ -132,9 +141,10 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidLeafCert) {
   const std::string cert_sct;
   std::string error_details;
   const std::vector<std::string> certs{"invalid leaf cert"};
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
             verifier_->VerifyCertChain("www.google.com", 54321, certs, ocsp_response, cert_sct,
-                                       nullptr, &error_details, nullptr, nullptr, nullptr));
+                                       nullptr, &error_details, &verify_details, nullptr, nullptr));
   EXPECT_EQ("d2i_X509: fail to parse DER", error_details);
 }
 
@@ -146,10 +156,11 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureLeafCertWithGarbage) {
   const std::string cert_sct;
   std::string cert_with_trailing_garbage = absl::StrCat(leaf_cert_, "AAAAAA");
   std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
             verifier_->VerifyCertChain(std::string(cert_view->subject_alt_name_domains()[0]), 54321,
                                        {cert_with_trailing_garbage}, ocsp_response, cert_sct,
-                                       nullptr, &error_details, nullptr, nullptr, nullptr))
+                                       nullptr, &error_details, &verify_details, nullptr, nullptr))
       << error_details;
   EXPECT_EQ("There is trailing garbage in DER.", error_details);
 }
@@ -159,9 +170,10 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidHost) {
   const std::string ocsp_response;
   const std::string cert_sct;
   std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
             verifier_->VerifyCertChain("unknown.org", 54321, {leaf_cert_}, ocsp_response, cert_sct,
-                                       nullptr, &error_details, nullptr, nullptr, nullptr))
+                                       nullptr, &error_details, &verify_details, nullptr, nullptr))
       << error_details;
   EXPECT_EQ("Leaf certificate doesn't match hostname: unknown.org", error_details);
 }
@@ -193,9 +205,10 @@ VdGXMAjeXhnOnPvmDi5hUz/uvI+Pg6cNmUoCRwSCnK/DazhA
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(chain[0]);
   ASSERT(cert_view);
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
             verifier_->VerifyCertChain("www.google.com", 54321, chain, ocsp_response, cert_sct,
-                                       nullptr, &error_details, nullptr, nullptr, nullptr));
+                                       nullptr, &error_details, &verify_details, nullptr, nullptr));
   EXPECT_EQ("Invalid leaf cert, only P-256 ECDSA certificates are supported", error_details);
 }
 
@@ -262,9 +275,10 @@ ZCFbredVxDBZuoVsfrKPSQa407Jj1Q==
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(chain[0]);
   ASSERT(cert_view);
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
             verifier_->VerifyCertChain("lyft.com", 54321, chain, ocsp_response, cert_sct, nullptr,
-                                       &error_details, nullptr, nullptr, nullptr));
+                                       &error_details, &verify_details, nullptr, nullptr));
   EXPECT_EQ("X509_verify_cert: certificate verification error at depth 0: unsupported certificate "
             "purpose",
             error_details);

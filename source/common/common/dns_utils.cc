@@ -15,6 +15,7 @@ getDnsLookupFamilyFromCluster(const envoy::config::cluster::v3::Cluster& cluster
 Network::DnsLookupFamily
 getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily family) {
   switch (family) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::cluster::v3::Cluster::V6_ONLY:
     return Network::DnsLookupFamily::V6Only;
   case envoy::config::cluster::v3::Cluster::V4_ONLY:
@@ -23,9 +24,10 @@ getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily 
     return Network::DnsLookupFamily::Auto;
   case envoy::config::cluster::v3::Cluster::V4_PREFERRED:
     return Network::DnsLookupFamily::V4Preferred;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::cluster::v3::Cluster::ALL:
+    return Network::DnsLookupFamily::All;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 std::vector<Network::Address::InstanceConstSharedPtr>
@@ -35,7 +37,7 @@ generateAddressList(const std::list<Network::DnsResponse>& responses, uint32_t p
     return addresses;
   }
   for (const auto& response : responses) {
-    auto address = Network::Utility::getAddressWithPort(*(response.address_), port);
+    auto address = Network::Utility::getAddressWithPort(*(response.addrInfo().address_), port);
     if (address) {
       addresses.push_back(address);
     }

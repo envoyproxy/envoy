@@ -499,6 +499,12 @@ TEST_F(SubsetLoadBalancerTest, NoFallback) {
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
   EXPECT_EQ(0U, stats_.lb_subsets_fallback_.value());
   EXPECT_EQ(0U, stats_.lb_subsets_selected_.value());
+
+  EXPECT_EQ(nullptr, lb_->peekAnotherHost(nullptr));
+  EXPECT_FALSE(lb_->lifetimeCallbacks().has_value());
+  std::vector<uint8_t> hash_key;
+  auto mock_host = std::make_shared<NiceMock<MockHost>>();
+  EXPECT_FALSE(lb_->selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
 }
 
 TEST_F(SubsetLoadBalancerTest, SelectOverrideHost) {

@@ -10,6 +10,7 @@ struct HttpProtocolTestParams {
   Network::Address::IpVersion version;
   Http::CodecType downstream_protocol;
   Http::CodecType upstream_protocol;
+  bool http2_new_codec_wrapper;
 };
 
 // Allows easy testing of Envoy code for HTTP/HTTP2 upstream/downstream.
@@ -52,7 +53,10 @@ public:
       : HttpIntegrationTest(
             GetParam().downstream_protocol, GetParam().version,
             ConfigHelper::httpProxyConfig(/*downstream_is_quic=*/GetParam().downstream_protocol ==
-                                          Http::CodecType::HTTP3)) {}
+                                          Http::CodecType::HTTP3)) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                      GetParam().http2_new_codec_wrapper ? "true" : "false");
+  }
 
   void SetUp() override {
     setDownstreamProtocol(GetParam().downstream_protocol);
@@ -72,10 +76,12 @@ protected:
   };
 
   void expectUpstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
-                                          BytesCountExpectation h2_expectation, const int id = 0);
+                                          BytesCountExpectation h2_expectation,
+                                          BytesCountExpectation h3_expectation, const int id = 0);
 
   void expectDownstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
-                                            BytesCountExpectation h2_expectation, const int id = 0);
+                                            BytesCountExpectation h2_expectation,
+                                            BytesCountExpectation h3_expectation, const int id = 0);
 };
 
 } // namespace Envoy

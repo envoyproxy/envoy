@@ -33,8 +33,8 @@ constexpr absl::string_view kRcDetailJwtAuthnPrefix = "jwt_authn_access_denied";
 std::string generateRcDetails(absl::string_view error_msg) {
   // Replace space with underscore since RCDetails may be written to access log.
   // Some log processors assume each log segment is separated by whitespace.
-  return absl::StrCat(kRcDetailJwtAuthnPrefix, "{",
-                      absl::StrJoin(absl::StrSplit(error_msg, ' '), "_"), "}");
+  return absl::StrCat(kRcDetailJwtAuthnPrefix, "{", StringUtil::replaceAllEmptySpace(error_msg),
+                      "}");
 }
 
 } // namespace

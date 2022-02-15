@@ -12,10 +12,11 @@ jobs:
 
     # CodeQL runs on ubuntu-latest and windows-latest
     runs-on: ubuntu-latest
+    if: github.repository == 'envoyproxy/envoy'
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f # v2.3.4
+      uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
       with:
         # We must fetch at least the immediate parents so that if this is
         # a pull request then we can checkout the head.
@@ -34,7 +35,7 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@a66b44a48a44d63acf71688c56aa168ac171d4cf # v1
+      uses: github/codeql-action/init@2b46439dd5477d8a1659811cdc500d35e601a1cb # v1.0.32
       # Override language selection by uncommenting this and choosing your languages
       with:
         languages: cpp
@@ -64,4 +65,4 @@ jobs:
 
     - name: Perform CodeQL Analysis
       if: env.BUILD_TARGETS != ''
-      uses: github/codeql-action/analyze@a66b44a48a44d63acf71688c56aa168ac171d4cf # v1
+      uses: github/codeql-action/analyze@2b46439dd5477d8a1659811cdc500d35e601a1cb # v1.0.32

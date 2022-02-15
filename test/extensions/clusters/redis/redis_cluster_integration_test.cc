@@ -670,8 +670,8 @@ TEST_P(RedisAdsIntegrationTest, RedisClusterRemoval) {
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, RedisAdsIntegrationTest,
-                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, RedisAdsIntegrationTest,
+                         ADS_INTEGRATION_PARAMS);
 
 } // namespace
 } // namespace Envoy

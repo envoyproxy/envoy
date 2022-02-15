@@ -25,6 +25,7 @@ envoy_cc_test_library(
     srcs = ["config_impl_test.cc"],
     deps = [
         ":route_fuzz_proto_cc_proto",
+        "//envoy/common:hashable_interface",
         "//source/common/config:metadata_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
@@ -188,6 +189,7 @@ envoy_cc_test(
         "//source/common/router:reset_header_parser_lib",
         "//source/common/router:retry_state_lib",
         "//source/common/upstream:resource_manager_lib",
+        "//test/common/http:common_lib",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:cluster_info_mocks",

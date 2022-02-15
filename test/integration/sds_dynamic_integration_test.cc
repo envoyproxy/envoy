@@ -309,9 +309,9 @@ resources:
     }
     return Quic::createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_,
                                              Network::Utility::resolveUrl(url), local_address,
-                                             quic_stat_names_, stats_store_);
+                                             quic_stat_names_, {}, stats_store_);
 #else
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
 #endif
   }
 

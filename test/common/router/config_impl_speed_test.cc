@@ -69,7 +69,7 @@ static RouteConfiguration genRouteConfig(benchmark::State& state,
       break;
     }
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("reached unexpected code");
     }
   }
 

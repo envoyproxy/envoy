@@ -13,17 +13,18 @@ envoy_cc_library(
     srcs = [
         "rds_route_config_provider_impl.cc",
         "rds_route_config_subscription.cc",
-        "route_config_provider_manager_impl.cc",
+        "route_config_provider_manager.cc",
         "route_config_update_receiver_impl.cc",
         "static_route_config_provider_impl.cc",
+        "util.cc",
     ],
     hdrs = [
         "rds_route_config_provider_impl.h",
         "rds_route_config_subscription.h",
         "route_config_provider_manager.h",
-        "route_config_provider_manager_impl.h",
         "route_config_update_receiver_impl.h",
         "static_route_config_provider_impl.h",
+        "util.h",
     ],
     deps = [
         "//envoy/rds:rds_interface",

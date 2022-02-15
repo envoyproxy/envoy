@@ -13,59 +13,48 @@ namespace Rds {
 /**
  * Traits of the protocol specific route configuration and proto.
  * The generic rds classes will call the methods of this interface
- * to get information which are not visible for them directly.
+ * to get information which is not visible for them directly.
  */
-class ConfigTraits {
+class ProtoTraits {
 public:
-  virtual ~ConfigTraits() = default;
+  virtual ~ProtoTraits() = default;
 
   /**
    * Give the full name of the route configuration proto description.
    * For example 'envoy.config.route.v3.RouteConfiguration'
    */
-  virtual std::string resourceType() const PURE;
+  virtual const std::string& resourceType() const PURE;
+
+  /**
+   * Gives back the name field tag number of the route configuration proto.
+   */
+  virtual int resourceNameFieldNumber() const PURE;
+
+  /**
+   * Create an empty route configuration proto object.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyProto() const PURE;
+};
+
+class ConfigTraits {
+public:
+  virtual ~ConfigTraits() = default;
 
   /**
    * Create a dummy config object without actual route configuration.
    * This object will be used before the first valid route configuration is fetched.
    */
-  virtual ConfigConstSharedPtr createConfig() const PURE;
-
-  /**
-   * Create an empty route configuration proto object.
-   */
-  virtual ProtobufTypes::MessagePtr createProto() const PURE;
-
-  /**
-   * Runtime check if the provided proto message object is really a route configuration instance.
-   * Throw an std::bad_cast exception if not.
-   * Every other method below this assumes the proto message is already
-   * validated and and doesn't do any further runtime check.
-   */
-  virtual const Protobuf::Message& validateResourceType(const Protobuf::Message& rc) const PURE;
-
-  /**
-   * Check if a valid config object can be made based on the provided route configuration proto.
-   * Throw an exception if not.
-   */
-  virtual const Protobuf::Message& validateConfig(const Protobuf::Message& rc) const PURE;
-
-  /**
-   * Gives back the value of the name field  Check if a valid config object can be made
-   * based on the provided route configuration proto.
-   * The object behind the returned reference has to have the same lifetime like the proto.
-   */
-  virtual const std::string& resourceName(const Protobuf::Message& rc) const PURE;
+  virtual ConfigConstSharedPtr createNullConfig() const PURE;
 
   /**
    * Create a config object based on a route configuration.
+   * The full name of the type of the parameter message is
+   * guaranteed to match with the return value of ProtoTraits::resourceType.
+   * Both dynamic or static cast can be applied to downcast the message
+   * to the corresponding route configuration class.
+   * @throw EnvoyException if the new config can't be applied of.
    */
   virtual ConfigConstSharedPtr createConfig(const Protobuf::Message& rc) const PURE;
-
-  /**
-   * Clones the route configuration proto.
-   */
-  virtual ProtobufTypes::MessagePtr cloneProto(const Protobuf::Message& rc) const PURE;
 };
 
 } // namespace Rds

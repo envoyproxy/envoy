@@ -203,8 +203,7 @@ response_rules:
   EXPECT_CALL(req_info_,
               setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEq(expected)));
   Http::TestResponseHeaderMapImpl continue_response{{":status", "100"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->encode100ContinueHeaders(continue_response));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(continue_response));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
   EXPECT_EQ(empty_headers, incoming_headers);
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};

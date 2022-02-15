@@ -197,9 +197,9 @@ for how to update or override dependencies.
 
     Set the `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
     `C:\Windows\TEMP`), and create a directory symlink `C:\c` to `C:\`, so that the MSYS2
-    path `/c/Windows/TEMP` is equivalent to the Windows path `C:\Windows\TEMP`:
+    path `/c/Windows/TEMP` is equivalent to the Windows path `C:/Windows/TEMP`:
     ```cmd
-    set TMPDIR=C:\Windows\TEMP
+    set TMPDIR=C:/Windows/TEMP
     mklink /d C:\c C:\
     ```
 
@@ -885,7 +885,7 @@ Note that if you run the `check_spelling.py` script you will need to have `aspel
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-20.04/bin/clang-format"
+export CLANG_FORMAT="$HOME/ext/clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
 

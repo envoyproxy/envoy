@@ -24,13 +24,11 @@ routing PRs, questions, etc. to the right place.
   * Upstream, host/priority sets, load balancing, and retry plugins.
 * Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
   * TLS, TCP proxy, listeners, and HTTP proxy/connection pooling.
+* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
+  * Data plane, codecs, security, configuration.
 
 # Maintainers
 
-* Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
-  * Fuzzing, security, headers, HTTP/gRPC, router, access log, tests.
-* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
-  * Data plane, codecs, security, configuration.
 * Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
   * Outlier detection, HTTP routing, xDS, configuration/operational questions.
 * Dhi Aurrahman ([dio](https://github.com/dio)) (dio@rockybars.com)
@@ -43,12 +41,15 @@ routing PRs, questions, etc. to the right place.
   * Windows port and CI build, `bazel/foreign_cc` build and dependencies liaison.
 * Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
   * Event management, security, performance, data plane.
-* Sotiris Nanopoulos ([davinci26](https://github.com/davinci26)) (Sotiris.Nanopoulos@microsoft.com)
-  * Windows, low level networking.
 * Dmitry Rozhkov ([rojkov](https://github.com/rojkov)) (dmitry.rozhkov@intel.com)
   * Scalability and performance.
 * Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
   * HTTP/3, upstream connection management.
+* Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
+  * xDS APIs, configuration, control plane, fuzzing.
+* Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
+  * Data plane, overload management, flow control.
+
 
 # Senior extension maintainers
 
@@ -67,6 +68,16 @@ without further review.
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
 * William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
+* Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
+* Tim Walsh ([twghu](https://github.com/twghu)) (walsh@redhat.com)
+
+In addition to the permanent Envoy security team, we have additional temporary
+contributors to envoy-setec and relevant Slack channels from:
+
+* [Trail of Bits](https://www.trailofbits.com/) expiring 9/30/2022.
+  * Adam Meily ([ameily](https://github.com/ameily))
+  * Alessandro Gario ([alessandrogario](https://github.com/alessandrogario))
+  * Mike Myers ([mike-myers-tob](https://github.com/mike-myers-tob))
 
 # Emeritus maintainers
 
@@ -74,6 +85,8 @@ without further review.
 * Roman Dzhabarov ([RomanDzhabarov](https://github.com/RomanDzhabarov)) (rdzhabarov@lyft.com)
 * Bill Gallagher ([wgallagher](https://github.com/wgallagher)) (bgallagher@lyft.com)
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
+* Sotiris Nanopoulos ([davinci26](https://github.com/davinci26)) (Sotiris.Nanopoulos@microsoft.com)
+* Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
 
 # Friends of Envoy
 

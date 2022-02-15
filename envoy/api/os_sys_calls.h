@@ -5,10 +5,14 @@
 #include <chrono>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/api/os_sys_calls_common.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/address.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Api {
@@ -16,6 +20,23 @@ namespace Api {
 struct EnvoyTcpInfo {
   std::chrono::microseconds tcpi_rtt;
 };
+
+// Small struct to avoid exposing ifaddrs -- which is not defined in all platforms -- to the
+// codebase.
+struct InterfaceAddress {
+  InterfaceAddress(absl::string_view interface_name, unsigned int interface_flags,
+                   Envoy::Network::Address::InstanceConstSharedPtr interface_addr)
+      : interface_name_(interface_name), interface_flags_(interface_flags),
+        interface_addr_(interface_addr) {}
+
+  std::string interface_name_;
+  unsigned int interface_flags_;
+  Envoy::Network::Address::InstanceConstSharedPtr interface_addr_;
+};
+
+using InterfaceAddressVector = std::vector<InterfaceAddress>;
+
+using AlternateGetifaddrs = std::function<SysCallIntResult(InterfaceAddressVector& interfaces)>;
 
 class OsSysCalls {
 public:
@@ -86,6 +107,11 @@ public:
    * return true if the OS support both IP_TRANSPARENT and IPV6_TRANSPARENT options
    */
   virtual bool supportsIpTransparent() const PURE;
+
+  /**
+   * return true if the OS supports multi-path TCP
+   */
+  virtual bool supportsMptcp() const PURE;
 
   /**
    * Release all resources allocated for fd.
@@ -190,6 +216,29 @@ public:
    * @see man TCP_INFO. Get the tcp info for the socket.
    */
   virtual SysCallBoolResult socketTcpInfo(os_fd_t sockfd, EnvoyTcpInfo* tcp_info) PURE;
+
+  /**
+   * return true if the OS supports getifaddrs.
+   */
+  virtual bool supportsGetifaddrs() const PURE;
+
+  /**
+   * @see man getifaddrs
+   */
+  virtual SysCallIntResult getifaddrs(InterfaceAddressVector& interfaces) PURE;
+
+  /**
+   * allows a platform to override getifaddrs or provide an implementation if one does not exist
+   * natively.
+   *
+   * @arg alternate_getifaddrs function pointer to implementation.
+   */
+  virtual void setAlternateGetifaddrs(AlternateGetifaddrs alternate_getifaddrs) {
+    alternate_getifaddrs_ = alternate_getifaddrs;
+  }
+
+protected:
+  absl::optional<AlternateGetifaddrs> alternate_getifaddrs_{};
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

@@ -75,17 +75,18 @@ vhds:
   }
   RouteConfigUpdatePtr
   makeRouteConfigUpdate(const envoy::config::route::v3::RouteConfiguration& rc) {
-    RouteConfigUpdatePtr config_update_info =
-        std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context_, OptionalHttpFilters());
+    RouteConfigUpdatePtr config_update_info = std::make_unique<RouteConfigUpdateReceiverImpl>(
+        proto_traits_, factory_context_, OptionalHttpFilters());
     config_update_info->onRdsUpdate(rc, "1");
     return config_update_info;
   }
 
+  ProtoTraitsImpl proto_traits_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
   const std::string context_ = "vhds_test";
-  absl::optional<Envoy::Router::RouteConfigProvider*> provider_;
+  absl::optional<Envoy::Rds::RouteConfigProvider*> provider_;
   Protobuf::util::MessageDifferencer messageDifferencer_;
   std::string default_vhds_config_;
   NiceMock<Envoy::Config::MockSubscriptionFactory> subscription_factory_;
@@ -97,8 +98,7 @@ TEST_F(VhdsTest, VhdsInstantiationShouldSucceedWithDELTA_GRPC) {
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  EXPECT_NO_THROW(
-      VhdsSubscription(config_update_info.get(), factory_context_, context_, provider_));
+  EXPECT_NO_THROW(VhdsSubscription(config_update_info, factory_context_, context_, provider_));
 }
 
 // verify that api_type: GRPC fails validation
@@ -116,7 +116,7 @@ vhds:
   )EOF");
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  EXPECT_THROW(VhdsSubscription(config_update_info.get(), factory_context_, context_, provider_),
+  EXPECT_THROW(VhdsSubscription(config_update_info, factory_context_, context_, provider_),
                EnvoyException);
 }
 
@@ -126,7 +126,7 @@ TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  VhdsSubscription subscription(config_update_info.get(), factory_context_, context_, provider_);
+  VhdsSubscription subscription(config_update_info, factory_context_, context_, provider_);
   EXPECT_EQ(0UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
 
   auto vhost = buildVirtualHost("vhost1", "vhost.first");
@@ -185,7 +185,7 @@ vhds:
   )EOF");
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  VhdsSubscription subscription(config_update_info.get(), factory_context_, context_, provider_);
+  VhdsSubscription subscription(config_update_info, factory_context_, context_, provider_);
   EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
   EXPECT_EQ("vhost_rds1", config_update_info->protobufConfigurationCast().virtual_hosts(0).name());
 

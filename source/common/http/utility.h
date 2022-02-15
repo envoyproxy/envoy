@@ -132,6 +132,7 @@ envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
                              const Protobuf::BoolValue& hcm_stream_error);
+
 } // namespace Utility
 } // namespace Http3
 namespace Http {
@@ -193,6 +194,14 @@ void appendXff(RequestHeaderMap& headers, const Network::Address::Instance& remo
  * @param via supplies the via header to append.
  */
 void appendVia(RequestOrResponseHeaderMap& headers, const std::string& via);
+
+/**
+ * Update authority with the specified hostname.
+ * @param headers headers where authority should be updated.
+ * @param hostname hostname that authority should be updated with.
+ * @param append_xfh append the original authority to the x-forwarded-host header.
+ */
+void updateAuthority(RequestHeaderMap& headers, absl::string_view hostname, bool append_xfh);
 
 /**
  * Creates an SSL (https) redirect path based on the input host and path headers.
@@ -613,6 +622,14 @@ AuthorityAttributes parseAuthority(absl::string_view host);
 envoy::config::route::v3::RetryPolicy
 convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy,
                               const std::string& retry_on);
+
+/**
+ * @param request_headers the request header to be looked into.
+ * @return true if the request method is safe as defined in
+ * https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1
+ */
+bool isSafeRequest(Http::RequestHeaderMap& request_headers);
+
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy

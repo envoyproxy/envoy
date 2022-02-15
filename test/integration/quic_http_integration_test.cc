@@ -23,6 +23,7 @@
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
+#include "quiche/quic/test_tools/quic_sent_packet_manager_peer.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -189,6 +190,7 @@ public:
     quic_connection_ = connection.get();
     ASSERT(quic_connection_persistent_info_ != nullptr);
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
+    OptRef<Http::AlternateProtocolsCache> cache;
     auto session = std::make_unique<EnvoyQuicClientSession>(
         persistent_info.quic_config_, supported_versions_, std::move(connection),
         (host.empty() ? persistent_info.server_id_
@@ -197,20 +199,29 @@ public:
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
-        persistent_info.crypto_stream_factory_, quic_stat_names_, stats_store_);
+        persistent_info.crypto_stream_factory_, quic_stat_names_, cache, stats_store_);
     return session;
   }
 
   IntegrationCodecClientPtr makeRawHttpConnection(
       Network::ClientConnectionPtr&& conn,
       absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) override {
+    ENVOY_LOG(debug, "Creating a new client {}",
+              conn->connectionInfoProvider().localAddress()->asStringView());
+    return makeRawHttp3Connection(std::move(conn), http2_options, true);
+  }
+
+  // Create Http3 codec client with the option not to wait for 1-RTT key establishment.
+  IntegrationCodecClientPtr makeRawHttp3Connection(
+      Network::ClientConnectionPtr&& conn,
+      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+      bool wait_for_1rtt_key) {
     std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
     cluster->max_response_headers_count_ = 200;
     if (http2_options.has_value()) {
       cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
           http2_options.value(), quic::kStreamReceiveWindowLimit);
     }
-    cluster->http3_options_.set_allow_extended_connect(true);
     *cluster->http3_options_.mutable_quic_protocol_options() = client_quic_options_;
     Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
         cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
@@ -218,7 +229,8 @@ public:
     // This call may fail in QUICHE because of INVALID_VERSION. QUIC connection doesn't support
     // in-connection version negotiation.
     auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
-                                                          host_description, downstream_protocol_);
+                                                          host_description, downstream_protocol_,
+                                                          wait_for_1rtt_key);
     if (codec->disconnected()) {
       // Connection may get closed during version negotiation or handshake.
       // TODO(#8479) QUIC connection doesn't support in-connection version negotiationPropagate
@@ -260,8 +272,24 @@ public:
     ASSERT(&transport_socket_factory_->clientContextConfig());
   }
 
+  void setConcurrency(size_t concurrency) {
+    concurrency_ = concurrency;
+    if (concurrency > 1) {
+      config_helper_.addConfigModifier(
+          [=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+            // SO_REUSEPORT is needed because concurrency > 1.
+            bootstrap.mutable_static_resources()
+                ->mutable_listeners(0)
+                ->mutable_enable_reuse_port()
+                ->set_value(true);
+          });
+    }
+  }
+
   void testMultipleQuicConnections() {
-    concurrency_ = 8;
+    // Enabling SO_REUSEPORT with 8 workers. Unfortunately this setting makes the test rarely flaky
+    // if it is configured to run with --runs_per_test=N where N > 1 but without --jobs=1.
+    setConcurrency(8);
     initialize();
     std::vector<IntegrationCodecClientPtr> codec_clients;
     for (size_t i = 1; i <= concurrency_; ++i) {
@@ -308,7 +336,7 @@ public:
                                                                         {":authority", "host"}});
       auto& request_encoder = encoder_decoder.first;
       auto response = std::move(encoder_decoder.second);
-      codec_clients[i]->sendData(request_encoder, 0, true);
+      codec_clients[i]->sendData(request_encoder, 1000, true);
       waitForNextUpstreamRequest();
       upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
                                                                        {"set-cookie", "foo"},
@@ -343,9 +371,38 @@ TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   testRouterHeaderOnlyRequestAndResponse();
 }
 
+TEST_P(QuicHttpIntegrationTest, Draft29NotSupportedByDefault) {
+  supported_versions_ = {quic::ParsedQuicVersion::Draft29()};
+  initialize();
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  EXPECT_TRUE(codec_client_->disconnected());
+  EXPECT_EQ(quic::QUIC_INVALID_VERSION,
+            static_cast<EnvoyQuicClientSession*>(codec_client_->connection())->error());
+}
+
+TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
+  supported_versions_ = {quic::ParsedQuicVersion::Draft29()};
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_disable_version_draft_29",
+      "false");
+  initialize();
+
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  EXPECT_EQ(transport_socket_factory_->clientContextConfig().serverNameIndication(),
+            codec_client_->connection()->requestedServerName());
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+  test_server_->waitForCounterEq("http3.quic_version_h3_29", 1u);
+}
+
 TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
-  // Make sure both connections use the same PersistentQuicInfoImpl.
+  // Make sure all connections use the same PersistentQuicInfoImpl.
   concurrency_ = 1;
+  const Http::TestResponseHeaderMapImpl too_early_response_headers{{":status", "425"}};
+
   initialize();
   // Start the first connection.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -358,11 +415,14 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   ASSERT_TRUE(response1->waitForEndStream());
   // Close the first connection.
   codec_client_->close();
+
   // Start a second connection.
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+                                         /*wait_for_1rtt_key*/ false);
   // Send a complete request on the second connection.
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response2->waitForEndStream());
   // Ensure 0-RTT was used by second connection.
@@ -371,6 +431,8 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   EXPECT_TRUE(static_cast<quic::QuicCryptoClientStream*>(
                   quic::test::QuicSessionPeer::GetMutableCryptoStream(quic_session))
                   ->EarlyDataAccepted());
+  EXPECT_NE(quic_session->ssl(), nullptr);
+  EXPECT_TRUE(quic_session->ssl()->peerCertificateValidated());
   // Close the second connection.
   codec_client_->close();
   if (GetParam() == Network::Address::IpVersion::v4) {
@@ -385,6 +447,38 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   }
 
   test_server_->waitForCounterEq("http3.quic_version_rfc_v1", 2u);
+
+  // Start the third connection.
+  codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+                                         /*wait_for_1rtt_key*/ false);
+  auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
+  upstream_request_->encodeHeaders(too_early_response_headers, true);
+  ASSERT_TRUE(response3->waitForEndStream());
+  // This is downstream sending early data, so the 425 response should be forwarded back to the
+  // client.
+  EXPECT_EQ("425", response3->headers().getStatusValue());
+  codec_client_->close();
+
+  // Start the fourth connection.
+  codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+                                         /*wait_for_1rtt_key*/ false);
+  Http::TestRequestHeaderMapImpl request{{":method", "GET"},
+                                         {":path", "/test/long/url"},
+                                         {":scheme", "http"},
+                                         {":authority", "host"},
+                                         {"Early-Data", "2"}};
+  auto response4 = codec_client_->makeHeaderOnlyRequest(request);
+  waitForNextUpstreamRequest(0);
+  // If the request already has Early-Data header, no additional Early-Data header should be added
+  // and the header should be forwarded as is.
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "2"));
+  upstream_request_->encodeHeaders(too_early_response_headers, true);
+  ASSERT_TRUE(response4->waitForEndStream());
+  // 425 response should be forwarded back to the client.
+  EXPECT_EQ("425", response4->headers().getStatusValue());
+  codec_client_->close();
 }
 
 // Ensure multiple quic connections work, regardless of platform BPF support
@@ -407,7 +501,15 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsNoBPF) {
 // Tests that the packets from a connection with CID longer than 8 bytes are routed to the same
 // worker.
 TEST_P(QuicHttpIntegrationTest, MultiWorkerWithLongConnectionId) {
-  concurrency_ = 8;
+  setConcurrency(8);
+  config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    // SO_REUSEPORT is needed because concurrency > 1.
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->mutable_enable_reuse_port()
+        ->set_value(true);
+  });
+
   initialize();
   // Setup 9-byte CID for the next connection.
   designated_connection_ids_.push_back(quic::test::TestConnectionIdNineBytesLong(2u));
@@ -415,7 +517,7 @@ TEST_P(QuicHttpIntegrationTest, MultiWorkerWithLongConnectionId) {
 }
 
 TEST_P(QuicHttpIntegrationTest, PortMigration) {
-  concurrency_ = 2;
+  setConcurrency(2);
   initialize();
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);
@@ -471,10 +573,16 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
 }
 
 TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
-  concurrency_ = 2;
+  setConcurrency(2);
   initialize();
+  client_quic_options_.mutable_num_timeouts_to_trigger_port_migration()->set_value(2);
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);
+
+  // Make sure that the port migration config is plumbed through.
+  EXPECT_EQ(2u, quic::test::QuicSentPacketManagerPeer::GetNumPtosForPathDegrading(
+                    &quic_connection_->sent_packet_manager()));
+
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
@@ -508,7 +616,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
 }
 
 TEST_P(QuicHttpIntegrationTest, NoPortMigrationWithoutConfig) {
-  concurrency_ = 2;
+  setConcurrency(2);
   initialize();
   client_quic_options_.mutable_num_timeouts_to_trigger_port_migration()->set_value(0);
   uint32_t old_port = lookupPort("http");
@@ -546,7 +654,7 @@ TEST_P(QuicHttpIntegrationTest, NoPortMigrationWithoutConfig) {
 }
 
 TEST_P(QuicHttpIntegrationTest, PortMigrationFailureOnPathDegrading) {
-  concurrency_ = 2;
+  setConcurrency(2);
   validation_failure_on_path_response_ = true;
   initialize();
   uint32_t old_port = lookupPort("http");
@@ -599,41 +707,6 @@ TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
   EXPECT_EQ(failure_reason, codec_client_->connection()->transportFailureReason());
 }
 
-// HTTP3 doesn't support 101 SwitchProtocol response code, the client should
-// reset the request.
-TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void { hcm.set_proxy_100_continue(true); });
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                                                 {":path", "/dynamo/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"},
-                                                                 {"expect", "100-continue"}});
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  // Wait for the request headers to be received upstream.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "101"}}, false);
-  ASSERT_TRUE(response->waitForReset());
-  codec_client_->close();
-  EXPECT_FALSE(response->complete());
-
-  // Verify stream error counters are correctly incremented.
-  std::string counter_scope = GetParam() == Network::Address::IpVersion::v4
-                                  ? "listener.127.0.0.1_0.http3.downstream.rx."
-                                  : "listener.[__1]_0.http3.downstream.rx.";
-  std::string error_code = "quic_reset_stream_error_code_QUIC_STREAM_GENERAL_PROTOCOL_ERROR";
-  test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1U);
-}
-
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
   initialize();
 
@@ -662,6 +735,134 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
   auto response = std::move(encoder_decoder.second);
 
   ASSERT_TRUE(response->waitForReset());
+  EXPECT_FALSE(response->complete());
+
+  // Verify stream error counters are correctly incremented.
+  std::string counter_scope = GetParam() == Network::Address::IpVersion::v4
+                                  ? "listener.127.0.0.1_0.http3.downstream.tx."
+                                  : "listener.[__1]_0.http3.downstream.tx.";
+  std::string error_code = "quic_connection_close_error_code_QUIC_HTTP_FRAME_ERROR";
+  test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1U);
+}
+
+TEST_P(QuicHttpIntegrationTest, Http3ClientKeepalive) {
+  initialize();
+
+  constexpr uint64_t max_interval_sec = 5;
+  constexpr uint64_t initial_interval_sec = 1;
+  // Set connection idle network timeout to be a little larger than max interval.
+  dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+      .quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromSeconds(max_interval_sec + 2));
+  client_quic_options_.mutable_connection_keepalive()->mutable_max_interval()->set_seconds(
+      max_interval_sec);
+  client_quic_options_.mutable_connection_keepalive()->mutable_initial_interval()->set_seconds(
+      initial_interval_sec);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Wait for 10s before sending back response. If keepalive is disabled, the
+  // connection would have idle timed out.
+  Event::TimerPtr timer(dispatcher_->createTimer([this]() -> void { dispatcher_->exit(); }));
+  timer->enableTimer(std::chrono::seconds(10));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                                   {"set-cookie", "foo"},
+                                                                   {"set-cookie", "bar"}},
+                                   true);
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  // First 6 PING frames should be sent every 1s, and the following ones less frequently.
+  EXPECT_LE(quic_connection_->GetStats().ping_frames_sent, 8u);
+}
+
+TEST_P(QuicHttpIntegrationTest, Http3ClientKeepaliveDisabled) {
+  initialize();
+
+  constexpr uint64_t max_interval_sec = 0;
+  constexpr uint64_t initial_interval_sec = 1;
+  // Set connection idle network timeout to be a little larger than max interval.
+  dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+      .quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromSeconds(5));
+  client_quic_options_.mutable_connection_keepalive()->mutable_max_interval()->set_seconds(
+      max_interval_sec);
+  client_quic_options_.mutable_connection_keepalive()->mutable_initial_interval()->set_seconds(
+      initial_interval_sec);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // As keepalive is disabled, the connection will timeout after 5s.
+  EXPECT_TRUE(response->waitForReset());
+  EXPECT_EQ(quic_connection_->GetStats().ping_frames_sent, 0u);
+}
+
+TEST_P(QuicHttpIntegrationTest, Http3DownstreamKeepalive) {
+  constexpr uint64_t max_interval_sec = 5;
+  constexpr uint64_t initial_interval_sec = 1;
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        auto* keepalive_options = hcm.mutable_http3_protocol_options()
+                                      ->mutable_quic_protocol_options()
+                                      ->mutable_connection_keepalive();
+        keepalive_options->mutable_initial_interval()->set_seconds(initial_interval_sec);
+        keepalive_options->mutable_max_interval()->set_seconds(max_interval_sec);
+      });
+  // Set connection idle network timeout to be a little larger than max interval.
+  config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->mutable_udp_listener_config()
+        ->mutable_quic_options()
+        ->mutable_idle_timeout()
+        ->set_seconds(max_interval_sec + 2);
+  });
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Wait for 10s before sending back response. If keepalive is disabled, the
+  // connection would have idle timed out.
+  Event::TimerPtr timer(dispatcher_->createTimer([this]() -> void { dispatcher_->exit(); }));
+  timer->enableTimer(std::chrono::seconds(10));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                                   {"set-cookie", "foo"},
+                                                                   {"set-cookie", "bar"}},
+                                   true);
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+}
+
+TEST_P(QuicHttpIntegrationTest, NoStreams) {
+  // Tighten the stream idle timeout, as it defaults to 5m
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_stream_idle_timeout()->set_seconds(0);
+        hcm.mutable_stream_idle_timeout()->set_nanos(400 * 1000 * 1000);
+      });
+
+  // Set the fake upstream to start with 0 streams available.
+  setUpstreamProtocol(Http::CodecType::HTTP3);
+  envoy::config::listener::v3::QuicProtocolOptions options;
+  options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(0);
+  mergeOptions(options);
+  initialize();
+
+  // Create the client connection and send a request.
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Make sure the time out closes the stream.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
 }
 
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {

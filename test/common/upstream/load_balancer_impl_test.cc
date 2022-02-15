@@ -89,11 +89,9 @@ public:
   using LoadBalancerBase::percentageDegradedLoad;
   using LoadBalancerBase::percentageLoad;
 
-  HostConstSharedPtr chooseHost(LoadBalancerContext*) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  HostConstSharedPtr chooseHost(LoadBalancerContext*) override { PANIC("not implemented"); }
 
-  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { PANIC("not implemented"); }
 };
 
 class LoadBalancerBaseTest : public LoadBalancerTestBase {
@@ -578,9 +576,7 @@ public:
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
     return choose_host_once_host_;
   }
-  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { PANIC("not implemented"); }
 
   HostConstSharedPtr choose_host_once_host_{std::make_shared<NiceMock<MockHost>>()};
 };
@@ -591,6 +587,13 @@ public:
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   TestZoneAwareLb lb_{priority_set_, stats_, runtime_, random_, common_config_};
 };
+
+TEST_F(ZoneAwareLoadBalancerBaseTest, BaseMethods) {
+  EXPECT_FALSE(lb_.lifetimeCallbacks().has_value());
+  std::vector<uint8_t> hash_key;
+  auto mock_host = std::make_shared<NiceMock<MockHost>>();
+  EXPECT_FALSE(lb_.selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
+}
 
 TEST_F(ZoneAwareLoadBalancerBaseTest, CrossPriorityHostMapUpdate) {
   // Fake cross priority host map.

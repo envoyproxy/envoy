@@ -153,6 +153,11 @@ public:
   static bool authorityIsValid(const absl::string_view authority_value);
 
   /**
+   * @brief return if the 1xx should be handled by the [encode|decode]1xx calls.
+   */
+  static bool isSpecial1xx(const ResponseHeaderMap& response_headers);
+
+  /**
    * @brief a helper function to determine if the headers represent a CONNECT request.
    */
   static bool isConnect(const RequestHeaderMap& headers);

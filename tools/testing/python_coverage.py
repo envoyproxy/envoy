@@ -17,7 +17,9 @@ import sys
 
 from coverage import cmdline  # type:ignore
 
-from envoy.base import runner, utils
+from aio.run import runner
+
+from envoy.base import utils
 
 
 class CoverageRunner(runner.Runner):
@@ -34,13 +36,14 @@ class CoverageRunner(runner.Runner):
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         """Add arguments to the arg parser"""
+        super().add_arguments(parser)
         parser.add_argument("cov_data", help="Path to coverage data")
         parser.add_argument("cov_html", help="Path to coverage html")
 
     def coverage_args(self, coveragerc: str) -> list:
         return ["html"] + self.extra_args + [f"--rcfile={coveragerc}", "-d", self.cov_html]
 
-    def run(self) -> int:
+    async def run(self) -> int:
         if not self.cov_data:
             return cmdline.main(self.extra_args)
 
@@ -49,7 +52,7 @@ class CoverageRunner(runner.Runner):
 
 
 def main(*args) -> int:
-    return CoverageRunner(*args).run()
+    return CoverageRunner(*args)()
 
 
 if __name__ == "__main__":

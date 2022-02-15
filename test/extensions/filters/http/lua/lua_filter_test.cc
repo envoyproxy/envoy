@@ -730,8 +730,7 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
   // No lua hooks for 100-continue
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("100"))).Times(0);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->encode100ContinueHeaders(continue_headers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(continue_headers));
 
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
@@ -1677,31 +1676,6 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandle) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
-// Test that the deprecated filter is disabled by default for metadata.
-// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
-TEST_F(LuaHttpFilterTest, DEPRECATED_FEATURE_TEST(GetMetadataFromHandleUsingDeprecatedName)) {
-  const std::string SCRIPT{R"EOF(
-    function envoy_on_request(request_handle)
-      request_handle:logTrace(request_handle:metadata():get("foo.bar")["name"])
-    end
-  )EOF"};
-
-  const std::string METADATA{R"EOF(
-    filter_metadata:
-      envoy.lua:
-        foo.bar:
-          name: foo
-  )EOF"};
-
-  InSequence s;
-  setup(SCRIPT);
-  setupMetadata(METADATA);
-
-  // Logs deprecation warning the first time.
-  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo"))).Times(0);
-}
-
 // No available metadata on route.
 TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoRoute) {
   const std::string SCRIPT{R"EOF(
@@ -2447,6 +2421,22 @@ TEST_F(LuaHttpFilterTest, LogTableInsteadOfString) {
           spdlog::level::err,
           StrEq("[string \"...\"]:3: bad argument #1 to 'logTrace' (string expected, got table)")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(LuaHttpFilterTest, DestructFilterConfigPerRoute) {
+  setupFilter();
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute proto;
+  proto.mutable_source_code()->set_inline_string(HEADER_ONLY_SCRIPT);
+  per_route_config_ = std::make_shared<FilterConfigPerRoute>(proto, server_factory_context_);
+
+  InSequence s;
+  EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).WillOnce(Return(false));
+  EXPECT_CALL(server_factory_context_.dispatcher_, post(_));
+  EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).Times(0);
+
+  per_route_config_ = std::make_shared<FilterConfigPerRoute>(proto, server_factory_context_);
+  per_route_config_.reset();
 }
 
 } // namespace

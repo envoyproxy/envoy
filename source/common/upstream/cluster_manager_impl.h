@@ -33,7 +33,9 @@
 #include "source/common/http/alternate_protocols_cache_manager_impl.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/quic/quic_stat_names.h"
+#include "source/common/upstream/cluster_discovery_manager.h"
 #include "source/common/upstream/load_stats_reporter.h"
+#include "source/common/upstream/od_cds_api_impl.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/server/factory_context_base_impl.h"
@@ -228,7 +230,9 @@ struct ClusterManagerStats {
  * Implementation of ClusterManager that reads from a proto configuration, maintains a central
  * cluster list, as well as thread local caches of each cluster and associated connection pools.
  */
-class ClusterManagerImpl : public ClusterManager, Logger::Loggable<Logger::Id::upstream> {
+class ClusterManagerImpl : public ClusterManager,
+                           public MissingClusterNotifier,
+                           Logger::Loggable<Logger::Id::upstream> {
 public:
   ClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                      ClusterManagerFactory& factory, Stats::Store& stats,
@@ -293,6 +297,11 @@ public:
   ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
+  OdCdsApiHandlePtr
+  allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
+                   OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
+                   ProtobufMessage::ValidationVisitor& validation_visitor) override;
+
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
   Config::SubscriptionFactory& subscriptionFactory() override { return subscription_factory_; }
@@ -320,6 +329,9 @@ public:
 
   void checkActiveStaticCluster(const std::string& cluster) override;
 
+  // Upstream::MissingClusterNotifier
+  void notifyMissingCluster(absl::string_view name) override;
+
 protected:
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
@@ -345,8 +357,56 @@ protected:
     std::vector<PerPriority> per_priority_update_params_;
   };
 
+  /**
+   * An implementation of an on-demand CDS handle. It forwards the discovery request to the cluster
+   * manager that created the handle.
+   *
+   * It's a protected type, so unit tests can use it.
+   */
+  class OdCdsApiHandleImpl : public OdCdsApiHandle {
+  public:
+    static OdCdsApiHandlePtr create(ClusterManagerImpl& parent, OdCdsApiSharedPtr odcds) {
+      return std::make_unique<OdCdsApiHandleImpl>(parent, std::move(odcds));
+    }
+
+    OdCdsApiHandleImpl(ClusterManagerImpl& parent, OdCdsApiSharedPtr odcds)
+        : parent_(parent), odcds_(std::move(odcds)) {
+      ASSERT(odcds_ != nullptr);
+    }
+
+    ClusterDiscoveryCallbackHandlePtr
+    requestOnDemandClusterDiscovery(absl::string_view name, ClusterDiscoveryCallbackPtr callback,
+                                    std::chrono::milliseconds timeout) override {
+      return parent_.requestOnDemandClusterDiscovery(odcds_, std::string(name), std::move(callback),
+                                                     timeout);
+    }
+
+  private:
+    ClusterManagerImpl& parent_;
+    OdCdsApiSharedPtr odcds_;
+  };
+
   virtual void postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
                                             ThreadLocalClusterUpdateParams&& params);
+
+  /**
+   * Notifies cluster discovery managers in each worker thread that the discovery process for the
+   * cluster with a passed name has timed out.
+   *
+   * It's protected, so the tests can use it.
+   */
+  void notifyExpiredDiscovery(absl::string_view name);
+
+  /**
+   * Creates a new discovery manager in current thread and swaps it with the one in thread local
+   * cluster manager. This could be used to simulate requesting a cluster from a different
+   * thread. Used for tests only.
+   *
+   * Protected, so tests can use it.
+   *
+   * @return the previous cluster discovery manager.
+   */
+  ClusterDiscoveryManager createAndSwapClusterDiscoveryManager(std::string thread_name);
 
 private:
   /**
@@ -354,7 +414,8 @@ private:
    * central dynamic cluster (if applicable). It maintains load balancer state and any created
    * connection pools.
    */
-  struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
+  struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject,
+                                         public ClusterLifecycleCallbackHandler {
     struct ConnPoolsContainer {
       ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host)
           : pools_{std::make_shared<ConnPools>(dispatcher, host)} {}
@@ -493,6 +554,9 @@ private:
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,
                                                   bool allocate = false);
 
+    // Upstream::ClusterLifecycleCallbackHandler
+    ClusterUpdateCallbacksHandlePtr addClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) override;
+
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
     absl::flat_hash_map<std::string, ClusterEntryPtr> thread_local_clusters_;
@@ -508,6 +572,7 @@ private:
     std::list<Envoy::Upstream::ClusterUpdateCallbacks*> update_callbacks_;
     const PrioritySet* local_priority_set_{};
     bool destroying_{};
+    ClusterDiscoveryManager cdm_;
   };
 
   struct ClusterData : public ClusterManagerCluster {
@@ -596,6 +661,17 @@ private:
   using PendingUpdatesByPriorityMapPtr = std::unique_ptr<PendingUpdatesByPriorityMap>;
   using ClusterUpdatesMap = absl::node_hash_map<std::string, PendingUpdatesByPriorityMapPtr>;
 
+  /**
+   * Holds a reference to an on-demand CDS to keep it alive for the duration of a cluster discovery,
+   * and an expiration timer notifying worker threads about discovery timing out.
+   */
+  struct ClusterCreation {
+    OdCdsApiSharedPtr odcds_;
+    Event::TimerPtr expiration_timer_;
+  };
+
+  using ClusterCreationsMap = absl::flat_hash_map<std::string, ClusterCreation>;
+
   void applyUpdates(ClusterManagerCluster& cluster, uint32_t priority, PendingUpdates& updates);
   bool scheduleUpdate(ClusterManagerCluster& cluster, uint32_t priority, bool mergeable,
                       const uint64_t timeout);
@@ -617,10 +693,20 @@ private:
                               const ClusterConnectivityState& cluster_manager_state,
                               std::function<ConnectionPool::Instance*()> preconnect_pool);
 
+  ClusterDiscoveryCallbackHandlePtr
+  requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std::string name,
+                                  ClusterDiscoveryCallbackPtr callback,
+                                  std::chrono::milliseconds timeout);
+
+  void notifyClusterDiscoveryStatus(absl::string_view name, ClusterDiscoveryStatus status);
+
+private:
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
   ThreadLocal::TypedSlot<ThreadLocalClusterManagerImpl> tls_;
+  // Contains information about ongoing on-demand cluster discoveries.
+  ClusterCreationsMap pending_cluster_creations_;
   Random::RandomGenerator& random_;
 
 protected:

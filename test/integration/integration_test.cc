@@ -28,6 +28,7 @@
 using Envoy::Http::Headers;
 using Envoy::Http::HeaderValueOf;
 using Envoy::Http::HttpStatusIs;
+using testing::ContainsRegex;
 using testing::EndsWith;
 using testing::HasSubstr;
 using testing::Not;
@@ -407,16 +408,16 @@ TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
-TEST_P(IntegrationTest, EnvoyProxyingEarly100ContinueWithEncoderFilter) {
+TEST_P(IntegrationTest, EnvoyProxyingEarly1xxWithEncoderFilter) {
   testEnvoyProxying1xx(true, true);
 }
 
-TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
+TEST_P(IntegrationTest, EnvoyProxyingLate1xxWithEncoderFilter) {
   testEnvoyProxying1xx(false, true);
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10923.
-TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
+TEST_P(IntegrationTest, EnvoyProxying1xxWithDecodeDataPause) {
   config_helper_.prependFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
@@ -429,7 +430,6 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
 // filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstruction) {
   concurrency_ = 2;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
 
   config_helper_.prependFilter(R"EOF(
 name: matcher
@@ -458,12 +458,12 @@ typed_config:
 
   initialize();
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
   {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), HttpStatusIs("403"));
+    codec_client_->close();
   }
 
   {
@@ -496,7 +496,6 @@ typed_config:
 // that we are able to skip filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstructionNewProto) {
   concurrency_ = 2;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
 
   config_helper_.prependFilter(R"EOF(
 name: matcher
@@ -525,12 +524,12 @@ typed_config:
 
   initialize();
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
   {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), HttpStatusIs("403"));
+    codec_client_->close();
   }
 
   {
@@ -561,8 +560,6 @@ typed_config:
 
 // Verifies routing via the match tree API.
 TEST_P(IntegrationTest, MatchTreeRouting) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
-
   const std::string vhost_yaml = R"EOF(
     name: vhost
     domains: ["matcher.com"]
@@ -1239,7 +1236,7 @@ TEST_P(IntegrationTest, AbsolutePathUsingHttpsAllowedInternally) {
 
 // Make that both IPv4 and IPv6 hosts match when using relative and absolute URLs.
 TEST_P(IntegrationTest, TestHostWithAddress) {
-  useAccessLog("%REQ(Host)%\n");
+  useAccessLog("%REQ(Host)%");
   std::string address_string;
   if (GetParam() == Network::Address::IpVersion::v4) {
     address_string = TestUtility::getIpv4Loopback();
@@ -1395,7 +1392,7 @@ TEST_P(IntegrationTest, TestBind) {
     address_string = "::1";
   }
   config_helper_.setSourceAddress(address_string);
-  useAccessLog("%UPSTREAM_LOCAL_ADDRESS%\n");
+  useAccessLog("%UPSTREAM_LOCAL_ADDRESS%");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1424,6 +1421,7 @@ TEST_P(IntegrationTest, TestBind) {
 
 TEST_P(IntegrationTest, TestFailedBind) {
   config_helper_.setSourceAddress("8.8.8.8");
+  config_helper_.addConfigModifier(configureProxyStatus());
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1439,6 +1437,10 @@ TEST_P(IntegrationTest, TestFailedBind) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("503"));
+  EXPECT_THAT(
+      response->headers().getProxyStatusValue(),
+      ContainsRegex(
+          R"(envoy; error=connection_refused; details="upstream_reset_before_response_started\{.*\}; UF")"));
   EXPECT_LT(0, test_server_->counter("cluster.cluster_0.bind_errors")->value());
 }
 
@@ -1472,9 +1474,9 @@ TEST_P(IntegrationTest, ViaAppendHeaderOnly) {
 
 // Validate that 100-continue works as expected with via header addition on both request and
 // response path.
-TEST_P(IntegrationTest, ViaAppendWith100Continue) {
+TEST_P(IntegrationTest, ViaAppendWith1xx) {
   config_helper_.addConfigModifier(setVia("foo"));
-  testEnvoyHandling100Continue(false, "foo");
+  testEnvoyHandling1xx(false, "foo");
 }
 
 // Test delayed close semantics for downstream HTTP/1.1 connections. When an early response is
@@ -2199,7 +2201,7 @@ TEST_P(IntegrationTest, RetryOptionsPredicate) {
 // successfully overrides the cached route, and subsequently, the request's upstream cluster
 // selection.
 TEST_P(IntegrationTest, SetRouteToDelegatingRouteWithClusterOverride) {
-  useAccessLog("%UPSTREAM_CLUSTER%\n");
+  useAccessLog("%UPSTREAM_CLUSTER%");
 
   config_helper_.prependFilter(R"EOF(
     name: set-route-filter

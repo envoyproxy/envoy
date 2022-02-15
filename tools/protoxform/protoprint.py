@@ -214,14 +214,25 @@ def format_header_from_file(
     options.java_multiple_files = True
     options.java_package = 'io.envoyproxy.' + file_proto.package
 
+    # Workaround packages in generated go code conflicting by transforming:
+    # foo/bar/v2 to use barv2 as the package in the generated code
+    golang_package_name = ""
+    if file_proto.package.split(".")[-1] in ("v2", "v3"):
+        name = "".join(file_proto.package.split(".")[-2:])
+        golang_package_name = ";" + name
+    options.go_package = "".join([
+        "github.com/envoyproxy/go-control-plane/",
+        file_proto.package.replace(".", "/"), golang_package_name
+    ])
+
     # This is a workaround for C#/Ruby namespace conflicts between packages and
     # objects, see https://github.com/envoyproxy/envoy/pull/3854.
     # TODO(htuch): remove once v3 fixes this naming issue in
     # https://github.com/envoyproxy/envoy/issues/8120.
     if file_proto.package in ['envoy.api.v2.listener', 'envoy.api.v2.cluster']:
-        qualified_package = '.'.join(s.capitalize() for s in file_proto.package.split('.')) + 'NS'
-        options.csharp_namespace = qualified_package
-        options.ruby_package = qualified_package
+        names = [s.capitalize() for s in file_proto.package.split('.')]
+        options.csharp_namespace = '.'.join(names) + 'NS'
+        options.ruby_package = '::'.join(names) + 'NS'
 
     if file_proto.service:
         options.java_generic_services = True

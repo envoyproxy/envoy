@@ -54,7 +54,7 @@ public:
   ~LogRecordingSink() override;
 
   // Logger::SinkDelegate
-  void log(absl::string_view msg) override;
+  void log(absl::string_view msg, const spdlog::details::log_msg& log_msg) override;
   void flush() override;
 
   const std::vector<std::string> messages() const {

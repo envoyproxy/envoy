@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/router/router.h"
 
 namespace Envoy {
 namespace Router {
@@ -21,6 +22,11 @@ public:
    * @return a struct containing StatNames for virtual cluster stats.
    */
   virtual const VirtualClusterStatNames& virtualClusterStatNames() const PURE;
+
+  /**
+   * @return a reference to the default generic connection pool factory.
+   */
+  virtual GenericConnPoolFactory& genericConnPoolFactory() PURE;
 };
 
 } // namespace Router

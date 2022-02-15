@@ -1,5 +1,5 @@
 #include "source/common/network/address_impl.h"
-#include "source/common/network/dns_resolver/dns_factory.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 
 #include "test/mocks/network/mocks.h"
 

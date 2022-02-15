@@ -29,12 +29,16 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/singleton/const_singleton.h"
+#include "source/common/version/api_version.h"
+#include "source/common/version/api_version_struct.h"
 
 #include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
 
 namespace Envoy {
 namespace Config {
+
+constexpr absl::string_view Wildcard = "*";
 
 /**
  * Constant Api Type Values, used by envoy::config::core::v3::ApiConfigSource.
@@ -192,16 +196,17 @@ public:
    */
   template <class Proto> static void checkTransportVersion(const Proto& api_config_source) {
     const auto transport_api_version = api_config_source.transport_api_version();
-    ASSERT(Thread::MainThread::isMainOrTestThread());
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO ||
         transport_api_version == envoy::config::core::v3::ApiVersion::V2) {
       Runtime::LoaderSingleton::getExisting()->countDeprecatedFeatureUse();
+      const ApiVersion version = ApiVersionInfo::apiVersion();
       const std::string& warning = fmt::format(
           "V2 (and AUTO) xDS transport protocol versions are deprecated in {}. "
-          "The v2 xDS major version is deprecated and disabled by default. Support for v2 will be "
-          "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q4 2020 by "
-          "following the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition.",
-          api_config_source.DebugString());
+          "The v2 xDS major version has been removed and is no longer supported. "
+          "You may be missing explicit V3 configuration of the transport API version, "
+          "see the advice in https://www.envoyproxy.io/docs/envoy/v{}.{}.{}/faq/api/envoy_v3.",
+          api_config_source.DebugString(), version.major, version.minor, version.patch);
       ENVOY_LOG_MISC(warn, warning);
       throw DeprecatedMajorVersionException(warning);
     }
@@ -420,10 +425,12 @@ public:
    * Create TagProducer instance. Check all tag names for conflicts to avoid
    * unexpected tag name overwriting.
    * @param bootstrap bootstrap proto.
+   * @param cli_tags tags that are provided by the cli
    * @throws EnvoyException when the conflict of tag names is found.
    */
   static Stats::TagProducerPtr
-  createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+  createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                    const Stats::TagVector& cli_tags);
 
   /**
    * Create StatsMatcher instance.

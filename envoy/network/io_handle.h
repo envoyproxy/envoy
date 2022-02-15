@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/api/io_error.h"
+#include "envoy/api/os_sys_calls_common.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/file_event.h"
@@ -325,6 +326,11 @@ public:
    *  returned.
    */
   virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() PURE;
+
+  /**
+   * @return the interface name for the socket, if the OS supports it. Otherwise, absl::nullopt.
+   */
+  virtual absl::optional<std::string> interfaceName() PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

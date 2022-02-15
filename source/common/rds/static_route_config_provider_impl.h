@@ -22,16 +22,16 @@ public:
   ~StaticRouteConfigProviderImpl() override;
 
   // Router::RouteConfigProvider
-  ConfigConstSharedPtr config() override { return config_; }
-  absl::optional<RouteConfigProvider::ConfigInfo> configInfo() const override;
+  ConfigConstSharedPtr config() const override { return config_; }
+  const absl::optional<ConfigInfo>& configInfo() const override { return config_info_; }
   SystemTime lastUpdated() const override { return last_updated_; }
   void onConfigUpdate() override {}
 
 private:
-  ConfigConstSharedPtr config_;
   ProtobufTypes::MessagePtr route_config_proto_;
-  const std::string& route_config_name_;
+  ConfigConstSharedPtr config_;
   SystemTime last_updated_;
+  absl::optional<ConfigInfo> config_info_;
   RouteConfigProviderManager& route_config_provider_manager_;
 };
 

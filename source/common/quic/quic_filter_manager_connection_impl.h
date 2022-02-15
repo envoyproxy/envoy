@@ -11,6 +11,7 @@
 #include "source/common/network/connection_impl_base.h"
 #include "source/common/quic/envoy_quic_simulated_watermark_buffer.h"
 #include "source/common/quic/quic_network_connection.h"
+#include "source/common/quic/quic_ssl_connection_info.h"
 #include "source/common/quic/send_buffer_monitor.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
@@ -30,7 +31,8 @@ class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
 public:
   QuicFilterManagerConnectionImpl(QuicNetworkConnection& connection,
                                   const quic::QuicConnectionId& connection_id,
-                                  Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
+                                  Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
+                                  std::shared_ptr<QuicSslConnectionInfo>&& info);
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
   void addWriteFilter(Network::WriteFilterSharedPtr filter) override;
@@ -43,7 +45,7 @@ public:
   void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override {
     // TODO(danzh): implement to support proxy. This interface is only called from
     // TCP proxy code.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("unexpected call to addBytesSentCallback");
   }
   void enableHalfClose(bool enabled) override;
   bool isHalfCloseEnabled() override;
@@ -59,9 +61,14 @@ public:
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { ASSERT(false); }
   bool readEnabled() const override { return true; }
   const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
+    ENVOY_BUG(network_connection_ && network_connection_->connectionSocket(),
+              "No connection socket.");
     return network_connection_->connectionSocket()->connectionInfoProvider();
   }
   Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    if (!network_connection_ || !network_connection_->connectionSocket()) {
+      return nullptr;
+    }
     return network_connection_->connectionSocket()->connectionInfoProviderSharedPtr();
   }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
@@ -93,12 +100,12 @@ public:
   }
   void write(Buffer::Instance& /*data*/, bool /*end_stream*/) override {
     // All writes should be handled by Quic internally.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("unexpected write call");
   }
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override {
     // As quic connection is not HTTP1.1, this method shouldn't be called by HCM.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
   bool aboveHighWatermark() const override;
 
@@ -116,7 +123,7 @@ public:
   // Network::ReadBufferSource
   Network::StreamBuffer getReadBuffer() override { return {empty_buffer_, false}; }
   // Network::WriteBufferSource
-  Network::StreamBuffer getWriteBuffer() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  Network::StreamBuffer getWriteBuffer() override { PANIC("not implemented"); }
 
   // SendBufferMonitor
   // Update the book keeping of the aggregated buffered bytes cross all the
@@ -151,14 +158,15 @@ protected:
   virtual bool hasDataToWrite() PURE;
 
   // Returns a QuicConnection interface if initialized_ is true, otherwise nullptr.
-  virtual const quic::QuicConnection* quicConnection() const = 0;
-  virtual quic::QuicConnection* quicConnection() = 0;
+  virtual const quic::QuicConnection* quicConnection() const PURE;
+  virtual quic::QuicConnection* quicConnection() PURE;
 
   QuicNetworkConnection* network_connection_{nullptr};
 
   OptRef<Http::Http3::CodecStats> codec_stats_;
   OptRef<const envoy::config::core::v3::Http3ProtocolOptions> http3_options_;
   bool initialized_{false};
+  std::shared_ptr<QuicSslConnectionInfo> quic_ssl_info_;
 
 private:
   friend class Envoy::TestPauseFilterForQuic;

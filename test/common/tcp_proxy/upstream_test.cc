@@ -6,6 +6,8 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/tcp/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -33,10 +35,10 @@ public:
     }
     EXPECT_CALL(stream_encoder_options_, enableHalfClose()).Times(AnyNumber());
     config_.set_hostname("default.host.com:443");
-    upstream_ = std::make_unique<T>(callbacks_, config_);
+    upstream_ = std::make_unique<T>(callbacks_, config_, downstream_stream_info_);
     upstream_->setRequestEncoder(encoder_, true);
   }
-
+  NiceMock<StreamInfo::MockStreamInfo> downstream_stream_info_;
   Http::MockRequestEncoder encoder_;
   Http::MockHttp1StreamEncoderOptions stream_encoder_options_;
   NiceMock<Tcp::ConnectionPool::MockUpstreamCallbacks> callbacks_;
@@ -60,7 +62,8 @@ TYPED_TEST(HttpUpstreamTest, WriteUpstream) {
   this->upstream_->encodeData(buffer2, true);
 
   // New upstream with no encoder
-  this->upstream_ = std::make_unique<TypeParam>(this->callbacks_, this->config_);
+  this->upstream_ =
+      std::make_unique<TypeParam>(this->callbacks_, this->config_, this->downstream_stream_info_);
   this->upstream_->encodeData(buffer2, true);
 }
 
@@ -94,7 +97,8 @@ TYPED_TEST(HttpUpstreamTest, ReadDisable) {
   EXPECT_TRUE(this->upstream_->readDisable(false));
 
   // New upstream with no encoder
-  this->upstream_ = std::make_unique<TypeParam>(this->callbacks_, this->config_);
+  this->upstream_ =
+      std::make_unique<TypeParam>(this->callbacks_, this->config_, this->downstream_stream_info_);
   EXPECT_FALSE(this->upstream_->readDisable(true));
 }
 
@@ -182,8 +186,11 @@ public:
     config_.set_hostname("default.host.com:443");
   }
 
-  void setupUpstream() { upstream_ = std::make_unique<T>(callbacks_, config_); }
+  void setupUpstream() {
+    upstream_ = std::make_unique<T>(callbacks_, config_, this->downstream_stream_info_);
+  }
 
+  NiceMock<StreamInfo::MockStreamInfo> downstream_stream_info_;
   Http::MockRequestEncoder encoder_;
   Http::MockHttp1StreamEncoderOptions stream_encoder_options_;
   NiceMock<Tcp::ConnectionPool::MockUpstreamCallbacks> callbacks_;
@@ -272,6 +279,47 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
   expected_headers->addCopy(Http::LowerCaseString("header1"), "value1");
   expected_headers->addCopy(Http::LowerCaseString("header1"), "value2");
 
+  EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
+  this->upstream_->setRequestEncoder(this->encoder_, false);
+}
+
+TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeadersWithDownstreamInfo) {
+  auto* header = this->config_.add_headers_to_add();
+  auto* hdr = header->mutable_header();
+  hdr->set_key("header0");
+  hdr->set_value("value0");
+
+  header = this->config_.add_headers_to_add();
+  hdr = header->mutable_header();
+  hdr->set_key("downstream_local_port");
+  hdr->set_value("%DOWNSTREAM_LOCAL_PORT%");
+  header->mutable_append()->set_value(true);
+
+  this->setupUpstream();
+  std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
+  expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
+      {Http::Headers::get().Method, "CONNECT"},
+      {Http::Headers::get().Host, this->config_.hostname()},
+  });
+
+  if (this->is_http2_) {
+    expected_headers->setReferenceKey(Http::Headers::get().Path, "/");
+    expected_headers->setReferenceKey(Http::Headers::get().Scheme,
+                                      Http::Headers::get().SchemeValues.Http);
+    expected_headers->setReferenceKey(Http::Headers::get().Protocol,
+                                      Http::Headers::get().ProtocolValues.Bytestream);
+  }
+
+  expected_headers->setCopy(Http::LowerCaseString("header0"), "value0");
+  expected_headers->addCopy(Http::LowerCaseString("downstream_local_port"), "80");
+  auto ip_versions = TestEnvironment::getIpVersionsForTest();
+  ASSERT_FALSE(ip_versions.empty());
+
+  auto ip_port = Network::Utility::getAddressWithPort(
+      *Network::Test::getCanonicalLoopbackAddress(ip_versions[0]), 80);
+  Network::ConnectionInfoSetterImpl connection_info(ip_port, ip_port);
+  EXPECT_CALL(this->downstream_stream_info_, downstreamAddressProvider)
+      .WillOnce(testing::ReturnRef(connection_info));
   EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }

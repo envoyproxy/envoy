@@ -88,7 +88,6 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
       upstream_drain_manager_slot_(context.threadLocal().allocateSlot()),
       shared_config_(std::make_shared<SharedConfig>(config, context)),
       random_generator_(context.api().randomGenerator()) {
-
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
     ThreadLocal::ThreadLocalObjectSharedPtr drain_manager =
         std::make_shared<UpstreamDrainManager>();
@@ -133,13 +132,11 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
 
 RouteConstSharedPtr Config::getRegularRouteFromEntries(Network::Connection& connection) {
   // First check if the per-connection state to see if we need to route to a pre-selected cluster
-  if (connection.streamInfo().filterState()->hasData<PerConnectionCluster>(
-          PerConnectionCluster::key())) {
-    const PerConnectionCluster& per_connection_cluster =
-        connection.streamInfo().filterState()->getDataReadOnly<PerConnectionCluster>(
-            PerConnectionCluster::key());
-
-    return std::make_shared<const SimpleRouteImpl>(*this, per_connection_cluster.value());
+  if (const auto* per_connection_cluster =
+          connection.streamInfo().filterState()->getDataReadOnly<PerConnectionCluster>(
+              PerConnectionCluster::key());
+      per_connection_cluster != nullptr) {
+    return std::make_shared<const SimpleRouteImpl>(*this, per_connection_cluster->value());
   }
 
   if (default_route_ != nullptr) {
@@ -196,7 +193,7 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   // in onData(). This will get re-enabled when the upstream connection is
   // established.
   read_callbacks_->connection().readDisable(true);
-
+  getStreamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   config_->stats().downstream_cx_total_.inc();
   if (set_connection_stats) {
     read_callbacks_->connection().setConnectionStats(
@@ -364,7 +361,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  if (downstreamConnection()) {
+  if (auto downstream_connection = downstreamConnection(); downstream_connection != nullptr) {
     if (!read_callbacks_->connection()
              .streamInfo()
              .filterState()
@@ -372,29 +369,24 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
                  Network::ProxyProtocolFilterState::key())) {
       read_callbacks_->connection().streamInfo().filterState()->setData(
           Network::ProxyProtocolFilterState::key(),
-          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-              downstreamConnection()->connectionInfoProvider().remoteAddress(),
-              downstreamConnection()->connectionInfoProvider().localAddress()}),
+          std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
+              downstream_connection->connectionInfoProvider().remoteAddress(),
+              downstream_connection->connectionInfoProvider().localAddress()}),
           StreamInfo::FilterState::StateType::ReadOnly,
           StreamInfo::FilterState::LifeSpan::Connection);
     }
     transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-        downstreamConnection()->streamInfo().filterState());
+        downstream_connection->streamInfo().filterState());
 
-    auto has_options_from_downstream =
-        downstreamConnection() && downstreamConnection()
-                                      ->streamInfo()
-                                      .filterState()
-                                      .hasData<Network::UpstreamSocketOptionsFilterState>(
-                                          Network::UpstreamSocketOptionsFilterState::key());
-    if (has_options_from_downstream) {
-      auto downstream_options = downstreamConnection()
-                                    ->streamInfo()
-                                    .filterState()
-                                    .getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
-                                        Network::UpstreamSocketOptionsFilterState::key())
-                                    .value();
-      upstream_options_ = std::make_shared<Network::Socket::Options>();
+    if (auto typed_state = downstream_connection->streamInfo()
+                               .filterState()
+                               .getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
+                                   Network::UpstreamSocketOptionsFilterState::key());
+        typed_state != nullptr) {
+      auto downstream_options = typed_state->value();
+      if (!upstream_options_) {
+        upstream_options_ = std::make_shared<Network::Socket::Options>();
+      }
       Network::Socket::appendOptions(upstream_options_, downstream_options);
     }
   }
@@ -439,24 +431,19 @@ void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
                                   Upstream::HostDescriptionConstSharedPtr host) {
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
-  getStreamInfo().onUpstreamHostSelected(host);
+  getStreamInfo().upstreamInfo()->setUpstreamHost(host);
 
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
     break;
-
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
     upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
     break;
-
   case ConnectionPool::PoolFailureReason::Timeout:
     onConnectTimeout();
     break;
-
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -468,13 +455,14 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
   upstream_ = std::move(upstream);
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
-  getStreamInfo().onUpstreamHostSelected(host);
-  getStreamInfo().setUpstreamLocalAddress(local_address);
-  getStreamInfo().setUpstreamSslConnection(ssl_info);
+  StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
+  upstream_info.setUpstreamHost(host);
+  upstream_info.setUpstreamLocalAddress(local_address);
+  upstream_info.setUpstreamSslConnection(ssl_info);
   onUpstreamConnection();
   read_callbacks_->continueReading();
   if (info) {
-    read_callbacks_->connection().streamInfo().setUpstreamFilterState(info->filterState());
+    upstream_info.setUpstreamFilterState(info->filterState());
   }
 }
 
@@ -531,6 +519,8 @@ Network::FilterStatus Filter::onNewConnection() {
 }
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
+  ENVOY_CONN_LOG(trace, "on downstream event {}, has upstream = {}", read_callbacks_->connection(),
+                 static_cast<int>(event), upstream_ == nullptr);
   if (upstream_) {
     Tcp::ConnectionPool::ConnectionDataPtr conn_data(upstream_->onDownstreamEvent(event));
     if (conn_data != nullptr &&
@@ -699,6 +689,7 @@ Drainer::Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedP
                  const Upstream::HostDescriptionConstSharedPtr& upstream_host)
     : parent_(parent), callbacks_(callbacks), upstream_conn_data_(std::move(conn_data)),
       timer_(std::move(idle_timer)), upstream_host_(upstream_host), config_(config) {
+  ENVOY_CONN_LOG(trace, "draining the upstream connection", upstream_conn_data_->connection());
   config_->stats().upstream_flush_total_.inc();
   config_->stats().upstream_flush_active_.inc();
 }

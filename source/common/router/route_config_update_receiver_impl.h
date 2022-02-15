@@ -26,18 +26,8 @@ public:
       : optional_http_filters_(optional_http_filters), factory_context_(factory_context),
         validator_(validator), validate_clusters_default_(validate_clusters_default) {}
 
-  std::string resourceType() const override;
-
-  Rds::ConfigConstSharedPtr createConfig() const override;
-  ProtobufTypes::MessagePtr createProto() const override;
-
-  const Protobuf::Message& validateResourceType(const Protobuf::Message& rc) const override;
-  const Protobuf::Message& validateConfig(const Protobuf::Message& rc) const override;
-
-  const std::string& resourceName(const Protobuf::Message& rc) const override;
-
+  Rds::ConfigConstSharedPtr createNullConfig() const override;
   Rds::ConfigConstSharedPtr createConfig(const Protobuf::Message& rc) const override;
-  ProtobufTypes::MessagePtr cloneProto(const Protobuf::Message& rc) const override;
 
 private:
   const OptionalHttpFilters optional_http_filters_;
@@ -48,25 +38,21 @@ private:
 
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
-  RouteConfigUpdateReceiverImpl(Server::Configuration::ServerFactoryContext& factory_context,
+  RouteConfigUpdateReceiverImpl(Rds::ProtoTraits& proto_traits,
+                                Server::Configuration::ServerFactoryContext& factory_context,
                                 const OptionalHttpFilters& optional_http_filters)
       : config_traits_(optional_http_filters, factory_context,
                        factory_context.messageValidationContext().dynamicValidationVisitor(),
                        false),
-        base_(config_traits_, factory_context), last_vhds_config_hash_(0ul),
+        base_(config_traits_, proto_traits, factory_context), last_vhds_config_hash_(0ul),
         vhds_virtual_hosts_(
             std::make_unique<std::map<std::string, envoy::config::route::v3::VirtualHost>>()),
         vhds_configuration_changed_(true) {}
 
-  void initializeRdsVhosts(const envoy::config::route::v3::RouteConfiguration& route_configuration);
   bool removeVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
                     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
   bool updateVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
                     const VirtualHostRefVector& added_vhosts);
-  void rebuildRouteConfig(
-      const std::map<std::string, envoy::config::route::v3::VirtualHost>& rds_vhosts,
-      const std::map<std::string, envoy::config::route::v3::VirtualHost>& vhds_vhosts,
-      envoy::config::route::v3::RouteConfiguration& route_config);
   bool onDemandFetchFailed(const envoy::service::discovery::v3::Resource& resource) const;
 
   // Router::RouteConfigUpdateReceiver
@@ -75,14 +61,12 @@ public:
                     const std::set<std::string>& added_resource_ids,
                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                     const std::string& version_info) override;
-  const std::string& routeConfigName() const override { return base_.routeConfigName(); }
-  const std::string& configVersion() const override { return base_.configVersion(); }
   uint64_t configHash() const override { return base_.configHash(); }
-  absl::optional<Rds::RouteConfigProvider::ConfigInfo> configInfo() const override {
+  const absl::optional<Rds::RouteConfigProvider::ConfigInfo>& configInfo() const override {
     return base_.configInfo();
   }
   bool vhdsConfigurationChanged() const override { return vhds_configuration_changed_; }
-  const Protobuf::Message& protobufConfiguration() override {
+  const Protobuf::Message& protobufConfiguration() const override {
     return base_.protobufConfiguration();
   }
   Rds::ConfigConstSharedPtr parsedConfiguration() const override {
@@ -92,12 +76,11 @@ public:
   const std::set<std::string>& resourceIdsInLastVhdsUpdate() override {
     return resource_ids_in_last_update_;
   }
-  const Rds::ConfigTraits& configTraits() const override { return config_traits_; }
-  const envoy::config::route::v3::RouteConfiguration& protobufConfigurationCast() override {
+  const envoy::config::route::v3::RouteConfiguration& protobufConfigurationCast() const override {
     ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(
-        &base_.protobufConfiguration()));
+        &RouteConfigUpdateReceiverImpl::protobufConfiguration()));
     return static_cast<const envoy::config::route::v3::RouteConfiguration&>(
-        base_.protobufConfiguration());
+        RouteConfigUpdateReceiverImpl::protobufConfiguration());
   }
 
 private:

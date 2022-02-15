@@ -168,16 +168,29 @@ public:
   T* get(const MakeObject& make_object) { return BaseClass::get(0, make_object); }
 };
 
-// RAII object to declare the TestThread. This should be declared in main() or
-// equivalent for any test binaries.
-//
-// Generally we expect TestThread to be instantiated only once on main() for
-// each test binary, though nested instantiations are allowed as long as the
-// thread ID does not change.
+// We use platform-specific functions to determine whether the current thread is
+// the "test thread". It is only valid to call isTestThread() on platforms where
+// these functions are available. Currently this is available only on apple and
+// linux.
+#if defined(__linux__) || defined(__APPLE__)
+#define TEST_THREAD_SUPPORTED 1
+#else
+#define TEST_THREAD_SUPPORTED 0
+#endif
+
+// Context for determining whether we are in the test thread.
 class TestThread {
 public:
-  TestThread();
-  ~TestThread();
+#if TEST_THREAD_SUPPORTED
+  /**
+   * @return whether the current thread is the test thread.
+   *
+   * Use of the macros ASSERT_IS_TEST_THREAD() and ASSERT_IS_NOT_TEST_THREAD()
+   * are preferred to avoid issues on platforms where detecting the test-thread
+   * is not supported.
+   */
+  static bool isTestThread();
+#endif
 };
 
 // RAII object to declare the MainThread. This should be declared in the thread
@@ -196,10 +209,25 @@ public:
   MainThread();
   ~MainThread();
 
+#if TEST_THREAD_SUPPORTED
   /**
    * @return whether the current thread is the main thread or test thread.
+   *
+   * Determines whether we are currently running on the main-thread or
+   * test-thread. We need to allow for either one because we don't establish
+   * the full threading model in all unit tests.
+   *
+   * Use of the macros ASSERT_IS_TEST_THREAD() and ASSERT_IS_NOT_TEST_THREAD()
+   * are preferred to avoid issues on platforms where detecting the test-thread
+   * is not supported.
    */
-  static bool isMainOrTestThread();
+  static bool isMainOrTestThread() { return isMainThread() || TestThread::isTestThread(); }
+#endif
+
+  /**
+   * @return whether the current thread is the main thread.
+   */
+  static bool isMainThread();
 
   /**
    * @return whether a MainThread has been instantiated.
@@ -207,18 +235,84 @@ public:
   static bool isMainThreadActive();
 };
 
-// To improve exception safety in data plane, we plan to forbid the use of raw try in the core code
-// base. This macros uses main thread assertion to make sure that exceptions aren't thrown from
-// worker thread.
-#define TRY_ASSERT_MAIN_THREAD                                                                     \
-  try {                                                                                            \
-    ASSERT(Thread::MainThread::isMainOrTestThread());
-
 #define END_TRY }
 
 // TODO(chaoqinli-1123): Remove this macros after we have removed all the exceptions from data
 // plane.
 #define TRY_NEEDS_AUDIT try
+
+// These convenience macros assert properties of the threading system, when
+// feasible. There is a platform-specific mechanism for determining whether the
+// current thread is from main(), which we call the "test thread", and if that
+// method is not available on the current platform we must skip the assertions.
+//
+// Note that the macros are all no-ops if there are any SkipAsserts instances
+// allocated.
+#ifdef NDEBUG
+
+#define ASSERT_IS_TEST_THREAD()
+#define ASSERT_IS_MAIN_OR_TEST_THREAD()
+#define ASSERT_IS_NOT_TEST_THREAD()
+#define ASSERT_IS_NOT_MAIN_OR_TEST_THREAD()
+
+#elif TEST_THREAD_SUPPORTED
+
+#define ASSERT_IS_TEST_THREAD()                                                                    \
+  ASSERT(Thread::SkipAsserts::skip() || Thread::TestThread::isTestThread())
+#define ASSERT_IS_MAIN_OR_TEST_THREAD()                                                            \
+  ASSERT(Thread::SkipAsserts::skip() || Thread::TestThread::isTestThread() ||                      \
+         Thread::MainThread::isMainThread())
+#define ASSERT_IS_NOT_TEST_THREAD()                                                                \
+  ASSERT(Thread::SkipAsserts::skip() || !Thread::TestThread::isTestThread())
+#define ASSERT_IS_NOT_MAIN_OR_TEST_THREAD()                                                        \
+  ASSERT(Thread::SkipAsserts::skip() ||                                                            \
+         (!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()))
+
+#else // !TEST_THREAD_SUPPORTED -- test-thread checks are skipped
+
+#define ASSERT_IS_TEST_THREAD()
+#define ASSERT_IS_MAIN_OR_TEST_THREAD()
+#define ASSERT_IS_NOT_TEST_THREAD()
+#define ASSERT_IS_NOT_MAIN_OR_TEST_THREAD() ASSERT(!Thread::MainThread::isMainThread())
+
+#endif
+
+/**
+ * To improve exception safety in data plane, we plan to forbid the use of raw
+ * try in the core code base. This macros uses main thread assertion to make
+ * sure that exceptions aren't thrown from worker thread.
+ */
+#define TRY_ASSERT_MAIN_THREAD                                                                     \
+  try {                                                                                            \
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+
+/**
+ * RAII class to override thread assertions checks in the macros:
+ *
+ *   TRY_ASSERT_MAIN_THREAD
+ *   ASSERT_IS_TEST_THREAD()
+ *   ASSERT_IS_MAIN_OR_TEST_THREAD()
+ *   ASSERT_IS_NOT_TEST_THREAD()
+ *   ASSERT_IS_NOT_MAIN_OR_TEST_THREAD()
+ *
+ * Those macros will be no-ops while there is a SkipAsserts object
+ * alive. SkipAsserts declarations can be nested.
+ *
+ * The state of the assertion-skipping can also be checked by calling static
+ * method SkipAsserts::skip().
+ *
+ * This class is intended to be instantiated on the stack in a limited scope.
+ */
+class SkipAsserts {
+public:
+  SkipAsserts();
+  ~SkipAsserts();
+
+  /**
+   * @return whether thread-related assertions should be skipped.
+   */
+  static bool skip();
+};
 
 } // namespace Thread
 } // namespace Envoy

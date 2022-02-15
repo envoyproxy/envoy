@@ -31,8 +31,6 @@ void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum d
   // state.
   ProcessWide process_wide;
   TestEnvironment::initializeOptions(argc, argv);
-  static auto* test_thread = new Envoy::Thread::TestThread;
-  UNREFERENCED_PARAMETER(test_thread);
 
   const auto environment_log_level = TestEnvironment::getOptions().logLevel();
   // We only override the default log level if it looks like we're debugging;

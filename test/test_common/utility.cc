@@ -74,7 +74,9 @@ bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
     lhs_keys.insert(key);
     return Http::HeaderMap::Iterate::Continue;
   });
-  rhs.iterate([&lhs, &rhs, &rhs_keys](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+  bool values_match = true;
+  rhs.iterate([&values_match, &lhs, &rhs,
+               &rhs_keys](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     const std::string key{header.key().getStringView()};
     // Compare with canonicalized multi-value headers. This ensures we respect order within
     // a header.
@@ -84,12 +86,13 @@ bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
         Http::HeaderUtility::getAllOfHeaderAsString(rhs, Http::LowerCaseString(key));
     ASSERT(rhs_entry.result());
     if (lhs_entry.result() != rhs_entry.result()) {
+      values_match = false;
       return Http::HeaderMap::Iterate::Break;
     }
     rhs_keys.insert(key);
     return Http::HeaderMap::Iterate::Continue;
   });
-  return lhs_keys.size() == rhs_keys.size();
+  return values_match && lhs_keys.size() == rhs_keys.size();
 }
 
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
@@ -168,6 +171,11 @@ Stats::TextReadoutSharedPtr TestUtility::findTextReadout(Stats::Store& store,
   return findByName(store.textReadouts(), name);
 }
 
+Stats::ParentHistogramSharedPtr TestUtility::findHistogram(Stats::Store& store,
+                                                           const std::string& name) {
+  return findByName(store.histograms(), name);
+}
+
 AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name,
                                               uint64_t value, Event::TestTimeSystem& time_system,
                                               std::chrono::milliseconds timeout,
@@ -199,7 +207,7 @@ AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::st
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
+      return AssertionFailure() << fmt::format("timed out waiting for {} to be >= {}", name, value);
     }
   }
   return AssertionSuccess();

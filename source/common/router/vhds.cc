@@ -20,18 +20,22 @@ namespace Envoy {
 namespace Router {
 
 // Implements callbacks to handle DeltaDiscovery protocol for VirtualHostDiscoveryService
-VhdsSubscription::VhdsSubscription(RouteConfigUpdateReceiver* config_update_info,
-                                   Server::Configuration::ServerFactoryContext& factory_context,
-                                   const std::string& stat_prefix,
-                                   absl::optional<RouteConfigProvider*>& route_config_provider_opt)
+VhdsSubscription::VhdsSubscription(
+    RouteConfigUpdatePtr& config_update_info,
+    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+    absl::optional<Rds::RouteConfigProvider*>& route_config_provider_opt)
     : Envoy::Config::SubscriptionBase<envoy::config::route::v3::VirtualHost>(
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       config_update_info_(config_update_info),
-      scope_(factory_context.scope().createScope(stat_prefix + "vhds." +
-                                                 config_update_info_->routeConfigName() + ".")),
+      scope_(factory_context.scope().createScope(
+          stat_prefix + "vhds." + config_update_info_->protobufConfigurationCast().name() + ".")),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
-      init_target_(fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
-                   [this]() { subscription_->start({config_update_info_->routeConfigName()}); }),
+      init_target_(fmt::format("VhdsConfigSubscription {}",
+                               config_update_info_->protobufConfigurationCast().name()),
+                   [this]() {
+                     subscription_->start(
+                         {config_update_info_->protobufConfigurationCast().name()});
+                   }),
       route_config_provider_opt_(route_config_provider_opt) {
   const auto& config_source = config_update_info_->protobufConfigurationCast()
                                   .vhds()
@@ -84,7 +88,8 @@ void VhdsSubscription::onConfigUpdate(
                                         version_info)) {
     stats_.config_reload_.inc();
     ENVOY_LOG(debug, "vhds: loading new configuration: config_name={} hash={}",
-              config_update_info_->routeConfigName(), config_update_info_->configHash());
+              config_update_info_->protobufConfigurationCast().name(),
+              config_update_info_->configHash());
     if (route_config_provider_opt_.has_value()) {
       route_config_provider_opt_.value()->onConfigUpdate();
     }

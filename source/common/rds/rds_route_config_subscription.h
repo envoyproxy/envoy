@@ -41,7 +41,7 @@ struct RdsStats {
  * RDS config providers.
  */
 class RdsRouteConfigSubscription : Envoy::Config::SubscriptionCallbacks,
-                                   protected Logger::Loggable<Logger::Id::router> {
+                                   protected Logger::Loggable<Logger::Id::rds> {
 public:
   RdsRouteConfigSubscription(
       RouteConfigUpdatePtr&& config_update,
@@ -49,7 +49,7 @@ public:
       const envoy::config::core::v3::ConfigSource& config_source,
       const std::string& route_config_name, const uint64_t manager_identifier,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-      RouteConfigProviderManager& route_config_provider_manager);
+      const std::string& rds_type, RouteConfigProviderManager& route_config_provider_manager);
 
   ~RdsRouteConfigSubscription() override;
 
@@ -73,7 +73,8 @@ private:
 
   bool validateUpdateSize(int num_resources);
 
-  virtual void beforeProviderUpdate() {}
+  virtual void beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>&,
+                                    std::unique_ptr<Cleanup>&) {}
   virtual void afterProviderUpdate() {}
 
 protected:
@@ -91,7 +92,8 @@ protected:
   // Target which starts the RDS subscription.
   Init::TargetImpl local_init_target_;
   Init::ManagerImpl local_init_manager_;
-  std::string stat_prefix_;
+  const std::string stat_prefix_;
+  const std::string rds_type_;
   RdsStats stats_;
   RouteConfigProviderManager& route_config_provider_manager_;
   const uint64_t manager_identifier_;

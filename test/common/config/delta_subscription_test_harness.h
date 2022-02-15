@@ -9,6 +9,7 @@
 
 #include "source/common/config/grpc_subscription_impl.h"
 #include "source/common/config/new_grpc_mux_impl.h"
+#include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/grpc/common.h"
 
 #include "test/common/config/subscription_test_harness.h"
@@ -32,17 +33,26 @@ namespace {
 
 class DeltaSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
-  DeltaSubscriptionTestHarness() : DeltaSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
-  DeltaSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
+  DeltaSubscriptionTestHarness(Envoy::Config::LegacyOrUnified legacy_or_unified)
+      : DeltaSubscriptionTestHarness(legacy_or_unified, std::chrono::milliseconds(0)) {}
+  DeltaSubscriptionTestHarness(Envoy::Config::LegacyOrUnified legacy_or_unified,
+                               std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints")),
-        async_client_(new Grpc::MockAsyncClient()) {
+        async_client_(new Grpc::MockAsyncClient()),
+        should_use_unified_(legacy_or_unified == Envoy::Config::LegacyOrUnified::Unified) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
-    xds_context_ = std::make_shared<NewGrpcMuxImpl>(
-        std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
-        random_, stats_store_, rate_limit_settings_, local_info_);
+    if (should_use_unified_) {
+      xds_context_ = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
+          std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
+          random_, stats_store_, rate_limit_settings_, local_info_, false);
+    } else {
+      xds_context_ = std::make_shared<NewGrpcMuxImpl>(
+          std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
+          random_, stats_store_, rate_limit_settings_, local_info_);
+    }
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         xds_context_, callbacks_, resource_decoder_, stats_,
         Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_, init_fetch_timeout, false,
@@ -126,6 +136,17 @@ public:
         });
   }
 
+  void onDiscoveryResponse(
+      std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& response) {
+    if (should_use_unified_) {
+      dynamic_cast<XdsMux::GrpcMuxDelta*>(subscription_->grpcMux().get())
+          ->onDiscoveryResponse(std::move(response), control_plane_stats_);
+    } else {
+      dynamic_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
+          ->onDiscoveryResponse(std::move(response), control_plane_stats_);
+    }
+  }
+
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
                            const std::string& version, bool accept) override {
     auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
@@ -155,8 +176,7 @@ public:
                                   Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
       expectSendMessage({}, {}, Grpc::Status::WellKnownGrpcStatus::Internal, "bad config", {});
     }
-    static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
-        ->onDiscoveryResponse(std::move(response), control_plane_stats_);
+    onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
@@ -196,7 +216,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncStream async_stream_;
-  NewGrpcMuxImplSharedPtr xds_context_;
+  GrpcMuxSharedPtr xds_context_;
   GrpcSubscriptionImplPtr subscription_;
   std::string last_response_nonce_;
   std::set<std::string> last_cluster_names_;
@@ -209,6 +229,7 @@ public:
   std::queue<std::string> nonce_acks_required_;
   std::queue<std::string> nonce_acks_sent_;
   bool subscription_started_{};
+  bool should_use_unified_;
 };
 
 } // namespace

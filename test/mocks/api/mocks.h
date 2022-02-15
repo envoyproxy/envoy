@@ -110,6 +110,10 @@ public:
   MOCK_METHOD(bool, supportsMmsg, (), (const));
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
   MOCK_METHOD(bool, supportsIpTransparent, (), (const));
+  MOCK_METHOD(bool, supportsMptcp, (), (const));
+  MOCK_METHOD(bool, supportsGetifaddrs, (), (const));
+  MOCK_METHOD(void, setAlternateGetifaddrs, (AlternateGetifaddrs alternate_getifaddrs));
+  MOCK_METHOD(SysCallIntResult, getifaddrs, (InterfaceAddressVector & interfaces));
 
   // Map from (sockfd,level,optname) to boolean socket option.
   using SockOptKey = std::tuple<os_fd_t, int, int>;

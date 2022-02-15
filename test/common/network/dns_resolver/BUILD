@@ -16,7 +16,7 @@ envoy_cc_test(
         "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
     ],
     deps = [
-        "//source/common/network/dns_resolver:dns_factory_lib",
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/extensions/network/dns_resolver/cares:config",
         "//test/mocks/network:network_mocks",
     ],

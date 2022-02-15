@@ -25,8 +25,8 @@ public:
   absl::optional<Details>
   getOptionDetails(const Socket& socket,
                    envoy::config::core::v3::SocketOption::SocketState) const override;
+  bool isSupported() const override;
 
-  bool isSupported() const;
   static const Network::SocketOptionName& optionName();
 
 private:

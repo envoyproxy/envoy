@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/common/common/matchers.h"
 #include "source/common/http/headers.h"
 
 namespace Envoy {
@@ -13,10 +14,12 @@ public:
    * Creates a canonicalized header map used in creating a AWS Signature V4 canonical request.
    * See https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
    * @param headers a header map to canonicalize.
+   * @param excluded_headers a list of string matchers to exclude a given header from signing.
    * @return a std::map of canonicalized headers to be used in building a canonical request.
    */
   static std::map<std::string, std::string>
-  canonicalizeHeaders(const Http::RequestHeaderMap& headers);
+  canonicalizeHeaders(const Http::RequestHeaderMap& headers,
+                      const std::vector<Matchers::StringMatcherPtr>& excluded_headers);
 
   /**
    * Creates an AWS Signature V4 canonical request string.

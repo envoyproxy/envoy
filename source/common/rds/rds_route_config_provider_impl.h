@@ -28,9 +28,9 @@ public:
   RdsRouteConfigSubscription& subscription() { return *subscription_; }
 
   // RouteConfigProvider
-  ConfigConstSharedPtr config() override { return tls_->config_; }
+  ConfigConstSharedPtr config() const override { return tls_->config_; }
 
-  absl::optional<RouteConfigProvider::ConfigInfo> configInfo() const override;
+  const absl::optional<ConfigInfo>& configInfo() const override;
   SystemTime lastUpdated() const override { return config_update_info_->lastUpdated(); }
   void onConfigUpdate() override;
 

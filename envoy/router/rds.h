@@ -18,9 +18,9 @@ public:
   /**
    * Same purpose as Rds::RouteConfigProvider::config()
    * but the return is downcasted to proper type.
-   * @return dowcasted ConfigConstSharedPtr from Rds::ConfigConstSharedPtr
+   * @return downcasted ConfigConstSharedPtr from Rds::ConfigConstSharedPtr
    */
-  virtual ConfigConstSharedPtr configCast() PURE;
+  virtual ConfigConstSharedPtr configCast() const PURE;
 
   /**
    * Callback used to request an update to the route configuration from the management server.
