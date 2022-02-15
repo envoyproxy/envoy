@@ -419,7 +419,7 @@ public:
  */
 class StreamInfoFormatter : public FormatterProvider {
 public:
-  StreamInfoFormatter(const std::string& field_name);
+  StreamInfoFormatter(const std::string&, const std::string& = "", const std::string& field_name = "");
 
   // FormatterProvider
   absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
@@ -437,7 +437,7 @@ public:
     virtual ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const PURE;
   };
   using FieldExtractorPtr = std::unique_ptr<FieldExtractor>;
-  using FieldExtractorCreateFunc = std::function<FieldExtractorPtr()>;
+  using FieldExtractorCreateFunc = std::function<FieldExtractorPtr(const std::string&, const std::string&)>;
 
   enum class StreamInfoAddressFieldExtractionType { WithPort, WithoutPort, JustPort };
 
