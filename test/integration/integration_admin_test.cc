@@ -60,7 +60,7 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_THAT(response->headers(),
               HeaderValueOf(Http::Headers::get().XContentTypeOptions, "nosniff"));
-  EXPECT_NE(std::string::npos, response->body().find("error: unknown log level\n"))
+  EXPECT_NE(std::string::npos, response->body().find("error: unknown logger level\n"))
       << response->body();
 
   // Bad logger

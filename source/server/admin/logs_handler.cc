@@ -82,7 +82,7 @@ std::pair<bool, std::string> LogsHandler::changeLogLevel(const Http::Utility::Qu
   absl::string_view key(it->first);
   absl::string_view value(it->second);
 
-  if (key == "all") {
+  if (key == "level") {
     // Change all log levels.
     auto level_to_use = parseLevel(value);
     if (!level_to_use.has_value()) {
