@@ -52,12 +52,14 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200", request("admin", "POST", "/logging", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  EXPECT_THAT(response->headers(), HeaderValueOf(Http::Headers::get().XContentTypeOptions, "nosniff"));
+  EXPECT_THAT(response->headers(),
+              HeaderValueOf(Http::Headers::get().XContentTypeOptions, "nosniff"));
 
   // Bad level
   EXPECT_EQ("400", request("admin", "POST", "/logging?level=blah", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  EXPECT_THAT(response->headers(), HeaderValueOf(Http::Headers::get().XContentTypeOptions, "nosniff"));
+  EXPECT_THAT(response->headers(),
+              HeaderValueOf(Http::Headers::get().XContentTypeOptions, "nosniff"));
   EXPECT_NE(std::string::npos, response->body().find("error: unknown log level\n"))
       << response->body();
 
