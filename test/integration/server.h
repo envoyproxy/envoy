@@ -437,18 +437,16 @@ class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
                               public IntegrationTestServerStats,
                               public Server::ComponentFactory {
 public:
-  static IntegrationTestServerPtr
-  create(const std::string& config_path, const Network::Address::IpVersion version,
-         std::function<void(IntegrationTestServer&)> on_server_ready_function,
-         std::function<void()> on_server_init_function,
-         absl::optional<uint64_t> deterministic_value, Event::TestTimeSystem& time_system,
-         Api::Api& api, bool defer_listener_finalization = false,
-         ProcessObjectOptRef process_object = absl::nullopt,
-         Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
-         uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
-         Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
-         Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false,
-         bool skip_asserts = false);
+  static IntegrationTestServerPtr create(
+      const std::string& config_path, const Network::Address::IpVersion version,
+      std::function<void(IntegrationTestServer&)> on_server_ready_function,
+      std::function<void()> on_server_init_function, absl::optional<uint64_t> deterministic_value,
+      Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization = false,
+      ProcessObjectOptRef process_object = absl::nullopt,
+      Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
+      uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
+      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
+      Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -477,7 +475,7 @@ public:
              ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
              uint32_t concurrency, std::chrono::seconds drain_time,
              Server::DrainStrategy drain_strategy,
-             Buffer::WatermarkFactorySharedPtr watermark_factory, bool skip_asserts);
+             Buffer::WatermarkFactorySharedPtr watermark_factory);
 
   void waitForCounterEq(const std::string& name, uint64_t value,
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
@@ -563,7 +561,6 @@ public:
   virtual Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() PURE;
   void useAdminInterfaceToQuit(bool use) { use_admin_interface_to_quit_ = use; }
   bool useAdminInterfaceToQuit() { return use_admin_interface_to_quit_; }
-  bool skipAsserts() const { return skip_asserts_; }
 
 protected:
   IntegrationTestServer(Event::TestTimeSystem& time_system, Api::Api& api,
@@ -596,9 +593,8 @@ private:
                      ProcessObjectOptRef process_object,
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-                     Buffer::WatermarkFactorySharedPtr watermark_factory, bool skip_asserts);
+                     Buffer::WatermarkFactorySharedPtr watermark_factory);
 
-  bool skip_asserts_{false};
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;
   const std::string config_path_;
@@ -649,9 +645,6 @@ private:
                                ProcessObjectOptRef process_object,
                                Buffer::WatermarkFactorySharedPtr watermark_factory) override;
 
-  // Used to skip thread checks for multi-envoy tests, when the test server is
-  // created create() with skip_asserts = true.
-  std::unique_ptr<Thread::SkipAsserts> skip_;
   // Owned by this class. An owning pointer is not used because the actual allocation is done
   // on a stack in a non-main thread.
   Server::Instance* server_{};
