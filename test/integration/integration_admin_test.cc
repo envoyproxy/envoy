@@ -34,19 +34,31 @@ INSTANTIATE_TEST_SUITE_P(Protocols, IntegrationAdminTest,
                              {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
+namespace {
+
+std::string ContentType(const BufferingStreamDecoderPtr& response) {
+  const Http::HeaderEntry* entry = response->headers().ContentType();
+  if (entry == nullptr) {
+    return "(null)";
+  }
+  return std::string(entry->value().getStringView());
+}
+
+} // namespace
+
 TEST_P(IntegrationAdminTest, AdminLogging) {
   initialize();
 
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200", request("admin", "POST", "/logging", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().XContentTypeOptions, "nosniff"));
+  EXPECT_THAT(response->headers(), HeaderValueOf(Http::Headers::get().XContentTypeOptions, "nosniff"));
 
   // Bad level
   EXPECT_EQ("400", request("admin", "POST", "/logging?level=blah", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().XContentTypeOptions, "nosniff"));
-  EXPECT_NE(std::string::npos, response->body().find("error: unknown logger level\n"))
+  EXPECT_THAT(response->headers(), HeaderValueOf(Http::Headers::get().XContentTypeOptions, "nosniff"));
+  EXPECT_NE(std::string::npos, response->body().find("error: unknown log level\n"))
       << response->body();
 
   // Bad logger
@@ -85,18 +97,6 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
     EXPECT_EQ(level_name, logger.levelString());
   }
 }
-
-namespace {
-
-std::string ContentType(const BufferingStreamDecoderPtr& response) {
-  const Http::HeaderEntry* entry = response->headers().ContentType();
-  if (entry == nullptr) {
-    return "(null)";
-  }
-  return std::string(entry->value().getStringView());
-}
-
-} // namespace
 
 TEST_P(IntegrationAdminTest, Admin) {
   initialize();
