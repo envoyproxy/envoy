@@ -25,6 +25,7 @@ RUNTIME_GUARD(envoy_reloadable_features_allow_response_for_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
 RUNTIME_GUARD(envoy_reloadable_features_append_or_truncate);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
+RUNTIME_GUARD(envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3)
 RUNTIME_GUARD(envoy_reloadable_features_correct_scheme_and_xfp);
 RUNTIME_GUARD(envoy_reloadable_features_correctly_validate_alpn);
 RUNTIME_GUARD(envoy_reloadable_features_disable_tls_inspector_injection);
@@ -36,12 +37,12 @@ RUNTIME_GUARD(envoy_reloadable_features_http_ext_authz_do_not_skip_direct_respon
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
 RUNTIME_GUARD(envoy_reloadable_features_internal_address);
-RUNTIME_GUARD(envoy_reloadable_features_internal_redirects_with_body);
 RUNTIME_GUARD(envoy_reloadable_features_listener_reuse_port_default_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_listener_wildcard_match_ip_family);
 RUNTIME_GUARD(envoy_reloadable_features_new_tcp_connection_pool);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_102_103);
 RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_json);
+RUNTIME_GUARD(envoy_reloadable_features_skip_delay_close);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_http_header_referer);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dispatching_frames_for_closed_connection);
 RUNTIME_GUARD(envoy_reloadable_features_support_locality_update_on_eds_cluster_endpoints);
@@ -50,7 +51,6 @@ RUNTIME_GUARD(envoy_reloadable_features_udp_listener_updates_filter_chain_in_pla
 RUNTIME_GUARD(envoy_reloadable_features_update_expected_rq_timeout_on_retry);
 RUNTIME_GUARD(envoy_reloadable_features_use_dns_ttl);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
-RUNTIME_GUARD(envoy_reloadable_features_vhds_heartbeats);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
 RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
 
@@ -130,6 +130,7 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_allow_upstream_inline_write,
   &FLAGS_envoy_reloadable_features_append_or_truncate,
   &FLAGS_envoy_reloadable_features_conn_pool_delete_when_idle,
+  &FLAGS_envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3,
   &FLAGS_envoy_reloadable_features_correct_scheme_and_xfp,
   &FLAGS_envoy_reloadable_features_correctly_validate_alpn,
   &FLAGS_envoy_reloadable_features_disable_tls_inspector_injection,
@@ -142,12 +143,12 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_http_reject_path_with_fragment,
   &FLAGS_envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled,
   &FLAGS_envoy_reloadable_features_internal_address,
-  &FLAGS_envoy_reloadable_features_internal_redirects_with_body,
   &FLAGS_envoy_reloadable_features_listener_reuse_port_default_enabled,
   &FLAGS_envoy_reloadable_features_listener_wildcard_match_ip_family,
   &FLAGS_envoy_reloadable_features_new_tcp_connection_pool,
   &FLAGS_envoy_reloadable_features_proxy_102_103,
   &FLAGS_envoy_reloadable_features_remove_legacy_json,
+  &FLAGS_envoy_reloadable_features_skip_delay_close,
   &FLAGS_envoy_reloadable_features_sanitize_http_header_referer,
   &FLAGS_envoy_reloadable_features_skip_dispatching_frames_for_closed_connection,
   &FLAGS_envoy_reloadable_features_support_locality_update_on_eds_cluster_endpoints,
@@ -156,7 +157,6 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_update_expected_rq_timeout_on_retry,
   &FLAGS_envoy_reloadable_features_use_dns_ttl,
   &FLAGS_envoy_reloadable_features_validate_connect,
-  &FLAGS_envoy_reloadable_features_vhds_heartbeats,
   &FLAGS_envoy_restart_features_explicit_wildcard_resource,
   &FLAGS_envoy_restart_features_use_apple_api_for_dns_lookups,
 };

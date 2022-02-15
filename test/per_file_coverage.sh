@@ -32,17 +32,18 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/exe:92.6"
 "source/extensions/common:95.8"
 "source/extensions/common/tap:94.2"
-"source/extensions/common/wasm:95.2" # flaky: be careful adjusting
+"source/extensions/common/wasm:95.1" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
 "source/extensions/filters/common:96.1"
 "source/extensions/filters/common/expr:96.2"
 "source/extensions/filters/common/fault:94.5"
 "source/extensions/filters/common/lua:96.5"
 "source/extensions/filters/common/rbac:88.1"
+"source/extensions/filters/http/aws_lambda:96.2"
 "source/extensions/filters/http/cache:93.4"
 "source/extensions/filters/http/cache/simple_http_cache:96.0"
 "source/extensions/filters/http/grpc_json_transcoder:94.7"
-"source/extensions/filters/http/ip_tagging:89.1"
+"source/extensions/filters/http/ip_tagging:87.0"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
 "source/extensions/filters/http/lua:96.4"
 "source/extensions/filters/http/wasm:95.8"

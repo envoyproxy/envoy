@@ -415,8 +415,6 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
                                  upstream_host_->address()->asString())),
         false);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (parent_.filter_complete_ && !response_complete_) {

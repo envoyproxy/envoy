@@ -161,63 +161,67 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
       server_info_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
-          {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
-          {"/certs", "print certs on machine",
-           MAKE_ADMIN_HANDLER(server_info_handler_.handlerCerts), false, false},
-          {"/clusters", "upstream cluster status",
-           MAKE_ADMIN_HANDLER(clusters_handler_.handlerClusters), false, false},
-          {"/config_dump", "dump current Envoy configs (experimental)",
-           MAKE_ADMIN_HANDLER(config_dump_handler_.handlerConfigDump), false, false},
-          {"/init_dump", "dump current Envoy init manager information (experimental)",
-           MAKE_ADMIN_HANDLER(init_dump_handler_.handlerInitDump), false, false},
-          {"/contention", "dump current Envoy mutex contention stats (if enabled)",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerContention), false, false},
-          {"/cpuprofiler", "enable/disable the CPU profiler",
-           MAKE_ADMIN_HANDLER(profiling_handler_.handlerCpuProfiler), false, true},
-          {"/heapprofiler", "enable/disable the heap profiler",
-           MAKE_ADMIN_HANDLER(profiling_handler_.handlerHeapProfiler), false, true},
-          {"/healthcheck/fail", "cause the server to fail health checks",
-           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckFail), false, true},
-          {"/healthcheck/ok", "cause the server to pass health checks",
-           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckOk), false, true},
-          {"/help", "print out list of admin commands", MAKE_ADMIN_HANDLER(handlerHelp), false,
-           false},
-          {"/hot_restart_version", "print the hot restart compatibility version",
-           MAKE_ADMIN_HANDLER(server_info_handler_.handlerHotRestartVersion), false, false},
-          {"/logging", "query/change logging levels",
-           MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true},
-          {"/memory", "print current allocation/heap usage",
-           MAKE_ADMIN_HANDLER(server_info_handler_.handlerMemory), false, false},
-          {"/quitquitquit", "exit the server",
-           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerQuitQuitQuit), false, true},
-          {"/reset_counters", "reset all counters to zero",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true},
-          {"/drain_listeners", "drain listeners",
-           MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true},
-          {"/server_info", "print server version/status information",
-           MAKE_ADMIN_HANDLER(server_info_handler_.handlerServerInfo), false, false},
-          {"/ready", "print server state, return 200 if LIVE, otherwise return 503",
-           MAKE_ADMIN_HANDLER(server_info_handler_.handlerReady), false, false},
-          {"/stats", "print server stats", MAKE_ADMIN_HANDLER(stats_handler_.handlerStats), false,
-           false},
-          {"/stats/prometheus", "print server stats in prometheus format",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerPrometheusStats), false, false},
-          {"/stats/recentlookups", "Show recent stat-name lookups",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookups), false, false},
-          {"/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsClear), false, true},
-          {"/stats/recentlookups/disable", "disable recording of reset stat-name lookup names",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsDisable), false, true},
-          {"/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsEnable), false, true},
-          {"/listeners", "print listener info",
-           MAKE_ADMIN_HANDLER(listeners_handler_.handlerListenerInfo), false, false},
-          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntime),
-           false, false},
-          {"/runtime_modify", "modify runtime values",
-           MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntimeModify), false, true},
-          {"/reopen_logs", "reopen access logs",
-           MAKE_ADMIN_HANDLER(logs_handler_.handlerReopenLogs), false, true},
+          makeHandler("/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false),
+          makeHandler("/certs", "print certs on machine",
+                      MAKE_ADMIN_HANDLER(server_info_handler_.handlerCerts), false, false),
+          makeHandler("/clusters", "upstream cluster status",
+                      MAKE_ADMIN_HANDLER(clusters_handler_.handlerClusters), false, false),
+          makeHandler("/config_dump", "dump current Envoy configs (experimental)",
+                      MAKE_ADMIN_HANDLER(config_dump_handler_.handlerConfigDump), false, false),
+          makeHandler("/init_dump", "dump current Envoy init manager information (experimental)",
+                      MAKE_ADMIN_HANDLER(init_dump_handler_.handlerInitDump), false, false),
+          makeHandler("/contention", "dump current Envoy mutex contention stats (if enabled)",
+                      MAKE_ADMIN_HANDLER(stats_handler_.handlerContention), false, false),
+          makeHandler("/cpuprofiler", "enable/disable the CPU profiler",
+                      MAKE_ADMIN_HANDLER(profiling_handler_.handlerCpuProfiler), false, true),
+          makeHandler("/heapprofiler", "enable/disable the heap profiler",
+                      MAKE_ADMIN_HANDLER(profiling_handler_.handlerHeapProfiler), false, true),
+          makeHandler("/healthcheck/fail", "cause the server to fail health checks",
+                      MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckFail), false, true),
+          makeHandler("/healthcheck/ok", "cause the server to pass health checks",
+                      MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckOk), false, true),
+          makeHandler("/help", "print out list of admin commands", MAKE_ADMIN_HANDLER(handlerHelp),
+                      false, false),
+          makeHandler("/hot_restart_version", "print the hot restart compatibility version",
+                      MAKE_ADMIN_HANDLER(server_info_handler_.handlerHotRestartVersion), false,
+                      false),
+          makeHandler("/logging", "query/change logging levels",
+                      MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true),
+          makeHandler("/memory", "print current allocation/heap usage",
+                      MAKE_ADMIN_HANDLER(server_info_handler_.handlerMemory), false, false),
+          makeHandler("/quitquitquit", "exit the server",
+                      MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerQuitQuitQuit), false, true),
+          makeHandler("/reset_counters", "reset all counters to zero",
+                      MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true),
+          makeHandler("/drain_listeners", "drain listeners",
+                      MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true),
+          makeHandler("/server_info", "print server version/status information",
+                      MAKE_ADMIN_HANDLER(server_info_handler_.handlerServerInfo), false, false),
+          makeHandler("/ready", "print server state, return 200 if LIVE, otherwise return 503",
+                      MAKE_ADMIN_HANDLER(server_info_handler_.handlerReady), false, false),
+          makeHandler("/stats", "print server stats",
+                      MAKE_ADMIN_HANDLER(stats_handler_.handlerStats), false, false),
+          makeHandler("/stats/prometheus", "print server stats in prometheus format",
+                      MAKE_ADMIN_HANDLER(stats_handler_.handlerPrometheusStats), false, false),
+          makeHandler("/stats/recentlookups", "Show recent stat-name lookups",
+                      MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookups), false, false),
+          makeHandler("/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
+                      MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsClear), false,
+                      true),
+          makeHandler(
+              "/stats/recentlookups/disable", "disable recording of reset stat-name lookup names",
+              MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsDisable), false, true),
+          makeHandler(
+              "/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
+              MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsEnable), false, true),
+          makeHandler("/listeners", "print listener info",
+                      MAKE_ADMIN_HANDLER(listeners_handler_.handlerListenerInfo), false, false),
+          makeHandler("/runtime", "print runtime values",
+                      MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntime), false, false),
+          makeHandler("/runtime_modify", "modify runtime values",
+                      MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntimeModify), false, true),
+          makeHandler("/reopen_logs", "reopen access logs",
+                      MAKE_ADMIN_HANDLER(logs_handler_.handlerReopenLogs), false, true),
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()),
@@ -247,16 +251,81 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
 }
 
 void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
-  callbacks.addStreamFilter(std::make_shared<AdminFilter>(createCallbackFunction()));
+  callbacks.addStreamFilter(std::make_shared<AdminFilter>(createHandlerFunction()));
+}
+
+namespace {
+
+// Implements a chunked handler for static text.
+class StaticTextHandler : public Admin::Handler {
+public:
+  StaticTextHandler(absl::string_view response_text, Http::Code code)
+      : response_text_(std::string(response_text)), code_(code) {}
+
+  Http::Code start(Http::ResponseHeaderMap&) override { return code_; }
+  bool nextChunk(Buffer::Instance& response) override {
+    response.add(response_text_);
+    return false;
+  }
+
+private:
+  const std::string response_text_;
+  const Http::Code code_;
+};
+
+// Implements a Chunked Handler implementation based on a non-chunked callback
+// that generates the entire admin output in one shot.
+class HandlerGasket : public Admin::Handler {
+public:
+  HandlerGasket(Admin::HandlerCb handler_cb, absl::string_view path_and_query,
+                AdminStream& admin_stream)
+      : path_and_query_(std::string(path_and_query)), handler_cb_(handler_cb),
+        admin_stream_(admin_stream) {}
+
+  static Admin::GenHandlerCb makeGen(Admin::HandlerCb callback) {
+    return [callback](absl::string_view path_and_query,
+                      AdminStream& admin_stream) -> Server::Admin::HandlerPtr {
+      return std::make_unique<HandlerGasket>(callback, path_and_query, admin_stream);
+    };
+  }
+
+  Http::Code start(Http::ResponseHeaderMap& response_headers) override {
+    return handler_cb_(path_and_query_, response_headers, response_, admin_stream_);
+  }
+
+  bool nextChunk(Buffer::Instance& response) override {
+    response.move(response_);
+    return false;
+  }
+
+private:
+  std::string path_and_query_;
+  Admin::HandlerCb handler_cb_;
+  AdminStream& admin_stream_;
+  Buffer::OwnedImpl response_;
+};
+
+} // namespace
+
+Admin::HandlerPtr AdminImpl::makeStaticTextHandler(absl::string_view response, Http::Code code) {
+  return std::make_unique<StaticTextHandler>(response, code);
 }
 
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream& admin_stream) {
+  HandlerPtr handler = findHandler(path_and_query, admin_stream);
+  Http::Code code = handler->start(/*path_and_query, */ response_headers);
+  bool more_data;
+  do {
+    more_data = handler->nextChunk(response);
+  } while (more_data);
+  Memory::Utils::tryShrinkHeap();
+  return code;
+}
 
-  Http::Code code = Http::Code::OK;
-  bool found_handler = false;
-
+Admin::HandlerPtr AdminImpl::findHandler(absl::string_view path_and_query,
+                                         AdminStream& admin_stream) {
   std::string::size_type query_index = path_and_query.find('?');
   if (query_index == std::string::npos) {
     query_index = path_and_query.size();
@@ -264,32 +333,26 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
 
   for (const UrlHandler& handler : handlers_) {
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
-      found_handler = true;
       if (handler.mutates_server_state_) {
         const absl::string_view method = admin_stream.getRequestHeaders().getMethodValue();
         if (method != Http::Headers::get().MethodValues.Post) {
           ENVOY_LOG(error, "admin path \"{}\" mutates state, method={} rather than POST",
                     handler.prefix_, method);
-          code = Http::Code::MethodNotAllowed;
-          response.add(fmt::format("Method {} not allowed, POST required.", method));
-          break;
+          return makeStaticTextHandler(fmt::format("Method {} not allowed, POST required.", method),
+                                       Http::Code::MethodNotAllowed);
         }
       }
-      code = handler.handler_(path_and_query, response_headers, response, admin_stream);
-      Memory::Utils::tryShrinkHeap();
-      break;
+
+      return handler.handler_(path_and_query, admin_stream);
     }
   }
 
-  if (!found_handler) {
-    // Extra space is emitted below to have "invalid path." be a separate sentence in the
-    // 404 output from "admin commands are:" in handlerHelp.
-    response.add("invalid path. ");
-    handlerHelp(path_and_query, response_headers, response, admin_stream);
-    code = Http::Code::NotFound;
-  }
-
-  return code;
+  // Extra space is emitted below to have "invalid path." be a separate sentence in the
+  // 404 output from "admin commands are:" in handlerHelp.
+  Buffer::OwnedImpl error_response;
+  error_response.add("invalid path. ");
+  getHelp(error_response);
+  return makeStaticTextHandler(error_response.toString(), Http::Code::NotFound);
 }
 
 std::vector<const AdminImpl::UrlHandler*> AdminImpl::sortedHandlers() const {
@@ -305,13 +368,17 @@ std::vector<const AdminImpl::UrlHandler*> AdminImpl::sortedHandlers() const {
 
 Http::Code AdminImpl::handlerHelp(absl::string_view, Http::ResponseHeaderMap&,
                                   Buffer::Instance& response, AdminStream&) {
+  getHelp(response);
+  return Http::Code::OK;
+}
+
+void AdminImpl::getHelp(Buffer::Instance& response) {
   response.add("admin commands are:\n");
 
   // Prefix order is used during searching, but for printing do them in alpha order.
   for (const UrlHandler* handler : sortedHandlers()) {
     response.add(fmt::format("  {}: {}\n", handler->prefix_, handler->help_text_));
   }
-  return Http::Code::OK;
 }
 
 Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMap& response_headers,
@@ -365,8 +432,14 @@ const Network::Address::Instance& AdminImpl::localAddress() {
   return *server_.localInfo().address();
 }
 
-bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
-                           HandlerCb callback, bool removable, bool mutates_state) {
+AdminImpl::UrlHandler AdminImpl::makeHandler(const std::string& prefix,
+                                             const std::string& help_text, HandlerCb callback,
+                                             bool removable, bool mutates_state) {
+  return UrlHandler{prefix, help_text, HandlerGasket::makeGen(callback), removable, mutates_state};
+}
+
+bool AdminImpl::addChunkedHandler(const std::string& prefix, const std::string& help_text,
+                                  GenHandlerCb callback, bool removable, bool mutates_state) {
   ASSERT(prefix.size() > 1);
   ASSERT(prefix[0] == '/');
 
@@ -389,6 +462,12 @@ bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_te
   return false;
 }
 
+bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
+                           HandlerCb callback, bool removable, bool mutates_state) {
+  return addChunkedHandler(prefix, help_text, HandlerGasket::makeGen(callback), removable,
+                           mutates_state);
+}
+
 bool AdminImpl::removeHandler(const std::string& prefix) {
   const size_t size_before_removal = handlers_.size();
   handlers_.remove_if(
@@ -401,7 +480,7 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
 
 Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_view method,
                               Http::ResponseHeaderMap& response_headers, std::string& body) {
-  AdminFilter filter(createCallbackFunction());
+  AdminFilter filter(createHandlerFunction());
 
   auto request_headers = Http::RequestHeaderMapImpl::create();
   request_headers->setMethod(method);
