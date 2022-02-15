@@ -268,18 +268,6 @@ public:
   NiceMock<Network::MockClientConnection> upstream_connection_;
 };
 
-TEST_F(SipRouterTest, Call) {
-  initializeTrans();
-  initializeRouter();
-  initializeTransaction();
-  startRequest(MsgType::Request);
-  connectUpstream();
-  completeRequest();
-  returnResponse();
-  EXPECT_CALL(callbacks_, transactionId()).WillRepeatedly(Return("test"));
-  destroyRouter();
-}
-
 } // namespace Router
 } // namespace SipProxy
 } // namespace NetworkFilters
