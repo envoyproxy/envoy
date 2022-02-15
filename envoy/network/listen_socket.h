@@ -70,6 +70,16 @@ public:
   virtual absl::string_view ja3Hash() const PURE;
 
   /**
+   * Set Connection Metadata.
+   */
+  virtual void setConnectionMetadata(absl::string_view connection_metadata) PURE;
+
+  /**
+   * @return Connection Metadata.
+   */
+  virtual absl::string_view connectionMetadata() const PURE;
+
+  /**
    *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip
    *  time of the connection. If the platform does not support this, then an empty optional is
    *  returned.

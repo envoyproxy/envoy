@@ -66,12 +66,15 @@ public:
   }
 
   const Network::FilterChain*
-  findFilterChainHelper(uint16_t destination_port, const std::string& destination_address,
+  findFilterChainHelper(const std::string& connection_metadata,
+                        uint16_t destination_port, const std::string& destination_address,
                         const std::string& server_name, const std::string& transport_protocol,
                         const std::vector<std::string>& application_protocols,
                         const std::string& source_address, uint16_t source_port) {
     auto mock_socket = std::make_shared<NiceMock<Network::MockConnectionSocket>>();
     sockets_.push_back(mock_socket);
+
+    mock_socket->connection_info_provider_->setConnectionMetadata(connection_metadata);
 
     if (absl::StartsWith(destination_address, "/")) {
       local_address_ = std::make_shared<Network::Address::PipeInstance>(destination_address);
@@ -143,24 +146,25 @@ public:
 };
 
 TEST_F(FilterChainManagerImplTest, FilterChainMatchNothing) {
-  auto filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  auto filter_chain = findFilterChainHelper("", 10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 }
 
 TEST_F(FilterChainManagerImplTest, FilterChainMatchCaseInSensitive) {
   envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
+  new_filter_chain.mutable_filter_chain_match()->set_connection_metadata("SOME_metadata");
   new_filter_chain.mutable_filter_chain_match()->add_server_names("foo.EXAMPLE.com");
   filter_chain_manager_.addFilterChains(
       std::vector<const envoy::config::listener::v3::FilterChain*>{&new_filter_chain}, nullptr,
       filter_chain_factory_builder_, filter_chain_manager_);
   auto filter_chain =
-      findFilterChainHelper(10000, "127.0.0.1", "FOO.example.com", "tls", {}, "8.8.8.8", 111);
+      findFilterChainHelper("some_METADATA", 10000, "127.0.0.1", "FOO.example.com", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
 }
 
 TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
   addSingleFilterChainHelper(filter_chain_template_);
-  auto* filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  auto* filter_chain = findFilterChainHelper("", 10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
 }
 
@@ -173,10 +177,10 @@ TEST_F(FilterChainManagerImplTest, FilterChainUseFallbackIfNoFilterChainMatches)
       .RetiresOnSaturation();
   addSingleFilterChainHelper(filter_chain_template_, &fallback_filter_chain_);
 
-  auto filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  auto filter_chain = findFilterChainHelper("", 10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
   auto fallback_filter_chain =
-      findFilterChainHelper(9999, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+      findFilterChainHelper("", 9999, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_EQ(fallback_filter_chain, build_out_fallback_filter_chain_.get());
 }
 

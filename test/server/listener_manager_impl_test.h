@@ -183,7 +183,8 @@ protected:
   }
 
   const Network::FilterChain*
-  findFilterChain(uint16_t destination_port, const std::string& destination_address,
+  findFilterChain(const std::string& connection_metadata,
+                  uint16_t destination_port, const std::string& destination_address,
                   const std::string& server_name, const std::string& transport_protocol,
                   const std::vector<std::string>& application_protocols,
                   const std::string& source_address, uint16_t source_port,
@@ -195,6 +196,8 @@ protected:
           Network::Utility::parseInternetAddress(destination_address, destination_port);
     }
     socket_->connection_info_provider_->setLocalAddress(local_address_);
+
+    socket_->connection_info_provider_->setConnectionMetadata(connection_metadata);
 
     ON_CALL(*socket_, requestedServerName()).WillByDefault(Return(absl::string_view(server_name)));
     ON_CALL(*socket_, detectedTransportProtocol())

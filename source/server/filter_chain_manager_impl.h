@@ -277,7 +277,18 @@ private:
   using DestinationIPsTriePtr = std::unique_ptr<DestinationIPsTrie>;
   using DestinationPortsMap =
       absl::flat_hash_map<uint16_t, std::pair<DestinationIPsMap, DestinationIPsTriePtr>>;
+  using ConnectionMetadataMap = absl::flat_hash_map<std::string, DestinationPortsMap>;
 
+  void addFilterChainForConnectionMetadata(
+      ConnectionMetadataMap& connection_metadata_map, const std::string& connection_metadata, uint16_t destination_port,
+      const std::vector<std::string>& destination_ips,
+      const absl::Span<const std::string> server_names, const std::string& transport_protocol,
+      const absl::Span<const std::string* const> application_protocols,
+      const std::vector<std::string>& direct_source_ips,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
+      const std::vector<std::string>& source_ips,
+      const absl::Span<const Protobuf::uint32> source_ports,
+      const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForDestinationPorts(
       DestinationPortsMap& destination_ports_map, uint16_t destination_port,
       const std::vector<std::string>& destination_ips,
@@ -334,6 +345,9 @@ private:
                                     const Network::FilterChainSharedPtr& filter_chain);
 
   const Network::FilterChain*
+  findFilterChainForDestinationPort(const DestinationPortsMap& destination_ports_map,
+                                    const Network::ConnectionSocket& socket) const;
+  const Network::FilterChain*
   findFilterChainForDestinationIP(const DestinationIPsTrie& destination_ips_trie,
                                   const Network::ConnectionSocket& socket) const;
   const Network::FilterChain*
@@ -372,7 +386,11 @@ private:
 
   // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
   // and application protocols, using structures defined above.
-  DestinationPortsMap destination_ports_map_;
+  // DestinationPortsMap destination_ports_map_;
+
+  // Mapping of FilterChain's configured Connection Metadata, destination ports, IPs, server names, transport protocols
+  // and application protocols, using structures defined above.
+  ConnectionMetadataMap connection_metadata_map_;
 
   const Network::Address::InstanceConstSharedPtr address_;
   // This is the reference to a factory context which all the generations of listener share.

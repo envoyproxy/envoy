@@ -225,8 +225,9 @@ void FilterChainManagerImpl::addFilterChains(
       ++new_filter_chain_size;
     }
 
-    addFilterChainForDestinationPorts(
-        destination_ports_map_,
+    addFilterChainForConnectionMetadata(
+        connection_metadata_map_,
+        absl::AsciiStrToLower(filter_chain_match.connection_metadata()),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
         server_names, filter_chain_match.transport_protocol(),
         filter_chain_match.application_protocols(), direct_source_ips,
@@ -273,6 +274,25 @@ void FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
     default_filter_chain_ =
         filter_chain_factory_builder.buildFilterChain(*default_filter_chain, context_creator);
   }
+}
+
+void FilterChainManagerImpl::addFilterChainForConnectionMetadata(
+    ConnectionMetadataMap& connection_metadata_map, const std::string& connection_metadata, uint16_t destination_port,
+    const std::vector<std::string>& destination_ips,
+    const absl::Span<const std::string> server_names, const std::string& transport_protocol,
+    const absl::Span<const std::string* const> application_protocols,
+    const std::vector<std::string>& direct_source_ips,
+    const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
+    const std::vector<std::string>& source_ips,
+    const absl::Span<const Protobuf::uint32> source_ports,
+    const Network::FilterChainSharedPtr& filter_chain) {
+  if (connection_metadata_map.find(connection_metadata) == connection_metadata_map.end()) {
+    connection_metadata_map[connection_metadata] = DestinationPortsMap{};
+  }
+  addFilterChainForDestinationPorts(connection_metadata_map[connection_metadata], destination_port, destination_ips,
+                                  server_names, transport_protocol, application_protocols,
+                                  direct_source_ips, source_type, source_ips, source_ports,
+                                  filter_chain);
 }
 
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(
@@ -468,13 +488,42 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
 
 const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
+  const auto& connection_metadata = absl::AsciiStrToLower(socket.connectionInfoProvider().connectionMetadata());
+
+  const Network::FilterChain* best_match_filter_chain = nullptr;
+  const auto connection_metadata_match = connection_metadata_map_.find(connection_metadata);
+  if (connection_metadata_match != connection_metadata_map_.end()) {
+    best_match_filter_chain = findFilterChainForDestinationPort(connection_metadata_match->second, socket);
+    if (best_match_filter_chain != nullptr) {
+      return best_match_filter_chain;
+    } else {
+      // There is entry for specific tenant ID but none of the filter chain matches. Instead of
+      // matching catch-all tenant ID "", the fallback filter chain is returned.
+      return default_filter_chain_.get();
+    }
+  }
+
+  // Match on a filter chain without tenant ID requirements.
+  const auto connection_metadata_catchall_match = connection_metadata_map_.find(EMPTY_STRING);
+  if (connection_metadata_catchall_match != connection_metadata_map_.end()) {
+    best_match_filter_chain = findFilterChainForDestinationPort(connection_metadata_catchall_match->second, socket);
+  }
+
+  return best_match_filter_chain != nullptr
+             ? best_match_filter_chain
+             // Neither exact tenant ID nor catch-all tenant ID matches. Use fallback filter chain.
+             : default_filter_chain_.get();
+}
+
+const Network::FilterChain*
+FilterChainManagerImpl::findFilterChainForDestinationPort(const DestinationPortsMap& destination_ports_map, const Network::ConnectionSocket& socket) const {
   const auto& address = socket.connectionInfoProvider().localAddress();
 
   const Network::FilterChain* best_match_filter_chain = nullptr;
   // Match on destination port (only for IP addresses).
   if (address->type() == Network::Address::Type::Ip) {
-    const auto port_match = destination_ports_map_.find(address->ip()->port());
-    if (port_match != destination_ports_map_.end()) {
+    const auto port_match = destination_ports_map.find(address->ip()->port());
+    if (port_match != destination_ports_map.end()) {
       best_match_filter_chain = findFilterChainForDestinationIP(*port_match->second.second, socket);
       if (best_match_filter_chain != nullptr) {
         return best_match_filter_chain;
@@ -486,8 +535,8 @@ FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket)
     }
   }
   // Match on catch-all port 0 if there is no specific port sub tree.
-  const auto port_match = destination_ports_map_.find(0);
-  if (port_match != destination_ports_map_.end()) {
+  const auto port_match = destination_ports_map.find(0);
+  if (port_match != destination_ports_map.end()) {
     best_match_filter_chain = findFilterChainForDestinationIP(*port_match->second.second, socket);
   }
   return best_match_filter_chain != nullptr
@@ -670,58 +719,60 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceIpAn
 }
 
 void FilterChainManagerImpl::convertIPsToTries() {
-  for (auto& [destination_port, destination_ips_pair] : destination_ports_map_) {
-    UNREFERENCED_PARAMETER(destination_port);
-    // These variables are used as we build up the destination CIDRs used for the trie.
-    auto& [destination_ips_map, destination_ips_trie] = destination_ips_pair;
-    std::vector<std::pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>>
-        destination_ips_list;
-    destination_ips_list.reserve(destination_ips_map.size());
+  for (auto& [connection_metadata, destination_ports_map] : connection_metadata_map_) {
+    for (auto& [destination_port, destination_ips_pair] : destination_ports_map) {
+      UNREFERENCED_PARAMETER(destination_port);
+      // These variables are used as we build up the destination CIDRs used for the trie.
+      auto& [destination_ips_map, destination_ips_trie] = destination_ips_pair;
+      std::vector<std::pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>>
+          destination_ips_list;
+      destination_ips_list.reserve(destination_ips_map.size());
 
-    for (const auto& [destination_ip, server_names_map_ptr] : destination_ips_map) {
-      destination_ips_list.push_back(makeCidrListEntry(destination_ip, server_names_map_ptr));
+      for (const auto& [destination_ip, server_names_map_ptr] : destination_ips_map) {
+        destination_ips_list.push_back(makeCidrListEntry(destination_ip, server_names_map_ptr));
 
-      // This hugely nested for loop greatly pains me, but I'm not sure how to make it better.
-      // We need to get access to all of the source IP strings so that we can convert them into
-      // a trie like we did for the destination IPs above.
-      for (auto& [server_name, transport_protocols_map] : *server_names_map_ptr) {
-        UNREFERENCED_PARAMETER(server_name);
-        for (auto& [transport_protocol, application_protocols_map] : transport_protocols_map) {
-          UNREFERENCED_PARAMETER(transport_protocol);
-          for (auto& [application_protocol, direct_source_ips_pair] : application_protocols_map) {
-            UNREFERENCED_PARAMETER(application_protocol);
-            auto& [direct_source_ips_map, direct_source_ips_trie] = direct_source_ips_pair;
+        // This hugely nested for loop greatly pains me, but I'm not sure how to make it better.
+        // We need to get access to all of the source IP strings so that we can convert them into
+        // a trie like we did for the destination IPs above.
+        for (auto& [server_name, transport_protocols_map] : *server_names_map_ptr) {
+          UNREFERENCED_PARAMETER(server_name);
+          for (auto& [transport_protocol, application_protocols_map] : transport_protocols_map) {
+            UNREFERENCED_PARAMETER(transport_protocol);
+            for (auto& [application_protocol, direct_source_ips_pair] : application_protocols_map) {
+              UNREFERENCED_PARAMETER(application_protocol);
+              auto& [direct_source_ips_map, direct_source_ips_trie] = direct_source_ips_pair;
 
-            std::vector<
-                std::pair<SourceTypesArraySharedPtr, std::vector<Network::Address::CidrRange>>>
-                direct_source_ips_list;
-            direct_source_ips_list.reserve(direct_source_ips_map.size());
+              std::vector<
+                  std::pair<SourceTypesArraySharedPtr, std::vector<Network::Address::CidrRange>>>
+                  direct_source_ips_list;
+              direct_source_ips_list.reserve(direct_source_ips_map.size());
 
-            for (auto& [direct_source_ip, source_arrays_ptr] : direct_source_ips_map) {
-              direct_source_ips_list.push_back(
-                  makeCidrListEntry(direct_source_ip, source_arrays_ptr));
+              for (auto& [direct_source_ip, source_arrays_ptr] : direct_source_ips_map) {
+                direct_source_ips_list.push_back(
+                    makeCidrListEntry(direct_source_ip, source_arrays_ptr));
 
-              for (auto& [source_ips_map, source_ips_trie] : *source_arrays_ptr) {
-                std::vector<
-                    std::pair<SourcePortsMapSharedPtr, std::vector<Network::Address::CidrRange>>>
-                    source_ips_list;
-                source_ips_list.reserve(source_ips_map.size());
+                for (auto& [source_ips_map, source_ips_trie] : *source_arrays_ptr) {
+                  std::vector<
+                      std::pair<SourcePortsMapSharedPtr, std::vector<Network::Address::CidrRange>>>
+                      source_ips_list;
+                  source_ips_list.reserve(source_ips_map.size());
 
-                for (auto& [source_ip, source_port_map_ptr] : source_ips_map) {
-                  source_ips_list.push_back(makeCidrListEntry(source_ip, source_port_map_ptr));
+                  for (auto& [source_ip, source_port_map_ptr] : source_ips_map) {
+                    source_ips_list.push_back(makeCidrListEntry(source_ip, source_port_map_ptr));
+                  }
+
+                  source_ips_trie = std::make_unique<SourceIPsTrie>(source_ips_list, true);
                 }
-
-                source_ips_trie = std::make_unique<SourceIPsTrie>(source_ips_list, true);
               }
+              direct_source_ips_trie =
+                  std::make_unique<DirectSourceIPsTrie>(direct_source_ips_list, true);
             }
-            direct_source_ips_trie =
-                std::make_unique<DirectSourceIPsTrie>(direct_source_ips_list, true);
           }
         }
       }
-    }
 
-    destination_ips_trie = std::make_unique<DestinationIPsTrie>(destination_ips_list, true);
+      destination_ips_trie = std::make_unique<DestinationIPsTrie>(destination_ips_list, true);
+    }
   }
 }
 

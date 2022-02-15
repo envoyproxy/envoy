@@ -50,6 +50,10 @@ public:
   void setRequestedServerName(const absl::string_view requested_server_name) override {
     server_name_ = std::string(requested_server_name);
   }
+  absl::string_view connectionMetadata() const override { return connection_metadata_; }
+  void setConnectionMetadata(const absl::string_view connection_metadata) override {
+    connection_metadata_ = std::string(connection_metadata);
+  }
   absl::optional<uint64_t> connectionID() const override { return connection_id_; }
   void setConnectionID(uint64_t id) override { connection_id_ = id; }
   absl::optional<absl::string_view> interfaceName() const override { return interface_name_; }
@@ -70,6 +74,7 @@ private:
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr direct_remote_address_;
   std::string server_name_;
+  std::string connection_metadata_;
   absl::optional<uint64_t> connection_id_;
   absl::optional<std::string> interface_name_;
   Ssl::ConnectionInfoConstSharedPtr ssl_info_;

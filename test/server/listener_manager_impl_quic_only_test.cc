@@ -130,9 +130,9 @@ udp_listener_config:
   EXPECT_EQ(udp_packet_writer->isBatchMode(), Api::OsSysCallsSingleton::get().supportsUdpGso());
 
   // No filter chain found with non-matching transport protocol.
-  EXPECT_EQ(nullptr, findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111));
+  EXPECT_EQ(nullptr, findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111));
 
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "quic", {}, "8.8.8.8", 111);
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "quic", {}, "8.8.8.8", 111);
   ASSERT_NE(nullptr, filter_chain);
   auto& quic_socket_factory = dynamic_cast<const Quic::QuicServerTransportSocketFactory&>(
       filter_chain->transportSocketFactory());

@@ -281,7 +281,7 @@ filter_chains:
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
 }
@@ -299,7 +299,7 @@ filter_chains:
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_EQ(filter_chain->transportSocketConnectTimeout(), std::chrono::seconds(3));
 }
@@ -2479,6 +2479,52 @@ TEST_F(ListenerManagerImplTest, EarlyShutdown) {
   manager_->stopWorkers();
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithConnectionMetadataMatch) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.tls_inspector"
+    filter_chains:
+    - filter_chain_match:
+        connection_metadata: "some_metadata"
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.api_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // TLS client connects to unknown connection metadata - no match.
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain, nullptr);
+
+  // TLS client without matching connection metadata - no match.
+  filter_chain = findFilterChain("some_other_metadata", 1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain, nullptr);
+
+  // TLS client with matching connection metadata - using 1st filter chain.
+  filter_chain =
+      findFilterChain("some_metadata", 1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  auto ssl_socket =
+      dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
+  EXPECT_EQ(server_names.size(), 1);
+  EXPECT_EQ(server_names.front(), "server1.example.com");
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationPortMatch) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
@@ -2505,11 +2551,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // IPv4 client connects to unknown port - no match.
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
   // IPv4 client connects to valid port - using 1st filter chain.
-  filter_chain = findFilterChain(8080, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  filter_chain = findFilterChain("", 8080, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2520,7 +2566,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // UDS client - no match.
-  filter_chain = findFilterChain(0, "/tmp/test.sock", "", "tls", {}, "/tmp/test.sock", 111);
+  filter_chain = findFilterChain("", 0, "/tmp/test.sock", "", "tls", {}, "/tmp/test.sock", 111);
   EXPECT_EQ(filter_chain, nullptr);
 }
 
@@ -2551,11 +2597,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDirectSource
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // IPv4 client connects to unknown IP - no match.
-  auto filter_chain = findFilterChain(1234, "1.2.3.4", "", "tls", {}, "8.8.8.8", 111, "1.2.3.4");
+  auto filter_chain = findFilterChain("", 1234, "1.2.3.4", "", "tls", {}, "8.8.8.8", 111, "1.2.3.4");
   EXPECT_EQ(filter_chain, nullptr);
 
   // IPv4 client connects to valid IP - using 1st filter chain.
-  filter_chain = findFilterChain(1234, "1.2.3.4", "", "tls", {}, "8.8.8.8", 111, "127.0.0.1");
+  filter_chain = findFilterChain("", 1234, "1.2.3.4", "", "tls", {}, "8.8.8.8", 111, "127.0.0.1");
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2566,7 +2612,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDirectSource
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // UDS client - no match.
-  filter_chain = findFilterChain(0, "/tmp/test.sock", "", "tls", {}, "/tmp/test.sock", 111);
+  filter_chain = findFilterChain("", 0, "/tmp/test.sock", "", "tls", {}, "/tmp/test.sock", 111);
   EXPECT_EQ(filter_chain, nullptr);
 }
 
@@ -2596,11 +2642,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // IPv4 client connects to unknown IP - no match.
-  auto filter_chain = findFilterChain(1234, "1.2.3.4", "", "tls", {}, "8.8.8.8", 111);
+  auto filter_chain = findFilterChain("", 1234, "1.2.3.4", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
   // IPv4 client connects to valid IP - using 1st filter chain.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2611,7 +2657,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // UDS client - no match.
-  filter_chain = findFilterChain(0, "/tmp/test.sock", "", "tls", {}, "/tmp/test.sock", 111);
+  filter_chain = findFilterChain("", 0, "/tmp/test.sock", "", "tls", {}, "/tmp/test.sock", 111);
   EXPECT_EQ(filter_chain, nullptr);
 }
 
@@ -2641,16 +2687,16 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // TLS client without SNI - no match.
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client without matching SNI - no match.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "www.example.com", "tls", {}, "8.8.8.8", 111);
+  filter_chain = findFilterChain("", 1234, "127.0.0.1", "www.example.com", "tls", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client with matching SNI - using 1st filter chain.
   filter_chain =
-      findFilterChain(1234, "127.0.0.1", "server1.example.com", "tls", {}, "8.8.8.8", 111);
+      findFilterChain("", 1234, "127.0.0.1", "server1.example.com", "tls", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2687,11 +2733,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // TCP client - no match.
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "raw_buffer", {}, "8.8.8.8", 111);
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "raw_buffer", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client - using 1st filter chain.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2729,12 +2775,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // TLS client without ALPN - no match.
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client with "http/1.1" ALPN - using 1st filter chain.
   filter_chain = findFilterChain(
-      1234, "127.0.0.1", "", "tls",
+      "", 1234, "127.0.0.1", "", "tls",
       {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "8.8.8.8",
       111);
   ASSERT_NE(filter_chain, nullptr);
@@ -2774,12 +2820,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // EXTERNAL IPv4 client without "http/1.1" ALPN - no match.
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
   // LOCAL IPv4 client with "http/1.1" ALPN - using 1st filter chain.
   filter_chain = findFilterChain(
-      1234, "127.0.0.1", "", "tls",
+      "", 1234, "127.0.0.1", "", "tls",
       {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "127.0.0.1",
       111);
   ASSERT_NE(filter_chain, nullptr);
@@ -2793,7 +2839,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
 
   // LOCAL UDS client with "http/1.1" ALPN - using 1st filter chain.
   filter_chain = findFilterChain(
-      0, "/tmp/test.sock", "", "tls",
+      "", 0, "/tmp/test.sock", "", "tls",
       {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11},
       "/tmp/test.sock", 111);
   ASSERT_NE(filter_chain, nullptr);
@@ -2834,12 +2880,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // IPv4 client with source 10.0.1.1. No match.
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "10.0.1.1", 111);
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "10.0.1.1", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
   // IPv4 client with source 10.0.0.10, Match.
   filter_chain = findFilterChain(
-      1234, "127.0.0.1", "", "tls",
+      "", 1234, "127.0.0.1", "", "tls",
       {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "10.0.0.10",
       111);
   ASSERT_NE(filter_chain, nullptr);
@@ -2852,13 +2898,13 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // IPv6 client. No match.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {},
+  filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {},
                                  "2001:0db8:85a3:0000:0000:8a2e:0370:7334", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
   // UDS client. No match.
   filter_chain = findFilterChain(
-      0, "/tmp/test.sock", "", "tls",
+      "", 0, "/tmp/test.sock", "", "tls",
       {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11},
       "/tmp/test.sock", 0);
   ASSERT_EQ(filter_chain, nullptr);
@@ -2893,12 +2939,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpv6Ma
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // IPv6 client with matching subnet. Match.
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {},
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {},
                                       "2001:0db8:85a3:0000:0000:8a2e:0370:7334", 111);
   EXPECT_NE(filter_chain, nullptr);
 
   // IPv6 client with non-matching subnet. No match.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {},
+  filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {},
                                  "2001:0db8:85a3:0001:0000:8a2e:0370:7334", 111);
   EXPECT_EQ(filter_chain, nullptr);
 }
@@ -2931,7 +2977,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourcePortMa
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // Client with source port 100. Match.
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 100);
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 100);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2943,7 +2989,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourcePortMa
 
   // Client with source port 101. No match.
   filter_chain = findFilterChain(
-      1234, "8.8.8.8", "", "tls",
+      "", 1234, "8.8.8.8", "", "tls",
       {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "4.4.4.4",
       101);
   ASSERT_EQ(filter_chain, nullptr);
@@ -2998,13 +3044,13 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
 
   // LOCAL TLS client with "http/1.1" ALPN - no match.
   auto filter_chain = findFilterChain(
-      1234, "127.0.0.1", "", "tls",
+      "", 1234, "127.0.0.1", "", "tls",
       {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "127.0.0.1",
       111);
   EXPECT_EQ(filter_chain, nullptr);
 
   // LOCAL TLS client without "http/1.1" ALPN - using 1st filter chain.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
+  filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3016,7 +3062,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
 
   // EXTERNAL TLS client with "http/1.1" ALPN - using 2nd filter chain.
   filter_chain = findFilterChain(
-      1234, "8.8.8.8", "", "tls",
+      "", 1234, "8.8.8.8", "", "tls",
       {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "4.4.4.4",
       111);
   ASSERT_NE(filter_chain, nullptr);
@@ -3027,7 +3073,94 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
   EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
   // EXTERNAL TLS client without "http/1.1" ALPN - using 3rd filter chain.
-  filter_chain = findFilterChain(1234, "8.8.8.8", "", "tls", {}, "4.4.4.4", 111);
+  filter_chain = findFilterChain("", 1234, "8.8.8.8", "", "tls", {}, "4.4.4.4", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
+  server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
+  EXPECT_EQ(server_names.size(), 2);
+  EXPECT_EQ(server_names.front(), "*.example.com");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithConnectionMetadataMatch) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.tls_inspector"
+    filter_chains:
+    - filter_chain_match:
+        # empty
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
+          session_ticket_keys:
+            keys:
+            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+    - filter_chain_match:
+        connection_metadata: "some_metadata"
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+          session_ticket_keys:
+            keys:
+            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+    - filter_chain_match:
+        connection_metadata: "some_other_metadata"
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+          session_ticket_keys:
+            keys:
+            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.api_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // TLS client without matching connection metadata - using 1st filter chain.
+  auto filter_chain = findFilterChain("different_metadata", 1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  auto ssl_socket =
+      dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
+  auto uri = ssl_socket->ssl()->uriSanLocalCertificate();
+  EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
+
+  // TLS client with some_metadata match - using 2nd filter chain.
+  filter_chain =
+      findFilterChain("some_metadata", 1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
+  EXPECT_EQ(server_names.size(), 1);
+  EXPECT_EQ(server_names.front(), "server1.example.com");
+
+  // TLS client with some_other_metadata match - using 3rd filter chain.
+  filter_chain =
+      findFilterChain("some_other_metadata", 1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3083,7 +3216,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // IPv4 client connects to default port - using 1st filter chain.
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3093,7 +3226,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
   // IPv4 client connects to port 8080 - using 2nd filter chain.
-  filter_chain = findFilterChain(8080, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
+  filter_chain = findFilterChain("", 8080, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3103,7 +3236,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // IPv4 client connects to port 8081 - using 3rd filter chain.
-  filter_chain = findFilterChain(8081, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
+  filter_chain = findFilterChain("", 8081, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3113,7 +3246,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   EXPECT_EQ(server_names.front(), "*.example.com");
 
   // UDS client - using 1st filter chain.
-  filter_chain = findFilterChain(0, "/tmp/test.sock", "", "tls", {}, "127.0.0.1", 111);
+  filter_chain = findFilterChain("", 0, "/tmp/test.sock", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3168,7 +3301,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // UDS client connects - using 1st filter chain with no IP match
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3178,7 +3311,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
   // IPv4 client connects to default IP - using 1st filter chain.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
+  filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3187,7 +3320,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
   // IPv4 client connects to exact IP match - using 2nd filter chain.
-  filter_chain = findFilterChain(1234, "192.168.0.1", "", "tls", {}, "127.0.0.1", 111);
+  filter_chain = findFilterChain("", 1234, "192.168.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3197,7 +3330,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // IPv4 client connects to wildcard IP match - using 3rd filter chain.
-  filter_chain = findFilterChain(1234, "192.168.1.1", "", "tls", {}, "192.168.1.1", 111);
+  filter_chain = findFilterChain("", 1234, "192.168.1.1", "", "tls", {}, "192.168.1.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3207,7 +3340,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   EXPECT_EQ(server_names.front(), "*.example.com");
 
   // UDS client - using 1st filter chain.
-  filter_chain = findFilterChain(0, "/tmp/test.sock", "", "tls", {}, "/tmp/test.sock", 111);
+  filter_chain = findFilterChain("", 0, "/tmp/test.sock", "", "tls", {}, "/tmp/test.sock", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3263,7 +3396,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSou
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // UDS client connects - using 1st filter chain with no IP match
-  auto filter_chain = findFilterChain(1234, "/uds_1", "", "tls", {}, "/uds_2", 111, "/uds_3");
+  auto filter_chain = findFilterChain("", 1234, "/uds_1", "", "tls", {}, "/uds_2", 111, "/uds_3");
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3273,7 +3406,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSou
   EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
   // IPv4 client connects to default IP - using 1st filter chain.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111, "127.0.0.1");
+  filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111, "127.0.0.1");
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3282,7 +3415,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSou
   EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
   // IPv4 client connects to exact IP match - using 2nd filter chain.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111, "192.168.0.1");
+  filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111, "192.168.0.1");
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3292,7 +3425,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSou
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // IPv4 client connects to wildcard IP match - using 3rd filter chain.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111, "192.168.1.1");
+  filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111, "192.168.1.1");
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3357,7 +3490,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // TLS client without SNI - using 1st filter chain.
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3368,7 +3501,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
 
   // TLS client with exact SNI match - using 2nd filter chain.
   filter_chain =
-      findFilterChain(1234, "127.0.0.1", "server1.example.com", "tls", {}, "127.0.0.1", 111);
+      findFilterChain("", 1234, "127.0.0.1", "server1.example.com", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3379,7 +3512,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
 
   // TLS client with wildcard SNI match - using 3rd filter chain.
   filter_chain =
-      findFilterChain(1234, "127.0.0.1", "server2.example.com", "tls", {}, "127.0.0.1", 111);
+      findFilterChain("", 1234, "127.0.0.1", "server2.example.com", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3390,7 +3523,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
 
   // TLS client with wildcard SNI match - using 3rd filter chain.
   filter_chain =
-      findFilterChain(1234, "127.0.0.1", "www.wildcard.com", "tls", {}, "127.0.0.1", 111);
+      findFilterChain("", 1234, "127.0.0.1", "www.wildcard.com", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3428,12 +3561,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // TCP client - using 1st filter chain.
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "raw_buffer", {}, "127.0.0.1", 111);
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "raw_buffer", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
 
   // TLS client - using 2nd filter chain.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
+  filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3472,13 +3605,13 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicati
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // TLS client without ALPN - using 1st filter chain.
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
 
   // TLS client with "h2,http/1.1" ALPN - using 2nd filter chain.
   filter_chain = findFilterChain(
-      1234, "127.0.0.1", "", "tls",
+      "", 1234, "127.0.0.1", "", "tls",
       {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "127.0.0.1",
       111);
   ASSERT_NE(filter_chain, nullptr);
@@ -3521,18 +3654,18 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // TLS client without SNI and ALPN - using 1st filter chain.
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
+  auto filter_chain = findFilterChain("", 1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
 
   // TLS client with exact SNI match but without ALPN - no match (SNI blackholed by configuration).
   filter_chain =
-      findFilterChain(1234, "127.0.0.1", "server1.example.com", "tls", {}, "127.0.0.1", 111);
+      findFilterChain("", 1234, "127.0.0.1", "server1.example.com", "tls", {}, "127.0.0.1", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client with ALPN match but without SNI - using 1st filter chain.
   filter_chain = findFilterChain(
-      1234, "127.0.0.1", "", "tls",
+      "", 1234, "127.0.0.1", "", "tls",
       {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "127.0.0.1",
       111);
   ASSERT_NE(filter_chain, nullptr);
@@ -3540,7 +3673,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
 
   // TLS client with exact SNI match and ALPN match - using 2nd filter chain.
   filter_chain = findFilterChain(
-      1234, "127.0.0.1", "server1.example.com", "tls",
+      "", 1234, "127.0.0.1", "server1.example.com", "tls",
       {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "127.0.0.1",
       111);
   ASSERT_NE(filter_chain, nullptr);

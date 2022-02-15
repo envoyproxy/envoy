@@ -112,6 +112,9 @@ message FilterChainMatch {
 
   reserved 1;
 
+  // The Connection Metadata of the connection to match against.
+  string connection_metadata = 100;
+
   // Optional destination port to consider when use_original_dst is set on the
   // listener in determining a filter chain match.
   google.protobuf.UInt32Value destination_port = 8 [(validate.rules).uint32 = {lte: 65535 gte: 1}];

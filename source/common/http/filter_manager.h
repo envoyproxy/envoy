@@ -627,6 +627,9 @@ public:
   absl::string_view requestedServerName() const override {
     return StreamInfoImpl::downstreamAddressProvider().requestedServerName();
   }
+  absl::string_view connectionMetadata() const override {
+    return StreamInfoImpl::downstreamAddressProvider().connectionMetadata();
+  }
   absl::optional<uint64_t> connectionID() const override {
     return StreamInfoImpl::downstreamAddressProvider().connectionID();
   }

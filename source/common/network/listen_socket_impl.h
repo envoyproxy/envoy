@@ -224,6 +224,14 @@ public:
   }
   absl::string_view ja3Hash() const override { return connectionInfoProvider().ja3Hash(); }
 
+  void setConnectionMetadata(absl::string_view connection_metadata) override {
+    // Always keep the connection_metadata as lower case.
+    connectionInfoProvider().setConnectionMetadata(absl::AsciiStrToLower(connection_metadata));
+  }
+  absl::string_view connectionMetadata() const override {
+    return connectionInfoProvider().connectionMetadata();
+  }
+
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {
     return ioHandle().lastRoundTripTime();
   }
