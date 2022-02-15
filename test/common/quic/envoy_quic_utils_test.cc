@@ -1,12 +1,11 @@
 #include "source/common/quic/envoy_quic_utils.h"
 
-#include "quiche/quic/test_tools/quic_test_utils.h"
-
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::_;
 using testing::NiceMock;

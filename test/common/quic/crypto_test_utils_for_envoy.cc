@@ -3,11 +3,12 @@
 // This file defines platform dependent test utility functions which is declared
 // in quiche/quic/test_tools/crypto_test_utils.h.
 
-#include "quiche/quic/test_tools/crypto_test_utils.h"
-
 #include <memory>
-#include "test/common/quic/test_proof_verifier.h"
+
 #include "test/common/quic/test_proof_source.h"
+#include "test/common/quic/test_proof_verifier.h"
+
+#include "quiche/quic/test_tools/crypto_test_utils.h"
 
 namespace quic {
 namespace test {

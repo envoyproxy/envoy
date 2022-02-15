@@ -1,22 +1,22 @@
 #pragma once
 
 #include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+
+#include "test/test_common/environment.h"
 
 #include "quiche/quic/core/http/quic_spdy_session.h"
-#include "quiche/quic/test_tools/quic_test_utils.h"
-#include "quiche/quic/test_tools/first_flight.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
-#include "quiche/quic/test_tools/quic_config_peer.h"
-#include "quiche/quic/test_tools/qpack/qpack_test_utils.h"
+#include "quiche/quic/test_tools/first_flight.h"
 #include "quiche/quic/test_tools/qpack/qpack_encoder_test_utils.h"
-
-#include "source/common/quic/envoy_quic_utils.h"
-#include "source/common/quic/envoy_quic_client_session.h"
-#include "test/test_common/environment.h"
-#include "source/common/stats/isolated_store_impl.h"
+#include "quiche/quic/test_tools/qpack/qpack_test_utils.h"
+#include "quiche/quic/test_tools/quic_config_peer.h"
+#include "quiche/quic/test_tools/quic_test_utils.h"
 
 namespace Envoy {
 namespace Quic {

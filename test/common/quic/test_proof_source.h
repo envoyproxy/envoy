@@ -1,11 +1,12 @@
 #pragma once
 
-#include "quiche/quic/test_tools/test_certificates.h"
-
 #include <memory>
 
-#include "test/mocks/network/mocks.h"
 #include "source/common/quic/envoy_quic_proof_source_base.h"
+
+#include "test/mocks/network/mocks.h"
+
+#include "quiche/quic/test_tools/test_certificates.h"
 
 namespace Envoy {
 namespace Quic {
