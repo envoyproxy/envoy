@@ -5,7 +5,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/upstream_impl.h"
-
+#include "source/server/backtrace.h"
 namespace Envoy {
 namespace ConnectionPool {
 namespace {
@@ -145,6 +145,7 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
     ActiveClientPtr client = instantiateActiveClient();
     if (client.get() == nullptr) {
       ENVOY_LOG(trace, "connection creation failed");
+      purgePendingStreams(host(), "failed to create connection", ConnectionPool::PoolFailureReason::LocalConnectionFailure);
       return ConnectionResult::FailedToCreateConnection;
     }
     ASSERT(client->state() == ActiveClient::State::CONNECTING);
@@ -286,18 +287,8 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
                  result == ConnectionResult::FailedToCreateConnection),
             fmt::format("Failed to create expected connection: {}", *this));
   if (result == ConnectionResult::FailedToCreateConnection) {
-    // This currently only happens for HTTP/3 if 1) secrets aren't yet loaded,
-    // or 2) connect failed immediately.
-    if (!pending_streams_.empty()) {
-      // If pending streams hasn't been purged. This failure must be because of 1). Trigger
-      // connection failure.
-      pending->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
-      onPoolFailure(nullptr, absl::string_view(), ConnectionPool::PoolFailureReason::Overflow,
-                    context);
-    }
     return nullptr;
   }
-
   return pending;
 }
 
@@ -475,7 +466,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       purgePendingStreams(client.real_host_description_, failure_reason, reason);
       // See if we should preconnect based on active connections.
       if (!is_draining_for_deletion_) {
-        tryCreateNewConnections();
+        std::cerr << "=========  tryCreateNewConnections\n";
+         dispatcher_.createSchedulableCallback([this](){tryCreateNewConnections();});
       }
     }
 
