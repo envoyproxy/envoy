@@ -128,9 +128,8 @@ class StatefulProcessor:
                     amended = re.sub(r'-2147483648', 'INT32_MIN', without_empty_newlines)
                     message_spec = json.loads(amended)
                     api_key = message_spec['apiKey']
-                    if api_key <= 51 or api_key in [56, 57, 60, 61]:
-                        message = self.parse_top_level_element(message_spec)
-                        messages.append(message)
+                    message = self.parse_top_level_element(message_spec)
+                    messages.append(message)
             except Exception as e:
                 print('could not process %s' % input_file)
                 raise
@@ -201,7 +200,7 @@ class StatefulProcessor:
                 if child is not None:
                     fields.append(child)
             # Some structures share the same name, use request/response as prefix.
-            if type_name in ['EntityData', 'EntryData', 'PartitionData', 'TopicData']:
+            if type_name in ['EntityData', 'EntryData', 'PartitionData', 'PartitionSnapshot', 'SnapshotId', 'TopicData', 'TopicSnapshot']:
                 type_name = self.type.capitalize() + type_name
             # Some of the types repeat multiple times (e.g. AlterableConfig).
             # In such a case, every second or later occurrence of the same name is going to be prefixed
@@ -541,6 +540,8 @@ class Primitive(TypeSpecification):
             'static_cast<int8_t>(8)',
         'int16':
             'static_cast<int16_t>(16)',
+        'uint16':
+            'static_cast<uint16_t>(17)',
         'int32':
             'static_cast<int32_t>(32)',
         'int64':
