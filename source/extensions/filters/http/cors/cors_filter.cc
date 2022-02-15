@@ -49,12 +49,13 @@ CorsFilter::CorsFilter(CorsFilterConfigSharedPtr config)
 // https://www.w3.org/TR/cors/#resource-preflight-requests
 Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   if (decoder_callbacks_->route() == nullptr ||
-      decoder_callbacks_->route()->routeEntry() == nullptr) {
+      (decoder_callbacks_->route()->routeEntry() == nullptr &&
+       decoder_callbacks_->route()->directResponseEntry() == nullptr)) {
     return Http::FilterHeadersStatus::Continue;
   }
 
   policies_ = {{
-      decoder_callbacks_->route()->routeEntry()->corsPolicy(),
+      decoder_callbacks_->route()->routeEntry() != nullptr ? decoder_callbacks_->route()->routeEntry()->corsPolicy() : decoder_callbacks_->route()->directResponseEntry()->corsPolicy(),
       decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy(),
   }};
 

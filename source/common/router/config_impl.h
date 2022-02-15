@@ -115,6 +115,7 @@ public:
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
   const std::string& responseBody() const override { return EMPTY_STRING; }
   const std::string& routeName() const override { return route_name_; }
+  const CorsPolicy* corsPolicy() const override { return nullptr; }
 
 private:
   const std::string route_name_;

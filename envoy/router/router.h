@@ -112,6 +112,11 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& routeName() const PURE;
+
+  /**
+   * @return const CorsPolicy* the CORS policy for this virtual host.
+   */
+  virtual const CorsPolicy* corsPolicy() const PURE;
 };
 
 /**

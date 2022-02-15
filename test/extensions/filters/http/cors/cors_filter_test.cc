@@ -519,18 +519,20 @@ TEST_F(CorsFilterTest, EncodeWithNonMatchingOrigin) {
 }
 
 TEST_F(CorsFilterTest, RedirectRoute) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "OPTIONS"}, {"origin", "localhost"}, {"access-control-request-method", "GET"}};
+
   ON_CALL(*decoder_callbacks_.route_, directResponseEntry())
       .WillByDefault(Return(&direct_response_entry_));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
-  EXPECT_EQ(false, IsCorsRequest());
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(true, IsCorsRequest());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   Http::TestResponseHeaderMapImpl response_headers{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
-  EXPECT_EQ("", response_headers.get_("access-control-allow-origin"));
-  EXPECT_EQ("", response_headers.get_("access-control-allow-credentials"));
+  EXPECT_EQ("localhost", response_headers.get_("access-control-allow-origin"));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
