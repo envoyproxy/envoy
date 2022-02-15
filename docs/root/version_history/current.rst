@@ -16,6 +16,7 @@ Minor Behavior Changes
 * file: changed disk based files to truncate files which are not being appended to. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.append_or_truncate`` to false.
 * grpc: flip runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to be default enabled. async grpc client created through getOrCreateRawAsyncClient will be cached by default.
 * http: now the max concurrent streams of http2 connection can not only be adjusted down according to the SETTINGS frame but also can be adjusted up, of course, it can not exceed the configured upper bounds. This fix is guarded by ``envoy.reloadable_features.http2_allow_capacity_increase_by_settings``.
+* http: changed the http status code to 503 from 408 if :ref:`max_stream_duration <envoy_api_field_core.HttpProtocolOptions.max_stream_duration>` in the cluster config is fired.
 
 Bug Fixes
 ---------
