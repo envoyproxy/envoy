@@ -99,7 +99,6 @@ public:
   MOCK_METHOD(bool, allowRenegotiation, (), (const));
   MOCK_METHOD(size_t, maxSessionKeys, (), (const));
   MOCK_METHOD(const std::string&, signingAlgorithmsForTest, (), (const));
-  MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogLocal, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogRemote, (), (const));
   MOCK_METHOD(const AccessLog::AccessLogFileSharedPtr, accessLog, (), (const));
@@ -135,7 +134,6 @@ public:
   MOCK_METHOD(OcspStaplePolicy, ocspStaplePolicy, (), (const));
   MOCK_METHOD(const std::vector<SessionTicketKey>&, sessionTicketKeys, (), (const));
   MOCK_METHOD(bool, disableStatelessSessionResumption, (), (const));
-  MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogLocal, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogRemote, (), (const));
   MOCK_METHOD(const AccessLog::AccessLogFileSharedPtr, accessLog, (), (const));

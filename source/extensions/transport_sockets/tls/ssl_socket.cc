@@ -56,7 +56,8 @@ int SslSocket::ssl_ex_data_file_index_ =
 
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
                      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                     Ssl::HandshakerFactoryCb handshaker_factory_cb, Ssl::ContextConfigPtr config)
+                     Ssl::HandshakerFactoryCb handshaker_factory_cb,
+                     const Ssl::ContextConfig& config)
     : transport_socket_options_(transport_socket_options),
       ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
       info_(std::dynamic_pointer_cast<SslHandshakerImpl>(
@@ -69,7 +70,7 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
     ASSERT(state == InitialState::Server);
     SSL_set_accept_state(rawSsl());
   }
-} // namespace Tls
+}
 
 void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   ASSERT(!callbacks_);
@@ -88,7 +89,7 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   auto loader = Runtime::LoaderSingleton::getExisting();
   if (loader != nullptr) {
     auto tls_keylog_enable = loader->threadsafeSnapshot()->getBoolean("tls_keylog", false);
-    if (tls_keylog_enable && config_->accessLog() != nullptr) {
+    if (tls_keylog_enable && config_.tlsKeyLogFile() != nullptr) {
       enableTlsKeyLog();
     } else {
       disableTlsKeyLog();
@@ -341,9 +342,9 @@ void SslSocket::enableTlsKeyLog(void) {
   SSL_CTX* ctx = SSL_get_SSL_CTX(rawSsl());
   ASSERT(ctx != nullptr);
   SSL_set_ex_data(rawSsl(), SslSocket::ssl_ex_data_file_index_,
-                  static_cast<void*>(config_->accessLog().get()));
+                  static_cast<void*>(config_.tlsKeyLogFile().get()));
   SSL_set_ex_data(rawSsl(), SslSocket::ssl_ex_data_config_index_,
-                  static_cast<void*>(config_.get()));
+                  static_cast<void*>(const_cast<Ssl::ContextConfig*>(&config_)));
   SSL_set_ex_data(rawSsl(), SslSocket::ssl_ex_data_callback_index_, static_cast<void*>(callbacks_));
   SSL_CTX_set_keylog_callback(ctx, keylogCallback);
   enable_tls_keylog_ = true;
@@ -439,7 +440,7 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
     ENVOY_LOG(debug, "Create ClientSslSocket");
     return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Client,
                                        transport_socket_options, config_->createHandshaker(),
-                                       config_);
+                                       *config_);
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.upstream_context_secrets_not_ready_.inc();
@@ -533,7 +534,7 @@ Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket(
     ENVOY_LOG(debug, "Create ServerSslSocket");
     return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server,
                                        transport_socket_options, config_->createHandshaker(),
-                                       config_);
+                                       *config_);
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.downstream_context_secrets_not_ready_.inc();

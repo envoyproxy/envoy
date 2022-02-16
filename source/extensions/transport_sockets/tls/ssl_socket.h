@@ -50,7 +50,7 @@ class SslSocket : public Network::TransportSocket,
 public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
             const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-            Ssl::HandshakerFactoryCb handshaker_factory_cb, Ssl::ContextConfigPtr config);
+            Ssl::HandshakerFactoryCb handshaker_factory_cb, const Ssl::ContextConfig& config);
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -105,7 +105,7 @@ private:
   std::string failure_reason_;
 
   SslHandshakerImplSharedPtr info_;
-  Envoy::Ssl::ContextConfigPtr config_;
+  const Envoy::Ssl::ContextConfig& config_;
   bool enable_tls_keylog_;
 };
 

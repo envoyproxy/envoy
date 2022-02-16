@@ -42,10 +42,9 @@ public:
   }
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
-  const std::string& tlsKeyLogPath() const override { return tls_keylog_path_; };
   const Network::Address::IpList& tlsKeyLogLocal() const override { return tls_keylog_local_; };
   const Network::Address::IpList& tlsKeyLogRemote() const override { return tls_keylog_remote_; };
-  const AccessLog::AccessLogFileSharedPtr accessLog() const override { return access_log_; };
+  const AccessLog::AccessLogFileSharedPtr tlsKeyLogFile() const override { return access_log_; };
 
   bool isReady() const override {
     const bool tls_is_ready =

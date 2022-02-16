@@ -187,7 +187,7 @@ ContextConfigImpl::ContextConfigImpl(
       factory_context_(factory_context), tls_keylog_path_(config.tls_keylog().logfile_path()),
       tls_keylog_local_(config.tls_keylog().local_address_range()),
       tls_keylog_remote_(config.tls_keylog().remote_address_range()), access_log_(nullptr) {
-  if (!config.tls_keylog().logfile_path().empty()) {
+  if (config.has_tls_keylog()) {
     if (config.tls_keylog().local_address_range_size() == 0 &&
         config.tls_keylog().remote_address_range_size() == 0) {
       throw EnvoyException(fmt::format("At least one of src or dst should be set for TLS key log"));
@@ -405,6 +405,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
       ocsp_staple_policy_(ocspStaplePolicyFromProto(config.ocsp_staple_policy())),
       session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
       disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)) {
+
   if (session_ticket_keys_provider_ != nullptr) {
     // Validate tls session ticket keys early to reject bad sds updates.
     stk_validation_callback_handle_ = session_ticket_keys_provider_->addValidationCallback(
