@@ -22,7 +22,7 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
 }
 
 uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
-  ASSERT(absl::StartsWith(feature, "envoy."));
+  ASSERT(absl::StartsWith(feature, "envoy.") || absl::StartsWith(feature, "re2."));
   if (Runtime::LoaderSingleton::getExisting()) {
     return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->getInteger(
         std::string(feature), default_value);
@@ -56,7 +56,6 @@ constexpr const char* runtime_features[] = {
     // Enabled
     "envoy.reloadable_features.test_feature_true",
     // Begin alphabetically sorted section.
-    "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.allow_upstream_inline_write",
     "envoy.reloadable_features.append_or_truncate",
     "envoy.reloadable_features.conn_pool_delete_when_idle",

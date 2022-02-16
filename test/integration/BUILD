@@ -720,6 +720,7 @@ envoy_cc_test_library(
         "fake_upstream.h",
     ],
     deps = [
+        "//test/mocks/runtime:runtime_mocks",
         "//source/server:listener_manager_lib",
         "//envoy/api:api_interface",
         "//envoy/grpc:status",
