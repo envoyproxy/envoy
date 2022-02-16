@@ -24,6 +24,7 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -674,7 +675,7 @@ public:
     server_ = std::make_unique<TestDnsServer>(*dispatcher_);
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
-    listener_ = dispatcher_->createListener(socket_, *server_, true, false);
+    listener_ = dispatcher_->createListener(socket_, *server_, runtime_, true, false);
     updateDnsResolverOptions();
 
     // Create a resolver options on stack here to emulate what actually happens in envoy bootstrap.
@@ -840,6 +841,7 @@ protected:
   virtual void updateDnsResolverOptions(){};
   virtual bool setResolverInConstructor() const { return false; }
   virtual bool filterUnroutableFamilies() const { return false; }
+  NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<TestDnsServer> server_;
   std::unique_ptr<DnsResolverImplPeer> peer_;
   std::shared_ptr<Network::TcpListenSocket> socket_;

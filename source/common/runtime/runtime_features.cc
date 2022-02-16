@@ -64,10 +64,12 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 // TODO(birenroy) reset to true after bug fixes
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
 
-// Block of non-boolean flags. These are deprecated.Do not add more.
+// Block of non-boolean flags. These are deprecated. Do not add more.
 ABSL_FLAG(uint64_t, envoy_buffer_overflow_multiplier, 0, "");                        // NOLINT
 ABSL_FLAG(uint64_t, envoy_do_not_use_going_away_max_http2_outbound_response, 2, ""); // NOLINT
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");                       // NOLINT
+ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, "");                       // NOLINT
+ABSL_FLAG(uint64_t, re2_max_program_size_warn_level, std::numeric_limits<uint32_t>::max(), ""); // NOLINT
 
 namespace Envoy {
 namespace Runtime {
@@ -94,6 +96,13 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
       return absl::GetFlag(FLAGS_envoy_do_not_use_going_away_max_http2_outbound_response);
     } else if (feature == "envoy.http.headermap.lazy_map_min_size") {
       return absl::GetFlag(FLAGS_envoy_headermap_lazy_map_min_size);
+    }
+  }
+  if (absl::StartsWith(feature, "re2.")) {
+    if (feature == "re2.max_program_size.error_level") {
+      return absl::GetFlag(FLAGS_re2_max_program_size_error_level);
+    } else if (feature == "re2.max_program_size.warn_level") {
+      return absl::GetFlag(FLAGS_re2_max_program_size_warn_level);
     }
   }
   IS_ENVOY_BUG(absl::StrCat("requested an unsupported integer ", feature));
@@ -184,6 +193,10 @@ void maybeSetDeprecatedInts(absl::string_view name, uint32_t value) {
     absl::SetFlag(&FLAGS_envoy_do_not_use_going_away_max_http2_outbound_response, value);
   } else if (name == "envoy.http.headermap.lazy_map_min_size") {
     absl::SetFlag(&FLAGS_envoy_headermap_lazy_map_min_size, value);
+  } else if (name == "re2.max_program_size.error_level") {
+    absl::SetFlag(&FLAGS_re2_max_program_size_error_level, value);
+  } else if (name == "re2.max_program_size.warn_level") {
+    absl::SetFlag(&FLAGS_re2_max_program_size_warn_level, value);
   }
 }
 
