@@ -6,7 +6,6 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
-#include "envoy/stats/symbol_table.h"
 #include "envoy/stats/tag.h"
 
 #include "absl/types/optional.h"
@@ -27,6 +26,16 @@ using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogr
 using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextReadout>>;
 using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
+
+// TODO(jmarantz): In the initial transformation to store Scope as shared_ptr,
+// we don't change all the references, as that would result in an unreviewable
+// PR that combines a small number of semantic changes and a large number of
+// files with trivial changes. Furthermore, code that depends on the Envoy stats
+// infrastructure that's not in this repo will stop compiling when we remove
+// ScopePtr. We should fully remove this alias in a future PR and change all the
+// references, once known consumers that might break from this change have a
+// chance to do the global replace in their own repos.
+using ScopePtr = ScopeSharedPtr;
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
 
@@ -53,9 +62,9 @@ public:
   virtual ~Scope() = default;
 
   /** @return a shared_ptr for this */
-  ScopeSharedPtr makeShared() { return shared_from_this(); }
+  ScopeSharedPtr getShared() { return shared_from_this(); }
   /** @return a const shared_ptr for this */
-  ConstScopeSharedPtr makeConstShared() const { return shared_from_this(); }
+  ConstScopeSharedPtr getConstShared() const { return shared_from_this(); }
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes

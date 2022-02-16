@@ -12,7 +12,7 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/memory/stats.h"
 #include "source/common/stats/stats_matcher_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/tag_producer_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
@@ -507,7 +507,7 @@ TEST_F(StatsThreadLocalStoreTest, ForEach) {
 
   const std::vector<std::string> empty;
 
-  EXPECT_THAT(collect_scopes(), UnorderedElementsAreArray({"", ""}));
+  EXPECT_THAT(collect_scopes(), UnorderedElementsAreArray({""}));
   EXPECT_THAT(collect_counters(), UnorderedElementsAreArray(empty));
   EXPECT_THAT(collect_gauges(), UnorderedElementsAreArray(empty));
   EXPECT_THAT(collect_text_readouts(), UnorderedElementsAreArray(empty));
@@ -522,7 +522,7 @@ TEST_F(StatsThreadLocalStoreTest, ForEach) {
   scope2->textReadoutFromString("tr2");
   ScopeSharedPtr scope3 = store_->createScope("scope3");
   EXPECT_THAT(collect_scopes(),
-              UnorderedElementsAreArray({"", "", "scope1", "scope1.scope2", "scope3"}));
+              UnorderedElementsAreArray({"", "scope1", "scope1.scope2", "scope3"}));
   EXPECT_THAT(collect_counters(),
               UnorderedElementsAreArray({"scope1.counter1", "scope1.scope2.counter2"}));
   EXPECT_THAT(collect_gauges(),
@@ -722,6 +722,34 @@ TEST_F(StatsThreadLocalStoreTest, TextReadoutAllLengths) {
   // Can set back to empty
   t.set("");
   EXPECT_EQ("", t.value());
+
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
+TEST_F(StatsThreadLocalStoreTest, SharedScopes) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  std::vector<ConstScopeSharedPtr> scopes;
+
+  // Verifies shared_ptr functionality by creating some scopes, iterating
+  // through them from the store and saving them in a vector, dropping the
+  // references, and then referencing the scopes, verifying their names.
+  {
+    ScopeSharedPtr scope1 = store_->createScope("scope1.");
+    ScopeSharedPtr scope2 = store_->createScope("scope2.");
+    store_->forEachScope(
+        [](size_t) {}, [&scopes](const Scope& scope) { scopes.push_back(scope.getConstShared()); });
+  }
+  ASSERT_EQ(3,
+            scopes.size()); // For some reason there are two scopes created with name "" by default.
+  store_->symbolTable().sortByStatNames<ConstScopeSharedPtr>(
+      scopes.begin(), scopes.end(),
+      [](const ConstScopeSharedPtr& scope) -> StatName { return scope->prefix(); });
+  EXPECT_EQ("", store_->symbolTable().toString(scopes[0]->prefix())); // default scope
+  EXPECT_EQ("scope1", store_->symbolTable().toString(scopes[1]->prefix()));
+  EXPECT_EQ("scope2", store_->symbolTable().toString(scopes[2]->prefix()));
 
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();

@@ -24,6 +24,7 @@ public:
                                                                      nullptr)
                         : nullptr) {}
   bool addHandler(const std::string&, const std::string&, HandlerCb, bool, bool) override;
+  bool addChunkedHandler(const std::string&, const std::string&, GenHandlerCb, bool, bool) override;
   bool removeHandler(const std::string&) override;
   const Network::Socket& socket() override;
   ConfigTracker& getConfigTracker() override;

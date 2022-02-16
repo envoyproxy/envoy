@@ -159,6 +159,8 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   check_listener_stats(0, 1);
 }
 
+// On OSX this is flaky as we can end up with connection imbalance.
+#if !defined(__APPLE__)
 // Make sure all workers pick up connections
 TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   concurrency_ = 2;
@@ -205,6 +207,7 @@ TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   EXPECT_TRUE(w0_ctr > 1);
   EXPECT_TRUE(w1_ctr > 1);
 }
+#endif
 
 TEST_P(IntegrationTest, RouterDirectResponseWithBody) {
   const std::string body = "Response body";
@@ -458,12 +461,12 @@ typed_config:
 
   initialize();
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
   {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), HttpStatusIs("403"));
+    codec_client_->close();
   }
 
   {
@@ -524,12 +527,12 @@ typed_config:
 
   initialize();
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
   {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), HttpStatusIs("403"));
+    codec_client_->close();
   }
 
   {

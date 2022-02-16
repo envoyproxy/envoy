@@ -299,9 +299,12 @@ stages:
   jobs:
   - job: docker
     displayName: "linux multiarch"
+    timeoutInMinutes: 120
     pool:
       vmImage: "ubuntu-18.04"
     steps:
+    - bash: .azure-pipelines/cleanup.sh
+      displayName: "Removing tools from agent"
     - bash: |
         echo "disk space at beginning of build:"
         df -h
@@ -422,8 +425,7 @@ stages:
       inputs:
         buildType: current
         artifactName: "docker"
-        itemPattern: "docker/envoy-docker-images.tar.xz"
-        downloadType: single
+        itemPattern: "docker/envoy*.tar"
         targetPath: $(Build.StagingDirectory)
     - bash: ./ci/do_ci.sh verify_examples
       env:
@@ -438,8 +440,7 @@ stages:
       inputs:
         buildType: current
         artifactName: "docker"
-        itemPattern: "docker/envoy-docker-images.tar.xz"
-        downloadType: single
+        itemPattern: "docker/envoy*.tar"
         targetPath: $(Build.StagingDirectory)
     - bash: ./ci/do_ci.sh verify_build_examples
       env:
@@ -486,7 +487,7 @@ stages:
   - job: release
     timeoutInMinutes: 120
     pool:
-      vmImage: "windows-latest"
+      vmImage: "windows-2019"
     steps:
     - task: Cache@2
       inputs:
@@ -522,7 +523,7 @@ stages:
     strategy:
       matrix:
         windows2019:
-          imageName: 'windows-latest'
+          imageName: 'windows-2019'
           windowsBuildType: "windows"
           windowsImageBase: "mcr.microsoft.com/windows/servercore"
           windowsImageTag: "ltsc2019"

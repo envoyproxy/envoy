@@ -13,7 +13,7 @@
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
 #include "source/common/stats/store_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/tag_utility.h"
 #include "source/common/stats/utility.h"
 
@@ -235,9 +235,12 @@ public:
 
   void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override {
     if (f_size != nullptr) {
-      f_size(1);
+      f_size(scopes_.size() + 1);
     }
     f_stat(*default_scope_);
+    for (const ScopeSharedPtr& scope : scopes_) {
+      f_stat(*scope);
+    }
   }
 
   Stats::StatName prefix() const override { return StatName(); }
@@ -266,6 +269,7 @@ private:
   RefcountPtr<NullCounterImpl> null_counter_;
   RefcountPtr<NullGaugeImpl> null_gauge_;
   ScopeSharedPtr default_scope_;
+  std::vector<ScopeSharedPtr> scopes_;
 };
 
 } // namespace Stats
