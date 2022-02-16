@@ -1,0 +1,38 @@
+name: bump_support_rotation
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Mondays at 2pm UTC (9am EST)
+    - cron: "0 14 * * 1"
+
+jobs:
+  bump_support_rotation:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: git checkout
+        uses: actions/checkout@v2
+      - name: Bump Lyft Support Rotation
+        run: ./tools/bump_lyft_support_rotation.sh
+      - name: Set Branch
+        id: branch
+        run: |
+          echo "::set-output name=BRANCH_NAME::support-bump-${GITHUB_RUN_ID}"
+      - name: Commit Changes
+        run: |
+          git checkout -b "${{ steps.branch.outputs.BRANCH_NAME }}"
+          git config --global user.email "${GITHUB_ACTOR}"
+          git config --global user.name "${GITHUB_ACTOR}@users.noreply.github.com"
+          git add .github/lyft_maintainers.yml
+          git commit -am "Bump Lyft Support Rotation"
+          git push
+      - name: Submit Pull Request
+        run: |
+          curl \
+            -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/octocat/hello-world/pulls \
+            -d '{"head":"${{ steps.branch.outputs.BRANCH_NAME }}","base":"main", "title": "Bump Lyft Support Rotation"}'
