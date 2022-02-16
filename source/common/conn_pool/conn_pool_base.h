@@ -17,7 +17,7 @@ namespace ConnectionPool {
 class ConnPoolImplBase;
 
 // A placeholder struct for whatever data a given connection pool needs to
-// successfully attach and upstream connection to a downstream connection.
+// successfully attach an upstream connection to a downstream connection.
 struct AttachContext {
   // Add a virtual destructor to allow for the dynamic_cast ASSERT in typedContext.
   virtual ~AttachContext() = default;
@@ -132,7 +132,7 @@ private:
 // yet established.
 class PendingStream : public LinkedObject<PendingStream>, public ConnectionPool::Cancellable {
 public:
-  PendingStream(ConnPoolImplBase& parent);
+  PendingStream(ConnPoolImplBase& parent, bool can_send_early_data);
   ~PendingStream() override;
 
   // ConnectionPool::Cancellable
@@ -143,6 +143,8 @@ public:
   virtual AttachContext& context() PURE;
 
   ConnPoolImplBase& parent_;
+  // The request can be sent as early data.
+  bool can_send_early_data_;
 };
 
 using PendingStreamPtr = std::unique_ptr<PendingStream>;
@@ -224,9 +226,10 @@ public:
   void checkForIdleAndCloseIdleConnsIfDraining();
 
   void scheduleOnUpstreamReady();
-  ConnectionPool::Cancellable* newStreamImpl(AttachContext& context);
+  ConnectionPool::Cancellable* newStreamImpl(AttachContext& context, bool can_send_early_data);
 
-  virtual ConnectionPool::Cancellable* newPendingStream(AttachContext& context) PURE;
+  virtual ConnectionPool::Cancellable* newPendingStream(AttachContext& context,
+                                                        bool can_send_early_data) PURE;
 
   virtual void attachStreamToClient(Envoy::ConnectionPool::ActiveClient& client,
                                     AttachContext& context);

@@ -58,6 +58,7 @@ enum class Code {
   UnprocessableEntity           = 422,
   Locked                        = 423,
   FailedDependency              = 424,
+  TooEarly                      = 425,
   UpgradeRequired               = 426,
   PreconditionRequired          = 428,
   TooManyRequests               = 429,
