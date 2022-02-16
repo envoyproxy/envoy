@@ -46,6 +46,8 @@ Removed Config or Runtime
 * http: removed ``envoy.reloadable_features.internal_redirects_with_body`` and legacy code paths.
 * udp: removed ``envoy.reloadable_features.udp_per_event_loop_read_limit`` and legacy code paths.
 * upstream: removed ``envoy.reloadable_features.health_check.graceful_goaway_handling`` and legacy code paths.
+* xds: removed ``envoy.reloadable_features.vhds_heartbeats`` and legacy code paths.
+
 
 New Features
 ------------

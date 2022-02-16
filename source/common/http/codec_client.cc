@@ -44,10 +44,6 @@ CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connecti
   connection_->noDelay(true);
 }
 
-CodecClient::~CodecClient() {
-  ASSERT(connect_called_, "CodecClient::connect() is not called through out the life time.");
-}
-
 void CodecClient::connect() {
   ASSERT(!connect_called_);
   connect_called_ = true;

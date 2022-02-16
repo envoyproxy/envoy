@@ -27,18 +27,18 @@ uint32_t getMaxStreams(const Upstream::ClusterInfo& cluster) {
 ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                            Upstream::Host::CreateConnectionData& data)
     : MultiplexedActiveClientBase(parent, getMaxStreams(parent.host()->cluster()),
-                                  parent.host()->cluster().stats().upstream_cx_http3_total_, data) {
-}
-
-void ActiveClient::onEnlisted() {
-  // HTTP/3 codec hasn't tried to connect yet.
-  MultiplexedActiveClientBase::onEnlisted();
+                                  parent.host()->cluster().stats().upstream_cx_http3_total_, data),
+      async_connect_callback_(parent_.dispatcher().createSchedulableCallback([this]() {
+        if (state() == Envoy::ConnectionPool::ActiveClient::State::CONNECTING) {
+          codec_client_->connect();
+        }
+      })) {
   ASSERT(codec_client_);
   if (dynamic_cast<CodecClientProd*>(codec_client_.get()) == nullptr) {
     ASSERT(Runtime::runtimeFeatureEnabled(
         "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted"));
-    // Hasn't called connect() yet.
-    codec_client_->connect();
+    // Hasn't called connect() yet, schedule one for the next event loop.
+    async_connect_callback_->scheduleCallbackNextIteration();
   }
 }
 

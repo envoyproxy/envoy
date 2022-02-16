@@ -21,7 +21,6 @@ using testing::Return;
 class TestActiveClient : public ActiveClient {
 public:
   using ActiveClient::ActiveClient;
-
   void close() override { onEvent(Network::ConnectionEvent::LocalClose); }
   uint64_t id() const override { return 1; }
   bool closingWithIncompleteStream() const override { return false; }
@@ -30,7 +29,6 @@ public:
   void onEvent(Network::ConnectionEvent event) override {
     parent_.onConnectionEvent(*this, "", event);
   }
-  MOCK_METHOD(void, onEnlisted, ());
 
   static void incrementActiveStreams(ActiveClient& client) {
     TestActiveClient* testClient = dynamic_cast<TestActiveClient*>(&client);
@@ -501,37 +499,6 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredLocalClose) {
 
   EXPECT_CALL(idle_pool_callback, Call());
   pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
-}
-
-TEST_F(ConnPoolImplDispatcherBaseTest, OnEnlistedFailed) {
-  // Create a new stream using the pool.
-  newConnectingClient();
-  // Limit the new connection capacity to 1 stream.
-  clients_.back()->capacity_override_ = 1;
-
-  // Creating the 2nd new stream would create another client which would fail during onEnlisted().
-  EXPECT_CALL(pool_, instantiateActiveClient).WillOnce(Invoke([this]() -> ActiveClientPtr {
-    auto ret =
-        std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_, concurrent_streams_);
-    EXPECT_CALL(*ret, onEnlisted()).WillOnce(Invoke([&client_ref = *ret]() {
-      client_ref.close();
-    }));
-    ret->real_host_description_ = descr_;
-    return ret;
-  }));
-  EXPECT_CALL(pool_, onPoolFailure(_, _, _, _))
-      .WillRepeatedly(Invoke([](const Upstream::HostDescriptionConstSharedPtr&, absl::string_view,
-                                ConnectionPool::PoolFailureReason, AttachContext&) {}));
-  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
-  CHECK_STATE(0 /*active*/,
-              (Runtime::runtimeFeatureEnabled(
-                   "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted")
-                   ? 0
-                   : 1) /*pending*/,
-              1 /*connecting capacity*/);
-
-  // Clean up.
-  pool_.destructAllConnections();
 }
 
 } // namespace ConnectionPool

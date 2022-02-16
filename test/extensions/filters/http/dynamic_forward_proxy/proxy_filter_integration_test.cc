@@ -151,6 +151,23 @@ typed_config:
   void testConnectionTiming(IntegrationStreamDecoderPtr& response, bool cached_dns,
                             int64_t original_usec);
 
+  // Send bidirectional data for CONNECT termination with dynamic forward proxy test.
+  void sendBidirectionalData(FakeRawConnectionPtr& fake_raw_upstream_connection,
+                             IntegrationStreamDecoderPtr& response,
+                             const char* downstream_send_data = "hello",
+                             const char* upstream_received_data = "hello",
+                             const char* upstream_send_data = "there!",
+                             const char* downstream_received_data = "there!") {
+    // Send some data upstream.
+    codec_client_->sendData(*request_encoder_, downstream_send_data, false);
+    ASSERT_TRUE(fake_raw_upstream_connection->waitForData(
+        FakeRawConnection::waitForInexactMatch(upstream_received_data)));
+    // Send some data downstream.
+    ASSERT_TRUE(fake_raw_upstream_connection->write(upstream_send_data));
+    response->waitForBodyData(strlen(downstream_received_data));
+    EXPECT_EQ(downstream_received_data, response->body());
+  }
+
   bool upstream_tls_{};
   std::string upstream_cert_name_{"upstreamlocalhost"};
   CdsHelper cds_helper_;
@@ -575,6 +592,44 @@ TEST_P(ProxyFilterIntegrationTest, MultipleRequestsLowStreamLimit) {
   ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_TRUE(response2->complete());
   EXPECT_EQ("200", response2->headers().getStatusValue());
+}
+
+// Test Envoy CONNECT request termination works with dynamic forward proxy config.
+TEST_P(ProxyFilterIntegrationTest, ConnectRequestWithDFPConfig) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { ConfigHelper::setConnectConfig(hcm, true, false); });
+
+  enableHalfClose(true);
+  initializeWithArgs();
+
+  const Http::TestRequestHeaderMapImpl connect_headers{
+      {":method", "CONNECT"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  FakeRawConnectionPtr fake_raw_upstream_connection;
+  IntegrationStreamDecoderPtr response;
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(connect_headers);
+  request_encoder_ = &encoder_decoder.first;
+  response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection));
+  response->waitForHeaders();
+
+  sendBidirectionalData(fake_raw_upstream_connection, response, "hello", "hello", "there!",
+                        "there!");
+  // Send a second set of data to make sure for example headers are only sent once.
+  sendBidirectionalData(fake_raw_upstream_connection, response, ",bye", "hello,bye", "ack",
+                        "there!ack");
+
+  // Send an end stream. This should result in half close upstream.
+  codec_client_->sendData(*request_encoder_, "", true);
+  ASSERT_TRUE(fake_raw_upstream_connection->waitForHalfClose());
+  // Now send a FIN from upstream. This should result in clean shutdown downstream.
+  ASSERT_TRUE(fake_raw_upstream_connection->close());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 } // namespace
