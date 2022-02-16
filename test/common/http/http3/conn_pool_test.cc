@@ -237,7 +237,7 @@ TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
 
   pool_->drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 
-  // Triggerring the async connect callback after the client starts draining shouldn't cause crash.
+  // Triggering the async connect callback after the client starts draining shouldn't cause crash.
   async_connect_callback->invokeCallback();
   cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
 }
