@@ -9,6 +9,7 @@ api_proto_package(
         "//envoy/config/core/v3:pkg",
         "//envoy/config/ratelimit/v3:pkg",
         "//envoy/extensions/common/ratelimit/v3:pkg",
+        "//envoy/type/v3:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
@@ -84,10 +83,10 @@ public:
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     filter_callbacks_ = &callbacks;
     filter_callbacks_->connection().addConnectionCallbacks(*this);
-    injectDynamicDescriptorKeys(config_->descriptors(), filter_callbacks_->connection());
+    //injectDynamicDescriptorKeys(config_->descriptors(), filter_callbacks_->connection());
   }
 
-  void injectDynamicDescriptorKeys(std::vector<RateLimit::Descriptor> original_descriptors,
+  /*void injectDynamicDescriptorKeys(std::vector<RateLimit::Descriptor> original_descriptors,
                                    const Network::Connection& connection) {
     std::vector<RateLimit::Descriptor> dynamicDescriptors = std::vector<RateLimit::Descriptor>();
     for (const RateLimit::Descriptor& descriptor : original_descriptors) {
@@ -112,7 +111,7 @@ public:
       dynamicDescriptors.push_back(new_descriptor);
     }
     filter_descriptors_ = dynamicDescriptors;
-  }
+  }*/
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;

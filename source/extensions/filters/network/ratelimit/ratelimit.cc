@@ -26,6 +26,7 @@ Config::Config(const envoy::extensions::filters::network::ratelimit::v3::RateLim
     }
     descriptors_.push_back(new_descriptor);
   }
+
 }
 
 InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope) {
