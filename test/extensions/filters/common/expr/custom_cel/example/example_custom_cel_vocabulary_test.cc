@@ -21,9 +21,10 @@
 // The problem of the unused parameters has been fixed in more recent version of the cel-cpp
 // library. However, it is not possible to upgrade the cel-cpp in envoy at this time
 // as it is waiting on the release of the one of its dependencies.
-
+#pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #include "eval/public/cel_function_adapter.h"
+#pragma GCC diagnostic pop
 
 namespace Envoy {
 namespace Extensions {

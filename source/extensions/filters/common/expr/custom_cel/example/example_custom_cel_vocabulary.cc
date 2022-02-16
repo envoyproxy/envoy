@@ -20,8 +20,10 @@
 // The problem of the unused parameters has been fixed in more recent version of the cel-cpp
 // library. However, it is not possible to upgrade the cel-cpp in envoy currently
 // as it is waiting on the release of the one of its dependencies.
+#pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #include "eval/public/cel_function_adapter.h"
+#pragma GCC diagnostic pop
 
 namespace Envoy {
 namespace Extensions {
@@ -43,10 +45,10 @@ using google::api::expr::runtime::FunctionAdapter;
 // All standard functions will need to take Arena as a parameter.
 //
 // Activation: When adding a mapping to an activation for a variable/value producer or function,
-// previously added mappings with the same name can be removed first.
+// any previously added mappings with the same name are removed first.
 //
 // CEL Function Registry: When registering a function in the function registry,
-// previous registrations with the same function descriptor cannot be removed.
+// previous registrations with the same function descriptor cannot be removed or overriden.
 // A message will be printed to the log.
 
 // addValueProducerToActivation:
@@ -140,10 +142,11 @@ void addStaticFunctionToRegistry(
 
 void addStaticFunctionToRegistry(CelFunctionRegistry* registry,
                                  std::unique_ptr<CelFunction> function) {
+  auto function_name = function->descriptor().name();
   absl::Status status = registry->Register(std::move(function));
   if (!status.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to register static function {}  in CEL function registry: {}",
-                   function->descriptor().name(), status.message());
+                   function_name, status.message());
   }
 }
 
