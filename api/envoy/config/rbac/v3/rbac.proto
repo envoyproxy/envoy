@@ -114,7 +114,8 @@ message RBAC {
   // The policies are evaluated in lexicographic order of the policy name.
   map<string, Policy> policies = 2;
 
-  // Add in order to use a custom cel vocabulary with rbac cel conditional statements.
+  // Create an implementation of this config in order to use a custom CEL vocabulary with
+  // RBAC policy CEL conditions.
   // [#extension-category: envoy.expr.custom_cel_vocabulary]
   core.v3.TypedExtensionConfig custom_cel_vocabulary_config = 3;
 }
