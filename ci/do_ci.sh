@@ -262,12 +262,14 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
-  if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
-    echo "Building and testing envoy-filter-example tests..."
-    pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-    bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${ENVOY_FILTER_EXAMPLE_TESTS[@]}"
-    popd
-  fi
+  # TODO(yanavlasov): disable envoy-filter-example build as it does use bazel version
+  # appropriate for the branch.
+  # if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
+  #   echo "Building and testing envoy-filter-example tests..."
+  #   pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+  #   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${ENVOY_FILTER_EXAMPLE_TESTS[@]}"
+  #   popd
+  # fi
 
   # TODO(mattklein123): This part of the test is now flaky in CI and it's unclear why, possibly
   # due to sandboxing issue. Debug and enable it again.
@@ -286,12 +288,14 @@ elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
   echo "bazel TSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
   bazel_with_collection test --config=rbe-toolchain-tsan "${BAZEL_BUILD_OPTIONS[@]}" -c dbg --build_tests_only "${TEST_TARGETS[@]}"
-  if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
-    echo "Building and testing envoy-filter-example tests..."
-    pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-    bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c dbg --config=clang-tsan "${ENVOY_FILTER_EXAMPLE_TESTS[@]}"
-    popd
-  fi
+  # TODO(yanavlasov): disable envoy-filter-example build as it does use bazel version
+  # appropriate for the branch.
+  # if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
+  #   echo "Building and testing envoy-filter-example tests..."
+  #   pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+  #   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c dbg --config=clang-tsan "${ENVOY_FILTER_EXAMPLE_TESTS[@]}"
+  #   popd
+  # fi
   exit 0
 elif [[ "$CI_TARGET" == "bazel.msan" ]]; then
   ENVOY_STDLIB=libc++
