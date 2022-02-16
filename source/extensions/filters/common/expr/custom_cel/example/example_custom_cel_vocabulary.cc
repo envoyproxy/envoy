@@ -49,7 +49,7 @@ using google::api::expr::runtime::FunctionAdapter;
 // any previously added mappings with the same name are removed first.
 //
 // CEL Function Registry: When registering a function in the function registry,
-// previous registrations with the same function descriptor cannot be removed or overriden.
+// previous registrations with the same function descriptor cannot be removed or overridden.
 // A message will be printed to the log.
 
 // addValueProducerToActivation:
