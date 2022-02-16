@@ -24,8 +24,7 @@ absl::Status GetDouble::Evaluate(absl::Span<const CelValue> args, CelValue* outp
   return absl::OkStatus();
 }
 
-absl::Status Get99::Evaluate(absl::Span<const CelValue>, CelValue* output,
-                             Protobuf::Arena*) const {
+absl::Status Get99::Evaluate(absl::Span<const CelValue>, CelValue* output, Protobuf::Arena*) const {
   *output = CelValue::CreateInt64(99);
   return absl::OkStatus();
 }

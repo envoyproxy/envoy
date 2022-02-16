@@ -33,12 +33,12 @@ namespace Example {
 
 using google::api::expr::runtime::FunctionAdapter;
 
-// Functions for the activation or CEL function registry: Either standard functions or CelFunctions can be used.
-// The standard functions will be converted to CelFunctions when added to the
-// registry and activation.
-// All functions will need a Protobuf arena because CelFunction::Evaluate takes
-// arena as a parameter.
-
+// Below are helper functions for adding mappings for a function to an activation
+// or registering a function in the CEL function registry.
+// The standard functions will be converted to CelFunctions when added to the registry
+// or before being added to the activation.
+// All functions will need access to a Protobuf Arena because CelFunction::Evaluate takes
+// Arena as a parameter.
 
 // addValueProducerToActivation:
 // Removes any envoy native value producer mapping of the same name from the activation.
@@ -64,9 +64,11 @@ void addLazyFunctionToActivation(Activation* activation, std::unique_ptr<CelFunc
 // Removes any envoy native version of a function with the same function descriptor from the
 // activation. Adds the custom version to the activation.
 template <typename ReturnType, typename... Arguments>
-void addLazyFunctionToActivation(Activation* activation, absl::string_view function_name, bool receiver_type,
-                                 std::function<ReturnType(Protobuf::Arena*, Arguments...)> function) {
-  auto result_or = FunctionAdapter<ReturnType, Arguments...>::Create(function_name, receiver_type, function);
+void addLazyFunctionToActivation(
+    Activation* activation, absl::string_view function_name, bool receiver_type,
+    std::function<ReturnType(Protobuf::Arena*, Arguments...)> function) {
+  auto result_or =
+      FunctionAdapter<ReturnType, Arguments...>::Create(function_name, receiver_type, function);
   if (result_or.ok()) {
     auto cel_function = std::move(result_or.value());
     activation->RemoveFunctionEntries(cel_function->descriptor());
@@ -94,17 +96,17 @@ void addLazyFunctionToRegistry(CelFunctionRegistry* registry, CelFunctionDescrip
 // If there is an existing registration with the same name, the registration will not be
 // overwritten. A message will be printed to the log.
 template <typename ReturnType, typename... Arguments>
-void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view function_name, bool receiver_type,
-                                 std::function<ReturnType(Protobuf::Arena*, Arguments...)> function) {
-  auto result_or = FunctionAdapter<ReturnType, Arguments...>::Create(function_name, receiver_type, function);
+void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view function_name,
+                               bool receiver_type,
+                               std::function<ReturnType(Protobuf::Arena*, Arguments...)> function) {
+  auto result_or =
+      FunctionAdapter<ReturnType, Arguments...>::Create(function_name, receiver_type, function);
   if (result_or.ok()) {
     auto cel_function = std::move(result_or.value());
     absl::Status status = registry->RegisterLazyFunction(cel_function->descriptor());
     if (!status.ok()) {
-      ENVOY_LOG_MISC(debug,
-                     "Failed to register static function {}  in CEL function registry: {}",
-                     function_name,
-                     status.message());
+      ENVOY_LOG_MISC(debug, "Failed to register static function {}  in CEL function registry: {}",
+                     function_name, status.message());
     }
   }
 }
@@ -115,8 +117,9 @@ void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view 
 // If there is an existing registration with the same name, the registration will not be
 // overwritten. A message will be printed to the log.
 template <typename ReturnType, typename... Arguments>
-void addStaticFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view function_name, bool receiver_type,
-                                 std::function<ReturnType(Protobuf::Arena*, Arguments...)> function) {
+void addStaticFunctionToRegistry(
+    CelFunctionRegistry* registry, absl::string_view function_name, bool receiver_type,
+    std::function<ReturnType(Protobuf::Arena*, Arguments...)> function) {
   absl::Status status = FunctionAdapter<ReturnType, Arguments...>::CreateAndRegister(
       function_name, receiver_type, function, registry);
   if (!status.ok()) {
@@ -125,7 +128,8 @@ void addStaticFunctionToRegistry(CelFunctionRegistry* registry, absl::string_vie
   }
 }
 
-void addStaticFunctionToRegistry(CelFunctionRegistry* registry, std::unique_ptr<CelFunction> function) {
+void addStaticFunctionToRegistry(CelFunctionRegistry* registry,
+                                 std::unique_ptr<CelFunction> function) {
   absl::Status status = registry->Register(std::move(function));
   if (!status.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to register static function {}  in CEL function registry: {}",
@@ -151,10 +155,8 @@ void ExampleCustomCELVocabulary::fillActivation(Activation* activation, Protobuf
                                std::make_unique<ExtendedRequestWrapper>(
                                    arena, request_headers, info, return_url_query_string_as_map_));
   // lazy functions only
-  addLazyFunctionToActivation(activation,
-                              std::make_unique<GetDouble>(LazyFuncNameGetDouble));
-  addLazyFunctionToActivation(activation,
-                              std::make_unique<GetProduct>(LazyFuncNameGetProduct));
+  addLazyFunctionToActivation(activation, std::make_unique<GetDouble>(LazyFuncNameGetDouble));
+  addLazyFunctionToActivation(activation, std::make_unique<GetProduct>(LazyFuncNameGetProduct));
   addLazyFunctionToActivation(activation, LazyFuncNameGetNextInt, false,
                               std::function<CelValue(Protobuf::Arena*, int64_t)>(getNextInt));
 }
@@ -163,10 +165,10 @@ void ExampleCustomCELVocabulary::registerFunctions(CelFunctionRegistry* registry
   absl::Status status;
 
   // lazy functions
-  addLazyFunctionToRegistry(registry,GetDouble::createDescriptor(LazyFuncNameGetDouble));
-  addLazyFunctionToRegistry(registry,GetProduct::createDescriptor(LazyFuncNameGetProduct));
+  addLazyFunctionToRegistry(registry, GetDouble::createDescriptor(LazyFuncNameGetDouble));
+  addLazyFunctionToRegistry(registry, GetProduct::createDescriptor(LazyFuncNameGetProduct));
   addLazyFunctionToRegistry(registry, LazyFuncNameGetNextInt, false,
-                              std::function<CelValue(Protobuf::Arena*, int64_t)>(getNextInt));
+                            std::function<CelValue(Protobuf::Arena*, int64_t)>(getNextInt));
 
   // static functions
   addStaticFunctionToRegistry(registry, std::make_unique<Get99>(StaticFuncNameGet99));

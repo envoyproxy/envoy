@@ -208,11 +208,10 @@ TEST_F(ExampleCustomCELVocabularyTests, AddCustomMappingsToActivationTwiceTest) 
       std::make_unique<ExtendedRequestWrapper>(arena, nullptr, mock_stream_info, false));
 
   status = activation.InsertFunction(std::make_unique<GetDouble>(LazyFuncNameGetDouble));
-  status =
-      activation.InsertFunction(std::make_unique<GetProduct>(LazyFuncNameGetProduct));
+  status = activation.InsertFunction(std::make_unique<GetProduct>(LazyFuncNameGetProduct));
 
-  auto result_or = FunctionAdapter<CelValue, int64_t>::Create(LazyFuncNameGetNextInt, false,
-                                                                     getNextInt);
+  auto result_or =
+      FunctionAdapter<CelValue, int64_t>::Create(LazyFuncNameGetNextInt, false, getNextInt);
   if (result_or.ok()) {
     auto cel_function = std::move(result_or.value());
     status = activation.InsertFunction(std::move(cel_function));
@@ -271,7 +270,8 @@ TEST_F(ExampleCustomCELVocabularyTests, AddRegistrationsToRegistryTwiceTest) {
 
   status = registry.RegisterLazyFunction(GetDouble::createDescriptor(LazyFuncNameGetDouble));
   status = registry.RegisterLazyFunction(GetProduct::createDescriptor(LazyFuncNameGetProduct));
-  auto result_or = FunctionAdapter<CelValue, int64_t>::Create(LazyFuncNameGetNextInt, false, getNextInt);
+  auto result_or =
+      FunctionAdapter<CelValue, int64_t>::Create(LazyFuncNameGetNextInt, false, getNextInt);
   if (result_or.ok()) {
     auto cel_function = std::move(result_or.value());
     status = registry.RegisterLazyFunction(cel_function->descriptor());

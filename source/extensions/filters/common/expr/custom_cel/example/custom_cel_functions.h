@@ -10,8 +10,8 @@
 // Either standard functions or CelFunctions can be used.
 // The standard functions will be converted to CelFunctions when added to the
 // registry and activation.
-// All functions will need a Protobuf arena because CelFunction::Evaluate takes
-// arena as a parameter.
+// All functions will need a Protobuf Arena because CelFunction::Evaluate takes
+// Arena as a parameter.
 //
 // Receiver style: If set to true, function calls have the form arg.function instead of
 // function(arg)
