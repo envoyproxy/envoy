@@ -97,8 +97,8 @@ void FilesystemSubscriptionImpl::refresh() {
     } else {
       ENVOY_LOG(warn, "Filesystem config update failure: {}", e.what());
       stats_.update_failure_.inc();
-      // This could happen due to filesystem issues or a bad configuration (e.g. proto
-      // validation). Since the latter is more likely, for now we will treat it as rejection.
+      // This could happen due to filesystem issues or a bad configuration (e.g. proto validation).
+      // Since the latter is more likely, for now we will treat it as rejection.
       callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     }
   }

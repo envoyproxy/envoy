@@ -144,6 +144,10 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, RtdsIntegrationTest,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
+#ifndef WIN32
+// TODO): The directory rotation via TestEnvironment::renameFile() fails on Windows. The
+// renameFile() implementation does not correctly handle symlinks.
+
 // This test mimics what K8s does when it swaps a ConfigMap.
 TEST_P(RtdsIntegrationTest, FileRtdsReload) {
   // Create an initial setup that looks similar to a K8s ConfigMap deployment. This is a file
@@ -170,7 +174,9 @@ resources:
     layer->set_name("file_rtds");
     auto* rtds_layer = layer->mutable_rtds_layer();
     rtds_layer->set_name("file_rtds");
-    auto* path_config_source = rtds_layer->mutable_rtds_config()->mutable_path_config_source();
+    auto* rtds_config = rtds_layer->mutable_rtds_config();
+    rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* path_config_source = rtds_config->mutable_path_config_source();
     path_config_source->set_path(temp_path + "/rtds.yaml");
     path_config_source->mutable_watched_directory()->set_path(temp_path);
   });
@@ -200,6 +206,7 @@ resources:
 
   TestEnvironment::removePath(temp_path);
 }
+#endif
 
 TEST_P(RtdsIntegrationTest, RtdsReload) {
   initialize();

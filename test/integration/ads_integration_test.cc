@@ -1292,7 +1292,7 @@ public:
       // Path to EDS for ads_cluster
       const std::string eds_path = TestEnvironment::temporaryFileSubstitute(
           "test/config/integration/server_xds.eds.ads_cluster.yaml", port_map_, version_);
-      ads_cluster_eds_config->set_path(eds_path);
+      ads_cluster_eds_config->mutable_path_config_source()->set_path(eds_path);
       ads_cluster_eds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
 
       // Add EDS static Cluster that uses ADS as config Source.
