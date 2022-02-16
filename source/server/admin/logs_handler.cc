@@ -33,7 +33,7 @@ Http::Code LogsHandler::handlerLogging(absl::string_view url, Http::ResponseHead
 
   Http::Code rc = Http::Code::OK;
   if (!query_params.empty()) {
-    const status = changeLogLevel(query_params);
+    auto status = changeLogLevel(query_params);
     if (!status.ok()) {
       rc = Http::Code::BadRequest;
       response.add(fmt::format("error: {}\n\n", status.message()));

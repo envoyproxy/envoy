@@ -53,7 +53,7 @@ private:
   }
 
   // Maps level string to level enum.
-  absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> log_levels_;
+  const absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> log_levels_;
 };
 
 } // namespace Server
