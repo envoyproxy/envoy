@@ -35,7 +35,7 @@ public:
   virtual Envoy::Http::HeaderEvaluator& headerEvaluator() const PURE;
 };
 
-using TunnelingConfigHelperOptConstRef = OptRef<TunnelingConfigHelper>;
+using TunnelingConfigHelperOptConstRef = OptRef<const TunnelingConfigHelper>;
 
 // An API for wrapping either a TCP or an HTTP connection pool.
 class GenericConnPool : public Logger::Loggable<Logger::Id::router> {
