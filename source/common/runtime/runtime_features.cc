@@ -68,8 +68,8 @@ ABSL_FLAG(uint64_t, envoy_buffer_overflow_multiplier, 0, "");                   
 ABSL_FLAG(uint64_t, envoy_do_not_use_going_away_max_http2_outbound_response, 2, ""); // NOLINT
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");                       // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, "");                      // NOLINT
-ABSL_FLAG(uint64_t, re2_max_program_size_warn_level, std::numeric_limits<uint32_t>::max(),
-          ""); // NOLINT
+ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,                                 // NOLINT
+          std::numeric_limits<uint32_t>::max(), "");                                 // NOLINT
 
 namespace Envoy {
 namespace Runtime {
