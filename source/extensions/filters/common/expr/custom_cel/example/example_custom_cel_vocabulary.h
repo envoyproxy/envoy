@@ -52,7 +52,7 @@ public:
   void registerFunctions(CelFunctionRegistry* registry) override;
 
   // return_url_query_string_as_map: url query string be returned as string or map.
-  // This is user provided and comes from the configuration.
+  // This is user provided and comes from the ExampleCustomCELVocabularyConfig proto.
   bool returnUrlQueryStringAsMap() { return return_url_query_string_as_map_; }
 
   ~ExampleCustomCELVocabulary() override = default;

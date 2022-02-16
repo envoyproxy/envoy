@@ -10,8 +10,18 @@
 
 #include "eval/public/activation.h"
 #include "eval/public/cel_function.h"
-#include "eval/public/cel_function_adapter.h"
 #include "eval/public/cel_value.h"
+
+// #pragma GCC diagnostic ignored "-Wunused-parameter"
+// This pragma directive is a temporary solution for the following problem:
+// The GitHub pipeline uses a gcc compiler which generates an error about unused parameters
+// for FunctionAdapter in cel_function_adapter.h
+// The problem of the unused parameters has been fixed in more recent version of the cel-cpp
+// library. However, it is not possible to upgrade the cel-cpp in envoy currently
+// as it is waiting on the release of the one of its dependencies.
+
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#include "eval/public/cel_function_adapter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,16 +30,6 @@ namespace Common {
 namespace Expr {
 namespace Custom_CEL {
 namespace Example {
-
-// #pragma GCC diagnostic ignored "-Wunused-parameter"
-// This pragma directive is a temporary solution for the following problem:
-// The GitHub pipeline uses a gcc compiler which generates an error about unused parameters
-// for FunctionAdapter in cel_function_adapter.h
-// The problem of the unused parameters has been fixed in more recent version of the cel-cpp
-// library. However, it is not possible to upgrade the cel-cpp in envoy currently
-// as it is waiting on the release of the one of its dependencies A N T L R (spaced out to evade
-// spell checker).
-#pragma GCC diagnostic ignored "-Wunused-parameter"
 
 using google::api::expr::runtime::FunctionAdapter;
 
@@ -104,6 +104,11 @@ void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view 
   }
 }
 
+// addStaticFunctionToRegistry:
+// There is no way to remove previous function registrations with the same
+// function descriptor from the registry.
+// If there is an existing registration with the same name, the registration will not be
+// overwritten. A message will be printed to the log.
 template <typename ReturnType, typename... Arguments>
 void addStaticFunctionToRegistry(absl::string_view function_name, bool receiver_type,
                                  std::function<ReturnType(Protobuf::Arena*, Arguments...)> function,

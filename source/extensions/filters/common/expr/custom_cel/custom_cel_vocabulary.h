@@ -25,7 +25,8 @@ class CustomCELVocabulary {
 public:
   CustomCELVocabulary() = default;
 
-  // fillActivation - Adds variables/value producers and lazy functions to the current request's
+  // fillActivation:
+  // Adds variables/value producers and lazy functions to the current request's
   // activation, an activation being a mapping of names to their reference implementations.
   // Lazily evaluated functions require a two part registration:
   // (1) fillActivation will add the name of the function to the activation, and
@@ -44,8 +45,8 @@ public:
   // register a custom version in its place or to leave the envoy native mapping as is.
   // It is possible to remove lazy function entries from an activation,
   // which exists for the life of a request.
-  // It is not possible to remove static function entries from the CEL function registry,
-  // which exists for the life of the application.
+  // It is not possible to remove either lazy or static function entries from the
+  // CEL function registry, which exists for the life of the application.
   virtual void fillActivation(Activation* activation, Protobuf::Arena& arena,
                               const StreamInfo::StreamInfo& info,
                               const Http::RequestHeaderMap* request_headers,
@@ -69,7 +70,7 @@ public:
   // The lazy function activation mapping must match its counterpart lazy function
   // descriptor in the registry.
   // Once registered, the function registration cannot be removed from the registry
-  // or overridden, as it can for an activation mappings.
+  // or overridden, as it can for an activation mapping.
   virtual void registerFunctions(CelFunctionRegistry* registry) PURE;
 
   virtual ~CustomCELVocabulary() = default;
