@@ -33,8 +33,8 @@ using ScopeSharedPtr = std::shared_ptr<Scope>;
 // files with trivial changes. Furthermore, code that depends on the Envoy stats
 // infrastructure that's not in this repo will stop compiling when we remove
 // ScopePtr. We should fully remove this alias in a future PR and change all the
-// references, once known parthers that might break from this change of a chance
-// to do the global replace in their own repos.
+// references, once known consumers that might break from this change have a
+// chance to do the global replace in their own repos.
 using ScopePtr = ScopeSharedPtr;
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
