@@ -21,7 +21,6 @@
 #define RUNTIME_GUARD(name) ABSL_FLAG(bool, name, true, "");        // NOLINT
 #define FALSE_RUNTIME_GUARD(name) ABSL_FLAG(bool, name, false, ""); // NOLINT
 
-RUNTIME_GUARD(envoy_reloadable_features_allow_response_for_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
 RUNTIME_GUARD(envoy_reloadable_features_append_or_truncate);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
@@ -136,7 +135,6 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_test_feature_true,
   // Begin alphabetically sorted section_
   &FLAGS_envoy_reloadable_features_allow_multiple_dns_addresses,
-  &FLAGS_envoy_reloadable_features_allow_response_for_timeout,
   &FLAGS_envoy_reloadable_features_allow_upstream_inline_write,
   &FLAGS_envoy_reloadable_features_append_or_truncate,
   &FLAGS_envoy_reloadable_features_conn_pool_delete_when_idle,
