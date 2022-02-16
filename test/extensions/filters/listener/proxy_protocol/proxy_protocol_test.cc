@@ -918,10 +918,8 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) {
         if (partial_write) {
-          ENVOY_LOG_MISC(debug, "inject failure");
           return Api::SysCallSizeResult{-1, 0};
         }
-        ENVOY_LOG_MISC(debug, "wire");
         const Api::SysCallSizeResult x = os_sys_calls_actual_.readv(fd, iov, num_iov);
         return x;
       }));
