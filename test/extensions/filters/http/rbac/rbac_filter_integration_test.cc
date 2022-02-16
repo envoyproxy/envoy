@@ -763,7 +763,7 @@ const std::string CUSTOM_CEL_FUNCTION_EXPR = R"EOF(
                 target:
                   const_expr:
                     int64_value: 4
-                function: getSquareOf
+                function: GetSquareOf
             - const_expr:
                 int64_value: {}
 )EOF";

@@ -3,7 +3,7 @@ expression {
     function: "_==_"
     args {
       call_expr {
-        function: "getSquareOf"
+        function: "GetSquareOf"
         args {
           const_expr {
             int64_value: 4

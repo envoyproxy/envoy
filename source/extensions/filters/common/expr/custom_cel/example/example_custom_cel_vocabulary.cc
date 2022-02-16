@@ -33,12 +33,21 @@ namespace Example {
 
 using google::api::expr::runtime::FunctionAdapter;
 
-// Below are helper functions for adding mappings for a function to an activation
+// Below are helper functions for adding a function mapping to an activation
 // or registering a function in the CEL function registry.
-// The standard functions will be converted to CelFunctions when added to the registry
-// or before being added to the activation.
-// All functions will need access to a Protobuf Arena because CelFunction::Evaluate takes
-// Arena as a parameter.
+//
+// Any standard functions have to be converted to CelFunctions which can be done
+// using the FunctionAdapter::Create or FunctionAdapter::CreateAndRegister methods.
+//
+// CelFunction::Evaluate takes Arena as a parameter.
+// All standard functions will need to take Arena as a parameter.
+//
+// Activation: When adding a mapping to an activation for a variable/value producer or function,
+// previously added mappings with the same name can be removed first.
+//
+// CEL Function Registry: When registering a function in the function registry,
+// previous registrations with the same function descriptor cannot be removed.
+// A message will be printed to the log.
 
 // addValueProducerToActivation:
 // Removes any envoy native value producer mapping of the same name from the activation.
@@ -60,7 +69,7 @@ void addLazyFunctionToActivation(Activation* activation, std::unique_ptr<CelFunc
 }
 
 // addLazyFunctionToActivation:
-// Converts standard function to CelFunction.
+// Converts standard function to CelFunction using FunctionAdapter::Create
 // Removes any envoy native version of a function with the same function descriptor from the
 // activation. Adds the custom version to the activation.
 template <typename ReturnType, typename... Arguments>
@@ -90,7 +99,7 @@ void addLazyFunctionToRegistry(CelFunctionRegistry* registry, CelFunctionDescrip
 }
 
 // addLazyFunctionToRegistry:
-// Converts standard function to CelFunction.
+// Converts a standard function to a CelFunction using FunctionAdapter::Create.
 // Previous function registrations with the same function descriptor cannot be removed
 // from the registry.
 // If there is an existing registration with the same name, the registration will not be
@@ -112,6 +121,7 @@ void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view 
 }
 
 // addStaticFunctionToRegistry:
+// Converts a standard function to a CelFunction using FunctionAdapter::CreateAndRegister.
 // Previous function registrations with the same function descriptor cannot be removed
 // from the registry.
 // If there is an existing registration with the same name, the registration will not be
