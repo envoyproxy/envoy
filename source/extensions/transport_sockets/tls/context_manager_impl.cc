@@ -29,7 +29,7 @@ ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
 
   Envoy::Ssl::ClientContextSharedPtr context =
       std::make_shared<ClientContextImpl>(scope, config, time_source_);
-  ASSERT(contexts_.insert(context).second);
+  contexts_.insert(context);
   return context;
 }
 
@@ -43,8 +43,7 @@ ContextManagerImpl::createSslServerContext(Stats::Scope& scope,
 
   Envoy::Ssl::ServerContextSharedPtr context =
       std::make_shared<ServerContextImpl>(scope, config, server_names, time_source_);
-  // Insert new context should never fail.
-  ASSERT(contexts_.insert(context).second);
+  contexts_.insert(context);
   return context;
 }
 
@@ -82,7 +81,10 @@ void ContextManagerImpl::iterateContexts(std::function<void(const Envoy::Ssl::Co
 
 void ContextManagerImpl::removeContext(const std::shared_ptr<Envoy::Ssl::Context>& old_context) {
   if (old_context != nullptr) {
-    ASSERT(contexts_.erase(old_context) == 1);
+    auto erased = contexts_.erase(old_context);
+    // The contexts is expected to be added before is removed.
+    // And the prod ssl factory implementation guarantees any context is removed exactly once.
+    ASSERT(erased == 1);
   }
 }
 
