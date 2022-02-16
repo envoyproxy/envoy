@@ -686,14 +686,6 @@ TEST_F(OldVhdsDeltaSubscriptionStateTest, ResourceTTL) {
 
   // Heartbeat update should not be propagated to the subscription callback.
   EXPECT_CALL(*ttl_timer_, enabled());
-  deliverDiscoveryResponse(create_resource_with_ttl(false), {}, "debug1", "nonce1", true, 0);
-
-  // When runtime flag is disabled, maintain old behavior where we do propagate
-  // the update to the subscription callback.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.vhds_heartbeats", "false"}});
-
-  EXPECT_CALL(*ttl_timer_, enabled());
   deliverDiscoveryResponse(create_resource_with_ttl(false), {}, "debug1", "nonce1", true, 1);
 }
 

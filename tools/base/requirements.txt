@@ -277,7 +277,7 @@ docutils==0.16 \
     --hash=sha256:0c5b78adfbf7762415433f5515cd5c9e762339e23369dbe8000d84a4bf4ab3af \
     --hash=sha256:c2de3a60e9e7d07be26b7f2b00ca0309c207e06c100f9cc2a94931fc75a478fc
     # via
-    #   envoy.docs.sphinx-runner
+    #   envoy.docs.sphinx.runner
     #   sphinx
     #   sphinx-rtd-theme
     #   sphinx-tabs
@@ -362,24 +362,24 @@ flake8-polyfill==1.0.2 \
     --hash=sha256:12be6a34ee3ab795b19ca73505e7b55826d5f6ad7230d31b18e106400169b9e9 \
     --hash=sha256:e44b087597f6da52ec6393a709e7108b2905317d0c0b744cdca6208e670d8eda
     # via pep8-naming
-frozendict==2.2.0 \
-    --hash=sha256:14ab850309632198b28e74948b800ac75609380a6f779a5779482a3189af7299 \
-    --hash=sha256:1708828a3fed512ea8fa18e75622b29e551a5524c14aea0b0364f4472ca15f7d \
-    --hash=sha256:2a47f3f7fe52094904777d29f300ad6c11213dd81a8fbdec96aa2d4763104319 \
-    --hash=sha256:2bfacb9f75768903495747ddaacb1bf98738fb3e966a27f0627f7f163fd676eb \
-    --hash=sha256:3a564bd93767044e740e0f6c59606cf612a143160ace9d2c047c4a297a74329a \
-    --hash=sha256:4519f6eb661f268c60a3ea14f000d321159cf5e6db397129ea4921aef3bf2173 \
-    --hash=sha256:722e915421b2d869b236d8de8e0ab42f1e2f7e12d670f9bc3dedfc055550bcb9 \
-    --hash=sha256:8e3d4735f9a13d1077567e568471663f3244f85ac89b23f8cb31cf231dbe45b9 \
-    --hash=sha256:9c720e4a19e9b5f48d1b12e193d39765898dff4952320251c0ccd9960631cae9 \
-    --hash=sha256:a6d56ec83e5120f273adbf7f3798f78e8775158eee95469cd66e2e28be153ee3 \
-    --hash=sha256:b39cfcf563b3432d4780bf15769e2de2a2906c46c26fb73a9582b69142621814 \
-    --hash=sha256:e237adae46cc28eb0355f6d65900e946c0a7bc4536145c6d8e6bbb2b6c28ac2a \
-    --hash=sha256:e7198dda9741f3da79db952ecd27607d836727ed320f29438eac565133008c8c \
-    --hash=sha256:ebf36b78ce0a43f7372e94eee8b0327a12c15914e1a29c088f9bcfba20971929 \
-    --hash=sha256:ede1bc6b6d734ba36bdcd99659463d96620069281e6bb6f72cbed719d679c1bb \
-    --hash=sha256:efc138fb1e2c115c39240f60b4b0daf752f1cca591d5f93ac4e788af0665d737 \
-    --hash=sha256:f6293ec3181ff98e5ae98f748e8ffe6c937caf14ca9561d3a6d6d02a82c7fbff
+frozendict==2.3.0 \
+    --hash=sha256:00ea9166aa68cc5feed05986206fdbf35e838a09cb3feef998cf35978ff8a803 \
+    --hash=sha256:1f34793fb409c4fa70ffd25bea87b01f3bd305fb1c6b09e7dff085b126302206 \
+    --hash=sha256:2d3f5016650c0e9a192f5024e68fb4d63f670d0ee58b099ed3f5b4c62ea30ecb \
+    --hash=sha256:4f45ef5f6b184d84744fff97b61f6b9a855e24d36b713ea2352fc723a047afa5 \
+    --hash=sha256:5346d9fc1c936c76d33975a9a9f1a067342963105d9a403a99e787c939cc2bb2 \
+    --hash=sha256:60dd2253f1bacb63a7c486ec541a968af4f985ffb06602ee8954a3d39ec6bd2e \
+    --hash=sha256:6cf605916f50aabaaba5624c81eb270200f6c2c466c46960237a125ec8fe3ae0 \
+    --hash=sha256:752a6dcfaf9bb20a7ecab24980e4dbe041f154509c989207caf185522ef85461 \
+    --hash=sha256:8578fe06815fcdcc672bd5603eebc98361a5317c1c3a13b28c6c810f6ea3b323 \
+    --hash=sha256:96dc7a02e78da5725e5e642269bb7ae792e0c9f13f10f2e02689175ebbfedb35 \
+    --hash=sha256:9ffaf440648b44e0bc694c1a4701801941378ba3ba6541e17750ae4b4aeeb116 \
+    --hash=sha256:a27a69b1ac3591e4258325108aee62b53c0eeb6ad0a993ae68d3c7eaea980420 \
+    --hash=sha256:b2e044602ce17e5cd86724add46660fb9d80169545164e763300a3b839cb1b79 \
+    --hash=sha256:da4231adefc5928e7810da2732269d3ad7b5616295b3e693746392a8205ea0b5 \
+    --hash=sha256:e18e2abd144a9433b0a8334582843b2aa0d3b9ac8b209aaa912ad365115fe2e1 \
+    --hash=sha256:f6da06e44904beae4412199d7e49be4f85c6cc168ab06b77c735ea7da5ce3454 \
+    --hash=sha256:fd72494a559bdcd28aa71f4aa81860269cd0b7c45fff3e2614a0a053ecfd2a13
     # via
     #   -r requirements.in
     #   aio.run.runner
@@ -620,17 +620,17 @@ pyparsing==2.4.7 \
 pyreadline==2.1 \
     --hash=sha256:4530592fc2e85b25b1a9f79664433da09237c1a270e4d78ea5aa3a2c7229e2d1
     # via -r requirements.in
-pytest==6.2.5 \
-    --hash=sha256:131b36680866a76e6781d13f101efb86cf674ebb9762eb70d3082b6f29889e89 \
-    --hash=sha256:7310f8d27bc79ced999e760ca304d69f6ba6c6649c0b60fb0e04a4a77cacc134
+pytest==7.0.0 \
+    --hash=sha256:42901e6bd4bd4a0e533358a86e848427a49005a3256f657c5c8f8dd35ef137a9 \
+    --hash=sha256:dad48ffda394e5ad9aa3b7d7ddf339ed502e5e365b1350e0af65f4a602344b11
     # via
     #   -r requirements.in
     #   pytest-asyncio
     #   pytest-cov
     #   pytest-patches
-pytest-asyncio==0.17.2 \
-    --hash=sha256:6d895b02432c028e6957d25fc936494e78c6305736e785d9fee408b1efbc7ff4 \
-    --hash=sha256:e0fe5dbea40516b661ef1bcfe0bd9461c2847c4ef4bb40012324f2454fb7d56d
+pytest-asyncio==0.18.1 \
+    --hash=sha256:c43fcdfea2335dd82ffe0f2774e40285ddfea78a8e81e56118d47b6a90fbb09e \
+    --hash=sha256:c9ec48e8bbf5cc62755e18c4d8bc6907843ec9c5f4ac8f61464093baeba24a7e
     # via -r requirements.in
 pytest-cov==3.0.0 \
     --hash=sha256:578d5d15ac4a25e5f961c938b85a05b09fdaae9deef3bb6de9a6e766622ca7a6 \
@@ -722,9 +722,9 @@ sphinx==4.4.0 \
     #   sphinx-tabs
     #   sphinxcontrib-httpdomain
     #   sphinxext-rediraffe
-sphinx-copybutton==0.4.0 \
-    --hash=sha256:4340d33c169dac6dd82dce2c83333412aa786a42dd01a81a8decac3b130dc8b0 \
-    --hash=sha256:8daed13a87afd5013c3a9af3575cc4d5bec052075ccd3db243f895c07a689386
+sphinx-copybutton==0.5.0 \
+    --hash=sha256:9684dec7434bd73f0eea58dda93f9bb879d24bff2d8b187b1f2ec08dfe7b5f48 \
+    --hash=sha256:a0c059daadd03c27ba750da534a92a63e7a36a7736dcf684f26ee346199787f6
     # via
     #   -r requirements.in
     #   envoy.docs.sphinx-runner
@@ -791,7 +791,9 @@ toml==0.10.2 \
 tomli==1.2.1 \
     --hash=sha256:8dd0e9524d6f386271a36b41dbf6c57d8e32fd96fd22b6584679dc569d20899f \
     --hash=sha256:a5b75cb6f3968abb47af1b40c1819dc519ea82bcc065776a866e8d74c5ca9442
-    # via coverage
+    # via
+    #   coverage
+    #   pytest
 trycast==0.3.0 \
     --hash=sha256:1b7b4c0d4b0d674770a53f34a762e52a6cd6879eb251ab21625602699920080d \
     --hash=sha256:687185b812e8d1c45f2ba841e8de7bdcdee0695dcf3464f206800505d4c65f26
@@ -888,7 +890,7 @@ zipp==3.7.0 \
     # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==60.5.0 \
-    --hash=sha256:2404879cda71495fc4d5cbc445ed52fdaddf352b36e40be8dcc63147cb4edabe \
-    --hash=sha256:68eb94073fc486091447fcb0501efd6560a0e5a1839ba249e5ff3c4c93f05f90
+setuptools==60.8.2 \
+    --hash=sha256:43a5575eea6d3459789316e1596a3d2a0d215260cacf4189508112f35c9a145b \
+    --hash=sha256:66b8598da112b8dc8cd941d54cf63ef91d3b50657b374457eda5851f3ff6a899
     # via -r requirements.in

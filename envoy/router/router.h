@@ -18,6 +18,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/hash_policy.h"
+#include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/http_tracer.h"
@@ -1149,10 +1150,8 @@ using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteE
 /**
  * The router configuration.
  */
-class Config {
+class Config : public Rds::Config {
 public:
-  virtual ~Config() = default;
-
   /**
    * Based on the incoming HTTP request headers, determine the target route (containing either a
    * route entry or a direct response entry) for the request.
