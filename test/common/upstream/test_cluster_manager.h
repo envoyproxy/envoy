@@ -188,6 +188,18 @@ public:
     }
     return clusters;
   }
+
+  OdCdsApiHandlePtr createOdCdsApiHandle(OdCdsApiSharedPtr odcds) {
+    return ClusterManagerImpl::OdCdsApiHandleImpl::create(*this, std::move(odcds));
+  }
+
+  void notifyExpiredDiscovery(absl::string_view name) {
+    ClusterManagerImpl::notifyExpiredDiscovery(name);
+  }
+
+  ClusterDiscoveryManager createAndSwapClusterDiscoveryManager(std::string thread_name) {
+    return ClusterManagerImpl::createAndSwapClusterDiscoveryManager(std::move(thread_name));
+  }
 };
 
 // Override postThreadLocalClusterUpdate so we can test that merged updates calls

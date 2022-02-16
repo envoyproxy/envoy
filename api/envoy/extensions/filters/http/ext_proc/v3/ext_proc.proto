@@ -31,7 +31,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // * Request and response attributes are not sent and not processed.
 // * Dynamic metadata in responses from the external processor is ignored.
-// * "async mode" is not implemented
+// * "async mode" is not implemented.
 
 // The filter communicates with an external gRPC service called an "external processor"
 // that can do a variety of things with the request and response:
@@ -147,7 +147,6 @@ message ExternalProcessor {
   // mode. Default is 200 milliseconds.
   google.protobuf.Duration message_timeout = 7;
 
-  // [#not-implemented-hide:]
   // Optional additional prefix to use when emitting statistics. This allows to distinguish
   // emitted statistics between configured *ext_proc* filters in an HTTP filter chain.
   string stat_prefix = 8;
@@ -188,10 +187,12 @@ message ExtProcOverrides {
   bool async_mode = 2;
 
   // [#not-implemented-hide:]
-  // Set different optional properties than the default.
-  repeated string request_properties = 3;
+  // Set different optional attributes than the default setting of the
+  // ``request_attributes`` field.
+  repeated string request_attributes = 3;
 
   // [#not-implemented-hide:]
-  // Set different optional properties than the default.
-  repeated string response_properties = 4;
+  // Set different optional properties than the default setting of the
+  // ``response_attributes`` field.
+  repeated string response_attributes = 4;
 }

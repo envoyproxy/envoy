@@ -195,6 +195,10 @@ struct ResponseCodeDetailValues {
       "filter_removed_required_response_headers";
   // The request was rejected because the original IP couldn't be detected.
   const std::string OriginalIPDetectionFailed = "rejecting_because_detection_failed";
+  // A filter called addDecodedData at the wrong point in the filter chain.
+  const std::string FilterAddedInvalidRequestData = "filter_added_invalid_request_data";
+  // A filter called addDecodedData at the wrong point in the filter chain.
+  const std::string FilterAddedInvalidResponseData = "filter_added_invalid_response_data";
   // Changes or additions to details should be reflected in
   // docs/root/configuration/http/http_conn_man/response_code_details.rst
 };
