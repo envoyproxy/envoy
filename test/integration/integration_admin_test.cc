@@ -107,7 +107,7 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
                              fmt::format("/logging?paths=assert:debug,admin:debug,config:debug,{}",
                                          bad_logger),
                              response));
-    EXPECT_THAT(response->body(), "error: empty logger name or empty logger level\n"));
+    EXPECT_THAT(response->body(), HasSubstr("error: empty logger name or empty logger level\n"));
     EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
   }
 

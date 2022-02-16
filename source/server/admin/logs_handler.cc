@@ -170,7 +170,7 @@ absl::Status LogsHandler::changeLogLevels(
     std::vector<std::pair<SpdLoggerSharedPtr, spdlog::level::level_enum>> loggers_to_change;
     for (auto& it : changes) {
       // TODO(timonwong) FancyContext::getFancyLogEntry should accept absl::string_view as key.
-      SpdLogSharedPtr logger = getFancyContext().getFancyLogEntry(std::string(it.first));
+      SpdLoggerSharedPtr logger = getFancyContext().getFancyLogEntry(std::string(it.first));
       if (!logger) {
         return absl::InvalidArgumentError("unknown logger name");
       }
