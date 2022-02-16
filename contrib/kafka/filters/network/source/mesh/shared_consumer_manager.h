@@ -19,6 +19,13 @@ class SharedConsumerManager {
 public:
   virtual ~SharedConsumerManager() = default;
 
+  // Process an inbound record callback by passing cached records to it
+  // and (if needed) registering the callback.
+  virtual void processCallback(const RecordCbSharedPtr& callback) PURE;
+
+  // Remove the callback (usually invoked by the callback timing out downstream).
+  virtual void removeCallback(const RecordCbSharedPtr& callback) PURE;
+
   // Start the consumer (if there is none) to make sure that records can be received from the topic.
   virtual void registerConsumerIfAbsent(const std::string& topic) PURE;
 };

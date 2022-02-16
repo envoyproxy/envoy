@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <vector>
 
 #include "envoy/thread/thread.h"
 
@@ -19,19 +20,47 @@ namespace Kafka {
 namespace Mesh {
 
 /**
- * Placeholder interface for now.
- * In future:
  * Processor implementation that stores received records (that had no interest), and callbacks
  * waiting for records (that had no matching records delivered yet).
  * Basically core of Fetch-handling business logic.
  */
-class RecordDistributor : public InboundRecordProcessor {
+class RecordDistributor : public InboundRecordProcessor,
+                          private Logger::Loggable<Logger::Id::kafka> {
 public:
   // InboundRecordProcessor
   bool waitUntilInterest(const std::string& topic, const int32_t timeout_ms) const override;
 
   // InboundRecordProcessor
   void receive(InboundRecordSharedPtr message) override;
+
+  // Process an inbound record callback by passing cached records to it
+  // and (if needed) registering the callback.
+  void processCallback(const RecordCbSharedPtr& callback);
+
+  // Remove the callback (usually invoked by the callback timing out downstream).
+  void removeCallback(const RecordCbSharedPtr& callback);
+
+private:
+  // Checks whether any of the callbacks stored right now are interested in the topic.
+  bool hasInterest(const std::string& topic) const ABSL_EXCLUSIVE_LOCKS_REQUIRED(callbacks_mutex_);
+
+  // HAX!
+  void removeCallbackWithoutLocking(
+      const RecordCbSharedPtr& callback,
+      std::map<KafkaPartition, std::vector<RecordCbSharedPtr>>& partition_to_callbacks);
+
+  /**
+   * Invariant: for every i: KafkaPartition, the following holds:
+   * !(partition_to_callbacks_[i].size() >= 0 && messages_waiting_for_interest_[i].size() >= 0)
+   */
+
+  mutable absl::Mutex callbacks_mutex_;
+  std::map<KafkaPartition, std::vector<RecordCbSharedPtr>>
+      partition_to_callbacks_ ABSL_GUARDED_BY(callbacks_mutex_);
+
+  mutable absl::Mutex messages_mutex_;
+  std::map<KafkaPartition, std::vector<InboundRecordSharedPtr>>
+      messages_waiting_for_interest_ ABSL_GUARDED_BY(messages_mutex_);
 };
 
 using RecordDistributorPtr = std::unique_ptr<RecordDistributor>;
@@ -52,6 +81,7 @@ public:
 
 /**
  * Maintains a collection of Kafka consumers (one per topic).
+ * Maintains a message cache for messages that had no interest but might be requested later.
  */
 class SharedConsumerManagerImpl : public SharedConsumerManager,
                                   private Logger::Loggable<Logger::Id::kafka> {
@@ -64,6 +94,12 @@ public:
   SharedConsumerManagerImpl(const UpstreamKafkaConfiguration& configuration,
                             Thread::ThreadFactory& thread_factory,
                             const KafkaConsumerFactory& consumer_factory);
+
+  // SharedConsumerManager
+  void processCallback(const RecordCbSharedPtr& callback) override;
+
+  // SharedConsumerManager
+  void removeCallback(const RecordCbSharedPtr& callback) override;
 
   // SharedConsumerManager
   void registerConsumerIfAbsent(const std::string& topic) override;
