@@ -44,7 +44,7 @@ public class QuicTestServerTest {
   private static final String QUIC_UPSTREAM_TYPE =
       "type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport";
 
-  private static final String config =
+  private static final String CONFIG =
       "static_resources:\n"
       + " listeners:\n"
       + " - name: base_api_listener\n"
@@ -108,8 +108,8 @@ public class QuicTestServerTest {
     QuicTestServer.startQuicTestServer();
     CountDownLatch latch = new CountDownLatch(1);
     engine = new AndroidEngineBuilder(
-                 appContext, new Custom(String.format(config, QuicTestServer.getServerPort())))
-                 .addLogLevel(LogLevel.OFF)
+                 appContext, new Custom(String.format(CONFIG, QuicTestServer.getServerPort())))
+                 .addLogLevel(LogLevel.WARN)
                  .setOnEngineRunning(() -> {
                    latch.countDown();
                    return null;
@@ -125,15 +125,17 @@ public class QuicTestServerTest {
   }
 
   @Test
-  public void get_simple() throws Exception {
-    QuicTestServerTest.RequestScenario requestScenario = new QuicTestServerTest.RequestScenario()
-                                                             .setHttpMethod(RequestMethod.GET)
-                                                             .setUrl(QuicTestServer.getServerURL());
+  public void get_simpleTxt() throws Exception {
+    QuicTestServerTest.RequestScenario requestScenario =
+        new QuicTestServerTest.RequestScenario()
+            .setHttpMethod(RequestMethod.GET)
+            .setUrl(QuicTestServer.getServerURL() + "/simple.txt");
 
     QuicTestServerTest.Response response = sendRequest(requestScenario);
 
     assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
-    assertThat(response.getBodyAsString()).isEqualTo("aaaaaaaaaa");
+    assertThat(response.getBodyAsString())
+        .isEqualTo("This is a simple text file served by QUIC.\n");
     assertThat(response.getEnvoyError()).isNull();
   }
 

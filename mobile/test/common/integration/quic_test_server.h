@@ -6,8 +6,8 @@
 #include "source/exe/process_wide.h"
 
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
+#include "test/common/integration/autonomous_upstream.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
-#include "test/integration/autonomous_upstream.h"
 #include "test/config/utility.h"
 
 namespace Envoy {

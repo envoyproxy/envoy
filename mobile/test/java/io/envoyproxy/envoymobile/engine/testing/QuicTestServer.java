@@ -30,7 +30,7 @@ public final class QuicTestServer {
   }
 
   public static String getServerURL() {
-    return "https://" + getServerHost() + ":" + getServerPort() + "/";
+    return "https://" + getServerHost() + ":" + getServerPort();
   }
 
   public static String getServerHost() { return "test.example.com"; }

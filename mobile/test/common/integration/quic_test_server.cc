@@ -49,8 +49,8 @@ void QuicTestServer::startQuicTestServer() {
 
   Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(factory_context_);
 
-  upstream_ = std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_,
-                                                   upstream_config_, false);
+  upstream_ =
+      std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_, upstream_config_);
 
   // see upstream address
   ENVOY_LOG_MISC(debug, "Upstream now listening on {}", upstream_->localAddress()->asString());
