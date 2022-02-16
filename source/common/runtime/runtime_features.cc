@@ -68,8 +68,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
 ABSL_FLAG(uint64_t, envoy_buffer_overflow_multiplier, 0, "");                        // NOLINT
 ABSL_FLAG(uint64_t, envoy_do_not_use_going_away_max_http2_outbound_response, 2, ""); // NOLINT
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");                       // NOLINT
-ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, "");                       // NOLINT
-ABSL_FLAG(uint64_t, re2_max_program_size_warn_level, std::numeric_limits<uint32_t>::max(), ""); // NOLINT
+ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, "");                      // NOLINT
+ABSL_FLAG(uint64_t, re2_max_program_size_warn_level, std::numeric_limits<uint32_t>::max(),
+          ""); // NOLINT
 
 namespace Envoy {
 namespace Runtime {
@@ -182,7 +183,7 @@ void maybeSetRuntimeGuard(absl::string_view name, bool value) {
 
 // TODO(alyssawilk) deprecate use of this
 void maybeSetDeprecatedInts(absl::string_view name, uint32_t value) {
-  if (!absl::StartsWith(name, "envoy.")) {
+  if (!absl::StartsWith(name, "envoy.") && !absl::StartsWith(name, "re2.")) {
     return;
   }
 
@@ -210,13 +211,27 @@ RuntimeFeatures::RuntimeFeatures() {
     std::string envoy_name = swapPrefix(std::string(reflection.Name()));
     all_features_.emplace(envoy_name, feature);
     absl::optional<bool> value = reflection.TryGet<bool>();
-    if (value.has_value() && value.value()) {
+    ASSERT(value.has_value());
+    if (value.value()) {
       enabled_features_.emplace(envoy_name, feature);
     } else {
-      ASSERT(value.has_value());
       disabled_features_.emplace(envoy_name, feature);
     }
   }
+}
+
+void RuntimeFeatures::restoreDefaults() const {
+  for (const auto& feature : enabled_features_) {
+    absl::SetFlag(feature.second, true);
+  }
+  for (const auto& feature : disabled_features_) {
+    absl::SetFlag(feature.second, false);
+  }
+  absl::SetFlag(&FLAGS_envoy_buffer_overflow_multiplier, 0);
+  absl::SetFlag(&FLAGS_envoy_do_not_use_going_away_max_http2_outbound_response, 2);
+  absl::SetFlag(&FLAGS_envoy_headermap_lazy_map_min_size, 3);
+  absl::SetFlag(&FLAGS_re2_max_program_size_error_level, 100);
+  absl::SetFlag(&FLAGS_re2_max_program_size_warn_level, std::numeric_limits<uint32_t>::max());
 }
 
 } // namespace Runtime

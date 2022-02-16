@@ -34,14 +34,7 @@ public:
     return it->second;
   }
 
-  void restoreDefaults() const {
-    for (const auto& feature : enabled_features_) {
-      absl::SetFlag(feature.second, true);
-    }
-    for (const auto& feature : disabled_features_) {
-      absl::SetFlag(feature.second, false);
-    }
-  }
+  void restoreDefaults() const;
 
 private:
   friend class RuntimeFeaturesPeer;
