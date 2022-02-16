@@ -59,9 +59,7 @@ ActiveQuicListener::ActiveQuicListener(
   ASSERT(GetQuicReloadableFlag(quic_single_ack_in_packet2));
   ASSERT(!GetQuicFlag(FLAGS_quic_header_size_limit_includes_overhead));
 
-  if (Runtime::LoaderSingleton::getExisting()) {
-    enabled_.emplace(Runtime::FeatureFlag(enabled, runtime));
-  }
+  enabled_.emplace(Runtime::FeatureFlag(enabled, runtime));
 
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
