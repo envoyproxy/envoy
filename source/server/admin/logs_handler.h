@@ -6,11 +6,10 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
-#include "source/common/common/statusor.h"
 #include "source/server/admin/handler_ctx.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
@@ -44,7 +43,7 @@ private:
   absl::Status
   changeLogLevels(const absl::flat_hash_map<absl::string_view, spdlog::level::level_enum>& changes);
 
-  inline StatusOr<spdlog::level::level_enum> parseLogLevel(absl::string_view level_string) {
+  inline absl::StatusOr<spdlog::level::level_enum> parseLogLevel(absl::string_view level_string) {
     auto level_it = log_levels_.find(level_string);
     if (level_it == log_levels_.end()) {
       return absl::InvalidArgumentError("unknown logger level");
