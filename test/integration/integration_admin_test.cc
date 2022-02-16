@@ -36,7 +36,8 @@ INSTANTIATE_TEST_SUITE_P(Protocols, IntegrationAdminTest,
 
 namespace {
 
-std::string contentType(const BufferingStreamDecoderPtr& response) {
+// NOLINTNEXTLINE(readability-identifier-naming)
+std::string ContentType(const BufferingStreamDecoderPtr& response) {
   const Http::HeaderEntry* entry = response->headers().ContentType();
   if (entry == nullptr) {
     return "(null)";
@@ -51,27 +52,24 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
 
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200", request("admin", "POST", "/logging", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_THAT(response->headers(),
               HeaderValueOf(Http::Headers::get().XContentTypeOptions, "nosniff"));
 
   // Bad level
   EXPECT_EQ("400", request("admin", "POST", "/logging?level=blah", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_THAT(response->headers(),
               HeaderValueOf(Http::Headers::get().XContentTypeOptions, "nosniff"));
-  EXPECT_NE(std::string::npos, response->body().find("error: unknown logger level\n"))
-      << response->body();
+  EXPECT_THAT(response->body(), HasSubstr("error: unknown logger level\n"));
 
   // Bad logger
   EXPECT_EQ("400", request("admin", "POST", "/logging?blah=info", response));
-  EXPECT_NE(std::string::npos, response->body().find("error: unknown logger name\n"))
-      << response->body();
+  EXPECT_THAT(response->body(), HasSubstr("error: unknown logger name\n"));
 
   // Invalid number of query parameters
   EXPECT_EQ("400", request("admin", "POST", "/logging?level=blah&assert=trace", response));
-  EXPECT_NE(std::string::npos, response->body().find("error: invalid number of parameters\n"))
-      << response->body();
+  EXPECT_THAT(response->body(), HasSubstr("error: invalid number of parameters\n"));
 
   // This is going to stomp over custom log levels that are set on the command line.
   EXPECT_EQ("200", request("admin", "POST", "/logging?level=warning", response));
@@ -90,15 +88,13 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   EXPECT_EQ("400",
             request("admin", "POST",
                     "/logging?paths=blah:debug,assert:debug,admin:debug,config:debug", response));
-  EXPECT_NE(std::string::npos, response->body().find("error: unknown logger name\n"))
-      << response->body();
+  EXPECT_THAT(response->body(), HasSubstr("error: unknown logger name\n"));
   EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
 
   // Multiple loggers at once with bad logger level.
   EXPECT_EQ("400", request("admin", "POST", "/logging?paths=assert:blah,admin:debug,config:debug",
                            response));
-  EXPECT_NE(std::string::npos, response->body().find("error: unknown logger level\n"))
-      << response->body();
+  EXPECT_THAT(response->body(), HasSubstr("error: unknown logger level\n"));
   EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
 
   // Multiple loggers at once with empty logger name or empty logger level.
@@ -111,9 +107,7 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
                              fmt::format("/logging?paths=assert:debug,admin:debug,config:debug,{}",
                                          bad_logger),
                              response));
-    EXPECT_NE(std::string::npos,
-              response->body().find("error: empty logger name or empty logger level\n"))
-        << response->body();
+    EXPECT_THAT(response->body(), "error: empty logger name or empty logger level\n"));
     EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
   }
 
@@ -137,83 +131,81 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("404", request("admin", "GET", "/notfound", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
-  EXPECT_NE(std::string::npos, response->body().find("invalid path. admin commands are:"))
-      << response->body();
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_THAT(response->body(), HasSubstr("invalid path. admin commands are:"));
 
   EXPECT_EQ("200", request("admin", "GET", "/help", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
-  EXPECT_NE(std::string::npos, response->body().find("admin commands are:")) << response->body();
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_THAT(response->body(), HasSubstr("admin commands are:"));
 
   EXPECT_EQ("200", request("admin", "GET", "/", response));
-  EXPECT_EQ("text/html; charset=UTF-8", contentType(response));
-  EXPECT_NE(std::string::npos, response->body().find("<title>Envoy Admin</title>"))
-      << response->body();
+  EXPECT_EQ("text/html; charset=UTF-8", ContentType(response));
+  EXPECT_THAT(response->body(), HasSubstr("<title>Envoy Admin</title>"));
 
   EXPECT_EQ("200", request("admin", "GET", "/server_info", response));
-  EXPECT_EQ("application/json", contentType(response));
+  EXPECT_EQ("application/json", ContentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/ready", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/stats", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   // Our first attempt to get recent lookups will get the error message as they
   // are off by default.
   EXPECT_EQ("200", request("admin", "GET", "/stats/recentlookups", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
-  EXPECT_THAT(response->body(), testing::HasSubstr("Lookup tracking is not enabled"));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_THAT(response->body(), HasSubstr("Lookup tracking is not enabled"));
 
   // Now enable recent-lookups tracking and check that we get a count.
   EXPECT_EQ("200", request("admin", "POST", "/stats/recentlookups/enable", response));
   EXPECT_EQ("200", request("admin", "GET", "/stats/recentlookups", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_TRUE(absl::StartsWith(response->body(), "   Count Lookup\n")) << response->body();
   EXPECT_LT(28, response->body().size());
 
   // Now disable recent-lookups tracking and check that we get the error again.
   EXPECT_EQ("200", request("admin", "POST", "/stats/recentlookups/disable", response));
   EXPECT_EQ("200", request("admin", "GET", "/stats/recentlookups", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
-  EXPECT_THAT(response->body(), testing::HasSubstr("Lookup tracking is not enabled"));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_THAT(response->body(), HasSubstr("Lookup tracking is not enabled"));
 
   EXPECT_EQ("200", request("admin", "GET", "/stats?usedonly", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   // Testing a filter with no matches
   EXPECT_EQ("200", request("admin", "GET", "/stats?filter=foo", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   // Testing a filter with matches
   EXPECT_EQ("200", request("admin", "GET", "/stats?filter=server", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/stats?filter=server&usedonly", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/stats?format=json&usedonly", response));
-  EXPECT_EQ("application/json", contentType(response));
+  EXPECT_EQ("application/json", ContentType(response));
   validateStatsJson(response->body(), 0);
 
   EXPECT_EQ("404", request("admin", "GET", "/stats?format=blah", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/stats?format=json", response));
-  EXPECT_EQ("application/json", contentType(response));
+  EXPECT_EQ("application/json", ContentType(response));
   validateStatsJson(response->body(), 1);
 
   // Filtering stats by a regex with one match should return just that match.
   EXPECT_EQ("200",
             request("admin", "GET", "/stats?format=json&filter=^server\\.version$", response));
-  EXPECT_EQ("application/json", contentType(response));
+  EXPECT_EQ("application/json", ContentType(response));
   validateStatsJson(response->body(), 0);
   EXPECT_THAT("{\"stats\":[{\"name\":\"server.version\",\"value\":0}]}",
               JsonStringEq(response->body()));
 
   // Filtering stats by a non-full-string regex should also return just that match.
   EXPECT_EQ("200", request("admin", "GET", "/stats?format=json&filter=server\\.version", response));
-  EXPECT_EQ("application/json", contentType(response));
+  EXPECT_EQ("application/json", ContentType(response));
   validateStatsJson(response->body(), 0);
   EXPECT_THAT("{\"stats\":[{\"name\":\"server.version\",\"value\":0}]}",
               JsonStringEq(response->body()));
@@ -222,7 +214,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   // valid, empty, stats array.
   EXPECT_EQ("200",
             request("admin", "GET", "/stats?format=json&filter=not_intended_to_appear", response));
-  EXPECT_EQ("application/json", contentType(response));
+  EXPECT_EQ("application/json", ContentType(response));
   validateStatsJson(response->body(), 0);
   EXPECT_THAT(response->body(), Eq("{\"stats\":[]}"));
 
@@ -274,25 +266,25 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   EXPECT_EQ("200", request("admin", "GET", "/clusters", response));
   EXPECT_THAT(response->body(), HasSubstr("added_via_api"));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/clusters?format=json", response));
-  EXPECT_EQ("application/json", contentType(response));
+  EXPECT_EQ("application/json", ContentType(response));
   EXPECT_NO_THROW(Json::Factory::loadFromString(response->body()));
 
   EXPECT_EQ("400", request("admin", "POST", "/cpuprofiler", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/hot_restart_version", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   EXPECT_EQ("200", request("admin", "POST", "/reset_counters", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   EXPECT_EQ("200", request("admin", "POST", "/stats/recentlookups/enable", response));
   EXPECT_EQ("200", request("admin", "POST", "/stats/recentlookups/clear", response));
   EXPECT_EQ("200", request("admin", "GET", "/stats/recentlookups", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   switch (GetParam().downstream_protocol) {
   case Http::CodecType::HTTP1:
@@ -312,15 +304,15 @@ TEST_P(IntegrationAdminTest, Admin) {
   }
 
   EXPECT_EQ("200", request("admin", "GET", "/certs", response));
-  EXPECT_EQ("application/json", contentType(response));
+  EXPECT_EQ("application/json", ContentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/runtime", response));
-  EXPECT_EQ("application/json", contentType(response));
+  EXPECT_EQ("application/json", ContentType(response));
 
   EXPECT_EQ("200", request("admin", "POST", "/runtime_modify?foo=bar&foo1=bar1", response));
 
   EXPECT_EQ("200", request("admin", "GET", "/runtime?format=json", response));
-  EXPECT_EQ("application/json", contentType(response));
+  EXPECT_EQ("application/json", ContentType(response));
 
   Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
   auto entries = json->getObject("entries");
@@ -330,7 +322,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("bar1", foo1_obj->getString("final_value"));
 
   EXPECT_EQ("200", request("admin", "GET", "/listeners", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   auto listeners = test_server_->server().listenerManager().listeners();
   auto listener_it = listeners.cbegin();
   for (; listener_it != listeners.end(); ++listener_it) {
@@ -341,7 +333,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   }
 
   EXPECT_EQ("200", request("admin", "GET", "/listeners?format=json", response));
-  EXPECT_EQ("application/json", contentType(response));
+  EXPECT_EQ("application/json", ContentType(response));
 
   json = Json::Factory::loadFromString(response->body());
   std::vector<Json::ObjectSharedPtr> listener_info = json->getObjectArray("listener_statuses");
@@ -359,7 +351,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   }
 
   EXPECT_EQ("200", request("admin", "GET", "/config_dump", response));
-  EXPECT_EQ("application/json", contentType(response));
+  EXPECT_EQ("application/json", ContentType(response));
   json = Json::Factory::loadFromString(response->body());
   size_t index = 0;
   const std::string expected_types[] = {"type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
@@ -391,7 +383,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("secret_static_0", secret_config_dump.static_secrets(0).name());
 
   EXPECT_EQ("200", request("admin", "GET", "/config_dump?include_eds", response));
-  EXPECT_EQ("application/json", contentType(response));
+  EXPECT_EQ("application/json", ContentType(response));
   json = Json::Factory::loadFromString(response->body());
   index = 0;
   const std::string expected_types_eds[] = {
@@ -414,7 +406,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ(7, config_dump_with_eds.configs_size());
 
   EXPECT_EQ("200", request("admin", "GET", "/config_dump?name_regex=route_config_0", response));
-  EXPECT_EQ("application/json", contentType(response));
+  EXPECT_EQ("application/json", ContentType(response));
   envoy::admin::v3::ConfigDump name_filtered_config_dump;
   TestUtility::loadFromJson(response->body(), name_filtered_config_dump);
   EXPECT_EQ(6, config_dump.configs_size());
@@ -430,7 +422,7 @@ TEST_P(IntegrationAdminTest, Admin) {
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_EQ("OK\n", response->body());
 
   // Validate that the listener stopped stat is not used and still zero.
@@ -442,7 +434,7 @@ TEST_P(IntegrationAdminTest, Admin) {
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_EQ("OK\n", response->body());
 
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
@@ -462,7 +454,7 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
       version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_EQ("OK\n", response->body());
 
   // Validate that the inbound listener has been stopped.
