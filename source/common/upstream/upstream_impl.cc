@@ -347,7 +347,7 @@ Network::ClientConnectionPtr HostImpl::createConnection(
                 socket_factory.createTransportSocket(std::move(transport_socket_options)),
                 connection_options);
 
-  connection->connectionInfoProvider().enableSettingInterfaceName(
+  connection->connectionInfoSetter().enableSettingInterfaceName(
       cluster.setLocalInterfaceNameOnUpstreamConnections());
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);

@@ -133,7 +133,7 @@ protected:
       Network::ConnectionInfoSetter& connectionInfoProvider() override {
         return *connection_info_provider_;
       }
-      const Network::ConnectionInfoProvider& connectionInfoProvider() const override {
+      const Network::ConnectionInfoProvider& connectionInfoSetter() const override {
         return *connection_info_provider_;
       }
       Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {

@@ -60,7 +60,7 @@ public:
   void readDisable(bool /*disable*/) override { ASSERT(false); }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { ASSERT(false); }
   bool readEnabled() const override { return true; }
-  Network::ConnectionInfoSetter& connectionInfoProvider() override {
+  Network::ConnectionInfoSetter& connectionInfoSetter() override {
     ENVOY_BUG(network_connection_ && network_connection_->connectionSocket(),
               "No connection socket.");
     return network_connection_->connectionSocket()->connectionInfoProvider();
