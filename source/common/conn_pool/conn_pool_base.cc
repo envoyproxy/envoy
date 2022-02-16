@@ -5,7 +5,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/server/backtrace.h"
+
 namespace Envoy {
 namespace ConnectionPool {
 namespace {
@@ -145,7 +145,6 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
     ActiveClientPtr client = instantiateActiveClient();
     if (client.get() == nullptr) {
       ENVOY_LOG(trace, "connection creation failed");
-      purgePendingStreams(host(), "failed to create connection", ConnectionPool::PoolFailureReason::LocalConnectionFailure);
       return ConnectionResult::FailedToCreateConnection;
     }
     ASSERT(client->state() == ActiveClient::State::CONNECTING);
@@ -155,13 +154,7 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
     // Increase the connecting capacity to reflect the streams this connection can serve.
     state_.incrConnectingAndConnectedStreamCapacity(client->effectiveConcurrentStreamLimit());
     connecting_stream_capacity_ += client->effectiveConcurrentStreamLimit();
-    ActiveClient& client_ref = *client;
     LinkedList::moveIntoList(std::move(client), owningList(client->state()));
-    client_ref.onEnlisted();
-    if (client_ref.state() == ActiveClient::State::CLOSED) {
-      ENVOY_LOG(trace, "created connection failed immediately");
-      return ConnectionResult::FailedToCreateConnection;
-    }
     return can_create_connection ? ConnectionResult::CreatedNewConnection
                                  : ConnectionResult::CreatedButRateLimited;
   } else {
@@ -287,6 +280,11 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
                  result == ConnectionResult::FailedToCreateConnection),
             fmt::format("Failed to create expected connection: {}", *this));
   if (result == ConnectionResult::FailedToCreateConnection) {
+    // This currently only happens for HTTP/3 if secrets aren't yet loaded.
+    // Trigger connection failure.
+    pending->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+    onPoolFailure(nullptr, absl::string_view(),
+                  ConnectionPool::PoolFailureReason::LocalConnectionFailure, context);
     return nullptr;
   }
   return pending;
@@ -466,8 +464,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       purgePendingStreams(client.real_host_description_, failure_reason, reason);
       // See if we should preconnect based on active connections.
       if (!is_draining_for_deletion_) {
-        std::cerr << "=========  tryCreateNewConnections\n";
-         dispatcher_.createSchedulableCallback([this](){tryCreateNewConnections();});
+        tryCreateNewConnections();
       }
     }
 

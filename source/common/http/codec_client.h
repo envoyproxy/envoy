@@ -58,8 +58,6 @@ public:
   // This is a legacy alias.
   using Type = Envoy::Http::CodecType;
 
-  ~CodecClient() override;
-
   /**
    * Add a connection callback to the underlying network connection.
    */
