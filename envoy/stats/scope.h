@@ -26,7 +26,6 @@ using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogr
 using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextReadout>>;
 using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
-using ScopePtr = ScopeSharedPtr; // TODO(jmarantz): global s/ScopePtr/ScopeSharedPtr/ & remove alias
 
 // TODO(jmarantz): In the initial transformation to store Scope as shared_ptr,
 // we don't change all the references, as that would result in an unreviewable

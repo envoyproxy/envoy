@@ -231,7 +231,7 @@ public:
     // can't be deleted after the initial iteration.
     stats_.forEachScope(
         [this](size_t s) { scopes_.reserve(s); },
-        [this](const Stats::Scope& scope) { scopes_.emplace_back(scope.makeConstShared()); });
+        [this](const Stats::Scope& scope) { scopes_.emplace_back(scope.getConstShared()); });
 
     startPhase();
     return Http::Code::OK;
