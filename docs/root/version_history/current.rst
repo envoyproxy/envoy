@@ -65,6 +65,5 @@ Deprecated
 ----------
 
 * http: removing support for long-deprecated old style filter names, e.g. envoy.router, envoy.lua.
-* runtime: removed deprecated_feature_use stats.
-
 * re2: removed undocumented histograms ``re2.program_size`` and ``re2.exceeded_warn_level``.
+* runtime: removed deprecated_feature_use stats.
