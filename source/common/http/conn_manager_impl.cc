@@ -786,9 +786,16 @@ void ConnectionManagerImpl::ActiveStream::onRequestHeaderTimeout() {
 void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
-  sendLocalReply(Http::Code::RequestTimeout, "downstream duration timeout", nullptr,
-                 Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
-                 StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
+  if (!state_.downstream_request_read_complete_) {
+    sendLocalReply(Http::Code::RequestTimeout,
+                   "downstream duration timeout before the request is fully read", nullptr,
+                   Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
+                   StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
+  } else {
+    sendLocalReply(Http::Code::GatewayTimeout, "downstream duration timeout", nullptr,
+                   Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
+                   StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& headers) {
@@ -1171,6 +1178,7 @@ void ConnectionManagerImpl::ActiveStream::decodeMetadata(MetadataMapPtr&& metada
 }
 
 void ConnectionManagerImpl::ActiveStream::disarmRequestTimeout() {
+  state_.downstream_request_read_complete_ = true;
   if (request_timer_) {
     request_timer_->disableTimer();
   }

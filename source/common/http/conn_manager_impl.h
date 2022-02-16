@@ -303,7 +303,8 @@ private:
     struct State {
       State()
           : codec_saw_local_complete_(false), saw_connection_close_(false),
-            successful_upgrade_(false), is_internally_created_(false), decorated_propagate_(true) {}
+            successful_upgrade_(false), is_internally_created_(false), decorated_propagate_(true),
+            downstream_request_read_complete_(false) {}
 
       bool codec_saw_local_complete_ : 1; // This indicates that local is complete as written all
                                           // the way through to the codec.
@@ -315,6 +316,9 @@ private:
       bool is_internally_created_ : 1;
 
       bool decorated_propagate_ : 1;
+
+      // True if the downstream request is fully read.
+      bool downstream_request_read_complete_ : 1;
     };
 
     // Per-stream idle timeout callback.
