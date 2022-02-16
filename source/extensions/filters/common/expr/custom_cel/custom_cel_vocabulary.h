@@ -23,7 +23,7 @@ using google::api::expr::runtime::CelFunctionRegistry;
 
 // CustomCELVocabulary
 //
-// Background Definitions:
+// Background Information:
 //
 // CEL Expressions are evaluated with the aid of certain data structures
 // which contain references to variables and functions implementations.
@@ -31,9 +31,12 @@ using google::api::expr::runtime::CelFunctionRegistry;
 //
 // Activation: contains a mapping of names (of variables and functions) to their
 // reference implementations.
-// A new activation is created for every request.
+// A new activation is created for every request and lasts for the life of a single request.
+// Contains variable definitions and lazily evaluated function definitions.
 //
-// CEL Function Registry: A registry for functions which lasts the life of the application.
+// CEL Function Registry: A registry of all CEL functions used to evaluate CEL Expressions,
+// which lasts the life of the application.
+// This contains both lazy functions and static (eagerly evaluated) functions.
 //
 // Vocabulary: The variables and functions constitute the "vocabulary" used to
 // evaluate expressions.
@@ -42,13 +45,14 @@ using google::api::expr::runtime::CelFunctionRegistry;
 // (2) Envoy defined Vocabulary, and (3) Custom CEL Vocabulary
 // Built-in CEL Functions are functions like "+", "-", "*".
 // These are static and registered with the CEL function registry.
-// Envoy defined CEL Variables:  Envoy has defined certain CEL variables/value producers like
-// Request, Response, Connection, etc.
+// Envoy defined CEL Variables:  Envoy has defined certain CEL variables/value producers
+// like Request, Response, Connection, etc.
 // These have been added to the Activation.
-// Custom CEL Vocabulary: These are vocabulary definitions which a user can provider.
+// Custom CEL Vocabulary: These are vocabulary definitions which a user can provide.
 // Custom CEL Variables must be added to the activation.
-// Custom CEL Static Functions must be added to the registry (they do not change for the life of the
-// application). Custom CEL Lazy functions must be added to both the registry and the activation.
+// Custom CEL Static Functions must be added to the registry
+// (they do not change for the life of the application).
+// Custom CEL Lazy Functions must be added to both the registry and the activation.
 // This interface is intended to allow for the addition of CustomCELVocabularies.
 //
 // Functions: Functions can be (1) lazy functions or (2) static functions
@@ -67,7 +71,7 @@ public:
   // Adds variables/value producers and lazy functions to the current request's
   // activation, an activation being a mapping of names to their reference implementations.
   // Lazily evaluated functions require a two part registration:
-  // (1) fillActivation will add the name of the function to the activation, and
+  // (1) fillActivation will add a function mapping to the activation, and
   // (2) registerFunctions will add it to the CEL function registry.
   // The function mapping for a lazy function which is added to the activation in fillActivation
   // must be compatible with the function descriptor added to the registry in registerFunctions.
@@ -104,7 +108,7 @@ public:
   // The custom CEL functions are registered here using registerFunctions.
   // Custom CEL functions may be (1) lazy or (2) static (eagerly evaluated).
   // Lazy functions must also be added to the activation using fillActivation.
-  // Static functions are not.
+  // Static functions do not.
   // The lazy function activation mapping must match its counterpart lazy function
   // descriptor in the registry.
   // Once registered, the function registration cannot be removed from the registry
