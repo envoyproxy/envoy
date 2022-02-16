@@ -1990,12 +1990,10 @@ TEST_F(OutlierDetectorImplTest, EjectionTimeJitterIsInRange) {
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
   // Get the jitter from the host monitor
-  // and make sure that it is strictly between
-  // 0 and 10000. We know that it shouldn't equal 0 or 10000
-  // since we chose the parameters.
+  // and make sure that it is 4445.
   auto host_monitor = detector->getHostMonitors().find(hosts_[0])->second;
   uint64_t jitter = host_monitor->getJitter().count();
-  EXPECT_THAT(jitter, testing::AllOf(testing::Gt(0UL), testing::Lt(10000UL)));
+  EXPECT_EQ(4445UL, jitter);
 }
 
 // Test verifies that jitter is 0 when the
