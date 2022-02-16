@@ -21,10 +21,12 @@
 // library. However, it is not possible to upgrade the cel-cpp in envoy currently
 // as it is waiting on the release of the one of its dependencies.
 // TODO(b/219971889): Remove #pragma directives once the cel-cpp dependency has been upgraded.
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #include "eval/public/cel_function_adapter.h"
 #pragma GCC diagnostic pop
+#endif
 
 namespace Envoy {
 namespace Extensions {
@@ -36,7 +38,7 @@ namespace Example {
 
 using google::api::expr::runtime::FunctionAdapter;
 
-// Below are helper functions for adding a function mapping to an activation
+// Below are several helper functions for adding a function mapping to an activation
 // or registering a function in the CEL function registry.
 //
 // Any standard functions have to be converted to CelFunctions which can be done
@@ -63,18 +65,11 @@ void addValueProducerToActivation(Activation* activation,
   activation->InsertValueProducer(value_producer_name, std::move(value_producer));
 }
 
-// addLazyFunctionToActivation:
-// Removes any envoy native version of a function with the same function descriptor from the
-// activation. Adds the custom version to the activation.
 void addLazyFunctionToActivation(Activation* activation, std::unique_ptr<CelFunction> function) {
   activation->RemoveFunctionEntries(function->descriptor());
   absl::Status status = activation->InsertFunction(std::move(function));
 }
 
-// addLazyFunctionToActivation:
-// Converts standard function to CelFunction using FunctionAdapter::Create
-// Removes any envoy native version of a function with the same function descriptor from the
-// activation. Adds the custom version to the activation.
 template <typename ReturnType, typename... Arguments>
 void addLazyFunctionToActivation(
     Activation* activation, absl::string_view function_name, bool receiver_type,
@@ -88,11 +83,6 @@ void addLazyFunctionToActivation(
   }
 }
 
-// addLazyFunctionToRegistry:
-// Previous function registrations with the same function descriptor cannot be removed
-// from the registry.
-// If there is an existing registration with the same name, the registration will not be
-// overwritten. A message will be printed to the log.
 void addLazyFunctionToRegistry(CelFunctionRegistry* registry, CelFunctionDescriptor descriptor) {
   absl::Status status = registry->RegisterLazyFunction(descriptor);
   if (!status.ok()) {
@@ -101,12 +91,6 @@ void addLazyFunctionToRegistry(CelFunctionRegistry* registry, CelFunctionDescrip
   }
 }
 
-// addLazyFunctionToRegistry:
-// Converts a standard function to a CelFunction using FunctionAdapter::Create.
-// Previous function registrations with the same function descriptor cannot be removed
-// from the registry.
-// If there is an existing registration with the same name, the registration will not be
-// overwritten. A message will be printed to the log.
 template <typename ReturnType, typename... Arguments>
 void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view function_name,
                                bool receiver_type,
@@ -123,12 +107,6 @@ void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view 
   }
 }
 
-// addStaticFunctionToRegistry:
-// Converts a standard function to a CelFunction using FunctionAdapter::CreateAndRegister.
-// Previous function registrations with the same function descriptor cannot be removed
-// from the registry.
-// If there is an existing registration with the same name, the registration will not be
-// overwritten. A message will be printed to the log.
 template <typename ReturnType, typename... Arguments>
 void addStaticFunctionToRegistry(
     CelFunctionRegistry* registry, absl::string_view function_name, bool receiver_type,
