@@ -71,3 +71,4 @@ Deprecated
 * config: deprecated :ref:`path <envoy_v3_api_field_config.core.v3.ConfigSource.path>` in favor of
   :ref:`path_config_source <envoy_v3_api_field_config.core.v3.ConfigSource.path_config_source>`
 * http: removing support for long-deprecated old style filter names, e.g. envoy.router, envoy.lua.
+* re2: removed undocumented histograms ``re2.program_size`` and ``re2.exceeded_warn_level``.
