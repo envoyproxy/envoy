@@ -29,7 +29,6 @@ public:
 class TestActiveClient : public ActiveClient {
 public:
   using ActiveClient::ActiveClient;
-
   void close() override { onEvent(Network::ConnectionEvent::LocalClose); }
   uint64_t id() const override { return 1; }
   bool closingWithIncompleteStream() const override { return false; }
@@ -38,7 +37,6 @@ public:
   void onEvent(Network::ConnectionEvent event) override {
     parent_.onConnectionEvent(*this, "", event);
   }
-  MOCK_METHOD(void, onEnlisted, ());
 
   static void incrementActiveStreams(ActiveClient& client) {
     TestActiveClient* testClient = dynamic_cast<TestActiveClient*>(&client);
@@ -521,60 +519,29 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredLocalClose) {
   pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 }
 
-TEST_F(ConnPoolImplDispatcherBaseTest, OnEnlistedFailed) {
-  // Create a new stream using the pool.
-  newConnectingClient();
-  // Limit the new connection capacity to 1 stream.
-  clients_.back()->overrideCurrentCapacity(1);
-
-  // Creating the 2nd new stream would create another client which would fail during onEnlisted().
-  EXPECT_CALL(pool_, instantiateActiveClient).WillOnce(Invoke([this]() -> ActiveClientPtr {
-    auto ret =
-        std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_, concurrent_streams_);
-    EXPECT_CALL(*ret, onEnlisted()).WillOnce(Invoke([&client_ref = *ret]() {
-      client_ref.close();
-    }));
-    ret->real_host_description_ = descr_;
-    return ret;
-  }));
-  EXPECT_CALL(pool_, onPoolFailure(_, _, _, _))
-      .WillRepeatedly(Invoke([](const Upstream::HostDescriptionConstSharedPtr&, absl::string_view,
-                                ConnectionPool::PoolFailureReason, AttachContext&) {}));
-  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
-  CHECK_STATE(0 /*active*/,
-              (Runtime::runtimeFeatureEnabled(
-                   "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted")
-                   ? 0
-                   : 1) /*pending*/,
-              1 /*connecting capacity*/);
-
-  // Clean up.
-  pool_.destructAllConnections();
-}
-
-TEST_F(ConnPoolImplDispatcherBaseTest, OnEnlistedSendEarlyData) {
+TEST_F(ConnPoolImplDispatcherBaseTest, ConnectedZeroRttSendsEarlyData) {
   concurrent_streams_ = 2u;
   ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
-  EXPECT_CALL(pool_, instantiateActiveClient).WillOnce(Invoke([this]() -> ActiveClientPtr {
-    // This client would fail during onEnlisted().
-    auto ret =
-        std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_, concurrent_streams_);
-    ret->real_host_description_ = descr_;
-    clients_.push_back(ret.get());
-    EXPECT_CALL(*ret, onEnlisted()).WillOnce(Invoke([&client_ref = *ret]() {
-      client_ref.onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
-    }));
-    return ret;
-  }));
+
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  EXPECT_NE(nullptr, pool_.newStreamImpl(context_, /*can_send_early_data=*/true));
+
+  ActiveClient& client_ref = *clients_.back();
+  // The first stream should be attached a client upon 0-RTT connected.
   EXPECT_CALL(pool_, onPoolReady);
-  pool_.newStreamImpl(context_, /*can_send_early_data=*/true);
+  client_ref.onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+  EXPECT_TRUE(client_ref.allows_early_data_);
+  pool_.onUpstreamReadyForEarlyData(client_ref);
+
   CHECK_STATE(1 /*active*/, 0 /*pending*/, concurrent_streams_ - 1 /*connecting capacity*/);
   EXPECT_EQ(1, pool_.host()->cluster().stats().upstream_rq_0rtt_.value());
 
-  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+  EXPECT_NE(nullptr, pool_.newStreamImpl(context_, /*can_send_early_data=*/false));
   CHECK_STATE(1 /*active*/, 1 /*pending*/, concurrent_streams_ - 1 /*connecting capacity*/);
+
   EXPECT_CALL(pool_, onPoolReady);
   clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+
   CHECK_STATE(2 /*active*/, 0 /*pending*/, 0 /*connecting capacity*/);
   EXPECT_EQ(1, pool_.host()->cluster().stats().upstream_rq_0rtt_.value());
 
