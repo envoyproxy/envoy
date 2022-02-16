@@ -250,7 +250,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
     stats_.response_exception_.inc();
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not reached");
   }
 }
 
