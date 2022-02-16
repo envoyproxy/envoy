@@ -480,7 +480,7 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
       // which could possibly generate a connection storm.
 
       // Retrieve max_eject_time_jitter configuration and then calculate the jitter.
-      const int64_t max_eject_time_jitter = runtime_.snapshot().getInteger(
+      const uint64_t max_eject_time_jitter = runtime_.snapshot().getInteger(
           MaxEjectionTimeJitterMsRuntime, config_.maxEjectionTimeJitterMs());
 
       const std::chrono::milliseconds jitter =
