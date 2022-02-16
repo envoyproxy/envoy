@@ -11,7 +11,21 @@
 namespace Envoy {
 namespace Server {
 
-LogsHandler::LogsHandler(Server::Instance& server) : HandlerContextBase(server) {}
+// Build the level string to level enum map.
+static absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> buildLevelMap() {
+  absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> levels;
+
+  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
+    spdlog::string_view_t spd_level_string{spdlog::level::level_string_views[i]};
+    absl::string_view level_string{spd_level_string.data(), spd_level_string.size()};
+    levels[level_string] = static_cast<spdlog::level::level_enum>(i);
+  }
+
+  return levels;
+}
+
+LogsHandler::LogsHandler(Server::Instance& server)
+    : HandlerContextBase(server), log_levels_(buildLevelMap()) {}
 
 Http::Code LogsHandler::handlerLogging(absl::string_view url, Http::ResponseHeaderMap&,
                                        Buffer::Instance& response, AdminStream&) {
@@ -19,12 +33,10 @@ Http::Code LogsHandler::handlerLogging(absl::string_view url, Http::ResponseHead
 
   Http::Code rc = Http::Code::OK;
   if (!query_params.empty()) {
-    const auto& [success, error] = changeLogLevel(query_params);
-    if (!success) {
+    const status = changeLogLevel(query_params);
+    if (!status.ok()) {
       rc = Http::Code::BadRequest;
-      if (!error.empty()) {
-        response.add(fmt::format("error: {}\n\n", error));
-      }
+      response.add(fmt::format("error: {}\n\n", status.message()));
 
       response.add("usage: /logging?<name>=<level> (change single level)\n");
       response.add(
@@ -62,20 +74,9 @@ Http::Code LogsHandler::handlerReopenLogs(absl::string_view, Http::ResponseHeade
   return Http::Code::OK;
 }
 
-static absl::optional<spdlog::level::level_enum> parseLevel(absl::string_view level) {
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-    spdlog::string_view_t spd_log_level{spdlog::level::level_string_views[i]};
-    if (level == absl::string_view{spd_log_level.data(), spd_log_level.size()}) {
-      return static_cast<spdlog::level::level_enum>(i);
-    }
-  }
-
-  return absl::nullopt;
-}
-
-std::pair<bool, std::string> LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params) {
+absl::Status LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params) {
   if (params.size() != 1) {
-    return std::make_pair(false, "invalid number of parameters");
+    return absl::InvalidArgumentError("invalid number of parameters");
   }
 
   const auto it = params.begin();
@@ -84,13 +85,13 @@ std::pair<bool, std::string> LogsHandler::changeLogLevel(const Http::Utility::Qu
 
   if (key == "level") {
     // Change all log levels.
-    auto level_to_use = parseLevel(value);
-    if (!level_to_use.has_value()) {
-      return std::make_pair(false, "unknown logger level");
+    auto level_to_use = parseLogLevel(value);
+    if (!level_to_use.ok()) {
+      return level_to_use.status();
     }
 
     changeAllLogLevels(*level_to_use);
-    return std::make_pair(true, "");
+    return absl::OkStatus();
   }
 
   // Build a map of name:level pairs, a few allocations is ok here since it's
@@ -105,21 +106,21 @@ std::pair<bool, std::string> LogsHandler::changeLogLevel(const Http::Utility::Qu
           absl::StrSplit(name_level, absl::MaxSplits(':', 1), absl::SkipWhitespace());
       auto [name, level] = name_level_pair;
       if (name.empty() || level.empty()) {
-        return std::make_pair(false, "empty log name or empty log level");
+        return absl::InvalidArgumentError("empty logger name or empty logger level");
       }
 
-      auto level_to_use = parseLevel(level);
-      if (!level_to_use.has_value()) {
-        return std::make_pair(false, "unknown logger level");
+      auto level_to_use = parseLogLevel(level);
+      if (!level_to_use.ok()) {
+        return level_to_use.status();
       }
 
       name_levels[name] = *level_to_use;
     }
   } else {
     // Change particular log level by name.
-    auto level_to_use = parseLevel(value);
-    if (!level_to_use.has_value()) {
-      return std::make_pair(false, "unknown logger level");
+    auto level_to_use = parseLogLevel(value);
+    if (!level_to_use.ok()) {
+      return level_to_use.status();
     }
 
     name_levels[key] = *level_to_use;
@@ -139,7 +140,7 @@ void LogsHandler::changeAllLogLevels(spdlog::level::level_enum level) {
   }
 }
 
-std::pair<bool, std::string> LogsHandler::changeLogLevels(
+absl::Status LogsHandler::changeLogLevels(
     const absl::flat_hash_map<absl::string_view, spdlog::level::level_enum>& changes) {
   if (!Logger::Context::useFancyLogger()) {
     std::vector<std::pair<Logger::Logger*, spdlog::level::level_enum>> loggers_to_change;
@@ -154,7 +155,7 @@ std::pair<bool, std::string> LogsHandler::changeLogLevels(
 
     // Check if we have any invalid logger in changes.
     if (loggers_to_change.size() != changes.size()) {
-      return std::make_pair(false, "unknown logger name");
+      return absl::InvalidArgumentError("unknown logger name");
     }
 
     for (auto& it : loggers_to_change) {
@@ -168,15 +169,13 @@ std::pair<bool, std::string> LogsHandler::changeLogLevels(
   } else {
     std::vector<std::pair<SpdLoggerSharedPtr, spdlog::level::level_enum>> loggers_to_change;
     for (auto& it : changes) {
-      std::string name(it.first.data(), it.first.size());
-      spdlog::level::level_enum level = it.second;
-
-      auto logger = getFancyContext().getFancyLogEntry(name);
+      // TODO(timonwong) FancyContext::getFancyLogEntry should accept absl::string_view as key.
+      SpdLogSharedPtr logger = getFancyContext().getFancyLogEntry(std::string(it.first));
       if (!logger) {
-        return std::make_pair(false, "unknown logger name");
+        return absl::InvalidArgumentError("unknown logger name");
       }
 
-      loggers_to_change.emplace_back(std::make_pair(logger, level));
+      loggers_to_change.emplace_back(std::make_pair(logger, it.second));
     }
 
     for (auto& it : loggers_to_change) {
@@ -189,7 +188,7 @@ std::pair<bool, std::string> LogsHandler::changeLogLevels(
     }
   }
 
-  return std::make_pair(true, "");
+  return absl::OkStatus();
 }
 
 } // namespace Server
