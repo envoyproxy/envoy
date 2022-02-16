@@ -197,7 +197,7 @@ public:
     return total_size_to_write;
   }
 
-  void setWatermarks(uint32_t) override {
+  void setWatermarks(uint32_t, uint32_t) override {
     // Not implemented.
     // TODO(antoniovicente) Implement and add fuzz coverage as we merge the Buffer::OwnedImpl and
     // WatermarkBuffer implementations.

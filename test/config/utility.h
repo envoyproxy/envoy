@@ -191,6 +191,9 @@ public:
   // order they are stored in |bootstrap_|
   void finalize(const std::vector<uint32_t>& ports);
 
+  // Called by finalize to set up the ports.
+  void setPorts(const std::vector<uint32_t>& ports, bool override_port_zero = false);
+
   // Set source_address in the bootstrap bind config.
   void setSourceAddress(const std::string& address_string);
 
