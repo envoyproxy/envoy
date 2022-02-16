@@ -17,6 +17,7 @@ Minor Behavior Changes
 * grpc: flip runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to be default enabled. async grpc client created through getOrCreateRawAsyncClient will be cached by default.
 * http: avoiding delay-close for HTTP/1.0 responses framed by connection: close as well as HTTP/1.1 if the request is fully read. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.skip_delay_close`` to false.
 * http: now the max concurrent streams of http2 connection can not only be adjusted down according to the SETTINGS frame but also can be adjusted up, of course, it can not exceed the configured upper bounds. This fix is guarded by ``envoy.reloadable_features.http2_allow_capacity_increase_by_settings``.
+* http: when writing custom filters, `injectEncodedDataToFilterChain` and `injectDecodedDataToFilterChain` now trigger sending of headers if they were not yet sent due to `StopIteration`. Previously, calling one of the inject functions in that state would trigger an assertion. See issue #19891 for more details.
 
 Bug Fixes
 ---------
@@ -46,6 +47,8 @@ Removed Config or Runtime
 * http: removed ``envoy.reloadable_features.internal_redirects_with_body`` and legacy code paths.
 * udp: removed ``envoy.reloadable_features.udp_per_event_loop_read_limit`` and legacy code paths.
 * upstream: removed ``envoy.reloadable_features.health_check.graceful_goaway_handling`` and legacy code paths.
+* xds: removed ``envoy.reloadable_features.vhds_heartbeats`` and legacy code paths.
+
 
 New Features
 ------------
@@ -62,3 +65,4 @@ Deprecated
 ----------
 
 * http: removing support for long-deprecated old style filter names, e.g. envoy.router, envoy.lua.
+* re2: removed undocumented histograms ``re2.program_size`` and ``re2.exceeded_warn_level``.

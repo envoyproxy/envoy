@@ -786,15 +786,9 @@ void ConnectionManagerImpl::ActiveStream::onRequestHeaderTimeout() {
 void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_response_for_timeout")) {
-    sendLocalReply(Http::Code::RequestTimeout, "downstream duration timeout", nullptr,
-                   Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
-                   StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
-  } else {
-    filter_manager_.streamInfo().setResponseCodeDetails(
-        StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
-    connection_manager_.doEndStream(*this);
-  }
+  sendLocalReply(Http::Code::RequestTimeout, "downstream duration timeout", nullptr,
+                 Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
+                 StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& headers) {
@@ -874,14 +868,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
   if (connection_manager_.config_.isRoutable()) {
     if (connection_manager_.config_.routeConfigProvider() != nullptr) {
-      snapped_route_config_ = connection_manager_.config_.routeConfigProvider()->config();
+      snapped_route_config_ = connection_manager_.config_.routeConfigProvider()->configCast();
     } else if (connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
       snapped_scoped_routes_config_ =
           connection_manager_.config_.scopedRouteConfigProvider()->config<Router::ScopedConfig>();
       snapScopedRouteConfig();
     }
   } else {
-    snapped_route_config_ = connection_manager_.config_.routeConfigProvider()->config();
+    snapped_route_config_ = connection_manager_.config_.routeConfigProvider()->configCast();
   }
 
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
@@ -1343,7 +1337,7 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
 absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
   if (connection_manager_.config_.routeConfigProvider() != nullptr) {
     return absl::optional<Router::ConfigConstSharedPtr>(
-        connection_manager_.config_.routeConfigProvider()->config());
+        connection_manager_.config_.routeConfigProvider()->configCast());
   }
   return {};
 }

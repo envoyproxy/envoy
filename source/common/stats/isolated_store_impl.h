@@ -141,8 +141,8 @@ public:
     Counter& counter = counters_.get(joiner.nameWithTags());
     return counter;
   }
-  ScopePtr createScope(const std::string& name) override;
-  ScopePtr scopeFromStatName(StatName name) override;
+  ScopeSharedPtr createScope(const std::string& name) override;
+  ScopeSharedPtr scopeFromStatName(StatName name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {
@@ -235,9 +235,12 @@ public:
 
   void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override {
     if (f_size != nullptr) {
-      f_size(1);
+      f_size(scopes_.size() + 1);
     }
     f_stat(*default_scope_);
+    for (const ScopeSharedPtr& scope : scopes_) {
+      f_stat(*scope);
+    }
   }
 
   Stats::StatName prefix() const override { return StatName(); }
@@ -266,6 +269,7 @@ private:
   RefcountPtr<NullCounterImpl> null_counter_;
   RefcountPtr<NullGaugeImpl> null_gauge_;
   ScopeSharedPtr default_scope_;
+  std::vector<ScopeSharedPtr> scopes_;
 };
 
 } // namespace Stats

@@ -18,7 +18,7 @@ envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
     return health_check_failed ? envoy::admin::v3::ServerInfo::DRAINING
                                : envoy::admin::v3::ServerInfo::LIVE;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& header_map) {

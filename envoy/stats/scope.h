@@ -28,6 +28,16 @@ using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 using ScopePtr = ScopeSharedPtr; // TODO(jmarantz): global s/ScopePtr/ScopeSharedPtr/ & remove alias
 
+// TODO(jmarantz): In the initial transformation to store Scope as shared_ptr,
+// we don't change all the references, as that would result in an unreviewable
+// PR that combines a small number of semantic changes and a large number of
+// files with trivial changes. Furthermore, code that depends on the Envoy stats
+// infrastructure that's not in this repo will stop compiling when we remove
+// ScopePtr. We should fully remove this alias in a future PR and change all the
+// references, once known consumers that might break from this change have a
+// chance to do the global replace in their own repos.
+using ScopePtr = ScopeSharedPtr;
+
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
 
 /**
@@ -52,8 +62,10 @@ class Scope : public std::enable_shared_from_this<Scope> {
 public:
   virtual ~Scope() = default;
 
-  ScopeSharedPtr makeShared() { return shared_from_this(); }
-  ConstScopeSharedPtr makeConstShared() const { return shared_from_this(); }
+  /** @return a shared_ptr for this */
+  ScopeSharedPtr getShared() { return shared_from_this(); }
+  /** @return a const shared_ptr for this */
+  ConstScopeSharedPtr getConstShared() const { return shared_from_this(); }
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
@@ -64,7 +76,7 @@ public:
    *
    * @param name supplies the scope's namespace prefix.
    */
-  virtual ScopePtr createScope(const std::string& name) PURE;
+  virtual ScopeSharedPtr createScope(const std::string& name) PURE;
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
@@ -73,7 +85,7 @@ public:
    *
    * @param name supplies the scope's namespace prefix.
    */
-  virtual ScopePtr scopeFromStatName(StatName name) PURE;
+  virtual ScopeSharedPtr scopeFromStatName(StatName name) PURE;
 
   /**
    * Deliver an individual histogram value to all registered sinks.

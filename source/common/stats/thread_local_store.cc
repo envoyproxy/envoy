@@ -144,7 +144,7 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   return ret;
 }
 
-ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
+ScopeSharedPtr ThreadLocalStoreImpl::createScope(const std::string& name) {
   StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), alloc_.symbolTable());
   return scopeFromStatName(stat_name_storage.statName());
 }
@@ -975,9 +975,8 @@ void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,
                                         StatFn<const Scope> f_scope) const {
   Thread::LockGuard lock(lock_);
   if (f_size != nullptr) {
-    f_size(scopes_.size() + 1 /* for default_scope_ */);
+    f_size(scopes_.size());
   }
-  f_scope(*default_scope_);
   for (ScopeImpl* scope : scopes_) {
     f_scope(*scope);
   }
