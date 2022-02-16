@@ -419,6 +419,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "win32_socket_handle_impl_test",
+    srcs = ["win32_socket_handle_impl_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "io_socket_handle_impl_integration_test",
     srcs = ["io_socket_handle_impl_integration_test.cc"],
     tags = ["requires-network"],

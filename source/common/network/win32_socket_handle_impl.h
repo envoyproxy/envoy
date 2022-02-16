@@ -6,6 +6,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/io_handle.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/network/io_socket_error_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
@@ -42,12 +43,17 @@ public:
                                    RecvMsgOutput& output) override;
   Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override;
 
+  void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                           Event::FileTriggerType trigger, uint32_t events) override;
+  void enableFileEvents(uint32_t events) override;
+
 private:
   void reEnableEventBasedOnIOResult(const Api::IoCallUint64Result& result, uint32_t event);
 
   // On Windows we use the MSG_PEEK on recv instead of peeking the socket
   // we drain the socket to memory. Subsequent read calls need to read
   // first from the class buffer and then go to the underlying socket.
+
   // Implement the peek logic of recv for readability purposes
   Api::IoCallUint64Result emulatePeek(void* buffer, size_t length);
 

@@ -24,3 +24,22 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "on_demand_integration_test",
+    srcs = ["on_demand_integration_test.cc"],
+    extension_names = ["envoy.filters.http.on_demand"],
+    deps = [
+        "//source/extensions/filters/http/on_demand:config",
+        "//source/extensions/filters/http/on_demand:on_demand_update_lib",
+        "//test/config:v2_link_hacks",
+        "//test/integration:http_integration_lib",
+        "//test/integration:scoped_rds_lib",
+        "//test/integration:vhds_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)

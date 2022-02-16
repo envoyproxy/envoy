@@ -49,7 +49,7 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   case ParseState::Continue:
     return Network::FilterStatus::StopIteration;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM
 }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {

@@ -118,6 +118,11 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocation) {
   EXPECT_FALSE(tokens[0]->isIssuerAllowed("issuer3"));
   EXPECT_FALSE(tokens[0]->isIssuerAllowed("issuer4"));
   EXPECT_FALSE(tokens[0]->isIssuerAllowed("issuer5"));
+  EXPECT_FALSE(tokens[0]->isIssuerAllowed("issuer6"));
+  EXPECT_FALSE(tokens[0]->isIssuerAllowed("issuer7"));
+  EXPECT_FALSE(tokens[0]->isIssuerAllowed("issuer8"));
+  EXPECT_FALSE(tokens[0]->isIssuerAllowed("issuer9"));
+  EXPECT_FALSE(tokens[0]->isIssuerAllowed("issuer10"));
   EXPECT_FALSE(tokens[0]->isIssuerAllowed("unknown_issuer"));
 
   // Test token remove
@@ -299,6 +304,26 @@ TEST_F(ExtractorTest, TestCookieToken) {
   EXPECT_TRUE(tokens[2]->isIssuerAllowed("issuer10"));
   EXPECT_FALSE(tokens[2]->isIssuerAllowed("issuer9"));
   tokens[2]->removeJwt(headers);
+}
+
+// Test extracting token from a cookie, but not from default location
+TEST_F(ExtractorTest, TestCookieTokenAndDefault) {
+  setUp(R"(
+providers:
+  provider11:
+    issuer: issuer11
+    from_cookies:
+      - token-cookie
+)");
+  // Headers has token in both cookie and default location.
+  auto headers = TestRequestHeaderMapImpl{{"Authorization", "Bearer jwt_token"},
+                                          {"cookie", "token-cookie=\"token-cookie-value\""}};
+  // token from the default location is not extracted
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 1);
+
+  EXPECT_EQ(tokens[0]->token(), "token-cookie-value");
+  EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer11"));
 }
 
 // Test extracting multiple tokens.

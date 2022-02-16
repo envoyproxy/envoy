@@ -13,6 +13,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/network_utility.h"
 
 #include "gmock/gmock.h"
@@ -114,6 +115,7 @@ public:
   std::unique_ptr<ActiveTcpListener> generic_active_listener_;
   NiceMock<Network::MockIoHandle> io_handle_;
   std::unique_ptr<NiceMock<Network::MockConnectionSocket>> generic_accepted_socket_;
+  NiceMock<Runtime::MockLoader> runtime_;
 };
 
 /**
@@ -229,7 +231,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters) {
   auto listener = std::make_unique<NiceMock<Network::MockListener>>();
   EXPECT_CALL(*listener, onDestroy());
   auto active_listener =
-      std::make_unique<ActiveTcpListener>(conn_handler_, std::move(listener), listener_config_);
+      std::make_unique<ActiveTcpListener>(conn_handler_, std::move(listener), listener_config_,
+		      		          runtime_);
   auto accepted_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
 
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle_));
@@ -345,7 +348,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   auto mock_listener_will_be_moved1 = std::make_unique<Network::MockListener>();
   auto& listener1 = *mock_listener_will_be_moved1;
   auto active_listener1 = std::make_unique<ActiveTcpListener>(
-      conn_handler_, std::move(mock_listener_will_be_moved1), listener_config1);
+      conn_handler_, std::move(mock_listener_will_be_moved1), listener_config1, runtime_);
 
   NiceMock<Network::MockListenerConfig> listener_config2;
   Network::MockConnectionBalancer balancer2;
@@ -366,7 +369,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   auto mock_listener_will_be_moved2 = std::make_unique<Network::MockListener>();
   auto& listener2 = *mock_listener_will_be_moved2;
   auto active_listener2 = std::make_shared<ActiveTcpListener>(
-      conn_handler_, std::move(mock_listener_will_be_moved2), listener_config2);
+      conn_handler_, std::move(mock_listener_will_be_moved2), listener_config2, runtime_);
 
   auto* test_filter = new NiceMock<Network::MockListenerFilter>();
   EXPECT_CALL(*test_filter, destroy_());

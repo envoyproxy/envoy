@@ -81,8 +81,6 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
   case Type::Ping:
     current_request_ = client_->makeRequest(pingHealthCheckRequest(), *this);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -107,8 +105,6 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
       handleFailure(envoy::data::core::v3::ACTIVE);
     }
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (!parent_.reuse_connection_) {

@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "source/common/common/assert.h"
-#include "source/common/common/hash.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/mem_block_builder.h"
 #include "source/common/common/non_copyable.h"

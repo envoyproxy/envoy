@@ -491,6 +491,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/server:worker_lib",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:guard_dog_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:overload_manager_mocks",
