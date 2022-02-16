@@ -112,11 +112,11 @@ public:
   State state() { return state_; };
   void setState(State state) { state_ = state; };
 
-  std::vector<std::pair<std::string, std::string>>::iterator destIter() { return destIter_; };
-  void setDestIter(std::vector<std::pair<std::string, std::string>>::iterator destIter) {
-    destIter_ = destIter;
+  std::vector<std::pair<std::string, std::string>>::iterator destIter() { return dest_iter_; };
+  void setDestIter(std::vector<std::pair<std::string, std::string>>::iterator dest_iter) {
+    dest_iter_ = dest_iter;
   }
-  void nextAffinity() { destIter_++; };
+  void nextAffinity() { dest_iter_++; };
 
   void addEPOperation(
       size_t raw_offset, absl::string_view& header,
@@ -297,7 +297,7 @@ private:
   // Could do remote subscribe for this param
   std::map<std::string, bool> subscribe_map_{};
   // The pointer to handle Affinity
-  std::vector<std::pair<std::string, std::string>>::iterator destIter_;
+  std::vector<std::pair<std::string, std::string>>::iterator dest_iter_;
 
   std::string raw_msg_{};
   State state_{State::TransportBegin};

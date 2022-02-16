@@ -343,7 +343,6 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
 
 FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   bool upstream_request_started = false;
-  FilterStatus lb_ret;
 
   // ACK_4XX reuse
   if (upstream_request_ != nullptr &&
@@ -409,8 +408,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     ENVOY_STREAM_LOG(trace, "no destination preset select with load balancer.", *callbacks_);
 
     upstream_request_started = false;
-    lb_ret =
-        messageHandlerWithLoadBalancer(transaction_info, metadata, host, upstream_request_started);
+    messageHandlerWithLoadBalancer(transaction_info, metadata, host, upstream_request_started);
     if (upstream_request_started) {
       // Continue: continue to messageEnd
       // StopIteration: continue to next affinity

@@ -32,7 +32,7 @@ enum class ResponseStatus {
  */
 class DecoderFilterCallbacks : public SipProxy::PendingListHandler {
 public:
-  virtual ~DecoderFilterCallbacks() = default;
+  ~DecoderFilterCallbacks() override = default;
 
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
