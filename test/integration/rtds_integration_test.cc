@@ -150,7 +150,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, RtdsIntegrationTest,
 
 // This test mimics what K8s does when it swaps a ConfigMap. The K8s directory structure looks like:
 // 1. ConfigMap mounted to `/config_map/xds`
-// 2. Read data directory `/config_map/xds/real_data`
+// 2. Real data directory `/config_map/xds/real_data`
 // 3. Real file `/config_map/xds/real_data/xds.yaml`
 // 4. Symlink `/config_map/xds/..data` -> `/config_map/xds/real_data`
 // 5. Symlink `/config_map/xds/xds.yaml -> `/config_map/xds/..data/xds.yaml`
