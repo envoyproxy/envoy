@@ -13,8 +13,8 @@
 // All functions will need a Protobuf arena because CelFunction::Evaluate takes
 // arena as a parameter.
 //
-// Receiver style: If set to true, function calls have the form 4.getSquareOf instead of
-// getSquareOf(4)
+// Receiver style: If set to true, function calls have the form arg.function instead of
+// function(arg)
 
 namespace Envoy {
 namespace Extensions {
@@ -28,11 +28,11 @@ using google::api::expr::runtime::CelFunction;
 using google::api::expr::runtime::CelFunctionDescriptor;
 using google::api::expr::runtime::CelValue;
 
-class GetProductCELFunction : public CelFunction {
+class GetProduct : public CelFunction {
 public:
-  explicit GetProductCELFunction(absl::string_view name)
+  explicit GetProduct(absl::string_view name)
       : CelFunction({std::string(name), false, {CelValue::Type::kInt64, CelValue::Type::kInt64}}) {}
-  explicit GetProductCELFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
+  explicit GetProduct(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
 
   static CelFunctionDescriptor createDescriptor(absl::string_view name) {
     return CelFunctionDescriptor{name, false, {CelValue::Type::kInt64, CelValue::Type::kInt64}};
@@ -42,11 +42,11 @@ public:
                         Protobuf::Arena* arena) const override;
 };
 
-class GetDoubleCELFunction : public CelFunction {
+class GetDouble : public CelFunction {
 public:
-  explicit GetDoubleCELFunction(absl::string_view name)
+  explicit GetDouble(absl::string_view name)
       : CelFunction({std::string(name), false, {CelValue::Type::kInt64}}) {}
-  explicit GetDoubleCELFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
+  explicit GetDouble(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
 
   static CelFunctionDescriptor createDescriptor(absl::string_view name) {
     return CelFunctionDescriptor{name, false, {CelValue::Type::kInt64}};
@@ -56,10 +56,10 @@ public:
                         Protobuf::Arena* arena) const override;
 };
 
-class Get99CELFunction : public CelFunction {
+class Get99 : public CelFunction {
 public:
-  explicit Get99CELFunction(absl::string_view name) : CelFunction({std::string(name), false, {}}) {}
-  explicit Get99CELFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
+  explicit Get99(absl::string_view name) : CelFunction({std::string(name), false, {}}) {}
+  explicit Get99(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
 
   static CelFunctionDescriptor createDescriptor(absl::string_view name) {
     return CelFunctionDescriptor{name, false, {}};

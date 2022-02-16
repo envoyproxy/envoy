@@ -47,84 +47,84 @@ static_resources:
               rules:
                 action: DENY
                 policies:
-                  "deny-admin-clusters-endpoint-policy":
-                    # curl -v "localhost:7777/clusters"
-                    # deny if request[path].endsWith("/clusters")
-                    condition:
-                      call_expr:
-                        function: endsWith
-                        args:
-                        - select_expr:
-                           operand:
-                             ident_expr:
-                               name: request
-                           field: path
-                        - const_expr:
-                           string_value: /clusters
-                    permissions:
-                    - any: true
-                    principals:
-                    - any: true
-                  "policy-deny-if-header-host-is-localhost":
-                    # deny if request.headers[host] == "localhost"
-                    condition:
-                      call_expr:
-                        function: contains
-                        args:
-                        - select_expr:
-                            operand:
-                              select_expr:
-                                operand:
-                                  ident_expr:
-                                    name: request
-                                field: headers
-                            field: host
-                        - const_expr:
-                            string_value: localhost
-                    permissions:
-                    - any: true
-                    principals:
-                    - any: true
-                  "policy-deny-if-header-server-name-is-envoy":
-                    # deny if request.headers[server] == "envoy"
-                    condition:
-                      call_expr:
-                        function: contains
-                        args:
-                        - select_expr:
-                            operand:
-                              select_expr:
-                                operand:
-                                  ident_expr:
-                                    name: request
-                                field: headers
-                            field: server
-                        - const_expr:
-                            string_value: envoy
-                    permissions:
-                    - any: true
-                    principals:
-                    - any: true
-                  "policy-deny-if-header-user-agent-is-chrome":
-                    # deny if request.headers[user-agent].contains("Chrome")
-                    condition:
-                      call_expr:
-                        function: contains
-                        args:
-                        - select_expr:
-                            operand:
-                              select_expr:
-                                operand:
-                                  ident_expr:
-                                    name: request
-                                field: headers
-                            field: user-agent
-                        - const_expr:
-                            string_value: Chrome
-                    permissions:
-                    - any: true
-                    principals:
-                    - any: true
+#                  "deny-admin-clusters-endpoint-policy":
+#                    # curl -v "localhost:7777/clusters"
+#                    # deny if request[path].endsWith("/clusters")
+#                    condition:
+#                      call_expr:
+#                        function: endsWith
+#                        args:
+#                        - select_expr:
+#                           operand:
+#                             ident_expr:
+#                               name: request
+#                           field: path
+#                        - const_expr:
+#                           string_value: /clusters
+#                    permissions:
+#                    - any: true
+#                    principals:
+#                    - any: true
+#                  "policy-deny-if-header-host-is-localhost":
+#                    # deny if request.headers[host] == "localhost"
+#                    condition:
+#                      call_expr:
+#                        function: contains
+#                        args:
+#                        - select_expr:
+#                            operand:
+#                              select_expr:
+#                                operand:
+#                                  ident_expr:
+#                                    name: request
+#                                field: headers
+#                            field: host
+#                        - const_expr:
+#                            string_value: localhost
+#                    permissions:
+#                    - any: true
+#                    principals:
+#                    - any: true
+#                  "policy-deny-if-header-server-name-is-envoy":
+#                    # deny if request.headers[server] == "envoy"
+#                    condition:
+#                      call_expr:
+#                        function: contains
+#                        args:
+#                        - select_expr:
+#                            operand:
+#                              select_expr:
+#                                operand:
+#                                  ident_expr:
+#                                    name: request
+#                                field: headers
+#                            field: server
+#                        - const_expr:
+#                            string_value: envoy
+#                    permissions:
+#                    - any: true
+#                    principals:
+#                    - any: true
+#                  "policy-deny-if-header-user-agent-is-chrome":
+#                    # deny if request.headers[user-agent].contains("Chrome")
+#                    condition:
+#                      call_expr:
+#                        function: contains
+#                        args:
+#                        - select_expr:
+#                            operand:
+#                              select_expr:
+#                                operand:
+#                                  ident_expr:
+#                                    name: request
+#                                field: headers
+#                            field: user-agent
+#                        - const_expr:
+#                            string_value: Chrome
+#                    permissions:
+#                    - any: true
+#                    principals:
+#                    - any: true
                   "policy-deny-if-header-user-agent-is-curl":
                     # deny if request.headers[user-agent] == "curl"
                     condition:
@@ -142,24 +142,24 @@ static_resources:
                     - any: true
                     principals:
                     - any: true
-                  "policy-deny-if-request-has-query":
-                    # deny if request has query
-                    condition:
-                      call_expr:
-                        function: contains
-                        args:
-                        - select_expr:
-                            test_only: true
-                            operand:
-                              ident_expr:
-                                name: request
-                            field: query
-                        - const_expr:
-                            bool_value: true
-                    permissions:
-                    - any: true
-                    principals:
-                    - any: true
+#                  "policy-deny-if-request-has-query":
+#                    # deny if request has query
+#                    condition:
+#                      call_expr:
+#                        function: contains
+#                        args:
+#                        - select_expr:
+#                            test_only: true
+#                            operand:
+#                              ident_expr:
+#                                name: request
+#                            field: query
+#                        - const_expr:
+#                            bool_value: true
+#                    permissions:
+#                    - any: true
+#                    principals:
+#                    - any: true
           - name: envoy.filters.http.router
   clusters:
   - name: admin_cluster

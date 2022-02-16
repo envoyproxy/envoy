@@ -18,7 +18,7 @@ using google::api::expr::runtime::CelValue;
 
 // tests for the custom CEL functions in the example implementation
 
-class CustomCELFunctionsTests : public testing::Test {
+class CustomCELFunctionTests : public testing::Test {
 public:
   Protobuf::Arena arena;
   CelValue result;
@@ -30,8 +30,8 @@ void matchDescriptorsTest(CelFunctionDescriptor descriptor1, CelFunctionDescript
   EXPECT_EQ(descriptor1.types(), descriptor2.types());
 }
 
-TEST_F(CustomCELFunctionsTests, GetProductCELFunctionTest) {
-  GetProductCELFunction function("GetProduct");
+TEST_F(CustomCELFunctionTests, GetProductTest) {
+  GetProduct function("GetProduct");
   std::vector<CelValue> input_values = {CelValue::CreateInt64(2), CelValue::CreateInt64(3)};
   auto args = absl::Span<CelValue>(input_values);
   absl::Status status = function.Evaluate(args, &result, &arena);
@@ -40,8 +40,8 @@ TEST_F(CustomCELFunctionsTests, GetProductCELFunctionTest) {
   matchDescriptorsTest(function.createDescriptor("GetProduct"), function.descriptor());
 }
 
-TEST_F(CustomCELFunctionsTests, GetDoubleCELFunctionTest) {
-  GetDoubleCELFunction function("GetDouble");
+TEST_F(CustomCELFunctionTests, GetDoubleTest) {
+  GetDouble function("GetDouble");
   std::vector<CelValue> input_values = {CelValue::CreateInt64(2)};
   auto args = absl::Span<CelValue>(input_values);
   absl::Status status = function.Evaluate(args, &result, &arena);
@@ -50,8 +50,8 @@ TEST_F(CustomCELFunctionsTests, GetDoubleCELFunctionTest) {
   matchDescriptorsTest(function.createDescriptor("GetDouble"), function.descriptor());
 }
 
-TEST_F(CustomCELFunctionsTests, Get99CELFunctionTest) {
-  Get99CELFunction function("Get99");
+TEST_F(CustomCELFunctionTests, Get99Test) {
+  Get99 function("Get99");
   std::vector<CelValue> input_values = {};
   auto args = absl::Span<CelValue>(input_values);
   absl::Status status = function.Evaluate(args, &result, &arena);
@@ -60,11 +60,11 @@ TEST_F(CustomCELFunctionsTests, Get99CELFunctionTest) {
   matchDescriptorsTest(function.createDescriptor("Get99"), function.descriptor());
 }
 
-TEST_F(CustomCELFunctionsTests, GetSquareOfTest) {
+TEST_F(CustomCELFunctionTests, GetSquareOfTest) {
   EXPECT_EQ(getSquareOf(&arena, 4).Int64OrDie(), 16);
 }
 
-TEST_F(CustomCELFunctionsTests, GetNextIntTest) {
+TEST_F(CustomCELFunctionTests, GetNextIntTest) {
   EXPECT_EQ(getNextInt(&arena, 10).Int64OrDie(), 11);
 }
 

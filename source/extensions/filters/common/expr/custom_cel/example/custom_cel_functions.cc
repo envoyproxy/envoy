@@ -10,22 +10,22 @@ namespace Expr {
 namespace Custom_CEL {
 namespace Example {
 
-absl::Status GetProductCELFunction::Evaluate(absl::Span<const CelValue> args, CelValue* output,
-                                             Protobuf::Arena*) const {
+absl::Status GetProduct::Evaluate(absl::Span<const CelValue> args, CelValue* output,
+                                  Protobuf::Arena*) const {
   int64_t value = args[0].Int64OrDie() * args[1].Int64OrDie();
   *output = CelValue::CreateInt64(value);
   return absl::OkStatus();
 }
 
-absl::Status GetDoubleCELFunction::Evaluate(absl::Span<const CelValue> args, CelValue* output,
-                                            Protobuf::Arena*) const {
+absl::Status GetDouble::Evaluate(absl::Span<const CelValue> args, CelValue* output,
+                                 Protobuf::Arena*) const {
   int64_t value = 2 * args[0].Int64OrDie();
   *output = CelValue::CreateInt64(value);
   return absl::OkStatus();
 }
 
-absl::Status Get99CELFunction::Evaluate(absl::Span<const CelValue>, CelValue* output,
-                                        Protobuf::Arena*) const {
+absl::Status Get99::Evaluate(absl::Span<const CelValue>, CelValue* output,
+                             Protobuf::Arena*) const {
   *output = CelValue::CreateInt64(99);
   return absl::OkStatus();
 }

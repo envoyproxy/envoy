@@ -19,7 +19,7 @@
 // The GitHub pipeline uses a gcc compiler which generates an error about unused parameters
 // for FunctionAdapter in cel_function_adapter.h
 // The problem of the unused parameters has been fixed in more recent version of the cel-cpp
-// library. However, it is not possible to upgrade the cel-cpp in envoy currently
+// library. However, it is not possible to upgrade the cel-cpp in envoy at this time
 // as it is waiting on the release of the one of its dependencies.
 
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -79,8 +79,8 @@ public:
   std::array<absl::string_view, 3> variable_set_names = {CustomVariablesName, SourceVariablesName,
                                                          ExtendedRequestVariablesName};
   std::array<absl::string_view, 3> lazy_function_names = {
-      LazyFuncNameGetDouble, LazyFuncNameGetProduct, LazyFuncNameGet99};
-  std::array<absl::string_view, 2> static_function_names = {StaticFuncNameGetNextInt,
+      LazyFuncNameGetDouble, LazyFuncNameGetProduct, LazyFuncNameGetNextInt};
+  std::array<absl::string_view, 2> static_function_names = {StaticFuncNameGet99,
                                                             StaticFuncNameGetSquareOf};
 };
 
@@ -197,6 +197,8 @@ TEST_F(ExampleCustomCELVocabularyTests, AddCustomMappingsToActivationTwiceTest) 
   absl::Status status;
   Activation activation;
 
+  using google::api::expr::runtime::FunctionAdapter;
+
   activation.InsertValueProducer(CustomVariablesName,
                                  std::make_unique<CustomWrapper>(arena, mock_stream_info));
   activation.InsertValueProducer(SourceVariablesName,
@@ -205,10 +207,16 @@ TEST_F(ExampleCustomCELVocabularyTests, AddCustomMappingsToActivationTwiceTest) 
       ExtendedRequestVariablesName,
       std::make_unique<ExtendedRequestWrapper>(arena, nullptr, mock_stream_info, false));
 
-  status = activation.InsertFunction(std::make_unique<GetDoubleCELFunction>(LazyFuncNameGetDouble));
+  status = activation.InsertFunction(std::make_unique<GetDouble>(LazyFuncNameGetDouble));
   status =
-      activation.InsertFunction(std::make_unique<GetProductCELFunction>(LazyFuncNameGetProduct));
-  status = activation.InsertFunction(std::make_unique<Get99CELFunction>(LazyFuncNameGet99));
+      activation.InsertFunction(std::make_unique<GetProduct>(LazyFuncNameGetProduct));
+
+  auto result_or = FunctionAdapter<CelValue, int64_t>::Create(LazyFuncNameGetNextInt, false,
+                                                                     getNextInt);
+  if (result_or.ok()) {
+    auto cel_function = std::move(result_or.value());
+    status = activation.InsertFunction(std::move(cel_function));
+  }
 
   custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, nullptr, nullptr,
                                        nullptr);
@@ -261,13 +269,15 @@ TEST_F(ExampleCustomCELVocabularyTests, AddRegistrationsToRegistryTwiceTest) {
 
   using google::api::expr::runtime::FunctionAdapter;
 
-  status =
-      registry.RegisterLazyFunction(GetDoubleCELFunction::createDescriptor(LazyFuncNameGetDouble));
-  status = registry.RegisterLazyFunction(
-      GetProductCELFunction::createDescriptor(LazyFuncNameGetProduct));
-  status = registry.RegisterLazyFunction(Get99CELFunction::createDescriptor(LazyFuncNameGet99));
-  status = FunctionAdapter<CelValue, int64_t>::CreateAndRegister(StaticFuncNameGetNextInt, false,
-                                                                 getNextInt, &registry);
+  status = registry.RegisterLazyFunction(GetDouble::createDescriptor(LazyFuncNameGetDouble));
+  status = registry.RegisterLazyFunction(GetProduct::createDescriptor(LazyFuncNameGetProduct));
+  auto result_or = FunctionAdapter<CelValue, int64_t>::Create(LazyFuncNameGetNextInt, false, getNextInt);
+  if (result_or.ok()) {
+    auto cel_function = std::move(result_or.value());
+    status = registry.RegisterLazyFunction(cel_function->descriptor());
+  }
+
+  status = registry.Register(std::make_unique<Get99>(StaticFuncNameGet99));
   status = FunctionAdapter<CelValue, int64_t>::CreateAndRegister(StaticFuncNameGetSquareOf, true,
                                                                  getSquareOf, &registry);
 
