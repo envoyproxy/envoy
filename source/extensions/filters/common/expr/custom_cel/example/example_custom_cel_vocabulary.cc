@@ -91,8 +91,8 @@ void addLazyFunctionToActivation(Activation* activation, std::unique_ptr<CelFunc
 }
 
 // addLazyFunctionToRegistry:
-// There is no way to remove previous function registrations with the same
-// function descriptor from the registry.
+// Previous function registrations with the same function descriptor cannot be removed
+// from the registry.
 // If there is an existing registration with the same name, the registration will not be
 // overwritten. A message will be printed to the log.
 void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view function_name,
@@ -105,8 +105,8 @@ void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view 
 }
 
 // addStaticFunctionToRegistry:
-// There is no way to remove previous function registrations with the same
-// function descriptor from the registry.
+// Previous function registrations with the same function descriptor cannot be removed
+// from the registry.
 // If there is an existing registration with the same name, the registration will not be
 // overwritten. A message will be printed to the log.
 template <typename ReturnType, typename... Arguments>

@@ -8,8 +8,10 @@
 // Toy functions for the Example Custom CEL Vocabulary
 //
 // Either standard functions or CelFunctions can be used.
-// The standard functions will be converted to CelFunctions.
-// All functions will need a Protobuf arena.
+// The standard functions will be converted to CelFunctions when added to the
+// registry and activation.
+// All functions will need a Protobuf arena because CelFunction::Evaluate takes
+// arena as a parameter.
 //
 // Receiver style: If set to true, function calls have the form 4.getSquareOf instead of
 // getSquareOf(4)
