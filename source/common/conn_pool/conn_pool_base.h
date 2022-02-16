@@ -72,6 +72,11 @@ public:
   // Returns the number of active streams on this connection.
   virtual uint32_t numActiveStreams() const PURE;
 
+  // Return true if it is ready to dispatch the next stream.
+  bool readyForStream() const;
+
+  bool isConnecting() const;
+
   // This function is called onStreamClosed to see if there was a negative delta
   // and (if necessary) update associated bookkeeping.
   // HTTP/1 and TCP pools can not have negative delta so the default implementation simply returns
@@ -80,7 +85,7 @@ public:
 
   enum class State {
     CONNECTING, // Connection is not yet established.
-    READY,      // Additional streams may be immediately dispatched to this connection.
+    READY,      // Any additional streams may be immediately dispatched to this connection.
     BUSY,       // Connection is at its concurrent stream limit.
     DRAINING,   // No more streams can be dispatched to this connection, and it will be closed
     // when all streams complete.
@@ -94,18 +99,8 @@ public:
     // streams and pool and cluster capacity.
     if (state == State::DRAINING) {
       drain();
-    } else if (state == State::BUSY && state_ != State::BUSY) {
-      last_state_before_busy_ = state_;
-    }
-    if (state_ == State::BUSY && state != State::BUSY) {
-      last_state_before_busy_ = absl::nullopt;
     }
     state_ = state;
-  }
-
-  State lastStateBeforeBusy() const {
-    ASSERT(last_state_before_busy_.has_value());
-    return last_state_before_busy_.value();
   }
 
   // Sets the remaining streams to 0, and updates pool and cluster capacity.
@@ -133,13 +128,13 @@ public:
   Event::TimerPtr connection_duration_timer_;
   bool resources_released_{false};
   bool timed_out_{false};
+  // True if the client is connecting and it can send early data. This means if the client is
+  // CONNECTING, an early data stream may be immediately dispatched to this connection. Once
+  // connected, it will become false.
   bool allows_early_data_{false};
 
 private:
   State state_{State::CONNECTING};
-  // Retain the state before this client becomes busy. When the client is under its current
-  // concurrent stream limit, switch to this state.
-  absl::optional<State> last_state_before_busy_;
 };
 
 // PendingStream is the base class tracking streams for which a connection has been created but not
@@ -303,6 +298,7 @@ public:
 
 protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
+  virtual void onConnectFailed(Envoy::ConnectionPool::ActiveClient&) {}
 
   enum class ConnectionResult {
     FailedToCreateConnection,

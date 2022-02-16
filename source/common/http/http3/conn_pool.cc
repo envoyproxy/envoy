@@ -33,10 +33,9 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
           return;
         }
         codec_client_->connect();
-        if (state() == Envoy::ConnectionPool::ActiveClient::State::CLOSED || !allows_early_data_) {
-          return;
+        if (state() != Envoy::ConnectionPool::ActiveClient::State::CLOSED && allows_early_data_) {
+          parent_.onUpstreamReadyForEarlyData(*this);
         }
-        parent_.onUpstreamReadyForEarlyData(*this);
       })) {
   ASSERT(codec_client_);
   if (dynamic_cast<CodecClientProd*>(codec_client_.get()) == nullptr) {
@@ -50,7 +49,8 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
 void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
   updateCapacity(num_streams);
   if (state() == ActiveClient::State::BUSY && currentUnusedCapacity() != 0) {
-    parent_.transitionActiveClientState(*this, lastStateBeforeBusy());
+    parent_.transitionActiveClientState(
+        *this, (isConnecting() ? ActiveClient::State::CONNECTING : ActiveClient::State::READY));
     // If there's waiting streams, make sure the pool will now serve them.
     parent_.onUpstreamReady();
   } else if (currentUnusedCapacity() == 0 && state() == ActiveClient::State::READY) {
