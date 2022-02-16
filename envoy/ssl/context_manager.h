@@ -57,7 +57,7 @@ public:
   /**
    * Remove an existing ssl context.
    */
-  virtual void removeContext(const std::shared_ptr<Envoy::Ssl::Context>& old_context) PURE;
+  virtual void removeContext(const Envoy::Ssl::ContextSharedPtr& old_context) PURE;
 };
 
 using ContextManagerPtr = std::unique_ptr<ContextManager>;

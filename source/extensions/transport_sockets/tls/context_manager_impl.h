@@ -40,11 +40,11 @@ public:
   Ssl::PrivateKeyMethodManager& privateKeyMethodManager() override {
     return private_key_method_manager_;
   };
-  void removeContext(const std::shared_ptr<Envoy::Ssl::Context>& old_context) override;
+  void removeContext(const Envoy::Ssl::ContextSharedPtr& old_context) override;
 
 private:
   TimeSource& time_source_;
-  absl::flat_hash_set<std::shared_ptr<Envoy::Ssl::Context>> contexts_;
+  absl::flat_hash_set<Envoy::Ssl::ContextSharedPtr> contexts_;
   PrivateKeyMethodManagerImpl private_key_method_manager_{};
 };
 

@@ -33,7 +33,7 @@ public:
   MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(void, iterateContexts, (std::function<void(const Context&)> callback));
   MOCK_METHOD(Ssl::PrivateKeyMethodManager&, privateKeyMethodManager, ());
-  MOCK_METHOD(void, removeContext, (const std::shared_ptr<Envoy::Ssl::Context>& old_context));
+  MOCK_METHOD(void, removeContext, (const Envoy::Ssl::ContextSharedPtr& old_context));
 };
 
 class MockConnectionInfo : public ConnectionInfo {

@@ -79,7 +79,7 @@ void ContextManagerImpl::iterateContexts(std::function<void(const Envoy::Ssl::Co
   }
 }
 
-void ContextManagerImpl::removeContext(const std::shared_ptr<Envoy::Ssl::Context>& old_context) {
+void ContextManagerImpl::removeContext(const Envoy::Ssl::ContextSharedPtr& old_context) {
   if (old_context != nullptr) {
     auto erased = contexts_.erase(old_context);
     // The contexts is expected to be added before is removed.
