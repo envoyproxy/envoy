@@ -46,7 +46,7 @@ public:
    * @return the Http Code and the response body as a string.
    */
   CodeResponse statsAsJsonHandler(const bool used_only,
-                                  const absl::optional<std::string> filter = absl::nullopt) {
+                                  absl::optional<std::string> filter = absl::nullopt) {
 
     std::string url = "stats?format=json";
     if (used_only) {
@@ -274,7 +274,7 @@ TEST_P(AdminStatsTest, StatsAsJson) {
   h1.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-  std::string actual_json = statsAsJsonHandler(false).second;
+  const std::string actual_json = statsAsJsonHandler(false).second;
 
   const std::string expected_json = R"EOF({
     "stats": [
@@ -412,7 +412,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
   h1.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-  std::string actual_json = statsAsJsonHandler(/*store_->histograms(), */ true).second;
+  const std::string actual_json = statsAsJsonHandler(true).second;
 
   // Expected JSON should not have h2 values as it is not used.
   const std::string expected_json = R"EOF({
@@ -506,7 +506,7 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
   h1.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-  std::string actual_json = statsAsJsonHandler(/*store_->histograms(),*/ false, "[a-z]1").second;
+  const std::string actual_json = statsAsJsonHandler(false, "[a-z]1").second;
 
   // Because this is a filter case, we don't expect to see any stats except for those containing
   // "h1" in their name.
@@ -610,7 +610,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
   h3.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-  std::string actual_json = statsAsJsonHandler(/*store_->histograms(),*/ true, "h[12]").second;
+  const std::string actual_json = statsAsJsonHandler(true, "h[12]").second;
 
   // Expected JSON should not have h2 values as it is not used, and should not have h3 values as
   // they are used but do not match.
