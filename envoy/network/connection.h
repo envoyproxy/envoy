@@ -334,6 +334,10 @@ public:
    * @param bandwidth_bits_per_sec The estimated bandwidth between the two endpoints of the
    * connection.
    * @param rtt The estimated round trip time between the two endpoints of the connection.
+   *
+   * @note Envoy does not provide an implementation for TCP connections because
+   * there is no portable system api to do so. Applications can implement it
+   * with a proprietary api in a customized TransportSocket.
    */
   virtual void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
                                                 std::chrono::microseconds rtt) PURE;
