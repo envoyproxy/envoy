@@ -170,7 +170,10 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
                                                               {/*can_send_early_data_=*/false,
                                                                /*can_use_http3_=*/true});
   EXPECT_NE(nullptr, cancellable);
-  async_connect_callback->invokeCallback();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted")) {
+    async_connect_callback->invokeCallback();
+  }
 
   std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
       Http3ConnPoolImplPeer::connectingClients(*pool_);
@@ -182,6 +185,11 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
 }
 
 TEST_F(Http3ConnPoolImplTest, NewAndCancelStreamBeforeConnect) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted")) {
+    return;
+  }
+
   EXPECT_CALL(mockHost().cluster_, perConnectionBufferLimitBytes);
   initialize();
 
@@ -209,6 +217,10 @@ TEST_F(Http3ConnPoolImplTest, NewAndCancelStreamBeforeConnect) {
 }
 
 TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted")) {
+    return;
+  }
   EXPECT_CALL(mockHost().cluster_, perConnectionBufferLimitBytes);
   initialize();
 
