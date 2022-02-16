@@ -48,7 +48,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         iter->second->internalListener()->get().updateListenerConfig(config);
         return;
       }
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      IS_ENVOY_BUG("unexpected");
     }
     auto internal_listener = std::make_unique<ActiveInternalListener>(*this, dispatcher(), config);
     details->typed_listener_ = *internal_listener;
@@ -60,7 +60,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         iter->second->tcpListener()->get().updateListenerConfig(config);
         return;
       }
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      IS_ENVOY_BUG("unexpected");
     }
     // worker_index_ doesn't have a value on the main thread for the admin server.
     auto tcp_listener = std::make_unique<ActiveTcpListener>(
@@ -71,8 +71,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     ASSERT(config.udpListenerConfig().has_value(), "UDP listener factory is not initialized.");
     ASSERT(worker_index_.has_value());
     ConnectionHandler::ActiveUdpListenerPtr udp_listener =
-        config.udpListenerConfig()->listenerFactory().createActiveUdpListener(*worker_index_, *this,
-                                                                              dispatcher_, config);
+        config.udpListenerConfig()->listenerFactory().createActiveUdpListener(
+            runtime, *worker_index_, *this, dispatcher_, config);
     details->typed_listener_ = *udp_listener;
     details->listener_ = std::move(udp_listener);
   }
