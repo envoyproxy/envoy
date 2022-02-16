@@ -27,7 +27,8 @@ namespace Example {
 // for FunctionAdapter in cel_function_adapter.h
 // The problem of the unused parameters has been fixed in more recent version of the cel-cpp
 // library. However, it is not possible to upgrade the cel-cpp in envoy currently
-// as it is waiting on the release of the one of its dependencies A N T L R (spaced out to evade spell checker).
+// as it is waiting on the release of the one of its dependencies A N T L R (spaced out to evade
+// spell checker).
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
 using google::api::expr::runtime::FunctionAdapter;

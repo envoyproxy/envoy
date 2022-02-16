@@ -73,8 +73,8 @@ absl::optional<CelValue> ExtendedRequestWrapper::getMapFromQueryStr(absl::string
   // create vector of key value pairs from QueryParams map
   for (const auto& [key, value] : query_params) {
     auto key_value_pair = std::make_pair(
-      CelValue::CreateString(Protobuf::Arena::Create<std::string>(&arena_, key)),
-      CelValue::CreateString(Protobuf::Arena::Create<std::string>(&arena_, value)));
+        CelValue::CreateString(Protobuf::Arena::Create<std::string>(&arena_, key)),
+        CelValue::CreateString(Protobuf::Arena::Create<std::string>(&arena_, value)));
     key_value_pairs.push_back(key_value_pair);
   }
   // create ContainerBackedMapImpl from vector of key value pairs

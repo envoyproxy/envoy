@@ -255,20 +255,21 @@ TEST_F(ExampleCustomCELVocabularyTests, AddRegistrationsToRegistryTwiceTest) {
 // for FunctionAdapter in cel_function_adapter.h
 // The problem of the unused parameters has been fixed in more recent version of the cel-cpp
 // library. However, it is not possible to upgrade the cel-cpp in envoy currently
-// as it is waiting on the release of the one of its dependencies A N T L R (spaced out to evade spell checker).
+// as it is waiting on the release of the one of its dependencies A N T L R (spaced out to evade
+// spell checker).
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
-using google::api::expr::runtime::FunctionAdapter;
+  using google::api::expr::runtime::FunctionAdapter;
 
   status =
       registry.RegisterLazyFunction(GetDoubleCELFunction::createDescriptor(LazyFuncNameGetDouble));
   status = registry.RegisterLazyFunction(
       GetProductCELFunction::createDescriptor(LazyFuncNameGetProduct));
   status = registry.RegisterLazyFunction(Get99CELFunction::createDescriptor(LazyFuncNameGet99));
-  status = FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
-      StaticFuncNameGetNextInt, false, getNextInt, &registry);
-  status = FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
-      StaticFuncNameGetSquareOf, true, getSquareOf, &registry);
+  status = FunctionAdapter<CelValue, int64_t>::CreateAndRegister(StaticFuncNameGetNextInt, false,
+                                                                 getNextInt, &registry);
+  status = FunctionAdapter<CelValue, int64_t>::CreateAndRegister(StaticFuncNameGetSquareOf, true,
+                                                                 getSquareOf, &registry);
 
   custom_cel_vocabulary.registerFunctions(&registry);
   auto functions = registry.ListFunctions();
