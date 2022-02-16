@@ -213,6 +213,7 @@ RuntimeFeatures::RuntimeFeatures() {
     if (value.has_value() && value.value()) {
       enabled_features_.emplace(envoy_name, feature);
     } else {
+      ASSERT(value.has_value());
       disabled_features_.emplace(envoy_name, feature);
     }
   }
