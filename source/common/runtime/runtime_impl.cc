@@ -35,6 +35,12 @@ namespace Runtime {
 
 namespace {
 
+void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
+  stats.deprecated_feature_use_.inc();
+  // Similar to the above, but a gauge that isn't imported during a hot restart.
+  stats.deprecated_feature_seen_since_process_start_.inc();
+}
+
 // TODO(12923): Document the Quiche reloadable flag setup.
 #ifdef ENVOY_ENABLE_QUIC
 void refreshQuicheReloadableFlags(const Snapshot::EntryMap& flag_map) {
@@ -63,6 +69,10 @@ bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_
                   getBoolean("envoy.features.enable_all_deprecated_features", default_value))) {
     return false;
   }
+
+  // The feature is allowed. It is assumed this check is called when the feature
+  // is about to be used, so increment the feature use stat.
+  countDeprecatedFeatureUseInternal(stats_);
 
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
   return false;
@@ -190,7 +200,7 @@ const Snapshot::EntryMap& SnapshotImpl::values() const { return values_; }
 
 SnapshotImpl::SnapshotImpl(Random::RandomGenerator& generator, RuntimeStats& stats,
                            std::vector<OverrideLayerConstPtr>&& layers)
-    : layers_{std::move(layers)}, generator_{generator} {
+    : layers_{std::move(layers)}, generator_{generator}, stats_{stats} {
   for (const auto& layer : layers_) {
     for (const auto& kv : layer->values()) {
       values_.erase(kv.first);
@@ -557,6 +567,8 @@ void LoaderImpl::mergeValues(const absl::node_hash_map<std::string, std::string>
 }
 
 Stats::Scope& LoaderImpl::getRootScope() { return store_; }
+
+void LoaderImpl::countDeprecatedFeatureUse() const { countDeprecatedFeatureUseInternal(stats_); }
 
 RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   std::string prefix = "runtime.";

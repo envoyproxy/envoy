@@ -260,6 +260,11 @@ public:
    * @return Stats::Scope& the root scope.
    */
   virtual Stats::Scope& getRootScope() PURE;
+
+  /**
+   * Updates deprecated feature use stats.
+   */
+  virtual void countDeprecatedFeatureUse() const PURE;
 };
 
 using LoaderPtr = std::unique_ptr<Loader>;
