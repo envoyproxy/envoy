@@ -76,6 +76,7 @@ def kotlin_dependencies():
             "com.squareup.okhttp3:okhttp:4.9.1",
             "com.squareup.okhttp3:mockwebserver:4.9.1",
             "io.github.classgraph:classgraph:4.8.121",
+            "io.netty:netty-all:4.1.74.Final",
             # Android test artifacts
             "androidx.test:core:1.3.0",
             "androidx.test:rules:1.3.0",
