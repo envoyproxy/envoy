@@ -73,7 +73,7 @@ public:
     generic_listener_ = std::make_unique<NiceMock<Network::MockListener>>();
     EXPECT_CALL(*generic_listener_, onDestroy());
     generic_active_listener_ = std::make_unique<ActiveTcpListener>(
-        conn_handler_, std::move(generic_listener_), listener_config_);
+        conn_handler_, std::move(generic_listener_), listener_config_, runtime_);
     generic_active_listener_->incNumConnections();
     generic_accepted_socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     EXPECT_CALL(*generic_accepted_socket_, ioHandle()).WillRepeatedly(ReturnRef(io_handle_));
@@ -91,7 +91,7 @@ public:
     generic_listener_ = std::make_unique<NiceMock<Network::MockListener>>();
     EXPECT_CALL(*generic_listener_, onDestroy());
     generic_active_listener_ = std::make_unique<ActiveTcpListener>(
-        conn_handler_, std::move(generic_listener_), listener_config_);
+        conn_handler_, std::move(generic_listener_), listener_config_, runtime_);
     generic_active_listener_->incNumConnections();
     generic_accepted_socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     EXPECT_CALL(*generic_accepted_socket_, ioHandle()).WillRepeatedly(ReturnRef(io_handle_));
