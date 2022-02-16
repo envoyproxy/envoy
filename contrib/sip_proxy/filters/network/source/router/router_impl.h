@@ -138,7 +138,7 @@ struct ThreadLocalTransactionInfo : public ThreadLocal::ThreadLocalObject,
       : parent_(parent), dispatcher_(dispatcher), transaction_timeout_(transaction_timeout) {
     audit_timer_ = dispatcher.createTimer([this]() -> void { auditTimerAction(); });
     audit_timer_->enableTimer(std::chrono::seconds(2));
-    for (const auto & service : local_services) {
+    for (const auto& service : local_services) {
       local_services_.emplace_back(service);
     }
   }
@@ -190,7 +190,7 @@ public:
                       local_services)
       : cluster_name_(cluster_name), tls_(tls.allocateSlot()),
         transaction_timeout_(transaction_timeout) {
-    for (const auto & service : local_services) {
+    for (const auto& service : local_services) {
       local_services_.emplace_back(service);
     }
   }

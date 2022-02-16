@@ -30,7 +30,7 @@ public:
         operate_via_(operate_via) {
     UNREFERENCED_PARAMETER(operate_via_);
 
-    for (const auto & service : local_services) {
+    for (const auto& service : local_services) {
       local_services_.emplace_back(service);
     }
   }
