@@ -128,6 +128,7 @@ class ExtensionsChecker(checker.Checker):
 
     async def check_fuzzed(self) -> None:
         if self.robust_to_downstream_count == self.fuzzed_count:
+            self.success("fuzzed", [f"Count: {self.fuzzed_count}"])
             return
         self.error(
             "fuzzed", [
@@ -140,6 +141,8 @@ class ExtensionsChecker(checker.Checker):
             errors = self._check_metadata(extension)
             if errors:
                 self.error("metadata", errors)
+            else:
+                self.success("metadata", [extension])
 
     async def check_registered(self) -> None:
         only_metadata = set(self.metadata.keys()) - self.all_extensions
@@ -150,9 +153,14 @@ class ExtensionsChecker(checker.Checker):
             # http_connection_manager
             if extension != "envoy.filters.network.envoy_mobile_http_connection_manager":
                 self.error("registered", [f"Metadata for unused extension found: {extension}"])
+            else:
+                self.success("registered", [f"Extension: {extension}"])
 
         for extension in missing_metadata:
             self.error("registered", [f"Metadata missing for extension: {extension}"])
+
+        if not missing_metadata:
+            self.success("registered", [f"No metadata missing"])
 
     def _check_metadata(self, extension: str) -> list:
         return (
