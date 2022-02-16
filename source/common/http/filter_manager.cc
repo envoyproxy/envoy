@@ -369,6 +369,10 @@ MetadataMapVector& ActiveStreamDecoderFilter::addDecodedMetadata() {
 
 void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
+  if (!headers_continued_) {
+    headers_continued_ = true;
+    doHeaders(false);
+  }
   parent_.decodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
@@ -1584,8 +1588,10 @@ void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool stre
 
 void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
-  // TODO(yosrym93): Check if this filter had previously stopped headers iteration.
-  // If so, it should be continued before injecting data.
+  if (!headers_continued_) {
+    headers_continued_ = true;
+    doHeaders(false);
+  }
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }

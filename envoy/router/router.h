@@ -18,6 +18,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/hash_policy.h"
+#include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/http_tracer.h"
@@ -185,20 +186,21 @@ using ResetHeaderParserSharedPtr = std::shared_ptr<ResetHeaderParser>;
 class RetryPolicy {
 public:
   // clang-format off
-  static constexpr uint32_t RETRY_ON_5XX                     = 0x1;
-  static constexpr uint32_t RETRY_ON_GATEWAY_ERROR           = 0x2;
-  static constexpr uint32_t RETRY_ON_CONNECT_FAILURE         = 0x4;
-  static constexpr uint32_t RETRY_ON_RETRIABLE_4XX           = 0x8;
-  static constexpr uint32_t RETRY_ON_REFUSED_STREAM          = 0x10;
-  static constexpr uint32_t RETRY_ON_GRPC_CANCELLED          = 0x20;
-  static constexpr uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x40;
-  static constexpr uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x80;
-  static constexpr uint32_t RETRY_ON_GRPC_UNAVAILABLE        = 0x100;
-  static constexpr uint32_t RETRY_ON_GRPC_INTERNAL           = 0x200;
-  static constexpr uint32_t RETRY_ON_RETRIABLE_STATUS_CODES  = 0x400;
-  static constexpr uint32_t RETRY_ON_RESET                   = 0x800;
-  static constexpr uint32_t RETRY_ON_RETRIABLE_HEADERS       = 0x1000;
-  static constexpr uint32_t RETRY_ON_ENVOY_RATE_LIMITED      = 0x2000;
+  static constexpr uint32_t RETRY_ON_5XX                                = 0x1;
+  static constexpr uint32_t RETRY_ON_GATEWAY_ERROR                      = 0x2;
+  static constexpr uint32_t RETRY_ON_CONNECT_FAILURE                    = 0x4;
+  static constexpr uint32_t RETRY_ON_RETRIABLE_4XX                      = 0x8;
+  static constexpr uint32_t RETRY_ON_REFUSED_STREAM                     = 0x10;
+  static constexpr uint32_t RETRY_ON_GRPC_CANCELLED                     = 0x20;
+  static constexpr uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED             = 0x40;
+  static constexpr uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED            = 0x80;
+  static constexpr uint32_t RETRY_ON_GRPC_UNAVAILABLE                   = 0x100;
+  static constexpr uint32_t RETRY_ON_GRPC_INTERNAL                      = 0x200;
+  static constexpr uint32_t RETRY_ON_RETRIABLE_STATUS_CODES             = 0x400;
+  static constexpr uint32_t RETRY_ON_RESET                              = 0x800;
+  static constexpr uint32_t RETRY_ON_RETRIABLE_HEADERS                  = 0x1000;
+  static constexpr uint32_t RETRY_ON_ENVOY_RATE_LIMITED                 = 0x2000;
+  static constexpr uint32_t RETRY_ON_HTTP3_POST_CONNECT_FAILURE         = 0x4000;
   // clang-format on
 
   virtual ~RetryPolicy() = default;
@@ -338,7 +340,30 @@ public:
  */
 class RetryState {
 public:
+  enum class RetryDecision {
+    // Retry the request immediately.
+    RetryImmediately,
+    // Retry the request with timed backoff delay.
+    RetryWithBackoff,
+    // Do not retry.
+    NoRetry,
+  };
+
+  enum class Http3Used {
+    Unknown,
+    Yes,
+    No,
+  };
+
   using DoRetryCallback = std::function<void()>;
+  /**
+   * @param disabled_http3 indicates whether the retry should disable http3 or not.
+   */
+  using DoRetryResetCallback = std::function<void(bool disable_http3)>;
+  /**
+   * @param disable_early_data indicates whether the retry should disable early data or not.
+   */
+  using DoRetryHeaderCallback = std::function<void(bool disable_early_data)>;
 
   virtual ~RetryState() = default;
 
@@ -358,6 +383,7 @@ public:
   /**
    * Determine whether a request should be retried based on the response headers.
    * @param response_headers supplies the response headers.
+   * @param original_request supplies the orignal request headers.
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. The callback will never be called
    *                 inline.
@@ -366,7 +392,8 @@ public:
    *         called. Calling code should proceed with error handling.
    */
   virtual RetryStatus shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
-                                         DoRetryCallback callback) PURE;
+                                         const Http::RequestHeaderMap& original_request,
+                                         DoRetryHeaderCallback callback) PURE;
 
   /**
    * Determines whether given response headers would be retried by the retry policy, assuming
@@ -374,22 +401,30 @@ public:
    * the information about whether a response is "good" or not is useful, but a retry should
    * not be attempted for other reasons.
    * @param response_headers supplies the response headers.
-   * @return bool true if a retry would be warranted based on the retry policy.
+   * @param original_request supplies the orignal request headers.
+   * @param retry_as_early_data output argument to tell the caller if a retry should be sent as
+   *        early data if it is warranted.
+   * @return RetryDecision if a retry would be warranted based on the retry policy and if it would
+   *         be warranted with timed backoff.
    */
-  virtual bool wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) PURE;
+  virtual RetryDecision wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers,
+                                              const Http::RequestHeaderMap& original_request,
+                                              bool& retry_as_early_data) PURE;
 
   /**
    * Determine whether a request should be retried after a reset based on the reason for the reset.
    * @param reset_reason supplies the reset reason.
+   * @param http3_used whether the reset request was sent over http3 as alternate protocol or
+   *                   not. nullopt means it wasn't sent at all before getting reset.
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. The callback will never be called
-   *                 inline.
+   * inline.
    * @return RetryStatus if a retry should take place. @param callback will be called at some point
    *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.
    */
-  virtual RetryStatus shouldRetryReset(const Http::StreamResetReason reset_reason,
-                                       DoRetryCallback callback) PURE;
+  virtual RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason, Http3Used http3_used,
+                                       DoRetryResetCallback callback) PURE;
 
   /**
    * Determine whether a "hedged" retry should be sent after the per try
@@ -397,7 +432,7 @@ public:
    * new one is sent to hedge against the original request taking even longer.
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. The callback will never be called
-   *                 inline.
+   * inline.
    * @return RetryStatus if a retry should take place. @param callback will be called at some point
    *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.
@@ -1115,10 +1150,8 @@ using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteE
 /**
  * The router configuration.
  */
-class Config {
+class Config : public Rds::Config {
 public:
-  virtual ~Config() = default;
-
   /**
    * Based on the incoming HTTP request headers, determine the target route (containing either a
    * route entry or a direct response entry) for the request.
@@ -1235,6 +1268,10 @@ public:
    * @return return the connection for the downstream stream.
    */
   virtual const Network::Connection& connection() const PURE;
+  /**
+   * @return returns the options to be consulted with for upstream stream creation.
+   */
+  virtual const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const PURE;
 };
 
 /**
