@@ -29,7 +29,7 @@ void ConnectionHandlerImpl::decNumConnections() {
 }
 
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
-                                        Network::ListenerConfig& config) {
+                                        Network::ListenerConfig& config, Runtime::Loader& runtime) {
   const bool support_udp_in_place_filter_chain_update = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place");
   if (support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
@@ -64,7 +64,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     }
     // worker_index_ doesn't have a value on the main thread for the admin server.
     auto tcp_listener = std::make_unique<ActiveTcpListener>(
-        *this, config, worker_index_.has_value() ? *worker_index_ : 0);
+        *this, config, runtime, worker_index_.has_value() ? *worker_index_ : 0);
     details->typed_listener_ = *tcp_listener;
     details->listener_ = std::move(tcp_listener);
   } else {
