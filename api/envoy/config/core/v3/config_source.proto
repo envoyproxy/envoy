@@ -167,8 +167,9 @@ message PathConfigSource {
   // If configured, this directory will be watched for *moves.* When an entry in this directory is
   // moved to, the `path` will be reloaded. This is required in certain deployment scenarios.
   //
-  // Specifically, if trying to load an xDS resource using a Kubernetes ConfigMap, the following
-  // configuration might be used:
+  // Specifically, if trying to load an xDS resource using a
+  // `Kubernetes ConfigMap <https://kubernetes.io/docs/concepts/configuration/configmap/>`_, the
+  // following configuration might be used:
   // 1. Store xds.yaml inside a ConfigMap.
   // 2. Mount the ConfigMap to `/config_map/xds`
   // 3. Configure path `/config_map/xds/xds.yaml`

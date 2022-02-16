@@ -148,7 +148,15 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, RtdsIntegrationTest,
 // TODO): The directory rotation via TestEnvironment::renameFile() fails on Windows. The
 // renameFile() implementation does not correctly handle symlinks.
 
-// This test mimics what K8s does when it swaps a ConfigMap.
+// This test mimics what K8s does when it swaps a ConfigMap. The K8s directory structure looks like:
+// 1. ConfigMap mounted to `/config_map/xds`
+// 2. Read data directory `/config_map/xds/real_data`
+// 3. Real file `/config_map/xds/real_data/xds.yaml`
+// 4. Symlink `/config_map/xds/..data` -> `/config_map/xds/real_data`
+// 5. Symlink `/config_map/xds/xds.yaml -> `/config_map/xds/..data/xds.yaml`
+//
+// 2 symlinks are used so that multiple files can be updated in a single atomic swap of ..data to
+// a new real target.
 TEST_P(RtdsIntegrationTest, FileRtdsReload) {
   // Create an initial setup that looks similar to a K8s ConfigMap deployment. This is a file
   // contained in a directory and referenced via an intermediate symlink on the directory.
