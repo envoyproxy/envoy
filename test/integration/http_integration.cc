@@ -346,7 +346,7 @@ void HttpIntegrationTest::initialize() {
   config_helper_.addQuicDownstreamTransportSocketConfig();
 
   BaseIntegrationTest::initialize();
-  registerTestServerPorts({"http"});
+  registerTestServerPorts({"http"}, test_server_);
 
   Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(fmt::format(
       "udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));

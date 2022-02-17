@@ -552,6 +552,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "multi_envoy_test",
+    srcs = [
+        "multi_envoy_test.cc",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "multiplexed_upstream_integration_test",
     srcs = [
         "multiplexed_upstream_integration_test.cc",
