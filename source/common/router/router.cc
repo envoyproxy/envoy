@@ -1038,7 +1038,7 @@ void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
       StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached);
   // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
   callbacks_->sendLocalReply(
-      Http::Code::ServiceUnavailable, "upstream max stream duration reached", modify_headers_,
+      Http::Code::GatewayTimeout, "upstream max stream duration reached", modify_headers_,
       absl::nullopt, StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
 }
 
