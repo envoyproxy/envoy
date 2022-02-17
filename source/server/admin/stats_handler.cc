@@ -285,29 +285,28 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
 
 std::string
 StatsHandler::computeDisjointBucketSummary(const Stats::ParentHistogramSharedPtr& histogram) {
-  if (histogram->used()) {
-    std::vector<std::string> bucket_summary;
-    Stats::ConstSupportedBuckets& supported_buckets =
-        histogram->intervalStatistics().supportedBuckets();
-    const std::vector<uint64_t> disjoint_interval_buckets =
-        histogram->intervalStatistics().computeDisjointBuckets();
-    const std::vector<uint64_t> disjoint_cumulative_buckets =
-        histogram->cumulativeStatistics().computeDisjointBuckets();
-    bucket_summary.reserve(supported_buckets.size());
-    // Make sure all vectors are the same size.
-    ASSERT(disjoint_interval_buckets.size() == disjoint_cumulative_buckets.size());
-    ASSERT(disjoint_cumulative_buckets.size() == supported_buckets.size());
-    size_t min_size = std::min({disjoint_interval_buckets.size(),
-                                disjoint_cumulative_buckets.size(), supported_buckets.size()});
-    for (size_t i = 0; i < min_size; ++i) {
-      bucket_summary.push_back(fmt::format("B{:g}({},{})", supported_buckets[i],
-                                           disjoint_interval_buckets[i],
-                                           disjoint_cumulative_buckets[i]));
-    }
-    return absl::StrJoin(bucket_summary, " ");
-  } else {
-    return std::string("No recorded values");
+  if (!histogram->used()) {
+    return "No recorded values";
   }
+  std::vector<std::string> bucket_summary;
+  Stats::ConstSupportedBuckets& supported_buckets =
+      histogram->intervalStatistics().supportedBuckets();
+  const std::vector<uint64_t> disjoint_interval_buckets =
+      histogram->intervalStatistics().computeDisjointBuckets();
+  const std::vector<uint64_t> disjoint_cumulative_buckets =
+      histogram->cumulativeStatistics().computeDisjointBuckets();
+  bucket_summary.reserve(supported_buckets.size());
+  // Make sure all vectors are the same size.
+  ASSERT(disjoint_interval_buckets.size() == disjoint_cumulative_buckets.size());
+  ASSERT(disjoint_cumulative_buckets.size() == supported_buckets.size());
+  size_t min_size = std::min({disjoint_interval_buckets.size(), disjoint_cumulative_buckets.size(),
+                              supported_buckets.size()});
+  for (size_t i = 0; i < min_size; ++i) {
+    bucket_summary.push_back(fmt::format("B{:g}({},{})", supported_buckets[i],
+                                         disjoint_interval_buckets[i],
+                                         disjoint_cumulative_buckets[i]));
+  }
+  return absl::StrJoin(bucket_summary, " ");
 }
 
 void StatsHandler::statsAsJsonQuantileSummaryHelper(
