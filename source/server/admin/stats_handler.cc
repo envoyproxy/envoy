@@ -404,19 +404,16 @@ ProtobufWkt::Value StatsHandler::statsAsJsonHistogramBucketsCreateHistogramEleme
   size_t min_size =
       std::min({interval_buckets.size(), cumulative_buckets.size(), supported_buckets.size()});
 
-  std::vector<ProtobufWkt::Value> supported_bucket_array;
-  std::vector<ProtobufWkt::Value> computed_bucket_array;
+  std::vector<ProtobufWkt::Value> bucket_array;
   for (size_t i = 0; i < min_size; ++i) {
-    supported_bucket_array.push_back(ValueUtil::numberValue(supported_buckets[i]));
-
-    ProtobufWkt::Struct computed_bucket;
-    auto* computed_bucket_fields = computed_bucket.mutable_fields();
-    (*computed_bucket_fields)["interval"] = ValueUtil::numberValue(interval_buckets[i]);
-    (*computed_bucket_fields)["cumulative"] = ValueUtil::numberValue(cumulative_buckets[i]);
-    computed_bucket_array.push_back(ValueUtil::structValue(computed_bucket));
+    ProtobufWkt::Struct bucket;
+    auto* bucket_fields = bucket.mutable_fields();
+    (*bucket_fields)["upper_bound"] = ValueUtil::numberValue(supported_buckets[i]);
+    (*bucket_fields)["interval"] = ValueUtil::numberValue(interval_buckets[i]);
+    (*bucket_fields)["cumulative"] = ValueUtil::numberValue(cumulative_buckets[i]);
+    bucket_array.push_back(ValueUtil::structValue(bucket));
   }
-  (*histogram_obj_fields)["supported_buckets"] = ValueUtil::listValue(supported_bucket_array);
-  (*histogram_obj_fields)["computed_buckets"] = ValueUtil::listValue(computed_bucket_array);
+  (*histogram_obj_fields)["buckets"] = ValueUtil::listValue(bucket_array);
 
   return ValueUtil::structValue(histogram_obj);
 }

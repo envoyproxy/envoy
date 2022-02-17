@@ -46,6 +46,22 @@ public:
     tls_.shutdownThread();
   }
 
+  void setHistogramBucketSettings() {
+    // Limit amount of buckets for tests.
+    envoy::config::metrics::v3::StatsConfig config;
+    auto& bucket_settings = *config.mutable_histogram_bucket_settings();
+
+    envoy::config::metrics::v3::HistogramBucketSettings setting;
+    setting.mutable_match()->set_prefix("h");
+    setting.mutable_buckets()->Add(1);
+    setting.mutable_buckets()->Add(2);
+    setting.mutable_buckets()->Add(3);
+    setting.mutable_buckets()->Add(4);
+
+    bucket_settings.Add(std::move(setting));
+    store_->setHistogramSettings(std::make_unique<Stats::HistogramSettingsImpl>(config));
+  }
+
   Stats::SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -304,6 +320,7 @@ TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsCumulative) {
   EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
   EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
   StatsHandler handler(instance);
+  setHistogramBucketSettings();
 
   store_->counterFromString("c1");
   Stats::Counter& c2 = store_->counterFromString("c2");
@@ -312,16 +329,16 @@ TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsCumulative) {
 
   Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
-  h1.recordValue(200);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
+  h1.recordValue(1);
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
-  h1.recordValue(300);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 2));
+  h1.recordValue(2);
 
   store_->mergeHistograms([]() -> void {});
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
-  h1.recordValue(300);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 2));
+  h1.recordValue(2);
 
   store_->mergeHistograms([]() -> void {});
 
@@ -330,116 +347,16 @@ TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsCumulative) {
 
   const std::string expected_json = R"EOF({
     "stats": [
-        {
-            "name":"c1",
-            "value":0
-        },
-        {
-            "name":"c2",
-            "value":20
-        },
+        {"name":"c1", "value":0},
+        {"name":"c2", "value":20},
         {
             "histograms": [
                 {
-                    "name": "h1",
-                    "supported_buckets": [
-                        0.5,
-                        1,
-                        5,
-                        10,
-                        25,
-                        50,
-                        100,
-                        250,
-                        500,
-                        1000,
-                        2500,
-                        5000,
-                        10000,
-                        30000,
-                        60000,
-                        300000,
-                        600000,
-                        1800000,
-                        3600000
-                    ],
-                    "computed_buckets": [
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        }
+                    "name": "h1", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":3, "interval":1, "cumulative":3},
+                        {"upper_bound":4, "interval":1, "cumulative":3}
                     ]
                 }
             ]
@@ -453,112 +370,15 @@ TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsCumulative) {
   EXPECT_EQ(Http::Code::OK, code);
   const std::string expected_json_used = R"EOF({
     "stats": [
-        {
-            "name":"c2",
-            "value":20
-        },
+        {"name":"c2", "value":20},
         {
             "histograms": [
                 {
-                    "name": "h1",
-                    "supported_buckets": [
-                        0.5,
-                        1,
-                        5,
-                        10,
-                        25,
-                        50,
-                        100,
-                        250,
-                        500,
-                        1000,
-                        2500,
-                        5000,
-                        10000,
-                        30000,
-                        60000,
-                        300000,
-                        600000,
-                        1800000,
-                        3600000
-                    ],
-                    "computed_buckets": [
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        }
+                    "name": "h1", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":3, "interval":1, "cumulative":3},
+                        {"upper_bound":4, "interval":1, "cumulative":3}
                     ]
                 }
             ]
@@ -576,105 +396,11 @@ TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsCumulative) {
         {
             "histograms": [
                 {
-                    "name": "h1",
-                    "supported_buckets": [
-                        0.5,
-                        1,
-                        5,
-                        10,
-                        25,
-                        50,
-                        100,
-                        250,
-                        500,
-                        1000,
-                        2500,
-                        5000,
-                        10000,
-                        30000,
-                        60000,
-                        300000,
-                        600000,
-                        1800000,
-                        3600000
-                    ],
-                    "computed_buckets": [
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 3
-                        }
+                    "name": "h1", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":3, "interval":1, "cumulative":3},
+                        {"upper_bound":4, "interval":1, "cumulative":3}
                     ]
                 }
             ]
@@ -700,6 +426,7 @@ TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsDisjoint) {
   EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
   EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
   StatsHandler handler(instance);
+  setHistogramBucketSettings();
 
   store_->counterFromString("c1");
   Stats::Counter& c2 = store_->counterFromString("c2");
@@ -708,16 +435,16 @@ TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsDisjoint) {
 
   Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
-  h1.recordValue(200);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
+  h1.recordValue(1);
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
-  h1.recordValue(300);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 2));
+  h1.recordValue(2);
 
   store_->mergeHistograms([]() -> void {});
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
-  h1.recordValue(300);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 2));
+  h1.recordValue(2);
 
   store_->mergeHistograms([]() -> void {});
 
@@ -726,116 +453,16 @@ TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsDisjoint) {
 
   const std::string expected_json = R"EOF({
     "stats": [
-        {
-            "name":"c1",
-            "value":0
-        },
-        {
-            "name":"c2",
-            "value":20
-        },
+        {"name":"c1", "value":0},
+        {"name":"c2", "value":20},
         {
             "histograms": [
                 {
-                    "name": "h1",
-                    "supported_buckets": [
-                        0.5,
-                        1,
-                        5,
-                        10,
-                        25,
-                        50,
-                        100,
-                        250,
-                        500,
-                        1000,
-                        2500,
-                        5000,
-                        10000,
-                        30000,
-                        60000,
-                        300000,
-                        600000,
-                        1800000,
-                        3600000
-                    ],
-                    "computed_buckets": [
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 2
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        }
+                    "name": "h1", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":3, "interval":1, "cumulative":2},
+                        {"upper_bound":4, "interval":0, "cumulative":0}
                     ]
                 }
             ]
@@ -849,112 +476,15 @@ TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsDisjoint) {
   EXPECT_EQ(Http::Code::OK, code);
   const std::string expected_json_used = R"EOF({
     "stats": [
-        {
-            "name":"c2",
-            "value":20
-        },
+        {"name":"c2", "value":20},
         {
             "histograms": [
                 {
-                    "name": "h1",
-                    "supported_buckets": [
-                        0.5,
-                        1,
-                        5,
-                        10,
-                        25,
-                        50,
-                        100,
-                        250,
-                        500,
-                        1000,
-                        2500,
-                        5000,
-                        10000,
-                        30000,
-                        60000,
-                        300000,
-                        600000,
-                        1800000,
-                        3600000
-                    ],
-                    "computed_buckets": [
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 2
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        }
+                    "name": "h1", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":3, "interval":1, "cumulative":2},
+                        {"upper_bound":4, "interval":0, "cumulative":0}
                     ]
                 }
             ]
@@ -972,105 +502,11 @@ TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsDisjoint) {
         {
             "histograms": [
                 {
-                    "name": "h1",
-                    "supported_buckets": [
-                        0.5,
-                        1,
-                        5,
-                        10,
-                        25,
-                        50,
-                        100,
-                        250,
-                        500,
-                        1000,
-                        2500,
-                        5000,
-                        10000,
-                        30000,
-                        60000,
-                        300000,
-                        600000,
-                        1800000,
-                        3600000
-                    ],
-                    "computed_buckets": [
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 2
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        }
+                    "name": "h1", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":3, "interval":1, "cumulative":2},
+                        {"upper_bound":4, "interval":0, "cumulative":0}
                     ]
                 }
             ]
@@ -1086,20 +522,21 @@ TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsDisjoint) {
 TEST_P(AdminStatsTest, StatsAsJsonHistogramBucketsMultipleHistograms) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
+  setHistogramBucketSettings();
 
   Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
   Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
-  h1.recordValue(200);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
+  h1.recordValue(1);
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 100));
-  h2.recordValue(100);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 2));
+  h2.recordValue(2);
 
   store_->mergeHistograms([]() -> void {});
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
-  h1.recordValue(100);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 2));
+  h1.recordValue(2);
 
   store_->mergeHistograms([]() -> void {});
 
@@ -1117,207 +554,19 @@ TEST_P(AdminStatsTest, StatsAsJsonHistogramBucketsMultipleHistograms) {
         {
             "histograms": [
                 {
-                    "name": "h1",
-                    "supported_buckets": [
-                        0.5,
-                        1,
-                        5,
-                        10,
-                        25,
-                        50,
-                        100,
-                        250,
-                        500,
-                        1000,
-                        2500,
-                        5000,
-                        10000,
-                        30000,
-                        60000,
-                        300000,
-                        600000,
-                        1800000,
-                        3600000
-                    ],
-                    "computed_buckets": [
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 2
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 2
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 2
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 2
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 2
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 2
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 2
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 2
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 2
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 2
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 2
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 2
-                        }
+                    "name": "h1", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":3, "interval":1, "cumulative":2},
+                        {"upper_bound":4, "interval":1, "cumulative":2}
                     ]
                 },
                 {
-                    "name": "h2",
-                    "supported_buckets": [
-                        0.5,
-                        1,
-                        5,
-                        10,
-                        25,
-                        50,
-                        100,
-                        250,
-                        500,
-                        1000,
-                        2500,
-                        5000,
-                        10000,
-                        30000,
-                        60000,
-                        300000,
-                        600000,
-                        1800000,
-                        3600000
-                    ],
-                    "computed_buckets": [
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        }
+                    "name": "h2", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":0},
+                        {"upper_bound":3, "interval":0, "cumulative":1},
+                        {"upper_bound":4, "interval":0, "cumulative":1}
                     ]
                 }
             ]
@@ -1335,207 +584,19 @@ TEST_P(AdminStatsTest, StatsAsJsonHistogramBucketsMultipleHistograms) {
         {
             "histograms": [
                 {
-                    "name": "h1",
-                    "supported_buckets": [
-                        0.5,
-                        1,
-                        5,
-                        10,
-                        25,
-                        50,
-                        100,
-                        250,
-                        500,
-                        1000,
-                        2500,
-                        5000,
-                        10000,
-                        30000,
-                        60000,
-                        300000,
-                        600000,
-                        1800000,
-                        3600000
-                    ],
-                    "computed_buckets": [
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 1,
-                            "cumulative": 2
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        }
+                    "name": "h1", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":3, "interval":1, "cumulative":1},
+                        {"upper_bound":4, "interval":0, "cumulative":0}
                     ]
                 },
                 {
-                    "name": "h2",
-                    "supported_buckets": [
-                        0.5,
-                        1,
-                        5,
-                        10,
-                        25,
-                        50,
-                        100,
-                        250,
-                        500,
-                        1000,
-                        2500,
-                        5000,
-                        10000,
-                        30000,
-                        60000,
-                        300000,
-                        600000,
-                        1800000,
-                        3600000
-                    ],
-                    "computed_buckets": [
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 1
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        },
-                        {
-                            "interval": 0,
-                            "cumulative": 0
-                        }
+                    "name": "h2", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":0},
+                        {"upper_bound":3, "interval":0, "cumulative":1},
+                        {"upper_bound":4, "interval":0, "cumulative":0}
                     ]
                 }
             ]
