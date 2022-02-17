@@ -23,6 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <https://www.nada.kth.se/~snilsson/publications/IP-address-lookup-using-LC-tries/>`_
 // by S. Nilsson and G. Karlsson. For "big" lists of IPs, this matcher is more
 // efficient than multiple single IP matcher, that would have a linear cost.
+// Envoy's LC-trie implementation supports up to 262144 unique entries.
 message Ip {
   // Match if the IP belongs to any of these CIDR ranges.
   repeated config.core.v3.CidrRange cidr_ranges = 1 [(validate.rules).repeated = {min_items: 1}];
