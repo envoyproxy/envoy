@@ -139,7 +139,7 @@ void FileEventImpl::registerEventIfEmulatedEdge(uint32_t event) {
       auto new_event_mask = enabled_events_ | event;
       if (event & FileReadyType::Read && (enabled_events_ & FileReadyType::Closed)) {
         // We never ask for both early close and read at the same time.
-        //new_event_mask = new_event_mask & ~FileReadyType::Read;
+        new_event_mask = new_event_mask & ~FileReadyType::Read;
       }
       updateEvents(new_event_mask);
     }
