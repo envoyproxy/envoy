@@ -2,10 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.ratelimit.v3;
 
-import "envoy/config/core/v3/substitution_format_string.proto";
 import "envoy/config/ratelimit/v3/rls.proto";
 import "envoy/extensions/common/ratelimit/v3/ratelimit.proto";
-import "envoy/type/v3/ratelimit_unit.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -23,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Rate limit :ref:`configuration overview <config_network_filters_rate_limit>`.
 // [#extension: envoy.filters.network.ratelimit]
 
-// [#next-free-field: 8]
+// [#next-free-field: 7]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.rate_limit.v2.RateLimit";
@@ -34,12 +32,9 @@ message RateLimit {
   // The rate limit domain to use in the rate limit service request.
   string domain = 2 [(validate.rules).string = {min_len: 1}];
 
-  // The rate limit descriptor list of static values to use in the rate limit service request.
+  // The rate limit descriptor list of values to use in the rate limit service request.
   repeated common.ratelimit.v3.RateLimitDescriptor descriptors = 3
       [(validate.rules).repeated = {min_items: 1}];
-
-  // The rate limit descriptor list of dynamic values to use in the rate limit service request.
-  repeated NetworkRateLimitDescriptor dynamic_descriptors = 8;
 
   // The timeout in milliseconds for the rate limit service RPC. If not
   // set, this defaults to 20ms.
@@ -56,45 +51,4 @@ message RateLimit {
   // success.
   config.ratelimit.v3.RateLimitServiceConfig rate_limit_service = 6
       [(validate.rules).message = {required: true}];
-}
-
-
-// TODO: documentation
-// TODO:
-message NetworkRateLimitDescriptor {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.api.v2.ratelimit.RateLimitDescriptor";
-
-  message Entry {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.api.v2.ratelimit.RateLimitDescriptor.Entry";
-
-    // Descriptor key.
-    string key = 1 [(validate.rules).string = {min_len: 1}];
-
-    oneof value {
-      // Descriptor value. Fixed.
-      string fixed_value = 2 [(validate.rules).string = {min_len: 1}];
-
-      // Descriptor value. Dynamic substitution.
-      config.core.v3.SubstitutionFormatString dynamic_value = 3 [(validate.rules).message = {required: true}];
-    }
-  }
-
-  // Override rate limit to apply to this descriptor instead of the limit
-  // configured in the rate limit service. See :ref:`rate limit override
-  // <config_http_filters_rate_limit_rate_limit_override>` for more information.
-  message RateLimitOverride {
-    // The number of requests per unit of time.
-    uint32 requests_per_unit = 1;
-
-    // The unit of time.
-    type.v3.RateLimitUnit unit = 2 [(validate.rules).enum = {defined_only: true}];
-  }
-
-  // Descriptor entries.
-  repeated Entry entries = 1 [(validate.rules).repeated = {min_items: 1}];
-
-  // Optional rate limit override to supply to the ratelimit service.
-  RateLimitOverride limit = 2;
 }
