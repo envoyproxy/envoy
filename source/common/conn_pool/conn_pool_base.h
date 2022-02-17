@@ -285,22 +285,8 @@ public:
   Upstream::ClusterConnectivityState& state() { return state_; }
 
   // Update the cluster capacity and the local connecting capacity if applicable.
-  void decrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client) {
-    state_.decrConnectingAndConnectedStreamCapacity(delta);
-    if (client.isConnecting()) {
-      // If connecting, this client must have been serving early data streams, update the local
-      // connecting capacity.
-      ASSERT(connecting_stream_capacity_ >= delta);
-      connecting_stream_capacity_ -= delta;
-    }
-  }
-
-  void incrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client) {
-    state_.incrConnectingAndConnectedStreamCapacity(delta);
-    if (client.isConnecting()) {
-      connecting_stream_capacity_ += delta;
-    }
-  }
+  void decrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client);
+  void incrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client);
 
   // Called when an upstream is ready to serve pending streams.
   void onUpstreamReady();

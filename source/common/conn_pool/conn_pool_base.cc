@@ -567,7 +567,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     // At this point, for the mixed ALPN pool, the client may be deleted. Do not
     // refer to client after this point.
     onConnected(client);
-    if (client.state() == ActiveClient::State::READY) {
+    if (client.readyForStream()) {
       onUpstreamReady();
     }
     checkForIdleAndCloseIdleConnsIfDraining();
@@ -777,6 +777,23 @@ bool ActiveClient::readyForStream() const {
 }
 
 bool ActiveClient::isConnecting() const { return connect_timer_ != nullptr; }
+
+void ActiveClient::decrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client) {
+  state_.decrConnectingAndConnectedStreamCapacity(delta);
+  if (client.isConnecting()) {
+    // If connecting, this client must have been serving early data streams, update the local
+    // connecting capacity.
+    ASSERT(connecting_stream_capacity_ >= delta);
+    connecting_stream_capacity_ -= delta;
+  }
+}
+
+void ActiveClient::incrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client) {
+  state_.incrConnectingAndConnectedStreamCapacity(delta);
+  if (client.isConnecting()) {
+    connecting_stream_capacity_ += delta;
+  }
+}
 
 } // namespace ConnectionPool
 } // namespace Envoy
