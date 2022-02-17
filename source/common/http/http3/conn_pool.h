@@ -25,7 +25,7 @@ public:
   ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                Upstream::Host::CreateConnectionData& data);
 
-  ~ActiveClient() {
+  ~ActiveClient() override {
     if (async_connect_callback_ != nullptr && async_connect_callback_->enabled()) {
       async_connect_callback_->cancel();
     }
@@ -102,6 +102,9 @@ private:
   // deemed connected, at which point further connections will be established if
   // necessary.
   uint64_t quiche_capacity_ = 100;
+  // Used to schedule a deferred connect() call. Because HTTP/3 codec client can
+  // do 0-RTT during connect(), deferring it to avoid handling network events during CodecClient
+  // construction.
   Event::SchedulableCallbackPtr async_connect_callback_;
 };
 

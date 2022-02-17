@@ -822,7 +822,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.postpone_h3_client_connect_till_enlisted", "false"}});
+      {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "false"}});
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
 

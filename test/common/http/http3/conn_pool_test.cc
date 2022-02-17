@@ -171,7 +171,7 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
                                                                /*can_use_http3_=*/true});
   EXPECT_NE(nullptr, cancellable);
   if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted")) {
+          "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
     async_connect_callback->invokeCallback();
   }
 
@@ -186,7 +186,7 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
 
 TEST_F(Http3ConnPoolImplTest, NewAndCancelStreamBeforeConnect) {
   if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted")) {
+          "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
     return;
   }
 
@@ -218,7 +218,7 @@ TEST_F(Http3ConnPoolImplTest, NewAndCancelStreamBeforeConnect) {
 
 TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
   if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted")) {
+          "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
     return;
   }
   EXPECT_CALL(mockHost().cluster_, perConnectionBufferLimitBytes);
