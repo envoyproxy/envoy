@@ -272,7 +272,7 @@ Developers trying to can iterate through changes in these tests locally with:
 If you are visiting this section because you saw a message like:
 
 ```bash
-[...][16][critical][assert] [source/common/stats/symbol_table_impl.cc:251] assert failure:
+[...][16][critical][assert] [source/common/stats/symbol_table.cc:341] assert failure:
 decode_search != decode_map_.end(). Details: Please see
 https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#debugging-symbol-table-assertions
 ```

@@ -215,9 +215,9 @@ void Router::onEvent(Network::ConnectionEvent event) {
   case Network::ConnectionEvent::LocalClose:
     upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
-  default:
+  case Network::ConnectionEvent::Connected:
     // Connected is consumed by the connection pool.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("unexpected");
   }
 }
 
@@ -415,8 +415,6 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
                                  upstream_host_->address()->asString())),
         false);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (parent_.filter_complete_ && !response_complete_) {

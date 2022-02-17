@@ -9,7 +9,7 @@
 #include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/cluster_info.h"

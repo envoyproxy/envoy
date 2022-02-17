@@ -19,7 +19,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/utility.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "absl/strings/str_join.h"
 
@@ -152,7 +152,7 @@ const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, Value
     return message;
   }
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 const std::string UdpStatsdSink::getName(const Stats::Metric& metric) const {

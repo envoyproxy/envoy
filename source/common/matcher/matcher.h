@@ -62,6 +62,22 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
 template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatcherPtr<DataType>()>;
 
 /**
+ * A matcher that will always resolve to associated on_no_match. This is used when
+ * the matcher is configured without a matcher, allowing for a tree that always resolves
+ * to a specific OnMatch.
+ */
+template <class DataType> class AnyMatcher : public MatchTree<DataType> {
+public:
+  explicit AnyMatcher(absl::optional<OnMatch<DataType>> on_no_match)
+      : on_no_match_(std::move(on_no_match)) {}
+
+  typename MatchTree<DataType>::MatchResult match(const DataType&) override {
+    return {MatchState::MatchComplete, on_no_match_};
+  }
+  const absl::optional<OnMatch<DataType>> on_no_match_;
+};
+
+/**
  * Recursively constructs a MatchTree from a protobuf configuration.
  * @param DataType the type used as a source for DataInputs
  * @param ActionFactoryContext the context provided to Action factories
@@ -83,8 +99,7 @@ public:
     case MatcherType::kMatcherList:
       return createListMatcher(config);
     case MatcherType::MATCHER_TYPE_NOT_SET:
-      IS_ENVOY_BUG("match fail");
-      return nullptr;
+      return createAnyMatcher(config);
     }
     return nullptr;
   }
@@ -100,6 +115,15 @@ public:
   }
 
 private:
+  template <class MatcherType>
+  MatchTreeFactoryCb<DataType> createAnyMatcher(const MatcherType& config) {
+    auto on_no_match = createOnMatch(config.on_no_match());
+
+    return [on_no_match]() {
+      return std::make_unique<AnyMatcher<DataType>>(
+          on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
+    };
+  }
   template <class MatcherType>
   MatchTreeFactoryCb<DataType> createListMatcher(const MatcherType& config) {
     std::vector<std::pair<FieldMatcherFactoryCb<DataType>, OnMatchFactoryCb<DataType>>>

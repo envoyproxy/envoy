@@ -24,25 +24,26 @@ namespace Quic {
 bool ActiveQuicListenerFactory::disable_kernel_bpf_packet_routing_for_test_ = false;
 
 ActiveQuicListener::ActiveQuicListener(
-    uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
-    Network::UdpConnectionHandler& parent, Network::ListenerConfig& listener_config,
-    const quic::QuicConfig& quic_config, bool kernel_worker_routing,
-    const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
-    uint32_t packets_received_to_connection_count_ratio,
+    Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
+    Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
+    Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
+    bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+    QuicStatNames& quic_stat_names, uint32_t packets_received_to_connection_count_ratio,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory)
-    : ActiveQuicListener(worker_index, concurrency, dispatcher, parent,
+    : ActiveQuicListener(runtime, worker_index, concurrency, dispatcher, parent,
                          listener_config.listenSocketFactory().getListenSocket(worker_index),
                          listener_config, quic_config, kernel_worker_routing, enabled,
                          quic_stat_names, packets_received_to_connection_count_ratio,
                          crypto_server_stream_factory, proof_source_factory) {}
 
 ActiveQuicListener::ActiveQuicListener(
-    uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
-    Network::UdpConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
-    Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
-    bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
-    QuicStatNames& quic_stat_names, uint32_t packets_to_read_to_connection_count_ratio,
+    Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
+    Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
+    Network::SocketSharedPtr listen_socket, Network::ListenerConfig& listener_config,
+    const quic::QuicConfig& quic_config, bool kernel_worker_routing,
+    const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
+    uint32_t packets_to_read_to_connection_count_ratio,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory)
     : Server::ActiveUdpListenerBase(
@@ -59,7 +60,7 @@ ActiveQuicListener::ActiveQuicListener(
   ASSERT(!GetQuicFlag(FLAGS_quic_header_size_limit_includes_overhead));
 
   if (Runtime::LoaderSingleton::getExisting()) {
-    enabled_.emplace(Runtime::FeatureFlag(enabled, Runtime::LoaderSingleton::get()));
+    enabled_.emplace(Runtime::FeatureFlag(enabled, runtime));
   }
 
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
@@ -339,13 +340,14 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
 }
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
-    uint32_t worker_index, Network::UdpConnectionHandler& parent, Event::Dispatcher& disptacher,
-    Network::ListenerConfig& config) {
+    Runtime::Loader& runtime, uint32_t worker_index, Network::UdpConnectionHandler& parent,
+    Event::Dispatcher& disptacher, Network::ListenerConfig& config) {
   ASSERT(crypto_server_stream_factory_.has_value());
   return std::make_unique<ActiveQuicListener>(
-      worker_index, concurrency_, disptacher, parent, config, quic_config_, kernel_worker_routing_,
-      enabled_, quic_stat_names_, packets_to_read_to_connection_count_ratio_,
-      crypto_server_stream_factory_.value(), proof_source_factory_.value());
+      runtime, worker_index, concurrency_, disptacher, parent, config, quic_config_,
+      kernel_worker_routing_, enabled_, quic_stat_names_,
+      packets_to_read_to_connection_count_ratio_, crypto_server_stream_factory_.value(),
+      proof_source_factory_.value());
 }
 
 } // namespace Quic
