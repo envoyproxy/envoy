@@ -9,6 +9,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
+#include "source/common/config/external_config_validators.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -60,7 +61,7 @@ struct Watch {
 // A WatchMap is assumed to be dedicated to a single type_url type of resource (EDS, CDS, etc).
 class WatchMap : public UntypedConfigUpdateCallbacks, public Logger::Loggable<Logger::Id::config> {
 public:
-  WatchMap(const bool use_namespace_matching) : use_namespace_matching_(use_namespace_matching) {}
+  WatchMap(const bool use_namespace_matching, const std::string& type_url, ExternalConfigValidators& config_validators) : use_namespace_matching_(use_namespace_matching), type_url_(type_url), config_validators_(config_validators) {}
 
   // Adds 'callbacks' to the WatchMap, with every possible resource being watched.
   // (Use updateWatchInterest() to narrow it down to some specific names).
@@ -127,6 +128,8 @@ private:
   absl::flat_hash_map<std::string, absl::flat_hash_set<Watch*>> watch_interest_;
 
   const bool use_namespace_matching_;
+  const std::string type_url_;
+  ExternalConfigValidators& config_validators_;
 };
 
 } // namespace Config

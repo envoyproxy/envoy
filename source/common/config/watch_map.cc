@@ -124,13 +124,20 @@ void WatchMap::onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
   // Build a map from watches, to the set of updated resources that each watch cares about. Each
   // entry in the map is then a nice little bundle that can be fed directly into the individual
   // onConfigUpdate()s.
+  // TODO(adisuissa): Remove the unneeded decoded_resources_for_validation.
+  std::vector<DecodedResourceRef> decoded_resources_for_validation;
   absl::flat_hash_map<Watch*, std::vector<DecodedResourceRef>> per_watch_updates;
   for (const auto& r : resources) {
+    decoded_resources_for_validation.emplace_back(*r);
     const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r->name());
     for (const auto& interested_watch : interested_in_r) {
       per_watch_updates[interested_watch].emplace_back(*r);
     }
   }
+
+  // Execute external config validators.
+  std::cerr << "ADI: WatchMap::onConfigUpdate calling sotw validators for type: " << type_url_ << ", resources#: " << decoded_resources_for_validation.size() << std::endl;
+  config_validators_.executeValidators(type_url_, decoded_resources_for_validation);
 
   const bool map_is_single_wildcard = (watches_.size() == 1 && wildcard_watches_.size() == 1);
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
@@ -185,6 +192,8 @@ void WatchMap::onConfigUpdate(
   // cares about. Each entry in the map-pair is then a nice little bundle that can be fed directly
   // into the individual onConfigUpdate()s.
   std::vector<DecodedResourceImplPtr> decoded_resources;
+  // TODO(adisuissa): Remove the unneeded decoded_resources_for_validation.
+  std::vector<DecodedResourceRef> decoded_resources_for_validation;
   absl::flat_hash_map<Watch*, std::vector<DecodedResourceRef>> per_watch_added;
   for (const auto& r : added_resources) {
     const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r.name());
@@ -195,6 +204,7 @@ void WatchMap::onConfigUpdate(
     }
     decoded_resources.emplace_back(
         new DecodedResourceImpl((*interested_in_r.begin())->resource_decoder_, r));
+    decoded_resources_for_validation.emplace_back(*decoded_resources.back());
     for (const auto& interested_watch : interested_in_r) {
       per_watch_added[interested_watch].emplace_back(*decoded_resources.back());
     }
@@ -206,6 +216,10 @@ void WatchMap::onConfigUpdate(
       *per_watch_removed[interested_watch].Add() = r;
     }
   }
+
+  // Execute external config validators.
+  std::cerr << "ADI: WatchMap::onConfigUpdate calling delta validators for type: " << type_url_ << ", added_resources#: " << decoded_resources_for_validation.size() << " removed_resources#: " << removed_resources.size()<< std::endl;
+  config_validators_.executeValidators(type_url_, decoded_resources_for_validation, removed_resources);
 
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (const auto& [cur_watch, resource_to_add] : per_watch_added) {

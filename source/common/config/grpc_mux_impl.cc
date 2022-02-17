@@ -36,10 +36,12 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
                          Random::RandomGenerator& random, Stats::Scope& scope,
-                         const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node)
+                         const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
+                         ExternalConfigValidatorsPtr&& config_validators)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
+      config_validators_(std::move(config_validators)),
       first_stream_request_(true), dispatcher_(dispatcher),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
           [this](absl::string_view resource_type_url) {
@@ -241,6 +243,12 @@ void GrpcMuxImpl::onDiscoveryResponse(
         all_resource_refs.emplace_back(*resources.back());
         resource_ref_map.emplace(resources.back()->name(), *resources.back());
       }
+    }
+
+    // Execute external config validators if there are any watches.
+    if (!api_state.watches_.empty()) {
+      std::cerr << "ADI: GrpcMuxImpl::onDiscoveryResponse calling sotw validators for type: " << type_url << ", resources#: " << all_resource_refs.size() << std::endl;
+      config_validators_->executeValidators(type_url, all_resource_refs);
     }
 
     for (auto watch : api_state.watches_) {

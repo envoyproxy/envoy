@@ -132,6 +132,7 @@ public:
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* config_validator_typed_config = bootstrap.mutable_dynamic_resources()
                                                 ->mutable_cds_config()
+                                                ->mutable_api_config_source()
                                                 ->add_config_validators_typed_configs();
       envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;
       config.set_min_clusters_num(threshold);
@@ -148,6 +149,30 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, MinimumClustersValidatorIntegrationTest,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
+TEST_P(MinimumClustersValidatorIntegrationTest, RemoveAllClustersThreshold0) {
+  addValidator(0);
+  initializeTest(2);
+
+  // 3 clusters: xds + 2 upstream clusters.
+  EXPECT_EQ(3, test_server_->gauge("cluster_manager.active_clusters")->value());
+
+  // Removing the 2 clusters should be successful.
+  std::vector<std::string> removed_clusters_names;
+  std::transform(clusters_.cbegin(), clusters_.cend(), std::back_inserter(removed_clusters_names),
+                 [](const envoy::config::cluster::v3::Cluster& cluster) -> std::string {
+                   return cluster.name();
+                 });
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "7", {}, {}, {}));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {}, {},
+                                                             {removed_clusters_names}, "8");
+
+  // Receive ACK.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "8", {}, {}, {}));
+  EXPECT_EQ(1, test_server_->gauge("cluster_manager.active_clusters")->value());
+}
+
 TEST_P(MinimumClustersValidatorIntegrationTest, RemoveAllClustersThreshold1) {
   addValidator(1);
   initializeTest(2);
@@ -163,30 +188,8 @@ TEST_P(MinimumClustersValidatorIntegrationTest, RemoveAllClustersThreshold1) {
                  });
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "7", {}, {}, {}));
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
-                                                             {removed_clusters_names}, "8");
-
-  // Receive ACK.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "8", {}, {}, {}));
-  EXPECT_EQ(1, test_server_->gauge("cluster_manager.active_clusters")->value());
-}
-
-TEST_P(MinimumClustersValidatorIntegrationTest, RemoveAllClustersThreshold2) {
-  addValidator(2);
-  initializeTest(2);
-
-  // 3 clusters: xds + 2 upstream clusters.
-  EXPECT_EQ(3, test_server_->gauge("cluster_manager.active_clusters")->value());
-
-  // Removing the 2 clusters should be successful.
-  std::vector<std::string> removed_clusters_names;
-  std::transform(clusters_.cbegin(), clusters_.cend(), std::back_inserter(removed_clusters_names),
-                 [](const envoy::config::cluster::v3::Cluster& cluster) -> std::string {
-                   return cluster.name();
-                 });
-
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "7", {}, {}, {}));
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {}, {},
                                                              {removed_clusters_names}, "8");
 
   // Receive NACK.

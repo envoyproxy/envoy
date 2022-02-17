@@ -268,6 +268,10 @@ public:
 
     ClusterInfoMap active_clusters_;
     ClusterInfoMap warming_clusters_;
+
+    // Clusters that were dynamically added via API (xDS). This map will be a
+    // subset of the `active_clusters_` and `warming_clusters_` maps.
+    ClusterInfoMap added_via_api_clusters_;
   };
 
   /**

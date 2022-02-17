@@ -247,7 +247,7 @@ public:
                      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                      Http::Context& http_context, Grpc::Context& grpc_context,
-                     Router::Context& router_context);
+                     Router::Context& router_context, Server::Instance& server);
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 
@@ -267,9 +267,17 @@ public:
     ClusterInfoMaps clusters_maps;
     for (const auto& cluster : active_clusters_) {
       clusters_maps.active_clusters_.emplace(cluster.first, *cluster.second->cluster_);
+      if (cluster.second->cluster_->info()->addedViaApi()) {
+        std::cout << "ADI1: adding cluster " << cluster.first << " which was added via API" << std::endl;
+        clusters_maps.added_via_api_clusters_.emplace(cluster.first, *cluster.second->cluster_);
+      }
     }
     for (const auto& cluster : warming_clusters_) {
       clusters_maps.warming_clusters_.emplace(cluster.first, *cluster.second->cluster_);
+      if (cluster.second->cluster_->info()->addedViaApi()) {
+        std::cout << "ADI2: adding cluster " << cluster.first << " which was added via API" << std::endl;
+        clusters_maps.added_via_api_clusters_.emplace(cluster.first, *cluster.second->cluster_);
+      }
     }
     return clusters_maps;
   }

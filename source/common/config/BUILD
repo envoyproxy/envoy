@@ -157,6 +157,7 @@ envoy_cc_library(
     deps = [
         ":api_version_lib",
         ":decoded_resource_lib",
+        ":external_config_validators_lib",
         ":grpc_stream_lib",
         ":ttl_lib",
         ":utility_lib",
@@ -193,6 +194,7 @@ envoy_cc_library(
     deps = [
         ":delta_subscription_state_lib",
         ":grpc_stream_lib",
+        ":external_config_validators_lib",
         ":pausable_ack_queue_lib",
         ":watch_map_lib",
         ":xds_context_params_lib",
@@ -313,6 +315,7 @@ envoy_cc_library(
     srcs = ["subscription_factory_impl.cc"],
     hdrs = ["subscription_factory_impl.h"],
     deps = [
+        ":external_config_validators_lib",
         ":filesystem_subscription_lib",
         ":grpc_subscription_lib",
         ":http_subscription_lib",
@@ -411,6 +414,7 @@ envoy_cc_library(
     hdrs = ["watch_map.h"],
     deps = [
         ":decoded_resource_lib",
+        ":external_config_validators_lib",
         ":utility_lib",
         ":xds_resource_lib",
         "//envoy/config:subscription_interface",
@@ -434,9 +438,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "validated_subscription_lib",
-    srcs = ["validated_subscription.cc"],
-    hdrs = ["validated_subscription.h"],
+    name = "external_config_validators_lib",
+    srcs = ["external_config_validators.cc"],
+    hdrs = ["external_config_validators.h"],
     deps = [
         ":opaque_resource_decoder_lib",
         ":resource_name_lib",

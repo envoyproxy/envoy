@@ -37,7 +37,6 @@ envoy_cc_library(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:subscription_base_interface",
-        "//source/common/config:validated_subscription_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

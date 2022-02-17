@@ -10,9 +10,23 @@ namespace Config {
 namespace Validators {
 
 bool MinimumClustersValidator::validate(Server::Instance&,
-                                        const std::vector<Envoy::Config::DecodedResourceRef>&) {
-  // Should never be reached because CDS updates are processed only by the delta validator.
-  PANIC("Validation not implemented");
+                                        const std::vector<Envoy::Config::DecodedResourceRef>& resources) {
+  absl::flat_hash_set<std::string> next_cluster_names(resources.size());
+  for (const auto& resource : resources) {
+    envoy::config::cluster::v3::Cluster cluster =
+        dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get().resource());
+
+    // If the cluster was already added in the current update, it won't be added twice.
+    next_cluster_names.insert(cluster.name());
+  }
+
+  // After applying the update, the clusters names will be the same as in
+  // next_cluster_names.
+  if (next_cluster_names.size() < min_clusters_num_) {
+    throw EnvoyException("CDS update attempts to reduce clusters below configured minimum.");
+  }
+
+  return true;
 }
 
 bool MinimumClustersValidator::validate(
@@ -22,8 +36,7 @@ bool MinimumClustersValidator::validate(
   // If the number of clusters after removing all of the clusters in the removed_resources list is
   // above the threshold, then it is surely a valid config.
   const Upstream::ClusterManager::ClusterInfoMaps cur_clusters = cm.clusters();
-  const uint32_t cur_clusters_num =
-      cur_clusters.active_clusters_.size() + cur_clusters.warming_clusters_.size();
+  const uint32_t cur_clusters_num = cur_clusters.added_via_api_clusters_.size();
   const uint32_t removed_resources_size = static_cast<uint32_t>(removed_resources.size());
   if ((cur_clusters_num >= removed_resources_size) &&
       (cur_clusters_num - removed_resources_size >= min_clusters_num_)) {

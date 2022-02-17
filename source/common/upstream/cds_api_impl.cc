@@ -11,21 +11,17 @@ namespace Upstream {
 CdsApiPtr CdsApiImpl::create(const envoy::config::core::v3::ConfigSource& cds_config,
                              const xds::core::v3::ResourceLocator* cds_resources_locator,
                              ClusterManager& cm, Stats::Scope& scope,
-                             ProtobufMessage::ValidationVisitor& validation_visitor,
-                             Server::Instance& server) {
+                             ProtobufMessage::ValidationVisitor& validation_visitor) {
   return CdsApiPtr{
-      new CdsApiImpl(cds_config, cds_resources_locator, cm, scope, validation_visitor, server)};
+      new CdsApiImpl(cds_config, cds_resources_locator, cm, scope, validation_visitor)};
 }
 
 CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
                        const xds::core::v3::ResourceLocator* cds_resources_locator,
                        ClusterManager& cm, Stats::Scope& scope,
-                       ProtobufMessage::ValidationVisitor& validation_visitor,
-                       Server::Instance& server)
+                       ProtobufMessage::ValidationVisitor& validation_visitor)
     : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(validation_visitor,
                                                                            "name"),
-      Envoy::Config::ValidatedSubscription(validation_visitor, server,
-                                           cds_config.config_validators_typed_configs()),
       helper_(cm, "cds"), cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   const auto resource_name = getResourceName();
   if (cds_resources_locator == nullptr) {
@@ -44,6 +40,7 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& r
   for (const auto& resource : resources) {
     all_existing_clusters.active_clusters_.erase(resource.get().name());
     all_existing_clusters.warming_clusters_.erase(resource.get().name());
+    all_existing_clusters.added_via_api_clusters_.erase(resource.get().name());
   }
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
   for (const auto& [cluster_name, _] : all_existing_clusters.active_clusters_) {
@@ -63,19 +60,8 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& r
 void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                                 const std::string& system_version_info) {
-  std::vector<std::string> exception_msgs;
-  // Run the external config validators (if any).
-  TRY_ASSERT_MAIN_THREAD { executeValidators(added_resources, removed_resources); }
-  END_TRY
-  catch (const EnvoyException& e) {
-    exception_msgs.push_back(e.what());
-  }
-
-  if (exception_msgs.empty()) {
-    // External validators verified the config, update internal data-structures.
-    exception_msgs =
-        helper_.onConfigUpdate(added_resources, removed_resources, system_version_info);
-  }
+  auto exception_msgs =
+      helper_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   runInitializeCallbackIfAny();
   if (!exception_msgs.empty()) {
     throw EnvoyException(

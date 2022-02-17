@@ -43,7 +43,8 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
                                        Event::Dispatcher& dispatcher,
                                        const Protobuf::MethodDescriptor& service_method,
                                        Random::RandomGenerator& random, Stats::Scope& scope,
-                                       const RateLimitSettings& rate_limit_settings)
+                                       const RateLimitSettings& rate_limit_settings,
+                                       ExternalConfigValidatorsPtr&& config_validators)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       subscription_state_factory_(std::move(subscription_state_factory)),
@@ -51,7 +52,8 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
           [this](absl::string_view resource_type_url) {
             onDynamicContextUpdate(resource_type_url);
-          })) {
+          })),
+      config_validators_(std::move(config_validators)) {
   Config::Utility::checkLocalInfo("ads", local_info);
   AllMuxes::get().insert(this);
 }
@@ -84,7 +86,7 @@ Config::GrpcMuxWatchPtr GrpcMuxImpl<S, F, RQ, RS>::addWatch(
   if (watch_map == watch_maps_.end()) {
     // We don't yet have a subscription for type_url! Make one!
     watch_map =
-        watch_maps_.emplace(type_url, std::make_unique<WatchMap>(options.use_namespace_matching_))
+        watch_maps_.emplace(type_url, std::make_unique<WatchMap>(options.use_namespace_matching_, type_url, *config_validators_.get()))
             .first;
     subscriptions_.emplace(type_url, subscription_state_factory_->makeSubscriptionState(
                                          type_url, *watch_maps_[type_url], resource_decoder));
@@ -359,10 +361,11 @@ GrpcMuxDelta::GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispat
                            const Protobuf::MethodDescriptor& service_method,
                            Random::RandomGenerator& random, Stats::Scope& scope,
                            const RateLimitSettings& rate_limit_settings,
-                           const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
+                           const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
+                           ExternalConfigValidatorsPtr&& config_validators)
     : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
                   local_info, std::move(async_client), dispatcher, service_method, random, scope,
-                  rate_limit_settings) {}
+                  rate_limit_settings, std::move(config_validators)) {}
 
 // GrpcStreamCallbacks for GrpcMuxDelta
 void GrpcMuxDelta::requestOnDemandUpdate(const std::string& type_url,
@@ -379,10 +382,11 @@ GrpcMuxSotw::GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatch
                          const Protobuf::MethodDescriptor& service_method,
                          Random::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings,
-                         const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
+                         const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
+                         ExternalConfigValidatorsPtr&& config_validators)
     : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
                   local_info, std::move(async_client), dispatcher, service_method, random, scope,
-                  rate_limit_settings) {}
+                  rate_limit_settings, std::move(config_validators)) {}
 
 Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
                                                   const absl::flat_hash_set<std::string>&,

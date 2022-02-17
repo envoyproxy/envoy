@@ -17,6 +17,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/external_config_validators.h"
 #include "source/common/config/grpc_stream.h"
 #include "source/common/config/pausable_ack_queue.h"
 #include "source/common/config/watch_map.h"
@@ -60,7 +61,8 @@ public:
               const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr&& async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Random::RandomGenerator& random, Stats::Scope& scope,
-              const RateLimitSettings& rate_limit_settings);
+              const RateLimitSettings& rate_limit_settings,
+              ExternalConfigValidatorsPtr&& config_validators);
 
   ~GrpcMuxImpl() override;
 
@@ -200,6 +202,7 @@ private:
   // this one is up to GrpcMux.
   const LocalInfo::LocalInfo& local_info_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
+  ExternalConfigValidatorsPtr config_validators_;
 
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.
@@ -213,7 +216,8 @@ public:
   GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
                const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
                Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-               const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node);
+               const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
+               ExternalConfigValidatorsPtr&& config_validators);
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string& type_url,
@@ -227,7 +231,8 @@ public:
   GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
               const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
               Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-              const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node);
+              const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
+              ExternalConfigValidatorsPtr&& config_validators);
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
