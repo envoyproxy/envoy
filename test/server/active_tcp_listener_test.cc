@@ -230,9 +230,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters) {
 
   auto listener = std::make_unique<NiceMock<Network::MockListener>>();
   EXPECT_CALL(*listener, onDestroy());
-  auto active_listener =
-      std::make_unique<ActiveTcpListener>(conn_handler_, std::move(listener), listener_config_,
-		      		          runtime_);
+  auto active_listener = std::make_unique<ActiveTcpListener>(conn_handler_, std::move(listener),
+                                                             listener_config_, runtime_);
   auto accepted_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
 
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle_));
