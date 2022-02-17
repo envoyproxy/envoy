@@ -13,6 +13,8 @@ namespace Envoy {
 namespace Server {
 namespace Utility {
 
+enum class HistogramBucketsValue { Null, Cumulative, Disjoint };
+
 envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
                                                 bool health_check_failed);
 
@@ -22,7 +24,7 @@ bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
                  absl::optional<std::regex>& regex);
 
 bool histogramBucketsParam(const Http::Utility::QueryParams& params, Buffer::Instance& response,
-                           absl::optional<std::string>& histogram_buckets_value);
+                           HistogramBucketsValue& histogram_buckets_value);
 
 absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params);
 

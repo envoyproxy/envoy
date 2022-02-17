@@ -27,13 +27,12 @@ public:
     store_->addSink(sink_);
   }
 
-  static std::string
-  statsAsJsonHandler(std::map<std::string, uint64_t>& all_stats,
-                     std::map<std::string, std::string>& all_text_readouts,
-                     const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                     const bool used_only,
-                     const absl::optional<std::string> histogram_buckets_value = absl::nullopt,
-                     const absl::optional<std::regex> regex = absl::nullopt) {
+  static std::string statsAsJsonHandler(
+      std::map<std::string, uint64_t>& all_stats,
+      std::map<std::string, std::string>& all_text_readouts,
+      const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, const bool used_only,
+      Utility::HistogramBucketsValue histogram_buckets_value = Utility::HistogramBucketsValue::Null,
+      const absl::optional<std::regex> regex = absl::nullopt) {
     return StatsHandler::statsAsJson(all_stats, all_text_readouts, all_histograms, used_only,
                                      histogram_buckets_value, regex, true /*pretty_print*/);
   }
@@ -1111,7 +1110,7 @@ TEST_P(AdminStatsTest, StatsAsJsonHistogramBucketsMultipleHistograms) {
   std::map<std::string, uint64_t> all_stats;
   std::map<std::string, std::string> all_text_readouts;
   std::string actual_json_cumulative = statsAsJsonHandler(
-      all_stats, all_text_readouts, histograms, false, absl::optional<std::string>("cumulative"));
+      all_stats, all_text_readouts, histograms, false, Utility::HistogramBucketsValue::Cumulative);
 
   const std::string expected_json_cumulative = R"EOF({
     "stats": [
@@ -1329,7 +1328,7 @@ TEST_P(AdminStatsTest, StatsAsJsonHistogramBucketsMultipleHistograms) {
   EXPECT_THAT(expected_json_cumulative, JsonStringEq(actual_json_cumulative));
 
   std::string actual_json_disjoint = statsAsJsonHandler(
-      all_stats, all_text_readouts, histograms, false, absl::optional<std::string>("disjoint"));
+      all_stats, all_text_readouts, histograms, false, Utility::HistogramBucketsValue::Disjoint);
 
   const std::string expected_json_disjoint = R"EOF({
     "stats": [
@@ -1937,9 +1936,9 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
 
   std::map<std::string, uint64_t> all_stats;
   std::map<std::string, std::string> all_text_readouts;
-  std::string actual_json =
-      statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(), false, absl::nullopt,
-                         absl::optional<std::regex>{std::regex("[a-z]1")});
+  std::string actual_json = statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(),
+                                               false, Utility::HistogramBucketsValue::Null,
+                                               absl::optional<std::regex>{std::regex("[a-z]1")});
 
   // Because this is a filter case, we don't expect to see any stats except for those containing
   // "h1" in their name.
@@ -2048,9 +2047,9 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
 
   std::map<std::string, uint64_t> all_stats;
   std::map<std::string, std::string> all_text_readouts;
-  std::string actual_json =
-      statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(), true, absl::nullopt,
-                         absl::optional<std::regex>{std::regex("h[12]")});
+  std::string actual_json = statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(),
+                                               true, Utility::HistogramBucketsValue::Null,
+                                               absl::optional<std::regex>{std::regex("h[12]")});
 
   // Expected JSON should not have h2 values as it is not used, and should not have h3 values as
   // they are used but do not match.

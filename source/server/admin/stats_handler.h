@@ -11,6 +11,7 @@
 
 #include "source/common/stats/histogram_impl.h"
 #include "source/server/admin/handler_ctx.h"
+#include "source/server/admin/utils.h"
 
 #include "absl/strings/string_view.h"
 
@@ -61,14 +62,14 @@ private:
                                  const std::map<std::string, std::string>& text_readouts,
                                  const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
                                  bool used_only,
-                                 const absl::optional<std::string>& histogram_buckets_value,
+                                 Utility::HistogramBucketsValue histogram_buckets_value,
                                  const absl::optional<std::regex>& regex,
                                  bool pretty_print = false);
 
   void statsAsText(const std::map<std::string, uint64_t>& all_stats,
                    const std::map<std::string, std::string>& text_readouts,
                    const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                   bool used_only, const absl::optional<std::string>& histogram_buckets_value,
+                   bool used_only, Utility::HistogramBucketsValue histogram_buckets_value,
                    const absl::optional<std::regex>& regex, Buffer::Instance& response);
 
   static std::string computeDisjointBucketSummary(const Stats::ParentHistogramSharedPtr& histogram);

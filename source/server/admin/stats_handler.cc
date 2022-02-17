@@ -10,7 +10,6 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/server/admin/prometheus_stats.h"
-#include "source/server/admin/utils.h"
 
 namespace Envoy {
 namespace Server {
@@ -88,7 +87,7 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   // If the histogram_buckets query param does not exist histogram output should contain quantile
   // summary data. Using histogram_buckets will change output to show bucket data. The
   // histogram_buckets query param has two possible values: cumulative or disjoint.
-  absl::optional<std::string> histogram_buckets_value;
+  Utility::HistogramBucketsValue histogram_buckets_value = Utility::HistogramBucketsValue::Null;
   if (!Utility::histogramBucketsParam(params, response, histogram_buckets_value)) {
     return Http::Code::BadRequest;
   }
@@ -184,7 +183,7 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
                                const std::map<std::string, std::string>& text_readouts,
                                const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
                                bool used_only,
-                               const absl::optional<std::string>& histogram_buckets_value,
+                               Utility::HistogramBucketsValue histogram_buckets_value,
                                const absl::optional<std::regex>& regex,
                                Buffer::Instance& response) {
   // Display plain stats if format query param is not there.
@@ -198,21 +197,27 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
   std::map<std::string, std::string> all_histograms;
   for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
     if (shouldShowMetric(*histogram, used_only, regex)) {
-      bool success = false;
+      bool emplace_success = false;
       // Display bucket data if histogram_buckets query parameter is used, otherwise output contains
       // quantile summary data.
-      if (!histogram_buckets_value.has_value()) {
-        success = all_histograms.emplace(histogram->name(), histogram->quantileSummary()).second;
-      } else if (histogram_buckets_value.value() == "cumulative") {
-        success = all_histograms.emplace(histogram->name(), histogram->bucketSummary()).second;
-      } else {
-        // "disjoint" should be only possible value at this point. Other values should already have
-        // caused a bad request response.
-        ASSERT(histogram_buckets_value.value() == "disjoint");
-        success = all_histograms.emplace(histogram->name(), computeDisjointBucketSummary(histogram))
-                      .second;
+      switch (histogram_buckets_value) {
+      case Utility::HistogramBucketsValue::Null:
+        emplace_success =
+            all_histograms.emplace(histogram->name(), histogram->quantileSummary()).second;
+        break;
+      case Utility::HistogramBucketsValue::Cumulative:
+        emplace_success =
+            all_histograms.emplace(histogram->name(), histogram->bucketSummary()).second;
+        break;
+      case Utility::HistogramBucketsValue::Disjoint:
+        emplace_success =
+            all_histograms.emplace(histogram->name(), computeDisjointBucketSummary(histogram))
+                .second;
+        break;
+      default:
+        break;
       }
-      ASSERT(success); // No duplicates expected.
+      ASSERT(emplace_success); // No duplicates expected.
     }
   }
   for (const auto& histogram : all_histograms) {
@@ -225,7 +230,7 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                           const std::map<std::string, std::string>& text_readouts,
                           const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
                           const bool used_only,
-                          const absl::optional<std::string>& histogram_buckets_value,
+                          Utility::HistogramBucketsValue histogram_buckets_value,
                           const absl::optional<std::regex>& regex, const bool pretty_print) {
 
   ProtobufWkt::Struct document;
@@ -250,18 +255,21 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
 
   // Display bucket data if histogram_buckets query parameter is used, otherwise output contains
   // quantile summary data.
-  if (!histogram_buckets_value.has_value()) {
+  switch (histogram_buckets_value) {
+  case Utility::HistogramBucketsValue::Null:
     statsAsJsonQuantileSummaryHelper(*histograms_obj_container_fields, all_histograms, used_only,
                                      regex);
-  } else if (histogram_buckets_value.value() == "cumulative") {
+    break;
+  case Utility::HistogramBucketsValue::Cumulative:
     statsAsJsonCumulativeHistogramBucketsHelper(*histograms_obj_container_fields, all_histograms,
                                                 used_only, regex);
-  } else {
-    // "disjoint" should be only possible value at this point. Other values should already have
-    // caused a bad request response.
-    ASSERT(histogram_buckets_value.value() == "disjoint");
+    break;
+  case Utility::HistogramBucketsValue::Disjoint:
     statsAsJsonDisjointHistogramBucketsHelper(*histograms_obj_container_fields, all_histograms,
                                               used_only, regex);
+    break;
+  default:
+    break;
   }
 
   // Add histograms to output if used histogram found.
