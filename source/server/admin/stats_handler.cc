@@ -5,12 +5,15 @@
 
 #include "envoy/admin/v3/mutex_stats.pb.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/html/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/server/admin/prometheus_stats.h"
 #include "source/server/admin/utils.h"
+
+#include "absl/types/variant.h"
 
 constexpr uint64_t ChunkSize = 2 * 1000 * 1000;
 

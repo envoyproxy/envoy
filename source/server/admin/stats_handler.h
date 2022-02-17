@@ -3,18 +3,16 @@
 #include <regex>
 #include <string>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
-#include "source/common/buffer/buffer_impl.h"
 #include "source/common/stats/histogram_impl.h"
 #include "source/server/admin/handler_ctx.h"
 
-#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Server {
