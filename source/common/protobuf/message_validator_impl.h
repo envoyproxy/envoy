@@ -14,7 +14,8 @@ namespace ProtobufMessage {
 class ValidationVisitorBase : public ValidationVisitor {
 public:
   void setRuntime(Runtime::Loader& runtime) { runtime_ = runtime; }
-  virtual OptRef<Runtime::Loader> runtime() { return runtime_; }
+  void clearRuntime() { runtime_ = {}; } // for tests
+  OptRef<Runtime::Loader> runtime() override { return runtime_; }
 
 protected:
   OptRef<Runtime::Loader> runtime_;

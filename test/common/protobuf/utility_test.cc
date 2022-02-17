@@ -62,7 +62,17 @@ public:
       : runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")),
         deprecated_feature_seen_since_process_start_(
             store_.gauge("runtime.deprecated_feature_seen_since_process_start",
-                         Stats::Gauge::ImportMode::NeverImport)) {}
+                         Stats::Gauge::ImportMode::NeverImport)) {
+
+    auto visitor = static_cast<ProtobufMessage::StrictValidationVisitorImpl*>(
+        &ProtobufMessage::getStrictValidationVisitor());
+    visitor->setRuntime(loader());
+  }
+  ~RuntimeStatsHelper() {
+    auto visitor = static_cast<ProtobufMessage::StrictValidationVisitorImpl*>(
+        &ProtobufMessage::getStrictValidationVisitor());
+    visitor->clearRuntime();
+  }
 
   Stats::Counter& runtime_deprecated_feature_use_;
   Stats::Gauge& deprecated_feature_seen_since_process_start_;
@@ -341,10 +351,6 @@ layered_runtime:
 watchdog: { miss_timeout: 1s })EOF";
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.yaml", bootstrap_yaml);
-
-  static_cast<ProtobufMessage::StrictValidationVisitorImpl*>(
-      &ProtobufMessage::getStrictValidationVisitor())
-      ->setRuntime(loader());
 
   envoy::config::bootstrap::v3::Bootstrap proto_from_file;
   TestUtility::loadFromFile(filename, proto_from_file, *api_);
