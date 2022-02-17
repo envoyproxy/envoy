@@ -13,6 +13,7 @@
 #include "source/server/admin/prometheus_stats.h"
 #include "source/server/admin/utils.h"
 
+#include "absl/container/btree_map.h"
 #include "absl/types/variant.h"
 
 constexpr uint64_t ChunkSize = 2 * 1000 * 1000;
@@ -371,7 +372,7 @@ public:
 
   Stats::Store& stats_;
   ScopeVec scopes_;
-  using StatMap = std::map<std::string, StatOrScopes>;
+  using StatMap = absl::btree_map<std::string, StatOrScopes>;
   StatMap stat_map_;
   Phase phase_{Phase::TextReadouts};
   Buffer::OwnedImpl response_;
