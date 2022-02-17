@@ -153,7 +153,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
         // Because HTTP/3 codec client connect() can close connection inline and can raise 0-RTT
         // event inline, and both cases need to have network callbacks and http callbacks wired up
-        // to propagate the event, so do not call connect() during codec client contruction.
+        // to propagate the event, so do not call connect() during codec client construction.
         CodecClientPtr codec =
             Runtime::runtimeFeatureEnabled(
                 "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")
