@@ -171,6 +171,10 @@ api_listener:
   // ForTest function.
   http_api_listener.readCallbacksForTest().connection().addConnectionCallbacks(
       network_connection_callbacks);
+  EXPECT_FALSE(
+      http_api_listener.readCallbacksForTest().connection().lastRoundTripTime().has_value());
+  http_api_listener.readCallbacksForTest().connection().configureInitialCongestionWindow(
+      100, std::chrono::microseconds(123));
 
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
   // Shutting down the ApiListener should raise an event on all connection callback targets.
