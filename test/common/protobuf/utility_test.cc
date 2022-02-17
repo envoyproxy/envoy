@@ -1705,6 +1705,8 @@ TEST_F(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
   base.set_not_deprecated("foo");
   // Fatal checks for a non-deprecated field should cause no problem.
   checkForDeprecation(base);
+  EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(0, deprecated_feature_seen_since_process_start_.value());
 }
 
 TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecatedEmitsError)) {
@@ -1714,6 +1716,8 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecatedEm
   EXPECT_LOG_CONTAINS("warning",
                       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
                       checkForDeprecation(base));
+  EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
 }
 
 TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecatedEmitsCrash) {
@@ -1727,6 +1731,8 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecatedEmitsCrash) {
   EXPECT_THROW_WITH_REGEX(
       checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'");
+  EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(0, deprecated_feature_seen_since_process_start_.value());
 }
 
 // Use of a deprecated and disallowed field should result in an exception.
