@@ -1,8 +1,9 @@
 #pragma once
 #include <map>
 
-#include "absl/strings/string_view.h"
 #include "source/common/singleton/const_singleton.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -70,8 +71,9 @@ enum class AppExceptionType {
 
 class HeaderTypeMap {
 public:
-  HeaderType str2Header(const absl::string_view & header) const {
-    if (const auto & result = sip_header_type_map_.find(header); result != sip_header_type_map_.end()) {
+  HeaderType str2Header(const absl::string_view& header) const {
+    if (const auto& result = sip_header_type_map_.find(header);
+        result != sip_header_type_map_.end()) {
       return result->second;
     } else {
       return HeaderType::Other;
@@ -79,7 +81,8 @@ public:
   }
 
   HeaderType str2Header(const std::string& header) const {
-    if (const auto & result = sip_header_type_map_.find(header); result != sip_header_type_map_.end()) {
+    if (const auto& result = sip_header_type_map_.find(header);
+        result != sip_header_type_map_.end()) {
       return result->second;
     } else {
       return HeaderType::Other;

@@ -34,7 +34,8 @@ public:
 private:
   bool session_affinity_;
   bool registration_affinity_;
-  const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity customized_affinity_;
+  const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity
+      customized_affinity_;
 };
 
 /**

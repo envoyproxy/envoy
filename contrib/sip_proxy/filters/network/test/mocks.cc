@@ -33,7 +33,7 @@ MockDecoderCallbacks::MockDecoderCallbacks() {
   local_services_.emplace_back(service1);
   local_services_.emplace_back(service2); */
   ON_CALL(*this, getLocalIp()).WillByDefault(Return("127.0.0.1"));
-  ON_CALL(*this, localServices()).WillByDefault(Return(local_services_));
+  ON_CALL(*this, localServices()).WillByDefault(ReturnRef(local_services_));
 }
 MockDecoderCallbacks::~MockDecoderCallbacks() = default;
 
