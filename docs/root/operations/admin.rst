@@ -528,56 +528,35 @@ modify different aspects of the server:
       "histograms": [
         {
           "name": "example_histogram",
-          "supported_buckets": [
-            0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000, 600000, 1800000, 3600000
-          ],
-          "computed_buckets": [
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 1, "cumulative": 2},
-            {"interval": 1, "cumulative": 2},
-            {"interval": 1, "cumulative": 2},
-            {"interval": 1, "cumulative": 2},
-            {"interval": 1, "cumulative": 2},
-            {"interval": 1, "cumulative": 2},
-            {"interval": 1, "cumulative": 2},
-            {"interval": 1, "cumulative": 2},
-            {"interval": 1, "cumulative": 2},
-            {"interval": 1, "cumulative": 2},
-            {"interval": 1, "cumulative": 2},
-            {"interval": 1, "cumulative": 2}
+          "buckets": [
+            {"upper_bound": 1, "interval": 0, "cumulative": 0},
+            {"upper_bound": 2, "interval": 0, "cumulative": 1},
+            {"upper_bound": 3, "interval": 1, "cumulative": 3},
+            {"upper_bound": 4, "interval": 1, "cumulative": 3}
           ]
         },
         {
           "name": "other_example_histogram",
-          "supported_buckets": [
-            0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000, 600000, 1800000, 3600000
-          ],
-          "computed_buckets": [
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 100},
-            {"interval": 0, "cumulative": 300},
-            {"interval": 0, "cumulative": 600},
-            {"interval": 0, "cumulative": 600},
-            {"interval": 0, "cumulative": 600},
-            {"interval": 0, "cumulative": 600},
-            {"interval": 0, "cumulative": 600},
-            {"interval": 0, "cumulative": 600},
-            {"interval": 0, "cumulative": 600}
+          "buckets": [
+            {"upper_bound": 0.5, "interval": 0, "cumulative": 0},
+            {"upper_bound": 1, "interval": 0, "cumulative": 0},
+            {"upper_bound": 5, "interval": 0, "cumulative": 0},
+            {"upper_bound": 10, "interval": 0, "cumulative": 0},
+            {"upper_bound": 25, "interval": 0, "cumulative": 0},
+            {"upper_bound": 50, "interval": 0, "cumulative": 0},
+            {"upper_bound": 100, "interval": 0, "cumulative": 0},
+            {"upper_bound": 250, "interval": 0, "cumulative": 0},
+            {"upper_bound": 500, "interval": 0, "cumulative": 0},
+            {"upper_bound": 1000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 2500, "interval": 0, "cumulative": 100},
+            {"upper_bound": 5000, "interval": 0, "cumulative": 300},
+            {"upper_bound": 10000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 30000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 60000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 300000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 600000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 1800000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 3600000, "interval": 0, "cumulative": 600}
           ]
         }
       ]
@@ -597,56 +576,35 @@ modify different aspects of the server:
       "histograms": [
         {
           "name": "example_histogram",
-          "supported_buckets": [
-            0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000, 600000, 1800000, 3600000
-          ],
-          "computed_buckets": [
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 1, "cumulative": 2},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0}
+          "buckets": [
+            {"upper_bound": 1, "interval": 0, "cumulative": 0},
+            {"upper_bound": 2, "interval": 0, "cumulative": 1},
+            {"upper_bound": 3, "interval": 1, "cumulative": 2},
+            {"upper_bound": 4, "interval": 0, "cumulative": 0}
           ]
         },
         {
           "name": "other_example_histogram",
-          "supported_buckets": [
-            0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000, 600000, 1800000, 3600000
-          ],
-          "computed_buckets": [
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 100},
-            {"interval": 0, "cumulative": 200},
-            {"interval": 0, "cumulative": 300},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0}
+          "buckets": [
+            {"upper_bound": 0.5, "interval": 0, "cumulative": 0},
+            {"upper_bound": 1, "interval": 0, "cumulative": 0},
+            {"upper_bound": 5, "interval": 0, "cumulative": 0},
+            {"upper_bound": 10, "interval": 0, "cumulative": 0},
+            {"upper_bound": 25, "interval": 0, "cumulative": 0},
+            {"upper_bound": 50, "interval": 0, "cumulative": 0},
+            {"upper_bound": 100, "interval": 0, "cumulative": 0},
+            {"upper_bound": 250, "interval": 0, "cumulative": 0},
+            {"upper_bound": 500, "interval": 0, "cumulative": 0},
+            {"upper_bound": 1000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 2500, "interval": 0, "cumulative": 100},
+            {"upper_bound": 5000, "interval": 0, "cumulative": 200},
+            {"upper_bound": 10000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 30000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 60000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 300000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 600000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 1800000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 3600000, "interval": 0, "cumulative": 0}
           ]
         }
       ]
