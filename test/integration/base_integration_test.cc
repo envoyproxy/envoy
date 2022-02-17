@@ -168,7 +168,10 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
         [lds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           bootstrap.mutable_dynamic_resources()->mutable_lds_config()->set_resource_api_version(
               envoy::config::core::v3::V3);
-          bootstrap.mutable_dynamic_resources()->mutable_lds_config()->set_path(lds_path);
+          bootstrap.mutable_dynamic_resources()
+              ->mutable_lds_config()
+              ->mutable_path_config_source()
+              ->set_path(lds_path);
         });
   }
 
@@ -180,7 +183,8 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
   envoy::config::bootstrap::v3::Bootstrap bootstrap = config_helper.bootstrap();
   if (use_lds) {
     // After the config has been finalized, write the final listener config to the lds file.
-    const std::string lds_path = config_helper.bootstrap().dynamic_resources().lds_config().path();
+    const std::string lds_path =
+        config_helper.bootstrap().dynamic_resources().lds_config().path_config_source().path();
     envoy::service::discovery::v3::DiscoveryResponse lds;
     lds.set_version_info("0");
     for (auto& listener : config_helper.bootstrap().static_resources().listeners()) {
