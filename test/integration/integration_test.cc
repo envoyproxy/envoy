@@ -159,6 +159,8 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   check_listener_stats(0, 1);
 }
 
+// On OSX this is flaky as we can end up with connection imbalance.
+#if !defined(__APPLE__)
 // Make sure all workers pick up connections
 TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   concurrency_ = 2;
@@ -205,6 +207,7 @@ TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   EXPECT_TRUE(w0_ctr > 1);
   EXPECT_TRUE(w1_ctr > 1);
 }
+#endif
 
 TEST_P(IntegrationTest, RouterDirectResponseWithBody) {
   const std::string body = "Response body";

@@ -118,16 +118,22 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     }
   }
 
+  Stats::Store& stats = server_.stats();
+  std::vector<Stats::ParentHistogramSharedPtr> histograms = stats.histograms();
+  stats.symbolTable().sortByStatNames<Stats::ParentHistogramSharedPtr>(
+      histograms.begin(), histograms.end(),
+      [](const Stats::ParentHistogramSharedPtr& a) -> Stats::StatName { return a->statName(); });
+
   if (!format_value.has_value()) {
     // Display plain stats if format query param is not there.
-    statsAsText(all_stats, text_readouts, server_.stats().histograms(), used_only,
+    statsAsText(all_stats, text_readouts, histograms, used_only,
                 histogram_buckets_value, regex, response);
     return Http::Code::OK;
   }
 
   if (format_value.value() == "json") {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-    response.add(statsAsJson(all_stats, text_readouts, server_.stats().histograms(), used_only,
+    response.add(statsAsJson(all_stats, text_readouts, histograms, used_only,
                              histogram_buckets_value, regex));
     return Http::Code::OK;
   }

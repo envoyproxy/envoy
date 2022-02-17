@@ -76,7 +76,7 @@ public:
     Network::TransportSocketOptionsConstSharedPtr transport_options;
     pool_ =
         allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
-                         transport_options, state_, simTime(), quic_stat_names_, store_,
+                         transport_options, state_, simTime(), quic_stat_names_, {}, store_,
                          makeOptRef<PoolConnectResultCallback>(connect_result_callback_));
   }
 
@@ -123,7 +123,7 @@ TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
   Network::TransportSocketOptionsConstSharedPtr transport_options;
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
-                       transport_options, state_, simTime(), quic_stat_names_, store_,
+                       transport_options, state_, simTime(), quic_stat_names_, {}, store_,
                        makeOptRef<PoolConnectResultCallback>(connect_result_callback_));
 
   EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
@@ -147,7 +147,7 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
   Network::TransportSocketOptionsConstSharedPtr transport_options;
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
-                       transport_options, state_, simTime(), quic_stat_names_, store_,
+                       transport_options, state_, simTime(), quic_stat_names_, {}, store_,
                        makeOptRef<PoolConnectResultCallback>(connect_result_callback_));
 
   EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
@@ -160,7 +160,9 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
 
-  ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks);
+  ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks,
+                                                              {/*can_send_early_data_=*/false,
+                                                               /*can_use_http3_=*/true});
   EXPECT_NE(nullptr, cancellable);
   std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
       Http3ConnPoolImplPeer::connectingClients(*pool_);
@@ -183,6 +185,7 @@ TEST_F(Http3ConnPoolImplTest, CreationWithConfig) {
             options->max_concurrent_streams().value());
   EXPECT_EQ(info.quic_config_.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend(),
             options->initial_stream_window_size().value());
+  EXPECT_EQ(3000, info.server_id_.port());
 }
 
 } // namespace Http3

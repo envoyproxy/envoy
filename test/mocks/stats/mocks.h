@@ -278,8 +278,10 @@ public:
   MockStore();
   ~MockStore() override;
 
-  ScopePtr createScope(const std::string& name) override { return ScopePtr{createScope_(name)}; }
-  ScopePtr scopeFromStatName(StatName name) override {
+  ScopeSharedPtr createScope(const std::string& name) override {
+    return ScopeSharedPtr(createScope_(name));
+  }
+  ScopeSharedPtr scopeFromStatName(StatName name) override {
     return createScope(symbolTable().toString(name));
   }
 
