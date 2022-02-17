@@ -97,14 +97,14 @@ TEST_P(SslLibraryCipherSuiteSupport, CipherSuitesNotRemoved) {
 
 class SslContextImplTest : public SslCertsTest {
 public:
-  ABSL_MUST_USE_RESULT Cleanup cleanUpHelper(const Envoy::Ssl::ClientContextSharedPtr& context) {
+  ABSL_MUST_USE_RESULT Cleanup cleanUpHelper(Envoy::Ssl::ClientContextSharedPtr& context) {
     return Cleanup([&manager = manager_, &context]() {
       if (context != nullptr) {
         manager.removeContext(context);
       }
     });
   }
-  ABSL_MUST_USE_RESULT Cleanup cleanUpHelper(const Envoy::Ssl::ServerContextSharedPtr& context) {
+  ABSL_MUST_USE_RESULT Cleanup cleanUpHelper(Envoy::Ssl::ServerContextSharedPtr& context) {
     return Cleanup([&manager = manager_, &context]() {
       if (context != nullptr) {
         manager.removeContext(context);
@@ -536,7 +536,8 @@ TEST_F(SslServerContextImplOcspTest, TestFilenameOcspStapleConfigLoads) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/good_ocsp_resp.der"
   ocsp_staple_policy: must_staple
   )EOF";
-  auto cleanup = cleanUpHelper(loadConfigYaml(tls_context_yaml));
+  auto context = loadConfigYaml(tls_context_yaml);
+  auto cleanup = cleanUpHelper(context);
 }
 
 TEST_F(SslServerContextImplOcspTest, TestInlineBytesOcspStapleConfigLoads) {
@@ -556,7 +557,8 @@ TEST_F(SslServerContextImplOcspTest, TestInlineBytesOcspStapleConfigLoads) {
   )EOF",
                                                    base64_response);
 
-  auto cleanup = cleanUpHelper(loadConfigYaml(tls_context_yaml));
+  auto context = loadConfigYaml(tls_context_yaml);
+  auto cleanup = cleanUpHelper(context);
 }
 
 TEST_F(SslServerContextImplOcspTest, TestInlineStringOcspStapleConfigFails) {
@@ -1033,7 +1035,7 @@ TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionEnabledWhenKeyI
 
 class ClientContextConfigImplTest : public SslCertsTest {
 public:
-  ABSL_MUST_USE_RESULT Cleanup cleanUpHelper(const Envoy::Ssl::ClientContextSharedPtr& context) {
+  ABSL_MUST_USE_RESULT Cleanup cleanUpHelper(Envoy::Ssl::ClientContextSharedPtr& context) {
     return Cleanup([&manager = manager_, &context]() {
       if (context != nullptr) {
         manager.removeContext(context);
@@ -1102,7 +1104,8 @@ TEST_F(ClientContextConfigImplTest, RSA2048Cert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto cleanup = cleanUpHelper(manager_.createSslClientContext(store, client_context_config));
+  auto context = manager_.createSslClientContext(store, client_context_config);
+  auto cleanup = cleanUpHelper(context);
 }
 
 // Validate that 1024-bit RSA certificates are rejected.
@@ -1170,7 +1173,8 @@ TEST_F(ClientContextConfigImplTest, RSA3072Cert) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  auto cleanup = cleanUpHelper(manager_.createSslClientContext(store, client_context_config));
+  auto context = manager_.createSslClientContext(store, client_context_config);
+  auto cleanup = cleanUpHelper(context);
 }
 
 // Validate that 4096-bit RSA certificates load successfully.
@@ -1186,7 +1190,8 @@ TEST_F(ClientContextConfigImplTest, RSA4096Cert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto cleanup = cleanUpHelper(manager_.createSslClientContext(store, client_context_config));
+  auto context = manager_.createSslClientContext(store, client_context_config);
+  auto cleanup = cleanUpHelper(context);
 }
 
 // Validate that P256 ECDSA certs load.
@@ -1202,7 +1207,8 @@ TEST_F(ClientContextConfigImplTest, P256EcdsaCert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto cleanup = cleanUpHelper(manager_.createSslClientContext(store, client_context_config));
+  auto context = manager_.createSslClientContext(store, client_context_config);
+  auto cleanup = cleanUpHelper(context);
 }
 
 // Validate that non-P256 ECDSA certs are rejected.
