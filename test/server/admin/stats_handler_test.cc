@@ -78,6 +78,24 @@ public:
     return std::make_pair(code, data.toString());
   }
 
+  /**
+   * Checks the presence and order of appearances of several fragments in a block of data.
+   *
+   * @param data the string to search
+   * @param fragments ordered list of fragments to check.
+   */
+  void checkOrder(const absl::string_view& data, const std::vector<absl::string_view>& fragments) {
+    size_t prev_pos = absl::string_view::npos;
+    for (absl::string_view fragment : fragments) {
+      size_t pos = data.find(fragment);
+      EXPECT_NE(std::string::npos, pos) << fragment;
+      if (prev_pos != absl::string_view::npos) {
+        EXPECT_LT(prev_pos, pos) << fragment;
+      }
+      prev_pos = pos;
+    }
+  }
+
   Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
 
   Stats::SymbolTableImpl symbol_table_;
@@ -683,6 +701,44 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
 })EOF";
 
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
+}
+
+TEST_P(AdminStatsTest, SortedCountersAndGauges) {
+  // Check counters and gauges are co-mingled in sorted order in the admin output.
+  store_->gaugeFromString("s4", Stats::Gauge::ImportMode::Accumulate);
+  store_->counterFromString("s3");
+  store_->counterFromString("s1");
+  store_->gaugeFromString("s2", Stats::Gauge::ImportMode::Accumulate);
+  for (const std::string& url : {"/stats", "/stats?format=json"}) {
+    CodeResponse code_response = handlerStats(url);
+    ASSERT_EQ(Http::Code::OK, code_response.first);
+    checkOrder(code_response.second, {"s1", "s2", "s3", "s4"});
+  }
+}
+
+TEST_P(AdminStatsTest, SortedTextReadouts) {
+  // Check counters and gauges are co-mingled in sorted order in the admin output.
+  store_->textReadoutFromString("t4");
+  store_->textReadoutFromString("t3");
+  store_->textReadoutFromString("t1");
+  store_->textReadoutFromString("t2");
+  for (const std::string& url : {"/stats", "/stats?format=json"}) {
+    CodeResponse code_response = handlerStats(url);
+    ASSERT_EQ(Http::Code::OK, code_response.first);
+    checkOrder(code_response.second, {"t1", "t2", "t3", "t4"});
+  }
+}
+
+TEST_P(AdminStatsTest, SortedHistograms) {
+  store_->histogramFromString("h4", Stats::Histogram::Unit::Unspecified);
+  store_->histogramFromString("h3", Stats::Histogram::Unit::Unspecified);
+  store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+  store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
+  for (const std::string& url : {"/stats", "/stats?format=json"}) {
+    CodeResponse code_response = handlerStats(url);
+    ASSERT_EQ(Http::Code::OK, code_response.first);
+    checkOrder(code_response.second, {"h1", "h2", "h3", "h4"});
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
