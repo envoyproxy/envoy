@@ -5,9 +5,10 @@ namespace {
 
 class MultiEnvoyTest : public HttpProtocolIntegrationTest {
 public:
+  ~MultiEnvoyTest() override { test_server_.reset(); }
+
   // Create an envoy in front of the original Envoy.
   void createL1Envoy();
-  ~MultiEnvoyTest() { test_server_.reset(); }
 
   IntegrationTestServerPtr l1_server_;
   Thread::SkipAsserts skip_;
