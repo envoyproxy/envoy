@@ -23,8 +23,7 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
     Api::Api& api, Server::Instance& server)
     : local_info_(local_info), dispatcher_(dispatcher), cm_(cm),
-      validation_visitor_(validation_visitor), api_(api),
-      server_(server) {}
+      validation_visitor_(validation_visitor), api_(api), server_(server) {}
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
@@ -64,8 +63,9 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           validation_visitor_);
     case envoy::config::core::v3::ApiConfigSource::GRPC: {
       GrpcMuxSharedPtr mux;
-      ExternalConfigValidatorsPtr external_config_validators = std::make_unique<ExternalConfigValidators>(
-           validation_visitor_, server_, api_config_source.config_validators_typed_configs());
+      ExternalConfigValidatorsPtr external_config_validators =
+          std::make_unique<ExternalConfigValidators>(
+              validation_visitor_, server_, api_config_source.config_validators_typed_configs());
 
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
@@ -94,8 +94,9 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     }
     case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
       GrpcMuxSharedPtr mux;
-      ExternalConfigValidatorsPtr external_config_validators = std::make_unique<ExternalConfigValidators>(
-           validation_visitor_, server_, api_config_source.config_validators_typed_configs());
+      ExternalConfigValidatorsPtr external_config_validators =
+          std::make_unique<ExternalConfigValidators>(
+              validation_visitor_, server_, api_config_source.config_validators_typed_configs());
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
             Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
@@ -158,8 +159,9 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
           config.api_config_source();
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
                                                               api_config_source);
-      ExternalConfigValidatorsPtr external_config_validators = std::make_unique<ExternalConfigValidators>(
-           validation_visitor_, server_, api_config_source.config_validators_typed_configs());
+      ExternalConfigValidatorsPtr external_config_validators =
+          std::make_unique<ExternalConfigValidators>(
+              validation_visitor_, server_, api_config_source.config_validators_typed_configs());
 
       SubscriptionOptions options;
       // All Envoy collections currently are xDS resource graph roots and require node context
@@ -175,7 +177,8 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
                                                                api_config_source, scope, true)
                     ->createUncachedRawAsyncClient(),
                 dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
-                Utility::parseRateLimitSettings(api_config_source), local_info_, std::move(external_config_validators)),
+                Utility::parseRateLimitSettings(api_config_source), local_info_,
+                std::move(external_config_validators)),
             callbacks, resource_decoder, stats, dispatcher_,
             Utility::configSourceInitialFetchTimeout(config), false, options);
       }

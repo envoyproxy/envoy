@@ -27,8 +27,8 @@ envoy_cc_extension(
     deps = [
         ":minimum_clusters_validator",
         "//envoy/config:config_validator_interface",
-        "//source/common/config:resource_name_lib",
         "//envoy/registry",
+        "//source/common/config:resource_name_lib",
         "@envoy_api//envoy/extensions/config/validators/minimum_clusters/v3:pkg_cc_proto",
     ],
 )

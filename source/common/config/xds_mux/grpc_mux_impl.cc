@@ -36,15 +36,12 @@ using AllMuxes = ThreadSafeSingleton<AllMuxesState>;
 } // namespace
 
 template <class S, class F, class RQ, class RS>
-GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory,
-                                       bool skip_subsequent_node,
-                                       const LocalInfo::LocalInfo& local_info,
-                                       Grpc::RawAsyncClientPtr&& async_client,
-                                       Event::Dispatcher& dispatcher,
-                                       const Protobuf::MethodDescriptor& service_method,
-                                       Random::RandomGenerator& random, Stats::Scope& scope,
-                                       const RateLimitSettings& rate_limit_settings,
-                                       ExternalConfigValidatorsPtr&& config_validators)
+GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(
+    std::unique_ptr<F> subscription_state_factory, bool skip_subsequent_node,
+    const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr&& async_client,
+    Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
+    Random::RandomGenerator& random, Stats::Scope& scope,
+    const RateLimitSettings& rate_limit_settings, ExternalConfigValidatorsPtr&& config_validators)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       subscription_state_factory_(std::move(subscription_state_factory)),
@@ -86,7 +83,9 @@ Config::GrpcMuxWatchPtr GrpcMuxImpl<S, F, RQ, RS>::addWatch(
   if (watch_map == watch_maps_.end()) {
     // We don't yet have a subscription for type_url! Make one!
     watch_map =
-        watch_maps_.emplace(type_url, std::make_unique<WatchMap>(options.use_namespace_matching_, type_url, *config_validators_.get()))
+        watch_maps_
+            .emplace(type_url, std::make_unique<WatchMap>(options.use_namespace_matching_, type_url,
+                                                          *config_validators_.get()))
             .first;
     subscriptions_.emplace(type_url, subscription_state_factory_->makeSubscriptionState(
                                          type_url, *watch_maps_[type_url], resource_decoder));

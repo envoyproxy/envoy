@@ -164,8 +164,7 @@ TEST_P(MinimumClustersValidatorIntegrationTest, RemoveAllClustersThreshold0) {
                  });
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "7", {}, {}, {}));
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
-                                                             {}, {},
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
                                                              {removed_clusters_names}, "8");
 
   // Receive ACK.
@@ -188,8 +187,7 @@ TEST_P(MinimumClustersValidatorIntegrationTest, RemoveAllClustersThreshold1) {
                  });
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "7", {}, {}, {}));
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
-                                                             {}, {},
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
                                                              {removed_clusters_names}, "8");
 
   // Receive NACK.

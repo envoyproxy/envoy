@@ -193,8 +193,8 @@ envoy_cc_library(
     hdrs = ["new_grpc_mux_impl.h"],
     deps = [
         ":delta_subscription_state_lib",
-        ":grpc_stream_lib",
         ":external_config_validators_lib",
+        ":grpc_stream_lib",
         ":pausable_ack_queue_lib",
         ":watch_map_lib",
         ":xds_context_params_lib",

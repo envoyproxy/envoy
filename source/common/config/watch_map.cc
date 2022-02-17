@@ -136,7 +136,8 @@ void WatchMap::onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
   }
 
   // Execute external config validators.
-  std::cerr << "ADI: WatchMap::onConfigUpdate calling sotw validators for type: " << type_url_ << ", resources#: " << decoded_resources_for_validation.size() << std::endl;
+  std::cerr << "ADI: WatchMap::onConfigUpdate calling sotw validators for type: " << type_url_
+            << ", resources#: " << decoded_resources_for_validation.size() << std::endl;
   config_validators_.executeValidators(type_url_, decoded_resources_for_validation);
 
   const bool map_is_single_wildcard = (watches_.size() == 1 && wildcard_watches_.size() == 1);
@@ -218,8 +219,11 @@ void WatchMap::onConfigUpdate(
   }
 
   // Execute external config validators.
-  std::cerr << "ADI: WatchMap::onConfigUpdate calling delta validators for type: " << type_url_ << ", added_resources#: " << decoded_resources_for_validation.size() << " removed_resources#: " << removed_resources.size()<< std::endl;
-  config_validators_.executeValidators(type_url_, decoded_resources_for_validation, removed_resources);
+  std::cerr << "ADI: WatchMap::onConfigUpdate calling delta validators for type: " << type_url_
+            << ", added_resources#: " << decoded_resources_for_validation.size()
+            << " removed_resources#: " << removed_resources.size() << std::endl;
+  config_validators_.executeValidators(type_url_, decoded_resources_for_validation,
+                                       removed_resources);
 
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (const auto& [cur_watch, resource_to_add] : per_watch_added) {

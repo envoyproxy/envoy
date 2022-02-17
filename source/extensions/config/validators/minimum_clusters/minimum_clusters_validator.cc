@@ -9,8 +9,8 @@ namespace Extensions {
 namespace Config {
 namespace Validators {
 
-bool MinimumClustersValidator::validate(Server::Instance&,
-                                        const std::vector<Envoy::Config::DecodedResourceRef>& resources) {
+bool MinimumClustersValidator::validate(
+    Server::Instance&, const std::vector<Envoy::Config::DecodedResourceRef>& resources) {
   absl::flat_hash_set<std::string> next_cluster_names(resources.size());
   for (const auto& resource : resources) {
     envoy::config::cluster::v3::Cluster cluster =

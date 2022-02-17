@@ -41,8 +41,8 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
-      config_validators_(std::move(config_validators)),
-      first_stream_request_(true), dispatcher_(dispatcher),
+      config_validators_(std::move(config_validators)), first_stream_request_(true),
+      dispatcher_(dispatcher),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
           [this](absl::string_view resource_type_url) {
             onDynamicContextUpdate(resource_type_url);
@@ -247,7 +247,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
 
     // Execute external config validators if there are any watches.
     if (!api_state.watches_.empty()) {
-      std::cerr << "ADI: GrpcMuxImpl::onDiscoveryResponse calling sotw validators for type: " << type_url << ", resources#: " << all_resource_refs.size() << std::endl;
+      std::cerr << "ADI: GrpcMuxImpl::onDiscoveryResponse calling sotw validators for type: "
+                << type_url << ", resources#: " << all_resource_refs.size() << std::endl;
       config_validators_->executeValidators(type_url, all_resource_refs);
     }
 

@@ -287,8 +287,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       cluster_request_response_size_stat_names_(stats.symbolTable()),
       cluster_timeout_budget_stat_names_(stats.symbolTable()),
       subscription_factory_(local_info, main_thread_dispatcher, *this,
-                            validation_context.dynamicValidationVisitor(), api,
-                            server) {
+                            validation_context.dynamicValidationVisitor(), api, server) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
       *this, tls, time_source_, api, grpc_context.statNames());
   const auto& cm_config = bootstrap.cluster_manager();
@@ -340,8 +339,10 @@ ClusterManagerImpl::ClusterManagerImpl(
   // After here, we just have a GrpcMux interface held in ads_mux_, which hides
   // whether the backing implementation is delta or SotW.
   if (dyn_resources.has_ads_config()) {
-    Config::ExternalConfigValidatorsPtr external_config_validators = std::make_unique<Config::ExternalConfigValidators>(
-         validation_context.dynamicValidationVisitor(), server, dyn_resources.ads_config().config_validators_typed_configs());
+    Config::ExternalConfigValidatorsPtr external_config_validators =
+        std::make_unique<Config::ExternalConfigValidators>(
+            validation_context.dynamicValidationVisitor(), server,
+            dyn_resources.ads_config().config_validators_typed_configs());
 
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {

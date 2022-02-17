@@ -1,10 +1,10 @@
 #include "source/extensions/config/validators/minimum_clusters/config.h"
 
-#include "source/common/config/resource_name.h"
-
 #include "envoy/extensions/config/validators/minimum_clusters/v3/minimum_clusters.pb.h"
 #include "envoy/extensions/config/validators/minimum_clusters/v3/minimum_clusters.pb.validate.h"
 #include "envoy/registry/registry.h"
+
+#include "source/common/config/resource_name.h"
 
 namespace Envoy {
 namespace Extensions {
