@@ -28,13 +28,13 @@ public:
 
   bool sessionAffinity() const override;
   bool registrationAffinity() const override;
-  envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity
+  const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity&
   customizedAffinity() const override;
 
 private:
   bool session_affinity_;
   bool registration_affinity_;
-  envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity customized_affinity_;
+  const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity customized_affinity_;
 };
 
 /**

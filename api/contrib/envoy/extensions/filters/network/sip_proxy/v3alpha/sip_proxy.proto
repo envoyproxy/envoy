@@ -121,7 +121,7 @@ message CustomizedAffinity {
   // Affinity rules to conclude the upstream endpoint
   repeated CustomizedAffinityEntry entries = 1;
 
-  // After affinity handling, whether load balance should be stop or continue
+  // Configures whether load balance should be stopped or continued after affinity handling.
   bool stop_load_balance = 2;
 }
 

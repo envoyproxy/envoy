@@ -52,7 +52,7 @@ public:
 
   virtual bool sessionAffinity() const PURE;
   virtual bool registrationAffinity() const PURE;
-  virtual envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity
+  virtual const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity&
   customizedAffinity() const PURE;
 };
 
@@ -129,7 +129,7 @@ public:
         ->addressAsString();
   }
 
-  std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>
+  std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
   localServices() override {
     return config_.settings()->localServices();
   }
@@ -185,7 +185,7 @@ private:
       return parent_.parent_.getLocalIp();
     }
 
-    std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>
+    std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
     localServices() override {
       return parent_.parent_.localServices();
     }

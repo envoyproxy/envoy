@@ -14,9 +14,8 @@ DirectResponse::ResponseType AppException::encode(MessageMetadata& metadata,
 
   // To
   if (!absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::To]).empty()) {
-    output += "To: ";
     auto to = absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::To])[0];
-    output += std::string(to);
+    output += fmt::format("{}: {}", "To", to);
 
     if (to.find("tag=") == absl::string_view::npos) {
 
@@ -26,7 +25,7 @@ DirectResponse::ResponseType AppException::encode(MessageMetadata& metadata,
       // character of the proxy's IP address
       output += ";tag=";
       if (metadata.ep().has_value() && metadata.ep().value().length() > 0) {
-        output += std::string(metadata.ep().value());
+        output += fmt::format("{}-", metadata.ep().value());
       }
       std::time_t t;
       long s = 0;
@@ -43,46 +42,38 @@ DirectResponse::ResponseType AppException::encode(MessageMetadata& metadata,
 
   // From
   if (!absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::From]).empty()) {
-    output += "From: ";
-    output += std::string(absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::From])[0]);
-    output += "\r\n";
+    output += fmt::format("{}: {}\r\n", "From",
+                          absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::From])[0]);
   } else {
     ENVOY_LOG(error, "No \"From\" in received message");
   }
 
   // Call-ID
   if (!absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::From]).empty()) {
-    output += "Call-ID: ";
-    output += std::string(absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::CallId])[0]);
-    output += "\r\n";
+    output += fmt::format("{}: {}\r\n", "Call-ID",
+                          absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::CallId])[0]);
   } else {
     ENVOY_LOG(error, "No \"Call-ID\" in received message");
   }
 
   // Via
   for (auto via : absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::Via])) {
-    output += "Via: ";
-    output += std::string(via);
-    output += "\r\n";
+    output += fmt::format("{}: {}\r\n", "Via", via);
   }
 
   // CSeq
   if (!absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::From]).empty()) {
-    output += "CSeq: ";
-    output += std::string(absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::Cseq])[0]);
-    output += "\r\n";
+    output += fmt::format("{}: {}\r\n", "CSeq",
+                          absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::Cseq])[0]);
   } else {
     ENVOY_LOG(error, "No \"Cseq\" in received message");
   }
 
   // Failed Reason
-  output += "Reason: ";
-  output += std::string(what());
-  output += "\r\n";
+  output += fmt::format("{}: {}\r\n", "Reason", what());
 
   // Content-length
-  output += "Content-Length: 0";
-  output += "\r\n";
+  output += "Content-Length: 0\r\n";
 
   // End
   output += "\r\n";

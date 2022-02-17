@@ -31,13 +31,12 @@ addUniqueClusters(absl::flat_hash_set<std::string>& clusters,
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::extensions::filters::network::sip_proxy::v3alpha::SipProtocolOptions& config)
     : session_affinity_(config.session_affinity()),
-      registration_affinity_(config.registration_affinity()) {
-  customized_affinity_ = config.customized_affinity();
-}
+      registration_affinity_(config.registration_affinity()),
+      customized_affinity_(config.customized_affinity()) {}
 
 bool ProtocolOptionsConfigImpl::sessionAffinity() const { return session_affinity_; }
 bool ProtocolOptionsConfigImpl::registrationAffinity() const { return registration_affinity_; }
-envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity
+const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity&
 ProtocolOptionsConfigImpl::customizedAffinity() const {
   return customized_affinity_;
 }

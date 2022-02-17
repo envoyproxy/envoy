@@ -38,7 +38,7 @@ message RouteMatch {
     string domain = 1;
   }
 
-  // The header to get match parameter, default is route.
+  // The header to get match parameter, default is "Route".
   string header = 2;
 
   // The parameter to get domain, default is host.

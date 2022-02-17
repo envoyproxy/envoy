@@ -45,8 +45,6 @@ RouteConstSharedPtr GeneralRouteEntryImpl::matches(MessageMetadata& metadata) co
   absl::string_view header = "";
   // Default is route
   HeaderType type = HeaderType::Route;
-  std::map<absl::string_view, HeaderType> sip_header_type_map =
-      Envoy::Extensions::NetworkFilters::SipProxy::type_map.headerTypeMap();
 
   if (domain_.empty()) {
     return nullptr;
@@ -59,12 +57,7 @@ RouteConstSharedPtr GeneralRouteEntryImpl::matches(MessageMetadata& metadata) co
   ENVOY_LOG(trace, "Do Route match with header: {}, parameter: {} and domain: {}", header_,
             parameter_, domain_);
 
-  if (sip_header_type_map.find(header_) == sip_header_type_map.end()) {
-    ENVOY_LOG(error, "Could not found mapped header type of {} ", header_);
-    return nullptr;
-  }
-
-  type = sip_header_type_map[header_];
+  type = Envoy::Extensions::NetworkFilters::SipProxy::HeaderTypes::get().str2Header(header_);
 
   if (type == HeaderType::Other) {
     // Default is Route
@@ -606,8 +599,8 @@ SipFilters::DecoderFilterCallbacks* UpstreamRequest::getTransaction(std::string&
 void UpstreamRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   UNREFERENCED_PARAMETER(end_stream);
   upstream_buffer_.move(data);
-  auto response_decoder_ = std::make_unique<ResponseDecoder>(*this);
-  response_decoder_->onData(upstream_buffer_);
+  auto response_decoder = std::make_unique<ResponseDecoder>(*this);
+  response_decoder->onData(upstream_buffer_);
 }
 
 void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
@@ -672,7 +665,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
 
 absl::string_view ResponseDecoder::getLocalIp() { return parent_.localAddress(); }
 
-std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>
+std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
 ResponseDecoder::localServices() {
   return parent_.transactionInfo()->localServices();
 }

@@ -91,7 +91,7 @@ public:
    */
   virtual DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) PURE;
   virtual absl::string_view getLocalIp() PURE;
-  virtual std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>
+  virtual std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
   localServices() PURE;
 };
 
@@ -113,7 +113,7 @@ public:
    * @throw EnvoyException on Sip protocol errors
    */
   FilterStatus onData(Buffer::Instance& data, bool continue_handling = false);
-  std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>
+  std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
   localServices() {
     return callbacks_.localServices();
   };

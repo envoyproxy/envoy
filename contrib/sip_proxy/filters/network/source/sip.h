@@ -2,6 +2,7 @@
 #include <map>
 
 #include "absl/strings/string_view.h"
+#include "source/common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -69,30 +70,41 @@ enum class AppExceptionType {
 
 class HeaderTypeMap {
 public:
-  HeaderTypeMap() {
-    sip_header_type_map_.insert({"Call-ID", HeaderType::CallId});
-    sip_header_type_map_.insert({"Via", HeaderType::Via});
-    sip_header_type_map_.insert({"To", HeaderType::To});
-    sip_header_type_map_.insert({"From", HeaderType::From});
-    sip_header_type_map_.insert({"Contact", HeaderType::Contact});
-    sip_header_type_map_.insert({"Record-Route", HeaderType::RRoute});
-    sip_header_type_map_.insert({"CSeq", HeaderType::Cseq});
-    sip_header_type_map_.insert({"Route", HeaderType::Route});
-    sip_header_type_map_.insert({"Path", HeaderType::Path});
-    sip_header_type_map_.insert({"Event", HeaderType::Event});
-    sip_header_type_map_.insert({"Service-Route", HeaderType::SRoute});
-    sip_header_type_map_.insert({"WWW-Authenticate", HeaderType::WAuth});
-    sip_header_type_map_.insert({"Authorization", HeaderType::Auth});
-    sip_header_type_map_.insert({"P-Nokia-Cookie-IP-Mapping", HeaderType::PCookieIPMap});
-    sip_header_type_map_.insert({"", HeaderType::Other});
+  HeaderType str2Header(const absl::string_view & header) const {
+    if (const auto & result = sip_header_type_map_.find(header); result != sip_header_type_map_.end()) {
+      return result->second;
+    } else {
+      return HeaderType::Other;
+    }
   }
-  std::map<absl::string_view, HeaderType> headerTypeMap() { return sip_header_type_map_; }
+
+  HeaderType str2Header(const std::string& header) const {
+    if (const auto & result = sip_header_type_map_.find(header); result != sip_header_type_map_.end()) {
+      return result->second;
+    } else {
+      return HeaderType::Other;
+    }
+  }
 
 private:
-  std::map<absl::string_view, HeaderType> sip_header_type_map_{};
+  const std::map<absl::string_view, HeaderType> sip_header_type_map_{
+      {"Call-ID", HeaderType::CallId},
+      {"Via", HeaderType::Via},
+      {"To", HeaderType::To},
+      {"From", HeaderType::From},
+      {"Contact", HeaderType::Contact},
+      {"Record-Route", HeaderType::RRoute},
+      {"CSeq", HeaderType::Cseq},
+      {"Route", HeaderType::Route},
+      {"Path", HeaderType::Path},
+      {"Event", HeaderType::Event},
+      {"Service-Route", HeaderType::SRoute},
+      {"WWW-Authenticate", HeaderType::WAuth},
+      {"Authorization", HeaderType::Auth},
+      {"P-Nokia-Cookie-IP-Mapping", HeaderType::PCookieIPMap}};
 };
 
-static HeaderTypeMap type_map;
+using HeaderTypes = ConstSingleton<HeaderTypeMap>;
 
 } // namespace SipProxy
 } // namespace NetworkFilters

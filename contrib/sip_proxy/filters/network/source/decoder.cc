@@ -196,17 +196,11 @@ FilterStatus Decoder::onDataReady(Buffer::Instance& data) {
 }
 
 auto Decoder::sipHeaderType(absl::string_view sip_line) {
-  static std::map<absl::string_view, HeaderType> sip_header_type_map = type_map.headerTypeMap();
-
   auto header_type_str = sip_line.substr(0, sip_line.find_first_of(':'));
-  if (auto result = sip_header_type_map.find(header_type_str);
-      result != sip_header_type_map.end()) {
-    return std::tuple<HeaderType, absl::string_view>{
-        result->second, sip_line.substr(sip_line.find_first_of(':') + strlen(": "))};
-  } else {
-    return std::tuple<HeaderType, absl::string_view>{
-        HeaderType::Other, sip_line.substr(sip_line.find_first_of(':') + strlen(": "))};
-  }
+  return std::tuple<HeaderType, absl::string_view>{
+    HeaderTypes::get().str2Header(header_type_str),
+    sip_line.substr(sip_line.find_first_of(':') + strlen(": "))
+  };
 }
 
 MsgType Decoder::sipMsgType(absl::string_view top_line) {

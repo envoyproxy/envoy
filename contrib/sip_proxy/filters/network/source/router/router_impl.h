@@ -249,7 +249,7 @@ public:
     tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.erase(host);
   }
 
-  std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>
+  std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
   localServices() {
     return local_services_;
   }
@@ -357,13 +357,12 @@ public:
     return *this;
   }
   absl::string_view getLocalIp() override;
-  std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>
+  std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
   localServices() override;
 
 private:
   UpstreamRequest& parent_;
   DecoderPtr decoder_;
-  MessageMetadataSharedPtr metadata_;
 };
 
 using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;

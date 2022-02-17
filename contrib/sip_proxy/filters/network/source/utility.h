@@ -35,7 +35,7 @@ public:
     }
   }
   std::chrono::milliseconds transactionTimeout() { return transaction_timeout_; }
-  std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>
+  std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
   localServices() {
     return local_services_;
   }
