@@ -534,7 +534,7 @@ class Primitive(TypeSpecification):
     # Custom values that make test code more readable.
     KAFKA_TYPE_TO_EXAMPLE_VALUE_FOR_TEST = {
         'string':
-            '"string"',
+            'static_cast<std::string>("string")',
         'bool':
             'false',
         'int8':
