@@ -1451,7 +1451,7 @@ TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicyWhenRetryUpstrea
     codec_client_->close();
   }
 
-  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ("504", response->headers().getStatusValue());
 }
 
 // Verify that headers with underscores in their names are dropped from client requests
