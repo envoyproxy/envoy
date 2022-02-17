@@ -14,16 +14,14 @@ namespace Server {
 class SslContextManagerNoTlsStub final : public Envoy::Ssl::ContextManager {
   Ssl::ClientContextSharedPtr
   createSslClientContext(Stats::Scope& /* scope */,
-                         const Envoy::Ssl::ClientContextConfig& /* config */,
-                         Envoy::Ssl::ClientContextSharedPtr /* old_context */) override {
+                         const Envoy::Ssl::ClientContextConfig& /* config */) override {
     throwException();
   }
 
   Ssl::ServerContextSharedPtr
   createSslServerContext(Stats::Scope& /* scope */,
                          const Envoy::Ssl::ServerContextConfig& /* config */,
-                         const std::vector<std::string>& /* server_names */,
-                         Envoy::Ssl::ServerContextSharedPtr /* old_context */) override {
+                         const std::vector<std::string>& /* server_names */) override {
     throwException();
   }
 
@@ -35,6 +33,12 @@ class SslContextManagerNoTlsStub final : public Envoy::Ssl::ContextManager {
   void iterateContexts(std::function<void(const Envoy::Ssl::Context&)> /* callback */) override{};
 
   Ssl::PrivateKeyMethodManager& privateKeyMethodManager() override { throwException(); }
+
+  void removeContext(const Envoy::Ssl::ContextSharedPtr& old_context) override {
+    if (old_context) {
+      throw EnvoyException("SSL is not supported in this configuration");
+    }
+  }
 
 private:
   [[noreturn]] void throwException() {
