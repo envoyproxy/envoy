@@ -261,12 +261,24 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                      regex);
     break;
   case Utility::HistogramBucketsValue::Cumulative:
-    statsAsJsonCumulativeHistogramBucketsHelper(*histograms_obj_container_fields, all_histograms,
-                                                used_only, regex);
+    statsAsJsonHistogramBucketsHelper(
+        *histograms_obj_container_fields, all_histograms, used_only, regex,
+        [](const Stats::ParentHistogramSharedPtr& histogram) {
+          return histogram->intervalStatistics().computedBuckets();
+        },
+        [](const Stats::ParentHistogramSharedPtr& histogram) {
+          return histogram->cumulativeStatistics().computedBuckets();
+        });
     break;
   case Utility::HistogramBucketsValue::Disjoint:
-    statsAsJsonDisjointHistogramBucketsHelper(*histograms_obj_container_fields, all_histograms,
-                                              used_only, regex);
+    statsAsJsonHistogramBucketsHelper(
+        *histograms_obj_container_fields, all_histograms, used_only, regex,
+        [](const Stats::ParentHistogramSharedPtr& histogram) {
+          return histogram->intervalStatistics().computeDisjointBuckets();
+        },
+        [](const Stats::ParentHistogramSharedPtr& histogram) {
+          return histogram->cumulativeStatistics().computeDisjointBuckets();
+        });
     break;
   default:
     break;
@@ -358,35 +370,20 @@ void StatsHandler::statsAsJsonQuantileSummaryHelper(
   }
 }
 
-void StatsHandler::statsAsJsonCumulativeHistogramBucketsHelper(
+void StatsHandler::statsAsJsonHistogramBucketsHelper(
     Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
     const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
-    const absl::optional<std::regex>& regex) {
+    const absl::optional<std::regex>& regex,
+    std::function<std::vector<uint64_t>(const Stats::ParentHistogramSharedPtr&)>
+        interval_computed_buckets,
+    std::function<std::vector<uint64_t>(const Stats::ParentHistogramSharedPtr&)>
+        cumulative_computed_buckets) {
   std::vector<ProtobufWkt::Value> histogram_obj_array;
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
     if (shouldShowMetric(*histogram, used_only, regex)) {
       histogram_obj_array.push_back(statsAsJsonHistogramBucketsCreateHistogramElementHelper(
-          histogram->intervalStatistics().supportedBuckets(),
-          histogram->intervalStatistics().computedBuckets(),
-          histogram->cumulativeStatistics().computedBuckets(), histogram->name()));
-    }
-  }
-  if (!histogram_obj_array.empty()) { // If used histogram found.
-    histograms_obj_container_fields["histograms"] = ValueUtil::listValue(histogram_obj_array);
-  }
-}
-
-void StatsHandler::statsAsJsonDisjointHistogramBucketsHelper(
-    Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
-    const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
-    const absl::optional<std::regex>& regex) {
-  std::vector<ProtobufWkt::Value> histogram_obj_array;
-  for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
-    if (shouldShowMetric(*histogram, used_only, regex)) {
-      histogram_obj_array.push_back(statsAsJsonHistogramBucketsCreateHistogramElementHelper(
-          histogram->intervalStatistics().supportedBuckets(),
-          histogram->intervalStatistics().computeDisjointBuckets(),
-          histogram->cumulativeStatistics().computeDisjointBuckets(), histogram->name()));
+          histogram->intervalStatistics().supportedBuckets(), interval_computed_buckets(histogram),
+          cumulative_computed_buckets(histogram), histogram->name()));
     }
   }
   if (!histogram_obj_array.empty()) { // If used histogram found.
