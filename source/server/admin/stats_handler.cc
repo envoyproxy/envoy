@@ -126,8 +126,8 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
 
   if (!format_value.has_value()) {
     // Display plain stats if format query param is not there.
-    statsAsText(all_stats, text_readouts, histograms, used_only,
-                histogram_buckets_value, regex, response);
+    statsAsText(all_stats, text_readouts, histograms, used_only, histogram_buckets_value, regex,
+                response);
     return Http::Code::OK;
   }
 
