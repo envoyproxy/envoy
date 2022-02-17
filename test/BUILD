@@ -37,6 +37,20 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "test_listener_lib",
+    srcs = [
+        "test_listener.cc",
+    ],
+    hdrs = ["test_listener.h"],
+    deps = [
+        "//source/common/common:logger_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//test/test_common:global_lib",
+    ],
+)
+
 envoy_pch_library(
     name = "test_pch",
     testonly = True,
