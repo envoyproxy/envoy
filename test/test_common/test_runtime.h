@@ -42,6 +42,11 @@ public:
 
   Runtime::Loader& loader() { return *Runtime::LoaderSingleton::getExisting(); }
 
+  ~TestScopedRuntime() {
+    Runtime::RuntimeFeatures features;
+    features.restoreDefaults();
+  }
+
 protected:
   Event::MockDispatcher dispatcher_;
   testing::NiceMock<ThreadLocal::MockInstance> tls_;
