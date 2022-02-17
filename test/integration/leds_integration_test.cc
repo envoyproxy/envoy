@@ -236,7 +236,10 @@ protected:
       // Remove the static cluster (cluster_0) and set up CDS.
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
           envoy::config::core::v3::ApiVersion::V3);
-      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
+      bootstrap.mutable_dynamic_resources()
+          ->mutable_cds_config()
+          ->mutable_path_config_source()
+          ->set_path(cds_helper_.cds_path());
       bootstrap.mutable_static_resources()->mutable_clusters()->erase(
           bootstrap.mutable_static_resources()->mutable_clusters()->begin());
 
