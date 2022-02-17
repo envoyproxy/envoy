@@ -691,7 +691,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
-  EXPECT_CALL(factory_context.context_manager_, createSslClientContext(_, _, _))
+  EXPECT_CALL(factory_context.context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context));
   auto factory =
       std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context);

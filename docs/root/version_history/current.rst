@@ -9,6 +9,7 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* perf: ssl contexts are now tracked without scan based garbage collection and greatly improved the performance on secret update.
 
 Bug Fixes
 ---------
