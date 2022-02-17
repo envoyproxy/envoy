@@ -2,6 +2,7 @@
 
 #include "envoy/config/core/v3/config_source.pb.h"
 
+#include "source/common/config/external_config_validators_impl.h"
 #include "source/common/config/filesystem_subscription_impl.h"
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/grpc_subscription_impl.h"
@@ -64,7 +65,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     case envoy::config::core::v3::ApiConfigSource::GRPC: {
       GrpcMuxSharedPtr mux;
       ExternalConfigValidatorsPtr external_config_validators =
-          std::make_unique<ExternalConfigValidators>(
+          std::make_unique<ExternalConfigValidatorsImpl>(
               validation_visitor_, server_, api_config_source.config_validators_typed_configs());
 
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
@@ -95,7 +96,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
       GrpcMuxSharedPtr mux;
       ExternalConfigValidatorsPtr external_config_validators =
-          std::make_unique<ExternalConfigValidators>(
+          std::make_unique<ExternalConfigValidatorsImpl>(
               validation_visitor_, server_, api_config_source.config_validators_typed_configs());
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
@@ -160,7 +161,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
                                                               api_config_source);
       ExternalConfigValidatorsPtr external_config_validators =
-          std::make_unique<ExternalConfigValidators>(
+          std::make_unique<ExternalConfigValidatorsImpl>(
               validation_visitor_, server_, api_config_source.config_validators_typed_configs());
 
       SubscriptionOptions options;

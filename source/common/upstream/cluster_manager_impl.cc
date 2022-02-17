@@ -21,7 +21,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/external_config_validators.h"
+#include "source/common/config/external_config_validators_impl.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
@@ -340,7 +340,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   // whether the backing implementation is delta or SotW.
   if (dyn_resources.has_ads_config()) {
     Config::ExternalConfigValidatorsPtr external_config_validators =
-        std::make_unique<Config::ExternalConfigValidators>(
+        std::make_unique<Config::ExternalConfigValidatorsImpl>(
             validation_context.dynamicValidationVisitor(), server,
             dyn_resources.ads_config().config_validators_typed_configs());
 

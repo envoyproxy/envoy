@@ -1,4 +1,4 @@
-#include "source/common/config/external_config_validators.h"
+#include "source/common/config/external_config_validators_impl.h"
 
 #include "source/common/config/opaque_resource_decoder_impl.h"
 #include "source/common/config/utility.h"
@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Config {
 
-ExternalConfigValidators::ExternalConfigValidators(
+ExternalConfigValidatorsImpl::ExternalConfigValidatorsImpl(
     ProtobufMessage::ValidationVisitor& validation_visitor, Server::Instance& server,
     const Protobuf::RepeatedPtrField<
         envoy::config::core::v3::ApiConfigSource::ConfigSourceTypedConfig>& validators_configs)
@@ -24,7 +24,7 @@ ExternalConfigValidators::ExternalConfigValidators(
   }
 }
 
-void ExternalConfigValidators::executeValidators(absl::string_view type_url,
+void ExternalConfigValidatorsImpl::executeValidators(absl::string_view type_url,
                                                  const std::vector<DecodedResourceRef>& resources) {
   auto validators_it = validators_map_.find(type_url);
   if (validators_it != validators_map_.end()) {
@@ -39,7 +39,7 @@ void ExternalConfigValidators::executeValidators(absl::string_view type_url,
   }
 }
 
-void ExternalConfigValidators::executeValidators(
+void ExternalConfigValidatorsImpl::executeValidators(
     absl::string_view type_url, const std::vector<DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
   auto validators_it = validators_map_.find(type_url);

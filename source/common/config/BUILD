@@ -157,7 +157,7 @@ envoy_cc_library(
     deps = [
         ":api_version_lib",
         ":decoded_resource_lib",
-        ":external_config_validators_lib",
+        ":external_config_validators_interface",
         ":grpc_stream_lib",
         ":ttl_lib",
         ":utility_lib",
@@ -193,7 +193,7 @@ envoy_cc_library(
     hdrs = ["new_grpc_mux_impl.h"],
     deps = [
         ":delta_subscription_state_lib",
-        ":external_config_validators_lib",
+        ":external_config_validators_interface",
         ":grpc_stream_lib",
         ":pausable_ack_queue_lib",
         ":watch_map_lib",
@@ -414,7 +414,7 @@ envoy_cc_library(
     hdrs = ["watch_map.h"],
     deps = [
         ":decoded_resource_lib",
-        ":external_config_validators_lib",
+        ":external_config_validators_interface",
         ":utility_lib",
         ":xds_resource_lib",
         "//envoy/config:subscription_interface",
@@ -438,13 +438,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "external_config_validators_lib",
-    srcs = ["external_config_validators.cc"],
+    name = "external_config_validators_interface",
     hdrs = ["external_config_validators.h"],
     deps = [
+        "//envoy/config:config_validator_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "external_config_validators_lib",
+    srcs = ["external_config_validators_impl.cc"],
+    hdrs = ["external_config_validators_impl.h"],
+    deps = [
+        ":external_config_validators_interface",
         ":opaque_resource_decoder_lib",
         ":resource_name_lib",
-        "//envoy/config:config_validator_interface",
         "//source/common/config:utility_lib",
     ],
 )
