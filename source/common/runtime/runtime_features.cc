@@ -62,9 +62,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_http3",
     "envoy.reloadable_features.correct_scheme_and_xfp",
     "envoy.reloadable_features.correctly_validate_alpn",
-    // TODO(kbaichoo): Move this to be disabled by default until fairness is
-    // implemented, and we've had more cpu time.
-    "envoy.reloadable_features.defer_processing_backedup_streams",
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.enable_grpc_async_client_cache",
     "envoy.reloadable_features.fix_added_trailers",
@@ -111,6 +108,9 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.unified_mux",
     // TODO(birenroy) flip after https://github.com/envoyproxy/envoy/issues/19761 sorted.
     "envoy.reloadable_features.http2_new_codec_wrapper",
+    // TODO(kbaichoo): Make this enabled by default when fairness is
+    // implemented, and we've had more cpu time.
+    "envoy.reloadable_features.defer_processing_backedup_streams",
 };
 
 RuntimeFeatures::RuntimeFeatures() {
