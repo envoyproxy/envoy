@@ -68,7 +68,7 @@ public:
   std::string category() const override { return "envoy.config.validators"; }
 
   /**
-   * Returns the xDS service type url that the config validator expectes to receive.
+   * Returns the xDS service type url that the config validator expects to receive.
    */
   virtual std::string typeUrl() const PURE;
 };

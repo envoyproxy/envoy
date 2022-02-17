@@ -268,16 +268,12 @@ public:
     for (const auto& cluster : active_clusters_) {
       clusters_maps.active_clusters_.emplace(cluster.first, *cluster.second->cluster_);
       if (cluster.second->cluster_->info()->addedViaApi()) {
-        std::cout << "ADI1: adding cluster " << cluster.first << " which was added via API"
-                  << std::endl;
         clusters_maps.added_via_api_clusters_.emplace(cluster.first, *cluster.second->cluster_);
       }
     }
     for (const auto& cluster : warming_clusters_) {
       clusters_maps.warming_clusters_.emplace(cluster.first, *cluster.second->cluster_);
       if (cluster.second->cluster_->info()->addedViaApi()) {
-        std::cout << "ADI2: adding cluster " << cluster.first << " which was added via API"
-                  << std::endl;
         clusters_maps.added_via_api_clusters_.emplace(cluster.first, *cluster.second->cluster_);
       }
     }

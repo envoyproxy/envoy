@@ -247,8 +247,6 @@ void GrpcMuxImpl::onDiscoveryResponse(
 
     // Execute external config validators if there are any watches.
     if (!api_state.watches_.empty()) {
-      std::cerr << "ADI: GrpcMuxImpl::onDiscoveryResponse calling sotw validators for type: "
-                << type_url << ", resources#: " << all_resource_refs.size() << std::endl;
       config_validators_->executeValidators(type_url, all_resource_refs);
     }
 
