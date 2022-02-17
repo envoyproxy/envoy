@@ -165,6 +165,7 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
 
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
+
   auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks,
                                                               {/*can_send_early_data_=*/false,
@@ -173,6 +174,9 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
     async_connect_callback->invokeCallback();
+  } else {
+    EXPECT_FALSE(async_connect_callback->enabled());
+    delete async_connect_callback;
   }
 
   std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
