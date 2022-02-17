@@ -17,6 +17,7 @@ export PPROF_PATH=/thirdparty_build/bin/pprof
     export ENVOY_BUILD_ARCH
 }
 
+read -ra BAZEL_STARTUP_OPTIONS <<< "${BAZEL_STARTUP_OPTIONS:-}"
 read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS:-}"
 read -ra BAZEL_EXTRA_TEST_OPTIONS <<< "${BAZEL_EXTRA_TEST_OPTIONS:-}"
 read -ra BAZEL_OPTIONS <<< "${BAZEL_OPTIONS:-}"
@@ -106,7 +107,7 @@ BAZEL_BUILD_OPTIONS=(
   "--flaky_test_attempts=2"
   "--test_env=HEAPCHECK=")
 
-[[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean --expunge
+[[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel "${BAZEL_STARTUP_OPTIONS[@]}" clean --expunge
 
 # Also setup some space for building Envoy standalone.
 export ENVOY_BUILD_DIR="${BUILD_DIR}"/envoy
@@ -137,7 +138,7 @@ export BUILDOZER_BIN="${BUILDOZER_BIN:-/usr/local/bin/buildozer}"
 # is not set AND this is an Envoy build. For derivative builds where Envoy
 # source tree is different than the current workspace, the setup step is
 # skipped.
-if [[ "$1" != "-nofetch" && "${ENVOY_SRCDIR}" == "$(bazel info workspace)" ]]; then
+if [[ "$1" != "-nofetch" && "${ENVOY_SRCDIR}" == "$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" info workspace)" ]]; then
   # shellcheck source=ci/filter_example_setup.sh
   . "$(dirname "$0")"/filter_example_setup.sh
 else

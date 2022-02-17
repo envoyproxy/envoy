@@ -40,14 +40,14 @@ echo "building for ${ENVOY_BUILD_ARCH}"
 
 function collect_build_profile() {
   declare -g build_profile_count=${build_profile_count:-1}
-  mv -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" || true
+  mv -f "$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" || true
   ((build_profile_count++))
 }
 
 function bazel_with_collection() {
   local failed_logs
   declare -r BAZEL_OUTPUT="${ENVOY_SRCDIR}"/bazel.output.txt
-  bazel "$@" | tee "${BAZEL_OUTPUT}"
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" "$@" | tee "${BAZEL_OUTPUT}"
   declare BAZEL_STATUS="${PIPESTATUS[0]}"
   if [ "${BAZEL_STATUS}" != "0" ]
   then
@@ -128,7 +128,7 @@ function bazel_binary_build() {
   # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
   [[ -n "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
 
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" "${BUILD_TARGET}" ${CONFIG_ARGS}
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" "${BUILD_TARGET}" ${CONFIG_ARGS}
   collect_build_profile "${BINARY_TYPE}"_build
 
   # Copy the built envoy binary somewhere that we can access outside of the
@@ -138,17 +138,17 @@ function bazel_binary_build() {
   if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
     # Generate dwp file for debugging since we used split DWARF to reduce binary
     # size
-    bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" "${BUILD_DEBUG_INFORMATION}" ${CONFIG_ARGS}
+    bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" "${BUILD_DEBUG_INFORMATION}" ${CONFIG_ARGS}
     # Copy the debug information
     cp -f bazel-bin/"${ENVOY_BIN}".dwp "${FINAL_DELIVERY_DIR}"/envoy.dwp
   fi
 
   # Validation tools for the tools image.
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" \
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" \
     //test/tools/schema_validator:schema_validator_tool ${CONFIG_ARGS}
 
   # Build su-exec utility
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" external:su-exec
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" external:su-exec
   cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
 }
 
@@ -163,7 +163,7 @@ function bazel_contrib_binary_build() {
 function run_process_test_result() {
   if [[ -z "$CI_SKIP_PROCESS_TEST_RESULTS" ]] && [[ $(find "$TEST_TMPDIR" -name "*_attempt.xml" 2> /dev/null) ]]; then
       echo "running flaky test reporting script"
-      bazel run "${BAZEL_BUILD_OPTIONS[@]}" //ci/flaky_test:process_xml "$CI_TARGET"
+      bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //ci/flaky_test:process_xml "$CI_TARGET"
   else
       echo "no flaky test results found"
   fi
@@ -246,7 +246,7 @@ elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
           "--action_env=PACKAGES_MAINTAINER_EMAIL")
   fi
 
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c opt //distribution:packages.tar.gz
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" -c opt //distribution:packages.tar.gz
   if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
       cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
   else
@@ -284,7 +284,7 @@ elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
 elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   setup_clang_toolchain
   echo "Testing ${TEST_TARGETS[*]}"
-  bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}"
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}"
 
   echo "bazel debug build with tests..."
   bazel_envoy_binary_build debug
@@ -348,7 +348,7 @@ elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
   bazel_envoy_binary_build fastbuild
 
   echo "Testing ${TEST_TARGETS[*]}"
-  bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
   exit 0
 elif [[ "$CI_TARGET" == "bazel.dev.contrib" ]]; then
   setup_clang_toolchain
@@ -358,7 +358,7 @@ elif [[ "$CI_TARGET" == "bazel.dev.contrib" ]]; then
   bazel_contrib_binary_build fastbuild
 
   echo "Testing ${TEST_TARGETS[*]}"
-  bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
   exit 0
 elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
@@ -404,7 +404,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test --define log_fast_debug_assert_in_release=enabled --define log_debug_assert_in_release=disabled
 
   echo "Building binary with wasm=wavm..."
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   collect_build_profile build
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
@@ -421,7 +421,7 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api//test/... @envoy_api//tools/... \
     @envoy_api//tools:tap2pcap_test
   echo "Building API..."
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api//envoy/...
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api//envoy/...
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api_compat" ]]; then
   echo "Checking API for breaking changes to protobuf backwards compatibility..."
@@ -429,7 +429,7 @@ elif [[ "$CI_TARGET" == "bazel.api_compat" ]]; then
   COMMIT_TITLE=$(git log -n 1 --pretty='format:%C(auto)%h (%s, %ad)' "${BASE_BRANCH_REF}")
   echo -e "\tUsing base commit ${COMMIT_TITLE}"
   # BAZEL_BUILD_OPTIONS needed for setting the repository_cache param.
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/api_proto_breaking_change_detector:detector_ci "${BASE_BRANCH_REF}"
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/api_proto_breaking_change_detector:detector_ci "${BASE_BRANCH_REF}"
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
   setup_clang_toolchain
@@ -455,7 +455,7 @@ elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   setup_gcc_toolchain
   echo "bazel Coverity Scan build"
   echo "Building..."
-  /build/cov-analysis/bin/cov-build --dir "${ENVOY_BUILD_DIR}"/cov-int bazel build --action_env=LD_PRELOAD "${BAZEL_BUILD_OPTIONS[@]}" \
+  /build/cov-analysis/bin/cov-build --dir "${ENVOY_BUILD_DIR}"/cov-int bazel "${BAZEL_STARTUP_OPTIONS[@]}" build --action_env=LD_PRELOAD "${BAZEL_BUILD_OPTIONS[@]}" \
     -c opt "${ENVOY_BUILD_TARGET}"
   # tar up the coverity results
   tar czvf "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz -C "${ENVOY_BUILD_DIR}" cov-int
@@ -466,7 +466,7 @@ elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   setup_clang_toolchain
-  FUZZ_TEST_TARGETS=("$(bazel query "attr('tags','fuzzer',${TEST_TARGETS[*]})")")
+  FUZZ_TEST_TARGETS=("$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" query "attr('tags','fuzzer',${TEST_TARGETS[*]})")")
   echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS[*]}"
   echo "Building envoy fuzzers and executing 100 fuzz iterations..."
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --config=asan-fuzzer "${FUZZ_TEST_TARGETS[@]}" --test_arg="-runs=10"
@@ -498,18 +498,18 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
 
   echo "verifying dependencies..."
   # Validate dependency relationships between core/extensions and external deps.
-  time bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:validate
+  time bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:validate
 
   # Validate repository metadata.
   echo "check repositories..."
   "${ENVOY_SRCDIR}"/tools/check_repositories.sh
 
   echo "check dependencies..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check
 
   # Run pip requirements tests
   echo "check pip..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check
 
   exit 0
 elif [[ "$CI_TARGET" == "tooling" ]]; then
@@ -518,7 +518,7 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
   # TODO(phlax): move this to a bazel rule
 
   echo "Run pytest tooling tests..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:all_pytests -- --cov-html /source/generated/tooling "${ENVOY_SRCDIR}"
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:all_pytests -- --cov-html /source/generated/tooling "${ENVOY_SRCDIR}"
 
   echo "Run protoxform test"
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/protoxform/protoxform_test.sh
@@ -527,7 +527,7 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
   "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
 
   echo "dependency validate_test..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:validate_test
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:validate_test
 
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
@@ -539,7 +539,7 @@ elif [[ "$CI_TARGET" == "verify_distro" ]]; then
     else
         PACKAGE_BUILD=/build/bazel.distribution.arm64/packages.arm64.tar.gz
     fi
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //distribution:verify_packages "$PACKAGE_BUILD"
+    bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //distribution:verify_packages "$PACKAGE_BUILD"
     exit 0
 elif [[ "$CI_TARGET" == "verify_build_examples" ]]; then
   run_ci_verify wasm-cc

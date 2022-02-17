@@ -14,6 +14,7 @@ df -h
 # shellcheck source=ci/setup_cache.sh
 . "$(dirname "$0")"/setup_cache.sh
 
+read -ra BAZEL_STARTUP_OPTIONS <<< "${BAZEL_STARTUP_OPTIONS:-}"
 read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS:-}"
 read -ra BAZEL_EXTRA_TEST_OPTIONS <<< "${BAZEL_EXTRA_TEST_OPTIONS:-}"
 
@@ -54,9 +55,9 @@ else
 fi
 
 if [[ "${TEST_TARGETS[*]}" == "${DEFAULT_TEST_TARGETS[*]}" ]]; then
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" //source/exe:envoy-static
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //source/exe:envoy-static
 fi
-bazel test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
 
 # Additionally run macOS specific test suites
-bazel test "${BAZEL_BUILD_OPTIONS[@]}" //test/extensions/network/dns_resolver/apple:apple_dns_impl_test
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" //test/extensions/network/dns_resolver/apple:apple_dns_impl_test

@@ -62,6 +62,7 @@ if ! brew link --overwrite bazelisk; then
     exit 1
 fi
 
-bazel version
+read -ra BAZEL_STARTUP_OPTIONS <<< "${BAZEL_STARTUP_OPTIONS:-}"
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" version
 
 pip3 install virtualenv
