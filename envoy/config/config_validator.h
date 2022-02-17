@@ -66,6 +66,11 @@ public:
                         ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.config.validators"; }
+
+  /**
+   * Returns the xDS service type url that the config validator expectes to receive.
+   */
+  virtual std::string typeUrl() const PURE;
 };
 
 } // namespace Config

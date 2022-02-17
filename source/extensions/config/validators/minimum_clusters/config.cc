@@ -1,5 +1,7 @@
 #include "source/extensions/config/validators/minimum_clusters/config.h"
 
+#include "source/common/config/resource_name.h"
+
 #include "envoy/extensions/config/validators/minimum_clusters/v3/minimum_clusters.pb.h"
 #include "envoy/extensions/config/validators/minimum_clusters/v3/minimum_clusters.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -25,6 +27,10 @@ Envoy::ProtobufTypes::MessagePtr MinimumClustersValidatorFactory::createEmptyCon
 
 std::string MinimumClustersValidatorFactory::name() const {
   return absl::StrCat(category(), ".minimum_clusters_validator");
+}
+
+std::string MinimumClustersValidatorFactory::typeUrl() const {
+  return Envoy::Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
 }
 
 /**

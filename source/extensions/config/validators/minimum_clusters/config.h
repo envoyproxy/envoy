@@ -20,6 +20,8 @@ public:
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
   std::string name() const override;
+
+  std::string typeUrl() const override;
 };
 
 } // namespace Validators
