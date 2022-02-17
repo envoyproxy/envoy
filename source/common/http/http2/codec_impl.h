@@ -394,6 +394,7 @@ protected:
              !stream_manager_.body_buffered_;
     }
 
+    // Schedules a callback to process buffered data.
     void scheduleProcessingOfBufferedData();
   };
 

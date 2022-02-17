@@ -108,8 +108,8 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.unified_mux",
     // TODO(birenroy) flip after https://github.com/envoyproxy/envoy/issues/19761 sorted.
     "envoy.reloadable_features.http2_new_codec_wrapper",
-    // TODO(kbaichoo): Make this enabled by default when fairness is
-    // implemented, and we've had more cpu time.
+    // TODO(kbaichoo): Make this enabled by default when fairness and chunking
+    // are implemented, and we've had more cpu time.
     "envoy.reloadable_features.defer_processing_backedup_streams",
 };
 

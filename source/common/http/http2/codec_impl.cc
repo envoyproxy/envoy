@@ -485,6 +485,7 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
 }
 
 bool ConnectionImpl::StreamImpl::maybeDeferDecodeTrailers() {
+  ASSERT(!deferred_reset_.has_value());
   // Buffer trailers if we're deferring processing and not flushing all data
   // through and either
   // 1) Buffers are overrun
@@ -1150,8 +1151,6 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
   switch (frame->hd.type) {
   case NGHTTP2_HEADERS: {
-    // We don't need to capture the remote_end_stream_ here as trailers will
-    // buffer if we have buffered data.
     stream->remote_end_stream_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
     if (!stream->cookies_.empty()) {
       HeaderString key(Headers::get().Cookie);
