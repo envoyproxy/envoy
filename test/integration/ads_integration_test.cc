@@ -406,7 +406,6 @@ TEST_P(AdsIntegrationTest, DEPRECATED_FEATURE_TEST(RejectV2TransportConfigByDefa
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
                                                              {cluster}, {cluster}, {}, "1");
   test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
-  EXPECT_GE(test_server_->gauge("runtime.deprecated_feature_seen_since_process_start")->value(), 1);
 }
 
 // Regression test for the use-after-free crash when processing RDS update (#3953).
