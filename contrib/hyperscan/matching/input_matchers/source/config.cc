@@ -24,7 +24,9 @@ Config::createInputMatcherFactoryCb(const Protobuf::Message& config,
 #ifdef HYPERSCAN_DISABLED
   throw EnvoyException("X86_64 architecture is required for Hyperscan.");
 #else
-  return [hyperscan_config]() { return std::make_unique<Matcher>(hyperscan_config); };
+  return [hyperscan_config, &factory_context]() {
+    return std::make_unique<Matcher>(hyperscan_config, factory_context.threadLocal());
+  };
 #endif
 }
 

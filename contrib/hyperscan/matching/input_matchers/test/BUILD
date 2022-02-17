@@ -39,5 +39,6 @@ envoy_cc_benchmark_binary(
         "//source/common/common:assert_lib",
         "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",
+        "//source/common/thread_local:thread_local_lib",
     ],
 )

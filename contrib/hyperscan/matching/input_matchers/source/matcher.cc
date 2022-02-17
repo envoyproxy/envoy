@@ -7,8 +7,17 @@ namespace Extensions {
 namespace Matching {
 namespace InputMatchers {
 namespace Hyperscan {
+ScratchThreadLocal::ScratchThreadLocal(hs_database_t* database) {
+  hs_error_t err = hs_alloc_scratch(database, &scratch_);
+  if (err != HS_SUCCESS) {
+    throw EnvoyException(fmt::format("unable to allocate scratch space, error code {}.", err));
+  }
+}
+
 Matcher::Matcher(
-    const envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan& config) {
+    const envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan& config,
+    ThreadLocal::SlotAllocator& tls)
+    : tls_(tls.allocateSlot()) {
   std::vector<const char*> expressions;
   expressions.reserve(config.regexes_size());
   flags_.reserve(config.regexes_size());
@@ -62,10 +71,9 @@ Matcher::Matcher(
     }
   }
 
-  err = hs_alloc_scratch(database_, &scratch_);
-  if (err != HS_SUCCESS) {
-    throw EnvoyException(fmt::format("unable to allocate scratch space, error code {}.", err));
-  }
+  tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ScratchThreadLocal>(this->database_);
+  });
 }
 
 bool Matcher::match(absl::optional<absl::string_view> input) {
@@ -75,21 +83,17 @@ bool Matcher::match(absl::optional<absl::string_view> input) {
 
   bool matched = false;
   const absl::string_view input_str = *input;
-  hs_error_t err;
-  {
-    absl::MutexLock lock(&scratch_mutex_);
-    err = hs_scan(
-        database_, input_str.data(), input_str.size(), 0, scratch_,
-        [](unsigned int, unsigned long long, unsigned long long, unsigned int,
-           void* context) -> int {
-          bool* matched = static_cast<bool*>(context);
-          *matched = true;
+  ScratchThreadLocal& scratch = tls_->getTyped<ScratchThreadLocal>();
+  hs_error_t err = hs_scan(
+      database_, input_str.data(), input_str.size(), 0, scratch.scratch_,
+      [](unsigned int, unsigned long long, unsigned long long, unsigned int, void* context) -> int {
+        bool* matched = static_cast<bool*>(context);
+        *matched = true;
 
-          // Non-zero if the matching should cease. Always terminate on the first match.
-          return 1;
-        },
-        &matched);
-  }
+        // Non-zero if the matching should cease. Always terminate on the first match.
+        return 1;
+      },
+      &matched);
   if (err != HS_SUCCESS && err != HS_SCAN_TERMINATED) {
     ENVOY_LOG_MISC(error, "unable to scan, error code {}.", err);
   }

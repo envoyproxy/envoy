@@ -42,6 +42,7 @@ envoy_cc_library(
     deps = [
         ":hyperscan",
         "//envoy/matcher:matcher_interface",
+        "//envoy/thread_local:thread_local_interface",
         "@envoy_api//contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha:pkg_cc_proto",
     ],
 )
