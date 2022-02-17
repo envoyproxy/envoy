@@ -72,9 +72,12 @@ public:
     EXPECT_CALL(instance, api()).WillRepeatedly(ReturnRef(api_));
     EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
     StatsHandler handler(instance);
-    Buffer::OwnedImpl data;
+    Admin::HandlerPtr context = handler.makeContext(url, admin_stream_);
     Http::TestResponseHeaderMapImpl response_headers;
-    Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream_);
+    Http::Code code = context->start(response_headers);
+    Buffer::OwnedImpl data;
+    while (context->nextChunk(data)) {
+    }
     return std::make_pair(code, data.toString());
   }
 
@@ -121,7 +124,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
 TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
   const std::string url = "/stats?format=blergh";
   CodeResponse code_response(handlerStats(url));
-  EXPECT_EQ(Http::Code::NotFound, code_response.first);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
   EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", code_response.second);
 }
 
