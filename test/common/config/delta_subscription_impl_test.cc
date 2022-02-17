@@ -150,11 +150,13 @@ TEST_P(DeltaSubscriptionNoGrpcStreamTest, NoGrpcStream) {
   if (GetParam() == LegacyOrUnified::Unified) {
     xds_context = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,
-        random, stats_store, rate_limit_settings, local_info, false);
+        random, stats_store, rate_limit_settings, local_info, false,
+        std::make_unique<NiceMock<MockExternalConfigValidators>>());
   } else {
     xds_context = std::make_shared<NewGrpcMuxImpl>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,
-        random, stats_store, rate_limit_settings, local_info);
+        random, stats_store, rate_limit_settings, local_info,
+        std::make_unique<NiceMock<MockExternalConfigValidators>>());
   }
 
   GrpcSubscriptionImplPtr subscription = std::make_unique<GrpcSubscriptionImpl>(

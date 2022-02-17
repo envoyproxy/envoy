@@ -15,6 +15,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/mocks/common.h"
+#include "test/mocks/config/external_config_validators.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -50,6 +51,7 @@ class NewGrpcMuxImplTestBase : public testing::TestWithParam<LegacyOrUnified> {
 public:
   NewGrpcMuxImplTestBase(LegacyOrUnified legacy_or_unified)
       : async_client_(new Grpc::MockAsyncClient()),
+        config_validators_(std::make_unique<NiceMock<MockExternalConfigValidators>>()),
         control_plane_stats_(Utility::generateControlPlaneStats(stats_)),
         control_plane_connected_state_(
             stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)),
@@ -61,14 +63,14 @@ public:
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_, rate_limit_settings_, local_info_, false);
+          random_, stats_, rate_limit_settings_, local_info_, false, std::move(config_validators_));
       return;
     }
     grpc_mux_ = std::make_unique<NewGrpcMuxImpl>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, rate_limit_settings_, local_info_);
+        random_, stats_, rate_limit_settings_, local_info_, std::move(config_validators_));
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -151,6 +153,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
+  ExternalConfigValidatorsPtr config_validators_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   std::unique_ptr<GrpcMux> grpc_mux_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;

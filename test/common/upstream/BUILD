@@ -178,6 +178,7 @@ envoy_cc_benchmark_binary(
         "//source/common/upstream:eds_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
+        "//test/mocks/config:external_config_validators_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
