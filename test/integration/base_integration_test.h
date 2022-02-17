@@ -94,6 +94,9 @@ public:
   makeClientConnectionWithOptions(uint32_t port,
                                   const Network::ConnectionSocket::OptionsSharedPtr& options);
 
+  void registerTestServerPorts(const std::vector<std::string>& port_names) {
+    registerTestServerPorts(port_names, test_server_);
+  }
   void registerTestServerPorts(const std::vector<std::string>& port_names,
                                IntegrationTestServerPtr& test_server);
   void createGeneratedApiTestServer(const std::string& bootstrap_path,
