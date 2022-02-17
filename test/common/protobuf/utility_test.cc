@@ -342,6 +342,10 @@ watchdog: { miss_timeout: 1s })EOF";
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.yaml", bootstrap_yaml);
 
+  static_cast<ProtobufMessage::StrictValidationVisitorImpl*>(
+      &ProtobufMessage::getStrictValidationVisitor())
+      ->setRuntime(loader());
+
   envoy::config::bootstrap::v3::Bootstrap proto_from_file;
   TestUtility::loadFromFile(filename, proto_from_file, *api_);
   TestUtility::validate(proto_from_file);
