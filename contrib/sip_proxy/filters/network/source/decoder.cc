@@ -54,7 +54,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState() {
     /**
      * test failed report "panic:     not reached" if reach here
      */
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not reached");
   }
 }
 
@@ -649,7 +649,7 @@ absl::string_view Decoder::domain(absl::string_view sip_header, HeaderType heade
     pattern = ".*sip.*[:@](.*?)[:;].*";
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not reached");
   }
 
   re2::RE2::FullMatch(static_cast<std::string>(sip_header), pattern, &domain);

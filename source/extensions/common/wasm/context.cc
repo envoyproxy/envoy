@@ -727,7 +727,8 @@ const Http::HeaderMap* Context::getConstMap(WasmHeaderMapType type) {
     return nullptr;
   }
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("unexpected");
+  return nullptr;
 }
 
 WasmResult Context::addHeaderMapValue(WasmHeaderMapType type, std::string_view key,
@@ -1177,9 +1178,12 @@ WasmResult Context::log(uint32_t level, std::string_view message) {
   case spdlog::level::critical:
     ENVOY_LOG(critical, "wasm log{}: {}", log_prefix(), message);
     return WasmResult::Ok;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case spdlog::level::off:
+    PANIC("not implemented");
+  case spdlog::level::n_levels:
+    PANIC("not implemented");
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 uint32_t Context::getLogLevel() {

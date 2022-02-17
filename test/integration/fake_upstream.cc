@@ -630,7 +630,7 @@ void FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManage
 
 void FakeUpstream::threadRoutine() {
   socket_factory_->doFinalPreWorkerInit();
-  handler_->addListener(absl::nullopt, listener_);
+  handler_->addListener(absl::nullopt, listener_, runtime_);
   server_initialized_.setReady();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   handler_.reset();

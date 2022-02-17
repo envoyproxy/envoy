@@ -102,7 +102,7 @@ RouteMatcher::RouteMatcher(
       routes_.emplace_back(new GeneralRouteEntryImpl(route));
       break;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("not reached");
     }
   }
 }
@@ -583,7 +583,7 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     callbacks_->resetDownstreamConnection();
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not reached");
   }
 }
 
