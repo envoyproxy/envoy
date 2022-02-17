@@ -341,8 +341,8 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRando
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     return;
   }
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.defer_processing_backedup_streams")) {
+
+  if (GetParam().defer_processing_backedup_streams) {
     // TODO(kbaichoo): fix this test to work with deferred processing by using a
     // timer to lower the watermark when the filter has raised above watermark.
     // Since we deferred processing data, when the filter raises watermark

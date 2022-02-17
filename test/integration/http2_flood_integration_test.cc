@@ -30,16 +30,20 @@ namespace Envoy {
 namespace {
 const uint32_t ControlFrameFloodLimit = 100;
 const uint32_t AllFrameFloodLimit = 1000;
+
+bool deferredProcessing(std::tuple<Network::Address::IpVersion, bool, bool> params) {
+  return std::get<2>(params);
+}
+
 } // namespace
 
 std::string testParamsToString(
     const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool, bool>> params) {
   const bool is_v4 = (std::get<0>(params.param) == Network::Address::IpVersion::v4);
   const bool http2_new_codec_wrapper = std::get<1>(params.param);
-  const bool defer_processing_backedup_streams = std::get<2>(params.param);
   return absl::StrCat(
       is_v4 ? "IPv4" : "IPv6", http2_new_codec_wrapper ? "WrappedHttp2" : "BareHttp2",
-      defer_processing_backedup_streams ? "WithDeferredProcessing" : "NoDeferredProcessing");
+      deferredProcessing(params.param) ? "WithDeferredProcessing" : "NoDeferredProcessing");
 }
 
 // It is important that the new socket interface is installed before any I/O activity starts and
@@ -60,9 +64,8 @@ public:
     const bool enable_new_wrapper = std::get<1>(GetParam());
     config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
                                       enable_new_wrapper ? "true" : "false");
-    const bool defer_processing_backedup_streams = std::get<2>(GetParam());
     config_helper_.addRuntimeOverride("envoy.reloadable_features.defer_processing_backedup_streams",
-                                      defer_processing_backedup_streams ? "true" : "false");
+                                      deferredProcessing(GetParam()) ? "true" : "false");
   }
 
 protected:
@@ -606,8 +609,7 @@ TEST_P(Http2FloodMitigationTest, WindowUpdateOnLowWatermarkFlood) {
   // passed through the filter.). With defer processing of backed up streams however
   // the data won't be eagerly processed as the stream is backed up.
   // TODO(kbaichoo): Remove this test when removing this feature tag.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.defer_processing_backedup_streams")) {
+  if (deferredProcessing(GetParam())) {
     return;
   }
   config_helper_.prependFilter(R"EOF(
