@@ -22,10 +22,16 @@
 // library. However, it is not possible to upgrade the cel-cpp in envoy at this time
 // as it is waiting on the release of the one of its dependencies.
 // TODO(b/219971889): Remove #pragma directives once the cel-cpp dependency has been upgraded.
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
+
 #include "eval/public/cel_function_adapter.h"
+
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 namespace Envoy {
 namespace Extensions {
