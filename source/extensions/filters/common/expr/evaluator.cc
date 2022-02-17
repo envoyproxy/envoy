@@ -35,12 +35,12 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
                                   std::make_unique<FilterStateWrapper>(info.filterState()));
 
   // fillActivation: There are two sets of vocabulary (variables and functions):
-  // (1) the envoy native CEL vocabulary (Request, Response, Connection, etc.) registered above and
+  // (1) the Envoy defined CEL vocabulary (Request, Response, Connection, etc.) registered above and
   // (2) the custom CEL vocabulary, registered using fillActivation.
-  // The envoy native vocabulary is registered first and the custom CEL vocabulary second.
-  // In the event of overlap in the names of the vocabulary ("request", "response", etc.),
-  // the fillActivation implementer can remove the envoy native version and
-  // register a custom version.
+  // The Envoy defined vocabulary is registered first and the custom CEL vocabulary second.
+  // If the implementer wishes to replace the Envoy vocabulary ("request", "response", etc.),
+  // the fillActivation implementer can remove the Envoy version and
+  // replace it with a custom version.
   if (custom_cel_vocabulary) {
     custom_cel_vocabulary->fillActivation(activation.get(), arena, info, request_headers,
                                           response_headers, response_trailers);
@@ -78,12 +78,13 @@ BuilderPtr createBuilder(Protobuf::Arena* arena, CustomCELVocabulary* custom_cel
 
   // CEL's built-in functions (e.g. +, -, !, *, etc.) are registered first using
   // RegisterBuiltinFunctions (up above).
-  // These are functions that people would most likely not want to override.
   // Any custom CEL functions are registered second.
-  // In the event of overlap in names of built-in functions and custom functions (there shouldn't be
-  // any), CEL's built-in functions will take precedence over any custom CEL functions. The registry
-  // retains the first instance of the registration of a name and will not allow it to be
-  // overwritten.
+  // In the event of overlap in names of built-in functions and custom functions
+  // (there shouldn't be any as these are functions that people would most likely
+  // not want to override.), CEL's built-in functions will take precedence over any
+  // custom CEL functions.
+  // The registry retains the first instance of the registration of a name and
+  // will not allow it to be overridden.
   if (custom_cel_vocabulary) {
     custom_cel_vocabulary->registerFunctions(builder->GetRegistry());
   }

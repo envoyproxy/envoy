@@ -26,25 +26,28 @@ using google::api::expr::runtime::CelFunctionRegistry;
 // Background Information:
 //
 // CelExpression: CelExpressions can contain values, variables and functions.
-// The functions can be (1) lazy functions or (2) static (eagerly evaluated) functions.
-// Lazy functions are evaluated during the request.
-// Static functions are evaluated once during the duration of the application.
+// The variables and functions can be either (1) stateless or (2) stateful.
+// In CEL, stateless functions are called "static" and stateful functions are "lazy".
 //
 // CelExpressions are evaluated with the aid of certain data structures
 // which contain references to variables and functions implementations.
 // The data structures are (1) the CelFunctionRegistry and (2) the Activation.
 //
 // CelFunctionRegistry: A registry of all CEL functions which may be used in
-// CelExpressions, and which lasts for the life of the application.
-// The registry contains registrations for both lazy functions and static functions.
+// CelExpressions.
+// The registry contains registrations for both stateless and stateful functions.
 //
 // Activation: contains a mapping of function names and variable names to their
 // reference implementations.
-// A new activation is created for every request and lasts for the duration of
-// a single request.
-// An activation contains lazy functions but not static functions.
+// A new activation is created for every CelExpression and is used for the
+// evaluation of the CelExpression.
+// An activation contains variables and stateful, but not stateless functions.
 //
-// Vocabulary: The variables and functions constitute the "vocabulary" used to
+// CelExpressionBuilder: A CelExpressionBuilder contains the registry of all allowable CEL
+// functions. The CelExpressionBuilder is used to create CelExpressions.
+// An activation is created for every CelExpression.
+
+// Vocabulary: Variables and functions constitute the "vocabulary" used to
 // evaluate expressions.
 //
 // There are multiple vocabularies in use:
@@ -52,19 +55,18 @@ using google::api::expr::runtime::CelFunctionRegistry;
 // (1) the Built-in CEL Vocabulary
 // https://github.com/google/cel-spec/blob/master/doc/langdef.md#list-of-standard-definitions
 // Built-in CEL Functions include "+", "-", "*".
-// These are static and registered with the CEL function registry.
+// These are stateless and are registered with the CEL function registry.
 //
 // (2) the Envoy defined Vocabulary,
 // https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes
-// Envoy defined CEL attributes:  Envoy has defined certain CEL attributes
+// Envoy defined CEL attributes:  Envoy has defined certain stateful CEL attributes
 // like Request, Response, Connection, etc.
 // These are added to the activation.
 //
 // and (3) the Custom CEL Vocabulary
 // These are custom definitions which a user can define.
-// Custom CEL Variables must be added to the activation.
-// Custom CEL Static Functions must be added to the registry.
-// Custom CEL Lazy Functions must be added to both the registry and the activation.
+// Custom CEL stateless functions have to be added to the registry.
+// Custom CEL variables and stateful functions have to be added to the activation.
 //
 // This interface is intended to allow for the addition and use of a CustomCELVocabulary.
 //
@@ -80,14 +82,15 @@ public:
 
   // fillActivation:
   //
-  // Adds variables/value producers and lazy functions to the current request's
+  // Adds variables/value producers and stateful/lazy functions to the current request's
   // activation.
-  // Lazily evaluated functions require a two part registration:
+  // Stateful/lazy functions require a two part registration:
   // (1) fillActivation will add a function mapping to the activation, and
   // (2) registerFunctions will add it to the CEL function registry.
-  // The function mapping for a lazy function which is added to the activation in fillActivation
-  // must be compatible with the function descriptor added to the registry in registerFunctions.
-  // Static functions do not need to be registered with the activation,
+  // The function mapping for a stateful/lazy function which is added to the
+  // activation in fillActivation must be compatible with the function descriptor
+  // added to the registry in registerFunctions.
+  // Stateless/static functions do not need to be registered with the activation,
   // only with the CEL function registry.
   //
   // The activation contains two sets of vocabulary (variables and functions):
@@ -101,10 +104,8 @@ public:
   // The mappings for the Envoy defined CEL vocabulary would have to be removed from the
   // activation and replaced with the mappings for the custom CEL vocabulary.
   //
-  // It is possible to remove variable entries and lazy function entries from an activation,
-  // which exists for the life of a request.
-  // It is not possible to remove either lazy or static function entries from the
-  // CEL function registry, which exists for the life of the application.
+  // It is possible to remove entries from an activation.
+  // It is not possible to remove entries from the CEL function registry.
   virtual void fillActivation(Activation* activation, Protobuf::Arena& arena,
                               const StreamInfo::StreamInfo& info,
                               const Http::RequestHeaderMap* request_headers,
@@ -113,20 +114,20 @@ public:
 
   // registerFunctions:
   //
-  // Registers both lazy and static functions in the CEL function registry.
+  // Registers both stateful/lazy and stateless/static functions in the CEL function registry.
   // The registry, with its functions, is used by the CEL expression builder to
   // build CEL expressions.
   // The registry contains two groups of functions.
   // (1) Built-in CEL  functions. ("+", "-" "*", "!", etc.)
   // (2) Custom CEL functions.
   // (There are currently no Envoy defined functions which are registered).
-  // The built-in CEL functions are registered using the evaluator's
-  // createBuilder function.
-  // The custom CEL functions are registered here using registerFunctions.
-  // Lazy functions must also be added to the activation using fillActivation.
-  // Static functions do not.
-  // The lazy function activation mapping must match its counterpart lazy function
-  // descriptor in the registry.
+  // The CelExpressionBuilder which is used to create CelExpressions contains a registry
+  // in which the built-in CEL functions have been registered.
+  // The custom CEL functions are registered in the registry using registerFunctions.
+  // Stateful/lazy functions must also be added to the activation using fillActivation.
+  // Stateless/static functions do not have to be added to the activation.
+  // The stateful/lazy function activation mapping must match its counterpart
+  // stateful/lazy function descriptor in the registry.
   // Once registered, the function registration cannot be removed from the registry
   // or overridden, as it can for an activation mapping.
   virtual void registerFunctions(CelFunctionRegistry* registry) PURE;
