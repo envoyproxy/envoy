@@ -220,8 +220,6 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
             all_histograms.emplace(histogram->name(), computeDisjointBucketSummary(histogram))
                 .second;
         break;
-      default:
-        break;
       }
       ASSERT(emplace_success); // No duplicates expected.
     }
@@ -285,8 +283,6 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
         [](const Stats::ParentHistogramSharedPtr& histogram) {
           return histogram->cumulativeStatistics().computeDisjointBuckets();
         });
-    break;
-  default:
     break;
   }
 
