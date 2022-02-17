@@ -161,8 +161,9 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
   if (buffered_body_ != nullptr) {
     // TODO(shikugawa): In addition to logging, the process of preventing too much data by using
     // ring buffers, etc.
-    if (buffered_body_->length() + data.length() > buffered_body_size_limit_) {
-      ENVOY_LOG_EVERY_POW_2(warn, "the buffer size limit (64KB) for retries has been exceeded.");
+    if (buffered_body_->length() + data.length() > kBufferLimitForRetry) {
+      ENVOY_LOG_EVERY_POW_2(
+          warn, "the buffer size limit (64KB) for async client retries has been exceeded.");
     } else {
       buffered_body_->add(data);
     }

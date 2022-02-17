@@ -430,7 +430,6 @@ private:
   bool local_closed_{};
   bool remote_closed_{};
   Buffer::InstancePtr buffered_body_;
-  uint64_t buffered_body_size_limit_ = kBufferLimitForRetry;
   bool encoded_response_headers_{};
   bool is_grpc_request_{};
   bool is_head_request_{false};
