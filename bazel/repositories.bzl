@@ -1059,6 +1059,7 @@ def _com_github_wasm_c_api():
         name = "wasmtime",
         actual = "@com_github_wasm_c_api//:wasmtime_lib",
     )
+
     # This isn't needed in builds with a single Wasm engine, but "bazel query"
     # complains about a missing dependency, so point it at the regular target.
     native.bind(
