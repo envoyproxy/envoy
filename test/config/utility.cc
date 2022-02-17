@@ -844,6 +844,23 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
 
   applyConfigModifiers();
 
+  setPorts(ports);
+
+  if (!connect_timeout_set_) {
+#ifdef __APPLE__
+    // Set a high default connect timeout. Under heavy load (and in particular in CI), macOS
+    // connections can take inordinately long to complete.
+    setConnectTimeout(std::chrono::seconds(30));
+#else
+    // Set a default connect timeout.
+    setConnectTimeout(std::chrono::seconds(5));
+#endif
+  }
+
+  finalized_ = true;
+}
+
+void ConfigHelper::setPorts(const std::vector<uint32_t>& ports, bool override_port_zero) {
   uint32_t port_idx = 0;
   bool eds_hosts = false;
   bool custom_cluster = false;
@@ -864,7 +881,8 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
         for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
           auto lb_endpoint = locality_lb->mutable_lb_endpoints(k);
           if (lb_endpoint->endpoint().address().has_socket_address()) {
-            if (lb_endpoint->endpoint().address().socket_address().port_value() == 0) {
+            if (lb_endpoint->endpoint().address().socket_address().port_value() == 0 ||
+                override_port_zero) {
               RELEASE_ASSERT(ports.size() > port_idx, "");
               lb_endpoint->mutable_endpoint()
                   ->mutable_address()
@@ -881,19 +899,6 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   }
   ASSERT(skip_port_usage_validation_ || port_idx == ports.size() || eds_hosts ||
          original_dst_cluster || custom_cluster || bootstrap_.dynamic_resources().has_cds_config());
-
-  if (!connect_timeout_set_) {
-#ifdef __APPLE__
-    // Set a high default connect timeout. Under heavy load (and in particular in CI), macOS
-    // connections can take inordinately long to complete.
-    setConnectTimeout(std::chrono::seconds(30));
-#else
-    // Set a default connect timeout.
-    setConnectTimeout(std::chrono::seconds(5));
-#endif
-  }
-
-  finalized_ = true;
 }
 
 void ConfigHelper::setSourceAddress(const std::string& address_string) {
@@ -1307,7 +1312,9 @@ void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
   addConfigModifier([function, this](envoy::config::bootstrap::v3::Bootstrap&) -> void {
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
         hcm_config;
-    loadHttpConnectionManager(hcm_config);
+    if (!loadHttpConnectionManager(hcm_config)) {
+      return;
+    }
     function(hcm_config);
     storeHttpConnectionManager(hcm_config);
   });

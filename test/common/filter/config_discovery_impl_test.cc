@@ -40,8 +40,10 @@ class FilterConfigDiscoveryTestBase : public testing::Test {
 public:
   FilterConfigDiscoveryTestBase() {
     // For server_factory_context
-    ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(scope_));
+    ON_CALL(factory_context_.server_factory_context_, scope()).WillByDefault(ReturnRef(scope_));
     ON_CALL(factory_context_, messageValidationContext())
+        .WillByDefault(ReturnRef(validation_context_));
+    ON_CALL(factory_context_.server_factory_context_, messageValidationContext())
         .WillByDefault(ReturnRef(validation_context_));
     EXPECT_CALL(validation_context_, dynamicValidationVisitor())
         .WillRepeatedly(ReturnRef(validation_visitor_));
@@ -113,8 +115,11 @@ type_urls:
 
   void setup(bool warm = true, bool default_configuration = false, bool last_filter_config = true) {
     provider_ = createProvider("foo", warm, default_configuration, last_filter_config);
-    callbacks_ = factory_context_.cluster_manager_.subscription_factory_.callbacks_;
-    EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
+    callbacks_ =
+        factory_context_.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+    EXPECT_CALL(*factory_context_.server_factory_context_.cluster_manager_.subscription_factory_
+                     .subscription_,
+                start(_));
     if (!warm) {
       EXPECT_CALL(init_watcher_, ready());
     }
