@@ -108,6 +108,7 @@ private:
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;
   NiceMock<Ssl::MockCertificateValidationContextConfig> cert_validation_ctx_config_;
   std::unique_ptr<EnvoyQuicProofVerifier> verifier_;
+  NiceMock<Ssl::MockContextManager> tls_context_manager_;
 };
 
 class TestSignatureCallback : public quic::ProofSource::SignatureCallback {
