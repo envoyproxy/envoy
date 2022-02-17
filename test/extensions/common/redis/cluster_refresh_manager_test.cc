@@ -1,12 +1,10 @@
 #include <atomic>
 #include <chrono>
 
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
-
-#include "exe/platform_impl.h"
-
-#include "extensions/common/redis/cluster_refresh_manager_impl.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
+#include "source/exe/platform_impl.h"
+#include "source/extensions/common/redis/cluster_refresh_manager_impl.h"
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"

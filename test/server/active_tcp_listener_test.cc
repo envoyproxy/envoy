@@ -4,16 +4,16 @@
 #include "envoy/network/listener.h"
 #include "envoy/stats/scope.h"
 
-#include "common/network/address_impl.h"
-#include "common/network/connection_balancer_impl.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/network/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/connection_balancer_impl.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/utility.h"
+#include "source/server/active_tcp_listener.h"
 
-#include "server/active_tcp_listener.h"
-
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
+#include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/network_utility.h"
 
 #include "gmock/gmock.h"
@@ -38,6 +38,7 @@ public:
   MOCK_METHOD(Network::BalancedConnectionHandlerOptRef, getBalancedHandlerByAddress,
               (const Network::Address::Instance& address));
 };
+
 class ActiveTcpListenerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {
 public:
   ActiveTcpListenerTest() {
@@ -59,7 +60,64 @@ public:
   NiceMock<Network::MockFilterChainFactory> filter_chain_factory_;
   std::shared_ptr<Network::MockFilterChain> filter_chain_;
   std::shared_ptr<NiceMock<Network::MockListenerFilterMatcher>> listener_filter_matcher_;
+  NiceMock<Runtime::MockLoader> runtime_;
 };
+
+TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
+  NiceMock<Network::MockConnectionBalancer> balancer;
+  EXPECT_CALL(listener_config_, connectionBalancer()).WillRepeatedly(ReturnRef(balancer));
+  EXPECT_CALL(listener_config_, listenerScope).Times(testing::AnyNumber());
+  EXPECT_CALL(listener_config_, listenerFiltersTimeout())
+      .WillOnce(Return(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(listener_config_, continueOnListenerFiltersTimeout());
+  EXPECT_CALL(listener_config_, openConnections()).WillRepeatedly(ReturnRef(resource_limit_));
+
+  auto listener = std::make_unique<NiceMock<Network::MockListener>>();
+  EXPECT_CALL(*listener, onDestroy());
+
+  auto* test_filter = new NiceMock<Network::MockListenerFilter>();
+  EXPECT_CALL(*test_filter, destroy_());
+  EXPECT_CALL(listener_config_, filterChainFactory())
+      .WillRepeatedly(ReturnRef(filter_chain_factory_));
+
+  // add a filter to stop the filter iteration.
+  EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+        manager.addAcceptFilter(nullptr, Network::ListenerFilterPtr{test_filter});
+        return true;
+      }));
+  EXPECT_CALL(*test_filter, onAccept(_))
+      .WillOnce(Invoke([](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
+        return Network::FilterStatus::StopIteration;
+      }));
+
+  auto active_listener = std::make_unique<ActiveTcpListener>(conn_handler_, std::move(listener),
+                                                             listener_config_, runtime_);
+
+  absl::string_view server_name = "envoy.io";
+  auto accepted_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  accepted_socket->connection_info_provider_->setRequestedServerName(server_name);
+
+  // fake the socket is open.
+  NiceMock<Network::MockIoHandle> io_handle;
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle));
+  EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
+
+  EXPECT_CALL(balancer, pickTargetHandler(_))
+      .WillOnce(testing::DoAll(
+          testing::WithArg<0>(Invoke([](auto& target) { target.incNumConnections(); })),
+          ReturnRef(*active_listener)));
+
+  // calling the onAcceptWorker() to create the ActiveTcpSocket.
+  active_listener->onAcceptWorker(std::move(accepted_socket), false, false);
+  // get the ActiveTcpSocket pointer before unlink() removed from the link-list.
+  ActiveTcpSocket* tcp_socket = active_listener->sockets().front().get();
+  // trigger the onTimeout event manually, since the timer is fake.
+  active_listener->sockets().front()->onTimeout();
+
+  EXPECT_EQ(server_name,
+            tcp_socket->stream_info_->downstreamAddressProvider().requestedServerName());
+}
 
 // Verify that the server connection with recovered address is rebalanced at redirected listener.
 TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
@@ -83,7 +141,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   auto mock_listener_will_be_moved1 = std::make_unique<Network::MockListener>();
   auto& listener1 = *mock_listener_will_be_moved1;
   auto active_listener1 = std::make_unique<ActiveTcpListener>(
-      conn_handler_, std::move(mock_listener_will_be_moved1), listener_config1);
+      conn_handler_, std::move(mock_listener_will_be_moved1), listener_config1, runtime_);
 
   NiceMock<Network::MockListenerConfig> listener_config2;
   Network::MockConnectionBalancer balancer2;
@@ -104,7 +162,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   auto mock_listener_will_be_moved2 = std::make_unique<Network::MockListener>();
   auto& listener2 = *mock_listener_will_be_moved2;
   auto active_listener2 = std::make_shared<ActiveTcpListener>(
-      conn_handler_, std::move(mock_listener_will_be_moved2), listener_config2);
+      conn_handler_, std::move(mock_listener_will_be_moved2), listener_config2, runtime_);
 
   auto* test_filter = new NiceMock<Network::MockListenerFilter>();
   EXPECT_CALL(*test_filter, destroy_());
@@ -132,7 +190,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
       }));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
-        cb.socket().addressProvider().restoreLocalAddress(alt_address);
+        cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
         return Network::FilterStatus::Continue;
       }));
   // Verify that listener1 hands off the connection by not creating network filter chain.

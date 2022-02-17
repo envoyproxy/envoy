@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_package",
 )
 load(
@@ -14,9 +16,10 @@ envoy_package()
 envoy_extension_cc_test(
     name = "grpc_access_log_impl_test",
     srcs = ["grpc_access_log_impl_test.cc"],
-    extension_name = "envoy.access_loggers.open_telemetry",
+    extension_names = ["envoy.access_loggers.open_telemetry"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/common/protobuf",
         "//source/extensions/access_loggers/open_telemetry:grpc_access_log_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
@@ -31,9 +34,9 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "access_log_impl_test",
     srcs = ["access_log_impl_test.cc"],
-    extension_name = "envoy.access_loggers.open_telemetry",
+    extension_names = ["envoy.access_loggers.open_telemetry"],
     deps = [
-        "//include/envoy/common:time_interface",
+        "//envoy/common:time_interface",
         "//source/common/protobuf",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/access_loggers/open_telemetry:access_log_lib",
@@ -52,20 +55,20 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.access_loggers.open_telemetry",
+    extension_names = ["envoy.access_loggers.open_telemetry"],
     deps = [
         "//source/extensions/access_loggers/open_telemetry:access_log_lib",
         "//source/extensions/access_loggers/open_telemetry:config",
         "//test/mocks/server:factory_context_mocks",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/access_loggers/open_telemetry/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/open_telemetry/v3:pkg_cc_proto",
     ],
 )
 
 envoy_extension_cc_test(
     name = "access_log_integration_test",
     srcs = ["access_log_integration_test.cc"],
-    extension_name = "envoy.access_loggers.open_telemetry",
+    extension_names = ["envoy.access_loggers.open_telemetry"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",
@@ -76,8 +79,46 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/access_loggers/open_telemetry/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/open_telemetry/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@opentelemetry_proto//:logs_cc_proto",
     ],
+)
+
+envoy_extension_cc_test(
+    name = "substitution_formatter_test",
+    srcs = ["substitution_formatter_test.cc"],
+    extension_names = ["envoy.access_loggers.open_telemetry"],
+    deps = [
+        "//source/common/formatter:substitution_formatter_lib",
+        "//source/common/http:exception_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/extensions/access_loggers/open_telemetry:substitution_formatter_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/test_common:utility_lib",
+        "@opentelemetry_proto//:logs_cc_proto",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "substitution_formatter_speed_test",
+    srcs = ["substitution_formatter_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//source/common/network:address_lib",
+        "//source/extensions/access_loggers/open_telemetry:substitution_formatter_lib",
+        "//test/common/stream_info:test_util",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "@opentelemetry_proto//:common_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "substitution_formatter_speed_test_benchmark_test",
+    benchmark_binary = "substitution_formatter_speed_test",
 )

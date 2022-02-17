@@ -6,7 +6,7 @@
 
 #include "envoy/http/metadata_interface.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/string_view.h"
 
@@ -78,6 +78,7 @@ public:
   // See https://tools.ietf.org/html/rfc7541#appendix-A for static header indexes
   enum class StaticHeaderIndex : uint8_t {
     Unknown,
+    Authority = 1,
     MethodGet = 2,
     MethodPost = 3,
     Path = 4,
@@ -89,7 +90,6 @@ public:
     Status404 = 13,
     Status500 = 14,
     SchemeHttps = 7,
-    Host = 38,
   };
 
   enum class ErrorCode : uint8_t {
@@ -129,6 +129,8 @@ public:
   // Methods for creating HTTP2 frames
   static Http2Frame makePingFrame(absl::string_view data = {});
   static Http2Frame makeEmptySettingsFrame(SettingsFlags flags = SettingsFlags::None);
+  static Http2Frame makeSettingsFrame(SettingsFlags flags,
+                                      std::list<std::pair<uint16_t, uint32_t>> settings);
   static Http2Frame makeEmptyHeadersFrame(uint32_t stream_index,
                                           HeadersFlags flags = HeadersFlags::None);
   static Http2Frame makeHeadersFrameNoStatus(uint32_t stream_index);

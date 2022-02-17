@@ -2,9 +2,9 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/socket_option_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_option_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -25,7 +25,7 @@ namespace {
 class SocketOptionTest : public testing::Test {
 public:
   SocketOptionTest() {
-    socket_.address_provider_->setLocalAddress(nullptr);
+    socket_.connection_info_provider_->setLocalAddress(nullptr);
 
     EXPECT_CALL(os_sys_calls_, socket(_, _, _))
         .Times(AnyNumber())
@@ -42,13 +42,15 @@ public:
         .Times(AnyNumber())
         .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
                                       socklen_t optlen) -> int {
-          return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen).rc_;
+          return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+              .return_value_;
         }));
     EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _))
         .Times(AnyNumber())
         .WillRepeatedly(Invoke(
             [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
-              return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+              return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
+                  .return_value_;
             }));
     EXPECT_CALL(os_sys_calls_, getsockname(_, _, _))
         .Times(AnyNumber())

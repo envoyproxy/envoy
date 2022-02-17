@@ -1,15 +1,14 @@
-#include "extensions/filters/network/dubbo_proxy/conn_manager.h"
+#include "source/extensions/filters/network/dubbo_proxy/conn_manager.h"
 
 #include <cstdint>
 
 #include "envoy/common/exception.h"
 
-#include "common/common/fmt.h"
-
-#include "extensions/filters/network/dubbo_proxy/app_exception.h"
-#include "extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
-#include "extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
-#include "extensions/filters/network/dubbo_proxy/heartbeat_response.h"
+#include "source/common/common/fmt.h"
+#include "source/extensions/filters/network/dubbo_proxy/app_exception.h"
+#include "source/extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/heartbeat_response.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,20 +29,7 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
   dispatch();
 
   if (end_stream) {
-    ENVOY_CONN_LOG(trace, "downstream half-closed", read_callbacks_->connection());
-
-    // Downstream has closed. Unless we're waiting for an upstream connection to complete a oneway
-    // request, close. The special case for oneway requests allows them to complete before the
-    // ConnectionManager is destroyed.
-    if (stopped_) {
-      ASSERT(!active_message_list_.empty());
-      auto metadata = (*active_message_list_.begin())->metadata();
-      if (metadata && metadata->messageType() == MessageType::Oneway) {
-        ENVOY_CONN_LOG(trace, "waiting for one-way completion", read_callbacks_->connection());
-        half_closed_ = true;
-        return Network::FilterStatus::StopIteration;
-      }
-    }
+    ENVOY_CONN_LOG(trace, "downstream closed", read_callbacks_->connection());
 
     ENVOY_LOG(debug, "dubbo: end data processing");
     resetAllMessages(false);
@@ -111,11 +97,6 @@ void ConnectionManager::dispatch() {
     return;
   }
 
-  if (stopped_) {
-    ENVOY_CONN_LOG(debug, "dubbo: dubbo filter stopped", read_callbacks_->connection());
-    return;
-  }
-
   try {
     bool underflow = false;
     while (!underflow) {
@@ -163,20 +144,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata,
     stats_.local_response_business_exception_.inc();
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-}
-
-void ConnectionManager::continueDecoding() {
-  ENVOY_CONN_LOG(debug, "dubbo filter continued", read_callbacks_->connection());
-  stopped_ = false;
-  dispatch();
-
-  if (!stopped_ && half_closed_) {
-    // If we're half closed, but not stopped waiting for an upstream,
-    // reset any pending rpcs and close the connection.
-    resetAllMessages(false);
-    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    IS_ENVOY_BUG("unexpected status");
   }
 }
 

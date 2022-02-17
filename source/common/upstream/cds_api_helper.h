@@ -6,8 +6,8 @@
 #include "envoy/config/subscription.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/logger.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/logger.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -37,7 +37,7 @@ public:
 
 private:
   ClusterManager& cm_;
-  std::string name_;
+  const std::string name_;
   std::string system_version_info_;
 };
 

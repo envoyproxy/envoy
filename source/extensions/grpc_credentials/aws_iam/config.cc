@@ -1,4 +1,4 @@
-#include "extensions/grpc_credentials/aws_iam/config.h"
+#include "source/extensions/grpc_credentials/aws_iam/config.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
@@ -7,15 +7,14 @@
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/utility.h"
-#include "common/grpc/google_grpc_creds_impl.h"
-#include "common/http/utility.h"
-#include "common/protobuf/message_validator_impl.h"
-
-#include "extensions/common/aws/credentials_provider_impl.h"
-#include "extensions/common/aws/region_provider_impl.h"
-#include "extensions/common/aws/signer_impl.h"
-#include "extensions/common/aws/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/grpc/google_grpc_creds_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/extensions/common/aws/credentials_provider_impl.h"
+#include "source/extensions/common/aws/region_provider_impl.h"
+#include "source/extensions/common/aws/signer_impl.h"
+#include "source/extensions/common/aws/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -34,7 +33,7 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
     switch (credential.credential_specifier_case()) {
     case envoy::config::core::v3::GrpcService::GoogleGrpc::CallCredentials::
         CredentialSpecifierCase::kFromPlugin: {
-      if (credential.from_plugin().name() == GrpcCredentialsNames::get().AwsIam) {
+      if (credential.from_plugin().name() == "envoy.grpc_credentials.aws_iam") {
         AwsIamGrpcCredentialsFactory credentials_factory;
         // We don't deal with validation failures here at runtime today, see
         // https://github.com/envoyproxy/envoy/issues/8010.
@@ -48,7 +47,10 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
         auto credentials_provider = std::make_shared<Common::Aws::DefaultCredentialsProviderChain>(
             api, Common::Aws::Utility::metadataFetcher);
         auto signer = std::make_unique<Common::Aws::SignerImpl>(
-            config.service_name(), getRegion(config), credentials_provider, api.timeSource());
+            config.service_name(), getRegion(config), credentials_provider, api.timeSource(),
+            // TODO: extend API to allow specifying header exclusion. ref:
+            // https://github.com/envoyproxy/envoy/pull/18998
+            Common::Aws::AwsSigV4HeaderExclusionVector{});
         std::shared_ptr<grpc::CallCredentials> new_call_creds = grpc::MetadataCredentialsFromPlugin(
             std::make_unique<AwsIamHeaderAuthenticator>(std::move(signer)));
         if (call_creds == nullptr) {

@@ -1,8 +1,7 @@
 #include "test/server/admin/admin_instance.h"
 
-#include "common/access_log/access_log_impl.h"
-
-#include "extensions/access_loggers/common/file_access_log_impl.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -10,8 +9,8 @@ namespace Server {
 AdminInstanceTest::AdminInstanceTest()
     : address_out_path_(TestEnvironment::temporaryPath("admin.address")),
       cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
-      admin_(cpu_profile_path_, server_), request_headers_{{":path", "/"}},
-      admin_filter_(admin_.createCallbackFunction()) {
+      admin_(cpu_profile_path_, server_, false), request_headers_{{":path", "/"}},
+      admin_filter_(admin_.createHandlerFunction()) {
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(

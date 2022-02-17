@@ -1,4 +1,4 @@
-#include "extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
 
 #include "google/api/httpbody.pb.h"
 

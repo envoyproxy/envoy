@@ -9,20 +9,18 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/config/metadata.h"
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_handle_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
-
-#include "server/configuration_impl.h"
-#include "server/filter_chain_manager_impl.h"
-#include "server/listener_manager_impl.h"
-
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/config/metadata.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/server/configuration_impl.h"
+#include "source/server/filter_chain_manager_impl.h"
+#include "source/server/listener_manager_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/drain_manager.h"
@@ -81,7 +79,7 @@ public:
       local_address_ =
           Network::Utility::parseInternetAddress(destination_address, destination_port);
     }
-    mock_socket->address_provider_->setLocalAddress(local_address_);
+    mock_socket->connection_info_provider_->setLocalAddress(local_address_);
 
     ON_CALL(*mock_socket, requestedServerName())
         .WillByDefault(Return(absl::AsciiStrToLower(server_name)));
@@ -95,7 +93,7 @@ public:
     } else {
       remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
     }
-    mock_socket->address_provider_->setRemoteAddress(remote_address_);
+    mock_socket->connection_info_provider_->setRemoteAddress(remote_address_);
     return filter_chain_manager_.findFilterChain(*mock_socket);
   }
 

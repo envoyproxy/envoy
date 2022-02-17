@@ -1,6 +1,6 @@
-#include "common/tracing/http_tracer_impl.h"
-#include "common/tracing/http_tracer_manager_impl.h"
-#include "common/tracing/tracer_config_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/common/tracing/http_tracer_manager_impl.h"
+#include "source/common/tracing/tracer_config_impl.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/tracer_factory.h"
@@ -22,7 +22,7 @@ namespace {
 
 class SampleDriver : public Driver {
 public:
-  SpanPtr startSpan(const Config&, Http::RequestHeaderMap&, const std::string&, SystemTime,
+  SpanPtr startSpan(const Config&, Tracing::TraceContext&, const std::string&, SystemTime,
                     const Tracing::Decision) override {
     return nullptr;
   }
@@ -130,12 +130,12 @@ TEST_F(HttpTracerManagerImplTest, ShouldFailIfProviderSpecificConfigIsNotValid) 
   tracing_config.set_name("envoy.tracers.sample");
   tracing_config.mutable_typed_config()->PackFrom(ValueUtil::stringValue("value"));
 
-  EXPECT_THROW_WITH_MESSAGE(
-      http_tracer_manager_.getOrCreateHttpTracer(&tracing_config), EnvoyException,
-      R"(Unable to unpack as google.protobuf.Struct: [type.googleapis.com/google.protobuf.Value] {
-  string_value: "value"
-}
-)");
+  ProtobufWkt::Any expected_any_proto;
+  expected_any_proto.PackFrom(ValueUtil::stringValue("value"));
+  EXPECT_THROW_WITH_MESSAGE(http_tracer_manager_.getOrCreateHttpTracer(&tracing_config),
+                            EnvoyException,
+                            fmt::format("Unable to unpack as google.protobuf.Struct: {}",
+                                        expected_any_proto.DebugString()));
 }
 
 class HttpTracerManagerImplCacheTest : public testing::Test {

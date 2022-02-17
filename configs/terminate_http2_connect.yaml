@@ -1,5 +1,6 @@
 # This configuration terminates a CONNECT request and sends the CONNECT payload upstream.
-# It can be used to test TCP tunneling as described in docs/root/intro/arch_overview/http/upgrades.rst
+# It can be used to test TCP tunneling as described in
+# https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/upgrades
 # or used to test CONNECT directly, by running `curl -k -v -x 127.0.0.1:10001 https://www.google.com`
 admin:
   address:
@@ -26,23 +27,23 @@ static_resources:
             virtual_hosts:
             - name: local_service
               domains:
-                - "*"
+              - "*"
               routes:
-                - match:
-                    connect_matcher:
+              - match:
+                  connect_matcher:
+                    {}
+                route:
+                  cluster: service_google
+                  upgrade_configs:
+                  - upgrade_type: CONNECT
+                    connect_config:
                       {}
-                  route:
-                    cluster: service_google
-                    upgrade_configs:
-                      - upgrade_type: CONNECT
-                        connect_config:
-                          {}
           http_filters:
           - name: envoy.filters.http.router
           http2_protocol_options:
             allow_connect: true
           upgrade_configs:
-            - upgrade_type: CONNECT
+          - upgrade_type: CONNECT
   clusters:
   - name: service_google
     connect_timeout: 0.25s

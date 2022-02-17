@@ -1,13 +1,13 @@
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 #include <memory>
 
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/http/utility.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Quic {
@@ -17,12 +17,12 @@ namespace Quic {
 Network::Address::InstanceConstSharedPtr
 quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address) {
   return quic_address.IsInitialized()
-             ? Network::Address::addressFromSockAddr(quic_address.generic_address(),
-                                                     quic_address.host().address_family() ==
-                                                             quic::IpAddressFamily::IP_V4
-                                                         ? sizeof(sockaddr_in)
-                                                         : sizeof(sockaddr_in6),
-                                                     false)
+             ? Network::Address::addressFromSockAddrOrDie(quic_address.generic_address(),
+                                                          quic_address.host().address_family() ==
+                                                                  quic::IpAddressFamily::IP_V4
+                                                              ? sizeof(sockaddr_in)
+                                                              : sizeof(sockaddr_in6),
+                                                          -1, false)
              : nullptr;
 }
 
@@ -73,6 +73,7 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::ConnectionTermination:
     return quic::QUIC_STREAM_CONNECTION_ERROR;
   case Http::StreamResetReason::LocalReset:
+  case Http::StreamResetReason::OverloadManager:
     return quic::QUIC_STREAM_CANCELLED;
   default:
     return quic::QUIC_BAD_APPLICATION_PAYLOAD;
@@ -125,24 +126,15 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
   }
 }
 
-Http::GoAwayErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) noexcept {
-  switch (error) {
-  case quic::QUIC_NO_ERROR:
-    return Http::GoAwayErrorCode::NoError;
-  default:
-    return Http::GoAwayErrorCode::Other;
-  }
-}
-
 Network::ConnectionSocketPtr
-createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
+createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
                        const Network::ConnectionSocket::OptionsSharedPtr& options) {
   if (local_addr == nullptr) {
     local_addr = Network::Utility::getLocalAddress(peer_addr->ip()->version());
   }
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
-      Network::Socket::Type::Datagram, local_addr, peer_addr);
+      Network::Socket::Type::Datagram, local_addr, peer_addr, Network::SocketCreationOptions{});
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
   if (options != nullptr) {
@@ -156,7 +148,7 @@ createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
   }
   connection_socket->bind(local_addr);
   ASSERT(local_addr->ip());
-  local_addr = connection_socket->addressProvider().localAddress();
+  local_addr = connection_socket->connectionInfoProvider().localAddress();
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
     ENVOY_LOG_MISC(error, "Fail to apply post-bind options");
@@ -184,6 +176,10 @@ bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes,
 
 int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::string* error_details) {
   int sign_alg = 0;
+  if (public_key == nullptr) {
+    *error_details = "Invalid leaf cert, bad public key";
+    return sign_alg;
+  }
   const int pkey_id = EVP_PKEY_id(public_key);
   switch (pkey_id) {
   case EVP_PKEY_EC: {
@@ -241,6 +237,14 @@ createServerConnectionSocket(Network::IoHandle& io_handle,
   return connection_socket;
 }
 
+void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& config,
+                       quic::QuicConfig& quic_config) {
+  int32_t max_streams = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_concurrent_streams, 100);
+  quic_config.SetMaxBidirectionalStreamsToSend(max_streams);
+  quic_config.SetMaxUnidirectionalStreamsToSend(max_streams);
+  configQuicInitialFlowControlWindow(config, quic_config);
+}
+
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
                                         quic::QuicConfig& quic_config) {
   size_t stream_flow_control_window_to_send = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -265,6 +269,15 @@ void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProto
   quic_config.SetInitialSessionFlowControlWindowToSend(
       std::max(quic::kMinimumFlowControlSendWindow,
                static_cast<quic::QuicByteCount>(session_flow_control_window_to_send)));
+}
+
+void adjustNewConnectionIdForRoutine(quic::QuicConnectionId& new_connection_id,
+                                     const quic::QuicConnectionId& old_connection_id) {
+  char* new_connection_id_data = new_connection_id.mutable_data();
+  const char* old_connection_id_ptr = old_connection_id.data();
+  auto* first_four_bytes = reinterpret_cast<const uint32_t*>(old_connection_id_ptr);
+  // Override the first 4 bytes of the new CID to the original CID's first 4 bytes.
+  safeMemcpyUnsafeDst(new_connection_id_data, first_four_bytes);
 }
 
 } // namespace Quic

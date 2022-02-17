@@ -28,7 +28,6 @@ static_resources:
                   cluster: service2
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
 
   - address:
       socket_address:
@@ -58,7 +57,6 @@ static_resources:
                   cluster: service2
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
 
       transport_socket:
         name: envoy.transport_sockets.tls
@@ -70,10 +68,10 @@ static_resources:
             # $ openssl req -x509 -newkey rsa:2048 -keyout a/front-proxy-key.pem -out  a/front-proxy-crt.pem -days 3650 -nodes -subj '/CN=front-envoy'
             #
             # Instead of feeding it as an inline_string, certificate pair can also be fed to Envoy
-            # via filename. Reference: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#config-core-v3-datasource.
+            # via filename. Reference: https://envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#config-core-v3-datasource.
             #
             # Or in a dynamic configuration scenario, certificate pair can be fetched remotely via
-            # Secret Discovery Service (SDS). Reference: https://www.envoyproxy.io/docs/envoy/latest/configuration/security/secret.
+            # Secret Discovery Service (SDS). Reference: https://envoyproxy.io/docs/envoy/latest/configuration/security/secret.
             - certificate_chain:
                 inline_string: |
                   -----BEGIN CERTIFICATE-----
@@ -126,7 +124,6 @@ static_resources:
 
   clusters:
   - name: service1
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -139,7 +136,6 @@ static_resources:
                 address: service1
                 port_value: 8000
   - name: service2
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -158,10 +154,10 @@ admin:
       port_value: 8001
 layered_runtime:
   layers:
-    - name: static_layer_0
-      static_layer:
-        envoy:
-          resource_limits:
-            listener:
-              example_listener_name:
-                connection_limit: 10000
+  - name: static_layer_0
+    static_layer:
+      envoy:
+        resource_limits:
+          listener:
+            example_listener_name:
+              connection_limit: 10000

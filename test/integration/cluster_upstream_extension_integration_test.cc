@@ -3,7 +3,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/router/router.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "test/integration/fake_upstream.h"
 #include "test/integration/http_integration.h"
@@ -20,7 +20,7 @@ class ClusterUpstreamExtensionIntegrationTest
       public HttpIntegrationTest {
 public:
   ClusterUpstreamExtensionIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata,
                                 const std::string& key1, const std::string& key2,

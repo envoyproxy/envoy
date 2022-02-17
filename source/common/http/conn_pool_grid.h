@@ -1,8 +1,10 @@
 #pragma once
 
-#include "common/http/alternate_protocols_cache_impl.h"
-#include "common/http/conn_pool_base.h"
-#include "common/http/http3_status_tracker.h"
+#include "source/common/http/alternate_protocols_cache_impl.h"
+#include "source/common/http/conn_pool_base.h"
+#include "source/common/http/http3/conn_pool.h"
+#include "source/common/http/http3_status_tracker.h"
+#include "source/common/quic/quic_stat_names.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -13,6 +15,7 @@ namespace Http {
 // [WiFi / cellular] [ipv4 / ipv6] [QUIC / TCP].
 // Currently only [QUIC / TCP are handled]
 class ConnectivityGrid : public ConnectionPool::Instance,
+                         public Http3::PoolConnectResultCallback,
                          protected Logger::Loggable<Logger::Id::pool> {
 public:
   struct ConnectivityOptions {
@@ -37,7 +40,7 @@ public:
                            public LinkedObject<WrapperCallbacks> {
   public:
     WrapperCallbacks(ConnectivityGrid& grid, Http::ResponseDecoder& decoder, PoolIterator pool_it,
-                     ConnectionPool::Callbacks& callbacks);
+                     ConnectionPool::Callbacks& callbacks, const Instance::StreamOptions& options);
 
     // This holds state for a single connection attempt to a specific pool.
     class ConnectionAttemptCallbacks : public ConnectionPool::Callbacks,
@@ -124,25 +127,32 @@ public:
     bool http3_attempt_failed_{};
     // True if the TCP attempt succeeded.
     bool tcp_attempt_succeeded_{};
+    // Latch the passed-in stream options.
+    const Instance::StreamOptions stream_options_{};
   };
   using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;
 
   ConnectivityGrid(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                    Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-                   OptRef<AlternateProtocolsCacheImpl> alternate_protocols,
-                   std::chrono::milliseconds next_attempt_duration,
-                   ConnectivityOptions connectivity_options);
+                   AlternateProtocolsCacheSharedPtr alternate_protocols,
+                   ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
+                   Stats::Scope& scope);
   ~ConnectivityGrid() override;
+
+  // Event::DeferredDeletable
+  void deleteIsPending() override;
 
   // Http::ConnPool::Instance
   bool hasActiveConnections() const override;
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
-                                         ConnectionPool::Callbacks& callbacks) override;
-  void addDrainedCallback(DrainedCb cb) override;
-  void drainConnections() override;
+                                         ConnectionPool::Callbacks& callbacks,
+                                         const Instance::StreamOptions& options) override;
+  void addIdleCallback(IdleCb cb) override;
+  bool isIdle() const override;
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override;
   Upstream::HostDescriptionConstSharedPtr host() const override;
   bool maybePreconnect(float preconnect_ratio) override;
   absl::string_view protocolDescription() const override { return "connection grid"; }
@@ -165,12 +175,19 @@ public:
   // event that HTTP/3 is marked broken again.
   void markHttp3Confirmed();
 
+  // Http3::PoolConnectResultCallback
+  void onHandshakeComplete() override;
+
+protected:
+  // Set the required idle callback on the pool.
+  void setupPool(ConnectionPool::Instance& pool);
+
 private:
   friend class ConnectivityGridForTest;
 
-  // Called by each pool as it drains. The grid is responsible for calling
-  // drained_callbacks_ once all pools have drained.
-  void onDrainReceived();
+  // Called by each pool as it idles. The grid is responsible for calling
+  // idle_callbacks_ once all pools have idled.
+  void onIdleReceived();
 
   // Returns true if HTTP/3 should be attempted because there is an alternate protocol
   // that specifies HTTP/3 and HTTP/3 is not broken.
@@ -186,30 +203,36 @@ private:
   Upstream::HostConstSharedPtr host_;
   Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr options_;
-  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Upstream::ClusterConnectivityState& state_;
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
   Http3StatusTracker http3_status_tracker_;
-  // TODO(RyanTheOptimist): Make the alternate_protocols_ member non-optional.
-  OptRef<AlternateProtocolsCacheImpl> alternate_protocols_;
+  AlternateProtocolsCacheSharedPtr alternate_protocols_;
 
-  // Tracks how many drains are needed before calling drain callbacks. This is
-  // set to the number of pools when the first drain callbacks are added, and
-  // decremented as various pools drain.
-  uint32_t drains_needed_ = 0;
+  // True iff this pool is draining. No new streams or connections should be created
+  // in this state.
+  bool draining_{false};
+
   // Tracks the callbacks to be called on drain completion.
-  std::list<Instance::DrainedCb> drained_callbacks_;
+  std::list<Instance::IdleCb> idle_callbacks_;
 
   // The connection pools to use to create new streams, ordered in the order of
   // desired use.
   std::list<ConnectionPool::InstancePtr> pools_;
+
   // True iff under the stack of the destructor, to avoid calling drain
   // callbacks on deletion.
   bool destroying_{};
 
+  // True iff this pool is being being defer deleted.
+  bool deferred_deleting_{};
+
   // Wrapped callbacks are stashed in the wrapped_callbacks_ for ownership.
   std::list<WrapperCallbacksPtr> wrapped_callbacks_;
+
+  Quic::QuicStatNames& quic_stat_names_;
+  Stats::Scope& scope_;
 };
 
 } // namespace Http

@@ -2,7 +2,7 @@
 
 #include "envoy/event/dispatcher.h"
 
-#include "common/event/dispatcher_impl.h"
+#include "source/common/event/dispatcher_impl.h"
 
 #include "dns.h"
 
@@ -23,15 +23,9 @@ public:
   createClientConnection(Network::Address::InstanceConstSharedPtr,
                          Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&&,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
-  Network::DnsResolverSharedPtr
-  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                    const bool use_tcp_for_dns_lookups) override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&&, Network::TcpListenerCallbacks&,
-                                      bool bind_to_port, uint32_t backlog_size) override;
-
-protected:
-  std::shared_ptr<Network::ValidationDnsResolver> dns_resolver_{
-      std::make_shared<Network::ValidationDnsResolver>()};
+                                      Runtime::Loader& runtime, bool bind_to_port,
+                                      bool ignore_global_conn_limit) override;
 };
 
 } // namespace Event

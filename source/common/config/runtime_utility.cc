@@ -1,4 +1,4 @@
-#include "common/config/runtime_utility.h"
+#include "source/common/config/runtime_utility.h"
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 

@@ -13,8 +13,8 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "common/runtime/runtime_impl.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -38,6 +38,11 @@ public:
     loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
         std::make_unique<Runtime::LoaderImpl>(dispatcher_, tls_, config, local_info_, store_,
                                               generator_, validation_visitor_, *api_));
+  }
+
+  ~TestScopedRuntime() {
+    Runtime::RuntimeFeatures features;
+    features.restoreDefaults();
   }
 
 protected:

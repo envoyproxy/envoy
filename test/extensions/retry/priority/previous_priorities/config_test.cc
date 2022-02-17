@@ -2,10 +2,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/retry.h"
 
-#include "common/protobuf/message_validator_impl.h"
-
-#include "extensions/retry/priority/previous_priorities/config.h"
-#include "extensions/retry/priority/well_known_names.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/extensions/retry/priority/previous_priorities/config.h"
 
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
@@ -28,7 +26,7 @@ public:
   void initialize(const Upstream::HealthyLoad& original_healthy_priority_load,
                   const Upstream::DegradedLoad& original_degraded_priority_load) {
     auto factory = Registry::FactoryRegistry<Upstream::RetryPriorityFactory>::getFactory(
-        RetryPriorityValues::get().PreviousPrioritiesRetryPriority);
+        "envoy.retry_priorities.previous_priorities");
 
     envoy::extensions::retry::priority::previous_priorities::v3::PreviousPrioritiesConfig config;
     config.set_update_frequency(update_frequency_);

@@ -13,19 +13,36 @@ MockStream::MockStream() {
   }));
 
   ON_CALL(*this, removeCallbacks(_))
-      .WillByDefault(
-          Invoke([this](StreamCallbacks& callbacks) -> void { callbacks_.remove(&callbacks); }));
+      .WillByDefault(Invoke([this](StreamCallbacks& callbacks) -> void {
+        for (auto& callback : callbacks_) {
+          if (callback == &callbacks) {
+            callback = nullptr;
+            return;
+          }
+        }
+      }));
 
   ON_CALL(*this, resetStream(_)).WillByDefault(Invoke([this](StreamResetReason reason) -> void {
-    for (StreamCallbacks* callbacks : callbacks_) {
-      callbacks->onResetStream(reason, absl::string_view());
+    for (auto& callback : callbacks_) {
+      if (callback) {
+        callback->onResetStream(reason, absl::string_view());
+        callback = nullptr;
+      }
     }
   }));
 
   ON_CALL(*this, connectionLocalAddress()).WillByDefault(ReturnRef(connection_local_address_));
+
+  ON_CALL(*this, setAccount(_))
+      .WillByDefault(Invoke(
+          [this](Buffer::BufferMemoryAccountSharedPtr account) -> void { account_ = account; }));
 }
 
-MockStream::~MockStream() = default;
+MockStream::~MockStream() {
+  if (account_) {
+    account_->clearDownstream();
+  }
+}
 
 } // namespace Http
 } // namespace Envoy

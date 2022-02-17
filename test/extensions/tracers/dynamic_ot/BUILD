@@ -19,7 +19,7 @@ envoy_extension_cc_test(
     data = [
         "@io_opentracing_cpp//mocktracer:libmocktracer_plugin.so",
     ],
-    extension_name = "envoy.tracers.dynamic_ot",
+    extension_names = ["envoy.tracers.dynamic_ot"],
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [
@@ -38,7 +38,7 @@ envoy_extension_cc_test(
     data = [
         "@io_opentracing_cpp//mocktracer:libmocktracer_plugin.so",
     ],
-    extension_name = "envoy.tracers.dynamic_ot",
+    extension_names = ["envoy.tracers.dynamic_ot"],
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [

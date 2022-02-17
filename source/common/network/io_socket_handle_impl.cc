@@ -1,11 +1,12 @@
-#include "common/network/io_socket_handle_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/utility.h"
-#include "common/event/file_event_impl.h"
-#include "common/network/address_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/utility.h"
+#include "source/common/event/file_event_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_interface_impl.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
@@ -74,7 +75,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::close() {
   }
 
   ASSERT(SOCKET_VALID(fd_));
-  const int rc = Api::OsSysCallsSingleton::get().close(fd_).rc_;
+  const int rc = Api::OsSysCallsSingleton::get().close(fd_).return_value_;
   SET_SOCKET_INVALID(fd_);
   return Api::IoCallUint64Result(rc, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
 }
@@ -96,15 +97,6 @@ Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::R
   ASSERT(num_bytes_to_read <= max_length);
   auto result = sysCallResultToIoCallResult(Api::OsSysCallsSingleton::get().readv(
       fd_, iov.begin(), static_cast<int>(num_slices_to_read)));
-
-  // Emulated edge events need to registered if the socket operation did not complete
-  // because the socket would block.
-  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-    // Some tests try to read without initializing the file_event.
-    if (result.wouldBlock() && file_event_) {
-      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
-    }
-  }
   return result;
 }
 
@@ -117,18 +109,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer,
   Buffer::Reservation reservation = buffer.reserveForRead();
   Api::IoCallUint64Result result = readv(std::min(reservation.length(), max_length),
                                          reservation.slices(), reservation.numSlices());
-  uint64_t bytes_to_commit = result.ok() ? result.rc_ : 0;
+  uint64_t bytes_to_commit = result.ok() ? result.return_value_ : 0;
   ASSERT(bytes_to_commit <= max_length);
   reservation.commit(bytes_to_commit);
-
-  // Emulated edge events need to registered if the socket operation did not complete
-  // because the socket would block.
-  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-    // Some tests try to read without initializing the file_event.
-    if (result.wouldBlock() && file_event_) {
-      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
-    }
-  }
   return result;
 }
 
@@ -148,15 +131,6 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
   }
   auto result = sysCallResultToIoCallResult(
       Api::OsSysCallsSingleton::get().writev(fd_, iov.begin(), num_slices_to_write));
-
-  // Emulated edge events need to registered if the socket operation did not complete
-  // because the socket would block.
-  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-    // Some tests try to write without initializing the file_event.
-    if (result.wouldBlock() && file_event_) {
-      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
-    }
-  }
   return result;
 }
 
@@ -164,17 +138,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
   constexpr uint64_t MaxSlices = 16;
   Buffer::RawSliceVector slices = buffer.getRawSlices(MaxSlices);
   Api::IoCallUint64Result result = writev(slices.begin(), slices.size());
-  if (result.ok() && result.rc_ > 0) {
-    buffer.drain(static_cast<uint64_t>(result.rc_));
-  }
-
-  // Emulated edge events need to registered if the socket operation did not complete
-  // because the socket would block.
-  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-    // Some tests try to read without initializing the file_event.
-    if (result.wouldBlock() && file_event_) {
-      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
-    }
+  if (result.ok() && result.return_value_ > 0) {
+    buffer.drain(static_cast<uint64_t>(result.return_value_));
   }
   return result;
 }
@@ -213,15 +178,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     message.msg_control = nullptr;
     message.msg_controllen = 0;
     const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
-    auto io_result = sysCallResultToIoCallResult(result);
-    // Emulated edge events need to registered if the socket operation did not complete
-    // because the socket would block.
-    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-      if (io_result.wouldBlock() && file_event_) {
-        file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
-      }
-    }
-    return io_result;
+    return sysCallResultToIoCallResult(result);
   } else {
     const size_t space_v6 = CMSG_SPACE(sizeof(in6_pktinfo));
     const size_t space_v4 = CMSG_SPACE(sizeof(in_pktinfo));
@@ -263,35 +220,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
       *(reinterpret_cast<absl::uint128*>(pktinfo->ipi6_addr.s6_addr)) = self_ip->ipv6()->address();
     }
     const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
-    auto io_result = sysCallResultToIoCallResult(result);
-    // Emulated edge events need to registered if the socket operation did not complete
-    // because the socket would block.
-    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-      if (io_result.wouldBlock() && file_event_) {
-        file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
-      }
-    }
-    return io_result;
-  }
-}
-
-Address::InstanceConstSharedPtr getAddressFromSockAddrOrDie(const sockaddr_storage& ss,
-                                                            socklen_t ss_len, os_fd_t fd) {
-  // TODO(chaoqin-li1123): remove exception catching and make Address::addressFromSockAddr return
-  // null on error.
-  TRY_NEEDS_AUDIT {
-    // Set v6only to false so that mapped-v6 address can be normalize to v4
-    // address. Though dual stack may be disabled, it's still okay to assume the
-    // address is from a dual stack socket. This is because mapped-v6 address
-    // must come from a dual stack socket. An actual v6 address can come from
-    // both dual stack socket and v6 only socket. If |peer_addr| is an actual v6
-    // address and the socket is actually v6 only, the returned address will be
-    // regarded as a v6 address from dual stack socket. However, this address is not going to be
-    // used to create socket. Wrong knowledge of dual stack support won't hurt.
-    return Address::addressFromSockAddr(ss, ss_len, /*v6only=*/false);
-  }
-  catch (const EnvoyException& e) {
-    PANIC(fmt::format("Invalid address for fd: {}, error: {}", fd, e.what()));
+    return sysCallResultToIoCallResult(result);
   }
 }
 
@@ -305,7 +234,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg
     ipv6_addr->sin6_family = AF_INET6;
     ipv6_addr->sin6_addr = info->ipi6_addr;
     ipv6_addr->sin6_port = htons(self_port);
-    return getAddressFromSockAddrOrDie(ss, sizeof(sockaddr_in6), fd);
+    return Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in6), fd);
   }
 
   if (cmsg.cmsg_type == messageTypeContainsIP()) {
@@ -315,7 +244,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg
     ipv4_addr->sin_family = AF_INET;
     ipv4_addr->sin_addr = addressFromMessage(cmsg);
     ipv4_addr->sin_port = htons(self_port);
-    return getAddressFromSockAddrOrDie(ss, sizeof(sockaddr_in), fd);
+    return Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in), fd);
   }
 
   return nullptr;
@@ -362,20 +291,12 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   hdr.msg_controllen = cmsg_space_;
   Api::SysCallSizeResult result =
       Api::OsSysCallsSingleton::get().recvmsg(fd_, &hdr, messageTruncatedOption());
-  if (result.rc_ < 0) {
-    auto io_result = sysCallResultToIoCallResult(result);
-    // Emulated edge events need to registered if the socket operation did not complete
-    // because the socket would block.
-    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-      if (io_result.wouldBlock() && file_event_) {
-        file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
-      }
-    }
-    return io_result;
+  if (result.return_value_ < 0) {
+    return sysCallResultToIoCallResult(result);
   }
   if ((hdr.msg_flags & MSG_TRUNC) != 0) {
-    ENVOY_LOG_MISC(debug, "Dropping truncated UDP packet with size: {}.", result.rc_);
-    result.rc_ = 0;
+    ENVOY_LOG_MISC(debug, "Dropping truncated UDP packet with size: {}.", result.return_value_);
+    result.return_value_ = 0;
     (*output.dropped_packets_)++;
     output.msg_[0].truncated_and_dropped_ = true;
     return sysCallResultToIoCallResult(result);
@@ -385,7 +306,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                  fmt::format("Incorrectly set control message length: {}", hdr.msg_controllen));
   RELEASE_ASSERT(hdr.msg_namelen > 0,
                  fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
-  output.msg_[0].peer_address_ = getAddressFromSockAddrOrDie(peer_addr, hdr.msg_namelen, fd_);
+  output.msg_[0].peer_address_ = Address::addressFromSockAddrOrDie(peer_addr, hdr.msg_namelen, fd_);
   output.msg_[0].gso_size_ = 0;
 
   if (hdr.msg_controllen > 0) {
@@ -461,19 +382,11 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
       Api::OsSysCallsSingleton::get().recvmmsg(fd_, mmsg_hdr.data(), num_packets_per_mmsg_call,
                                                messageTruncatedOption() | MSG_WAITFORONE, nullptr);
 
-  if (result.rc_ <= 0) {
-    auto io_result = sysCallResultToIoCallResult(result);
-    // Emulated edge events need to registered if the socket operation did not complete
-    // because the socket would block.
-    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-      if (io_result.wouldBlock() && file_event_) {
-        file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
-      }
-    }
-    return io_result;
+  if (result.return_value_ <= 0) {
+    return sysCallResultToIoCallResult(result);
   }
 
-  int num_packets_read = result.rc_;
+  int num_packets_read = result.return_value_;
 
   for (int i = 0; i < num_packets_read; ++i) {
     msghdr& hdr = mmsg_hdr[i].msg_hdr;
@@ -492,7 +405,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
     output.msg_[i].msg_len_ = mmsg_hdr[i].msg_len;
     // Get local and peer addresses for each packet.
     output.msg_[i].peer_address_ =
-        getAddressFromSockAddrOrDie(raw_addresses[i], hdr.msg_namelen, fd_);
+        Address::addressFromSockAddrOrDie(raw_addresses[i], hdr.msg_namelen, fd_);
     if (hdr.msg_controllen > 0) {
       struct cmsghdr* cmsg;
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
@@ -524,15 +437,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
 Api::IoCallUint64Result IoSocketHandleImpl::recv(void* buffer, size_t length, int flags) {
   const Api::SysCallSizeResult result =
       Api::OsSysCallsSingleton::get().recv(fd_, buffer, length, flags);
-  auto io_result = sysCallResultToIoCallResult(result);
-  // Emulated edge events need to registered if the socket operation did not complete
-  // because the socket would block.
-  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-    if (io_result.wouldBlock() && file_event_) {
-      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
-    }
-  }
-  return io_result;
+  return sysCallResultToIoCallResult(result);
 }
 
 bool IoSocketHandleImpl::supportsMmsg() const {
@@ -553,11 +458,11 @@ Api::SysCallIntResult IoSocketHandleImpl::listen(int backlog) {
 
 IoHandlePtr IoSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen) {
   auto result = Api::OsSysCallsSingleton::get().accept(fd_, addr, addrlen);
-  if (SOCKET_INVALID(result.rc_)) {
+  if (SOCKET_INVALID(result.return_value_)) {
     return nullptr;
   }
-
-  return std::make_unique<IoSocketHandleImpl>(result.rc_, socket_v6only_, domain_);
+  return SocketInterfaceImpl::makePlatformSpecificSocket(result.return_value_, socket_v6only_,
+                                                         domain_);
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
@@ -588,9 +493,11 @@ Api::SysCallIntResult IoSocketHandleImpl::setBlocking(bool blocking) {
 
 IoHandlePtr IoSocketHandleImpl::duplicate() {
   auto result = Api::OsSysCallsSingleton::get().duplicate(fd_);
-  RELEASE_ASSERT(result.rc_ != -1, fmt::format("duplicate failed for '{}': ({}) {}", fd_,
-                                               result.errno_, errorDetails(result.errno_)));
-  return std::make_unique<IoSocketHandleImpl>(result.rc_, socket_v6only_, domain_);
+  RELEASE_ASSERT(result.return_value_ != -1,
+                 fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
+                             errorDetails(result.errno_)));
+  return SocketInterfaceImpl::makePlatformSpecificSocket(result.return_value_, socket_v6only_,
+                                                         domain_);
 }
 
 absl::optional<int> IoSocketHandleImpl::domain() { return domain_; }
@@ -601,11 +508,11 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
   Api::SysCallIntResult result =
       os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
-  if (result.rc_ != 0) {
+  if (result.return_value_ != 0) {
     throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
                                      errorDetails(result.errno_)));
   }
-  return Address::addressFromSockAddr(ss, ss_len, socket_v6only_);
+  return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
@@ -614,9 +521,9 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
   Api::SysCallIntResult result =
       os_sys_calls.getpeername(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
-  if (result.rc_ != 0) {
+  if (result.return_value_ != 0) {
     throw EnvoyException(
-        fmt::format("getpeername failed for '{}': {}", fd_, errorDetails(result.errno_)));
+        fmt::format("getpeername failed for '{}': {}", errorDetails(result.errno_)));
   }
 
   if (ss_len == udsAddressLength() && ss.ss_family == AF_UNIX) {
@@ -625,12 +532,12 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
     // mechanisms to hide things, of which there are many).
     ss_len = sizeof ss;
     result = os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
-    if (result.rc_ != 0) {
+    if (result.return_value_ != 0) {
       throw EnvoyException(
           fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
   }
-  return Address::addressFromSockAddr(ss, ss_len);
+  return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 
 void IoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
@@ -663,10 +570,59 @@ Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
 absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime() {
   Api::EnvoyTcpInfo info;
   auto result = Api::OsSysCallsSingleton::get().socketTcpInfo(fd_, &info);
-  if (!result.rc_) {
+  if (!result.return_value_) {
     return {};
   }
   return std::chrono::duration_cast<std::chrono::milliseconds>(info.tcpi_rtt);
+}
+
+absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
+  auto& os_syscalls_singleton = Api::OsSysCallsSingleton::get();
+  if (!os_syscalls_singleton.supportsGetifaddrs()) {
+    return absl::nullopt;
+  }
+
+  Address::InstanceConstSharedPtr socket_address = localAddress();
+  if (!socket_address || socket_address->type() != Address::Type::Ip) {
+    return absl::nullopt;
+  }
+
+  Api::InterfaceAddressVector interface_addresses{};
+  const Api::SysCallIntResult rc = os_syscalls_singleton.getifaddrs(interface_addresses);
+  RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
+
+  absl::optional<std::string> selected_interface_name{};
+  for (const auto& interface_address : interface_addresses) {
+    if (!interface_address.interface_addr_) {
+      continue;
+    }
+
+    if (socket_address->ip()->version() == interface_address.interface_addr_->ip()->version()) {
+      // Compare address _without port_.
+      // TODO: create common addressAsStringWithoutPort method to simplify code here.
+      absl::uint128 socket_address_value;
+      absl::uint128 interface_address_value;
+      switch (socket_address->ip()->version()) {
+      case Address::IpVersion::v4:
+        socket_address_value = socket_address->ip()->ipv4()->address();
+        interface_address_value = interface_address.interface_addr_->ip()->ipv4()->address();
+        break;
+      case Address::IpVersion::v6:
+        socket_address_value = socket_address->ip()->ipv6()->address();
+        interface_address_value = interface_address.interface_addr_->ip()->ipv6()->address();
+        break;
+      default:
+        ENVOY_BUG(false, fmt::format("unexpected IP family {}", socket_address->ip()->version()));
+      }
+
+      if (socket_address_value == interface_address_value) {
+        selected_interface_name = interface_address.interface_name_;
+        break;
+      }
+    }
+  }
+
+  return selected_interface_name;
 }
 
 } // namespace Network

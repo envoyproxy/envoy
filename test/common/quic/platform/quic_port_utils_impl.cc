@@ -8,8 +8,8 @@
 
 #include "envoy/network/address.h"
 
-#include "common/common/assert.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/network/utility.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"

@@ -8,7 +8,7 @@ licenses(["notice"])  # Apache 2
 
 # Redis proxy L4 network filter. Implements consistent hashing and observability for large redis
 # clusters.
-# Public docs: docs/root/configuration/network_filters/redis_proxy_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/redis_proxy_filter
 
 envoy_extension_package()
 
@@ -25,9 +25,9 @@ envoy_cc_library(
     hdrs = ["cluster_refresh_manager_impl.h"],
     deps = [
         ":cluster_refresh_manager_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/singleton:manager_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/singleton:manager_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:lock_guard_lib",
         "//source/common/common:thread_annotations",
         "//source/common/common:thread_lib",

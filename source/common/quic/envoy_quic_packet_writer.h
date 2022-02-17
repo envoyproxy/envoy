@@ -1,18 +1,8 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "envoy/network/udp_packet_writer_handler.h"
 
 #include "quiche/quic/core/quic_packet_writer.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "envoy/network/udp_packet_writer_handler.h"
 
 namespace Envoy {
 namespace Quic {

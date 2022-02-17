@@ -7,8 +7,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "common/protobuf/protobuf.h"
-#include "common/router/header_formatter.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/router/header_formatter.h"
 
 namespace Envoy {
 namespace Router {
@@ -55,8 +55,11 @@ public:
    * Same as evaluateHeaders, but returns the modifications that would have been made rather than
    * modifying an existing HeaderMap.
    * @param stream_info contains additional information about the request.
+   * @param do_formatting whether or not to evaluate configured transformations; if false, returns
+   * original values instead.
    */
-  Http::HeaderTransforms getHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const;
+  Http::HeaderTransforms getHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                             bool do_formatting = true) const;
 
 protected:
   HeaderParser() = default;

@@ -2,7 +2,7 @@
 
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

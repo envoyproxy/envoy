@@ -4,23 +4,31 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 
 // The FakeOriginalDstListenerFilter restore desired local address without the dependency of OS.
+// Ipv6 and Ipv4 addresses are restored to the corresponding loopback ip address and port 80.
 class FakeOriginalDstListenerFilter : public Network::ListenerFilter {
 public:
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
     FANCY_LOG(debug, "in FakeOriginalDstListenerFilter::onAccept");
     Network::ConnectionSocket& socket = cb.socket();
-    socket.addressProvider().restoreLocalAddress(
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2", 80));
+    auto local_address = socket.connectionInfoProvider().localAddress();
+    if (local_address != nullptr &&
+        local_address->ip()->version() == Network::Address::IpVersion::v6) {
+      socket.connectionInfoProvider().restoreLocalAddress(
+          std::make_shared<Network::Address::Ipv6Instance>("::1", 80));
+    } else {
+      socket.connectionInfoProvider().restoreLocalAddress(
+          std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 80));
+    }
     FANCY_LOG(debug, "current local socket address is {} restored = {}",
-              socket.addressProvider().localAddress()->asString(),
-              socket.addressProvider().localAddressRestored());
+              socket.connectionInfoProvider().localAddress()->asString(),
+              socket.connectionInfoProvider().localAddressRestored());
     return Network::FilterStatus::Continue;
   }
 };

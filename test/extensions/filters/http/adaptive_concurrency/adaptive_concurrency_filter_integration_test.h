@@ -36,13 +36,12 @@ class AdaptiveConcurrencyIntegrationTest
       public Event::TestUsingSimulatedTime,
       public HttpIntegrationTest {
 public:
-  AdaptiveConcurrencyIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+  AdaptiveConcurrencyIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {}
 
   void customInit() {
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    config_helper_.addFilter(ADAPTIVE_CONCURRENCY_CONFIG);
+    setDownstreamProtocol(Http::CodecType::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+    config_helper_.prependFilter(ADAPTIVE_CONCURRENCY_CONFIG);
     initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
   }

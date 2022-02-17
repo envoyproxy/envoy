@@ -11,6 +11,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.type.matcher.v3";
 option java_outer_classname = "StringProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3;matcherv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: String matcher]
@@ -62,8 +63,8 @@ message StringMatcher {
     string contains = 7 [(validate.rules).string = {min_len: 1}];
   }
 
-  // If true, indicates the exact/prefix/suffix matching should be case insensitive. This has no
-  // effect for the safe_regex match.
+  // If true, indicates the exact/prefix/suffix/contains matching should be case insensitive. This
+  // has no effect for the safe_regex match.
   // For example, the matcher *data* will match both input string *Data* and *data* if set to true.
   bool ignore_case = 6;
 }

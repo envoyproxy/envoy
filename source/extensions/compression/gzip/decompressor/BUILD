@@ -15,9 +15,9 @@ envoy_cc_library(
     hdrs = ["zlib_decompressor_impl.h"],
     external_deps = ["zlib"],
     deps = [
-        "//include/envoy/compression/decompressor:decompressor_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/compression/decompressor:decompressor_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
@@ -29,8 +29,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.compression.decompressor",
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":zlib_decompressor_impl_lib",
         "//source/common/http:headers_lib",

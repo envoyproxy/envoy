@@ -1,56 +1,51 @@
 load("@rules_python//python:defs.bzl", "py_binary")
-load("@deps_pip3//:requirements.bzl", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_py_binary")
+load("//tools/base:envoy_python.bzl", "envoy_entry_point")
+load("@base_pip3//:requirements.bzl", "requirement")
+load("@envoy_repo//:path.bzl", "PATH")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-py_binary(
-    name = "exports",
-    srcs = ["exports.py"],
-    data = [
-        "//bazel:repository_locations.bzl",
-        "@envoy_api_canonical//bazel:repository_locations.bzl",
-        "@envoy_api_canonical//bazel:repository_locations_utils.bzl",
+envoy_entry_point(
+    name = "check",
+    args = [
+        "--repository_locations=$(location //bazel:all_repository_locations)",
+        "--cve_config=$(location :cve.yaml)",
     ],
+    data = [
+        ":cve.yaml",
+        "//bazel:all_repository_locations",
+    ],
+    pkg = "envoy.dependency.check",
+)
+
+envoy_entry_point(
+    name = "pip_check",
+    args = ["--path=%s" % PATH],
+    pkg = "envoy.dependency.pip_check",
 )
 
 py_binary(
-    name = "generate_external_dep_rst",
-    srcs = [
-        "generate_external_dep_rst.py",
-        "utils.py",
+    name = "validate",
+    srcs = ["validate.py"],
+    args = [
+        "$(location //bazel:all_repository_locations)",
+        "$(location //source/extensions:extensions_build_config)",
     ],
     data = [
-        ":exports",
+        "//bazel:all_repository_locations",
+        "//source/extensions:extensions_build_config",
     ],
-)
-
-py_binary(
-    name = "cve_scan",
-    srcs = [
-        "cve_scan.py",
-        "utils.py",
-    ],
-    data = [
-        ":exports",
-    ],
-)
-
-py_binary(
-    name = "cve_scan_test",
-    srcs = ["cve_scan_test.py"],
-    data = [
-        ":cve_scan",
-    ],
-)
-
-envoy_py_binary(
-    name = "tools.dependency.pip_check",
     deps = [
-        "//tools/base:checker",
-        requirement("PyYaml"),
+        "@envoy_repo",
+        requirement("aio.api.bazel"),
     ],
+)
+
+py_binary(
+    name = "validate_test",
+    srcs = ["validate_test.py"],
+    deps = [":validate"],
 )

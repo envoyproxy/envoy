@@ -1,6 +1,6 @@
-#include "extensions/common/matcher/matcher.h"
+#include "source/extensions/common/matcher/matcher.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -56,8 +56,8 @@ void buildMatcher(const envoy::config::common::matcher::v3::MatchPredicate& matc
     new_matcher = std::make_unique<HttpResponseGenericBodyMatcher>(
         match_config.http_response_generic_body_match(), matchers);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::RULE_NOT_SET:
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   // Per above, move the matcher into its position.
@@ -148,8 +148,8 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
     case envoy::config::common::matcher::v3::HttpGenericBodyMatch::GenericTextMatch::kStringMatch:
       patterns_->push_back(i.string_match());
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::common::matcher::v3::HttpGenericBodyMatch::GenericTextMatch::RULE_NOT_SET:
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
     // overlap_size_ indicates how many bytes from previous data chunk(s) are buffered.
     overlap_size_ = std::max(overlap_size_, patterns_->back().length() - 1);

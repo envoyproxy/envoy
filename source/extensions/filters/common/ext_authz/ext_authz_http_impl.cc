@@ -1,18 +1,19 @@
-#include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/matchers.h"
-#include "common/http/async_client_impl.h"
-#include "common/http/codes.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/matchers.h"
+#include "source/common/http/async_client_impl.h"
+#include "source/common/http/codes.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -36,7 +37,10 @@ const Response& errorResponse() {
                                             Http::HeaderVector{},
                                             Http::HeaderVector{},
                                             Http::HeaderVector{},
+                                            Http::HeaderVector{},
                                             {{}},
+                                            Http::Utility::QueryParamsVector{},
+                                            {},
                                             EMPTY_STRING,
                                             Http::Code::Forbidden,
                                             ProtobufWkt::Struct{}});
@@ -46,9 +50,12 @@ const Response& errorResponse() {
 struct SuccessResponse {
   SuccessResponse(const Http::HeaderMap& headers, const MatcherSharedPtr& matchers,
                   const MatcherSharedPtr& append_matchers,
-                  const MatcherSharedPtr& response_matchers, Response&& response)
+                  const MatcherSharedPtr& response_matchers,
+                  const MatcherSharedPtr& dynamic_metadata_matchers, Response&& response)
       : headers_(headers), matchers_(matchers), append_matchers_(append_matchers),
-        response_matchers_(response_matchers), response_(std::make_unique<Response>(response)) {
+        response_matchers_(response_matchers),
+        to_dynamic_metadata_matchers_(dynamic_metadata_matchers),
+        response_(std::make_unique<Response>(response)) {
     headers_.iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
       // UpstreamHeaderMatcher
       if (matchers_->matches(header.key().getStringView())) {
@@ -67,18 +74,27 @@ struct SuccessResponse {
             std::string(header.value().getStringView()));
       }
       if (response_matchers_->matches(header.key().getStringView())) {
+        // For HTTP implementation, the response headers from the auth server will, by default, be
+        // appended (using addCopy) to the encoded response headers.
         response_->response_headers_to_add.emplace_back(
             Http::LowerCaseString{std::string(header.key().getStringView())},
             std::string(header.value().getStringView()));
+      }
+      if (to_dynamic_metadata_matchers_->matches(header.key().getStringView())) {
+        const std::string key{header.key().getStringView()};
+        const std::string value{header.value().getStringView()};
+        (*response_->dynamic_metadata.mutable_fields())[key] = ValueUtil::stringValue(value);
       }
       return Http::HeaderMap::Iterate::Continue;
     });
   }
 
   const Http::HeaderMap& headers_;
+  // All matchers below are used on headers_.
   const MatcherSharedPtr& matchers_;
   const MatcherSharedPtr& append_matchers_;
   const MatcherSharedPtr& response_matchers_;
+  const MatcherSharedPtr& to_dynamic_metadata_matchers_;
   ResponsePtr response_;
 };
 
@@ -86,7 +102,9 @@ std::vector<Matchers::StringMatcherPtr>
 createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
   std::vector<Matchers::StringMatcherPtr> matchers;
   for (const auto& matcher : list.patterns()) {
-    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+    matchers.push_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            matcher));
   }
   return matchers;
 }
@@ -116,6 +134,8 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           config.http_service().authorization_response().allowed_client_headers())),
       client_header_on_success_matchers_(toClientMatchersOnSuccess(
           config.http_service().authorization_response().allowed_client_headers_on_success())),
+      to_dynamic_metadata_matchers_(toDynamicMetadataMatchers(
+          config.http_service().authorization_response().dynamic_metadata_from_headers())),
       upstream_header_matchers_(toUpstreamMatchers(
           config.http_service().authorization_response().allowed_upstream_headers())),
       upstream_header_to_append_matchers_(toUpstreamMatchers(
@@ -136,7 +156,9 @@ ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatche
   for (const auto& key : keys) {
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(key.get());
-    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+    matchers.push_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            matcher));
   }
 
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
@@ -144,6 +166,12 @@ ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatche
 
 MatcherSharedPtr
 ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list) {
+  std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list));
+  return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
+}
+
+MatcherSharedPtr
+ClientConfig::toDynamicMetadataMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
   std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list));
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
 }
@@ -157,7 +185,9 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
   if (matchers.empty()) {
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(Http::Headers::get().Host.get());
-    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+    matchers.push_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            matcher));
 
     return std::make_shared<NotHeaderKeyMatcher>(std::move(matchers));
   }
@@ -171,7 +201,9 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
   for (const auto& key : keys) {
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(key.get());
-    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+    matchers.push_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            matcher));
   }
 
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
@@ -245,10 +277,12 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
     callbacks_ = nullptr;
   } else {
+    // Do not enforce a sampling decision on this span; instead keep the parent's sampling status.
     auto options = Http::AsyncClient::RequestOptions()
                        .setTimeout(config_->timeout())
                        .setParentSpan(parent_span)
-                       .setChildSpanName(config_->tracingName());
+                       .setChildSpanName(config_->tracingName())
+                       .setSampled(absl::nullopt);
 
     request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }
@@ -316,25 +350,41 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
 
   // Create an Ok authorization response.
   if (status_code == enumToInt(Http::Code::OK)) {
-    SuccessResponse ok{
-        message->headers(), config_->upstreamHeaderMatchers(),
-        config_->upstreamHeaderToAppendMatchers(), config_->clientHeaderOnSuccessMatchers(),
-        Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{}, Http::HeaderVector{},
-                 Http::HeaderVector{}, std::move(headers_to_remove), EMPTY_STRING, Http::Code::OK,
-                 ProtobufWkt::Struct{}}};
+    SuccessResponse ok{message->headers(),
+                       config_->upstreamHeaderMatchers(),
+                       config_->upstreamHeaderToAppendMatchers(),
+                       config_->clientHeaderOnSuccessMatchers(),
+                       config_->dynamicMetadataMatchers(),
+                       Response{CheckStatus::OK,
+                                Http::HeaderVector{},
+                                Http::HeaderVector{},
+                                Http::HeaderVector{},
+                                Http::HeaderVector{},
+                                Http::HeaderVector{},
+                                std::move(headers_to_remove),
+                                Http::Utility::QueryParamsVector{},
+                                {},
+                                EMPTY_STRING,
+                                Http::Code::OK,
+                                ProtobufWkt::Struct{}}};
     return std::move(ok.response_);
   }
 
   // Create a Denied authorization response.
-  SuccessResponse denied{message->headers(), config_->clientHeaderMatchers(),
+  SuccessResponse denied{message->headers(),
+                         config_->clientHeaderMatchers(),
                          config_->upstreamHeaderToAppendMatchers(),
                          config_->clientHeaderOnSuccessMatchers(),
+                         config_->dynamicMetadataMatchers(),
                          Response{CheckStatus::Denied,
                                   Http::HeaderVector{},
                                   Http::HeaderVector{},
                                   Http::HeaderVector{},
                                   Http::HeaderVector{},
+                                  Http::HeaderVector{},
                                   {{}},
+                                  Http::Utility::QueryParamsVector{},
+                                  {},
                                   message->bodyAsString(),
                                   static_cast<Http::Code>(status_code),
                                   ProtobufWkt::Struct{}}};

@@ -10,10 +10,10 @@
 #include "envoy/stats/tag_extractor.h"
 #include "envoy/stats/tag_producer.h"
 
-#include "common/common/hash.h"
-#include "common/common/utility.h"
-#include "common/config/well_known_names.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/node_hash_set.h"
@@ -28,7 +28,11 @@ namespace Stats {
  */
 class TagProducerImpl : public TagProducer {
 public:
+  TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config,
+                  const Stats::TagVector& cli_tags);
+
   TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config);
+
   TagProducerImpl() = default;
 
   /**

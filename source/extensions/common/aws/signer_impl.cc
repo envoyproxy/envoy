@@ -1,14 +1,13 @@
-#include "extensions/common/aws/signer_impl.h"
+#include "source/extensions/common/aws/signer_impl.h"
 
 #include "envoy/common/exception.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/fmt.h"
-#include "common/common/hex.h"
-#include "common/crypto/utility.h"
-#include "common/http/headers.h"
-
-#include "extensions/common/aws/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/str_join.h"
 
@@ -58,9 +57,9 @@ void SignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& conten
   const auto short_date = short_date_formatter_.now(time_source_);
   headers.addCopy(SignatureHeaders::get().Date, long_date);
   // Phase 1: Create a canonical request
-  const auto canonical_headers = Utility::canonicalizeHeaders(headers);
+  const auto canonical_headers = Utility::canonicalizeHeaders(headers, excluded_header_matchers_);
   const auto canonical_request = Utility::createCanonicalRequest(
-      method_header->value().getStringView(), path_header->value().getStringView(),
+      service_name_, method_header->value().getStringView(), path_header->value().getStringView(),
       canonical_headers, content_hash);
   ENVOY_LOG(debug, "Canonical request:\n{}", canonical_request);
   // Phase 2: Create a string to sign

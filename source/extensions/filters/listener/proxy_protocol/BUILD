@@ -20,9 +20,9 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/network:listen_socket_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -32,7 +32,6 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
-        "//source/extensions/filters/listener:well_known_names",
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
     ],
 )
@@ -40,16 +39,9 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
-    category = "envoy.filters.listener",
-    # TODO(#9953) clean up.
-    extra_visibility = [
-        "//test/integration:__subpackages__",
-    ],
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/listener:well_known_names",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
         "//source/extensions/filters/listener/proxy_protocol:proxy_protocol_lib",
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
     ],

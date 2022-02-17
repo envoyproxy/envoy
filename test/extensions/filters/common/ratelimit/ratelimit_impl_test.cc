@@ -6,11 +6,10 @@
 #include "envoy/service/ratelimit/v3/rls.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/filters/common/ratelimit/ratelimit_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/filters/common/ratelimit/ratelimit_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -55,8 +54,8 @@ class RateLimitGrpcClientTest : public testing::Test {
 public:
   RateLimitGrpcClientTest()
       : async_client_(new Grpc::MockAsyncClient()),
-        client_(Grpc::RawAsyncClientPtr{async_client_}, absl::optional<std::chrono::milliseconds>(),
-                envoy::config::core::v3::ApiVersion::AUTO) {}
+        client_(Grpc::RawAsyncClientPtr{async_client_},
+                absl::optional<std::chrono::milliseconds>()) {}
 
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncRequest async_request_;
@@ -78,7 +77,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
             Invoke([this](absl::string_view service_full_name, absl::string_view method_name,
                           Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
                           const Http::AsyncClient::RequestOptions&) -> Grpc::AsyncRequest* {
-              std::string service_name = "envoy.service.ratelimit.v2.RateLimitService";
+              std::string service_name = "envoy.service.ratelimit.v3.RateLimitService";
               EXPECT_EQ(service_name, service_full_name);
               EXPECT_EQ("ShouldRateLimit", method_name);
               return &async_request_;

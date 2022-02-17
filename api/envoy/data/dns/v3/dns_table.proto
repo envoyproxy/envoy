@@ -6,6 +6,7 @@ import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/duration.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -13,6 +14,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.data.dns.v3";
 option java_outer_classname = "DnsTableProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/data/dns/v3;dnsv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: DNS Filter Table Data]
@@ -143,8 +145,13 @@ message DnsTable {
   // list empty, Envoy will forward all queries to external resolvers
   repeated DnsVirtualDomain virtual_domains = 2;
 
+  // This field is deprecated and no longer used in Envoy. The filter's behavior has changed
+  // internally to use a different data structure allowing the filter to determine whether a
+  // query is for known domain without the use of this field.
+  //
   // This field serves to help Envoy determine whether it can authoritatively answer a query
   // for a name matching a suffix in this list. If the query name does not match a suffix in
   // this list, Envoy will forward the query to an upstream DNS server
-  repeated type.matcher.v3.StringMatcher known_suffixes = 3;
+  repeated type.matcher.v3.StringMatcher known_suffixes = 3
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }

@@ -13,14 +13,14 @@
 #include "envoy/thread_local/thread_local_object.h"
 #include "envoy/tracing/http_tracer.h"
 
-#include "common/common/linked_object.h"
-#include "common/common/thread.h"
-#include "common/common/thread_annotations.h"
-#include "common/grpc/google_grpc_context.h"
-#include "common/grpc/stat_names.h"
-#include "common/grpc/typed_async_client.h"
-#include "common/router/header_parser.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/thread_annotations.h"
+#include "source/common/grpc/google_grpc_context.h"
+#include "source/common/grpc/stat_names.h"
+#include "source/common/grpc/typed_async_client.h"
+#include "source/common/router/header_parser.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 #include "absl/container/node_hash_set.h"
 #include "grpcpp/generic/generic_stub.h"
@@ -198,6 +198,7 @@ private:
   GoogleStubSharedPtr stub_;
   std::list<GoogleAsyncStreamImplPtr> active_streams_;
   const std::string stat_prefix_;
+  const std::string target_uri_;
   Stats::ScopeSharedPtr scope_;
   GoogleAsyncClientStats stats_;
   uint64_t per_stream_buffer_limit_bytes_;

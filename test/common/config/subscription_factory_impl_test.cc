@@ -8,9 +8,10 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/subscription_factory_impl.h"
-#include "common/config/xds_resource.h"
+#include "source/common/config/subscription_factory_impl.h"
+#include "source/common/config/xds_resource.h"
 
+#include "test/config/v2_link_hacks.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
@@ -34,6 +35,8 @@ using ::testing::ReturnRef;
 namespace Envoy {
 namespace Config {
 namespace {
+
+enum class LegacyOrUnified { Legacy, Unified };
 
 class SubscriptionFactoryTest : public testing::Test {
 public:
@@ -68,13 +71,30 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
-  NiceMock<Runtime::MockLoader> runtime_;
   SubscriptionFactoryImpl subscription_factory_;
+};
+
+class SubscriptionFactoryTestUnifiedOrLegacyMux
+    : public SubscriptionFactoryTest,
+      public testing::WithParamInterface<LegacyOrUnified> {
+public:
+  SubscriptionFactoryTestUnifiedOrLegacyMux() {
+    if (GetParam() == LegacyOrUnified::Unified) {
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.unified_mux", "true"}});
+    }
+  }
+
+  TestScopedRuntime scoped_runtime_;
 };
 
 class SubscriptionFactoryTestApiConfigSource
     : public SubscriptionFactoryTest,
       public testing::WithParamInterface<envoy::config::core::v3::ApiConfigSource::ApiType> {};
+
+INSTANTIATE_TEST_SUITE_P(SubscriptionFactoryTestUnifiedOrLegacyMux,
+                         SubscriptionFactoryTestUnifiedOrLegacyMux,
+                         ::testing::Values(LegacyOrUnified::Unified, LegacyOrUnified::Legacy));
 
 TEST_F(SubscriptionFactoryTest, NoConfigSpecifier) {
   envoy::config::core::v3::ConfigSource config;
@@ -94,7 +114,7 @@ TEST_F(SubscriptionFactoryTest, RestClusterEmpty) {
                           "API configs must have either a gRPC service or a cluster name defined:");
 }
 
-TEST_F(SubscriptionFactoryTest, GrpcClusterEmpty) {
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterEmpty) {
   envoy::config::core::v3::ConfigSource config;
   Upstream::ClusterManager::ClusterSet primary_clusters;
 
@@ -120,7 +140,7 @@ TEST_F(SubscriptionFactoryTest, RestClusterSingleton) {
   subscriptionFromConfigSource(config);
 }
 
-TEST_F(SubscriptionFactoryTest, GrpcClusterSingleton) {
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterSingleton) {
   envoy::config::core::v3::ConfigSource config;
   Upstream::ClusterManager::ClusterSet primary_clusters;
 
@@ -140,7 +160,7 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterSingleton) {
               factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
       .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
-        EXPECT_CALL(*async_client_factory, create()).WillOnce(Invoke([] {
+        EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
           return std::make_unique<Grpc::MockAsyncClient>();
         }));
         return async_client_factory;
@@ -168,7 +188,7 @@ TEST_F(SubscriptionFactoryTest, RestClusterMultiton) {
                                       config.mutable_api_config_source()->GetTypeName()));
 }
 
-TEST_F(SubscriptionFactoryTest, GrpcClusterMultiton) {
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterMultiton) {
   envoy::config::core::v3::ConfigSource config;
   Upstream::ClusterManager::ClusterSet primary_clusters;
 
@@ -205,7 +225,7 @@ TEST_F(SubscriptionFactoryTest, FilesystemSubscriptionNonExistentFile) {
   envoy::config::core::v3::ConfigSource config;
   config.set_path("/blahblah");
   EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}), EnvoyException,
-                            "envoy::api::v2::Path must refer to an existing path in the system: "
+                            "paths must refer to an existing path in the system: "
                             "'/blahblah' does not exist")
 }
 
@@ -223,22 +243,8 @@ TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscription) {
 TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscriptionNonExistentFile) {
   EXPECT_THROW_WITH_MESSAGE(collectionSubscriptionFromUrl("file:///blahblah", {})->start({}),
                             EnvoyException,
-                            "envoy::api::v2::Path must refer to an existing path in the system: "
+                            "paths must refer to an existing path in the system: "
                             "'/blahblah' does not exist");
-}
-
-TEST_F(SubscriptionFactoryTest, LegacySubscription) {
-  envoy::config::core::v3::ConfigSource config;
-  auto* api_config_source = config.mutable_api_config_source();
-  api_config_source->set_api_type(
-      envoy::config::core::v3::ApiConfigSource::hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY);
-  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
-  api_config_source->add_cluster_names("static_cluster");
-  Upstream::ClusterManager::ClusterSet primary_clusters;
-  primary_clusters.insert("static_cluster");
-  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
-  EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config)->start({"static_cluster"}),
-                          EnvoyException, "REST_LEGACY no longer a supported ApiConfigSource.*");
 }
 
 TEST_F(SubscriptionFactoryTest, HttpSubscriptionCustomRequestTimeout) {
@@ -303,7 +309,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionNoRefreshDelay) {
                             "refresh_delay is required for REST API configuration sources");
 }
 
-TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcSubscription) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -319,7 +325,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
               factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
       .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
-        EXPECT_CALL(*async_client_factory, create()).WillOnce(Invoke([] {
+        EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
           return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
         }));
         return async_client_factory;
@@ -331,14 +337,14 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   subscriptionFromConfigSource(config)->start({"static_cluster"});
 }
 
-TEST_F(SubscriptionFactoryTest, GrpcCollectionSubscriptionBadType) {
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionSubscriptionBadType) {
   EXPECT_THROW_WITH_MESSAGE(collectionSubscriptionFromUrl("xdstp:///foo", {})->start({}),
                             EnvoyException,
                             "xdstp:// type does not match "
                             "envoy.config.endpoint.v3.ClusterLoadAssignment in xdstp:///foo");
 }
 
-TEST_F(SubscriptionFactoryTest, GrpcCollectionSubscriptionUnsupportedApiType) {
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionSubscriptionUnsupportedApiType) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -347,14 +353,32 @@ TEST_F(SubscriptionFactoryTest, GrpcCollectionSubscriptionUnsupportedApiType) {
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  std::string expected_config_text = R"pb(api_type: GRPC)pb";
+  envoy::config::core::v3::ApiConfigSource expected_config_proto;
+  Protobuf::TextFormat::ParseFromString(expected_config_text, &expected_config_proto);
   EXPECT_THROW_WITH_REGEX(
       collectionSubscriptionFromUrl(
           "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar", config)
           ->start({}),
-      EnvoyException, "Unknown xdstp:// transport API type in api_type: GRPC");
+      EnvoyException,
+      fmt::format("Unknown xdstp:// transport API type in {}",
+                  expected_config_proto.DebugString()));
 }
 
-TEST_F(SubscriptionFactoryTest, GrpcCollectionAggregatedSubscription) {
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux,
+       GrpcCollectionSubscriptionUnsupportedConfigSpecifierType) {
+  envoy::config::core::v3::ConfigSource config;
+  config.set_path("/path/foo/bar");
+  EXPECT_THROW_WITH_REGEX(
+      collectionSubscriptionFromUrl(
+          "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar", config)
+          ->start({}),
+      EnvoyException,
+      "Missing or not supported config source specifier in envoy::config::core::v3::ConfigSource "
+      "for a collection. Only ADS and gRPC in delta-xDS mode are supported.");
+}
+
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionAggregatedSubscription) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
@@ -373,7 +397,7 @@ TEST_F(SubscriptionFactoryTest, GrpcCollectionAggregatedSubscription) {
       ->start({});
 }
 
-TEST_F(SubscriptionFactoryTest, GrpcCollectionDeltaSubscription) {
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionDeltaSubscription) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);

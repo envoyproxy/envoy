@@ -2,8 +2,8 @@
 
 #include <exception>
 
-#include "common/common/logger.h"
-#include "common/common/non_copyable.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/non_copyable.h"
 
 namespace Envoy {
 

@@ -2,10 +2,9 @@
 #include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/network/client_ssl_auth/config.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/network/client_ssl_auth/config.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/mocks/server/factory_context.h"
 
@@ -100,16 +99,6 @@ TEST(ClientSslAuthConfigFactoryTest, ValidateFail) {
       ClientSslAuthConfigFactory().createFilterFactoryFromProto(
           envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth(), context),
       ProtoValidationException);
-}
-
-// Test that the deprecated extension name still functions.
-TEST(ClientSslAuthConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.client_ssl_auth";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
-          deprecated_name));
 }
 
 } // namespace ClientSslAuth

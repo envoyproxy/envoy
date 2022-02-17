@@ -1,9 +1,9 @@
-#include "extensions/resource_monitors/fixed_heap/fixed_heap_monitor.h"
+#include "source/extensions/resource_monitors/fixed_heap/fixed_heap_monitor.h"
 
 #include "envoy/extensions/resource_monitors/fixed_heap/v3/fixed_heap.pb.h"
 
-#include "common/common/assert.h"
-#include "common/memory/stats.h"
+#include "source/common/common/assert.h"
+#include "source/common/memory/stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,7 +21,7 @@ FixedHeapMonitor::FixedHeapMonitor(
   ASSERT(max_heap_ > 0);
 }
 
-void FixedHeapMonitor::updateResourceUsage(Server::ResourceMonitor::Callbacks& callbacks) {
+void FixedHeapMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
   const size_t physical = stats_->reservedHeapBytes();
   const size_t unmapped = stats_->unmappedHeapBytes();
   ASSERT(physical >= unmapped);

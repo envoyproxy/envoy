@@ -5,17 +5,16 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/stream_info/stream_info_impl.h"
-
-#include "extensions/filters/network/dubbo_proxy/decoder.h"
-#include "extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
-#include "extensions/filters/network/dubbo_proxy/filters/filter.h"
-#include "extensions/filters/network/dubbo_proxy/metadata.h"
-#include "extensions/filters/network/dubbo_proxy/router/router.h"
-#include "extensions/filters/network/dubbo_proxy/stats.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/decoder.h"
+#include "source/extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
+#include "source/extensions/filters/network/dubbo_proxy/filters/filter.h"
+#include "source/extensions/filters/network/dubbo_proxy/metadata.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/router.h"
+#include "source/extensions/filters/network/dubbo_proxy/stats.h"
 
 #include "absl/types/optional.h"
 
@@ -42,7 +41,7 @@ public:
 
   // ResponseDecoderCallbacks
   StreamHandler& newStream() override { return *this; }
-  void onHeartbeat(MessageMetadataSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void onHeartbeat(MessageMetadataSharedPtr) override {}
 
   uint64_t requestId() const { return metadata_ ? metadata_->requestId() : 0; }
 
@@ -134,7 +133,6 @@ using ActiveMessageEncoderFilterPtr = std::unique_ptr<ActiveMessageEncoderFilter
 class ActiveMessage : public LinkedObject<ActiveMessage>,
                       public Event::DeferredDeletable,
                       public StreamHandler,
-                      public DubboFilters::DecoderFilterCallbacks,
                       public DubboFilters::FilterChainFactoryCallbacks,
                       Logger::Loggable<Logger::Id::dubbo> {
 public:
@@ -159,21 +157,19 @@ public:
   // StreamHandler
   void onStreamDecoded(MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) override;
 
-  // DubboFilters::DecoderFilterCallbacks
-  uint64_t requestId() const override;
-  uint64_t streamId() const override;
-  const Network::Connection* connection() const override;
-  void continueDecoding() override;
-  SerializationType serializationType() const override;
-  ProtocolType protocolType() const override;
-  StreamInfo::StreamInfo& streamInfo() override;
-  Router::RouteConstSharedPtr route() override;
-  void sendLocalReply(const DubboFilters::DirectResponse& response, bool end_stream) override;
-  void startUpstreamResponse() override;
-  DubboFilters::UpstreamResponseStatus upstreamData(Buffer::Instance& buffer) override;
-  void resetDownstreamConnection() override;
-  Event::Dispatcher& dispatcher() override;
-  void resetStream() override;
+  uint64_t requestId() const;
+  uint64_t streamId() const;
+  const Network::Connection* connection() const;
+  SerializationType serializationType() const;
+  ProtocolType protocolType() const;
+  StreamInfo::StreamInfo& streamInfo();
+  Router::RouteConstSharedPtr route();
+  void sendLocalReply(const DubboFilters::DirectResponse& response, bool end_stream);
+  void startUpstreamResponse();
+  DubboFilters::UpstreamResponseStatus upstreamData(Buffer::Instance& buffer);
+  void resetDownstreamConnection();
+  Event::Dispatcher& dispatcher();
+  void resetStream();
 
   void createFilterChain();
   FilterStatus applyDecoderFilters(ActiveMessageDecoderFilter* filter,
@@ -205,8 +201,6 @@ private:
 
   std::list<ActiveMessageEncoderFilterPtr> encoder_filters_;
   std::function<FilterStatus(DubboFilters::EncoderFilter*)> encoder_filter_action_;
-
-  int32_t request_id_;
 
   // This value is used in the calculation of the weighted cluster.
   uint64_t stream_id_;

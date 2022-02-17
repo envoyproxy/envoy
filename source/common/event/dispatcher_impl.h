@@ -14,11 +14,11 @@
 #include "envoy/network/connection_handler.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/logger.h"
-#include "common/common/thread.h"
-#include "common/event/libevent.h"
-#include "common/event/libevent_scheduler.h"
-#include "common/signal/fatal_error_handler.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/libevent.h"
+#include "source/common/event/libevent_scheduler.h"
+#include "source/common/signal/fatal_error_handler.h"
 
 #include "absl/container/inlined_vector.h"
 
@@ -66,15 +66,12 @@ public:
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
-  Network::DnsResolverSharedPtr
-  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                    const bool use_tcp_for_dns_lookups) override;
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::TcpListenerCallbacks& cb, bool bind_to_port,
-                                      uint32_t backlog_size) override;
+                                      Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
+                                      bool bind_to_port, bool ignore_global_conn_limit) override;
   Network::UdpListenerPtr
   createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
                     const envoy::config::core::v3::UdpSocketConfig& config) override;
@@ -92,6 +89,7 @@ public:
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
   void pushTrackedObject(const ScopeTrackedObject* object) override;
   void popTrackedObject(const ScopeTrackedObject* expected_object) override;
+  bool trackedObjectStackIsEmpty() const override { return tracked_object_stack_.empty(); }
   MonotonicTime approximateMonotonicTime() const override;
   void updateApproximateMonotonicTime() override;
   void shutdown() override;

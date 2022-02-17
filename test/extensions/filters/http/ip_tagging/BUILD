@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "ip_tagging_filter_test",
     srcs = ["ip_tagging_filter_test.cc"],
-    extension_name = "envoy.filters.http.ip_tagging",
+    extension_names = ["envoy.filters.http.ip_tagging"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",

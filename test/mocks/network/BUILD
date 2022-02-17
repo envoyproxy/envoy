@@ -13,7 +13,7 @@ envoy_cc_mock(
     srcs = ["connection.cc"],
     hdrs = ["connection.h"],
     deps = [
-        "//include/envoy/network:connection_interface",
+        "//envoy/network:connection_interface",
         "//source/common/network:filter_manager_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
@@ -25,8 +25,8 @@ envoy_cc_mock(
     srcs = ["io_handle.cc"],
     hdrs = ["io_handle.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/network:io_handle_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/network:io_handle_interface",
         "//source/common/buffer:buffer_lib",
     ],
 )
@@ -37,7 +37,7 @@ envoy_cc_mock(
     hdrs = ["socket.h"],
     deps = [
         ":io_handle_mocks",
-        "//include/envoy/network:socket_interface",
+        "//envoy/network:socket_interface",
     ],
 )
 
@@ -47,16 +47,19 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         ":connection_mocks",
+        ":io_handle_mocks",
         ":transport_socket_mocks",
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:drain_decision_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/network:resolver_interface",
-        "//include/envoy/network:transport_socket_interface",
-        "//include/envoy/server:listener_manager_interface",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:drain_decision_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/network:resolver_interface",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/server:listener_manager_interface",
         "//source/common/network:address_lib",
+        "//source/common/network:socket_interface_lib",
         "//source/common/network:utility_lib",
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
@@ -71,7 +74,7 @@ envoy_cc_mock(
     srcs = ["transport_socket.cc"],
     hdrs = ["transport_socket.h"],
     deps = [
-        "//include/envoy/network:transport_socket_interface",
+        "//envoy/network:transport_socket_interface",
         "//source/common/network:utility_lib",
     ],
 )

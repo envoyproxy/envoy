@@ -1,6 +1,5 @@
-#include "common/common/fmt.h"
-
-#include "extensions/common/aws/utility.h"
+#include "source/common/common/fmt.h"
+#include "source/extensions/common/aws/utility.h"
 
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
@@ -56,7 +55,8 @@ public:
                     prefix: "/"
                     headers:
                       - name: Authorization
-                        exact_match: AUTH_TOKEN
+                        string_match:
+                          exact: AUTH_TOKEN
                 - name: no_auth_route
                   direct_response:
                     status: {}

@@ -1,13 +1,14 @@
 #include "mocks.h"
 
-#include "common/common/assert.h"
-#include "common/common/lock_guard.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/lock_guard.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Api {
@@ -16,6 +17,7 @@ MockApi::MockApi() {
   ON_CALL(*this, fileSystem()).WillByDefault(ReturnRef(file_system_));
   ON_CALL(*this, rootScope()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, randomGenerator()).WillByDefault(ReturnRef(random_));
+  ON_CALL(*this, bootstrap()).WillByDefault(ReturnRef(empty_bootstrap_));
 }
 
 MockApi::~MockApi() = default;
@@ -58,14 +60,14 @@ MockOsSysCalls::~MockOsSysCalls() = default;
 
 SysCallIntResult MockOsSysCalls::setsockopt(os_fd_t sockfd, int level, int optname,
                                             const void* optval, socklen_t optlen) {
-  ASSERT(optlen == sizeof(int));
-
   // Allow mocking system call failure.
   if (setsockopt_(sockfd, level, optname, optval, optlen) != 0) {
     return SysCallIntResult{-1, 0};
   }
 
-  boolsockopts_[SockOptKey(sockfd, level, optname)] = !!*reinterpret_cast<const int*>(optval);
+  if (optlen >= sizeof(int)) {
+    boolsockopts_[SockOptKey(sockfd, level, optname)] = !!*reinterpret_cast<const int*>(optval);
+  }
   return SysCallIntResult{0, 0};
 };
 

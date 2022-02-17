@@ -8,9 +8,9 @@
 
 #include "envoy/stats/stats.h"
 
-#include "common/http/codes.h"
-#include "common/stats/isolated_store_impl.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/http/codes.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "benchmark/benchmark.h"
 
@@ -35,7 +35,7 @@ public:
         global_store_,      cluster_scope_,        prefix_, code,  internal_request,
         request_vhost_name, request_vcluster_name, from_az, to_az, canary};
 
-    code_stats_.chargeResponseStat(info);
+    code_stats_.chargeResponseStat(info, false);
   }
 
   void addResponses() {

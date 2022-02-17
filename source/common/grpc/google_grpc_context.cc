@@ -1,11 +1,11 @@
-#include "common/grpc/google_grpc_context.h"
+#include "source/common/grpc/google_grpc_context.h"
 
 #include <atomic>
 
-#include "common/common/assert.h"
-#include "common/common/lock_guard.h"
-#include "common/common/macros.h"
-#include "common/common/thread.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/thread.h"
 
 #ifdef ENVOY_GOOGLE_GRPC
 #include "grpcpp/grpcpp.h"

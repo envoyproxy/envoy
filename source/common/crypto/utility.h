@@ -6,7 +6,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/crypto/crypto.h"
 
-#include "common/singleton/threadsafe_singleton.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 
 #include "absl/strings/string_view.h"
 

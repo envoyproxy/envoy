@@ -1,4 +1,4 @@
-#include "extensions/filters/http/admission_control/admission_control.h"
+#include "source/extensions/filters/http/admission_control/admission_control.h"
 
 #include <chrono>
 #include <cstdint>
@@ -6,21 +6,19 @@
 #include <vector>
 
 #include "envoy/common/random_generator.h"
-#include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
+#include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/common/cleanup.h"
-#include "common/common/enum_to_int.h"
-#include "common/grpc/common.h"
-#include "common/http/codes.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,6 +29,8 @@ using GrpcStatus = Grpc::Status::GrpcStatus;
 
 static constexpr double defaultAggression = 1.0;
 static constexpr double defaultSuccessRateThreshold = 95.0;
+static constexpr uint32_t defaultRpsThreshold = 0;
+static constexpr double defaultMaxRejectionProbability = 80.0;
 
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
     const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
@@ -45,6 +45,13 @@ AdmissionControlFilterConfig::AdmissionControlFilterConfig(
       sr_threshold_(proto_config.has_sr_threshold() ? std::make_unique<Runtime::Percentage>(
                                                           proto_config.sr_threshold(), runtime)
                                                     : nullptr),
+      rps_threshold_(proto_config.has_rps_threshold()
+                         ? std::make_unique<Runtime::UInt32>(proto_config.rps_threshold(), runtime)
+                         : nullptr),
+      max_rejection_probability_(proto_config.has_max_rejection_probability()
+                                     ? std::make_unique<Runtime::Percentage>(
+                                           proto_config.max_rejection_probability(), runtime)
+                                     : nullptr),
       response_evaluator_(std::move(response_evaluator)) {}
 
 double AdmissionControlFilterConfig::aggression() const {
@@ -54,6 +61,16 @@ double AdmissionControlFilterConfig::aggression() const {
 double AdmissionControlFilterConfig::successRateThreshold() const {
   const double pct = sr_threshold_ ? sr_threshold_->value() : defaultSuccessRateThreshold;
   return std::min<double>(pct, 100.0) / 100.0;
+}
+
+uint32_t AdmissionControlFilterConfig::rpsThreshold() const {
+  return rps_threshold_ ? rps_threshold_->value() : defaultRpsThreshold;
+}
+
+double AdmissionControlFilterConfig::maxRejectionProbability() const {
+  const double ret = max_rejection_probability_ ? max_rejection_probability_->value()
+                                                : defaultMaxRejectionProbability;
+  return ret / 100.0;
 }
 
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
@@ -68,6 +85,11 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
     return Http::FilterHeadersStatus::Continue;
   }
 
+  if (config_->getController().averageRps() < config_->rpsThreshold()) {
+    ENVOY_LOG(debug, "Current rps: {} is below rps_threshold: {}, continue");
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (shouldRejectRequest()) {
     // We do not want to sample requests that we are rejecting, since this taints the measurements
     // that should be describing the upstreams. In addition, if we were to record the requests
@@ -77,7 +99,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
 
     stats_.rq_rejected_.inc();
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
-                                       "denied by admission control");
+                                       "denied_by_admission_control");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -148,6 +170,7 @@ bool AdmissionControlFilter::shouldRejectRequest() const {
   if (aggression != 1.0) {
     probability = std::pow(probability, 1.0 / aggression);
   }
+  probability = std::min<double>(probability, config_->maxRejectionProbability());
 
   // Choosing an accuracy of 4 significant figures for the probability.
   static constexpr uint64_t accuracy = 1e4;

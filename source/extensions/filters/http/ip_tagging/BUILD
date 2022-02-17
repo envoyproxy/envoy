@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # HTTP L7 filter that writes an IP tagging header based on IP trie data
-# Public docs: docs/root/configuration/http_filters/ip_tagging_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ip_tagging_filter
 
 envoy_extension_package()
 
@@ -17,8 +17,8 @@ envoy_cc_library(
     srcs = ["ip_tagging_filter.cc"],
     hdrs = ["ip_tagging_filter.h"],
     deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/runtime:runtime_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/runtime:runtime_interface",
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
@@ -33,16 +33,13 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.http",
     # TODO(#9953) clean up.
     extra_visibility = [
         "//test/integration:__subpackages__",
     ],
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/ip_tagging:ip_tagging_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/ip_tagging/v3:pkg_cc_proto",

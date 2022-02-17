@@ -12,6 +12,10 @@ load(
 
 licenses(["notice"])  # Apache 2
 
+exports_files([
+    "uber_per_readfilter.cc",
+])
+
 envoy_package()
 
 envoy_proto_library(
@@ -45,7 +49,6 @@ envoy_cc_test_library(
         "//source/common/network:address_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",
         "//source/extensions/filters/network:well_known_names",
-        "//source/extensions/filters/network/common:utility_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
         "//test/extensions/filters/network/common/fuzz/utils:network_filter_fuzzer_fakes_lib",
         "//test/fuzz:utility_lib",
@@ -82,7 +85,6 @@ envoy_cc_test_library(
         ":network_writefilter_fuzz_proto_cc_proto",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/network:well_known_names",
-        "//source/extensions/filters/network/common:utility_lib",
         "//test/extensions/filters/network/common/fuzz/utils:network_filter_fuzzer_fakes_lib",
         "//test/fuzz:utility_lib",
         "//test/mocks/network:network_mocks",
@@ -98,9 +100,7 @@ envoy_cc_fuzz_test(
     deps = [
         ":uber_writefilter_lib",
         "//source/common/config:utility_lib",
-        "//source/extensions/filters/network/kafka:kafka_broker_config_lib",
         "//source/extensions/filters/network/mongo_proxy:config",
-        "//source/extensions/filters/network/mysql_proxy:config",
         "//source/extensions/filters/network/zookeeper_proxy:config",
         "//test/config:utility_lib",
     ],

@@ -1,18 +1,18 @@
-#include "common/network/tcp_listener_impl.h"
+#include "source/common/network/tcp_listener_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/event/file_event_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_handle_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/event/file_event_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -20,14 +20,9 @@ namespace Network {
 const absl::string_view TcpListenerImpl::GlobalMaxCxRuntimeKey =
     "overload.global_downstream_max_connections";
 
-bool TcpListenerImpl::rejectCxOverGlobalLimit() {
+bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
   // Enforce the global connection limit if necessary, immediately closing the accepted connection.
-  Runtime::Loader* runtime = Runtime::LoaderSingleton::getExisting();
-
-  if (runtime == nullptr) {
-    // The runtime singleton won't exist in most unit tests that do not need global downstream limit
-    // enforcement. Therefore, there is no need to enforce limits if the singleton doesn't exist.
-    // TODO(tonya11en): Revisit this once runtime is made globally available.
+  if (ignore_global_conn_limit_) {
     return false;
   }
 
@@ -36,12 +31,13 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() {
   // use a listener and do not run in a worker thread. In practice, this code path will always be
   // run on a worker thread, but to prevent failed assertions in test environments, threadsafe
   // snapshots must be used. This must be revisited.
-  const uint64_t global_cx_limit = runtime->threadsafeSnapshot()->getInteger(
+  const uint64_t global_cx_limit = runtime_.threadsafeSnapshot()->getInteger(
       GlobalMaxCxRuntimeKey, std::numeric_limits<uint64_t>::max());
   return AcceptedSocketImpl::acceptedSocketCount() >= global_cx_limit;
 }
 
 void TcpListenerImpl::onSocketEvent(short flags) {
+  ASSERT(bind_to_port_);
   ASSERT(flags & (Event::FileReadyType::Read));
 
   // TODO(fcoras): Add limit on number of accepted calls per wakeup
@@ -82,47 +78,50 @@ void TcpListenerImpl::onSocketEvent(short flags) {
     // Pass the 'v6only' parameter as true if the local_address is an IPv6 address. This has no
     // effect if the socket is a v4 socket, but for v6 sockets this will create an IPv4 remote
     // address if an IPv4 local_address was created from an IPv6 mapped IPv4 address.
-    const Address::InstanceConstSharedPtr& remote_address =
+
+    const Address::InstanceConstSharedPtr remote_address =
         (remote_addr.ss_family == AF_UNIX)
             ? io_handle->peerAddress()
-            : Address::addressFromSockAddr(remote_addr, remote_addr_len,
-                                           local_address->ip()->version() ==
-                                               Address::IpVersion::v6);
+            : Address::addressFromSockAddrOrThrow(remote_addr, remote_addr_len,
+                                                  local_address->ip()->version() ==
+                                                      Address::IpVersion::v6);
 
     cb_.onAccept(
         std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address));
   }
 }
 
-void TcpListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket) {
-  socket.ioHandle().listen(backlog_size_);
-
-  // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
-  // loss of the trigger due to transient accept errors.
-  socket.ioHandle().initializeFileEvent(
-      dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
-      Event::FileTriggerType::Level, Event::FileReadyType::Read);
-
-  if (!Network::Socket::applyOptions(socket.options(), socket,
-                                     envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
-    throw CreateListenerException(fmt::format("cannot set post-listen socket option on socket: {}",
-                                              socket.addressProvider().localAddress()->asString()));
-  }
-}
-
 TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
-                                 SocketSharedPtr socket, TcpListenerCallbacks& cb,
-                                 bool bind_to_port, uint32_t backlog_size)
-    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), backlog_size_(backlog_size),
-      random_(random), reject_fraction_(0.0) {
+                                 Runtime::Loader& runtime, SocketSharedPtr socket,
+                                 TcpListenerCallbacks& cb, bool bind_to_port,
+                                 bool ignore_global_conn_limit)
+    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), random_(random), runtime_(runtime),
+      bind_to_port_(bind_to_port), reject_fraction_(0.0),
+      ignore_global_conn_limit_(ignore_global_conn_limit) {
   if (bind_to_port) {
-    setupServerSocket(dispatcher, *socket_);
+    // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
+    // loss of the trigger due to transient accept errors.
+    socket_->ioHandle().initializeFileEvent(
+        dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
+        Event::FileTriggerType::Level, Event::FileReadyType::Read);
   }
 }
 
-void TcpListenerImpl::enable() { socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read); }
+void TcpListenerImpl::enable() {
+  if (bind_to_port_) {
+    socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read);
+  } else {
+    FANCY_LOG(debug, "The listener cannot be enabled since it's not bind to port.");
+  }
+}
 
-void TcpListenerImpl::disable() { socket_->ioHandle().enableFileEvents(0); }
+void TcpListenerImpl::disable() {
+  if (bind_to_port_) {
+    socket_->ioHandle().enableFileEvents(0);
+  } else {
+    FANCY_LOG(debug, "The listener cannot be disable since it's not bind to port.");
+  }
+}
 
 void TcpListenerImpl::setRejectFraction(const UnitFloat reject_fraction) {
   reject_fraction_ = reject_fraction;

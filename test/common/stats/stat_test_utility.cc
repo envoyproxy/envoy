@@ -1,13 +1,14 @@
 #include "test/common/stats/stat_test_utility.h"
 
-#include "common/common/assert.h"
-#include "common/memory/stats.h"
+#include "source/common/common/assert.h"
+#include "source/common/memory/stats.h"
 
 namespace Envoy {
 namespace Stats {
 namespace TestUtil {
 
-void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> fn) {
+void forEachSampleStat(int num_clusters, bool include_other_stats,
+                       std::function<void(absl::string_view)> fn) {
   // These are stats that are repeated for each cluster as of Oct 2018, with a
   // very basic configuration with no traffic.
   static const char* cluster_stats[] = {"bind_errors",
@@ -95,8 +96,10 @@ void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> 
       fn(absl::StrCat("cluster.service_", cluster, ".", cluster_stat));
     }
   }
-  for (const auto& other_stat : other_stats) {
-    fn(other_stat);
+  if (include_other_stats) {
+    for (const auto& other_stat : other_stats) {
+      fn(other_stat);
+    }
   }
 }
 

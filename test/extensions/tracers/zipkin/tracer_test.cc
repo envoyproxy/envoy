@@ -1,11 +1,10 @@
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/runtime/runtime_impl.h"
-
-#include "extensions/tracers/zipkin/tracer.h"
-#include "extensions/tracers/zipkin/util.h"
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/extensions/tracers/zipkin/tracer.h"
+#include "source/extensions/tracers/zipkin/util.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"

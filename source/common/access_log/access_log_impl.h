@@ -12,10 +12,10 @@
 #include "envoy/server/access_log_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/common/matchers.h"
-#include "common/grpc/status.h"
-#include "common/http/header_utility.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/matchers.h"
+#include "source/common/grpc/status.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/hash/hash.h"

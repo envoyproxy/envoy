@@ -1,7 +1,7 @@
 #include "envoy/matcher/matcher.h"
 
-#include "common/matcher/field_matcher.h"
-#include "common/matcher/matcher.h"
+#include "source/common/matcher/field_matcher.h"
+#include "source/common/matcher/matcher.h"
 
 #include "test/common/matcher/test_utility.h"
 

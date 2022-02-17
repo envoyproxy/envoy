@@ -1,8 +1,8 @@
-#include "extensions/filters/network/thrift_proxy/framed_transport_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/framed_transport_impl.h"
 
 #include "envoy/common/exception.h"
 
-#include "extensions/filters/network/thrift_proxy/buffer_helper.h"
+#include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
 
 namespace Envoy {
 namespace Extensions {

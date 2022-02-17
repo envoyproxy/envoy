@@ -10,9 +10,9 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 
-#include "common/common/hash.h"
-#include "common/grpc/status.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/hash.h"
+#include "source/common/grpc/status.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
 #include "google/rpc/status.pb.h"
@@ -38,11 +38,25 @@ public:
 
   /**
    * @param headers the headers to parse.
+   * @return bool indicating whether content-type is Protobuf.
+   */
+  static bool hasProtobufContentType(const Http::RequestOrResponseHeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
    * @return bool indicating whether the header is a gRPC request header.
    * Currently headers are considered gRPC request headers if they have the gRPC
    * content type, and have a path header.
    */
   static bool isGrpcRequestHeaders(const Http::RequestHeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
+   * @return bool indicating whether the header is a protobuf request header.
+   * Currently headers are considered gRPC request headers if they have the protobuf
+   * content type, and have a path header.
+   */
+  static bool isProtobufRequestHeaders(const Http::RequestHeaderMap& headers);
 
   /**
    * @param headers the headers to parse.

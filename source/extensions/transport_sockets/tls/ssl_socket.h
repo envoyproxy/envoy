@@ -13,11 +13,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/transport_sockets/tls/context_impl.h"
-#include "extensions/transport_sockets/tls/ssl_handshaker.h"
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/synchronization/mutex.h"
@@ -49,7 +48,7 @@ class SslSocket : public Network::TransportSocket,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
-            const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+            const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
             Ssl::HandshakerFactoryCb handshaker_factory_cb);
 
   // Network::TransportSocket
@@ -74,7 +73,7 @@ public:
   SSL* rawSslForTest() const { return rawSsl(); }
 
 protected:
-  SSL* rawSsl() const { return info_->ssl_.get(); }
+  SSL* rawSsl() const { return info_->ssl(); }
 
 private:
   struct ReadResult {
@@ -87,11 +86,8 @@ private:
   void drainErrorQueue();
   void shutdownSsl();
   void shutdownBasic();
-  bool isThreadSafe() const {
-    return callbacks_ != nullptr && callbacks_->connection().dispatcher().isThreadSafe();
-  }
 
-  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
   uint64_t bytes_to_retry_{};
@@ -107,8 +103,10 @@ public:
   ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
                          Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope);
 
+  ~ClientSslSocketFactory() override;
+
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;
   bool usesProxyProtocolOptions() const override { return false; }
   bool supportsAlpn() const override { return true; }
@@ -137,8 +135,10 @@ public:
                          Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope,
                          const std::vector<std::string>& server_names);
 
+  ~ServerSslSocketFactory() override;
+
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;
   bool usesProxyProtocolOptions() const override { return false; }
 

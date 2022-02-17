@@ -6,8 +6,8 @@
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/private_key/private_key_config.h"
 
-#include "common/config/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {

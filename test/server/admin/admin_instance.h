@@ -1,6 +1,6 @@
 #pragma once
 
-#include "server/admin/admin.h"
+#include "source/server/admin/admin.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"

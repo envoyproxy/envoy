@@ -1,11 +1,10 @@
-#include "extensions/filters/listener/original_src/original_src.h"
+#include "source/extensions/filters/listener/original_src/original_src.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
 
-#include "common/common/assert.h"
-
-#include "extensions/filters/common/original_src/socket_option_factory.h"
+#include "source/common/common/assert.h"
+#include "source/extensions/filters/common/original_src/socket_option_factory.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,7 +15,7 @@ OriginalSrcFilter::OriginalSrcFilter(const Config& config) : config_(config) {}
 
 Network::FilterStatus OriginalSrcFilter::onAccept(Network::ListenerFilterCallbacks& cb) {
   auto& socket = cb.socket();
-  auto address = socket.addressProvider().remoteAddress();
+  auto address = socket.connectionInfoProvider().remoteAddress();
   ASSERT(address);
 
   ENVOY_LOG(debug,

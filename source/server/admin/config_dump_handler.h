@@ -9,8 +9,8 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
-#include "server/admin/config_tracker_impl.h"
-#include "server/admin/handler_ctx.h"
+#include "source/server/admin/config_tracker_impl.h"
+#include "source/server/admin/handler_ctx.h"
 
 #include "absl/strings/string_view.h"
 
@@ -27,8 +27,9 @@ public:
                                Buffer::Instance& response, AdminStream&) const;
 
 private:
-  void addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
-                          const absl::optional<std::string>& mask, bool include_eds) const;
+  absl::optional<std::pair<Http::Code, std::string>>
+  addAllConfigToDump(envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
+                     const Matchers::StringMatcher& name_matcher, bool include_eds) const;
   /**
    * Add the config matching the passed resource to the passed config dump.
    * @return absl::nullopt on success, else the Http::Code and an error message that should be added
@@ -36,7 +37,8 @@ private:
    */
   absl::optional<std::pair<Http::Code, std::string>>
   addResourceToDump(envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
-                    const std::string& resource, bool include_eds) const;
+                    const std::string& resource, const Matchers::StringMatcher& name_matcher,
+                    bool include_eds) const;
 
   /**
    * Helper methods to add endpoints config
@@ -44,7 +46,7 @@ private:
   void addLbEndpoint(const Upstream::HostSharedPtr& host,
                      envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) const;
 
-  ProtobufTypes::MessagePtr dumpEndpointConfigs() const;
+  ProtobufTypes::MessagePtr dumpEndpointConfigs(const Matchers::StringMatcher& name_matcher) const;
 
   ConfigTracker& config_tracker_;
 };

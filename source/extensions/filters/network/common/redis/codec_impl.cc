@@ -1,4 +1,4 @@
-#include "extensions/filters/network/common/redis/codec_impl.h"
+#include "source/extensions/filters/network/common/redis/codec_impl.h"
 
 #include <cstdint>
 #include <memory>
@@ -7,9 +7,9 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -52,7 +52,7 @@ std::string RespValue::toString() const {
     return std::to_string(asInteger());
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return "";
 }
 
 std::vector<RespValue>& RespValue::asArray() {

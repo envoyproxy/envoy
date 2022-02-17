@@ -6,10 +6,10 @@
 #include "envoy/upstream/host_description.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/config/metadata.h"
-#include "common/http/utility.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/config/metadata.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/upstream/upstream_impl.h"
 
 using testing::_;
 using testing::Invoke;
@@ -59,7 +59,8 @@ MockClusterInfo::MockClusterInfo()
           cluster_circuit_breakers_stat_names_)),
       resource_manager_(new Upstream::ResourceManagerImpl(
           runtime_, "fake_key", 1, 1024, 1024, 1, std::numeric_limits<uint64_t>::max(),
-          circuit_breakers_stats_, absl::nullopt, absl::nullopt)) {
+          circuit_breakers_stats_, absl::nullopt, absl::nullopt)),
+      stats_scope_(stats_store_.createScope("test_scope")) {
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, perUpstreamPreconnectRatio()).WillByDefault(Return(1.0));
@@ -98,6 +99,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, lbType()).WillByDefault(ReturnPointee(&lb_type_));
   ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
   ON_CALL(*this, lbSubsetInfo()).WillByDefault(ReturnRef(lb_subset_));
+  ON_CALL(*this, lbRoundRobinConfig()).WillByDefault(ReturnRef(lb_round_robin_config_));
   ON_CALL(*this, lbRingHashConfig()).WillByDefault(ReturnRef(lb_ring_hash_config_));
   ON_CALL(*this, lbMaglevConfig()).WillByDefault(ReturnRef(lb_maglev_config_));
   ON_CALL(*this, lbOriginalDstConfig()).WillByDefault(ReturnRef(lb_original_dst_config_));
@@ -107,6 +109,8 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, upstreamHttpProtocolOptions())
       .WillByDefault(ReturnRef(upstream_http_protocol_options_));
+  ON_CALL(*this, alternateProtocolsCacheOptions())
+      .WillByDefault(ReturnRef(alternate_protocols_cache_options_));
   // Delayed construction of typed_metadata_, to allow for injection of metadata
   ON_CALL(*this, typedMetadata())
       .WillByDefault(Invoke([this]() -> const Envoy::Config::TypedMetadata& {
@@ -124,15 +128,15 @@ MockClusterInfo::MockClusterInfo()
 MockClusterInfo::~MockClusterInfo() = default;
 
 Http::Http1::CodecStats& MockClusterInfo::http1CodecStats() const {
-  return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, statsScope());
+  return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, *stats_scope_);
 }
 
 Http::Http2::CodecStats& MockClusterInfo::http2CodecStats() const {
-  return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, statsScope());
+  return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *stats_scope_);
 }
 
 Http::Http3::CodecStats& MockClusterInfo::http3CodecStats() const {
-  return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, statsScope());
+  return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, *stats_scope_);
 }
 
 } // namespace Upstream

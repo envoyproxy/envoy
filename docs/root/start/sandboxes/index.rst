@@ -45,6 +45,7 @@ The following sandboxes are available:
 .. toctree::
     :maxdepth: 1
 
+    brotli
     cache
     cors
     csrf
@@ -55,9 +56,11 @@ The following sandboxes are available:
     fault_injection
     front_proxy
     grpc_bridge
+    gzip
     jaeger_native_tracing
     jaeger_tracing
     load_reporting_service
+    locality_load_balancing
     lua
     mysql
     postgres
@@ -69,4 +72,5 @@ The following sandboxes are available:
     udp
     wasm-cc
     websocket
+    win32_front_proxy
     zipkin_tracing

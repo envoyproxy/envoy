@@ -92,8 +92,8 @@ The `status` is one of:
 The extension status may be adjusted by the extension [CODEOWNERS](./CODEOWNERS) and/or Envoy
 maintainers based on an assessment of the above criteria. Note that the status of the extension
 reflects the implementation status. It is orthogonal to the API stability, for example, an extension
-with configuration `envoy.foo.v3alpha.Bar` might have a `stable` implementation and
-`envoy.foo.v3.Baz` can have a `wip` implementation.
+API marked with `(xds.annotations.v3.file_status).work_in_progress` might have a `stable` implementation and
+and an extension with a stable config proto can have a `wip` implementation.
 
 The `security_posture` is one of:
 * `robust_to_untrusted_downstream`: The extension is hardened against untrusted downstream traffic. It
@@ -137,3 +137,16 @@ case we need to install an extension point, which can be done as follows:
   3. Update [extending envoy](docs/root/extending/extending.rst) to list the new
      extension point and add any documentation explaining the extension point.
      At the very least this should link to the corresponding proto.
+
+## Contrib extensions
+
+As described in [this document](https://docs.google.com/document/d/1yl7GOZK1TDm_7vxQvt8UQEAu07UQFru1uEKXM6ZZg_g/edit#),
+Envoy allows an alternate path to adding extensions called `contrib/`. The barrier to entry for a
+contrib extension is lower than a core extension, with the tradeoff that contrib extensions are not
+included by default in the main image builds. Consumers need to pull directly from the contrib
+images described in the installation guide. Please read the linked document in detail to determine
+whether contrib extensions are the right choice for a newly proposed extension.
+
+**NOTE:** Contrib extensions are not eligible for Envoy security team coverage.
+**NOTE:** As per the linked Google Doc, contrib extensions generally should use `v3alpha` to avoid
+requiring API shepherd reviews.

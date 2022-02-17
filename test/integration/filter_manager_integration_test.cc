@@ -9,9 +9,8 @@
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/common/factory_base.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/common/factory_base.h"
 
 #include "test/integration/filter_manager_integration_test.pb.h"
 #include "test/integration/filter_manager_integration_test.pb.validate.h"
@@ -582,7 +581,7 @@ TEST_P(FilterChainAccessLogTest, FilterChainName) {
  */
 class InjectDataWithHttpConnectionManagerIntegrationTest
     : public testing::TestWithParam<
-          std::tuple<Network::Address::IpVersion, Http::CodecClient::Type, std::string>>,
+          std::tuple<Network::Address::IpVersion, Http::CodecType, std::string>>,
       public HttpIntegrationTest,
       public TestWithAuxiliaryFilter {
 public:
@@ -590,12 +589,12 @@ public:
   // FooTestCase.BarInstance/IPv4_Http_no_inject_data
   static std::string testParamsToString(
       const testing::TestParamInfo<
-          std::tuple<Network::Address::IpVersion, Http::CodecClient::Type, std::string>>& params) {
+          std::tuple<Network::Address::IpVersion, Http::CodecType, std::string>>& params) {
     return fmt::format(
         "{}_{}_{}",
         TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
             std::get<0>(params.param), params.index)),
-        (std::get<1>(params.param) == Http::CodecClient::Type::HTTP2 ? "Http2" : "Http"),
+        (std::get<1>(params.param) == Http::CodecType::HTTP2 ? "Http2" : "Http"),
         std::regex_replace(std::get<2>(params.param), invalid_param_name_regex(), "_"));
   }
 
@@ -625,8 +624,7 @@ protected:
 INSTANTIATE_TEST_SUITE_P(
     Params, InjectDataWithHttpConnectionManagerIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(Http::CodecClient::Type::HTTP1,
-                                     Http::CodecClient::Type::HTTP2),
+                     testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2),
                      testing::ValuesIn(auxiliary_filters())),
     InjectDataWithHttpConnectionManagerIntegrationTest::testParamsToString);
 

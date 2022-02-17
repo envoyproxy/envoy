@@ -1,6 +1,6 @@
-#include "extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
-#include "extensions/filters/network/dubbo_proxy/hessian_utils.h"
-#include "extensions/filters/network/dubbo_proxy/message_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/hessian_utils.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/extensions/filters/network/dubbo_proxy/utility.h"

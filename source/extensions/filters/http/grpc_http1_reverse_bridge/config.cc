@@ -1,10 +1,10 @@
-#include "extensions/filters/http/grpc_http1_reverse_bridge/config.h"
+#include "source/extensions/filters/http/grpc_http1_reverse_bridge/config.h"
 
 #include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.pb.h"
 #include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
+#include "source/extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,8 +15,8 @@ Http::FilterFactoryCb Config::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfig& config,
     const std::string&, Server::Configuration::FactoryContext&) {
   return [config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(
-        std::make_shared<Filter>(config.content_type(), config.withhold_grpc_frames()));
+    callbacks.addStreamFilter(std::make_shared<Filter>(
+        config.content_type(), config.withhold_grpc_frames(), config.response_size_header()));
   };
 }
 

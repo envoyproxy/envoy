@@ -1,12 +1,12 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/rbac/matchers/upstream_ip_port/v3/upstream_ip_port_matcher.pb.h"
 
-#include "common/config/metadata.h"
-#include "common/network/utility.h"
-
-#include "extensions/filters/common/rbac/utility.h"
-#include "extensions/filters/http/rbac/rbac_filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/config/metadata.h"
+#include "source/common/network/utility.h"
+#include "source/common/stream_info/upstream_address.h"
+#include "source/extensions/filters/common/rbac/utility.h"
+#include "source/extensions/filters/http/rbac/rbac_filter.h"
 
 #include "test/extensions/filters/common/rbac/mocks.h"
 #include "test/extensions/filters/http/rbac/mocks.h"
@@ -34,8 +34,8 @@ public:
 
     envoy::config::rbac::v3::Policy policy;
     auto policy_rules = policy.add_permissions()->mutable_or_rules();
-    policy_rules->add_rules()->mutable_requested_server_name()->set_hidden_envoy_deprecated_regex(
-        ".*cncf.io");
+    policy_rules->add_rules()->mutable_requested_server_name()->MergeFrom(
+        TestUtility::createRegexMatcher(".*cncf.io"));
     policy_rules->add_rules()->set_destination_port(123);
     policy_rules->add_rules()->mutable_url_path()->mutable_path()->set_suffix("suffix");
     policy.add_principals()->set_any(true);
@@ -51,21 +51,33 @@ public:
     (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
     config.set_shadow_rules_stat_prefix("prefix_");
 
-    return std::make_shared<RoleBasedAccessControlFilterConfig>(config, "test", store_);
+    return std::make_shared<RoleBasedAccessControlFilterConfig>(
+        config, "test", store_, ProtobufMessage::getStrictValidationVisitor());
   }
 
   RoleBasedAccessControlFilterTest()
       : config_(setupConfig(envoy::config::rbac::v3::RBAC::ALLOW)), filter_(config_) {}
 
   void SetUp() override {
+    config_ = setupConfig(envoy::config::rbac::v3::RBAC::ALLOW);
+    filter_ = RoleBasedAccessControlFilter(config_);
+
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
     EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
+  void SetUp(RoleBasedAccessControlFilterConfigSharedPtr config) {
+    config_ = config;
+    filter_ = RoleBasedAccessControlFilter(config_);
+
+    EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
+    EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+    filter_.setDecoderFilterCallbacks(callbacks_);
+  }
   void setDestinationPort(uint16_t port) {
     address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
-    req_info_.downstream_address_provider_->setLocalAddress(address_);
+    req_info_.downstream_connection_info_provider_->setLocalAddress(address_);
   }
 
   void setRequestedServerName(std::string server_name) {
@@ -89,11 +101,10 @@ public:
   }
 
   void setMetadata() {
-    ON_CALL(req_info_, setDynamicMetadata(HttpFilterNames::get().Rbac, _))
+    ON_CALL(req_info_, setDynamicMetadata("envoy.filters.http.rbac", _))
         .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
           req_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(HttpFilterNames::get().Rbac,
-                                                                  obj));
+              Protobuf::MapPair<std::string, ProtobufWkt::Struct>("envoy.filters.http.rbac", obj));
         }));
 
     ON_CALL(req_info_,
@@ -196,7 +207,7 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   EXPECT_EQ("testrbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
   EXPECT_EQ("testrbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
   EXPECT_EQ("allowed", filter_meta.fields().at("prefix_shadow_engine_result").string_value());
   EXPECT_EQ("bar", filter_meta.fields().at("prefix_shadow_effective_policy_id").string_value());
   EXPECT_EQ("rbac_access_denied_matched_policy[none]", callbacks_.details());
@@ -215,7 +226,7 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
   EXPECT_CALL(engine, handleAction(_, _, _, _)).WillRepeatedly(Return(true));
   EXPECT_CALL(per_route_config_, engine()).WillRepeatedly(ReturnRef(engine));
 
-  EXPECT_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Rbac))
+  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.rbac"))
       .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, true));
@@ -267,6 +278,321 @@ TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(trailers_));
 
   checkAccessLogMetadata(LogResult::No);
+}
+
+// Upstream Ip and Port matcher tests.
+class UpstreamIpPortMatcherTests : public RoleBasedAccessControlFilterTest {
+public:
+  struct UpstreamIpPortMatcherConfig {
+    UpstreamIpPortMatcherConfig() = default;
+
+    UpstreamIpPortMatcherConfig(const std::string& ip) : ip_(ip) {}
+
+    UpstreamIpPortMatcherConfig(uint16_t start, uint16_t end) {
+      envoy::type::v3::Int64Range port_range;
+      port_range.set_start(start);
+      port_range.set_end(end);
+      port_range_ = port_range;
+    }
+
+    UpstreamIpPortMatcherConfig(const std::string& ip, uint16_t start, uint16_t end) : ip_(ip) {
+      envoy::type::v3::Int64Range port_range;
+      port_range.set_start(start);
+      port_range.set_end(end);
+      port_range_ = port_range;
+    }
+
+    absl::optional<std::string> ip_;
+    absl::optional<envoy::type::v3::Int64Range> port_range_;
+  };
+
+  void upstreamIpTestsBasicPolicySetup(const std::vector<UpstreamIpPortMatcherConfig>& configs,
+                                       const envoy::config::rbac::v3::RBAC::Action& action) {
+    envoy::config::rbac::v3::Policy policy;
+
+    auto policy_rules = policy.add_permissions()->mutable_or_rules();
+    policy_rules->add_rules()->mutable_requested_server_name()->MergeFrom(
+        TestUtility::createRegexMatcher(".*cncf.io"));
+
+    for (const auto& config : configs) {
+      envoy::extensions::rbac::matchers::upstream_ip_port::v3::UpstreamIpPortMatcher matcher;
+
+      if (config.ip_) {
+        matcher.mutable_upstream_ip()->set_address_prefix(*config.ip_);
+        matcher.mutable_upstream_ip()->mutable_prefix_len()->set_value(32);
+      }
+
+      if (config.port_range_) {
+        *matcher.mutable_upstream_port_range() = config.port_range_.value();
+      }
+
+      auto* matcher_ext_config = policy_rules->add_rules()->mutable_matcher();
+
+      *matcher_ext_config->mutable_name() = "envoy.rbac.matchers.upstream.upstream_ip_port";
+
+      matcher_ext_config->mutable_typed_config()->PackFrom(matcher);
+    }
+
+    policy.add_principals()->set_any(true);
+
+    envoy::extensions::filters::http::rbac::v3::RBAC config;
+    config.mutable_rules()->set_action(action);
+    (*config.mutable_rules()->mutable_policies())["foo"] = policy;
+
+    auto config_ptr = std::make_shared<RoleBasedAccessControlFilterConfig>(
+        config, "test", store_, ProtobufMessage::getStrictValidationVisitor());
+
+    // Setup test with the policy config.
+    SetUp(config_ptr);
+  }
+
+  void upstreamIpTestsFilterStateSetup(NiceMock<Http::MockStreamDecoderFilterCallbacks>& callback,
+                                       const std::vector<std::string>& upstream_ips) {
+    auto address_obj = std::make_unique<StreamInfo::UpstreamAddress>();
+
+    for (const auto& ip : upstream_ips) {
+      Network::Address::InstanceConstSharedPtr address =
+          Envoy::Network::Utility::parseInternetAddressAndPort(ip, false);
+
+      address_obj->address_ = address;
+    }
+
+    // Set the filter state data.
+    callback.streamInfo().filterState()->setData(
+        StreamInfo::UpstreamAddress::key(), std::move(address_obj),
+        StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+  }
+};
+
+// Tests simple permission policy with no upstream ip metadata in the filter state.
+TEST_F(UpstreamIpPortMatcherTests, UpstreamIpNoFilterStateMetadata) {
+  const std::vector<UpstreamIpPortMatcherConfig> configs = {
+      {"1.2.3.4"},
+  };
+  // Setup policy config.
+  upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::ALLOW);
+
+  // Filter iteration should be stopped as there is no filter state metadata.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers_, false));
+
+  // Expect `denied` stats to be incremented.
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
+// Tests simple upstream_ip ALLOW permission policy with ONLY upstream ip metadata in the filter
+// state.
+TEST_F(UpstreamIpPortMatcherTests, UpstreamIpWithFilterStateAllow) {
+  // Setup filter state with the upstream address.
+  upstreamIpTestsFilterStateSetup(callbacks_, {"1.2.3.4:123"});
+
+  // Setup policy config.
+  const std::vector<UpstreamIpPortMatcherConfig> configs = {
+      {"1.2.3.4"},
+  };
+  upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::ALLOW);
+
+  // Filter iteration should continue since the policy is ALLOW.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+
+  // Expect `allowed` stats to be incremented.
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+}
+
+// Tests simple upstream_ip DENY permission policy with ONLY upstream ip metadata in the filter
+// state.
+TEST_F(UpstreamIpPortMatcherTests, UpstreamIpWithFilterStateDeny) {
+  // Setup filter state with the upstream address.
+  upstreamIpTestsFilterStateSetup(callbacks_, {"1.2.3.4:123"});
+
+  // Setup policy config.
+  const std::vector<UpstreamIpPortMatcherConfig> configs = {
+      {"1.2.3.4"},
+  };
+
+  upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY);
+
+  // Filter iteration should stop since the policy is DENY.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers_, false));
+
+  // Expect `denied` stats to be incremented.
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
+// Tests simple upstream_ip DENY permission policy with BOTH upstream ip and port matching the
+// policy.
+TEST_F(UpstreamIpPortMatcherTests, UpstreamIpPortMatchDeny) {
+  // Setup filter state with the upstream address.
+  upstreamIpTestsFilterStateSetup(callbacks_, {"1.2.3.4:123"});
+
+  const std::vector<UpstreamIpPortMatcherConfig> configs = {
+      {"1.2.3.4", 120, 123},
+  };
+
+  // Setup policy config.
+  upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY);
+
+  // Filter iteration should stop since the policy is DENY.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers_, false));
+
+  // Expect `denied` stats to be incremented.
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
+TEST_F(UpstreamIpPortMatcherTests, UpstreamIpPortMatchAllow) {
+  // Setup filter state with the upstream address.
+  upstreamIpTestsFilterStateSetup(callbacks_, {"1.2.3.4:123"});
+
+  const std::vector<UpstreamIpPortMatcherConfig> configs = {
+      {"1.2.3.4", 120, 123},
+  };
+
+  // Setup policy config.
+  upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::ALLOW);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+
+  // Expect `allowed` stats to be incremented.
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+}
+
+TEST_F(UpstreamIpPortMatcherTests, UpstreamPortMatchDeny) {
+  // Setup filter state with the upstream address.
+  upstreamIpTestsFilterStateSetup(callbacks_, {"1.2.3.4:123"});
+
+  const std::vector<UpstreamIpPortMatcherConfig> configs = {
+      {120, 123},
+  };
+
+  // Setup policy config.
+  upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY);
+
+  // Filter iteration should stop since the policy is DENY.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers_, false));
+
+  // Expect `denied` stats to be incremented.
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
+TEST_F(UpstreamIpPortMatcherTests, UpstreamPortMatchAllow) {
+  // Setup filter state with the upstream address.
+  upstreamIpTestsFilterStateSetup(callbacks_, {"1.2.3.4:123"});
+
+  const std::vector<UpstreamIpPortMatcherConfig> configs = {
+      {120, 123},
+  };
+
+  // Setup policy config.
+  upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::ALLOW);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+
+  // Expect `allowed` stats to be incremented.
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+}
+
+// Tests upstream_ip DENY permission policy with multiple upstream ips to match in the policy.
+// If any of the configured upstream ip addresses match the metadata, the policy is enforced (DENY).
+TEST_F(UpstreamIpPortMatcherTests, MultiUpstreamIpsAnyPolicyDeny) {
+  // Setup filter state with the upstream address.
+  upstreamIpTestsFilterStateSetup(callbacks_, {"1.2.3.4:123"});
+
+  // Setup policy config.
+  const std::vector<UpstreamIpPortMatcherConfig> configs = {
+      {"1.1.1.2"}, {"1.2.3.4", 120, 123}, {"1.2.3.5"}};
+
+  upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY);
+
+  // Filter iteration should stop since the policy is DENY.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers_, false));
+
+  // Expect `denied` stats to be incremented.
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
+// Tests upstream_ip DENY permission policy with multiple upstream ips to match in the policy.
+// If ONLY port is configured in the policy, a match should enforce the policy.
+TEST_F(UpstreamIpPortMatcherTests, MultiUpstreamIpsNoIpMatchPortMatchDeny) {
+  // Setup filter state with the upstream address.
+  upstreamIpTestsFilterStateSetup(callbacks_, {"2.2.3.4:123"});
+
+  // Setup policy config.
+  const std::vector<UpstreamIpPortMatcherConfig> configs = {{"1.1.1.2"}, {120, 123}, {"1.2.3.5"}};
+
+  upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY);
+
+  // Filter iteration should stop since the policy is DENY.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers_, false));
+
+  // Expect `denied` stats to be incremented.
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
+// Tests upstream_ip DENY permission policy with multiple upstream ips to match in the policy.
+// If NONE of the configured upstream ip addresses or port match the metadata, the policy is NOT
+// enforced.
+TEST_F(UpstreamIpPortMatcherTests, MultiUpstreamIpsNoIpMatchNoPortMatchDeny) {
+  // Setup filter state with the upstream address.
+  upstreamIpTestsFilterStateSetup(callbacks_, {"2.2.3.4:123"});
+
+  // Setup policy config.
+  const std::vector<UpstreamIpPortMatcherConfig> configs = {{"1.1.1.2"}, {124, 125}, {"1.2.3.5"}};
+
+  upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+
+  // Expect `allowed` stats to be incremented.
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+}
+
+// Tests upstream_ip DENY permission policy with multiple upstream ips to match in the policy.
+// If NONE of the configured upstream ip addresses or port match the metadata, the policy is NOT
+// enforced.
+TEST_F(UpstreamIpPortMatcherTests, MultiUpstreamIpsAnyPolicyNoMatchDeny) {
+  // Setup filter state with the upstream address.
+  upstreamIpTestsFilterStateSetup(callbacks_, {"1.2.3.4:123"});
+
+  // Setup policy config.
+  const std::vector<UpstreamIpPortMatcherConfig> configs = {
+      {"1.1.1.2"}, {"1.2.3.4", 124, 125}, {"1.2.3.5"}};
+
+  upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+
+  // Expect `allowed` stats to be incremented.
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+}
+
+// Tests simple DENY permission policy with misconfigured port range.
+TEST_F(UpstreamIpPortMatcherTests, UpstreamPortBadRangeDeny) {
+  // Setup filter state with the upstream address.
+  upstreamIpTestsFilterStateSetup(callbacks_, {"1.2.3.4:8080"});
+
+  const std::vector<UpstreamIpPortMatcherConfig> configs = {
+      {8080, 0},
+  };
+
+  // Setup policy config.
+  upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+
+  EXPECT_EQ(0, config_->stats().denied_.value());
+}
+
+// Verifies that if no IP or port is configured, EnvoyException is thrown.
+TEST_F(UpstreamIpPortMatcherTests, EmptyUpstreamConfigPolicyDeny) {
+  // Setup filter state with the upstream address.
+  upstreamIpTestsFilterStateSetup(callbacks_, {"1.2.3.4:123"});
+
+  // Setup policy config.
+  const std::vector<UpstreamIpPortMatcherConfig> configs = {{}};
+
+  EXPECT_THROW_WITH_MESSAGE(
+      upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY), EnvoyException,
+      "Invalid UpstreamIpPortMatcher configuration - missing `upstream_ip` "
+      "and/or `upstream_port_range`");
 }
 
 } // namespace

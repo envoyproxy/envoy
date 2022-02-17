@@ -1,6 +1,6 @@
 #include "envoy/config/tap/v3/common.pb.h"
 
-#include "extensions/common/tap/admin.h"
+#include "source/extensions/common/tap/admin.h"
 
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/admin_stream.h"

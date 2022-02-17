@@ -8,17 +8,16 @@
 #include "envoy/tracing/trace_driver.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/empty_string.h"
-#include "common/http/async_client_utility.h"
-#include "common/http/header_map_impl.h"
-#include "common/json/json_loader.h"
-#include "common/tracing/common_values.h"
-#include "common/tracing/null_span_impl.h"
-#include "common/upstream/cluster_update_tracker.h"
-
-#include "extensions/tracers/zipkin/span_buffer.h"
-#include "extensions/tracers/zipkin/tracer.h"
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/async_client_utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/tracing/common_values.h"
+#include "source/common/tracing/null_span_impl.h"
+#include "source/common/upstream/cluster_update_tracker.h"
+#include "source/extensions/tracers/zipkin/span_buffer.h"
+#include "source/extensions/tracers/zipkin/tracer.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -73,7 +72,7 @@ public:
 
   void log(SystemTime timestamp, const std::string& event) override;
 
-  void injectContext(Http::RequestHeaderMap& request_headers) override;
+  void injectContext(Tracing::TraceContext& trace_context) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
                               SystemTime start_time) override;
 
@@ -123,7 +122,7 @@ public:
    * Thus, this implementation of the virtual function startSpan() ignores the operation name
    * ("ingress" or "egress") passed by the caller.
    */
-  Tracing::SpanPtr startSpan(const Tracing::Config&, Http::RequestHeaderMap& request_headers,
+  Tracing::SpanPtr startSpan(const Tracing::Config&, Tracing::TraceContext& trace_context,
                              const std::string&, SystemTime start_time,
                              const Tracing::Decision tracing_decision) override;
 
@@ -159,15 +158,12 @@ private:
  * Information about the Zipkin collector.
  */
 struct CollectorInfo {
-  // The Zipkin collector endpoint/path to receive the collected trace data. e.g. /api/v1/spans if
-  // HTTP_JSON_V1 or /api/v2/spans otherwise.
-  std::string endpoint_{DEFAULT_COLLECTOR_ENDPOINT};
+  // The Zipkin collector endpoint/path to receive the collected trace data.
+  std::string endpoint_;
 
   // The version of the collector. This is related to endpoint's supported payload specification and
-  // transport. Currently it defaults to envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1. In
-  // the future, we will throw when collector_endpoint_version is not specified.
-  envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion version_{
-      envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1};
+  // transport.
+  envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion version_;
 
   bool shared_span_context_{DEFAULT_SHARED_SPAN_CONTEXT};
 };

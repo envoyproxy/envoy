@@ -7,7 +7,7 @@ DNS Filter
 
   DNS Filter is under active development and should be considered alpha and not production ready.
 
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3.DnsFilterConfig>`
 * This filter should be configured with the name *envoy.filters.udp_listener.dns_filter*
 
 Overview
@@ -24,7 +24,7 @@ will use for external resolution. Users can disable external DNS resolution by o
 client configuration object.
 
 The filter supports :ref:`per-filter configuration
-<envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig>`.
+<envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3.DnsFilterConfig>`.
 An Example configuration follows that illustrates how the filter can be used.
 
 Example Configuration
@@ -35,26 +35,24 @@ Example Configuration
   listener_filters:
     name: envoy.filters.udp.dns_filter
     typed_config:
-      "@type": "type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig"
+      "@type": "type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig"
       stat_prefix: "dns_filter_prefix"
       client_config:
         resolution_timeout: 5s
-        upstream_resolvers:
-        - socket_address:
-            address: "8.8.8.8"
-            port_value: 53
-        - socket_address:
-            address: "8.8.4.4"
-            port_value: 53
+        dns_resolution_config:
+          dns_resolver_options:
+            use_tcp_for_dns_lookups: false
+            no_default_search_domain: false
+          resolvers:
+          - socket_address:
+              address: "8.8.8.8"
+              port_value: 53
+          - socket_address:
+              address: "8.8.4.4"
+              port_value: 53
         max_pending_lookups: 256
       server_config:
         inline_dns_table:
-          known_suffixes:
-          - suffix: "domain1.com"
-          - suffix: "domain2.com"
-          - suffix: "domain3.com"
-          - suffix: "domain4.com"
-          - suffix: "domain5.com"
           virtual_domains:
             - name: "www.domain1.com"
               endpoint:
@@ -97,7 +95,7 @@ Example Configuration
                         port: 5060
 
 
-In this example, Envoy is configured to respond to client queries for four domains. For any
+In this example, Envoy is configured to respond to client queries for five domains. For any
 other query, it will forward upstream to external resolvers. The filter will return an address
 matching the input query type. If the query is for type A records and no A records are configured,
 Envoy will return no addresses and set the response code appropriately. Conversely, if there are
@@ -133,7 +131,7 @@ Example External DnsTable Configuration
     listener_filters:
       name: "envoy.filters.udp.dns_filter"
       typed_config:
-        '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig'
+        '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig'
         stat_prefix: "my_prefix"
         server_config:
           external_dns_table:
@@ -147,10 +145,6 @@ DnsTable JSON Configuration
 .. code-block:: json
 
   {
-    "known_suffixes": [
-      { "suffix": "suffix1.com" },
-      { "suffix": "suffix2.com" }
-    ],
     "virtual_domains": [
       {
         "name": "www.suffix1.com",

@@ -1,4 +1,4 @@
-#include "extensions/filters/http/jwt_authn/verifier.h"
+#include "source/extensions/filters/http/jwt_authn/verifier.h"
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
@@ -55,14 +55,14 @@ public:
   // Stores an authenticator object for this request.
   void storeAuth(AuthenticatorPtr&& auth) { auths_.emplace_back(std::move(auth)); }
 
-  // Add a pair of (name, payload), called by Authenticator
-  void addPayload(const std::string& name, const ProtobufWkt::Struct& payload) {
-    *(*payload_.mutable_fields())[name].mutable_struct_value() = payload;
+  // Add a pair of (name, payload), called by Authenticator. It can be either JWT header or payload.
+  void addExtractedData(const std::string& name, const ProtobufWkt::Struct& extracted_data) {
+    *(*extrated_data_.mutable_fields())[name].mutable_struct_value() = extracted_data;
   }
 
-  void setPayload() {
-    if (!payload_.fields().empty()) {
-      callback_->setPayload(payload_);
+  void setExtractedData() {
+    if (!extrated_data_.fields().empty()) {
+      callback_->setExtractedData(extrated_data_);
     }
   }
 
@@ -72,7 +72,7 @@ private:
   Verifier::Callbacks* callback_;
   absl::node_hash_map<const Verifier*, CompletionState> completion_states_;
   std::vector<AuthenticatorPtr> auths_;
-  ProtobufWkt::Struct payload_;
+  ProtobufWkt::Struct extrated_data_;
 };
 
 // base verifier for provider_name, provider_and_audiences, and allow_missing_or_failed.
@@ -88,7 +88,8 @@ public:
     }
 
     if (Status::Ok == status) {
-      context.setPayload();
+      // We only set the extracted data to context when the JWT is verified.
+      context.setExtractedData();
     }
     context.callback()->onComplete(status);
     context.cancel();
@@ -123,8 +124,8 @@ public:
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
-        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
-          ctximpl.addPayload(name, payload);
+        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
+          ctximpl.addExtractedData(name, extracted_data);
         },
         [this, context](const Status& status) {
           onComplete(status, static_cast<ContextImpl&>(*context));
@@ -174,8 +175,8 @@ public:
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
-        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
-          ctximpl.addPayload(name, payload);
+        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
+          ctximpl.addExtractedData(name, extracted_data);
         },
         [this, context](const Status& status) {
           onComplete(status, static_cast<ContextImpl&>(*context));
@@ -209,8 +210,8 @@ public:
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
-        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
-          ctximpl.addPayload(name, payload);
+        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
+          ctximpl.addExtractedData(name, extracted_data);
         },
         [this, context](const Status& status) {
           onComplete(status, static_cast<ContextImpl&>(*context));
@@ -403,8 +404,6 @@ VerifierConstPtr innerCreate(const JwtRequirement& requirement,
                                                       parent);
   case JwtRequirement::RequiresTypeCase::REQUIRES_TYPE_NOT_SET:
     return std::make_unique<AllowAllVerifierImpl>(parent);
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const auto& it = providers.find(provider_name);

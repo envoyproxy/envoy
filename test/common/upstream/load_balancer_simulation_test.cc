@@ -7,11 +7,11 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
-#include "common/common/fmt.h"
-#include "common/common/random_generator.h"
-#include "common/network/utility.h"
-#include "common/upstream/load_balancer_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
@@ -74,11 +74,13 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   ClusterStats stats{ClusterInfoImpl::generateStats(stats_store, stat_names)};
   stats.max_host_weight_.set(weight);
   NiceMock<Runtime::MockLoader> runtime;
+  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   Random::RandomGeneratorImpl random;
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
   LeastRequestLoadBalancer lb_{
-      priority_set, nullptr, stats, runtime, random, common_config, least_request_lb_config};
+      priority_set, nullptr, stats, runtime, random, common_config, least_request_lb_config,
+      *time_source};
 
   absl::node_hash_map<HostConstSharedPtr, uint64_t> host_hits;
   const uint64_t total_requests = 100;

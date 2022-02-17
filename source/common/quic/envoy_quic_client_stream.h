@@ -1,18 +1,10 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "envoy/buffer/buffer.h"
+
+#include "source/common/quic/envoy_quic_stream.h"
 
 #include "quiche/quic/core/http/quic_spdy_client_stream.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "common/quic/envoy_quic_stream.h"
 
 namespace Envoy {
 namespace Quic {
@@ -23,9 +15,6 @@ class EnvoyQuicClientStream : public quic::QuicSpdyClientStream,
                               public Http::RequestEncoder {
 public:
   EnvoyQuicClientStream(quic::QuicStreamId id, quic::QuicSpdyClientSession* client_session,
-                        quic::StreamType type, Http::Http3::CodecStats& stats,
-                        const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
-  EnvoyQuicClientStream(quic::PendingStream* pending, quic::QuicSpdyClientSession* client_session,
                         quic::StreamType type, Http::Http3::CodecStats& stats,
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
 
@@ -46,10 +35,13 @@ public:
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
   void setFlushTimeout(std::chrono::milliseconds) override {}
+
+  // quic::QuicStream
+  void OnStreamFrame(const quic::QuicStreamFrame& frame) override;
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
-  void Reset(quic::QuicRstStreamErrorCode error) override;
+  void ResetWithError(quic::QuicResetStreamError error) override;
   void OnClose() override;
   void OnCanWrite() override;
   // quic::Stream
@@ -70,20 +62,21 @@ protected:
   void OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                  const quic::QuicHeaderList& header_list) override;
 
+  // Http::MultiplexedStreamImplBase
+  bool hasPendingData() override;
+
+  void onStreamError(absl::optional<bool> should_close_connection,
+                     quic::QuicRstStreamErrorCode rst_code) override;
+
 private:
   QuicFilterManagerConnectionImpl* filterManagerConnection();
 
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
 
-  // Either reset the stream or close the connection according to
-  // should_close_connection and configured http3 options.
-  void onStreamError(absl::optional<bool> should_close_connection,
-                     quic::QuicRstStreamErrorCode rst_code);
-
   Http::ResponseDecoder* response_decoder_{nullptr};
 
-  bool decoded_100_continue_{false};
+  bool decoded_1xx_{false};
 };
 
 } // namespace Quic

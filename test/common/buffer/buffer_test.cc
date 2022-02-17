@@ -1,8 +1,9 @@
+#include <cstddef>
 #include <limits>
 
 #include "envoy/common/exception.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "test/common/buffer/utility.h"
 #include "test/test_common/printers.h"
@@ -1073,6 +1074,33 @@ TEST(BufferHelperTest, WriteBEI64) {
     Buffer::OwnedImpl buffer;
     buffer.writeBEInt<int64_t>(std::numeric_limits<int64_t>::max());
     EXPECT_EQ("\x7F\xFF\xFF\xFF\xFF\xFF\xFF\xFF", buffer.toString());
+  }
+}
+TEST(BufferHelperTest, AddFragments) {
+  {
+    // Add some string fragments.
+    Buffer::OwnedImpl buffer;
+    buffer.addFragments({"aaaaa", "bbbbb"});
+    EXPECT_EQ("aaaaabbbbb", buffer.toString());
+  }
+
+  {
+    // Add string fragments cyclically.
+    Buffer::OwnedImpl buffer;
+    std::string str;
+    for (size_t i = 0; i < 1024; i++) {
+      buffer.addFragments({"aaaaa", "bbbbb", "ccccc", "ddddd"});
+      str += "aaaaabbbbbcccccddddd";
+    }
+    EXPECT_EQ(20 * 1024, buffer.length());
+    EXPECT_EQ(str, buffer.toString());
+
+    auto slice_vec = buffer.getRawSlices();
+
+    EXPECT_EQ(5, slice_vec.size());
+    for (size_t i = 0; i < 5; i++) {
+      EXPECT_EQ(4096, slice_vec[i].len_);
+    }
   }
 }
 

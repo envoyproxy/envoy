@@ -176,7 +176,12 @@ const char OtherGoodToken[] =
 // Expected base64 payload value.
 const char ExpectedPayloadValue[] = "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcG"
                                     "xlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiYXVkIjoiZXhhbXBsZV9zZXJ2"
-                                    "aWNlIn0=";
+                                    "aWNlIn0";
+
+const char ExpectedPayloadValueWithPadding[] =
+    "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcG"
+    "xlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiYXVkIjoiZXhhbXBsZV9zZXJ2"
+    "aWNlIn0=";
 
 // Base64 decoded Payload JSON
 const char ExpectedPayloadJSON[] = R"(
@@ -185,6 +190,28 @@ const char ExpectedPayloadJSON[] = R"(
   "sub":"test@example.com",
   "exp":2001001001,
   "aud":"example_service"
+}
+)";
+
+const char ExpectedHeaderJSON[] = R"(
+{
+  "alg": "RS256",
+  "typ": "JWT"
+}
+)";
+
+const char ExpectedPayloadAndHeaderJSON[] = R"(
+{
+  "my_payload":{
+    "iss":"https://example.com",
+    "exp":2001001001,
+    "sub":"test@example.com",
+    "aud":"example_service"
+  },
+  "my_header":{
+    "typ":"JWT",
+    "alg":"RS256"
+  }
 }
 )";
 

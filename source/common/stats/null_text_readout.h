@@ -2,7 +2,7 @@
 
 #include "envoy/stats/stats.h"
 
-#include "common/stats/metric_impl.h"
+#include "source/common/stats/metric_impl.h"
 
 namespace Envoy {
 namespace Stats {

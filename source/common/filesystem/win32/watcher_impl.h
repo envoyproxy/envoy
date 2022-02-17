@@ -13,12 +13,12 @@
 #include "envoy/filesystem/watcher.h"
 #include "envoy/network/io_handle.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/common/fmt.h"
-#include "common/common/logger.h"
-#include "common/common/thread_impl.h"
-#include "common/network/io_socket_handle_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 
 #include "absl/container/node_hash_map.h"
 

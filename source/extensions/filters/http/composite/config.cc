@@ -1,9 +1,9 @@
-#include "extensions/filters/http/composite/config.h"
+#include "source/extensions/filters/http/composite/config.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/http/composite/filter.h"
+#include "source/extensions/filters/http/composite/filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,7 +19,9 @@ Http::FilterFactoryCb CompositeFilterFactory::createFilterFactoryFromProtoTyped(
       ALL_COMPOSITE_FILTER_STATS(POOL_COUNTER_PREFIX(factory_context.scope(), prefix))});
 
   return [stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<Filter>(*stats));
+    auto filter = std::make_shared<Filter>(*stats, callbacks.dispatcher());
+    callbacks.addStreamFilter(filter);
+    callbacks.addAccessLogHandler(filter);
   };
 }
 

@@ -2,9 +2,8 @@
 
 #include "envoy/server/configuration.h"
 
-#include "common/router/context_impl.h"
-
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/router/context_impl.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "admin.h"
 #include "drain_manager.h"
@@ -26,7 +25,7 @@ public:
   MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), (const));
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, ());
   MOCK_METHOD(const Server::Options&, options, ());
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(bool, healthCheckFailed, ());
@@ -34,13 +33,16 @@ public:
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
   MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
   MOCK_METHOD(Stats::Scope&, scope, ());
+  MOCK_METHOD(Stats::Scope&, serverScope, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(Server::Admin&, admin, ());
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
+  MOCK_METHOD(bool, isQuicListener, (), (const));
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, listenerMetadata, (), (const));
+  MOCK_METHOD(const Envoy::Config::TypedMetadata&, listenerTypedMetadata, (), (const));
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, ());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
@@ -64,6 +66,7 @@ public:
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
+  testing::NiceMock<Server::MockOptions> options_;
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;

@@ -4,7 +4,7 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -4,7 +4,7 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
+#include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 namespace Envoy {
 namespace Extensions {

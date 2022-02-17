@@ -6,9 +6,10 @@
 #include "envoy/secret/secret_provider.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/datasource.h"
-#include "common/grpc/common.h"
+#include "source/common/config/datasource.h"
+#include "source/common/grpc/common.h"
 
+#include "test/config/v2_link_hacks.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
@@ -90,7 +91,7 @@ class SdsGenericSecretIntegrationTest : public Grpc::GrpcClientIntegrationParamT
                                         public HttpIntegrationTest {
 public:
   SdsGenericSecretIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()), registration_(factory_) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()), registration_(factory_) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -100,7 +101,7 @@ public:
       ConfigHelper::setHttp2(*sds_cluster);
     });
 
-    config_helper_.addFilter("{ name: sds-generic-secret-test }");
+    config_helper_.prependFilter("{ name: sds-generic-secret-test }");
 
     create_xds_upstream_ = true;
     HttpIntegrationTest::initialize();

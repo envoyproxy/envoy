@@ -1,8 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "extensions/filters/http/well_known_names.h"
-
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
@@ -16,18 +15,18 @@ namespace {
 class LuaIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
-  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
     // Create the xDS upstream.
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void initializeFilter(const std::string& filter_config, const std::string& domain = "*") {
-    config_helper_.addFilter(filter_config);
+    config_helper_.prependFilter(filter_config);
 
     // Create static clusters.
     createClusters();
@@ -47,7 +46,7 @@ public:
           new_route->mutable_match()->set_prefix("/alt/route");
           new_route->mutable_route()->set_cluster("alt_cluster");
 
-          const std::string key = Extensions::HttpFilters::HttpFilterNames::get().Lua;
+          const std::string key = "envoy.filters.http.lua";
           const std::string yaml =
               R"EOF(
             foo.bar:
@@ -73,15 +72,13 @@ public:
   }
 
   void initializeWithYaml(const std::string& filter_config, const std::string& route_config) {
-    config_helper_.addFilter(filter_config);
+    config_helper_.prependFilter(filter_config);
 
     createClusters();
     config_helper_.addConfigModifier(
         [route_config](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) {
-          TestUtility::loadFromYaml(route_config, *hcm.mutable_route_config(), true);
-        });
+                hcm) { TestUtility::loadFromYaml(route_config, *hcm.mutable_route_config()); });
     initialize();
   }
 
@@ -104,7 +101,7 @@ public:
 
   void initializeWithRds(const std::string& filter_config, const std::string& route_config_name,
                          const std::string& initial_route_config) {
-    config_helper_.addFilter(filter_config);
+    config_helper_.prependFilter(filter_config);
 
     // Create static clusters.
     createClusters();
@@ -277,6 +274,20 @@ typed_config:
       request_handle:streamInfo():dynamicMetadata():set("envoy.lb", "foo", "bar")
       local dynamic_metadata_value = request_handle:streamInfo():dynamicMetadata():get("envoy.lb")["foo"]
 
+      local test_header_value_0 = request_handle:headers():getAtIndex("X-Test-Header", 0)
+      request_handle:headers():add("test_header_value_0", test_header_value_0)
+      local test_header_value_1 = request_handle:headers():getAtIndex("X-TEST-Header", 1)
+      request_handle:headers():add("test_header_value_1", test_header_value_1)
+      local test_header_value_2 = request_handle:headers():getAtIndex("x-test-header", 2)
+      if test_header_value_2 == nil then
+        request_handle:headers():add("test_header_value_2", "nil_value")
+      end
+      local test_header_value_size = request_handle:headers():getNumValues("x-test-header")
+      request_handle:headers():add("test_header_value_size", test_header_value_size)
+      request_handle:headers():add("cookie_0", request_handle:headers():getAtIndex("set-cookie", 0))
+      request_handle:headers():add("cookie_1", request_handle:headers():getAtIndex("set-cookie", 1))
+      request_handle:headers():add("cookie_size", request_handle:headers():getNumValues("set-cookie"))
+
       request_handle:headers():add("request_body_size", body_length)
       request_handle:headers():add("request_metadata_foo", metadata["foo"])
       request_handle:headers():add("request_metadata_baz", metadata["baz"])
@@ -308,11 +319,10 @@ typed_config:
 
   initializeFilter(FILTER_AND_CODE);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
-                                                 {":path", "/test/long/url"},
-                                                 {":scheme", "http"},
-                                                 {":authority", "host"},
-                                                 {"x-forwarded-for", "10.0.0.1"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},      {":path", "/test/long/url"},     {":scheme", "http"},
+      {":authority", "host"},   {"x-forwarded-for", "10.0.0.1"}, {"x-test-header", "foo"},
+      {"x-test-header", "bar"}, {"set-cookie", "foo;bar;"},      {"set-cookie", "1,3;2,5;"}};
 
   auto encoder_decoder = codec_client_->startRequest(request_headers);
   Http::StreamEncoder& encoder = encoder_decoder.first;
@@ -323,6 +333,41 @@ typed_config:
   encoder.encodeData(request_data2, true);
 
   waitForNextUpstreamRequest();
+  EXPECT_EQ("foo", upstream_request_->headers()
+                       .get(Http::LowerCaseString("test_header_value_0"))[0]
+                       ->value()
+                       .getStringView());
+
+  EXPECT_EQ("bar", upstream_request_->headers()
+                       .get(Http::LowerCaseString("test_header_value_1"))[0]
+                       ->value()
+                       .getStringView());
+
+  EXPECT_EQ("nil_value", upstream_request_->headers()
+                             .get(Http::LowerCaseString("test_header_value_2"))[0]
+                             ->value()
+                             .getStringView());
+
+  EXPECT_EQ("2", upstream_request_->headers()
+                     .get(Http::LowerCaseString("test_header_value_size"))[0]
+                     ->value()
+                     .getStringView());
+
+  EXPECT_EQ("foo;bar;", upstream_request_->headers()
+                            .get(Http::LowerCaseString("cookie_0"))[0]
+                            ->value()
+                            .getStringView());
+
+  EXPECT_EQ("1,3;2,5;", upstream_request_->headers()
+                            .get(Http::LowerCaseString("cookie_1"))[0]
+                            ->value()
+                            .getStringView());
+
+  EXPECT_EQ("2", upstream_request_->headers()
+                     .get(Http::LowerCaseString("cookie_size"))[0]
+                     ->value()
+                     .getStringView());
+
   EXPECT_EQ("10", upstream_request_->headers()
                       .get(Http::LowerCaseString("request_body_size"))[0]
                       ->value()
@@ -916,6 +961,62 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
   cleanup();
 }
 
+TEST_P(LuaIntegrationTest, DirectResponseLuaMetadata) {
+  const std::string filter_config =
+      R"EOF(
+  name: lua
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+    inline_code: |
+      function envoy_on_response(response_handle)
+        response_handle:headers():add('foo', response_handle:metadata():get('foo') or 'nil')
+      end
+)EOF";
+
+  std::string route_config =
+      R"EOF(
+name: basic_lua_routes
+virtual_hosts:
+- name: rds_vhost_1
+  domains: ["lua.per.route"]
+  routes:
+  - match:
+      prefix: "/lua/direct_response"
+    direct_response:
+      status: 200
+      body:
+        inline_string: "hello"
+    metadata:
+      filter_metadata:
+        envoy.filters.http.lua:
+          foo: bar
+)EOF";
+
+  initializeWithYaml(filter_config, route_config);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Lua code defined in 'inline_code' will be executed by default.
+  Http::TestRequestHeaderMapImpl default_headers{{":method", "GET"},
+                                                 {":path", "/lua/direct_response"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "lua.per.route"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+
+  auto encoder_decoder = codec_client_->startRequest(default_headers);
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  EXPECT_EQ("bar",
+            response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("hello", response->body());
+
+  cleanup();
+}
+
 // Test whether Rds can correctly deliver LuaPerRoute configuration.
 TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
 // When the route configuration is updated dynamically via RDS and the configuration contains an
@@ -1056,6 +1157,22 @@ typed_config:
         last = chunk
       end
       last:setBytes("ok")
+    end
+)EOF";
+
+  testRewriteResponse(FILTER_AND_CODE);
+}
+
+TEST_P(LuaIntegrationTest, RewriteResponseBufferWithoutHeaderReplaceContentLength) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  inline_code: |
+    function envoy_on_response(response_handle)
+      local content_length = response_handle:body():setBytes("ok")
+      response_handle:logTrace(content_length)
     end
 )EOF";
 

@@ -1,4 +1,4 @@
-#include "common/stream_info/filter_state_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 
 #include "envoy/common/exception.h"
 
@@ -47,13 +47,13 @@ bool FilterStateImpl::hasDataWithName(absl::string_view data_name) const {
 
 const FilterState::Object*
 FilterStateImpl::getDataReadOnlyGeneric(absl::string_view data_name) const {
-  const auto& it = data_storage_.find(data_name);
+  const auto it = data_storage_.find(data_name);
 
   if (it == data_storage_.end()) {
     if (parent_) {
-      return &(parent_->getDataReadOnly<FilterState::Object>(data_name));
+      return parent_->getDataReadOnlyGeneric(data_name);
     }
-    throw EnvoyException("FilterState::getDataReadOnly<T> called for unknown data name.");
+    return nullptr;
   }
 
   const FilterStateImpl::FilterObject* current = it->second.get();
@@ -65,9 +65,9 @@ FilterState::Object* FilterStateImpl::getDataMutableGeneric(absl::string_view da
 
   if (it == data_storage_.end()) {
     if (parent_) {
-      return &(parent_->getDataMutable<FilterState::Object>(data_name));
+      return parent_->getDataMutableGeneric(data_name);
     }
-    throw EnvoyException("FilterState::getDataMutable<T> called for unknown data name.");
+    return nullptr;
   }
 
   FilterStateImpl::FilterObject* current = it->second.get();

@@ -11,10 +11,10 @@
 #include "envoy/upstream/host_description.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/logger.h"
-#include "common/config/metadata.h"
-#include "common/config/well_known_names.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -39,6 +39,18 @@ public:
       Network::TransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope);
 
   MatchData resolve(const envoy::config::core::v3::Metadata* metadata) const override;
+
+  bool allMatchesSupportAlpn() const override {
+    if (!default_match_.factory->supportsAlpn()) {
+      return false;
+    }
+    for (const auto& match : matches_) {
+      if (!match.factory->supportsAlpn()) {
+        return false;
+      }
+    }
+    return true;
+  }
 
 protected:
   TransportSocketMatchStats generateStats(const std::string& prefix);

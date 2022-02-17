@@ -1,10 +1,10 @@
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/safe_memcpy.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/str_join.h"
 #include "openssl/x509v3.h"
@@ -13,6 +13,31 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+#if BORINGSSL_API_VERSION < 10
+static constexpr absl::string_view SSL_ERROR_NONE_MESSAGE = "NONE";
+static constexpr absl::string_view SSL_ERROR_SSL_MESSAGE = "SSL";
+static constexpr absl::string_view SSL_ERROR_WANT_READ_MESSAGE = "WANT_READ";
+static constexpr absl::string_view SSL_ERROR_WANT_WRITE_MESSAGE = "WANT_WRITE";
+static constexpr absl::string_view SSL_ERROR_WANT_X509_LOOPUP_MESSAGE = "WANT_X509_LOOKUP";
+static constexpr absl::string_view SSL_ERROR_SYSCALL_MESSAGE = "SYSCALL";
+static constexpr absl::string_view SSL_ERROR_ZERO_RETURN_MESSAGE = "ZERO_RETURN";
+static constexpr absl::string_view SSL_ERROR_WANT_CONNECT_MESSAGE = "WANT_CONNECT";
+static constexpr absl::string_view SSL_ERROR_WANT_ACCEPT_MESSAGE = "WANT_ACCEPT";
+static constexpr absl::string_view SSL_ERROR_WANT_CHANNEL_ID_LOOKUP_MESSAGE =
+    "WANT_CHANNEL_ID_LOOKUP";
+static constexpr absl::string_view SSL_ERROR_PENDING_SESSION_MESSAGE = "PENDING_SESSION";
+static constexpr absl::string_view SSL_ERROR_PENDING_CERTIFICATE_MESSAGE = "PENDING_CERTIFICATE";
+static constexpr absl::string_view SSL_ERROR_WANT_PRIVATE_KEY_OPERATION_MESSAGE =
+    "WANT_PRIVATE_KEY_OPERATION";
+static constexpr absl::string_view SSL_ERROR_PENDING_TICKET_MESSAGE = "PENDING_TICKET";
+static constexpr absl::string_view SSL_ERROR_EARLY_DATA_REJECTED_MESSAGE = "EARLY_DATA_REJECTED";
+static constexpr absl::string_view SSL_ERROR_WANT_CERTIFICATE_VERIFY_MESSAGE =
+    "WANT_CERTIFICATE_VERIFY";
+static constexpr absl::string_view SSL_ERROR_HANDOFF_MESSAGE = "HANDOFF";
+static constexpr absl::string_view SSL_ERROR_HANDBACK_MESSAGE = "HANDBACK";
+#endif
+static constexpr absl::string_view SSL_ERROR_UNKNOWN_ERROR_MESSAGE = "UNKNOWN_ERROR";
 
 Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const std::string& path,
                                                               TimeSource& time_source) {
@@ -44,6 +69,51 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
     subject_alt_name.set_ip_address(ip_san);
   }
   return certificate_details;
+}
+
+bool Utility::labelWildcardMatch(absl::string_view dns_label, absl::string_view pattern) {
+  constexpr char glob = '*';
+  // Check the special case of a single * pattern, as it's common.
+  if (pattern.size() == 1 && pattern[0] == glob) {
+    return true;
+  }
+  // Only valid if wildcard character appear once.
+  if (std::count(pattern.begin(), pattern.end(), glob) == 1) {
+    std::vector<absl::string_view> split_pattern = absl::StrSplit(pattern, glob);
+    return (pattern.size() <= dns_label.size() + 1) &&
+           absl::StartsWith(dns_label, split_pattern[0]) &&
+           absl::EndsWith(dns_label, split_pattern[1]);
+  }
+  return false;
+}
+
+bool Utility::dnsNameMatch(absl::string_view dns_name, absl::string_view pattern) {
+  // A-label ACE prefix https://www.rfc-editor.org/rfc/rfc5890#section-2.3.2.5.
+  constexpr absl::string_view ACE_prefix = "xn--";
+  const std::string lower_case_dns_name = absl::AsciiStrToLower(dns_name);
+  const std::string lower_case_pattern = absl::AsciiStrToLower(pattern);
+  if (lower_case_dns_name == lower_case_pattern) {
+    return true;
+  }
+
+  std::vector<absl::string_view> split_pattern =
+      absl::StrSplit(lower_case_pattern, absl::MaxSplits('.', 1));
+  std::vector<absl::string_view> split_dns_name =
+      absl::StrSplit(lower_case_dns_name, absl::MaxSplits('.', 1));
+
+  // dns name and pattern should contain more than 1 label to match.
+  if (split_pattern.size() < 2 || split_dns_name.size() < 2) {
+    return false;
+  }
+  // Only the left-most label in the pattern contains wildcard '*' and is not an A-label.
+  if ((split_pattern[0].find('*') != absl::string_view::npos) &&
+      (split_pattern[1].find('*') == absl::string_view::npos) &&
+      (!absl::StartsWith(split_pattern[0], ACE_prefix))) {
+    return (split_dns_name[1] == split_pattern[1]) &&
+           labelWildcardMatch(split_dns_name[0], split_pattern[0]);
+  }
+
+  return false;
 }
 
 namespace {
@@ -255,6 +325,9 @@ absl::optional<std::string> Utility::getLastCryptoError() {
 }
 
 absl::string_view Utility::getErrorDescription(int err) {
+#if BORINGSSL_API_VERSION < 10
+  // TODO(davidben): Remove this and the corresponding SSL_ERROR_*_MESSAGE constants when the FIPS
+  // build is updated to a later version.
   switch (err) {
   case SSL_ERROR_NONE:
     return SSL_ERROR_NONE_MESSAGE;
@@ -292,10 +365,24 @@ absl::string_view Utility::getErrorDescription(int err) {
     return SSL_ERROR_HANDOFF_MESSAGE;
   case SSL_ERROR_HANDBACK:
     return SSL_ERROR_HANDBACK_MESSAGE;
-  default:
-    ENVOY_BUG(false, "Unknown BoringSSL error had occurred");
-    return SSL_ERROR_UNKNOWN_ERROR_MESSAGE;
   }
+#else
+  const char* description = SSL_error_description(err);
+  if (description) {
+    return description;
+  }
+#endif
+  ENVOY_BUG(false, "Unknown BoringSSL error had occurred");
+  return SSL_ERROR_UNKNOWN_ERROR_MESSAGE;
+}
+
+std::string Utility::getX509VerificationErrorInfo(X509_STORE_CTX* ctx) {
+  const int n = X509_STORE_CTX_get_error(ctx);
+  const int depth = X509_STORE_CTX_get_error_depth(ctx);
+  std::string error_details =
+      absl::StrCat("X509_verify_cert: certificate verification error at depth ", depth, ": ",
+                   X509_verify_cert_error_string(n));
+  return error_details;
 }
 
 } // namespace Tls

@@ -1,4 +1,4 @@
-#include "common/config/decoded_resource_impl.h"
+#include "source/common/config/decoded_resource_impl.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/test_common/utility.h"

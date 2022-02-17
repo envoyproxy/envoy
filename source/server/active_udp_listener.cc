@@ -1,10 +1,10 @@
-#include "server/active_udp_listener.h"
+#include "source/server/active_udp_listener.h"
 
 #include "envoy/network/exception.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
-#include "common/network/utility.h"
+#include "source/common/network/utility.h"
 
 #include "spdlog/spdlog.h"
 
@@ -68,7 +68,8 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
     : ActiveRawUdpListener(worker_index, concurrency, parent,
-                           config.listenSocketFactory().getListenSocket(), dispatcher, config) {}
+                           config.listenSocketFactory().getListenSocket(worker_index), dispatcher,
+                           config) {}
 
 ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                                            Network::UdpConnectionHandler& parent,
@@ -96,16 +97,14 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
                                            Network::UdpListenerPtr&& listener,
                                            Network::ListenerConfig& config)
     : ActiveUdpListenerBase(worker_index, concurrency, parent, listen_socket, std::move(listener),
-                            &config),
-      read_filter_(nullptr) {
-  // Create the filter chain on creating a new udp listener
+                            &config) {
+  // Create the filter chain on creating a new udp listener.
   config_->filterChainFactory().createUdpListenerFilterChain(*this, *this);
 
-  // If filter is nullptr, fail the creation of the listener
-  if (read_filter_ == nullptr) {
-    throw Network::CreateListenerException(
-        fmt::format("Cannot create listener as no read filter registered for the udp listener: {} ",
-                    config_->name()));
+  // If filter is nullptr warn that we will be dropping packets. This is an edge case and should
+  // only happen due to a bad factory. It's not worth adding per-worker error handling for this.
+  if (read_filters_.empty()) {
+    ENVOY_LOG(warn, "UDP listener has no filters. Packets will be dropped.");
   }
 
   // Create udp_packet_writer
@@ -113,7 +112,14 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
       listen_socket_.ioHandle(), config.listenerScope());
 }
 
-void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) { read_filter_->onData(data); }
+void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) {
+  for (auto& read_filter : read_filters_) {
+    Network::FilterStatus status = read_filter->onData(data);
+    if (status == Network::FilterStatus::StopIteration) {
+      return;
+    }
+  }
+}
 
 void ActiveRawUdpListener::onReadReady() {}
 
@@ -127,12 +133,16 @@ void ActiveRawUdpListener::onWriteReady(const Network::Socket&) {
 }
 
 void ActiveRawUdpListener::onReceiveError(Api::IoError::IoErrorCode error_code) {
-  read_filter_->onReceiveError(error_code);
+  for (auto& read_filter : read_filters_) {
+    Network::FilterStatus status = read_filter->onReceiveError(error_code);
+    if (status == Network::FilterStatus::StopIteration) {
+      return;
+    }
+  }
 }
 
 void ActiveRawUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& filter) {
-  ASSERT(read_filter_ == nullptr, "Cannot add a 2nd UDP read filter");
-  read_filter_ = std::move(filter);
+  read_filters_.emplace_back(std::move(filter));
 }
 
 Network::UdpListener& ActiveRawUdpListener::udpListener() { return *udp_listener_; }

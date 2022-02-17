@@ -9,16 +9,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "api_type_oracle_lib",
-    srcs = ["api_type_oracle.cc"],
-    hdrs = ["api_type_oracle.h"],
-    deps = [
-        "//source/common/protobuf",
-        "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "api_version_lib",
     hdrs = ["api_version.h"],
 )
@@ -29,13 +19,13 @@ envoy_cc_library(
     hdrs = ["config_provider_impl.h"],
     deps = [
         ":utility_lib",
-        "//include/envoy/config:config_provider_interface",
-        "//include/envoy/config:config_provider_manager_interface",
-        "//include/envoy/init:manager_interface",
-        "//include/envoy/server:admin_interface",
-        "//include/envoy/server:config_tracker_interface",
-        "//include/envoy/singleton:instance_interface",
-        "//include/envoy/thread_local:thread_local_interface",
+        "//envoy/config:config_provider_interface",
+        "//envoy/config:config_provider_manager_interface",
+        "//envoy/init:manager_interface",
+        "//envoy/server:admin_interface",
+        "//envoy/server:config_tracker_interface",
+        "//envoy/singleton:instance_interface",
+        "//envoy/thread_local:thread_local_interface",
         "//source/common/init:manager_lib",
         "//source/common/init:target_lib",
         "//source/common/init:watcher_lib",
@@ -48,7 +38,7 @@ envoy_cc_library(
     hdrs = ["context_provider_impl.h"],
     deps = [
         ":xds_context_params_lib",
-        "//include/envoy/config:context_provider_interface",
+        "//envoy/config:context_provider_interface",
         "//source/common/common:callback_impl_lib",
         "//source/common/common:thread_lib",
     ],
@@ -60,9 +50,9 @@ envoy_cc_library(
     hdrs = ["datasource.h"],
     deps = [
         ":remote_data_fetcher_lib",
-        "//include/envoy/api:api_interface",
-        "//include/envoy/init:manager_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/api:api_interface",
+        "//envoy/init:manager_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:backoff_lib",
         "//source/common/common:empty_string",
         "//source/common/init:target_lib",
@@ -75,7 +65,7 @@ envoy_cc_library(
     name = "decoded_resource_lib",
     hdrs = ["decoded_resource_impl.h"],
     deps = [
-        "//include/envoy/config:subscription_interface",
+        "//envoy/config:subscription_interface",
         "//source/common/protobuf:utility_lib",
         "@com_github_cncf_udpa//xds/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -87,32 +77,39 @@ envoy_cc_library(
     srcs = ["ttl.cc"],
     hdrs = ["ttl.h"],
     deps = [
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
+        "//envoy/config:subscription_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
         "@com_google_absl//absl/container:btree",
     ],
 )
 
 envoy_cc_library(
     name = "delta_subscription_state_lib",
-    srcs = ["delta_subscription_state.cc"],
-    hdrs = ["delta_subscription_state.h"],
+    srcs = [
+        "delta_subscription_state.cc",
+        "new_delta_subscription_state.cc",
+        "old_delta_subscription_state.cc",
+    ],
+    hdrs = [
+        "delta_subscription_state.h",
+        "new_delta_subscription_state.h",
+        "old_delta_subscription_state.h",
+    ],
     deps = [
         ":api_version_lib",
         ":pausable_ack_queue_lib",
         ":ttl_lib",
         ":utility_lib",
         ":watch_map_lib",
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/event:dispatcher_interface",
+        "//envoy/config:subscription_interface",
+        "//envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:backoff_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:token_bucket_impl_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -123,15 +120,17 @@ envoy_cc_library(
     hdrs = ["filesystem_subscription_impl.h"],
     deps = [
         ":decoded_resource_lib",
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/filesystem:filesystem_interface",
+        ":watched_directory_lib",
+        "//envoy/config:subscription_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/filesystem:filesystem_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -141,10 +140,10 @@ envoy_cc_library(
     hdrs = ["grpc_stream.h"],
     deps = [
         ":utility_lib",
-        "//include/envoy/config:grpc_mux_interface",
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/grpc:async_client_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/config:grpc_mux_interface",
+        "//envoy/config:subscription_interface",
+        "//envoy/grpc:async_client_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:backoff_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:token_bucket_impl_lib",
@@ -163,16 +162,15 @@ envoy_cc_library(
         ":grpc_stream_lib",
         ":ttl_lib",
         ":utility_lib",
-        "//include/envoy/config:grpc_mux_interface",
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/config:grpc_mux_interface",
+        "//envoy/config:subscription_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/memory:utils_lib",
         "//source/common/protobuf",
         "@com_google_absl//absl/container:btree",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -184,9 +182,9 @@ envoy_cc_library(
     deps = [
         ":grpc_mux_lib",
         ":xds_resource_lib",
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/grpc:async_client_interface",
+        "//envoy/config:subscription_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/grpc:async_client_interface",
     ],
 )
 
@@ -198,14 +196,12 @@ envoy_cc_library(
         ":delta_subscription_state_lib",
         ":grpc_stream_lib",
         ":pausable_ack_queue_lib",
-        ":version_converter_lib",
         ":watch_map_lib",
         ":xds_context_params_lib",
         ":xds_resource_lib",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/grpc:async_client_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/grpc:async_client_interface",
         "//source/common/memory:utils_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -220,9 +216,8 @@ envoy_cc_library(
     deps = [
         ":api_version_lib",
         ":decoded_resource_lib",
-        ":version_converter_lib",
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/event:dispatcher_interface",
+        "//envoy/config:subscription_interface",
+        "//envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
@@ -231,7 +226,6 @@ envoy_cc_library(
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -241,10 +235,10 @@ envoy_cc_library(
     srcs = ["metadata.cc"],
     hdrs = ["metadata.h"],
     deps = [
-        "//include/envoy/config:typed_metadata_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/registry",
-        "//include/envoy/singleton:manager_interface",
+        "//envoy/config:typed_metadata_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/registry",
+        "//envoy/singleton:manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
@@ -258,7 +252,7 @@ envoy_cc_library(
     name = "opaque_resource_decoder_lib",
     hdrs = ["opaque_resource_decoder_impl.h"],
     deps = [
-        "//include/envoy/config:subscription_interface",
+        "//envoy/config:subscription_interface",
         "//source/common/protobuf:utility_lib",
     ],
 )
@@ -277,15 +271,12 @@ envoy_cc_library(
     name = "protobuf_link_hacks",
     hdrs = ["protobuf_link_hacks.h"],
     deps = [
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/extension/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/health/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/listener/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/ratelimit/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/ratelimit/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
@@ -298,7 +289,7 @@ envoy_cc_library(
     srcs = ["remote_data_fetcher.cc"],
     hdrs = ["remote_data_fetcher.h"],
     deps = [
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
         "//source/common/http:utility_lib",
@@ -309,11 +300,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "resource_name_lib",
     hdrs = ["resource_name.h"],
-    deps = [
-        ":api_type_oracle_lib",
-        "//source/common/common:assert_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
+    deps = ["//source/common/common:assert_lib"],
 )
 
 envoy_cc_library(
@@ -335,10 +322,11 @@ envoy_cc_library(
         ":type_to_endpoint_lib",
         ":utility_lib",
         ":xds_resource_lib",
-        "//include/envoy/config:subscription_factory_interface",
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/config:subscription_factory_interface",
+        "//envoy/config:subscription_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/config/xds_mux:grpc_mux_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -390,14 +378,12 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     deps = [
-        ":api_type_oracle_lib",
-        ":version_converter_lib",
-        "//include/envoy/config:grpc_mux_interface",
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/local_info:local_info_interface",
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/config:grpc_mux_interface",
+        "//envoy/config:subscription_interface",
+        "//envoy/local_info:local_info_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:backoff_lib",
         "//source/common/common:hash_lib",
@@ -411,25 +397,13 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:tag_producer_lib",
+        "//source/common/version:api_version_lib",
         "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
+        "@com_github_cncf_udpa//xds/type/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "version_converter_lib",
-    srcs = ["version_converter.cc"],
-    hdrs = ["version_converter.h"],
-    deps = [
-        ":api_type_oracle_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/protobuf",
-        "//source/common/protobuf:visitor_lib",
-        "//source/common/protobuf:well_known_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -439,8 +413,9 @@ envoy_cc_library(
     hdrs = ["watch_map.h"],
     deps = [
         ":decoded_resource_lib",
+        ":utility_lib",
         ":xds_resource_lib",
-        "//include/envoy/config:subscription_interface",
+        "//envoy/config:subscription_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:cleanup_lib",
         "//source/common/common:minimal_logger_lib",
@@ -456,7 +431,7 @@ envoy_cc_library(
     deps = [
         ":opaque_resource_decoder_lib",
         ":resource_name_lib",
-        "//include/envoy/config:subscription_interface",
+        "//envoy/config:subscription_interface",
     ],
 )
 
@@ -465,8 +440,8 @@ envoy_cc_library(
     srcs = ["watched_directory.cc"],
     hdrs = ["watched_directory.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/filesystem:watcher_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/filesystem:watcher_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

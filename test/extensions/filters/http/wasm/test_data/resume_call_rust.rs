@@ -12,7 +12,7 @@ pub fn _start() {
 struct TestStream;
 
 impl HttpContext for TestStream {
-    fn on_http_request_headers(&mut self, _: usize) -> Action {
+    fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
         self.dispatch_http_call(
             "cluster",
             vec![(":method", "POST"), (":path", "/"), (":authority", "foo")],

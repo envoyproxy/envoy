@@ -1,10 +1,9 @@
 #include <string>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/json/json_loader.h"
-
-#include "extensions/filters/network/mongo_proxy/bson_impl.h"
-#include "extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/extensions/filters/network/mongo_proxy/bson_impl.h"
+#include "source/extensions/filters/network/mongo_proxy/codec_impl.h"
 
 #include "test/test_common/printers.h"
 

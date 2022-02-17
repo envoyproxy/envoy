@@ -1,7 +1,6 @@
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/tracers/zipkin/span_context.h"
-#include "extensions/tracers/zipkin/span_context_extractor.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/tracers/zipkin/span_context.h"
+#include "source/extensions/tracers/zipkin/span_context_extractor.h"
 
 #include "test/test_common/utility.h"
 

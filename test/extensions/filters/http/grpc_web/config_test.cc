@@ -1,4 +1,4 @@
-#include "extensions/filters/http/grpc_web/config.h"
+#include "source/extensions/filters/http/grpc_web/config.h"
 
 #include "test/mocks/server/factory_context.h"
 
@@ -21,16 +21,6 @@ TEST(GrpcWebFilterConfigTest, GrpcWebFilter) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
-}
-
-// Test that the deprecated extension name still functions.
-TEST(GrpcWebFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.grpc_web";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
-          deprecated_name));
 }
 
 } // namespace

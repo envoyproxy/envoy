@@ -1,9 +1,8 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "common/router/string_accessor_impl.h"
-#include "common/stream_info/filter_state_impl.h"
-
-#include "extensions/filters/http/jwt_authn/filter_config.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/extensions/filters/http/jwt_authn/filter_config.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/factory_context.h"
@@ -176,7 +175,8 @@ rules:
     // The threadLocal, dispatcher and api that are used by the filter config, actually belong to
     // the server factory context that who's lifetime is longer. We simulate that by returning
     // their instances from outside the scope.
-    ON_CALL(context, dispatcher()).WillByDefault(ReturnRef(server_context.dispatcher()));
+    ON_CALL(context, mainThreadDispatcher())
+        .WillByDefault(ReturnRef(server_context.mainThreadDispatcher()));
     ON_CALL(context, api()).WillByDefault(ReturnRef(server_context.api()));
     ON_CALL(context, threadLocal()).WillByDefault(ReturnRef(server_context.threadLocal()));
 

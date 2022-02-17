@@ -1,4 +1,4 @@
-#include "extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
+#include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/utility.h"
@@ -247,8 +247,8 @@ TEST_F(LocalRateLimiterDescriptorImplTest, CasEdgeCasesDescriptor) {
     synchronizer().enable();
 
     // Start a thread and start the fill callback. This will wait pre-CAS.
-    dispatcher_.time_system_.advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
-                                               Envoy::Event::Dispatcher::RunType::NonBlock);
+    dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
+                                                     Envoy::Event::Dispatcher::RunType::NonBlock);
     synchronizer().waitOn("on_fill_timer_pre_cas");
     std::thread t1([&] {
       EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
@@ -296,8 +296,8 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptor2) {
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
-  dispatcher_.time_system_.advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
-                                             Envoy::Event::Dispatcher::RunType::NonBlock);
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
 }
 
 // Verify token bucket functionality with a single token.
@@ -311,8 +311,8 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptor) {
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
 
   // 0 -> 1 tokens
-  dispatcher_.time_system_.advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
-                                             Envoy::Event::Dispatcher::RunType::NonBlock);
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
   fill_timer_->invokeCallback();
 
@@ -321,14 +321,14 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptor) {
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
 
   // 0 -> 1 tokens
-  dispatcher_.time_system_.advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
-                                             Envoy::Event::Dispatcher::RunType::NonBlock);
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
   fill_timer_->invokeCallback();
 
   // 1 -> 1 tokens
-  dispatcher_.time_system_.advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
-                                             Envoy::Event::Dispatcher::RunType::NonBlock);
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
   fill_timer_->invokeCallback();
 
@@ -349,8 +349,8 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketMultipleTokensPerFillDescr
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
 
   // 0 -> 2 tokens
-  dispatcher_.time_system_.advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
-                                             Envoy::Event::Dispatcher::RunType::NonBlock);
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
   fill_timer_->invokeCallback();
 
@@ -358,8 +358,8 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketMultipleTokensPerFillDescr
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
 
   // 1 -> 2 tokens
-  dispatcher_.time_system_.advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
-                                             Envoy::Event::Dispatcher::RunType::NonBlock);
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
   fill_timer_->invokeCallback();
 
@@ -383,8 +383,8 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorDiffere
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
 
   // 0 -> 1 tokens for descriptor2_
-  dispatcher_.time_system_.advanceTimeAndRun(std::chrono::milliseconds(50), dispatcher_,
-                                             Envoy::Event::Dispatcher::RunType::NonBlock);
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(50), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
   fill_timer_->invokeCallback();
 

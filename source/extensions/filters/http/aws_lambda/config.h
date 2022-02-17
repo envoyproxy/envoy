@@ -3,8 +3,7 @@
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.h"
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.validate.h"
 
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,7 +14,7 @@ class AwsLambdaFilterFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::aws_lambda::v3::Config,
                                  envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig> {
 public:
-  AwsLambdaFilterFactory() : FactoryBase(HttpFilterNames::get().AwsLambda) {}
+  AwsLambdaFilterFactory() : FactoryBase("envoy.filters.http.aws_lambda") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

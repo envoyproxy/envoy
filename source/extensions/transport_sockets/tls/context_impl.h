@@ -14,13 +14,12 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/matchers.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "extensions/transport_sockets/tls/cert_validator/cert_validator.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
-#include "extensions/transport_sockets/tls/ocsp/ocsp.h"
-#include "extensions/transport_sockets/tls/stats.h"
+#include "source/common/common/matchers.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/ocsp/ocsp.h"
+#include "source/extensions/transport_sockets/tls/stats.h"
 
 #include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"
@@ -53,6 +52,12 @@ struct TlsContext {
   Envoy::Ssl::PrivateKeyMethodProviderSharedPtr getPrivateKeyMethodProvider() {
     return private_key_method_provider_;
   }
+  void loadCertificateChain(const std::string& data, const std::string& data_path);
+  void loadPrivateKey(const std::string& data, const std::string& data_path,
+                      const std::string& password);
+  void loadPkcs12(const std::string& data, const std::string& data_path,
+                  const std::string& password);
+  void checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path);
 };
 
 class ContextImpl : public virtual Envoy::Ssl::Context {

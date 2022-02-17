@@ -8,8 +8,8 @@
 
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/logger.h"
-#include "common/common/non_copyable.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/non_copyable.h"
 
 namespace Envoy {
 namespace ThreadLocal {
@@ -19,7 +19,6 @@ namespace ThreadLocal {
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public NonCopyable, public Instance {
 public:
-  InstanceImpl() { Thread::MainThread::initMainThread(); }
   ~InstanceImpl() override;
 
   // ThreadLocal::Instance
@@ -28,6 +27,7 @@ public:
   void shutdownGlobalThreading() override;
   void shutdownThread() override;
   Event::Dispatcher& dispatcher() override;
+  bool isShutdown() const override { return shutdown_; }
 
 private:
   // On destruction returns the slot index to the deferred delete queue (detaches it). This allows
@@ -47,6 +47,7 @@ private:
     void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& complete_cb) override;
     bool currentThreadRegistered() override;
     void set(InitializeCb cb) override;
+    bool isShutdown() const override { return parent_.shutdown_; }
 
     InstanceImpl& parent_;
     const uint32_t index_;
@@ -77,6 +78,7 @@ private:
 
   static thread_local ThreadLocalData thread_local_data_;
 
+  Thread::MainThread main_thread_;
   std::vector<Slot*> slots_;
   // A list of index of freed slots.
   std::list<uint32_t> free_slot_indexes_;

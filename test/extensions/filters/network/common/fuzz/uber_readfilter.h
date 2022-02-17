@@ -2,7 +2,7 @@
 
 #include "envoy/network/filter.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/extensions/filters/network/common/fuzz/network_readfilter_fuzz.pb.validate.h"
 #include "test/extensions/filters/network/common/fuzz/utils/fakes.h"
@@ -41,7 +41,7 @@ private:
   Event::SimulatedTimeSystem& time_source_;
   std::shared_ptr<NiceMock<Network::MockReadFilterCallbacks>> read_filter_callbacks_;
   std::unique_ptr<Grpc::MockAsyncRequest> async_request_;
-  std::unique_ptr<Grpc::MockAsyncClient> async_client_;
+  std::shared_ptr<Grpc::MockAsyncClient> async_client_;
   std::unique_ptr<Grpc::MockAsyncClientFactory> async_client_factory_;
   Tracing::MockSpan span_;
 };

@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Client SSL authorization L4 network filter
-# Public docs: docs/root/configuration/network_filters/client_ssl_auth_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/client_ssl_auth_filter
 
 envoy_extension_package()
 
@@ -17,12 +17,12 @@ envoy_cc_library(
     srcs = ["client_ssl_auth.cc"],
     hdrs = ["client_ssl_auth.h"],
     deps = [
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/stats:stats_macros",
-        "//include/envoy/thread_local:thread_local_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/runtime:runtime_interface",
+        "//envoy/stats:stats_macros",
+        "//envoy/thread_local:thread_local_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
         "//source/common/http:headers_lib",
@@ -40,11 +40,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.network",
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":client_ssl_auth",
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/network/client_ssl_auth/v3:pkg_cc_proto",

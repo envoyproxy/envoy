@@ -5,7 +5,7 @@
 
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
-#include "extensions/filters/common/ext_authz/ext_authz.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz.h"
 
 #include "gmock/gmock.h"
 

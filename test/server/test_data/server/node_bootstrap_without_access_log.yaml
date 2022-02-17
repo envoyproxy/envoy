@@ -7,6 +7,5 @@ node:
 admin:
   address:
     socket_address:
-      address: {{ ntop_ip_loopback_address }}
+      address: "{{ ntop_ip_loopback_address }}"
       port_value: 0
-

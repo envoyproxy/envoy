@@ -2,9 +2,8 @@
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 
-#include "extensions/filters/common/ratelimit/ratelimit_impl.h"
-#include "extensions/filters/network/common/utility.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/common/ratelimit/ratelimit_impl.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/extensions/filters/network/common/fuzz/uber_readfilter.h"
@@ -26,6 +25,7 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
         Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
     const std::vector<absl::string_view> supported_filter_names = {
         NetworkFilterNames::get().ClientSslAuth, NetworkFilterNames::get().ExtAuthorization,
+        NetworkFilterNames::get().EnvoyMobileHttpConnectionManager,
         // A dedicated http_connection_manager fuzzer can be found in
         // test/common/http/conn_manager_impl_fuzz_test.cc
         NetworkFilterNames::get().HttpConnectionManager, NetworkFilterNames::get().LocalRateLimit,
@@ -71,24 +71,21 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
           return async_request_.get();
         })));
 
-    EXPECT_CALL(*async_client_factory_, create()).WillOnce(Invoke([&] {
-      return std::move(async_client_);
-    }));
+    ON_CALL(factory_context_.cluster_manager_.async_client_manager_,
+            getOrCreateRawAsyncClient(_, _, _, _))
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                                  Grpc::CacheOption) { return async_client_; }));
 
-    EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_,
-                factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          return std::move(async_client_factory_);
-        }));
-    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
-        pipe_addr_);
-    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
-        pipe_addr_);
-  } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
-    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
-        pipe_addr_);
-    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
-        pipe_addr_);
+    read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
+        ->setLocalAddress(pipe_addr_);
+    read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
+        ->setRemoteAddress(pipe_addr_);
+  } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager ||
+             filter_name == NetworkFilterNames::get().EnvoyMobileHttpConnectionManager) {
+    read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
+        ->setLocalAddress(pipe_addr_);
+    read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
+        ->setRemoteAddress(pipe_addr_);
   } else if (filter_name == NetworkFilterNames::get().RateLimit) {
     async_client_factory_ = std::make_unique<Grpc::MockAsyncClientFactory>();
     async_client_ = std::make_unique<Grpc::MockAsyncClient>();
@@ -104,19 +101,14 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
           return async_request_.get();
         })));
 
-    EXPECT_CALL(*async_client_factory_, create()).WillOnce(Invoke([&] {
-      return std::move(async_client_);
-    }));
-
-    EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_,
-                factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          return std::move(async_client_factory_);
-        }));
-    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
-        pipe_addr_);
-    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
-        pipe_addr_);
+    ON_CALL(factory_context_.cluster_manager_.async_client_manager_,
+            getOrCreateRawAsyncClient(_, _, _, _))
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                                  Grpc::CacheOption) { return async_client_; }));
+    read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
+        ->setLocalAddress(pipe_addr_);
+    read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
+        ->setRemoteAddress(pipe_addr_);
   }
 }
 
@@ -126,8 +118,6 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
   // mock/fake objects are also prohibited. We could also avoid fuzzing some unfinished features by
   // checking them here. For now there are only three filters {DirectResponse, LocalRateLimit,
   // HttpConnectionManager} on which we have constraints.
-  const std::string name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(
-      std::string(filter_name));
   if (filter_name == NetworkFilterNames::get().DirectResponse) {
     envoy::extensions::filters::network::direct_response::v3::Config& config =
         dynamic_cast<envoy::extensions::filters::network::direct_response::v3::Config&>(
@@ -160,6 +150,20 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
       throw EnvoyException(absl::StrCat(
           "http_conn_manager trying to use Quiche which we won't fuzz here. Config:\n{}",
           config.DebugString()));
+    }
+  } else if (filter_name == NetworkFilterNames::get().EnvoyMobileHttpConnectionManager) {
+    envoy::extensions::filters::network::http_connection_manager::v3::
+        EnvoyMobileHttpConnectionManager& config =
+            dynamic_cast<envoy::extensions::filters::network::http_connection_manager::v3::
+                             EnvoyMobileHttpConnectionManager&>(*config_message);
+    if (config.config().codec_type() ==
+        envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+            HTTP3) {
+      // Quiche is still in progress and http_conn_manager has a dedicated fuzzer.
+      // So we won't fuzz it here with complex mocks.
+      throw EnvoyException(absl::StrCat("envoy_mobile_http_conn_manager trying to use Quiche which "
+                                        "we won't fuzz here. Config:\n{}",
+                                        config.DebugString()));
     }
   }
 }

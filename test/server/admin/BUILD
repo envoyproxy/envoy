@@ -27,8 +27,8 @@ envoy_cc_test(
     srcs = ["admin_test.cc"],
     deps = [
         ":admin_instance_lib",
-        "//include/envoy/json:json_object_interface",
-        "//include/envoy/runtime:runtime_interface",
+        "//envoy/json:json_object_interface",
+        "//envoy/runtime:runtime_interface",
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf",
@@ -49,6 +49,7 @@ envoy_cc_test(
     srcs = ["admin_filter_test.cc"],
     deps = [
         "//source/server/admin:admin_filter_lib",
+        "//source/server/admin:admin_lib",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:environment_lib",
     ],
@@ -61,6 +62,7 @@ envoy_cc_test(
         ":admin_instance_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/server/admin:stats_handler_lib",
+        "//test/mocks/server:admin_stream_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
@@ -140,6 +142,7 @@ envoy_cc_test(
     name = "config_tracker_impl_test",
     srcs = ["config_tracker_impl_test.cc"],
     deps = [
+        "//source/common/common:matchers_lib",
         "//source/server/admin:config_tracker_lib",
         "//test/mocks:common_lib",
     ],

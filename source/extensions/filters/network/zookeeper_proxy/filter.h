@@ -11,10 +11,9 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "extensions/filters/network/zookeeper_proxy/decoder.h"
+#include "source/common/common/logger.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/extensions/filters/network/zookeeper_proxy/decoder.h"
 
 namespace Envoy {
 namespace Extensions {

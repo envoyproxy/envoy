@@ -1,10 +1,9 @@
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/tracers/zipkin/span_buffer.h"
-#include "extensions/tracers/zipkin/util.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/tracers/zipkin/span_buffer.h"
+#include "source/extensions/tracers/zipkin/util.h"
 
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -158,68 +157,72 @@ TEST(ZipkinSpanBufferTest, TestSerializeTimestamp) {
 }
 
 TEST(ZipkinSpanBufferTest, ConstructBuffer) {
-  const std::string expected1 =
-      withDefaultTimestampAndDuration(R"([{"traceId":"0000000000000001",)"
-                                      R"("name":"",)"
-                                      R"("id":"0000000000000001",)"
-                                      R"("duration":DEFAULT_TEST_DURATION,)"
-                                      R"("annotations":[{"timestamp":ANNOTATION_TEST_TIMESTAMP,)"
-                                      R"("value":"cs",)"
-                                      R"("endpoint":{"ipv4":"1.2.3.4",)"
-                                      R"("port":8080,)"
-                                      R"("serviceName":"service1"}},)"
-                                      R"({"timestamp":ANNOTATION_TEST_TIMESTAMP,)"
-                                      R"("value":"sr",)"
-                                      R"("endpoint":{"ipv4":"1.2.3.4",)"
-                                      R"("port":8080,)"
-                                      R"("serviceName":"service1"}}],)"
-                                      R"("binaryAnnotations":[{"key":"response_size",)"
-                                      R"("value":"DEFAULT_TEST_DURATION"}]}])");
-
-  const std::string expected2 =
-      withDefaultTimestampAndDuration(R"([{"traceId":"0000000000000001",)"
-                                      R"("name":"",)"
-                                      R"("id":"0000000000000001",)"
-                                      R"("duration":DEFAULT_TEST_DURATION,)"
-                                      R"("annotations":[{"timestamp":ANNOTATION_TEST_TIMESTAMP,)"
-                                      R"("value":"cs",)"
-                                      R"("endpoint":{"ipv4":"1.2.3.4",)"
-                                      R"("port":8080,)"
-                                      R"("serviceName":"service1"}},)"
-                                      R"({"timestamp":ANNOTATION_TEST_TIMESTAMP,)"
-                                      R"("value":"sr",)"
-                                      R"("endpoint":{"ipv4":"1.2.3.4",)"
-                                      R"("port":8080,)"
-                                      R"("serviceName":"service1"}}],)"
-                                      R"("binaryAnnotations":[{"key":"response_size",)"
-                                      R"("value":"DEFAULT_TEST_DURATION"}]},)"
-                                      R"({"traceId":"0000000000000001",)"
-                                      R"("name":"",)"
-                                      R"("id":"0000000000000001",)"
-                                      R"("duration":DEFAULT_TEST_DURATION,)"
-                                      R"("annotations":[{"timestamp":ANNOTATION_TEST_TIMESTAMP,)"
-                                      R"("value":"cs",)"
-                                      R"("endpoint":{"ipv4":"1.2.3.4",)"
-                                      R"("port":8080,)"
-                                      R"("serviceName":"service1"}},)"
-                                      R"({"timestamp":ANNOTATION_TEST_TIMESTAMP,)"
-                                      R"("value":"sr",)"
-                                      R"("endpoint":{"ipv4":"1.2.3.4",)"
-                                      R"("port":8080,)"
-                                      R"("serviceName":"service1"}}],)"
-                                      R"("binaryAnnotations":[{"key":"response_size",)"
-                                      R"("value":"DEFAULT_TEST_DURATION"}]}])");
+  const std::string expected = "[{"
+                               R"("traceId":"0000000000000001",)"
+                               R"("id":"0000000000000001",)"
+                               R"("kind":"CLIENT",)"
+                               R"("timestamp":ANNOTATION_TEST_TIMESTAMP,)"
+                               R"("duration":DEFAULT_TEST_DURATION,)"
+                               R"("localEndpoint":{)"
+                               R"("serviceName":"service1",)"
+                               R"("ipv4":"1.2.3.4",)"
+                               R"("port":8080},)"
+                               R"("tags":{)"
+                               R"("response_size":"DEFAULT_TEST_DURATION"}},)"
+                               R"({)"
+                               R"("traceId":"0000000000000001",)"
+                               R"("id":"0000000000000001",)"
+                               R"("kind":"SERVER",)"
+                               R"("timestamp":ANNOTATION_TEST_TIMESTAMP,)"
+                               R"("duration":DEFAULT_TEST_DURATION,)"
+                               R"("localEndpoint":{)"
+                               R"("serviceName":"service1",)"
+                               R"("ipv4":"1.2.3.4",)"
+                               R"("port":8080},)"
+                               R"("tags":{)"
+                               R"("response_size":"DEFAULT_TEST_DURATION"},)"
+                               R"("shared":true)"
+                               "}]";
   const bool shared = true;
   const bool delay_allocation = true;
 
-  SpanBuffer buffer1(envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1,
-                     shared);
-  expectSerializedBuffer(buffer1, delay_allocation, {expected1, expected2});
+  SpanBuffer buffer1(envoy::config::trace::v3::ZipkinConfig::HTTP_JSON, shared);
+  expectSerializedBuffer(buffer1, delay_allocation, {expected});
 
-  // Prepare 3 slots, since we will add one more inside the `expectSerializedBuffer` function.
-  SpanBuffer buffer2(envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1,
-                     shared, 3);
-  expectSerializedBuffer(buffer2, !delay_allocation, {expected1, expected2});
+  // Prepare 2 slots, since we will add one more inside the `expectSerializedBuffer` function.
+  // SpanBuffer
+  SpanBuffer buffer2(envoy::config::trace::v3::ZipkinConfig::HTTP_JSON, shared, 2);
+  expectSerializedBuffer(buffer2, !delay_allocation, {expected});
+
+  const std::string expected2 = "[{"
+                                R"("traceId":"0000000000000001",)"
+                                R"("id":"0000000000000001",)"
+                                R"("kind":"CLIENT",)"
+                                R"("timestamp":ANNOTATION_TEST_TIMESTAMP,)"
+                                R"("duration":DEFAULT_TEST_DURATION,)"
+                                R"("localEndpoint":{)"
+                                R"("serviceName":"service1",)"
+                                R"("ipv4":"1.2.3.4",)"
+                                R"("port":8080},)"
+                                R"("tags":{)"
+                                R"("response_size":"DEFAULT_TEST_DURATION"}},)"
+                                R"({)"
+                                R"("traceId":"0000000000000001",)"
+                                R"("id":"0000000000000001",)"
+                                R"("kind":"SERVER",)"
+                                R"("timestamp":ANNOTATION_TEST_TIMESTAMP,)"
+                                R"("duration":DEFAULT_TEST_DURATION,)"
+                                R"("localEndpoint":{)"
+                                R"("serviceName":"service1",)"
+                                R"("ipv4":"1.2.3.4",)"
+                                R"("port":8080},)"
+                                R"("tags":{)"
+                                R"("response_size":"DEFAULT_TEST_DURATION"},)"
+                                "}]";
+
+  // Test the buffer construct when `shared_span_context` is set to false
+  SpanBuffer buffer3(envoy::config::trace::v3::ZipkinConfig::HTTP_JSON, !shared);
+  expectSerializedBuffer(buffer3, delay_allocation, {expected2});
 }
 
 TEST(ZipkinSpanBufferTest, SerializeSpan) {
@@ -456,16 +459,15 @@ TEST(ZipkinSpanBufferTest, TestSerializeTimestampInTheFuture) {
               Not(HasSubstr(R"("duration":2.584324295476870e+15)")));
   EXPECT_THAT(bufferDeprecatedJsonV1.serialize(),
               Not(HasSubstr(R"("duration":"2584324295476870")")));
+}
 
-  SpanBuffer bufferJsonV2(
-      envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1, true, 2);
-  bufferJsonV2.addSpan(createSpan({"cs"}, IpType::V4));
-  EXPECT_THAT(bufferJsonV2.serialize(), HasSubstr(R"("timestamp":1584324295476871)"));
-  EXPECT_THAT(bufferJsonV2.serialize(), Not(HasSubstr(R"("timestamp":1.58432429547687e+15)")));
-  EXPECT_THAT(bufferJsonV2.serialize(), Not(HasSubstr(R"("timestamp":"1584324295476871")")));
-  EXPECT_THAT(bufferJsonV2.serialize(), HasSubstr(R"("duration":2584324295476870)"));
-  EXPECT_THAT(bufferJsonV2.serialize(), Not(HasSubstr(R"("duration":2.584324295476870e+15)")));
-  EXPECT_THAT(bufferJsonV2.serialize(), Not(HasSubstr(R"("duration":"2584324295476870")")));
+TEST(ZipkinSpanBufferTest, TestDeprecationOfHttpJsonV1) {
+  EXPECT_THROW_WITH_MESSAGE(
+      SpanBuffer buffer1(
+          envoy::config::trace::v3::ZipkinConfig::DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE, false),
+      Envoy::EnvoyException,
+      "hidden_envoy_deprecated_HTTP_JSON_V1 has been deprecated. Please use a non-default "
+      "envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion value.");
 }
 
 } // namespace

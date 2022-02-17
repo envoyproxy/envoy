@@ -1,13 +1,12 @@
-#include "extensions/filters/http/dynamo/dynamo_stats.h"
+#include "source/extensions/filters/http/dynamo/dynamo_stats.h"
 
 #include <memory>
 #include <string>
 
 #include "envoy/stats/scope.h"
 
-#include "common/stats/symbol_table_impl.h"
-
-#include "extensions/filters/http/dynamo/dynamo_request_parser.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/extensions/filters/http/dynamo/dynamo_request_parser.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -6,10 +6,10 @@
 #include "envoy/grpc/context.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/hash.h"
-#include "common/grpc/stat_names.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/utility.h"
+#include "source/common/common/hash.h"
+#include "source/common/grpc/stat_names.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/utility.h"
 
 #include "absl/types/optional.h"
 

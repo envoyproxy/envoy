@@ -6,9 +6,10 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/core/v3/address.pb.h"
 
-#include "common/common/thread.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/common/thread.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -225,7 +226,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, NetworkUtilityGetLocalAddress,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
-  EXPECT_NE(nullptr, Utility::getLocalAddress(GetParam()));
+  auto ip_version = GetParam();
+  auto local_address = Utility::getLocalAddress(ip_version);
+  EXPECT_NE(nullptr, local_address);
+  EXPECT_EQ(ip_version, local_address->ip()->version());
 }
 
 TEST(NetworkUtility, GetOriginalDst) {
@@ -244,73 +248,73 @@ TEST(NetworkUtility, GetOriginalDst) {
 TEST(NetworkUtility, LocalConnection) {
   testing::NiceMock<Network::MockConnectionSocket> socket;
 
-  socket.address_provider_->setLocalAddress(
+  socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
-  socket.address_provider_->setRemoteAddress(
+  socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  socket.address_provider_->setLocalAddress(
+  socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
-  socket.address_provider_->setRemoteAddress(
+  socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  socket.address_provider_->setLocalAddress(
+  socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
-  socket.address_provider_->setRemoteAddress(
+  socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  socket.address_provider_->setLocalAddress(
+  socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2"));
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  socket.address_provider_->setLocalAddress(
+  socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4"));
-  socket.address_provider_->setRemoteAddress(
+  socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("8.8.8.8"));
   EXPECT_FALSE(Utility::isSameIpOrLoopback(socket));
 
-  socket.address_provider_->setLocalAddress(
+  socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4"));
-  socket.address_provider_->setRemoteAddress(
+  socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4"));
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  socket.address_provider_->setLocalAddress(
+  socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4", 1234));
-  socket.address_provider_->setRemoteAddress(
+  socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4", 4321));
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  socket.address_provider_->setLocalAddress(
+  socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::1"));
-  socket.address_provider_->setRemoteAddress(
+  socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::1"));
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  socket.address_provider_->setLocalAddress(
+  socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::2"));
-  socket.address_provider_->setRemoteAddress(
+  socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::1"));
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  socket.address_provider_->setRemoteAddress(
+  socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::3"));
   EXPECT_FALSE(Utility::isSameIpOrLoopback(socket));
 
-  socket.address_provider_->setRemoteAddress(
+  socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::2"));
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  socket.address_provider_->setRemoteAddress(
+  socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::2", 4321));
-  socket.address_provider_->setLocalAddress(
+  socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::2", 1234));
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  socket.address_provider_->setRemoteAddress(
+  socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("fd00::"));
   EXPECT_FALSE(Utility::isSameIpOrLoopback(socket));
 }
@@ -578,6 +582,56 @@ TEST(ResolvedUdpSocketConfig, Warning) {
       "warn", "GRO requested but not supported by the OS. Check OS config or disable prefer_gro.",
       ResolvedUdpSocketConfig resolved_config(envoy::config::core::v3::UdpSocketConfig(), true));
 }
+
+#ifndef WIN32
+TEST(PacketLoss, LossTest) {
+  // Create and bind a UDP socket.
+  auto version = TestEnvironment::getIpVersionsForTest()[0];
+  auto kernel_version = version == Network::Address::IpVersion::v4 ? AF_INET : AF_INET6;
+  int fd = socket(kernel_version, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+  ASSERT_NE(fd, 0);
+  sockaddr_storage storage;
+  auto& sin = reinterpret_cast<sockaddr_in&>(storage);
+  sin.sin_family = kernel_version;
+  sin.sin_port = 0;
+  EXPECT_EQ(1,
+            inet_pton(kernel_version, Network::Test::getLoopbackAddressUrlString(version).c_str(),
+                      &sin.sin_addr));
+  ASSERT_EQ(0, bind(fd, reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
+
+  // Get the port.
+  socklen_t storage_len = sizeof(storage);
+  ASSERT_EQ(0, getsockname(fd, reinterpret_cast<sockaddr*>(&storage), &storage_len));
+
+  // Set the buffer size artificially small.
+  int receive_buffer_size = 1000;
+  ASSERT_EQ(
+      0, setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &receive_buffer_size, sizeof(receive_buffer_size)));
+
+  // Send a packet.
+  char buf[2048];
+  memset(buf, 0, ABSL_ARRAYSIZE(buf));
+  EXPECT_EQ(ABSL_ARRAYSIZE(buf), sendto(fd, buf, ABSL_ARRAYSIZE(buf), 0,
+                                        reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
+
+  // Verify the packet is dropped.
+  IoSocketHandleImpl handle(fd);
+  auto address = Network::Test::getCanonicalLoopbackAddress(version);
+  NiceMock<MockUdpPacketProcessor> processor;
+  MonotonicTime time(std::chrono::seconds(0));
+  uint32_t packets_dropped = 0;
+  Utility::readFromSocket(handle, *address, processor, time, false, &packets_dropped);
+  EXPECT_EQ(1, packets_dropped);
+
+  // Send another packet.
+  EXPECT_EQ(ABSL_ARRAYSIZE(buf), sendto(fd, buf, ABSL_ARRAYSIZE(buf), 0,
+                                        reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
+
+  // Make sure the drop count is now 2.
+  Utility::readFromSocket(handle, *address, processor, time, false, &packets_dropped);
+  EXPECT_EQ(2, packets_dropped);
+}
+#endif
 
 } // namespace
 } // namespace Network

@@ -3,7 +3,7 @@
 #include <chrono>
 #include <memory>
 
-#include "common/grpc/common.h"
+#include "source/common/grpc/common.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/fuzz/utility.h"
@@ -51,7 +51,7 @@ convertToGrpcServingStatus(test::common::upstream::ServingStatus status) {
     return grpc::health::v1::HealthCheckResponse::SERVICE_UNKNOWN;
   }
   default: // shouldn't hit
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 }
 
@@ -84,7 +84,7 @@ makeBufferListToRespondWith(test::common::upstream::GrpcRespondBytes grpc_respon
     return bufferList;
   }
   default: // shouldn't hit
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 }
 
@@ -343,9 +343,9 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
             Event::MockDispatcher dispatcher_;
             auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
             test_session.codec_client_ = new CodecClientForTest(
-                Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
-                test_session.codec_, nullptr,
-                Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", *time_source), dispatcher_);
+                Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_,
+                nullptr, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", *time_source),
+                dispatcher_);
             return test_session.codec_client_;
           }));
   expectStreamCreate();
@@ -529,7 +529,7 @@ HealthCheckFuzz::getEventTypeFromProto(const test::common::upstream::RaiseEvent&
     return Network::ConnectionEvent::LocalClose;
   }
   default: // shouldn't hit
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 }
 

@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "udp_proxy_filter_test",
     srcs = ["udp_proxy_filter_test.cc"],
-    extension_name = "envoy.filters.udp_listener.udp_proxy",
+    extension_names = ["envoy.filters.udp_listener.udp_proxy"],
     deps = [
         "//source/common/common:hash_lib",
         "//source/extensions/filters/udp/udp_proxy:udp_proxy_filter_lib",
@@ -33,7 +33,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "hash_policy_impl_test",
     srcs = ["hash_policy_impl_test.cc"],
-    extension_name = "envoy.filters.udp_listener.udp_proxy",
+    extension_names = ["envoy.filters.udp_listener.udp_proxy"],
     deps = [
         "//source/common/common:hash_lib",
         "//source/common/network:address_lib",
@@ -45,10 +45,13 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "udp_proxy_integration_test",
     srcs = ["udp_proxy_integration_test.cc"],
-    extension_name = "envoy.filters.udp_listener.udp_proxy",
+    extension_names = ["envoy.filters.udp_listener.udp_proxy"],
     deps = [
+        "//envoy/network:filter_interface",
+        "//envoy/server:filter_config_interface",
         "//source/extensions/filters/udp/udp_proxy:config",
         "//test/integration:integration_lib",
+        "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )

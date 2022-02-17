@@ -10,13 +10,15 @@ public:
   ActiveRawUdpListenerFactory(uint32_t concurrency);
 
   Network::ConnectionHandler::ActiveUdpListenerPtr
-  createActiveUdpListener(uint32_t worker_index, Network::UdpConnectionHandler& parent,
-                          Event::Dispatcher& disptacher, Network::ListenerConfig& config) override;
-
+  createActiveUdpListener(Runtime::Loader&, uint32_t worker_index,
+                          Network::UdpConnectionHandler& parent, Event::Dispatcher& disptacher,
+                          Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return true; }
+  const Network::Socket::OptionsSharedPtr& socketOptions() const override { return options_; }
 
 private:
   const uint32_t concurrency_;
+  const Network::Socket::OptionsSharedPtr options_{std::make_shared<Network::Socket::Options>()};
 };
 
 } // namespace Server

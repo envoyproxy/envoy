@@ -5,10 +5,9 @@
 #include "envoy/data/tap/v3/http.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/common/tap/tap_config_base.h"
-#include "extensions/filters/http/tap/tap_config.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/common/tap/tap_config_base.h"
+#include "source/extensions/filters/http/tap/tap_config.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -8,13 +8,13 @@
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/thread.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/init/manager_impl.h"
-#include "common/init/target_impl.h"
-#include "common/init/watcher_impl.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/init/manager_impl.h"
+#include "source/common/init/target_impl.h"
+#include "source/common/init/watcher_impl.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Config {
@@ -383,7 +383,8 @@ public:
    * @return ProtobufTypes::MessagePtr the config dump proto corresponding to the associated
    *                                   config providers.
    */
-  virtual ProtobufTypes::MessagePtr dumpConfigs() const PURE;
+  virtual ProtobufTypes::MessagePtr
+  dumpConfigs(const Matchers::StringMatcher& name_matcher) const PURE;
 
 protected:
   // Ordered set for deterministic config dump output.

@@ -1,13 +1,13 @@
-#include "extensions/common/tap/admin.h"
+#include "source/extensions/common/tap/admin.h"
 
 #include "envoy/admin/v3/tap.pb.h"
 #include "envoy/admin/v3/tap.pb.validate.h"
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -124,12 +124,17 @@ void AdminHandler::AdminPerTapSinkHandle::submitTrace(
 
     std::string output_string;
     switch (format) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
     case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
       output_string = MessageUtil::getJsonStringFromMessageOrError(*trace, true, true);
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::tap::v3::OutputSink::PROTO_BINARY:
+      PANIC("not implemented");
+    case envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED:
+      PANIC("not implemented");
+    case envoy::config::tap::v3::OutputSink::PROTO_TEXT:
+      PANIC("not implemented");
     }
 
     ENVOY_LOG(debug, "admin writing buffered trace to response");

@@ -4,7 +4,7 @@
 
 #include "envoy/api/api.h"
 
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/test_common/utility.h"
 

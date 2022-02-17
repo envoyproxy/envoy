@@ -1,4 +1,4 @@
-#include "server/server.h"
+#include "source/server/server.h"
 
 #include <csignal>
 #include <cstdint>
@@ -10,8 +10,6 @@
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/time.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/event/dispatcher.h"
@@ -22,39 +20,44 @@
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/api/api_impl.h"
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/mutex_tracer_impl.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/config/xds_resource.h"
-#include "common/http/codes.h"
-#include "common/local_info/local_info_impl.h"
-#include "common/memory/stats.h"
-#include "common/network/address_impl.h"
-#include "common/network/socket_interface.h"
-#include "common/network/socket_interface_impl.h"
-#include "common/network/tcp_listener_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/router/rds_impl.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/signal/fatal_error_handler.h"
-#include "common/singleton/manager_impl.h"
-#include "common/stats/thread_local_store.h"
-#include "common/stats/timespan_impl.h"
-#include "common/upstream/cluster_manager_impl.h"
-#include "common/version/version.h"
-
-#include "server/admin/utils.h"
-#include "server/configuration_impl.h"
-#include "server/connection_handler_impl.h"
-#include "server/guarddog_impl.h"
-#include "server/listener_hooks.h"
-#include "server/ssl_context_manager.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/mutex_tracer_impl.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/grpc_mux_impl.h"
+#include "source/common/config/new_grpc_mux_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/xds_mux/grpc_mux_impl.h"
+#include "source/common/config/xds_resource.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/headers.h"
+#include "source/common/local_info/local_info_impl.h"
+#include "source/common/memory/stats.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
+#include "source/common/network/socket_interface.h"
+#include "source/common/network/socket_interface_impl.h"
+#include "source/common/network/tcp_listener_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/rds_impl.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/signal/fatal_error_handler.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/common/upstream/cluster_manager_impl.h"
+#include "source/common/version/version.h"
+#include "source/server/admin/utils.h"
+#include "source/server/configuration_impl.h"
+#include "source/server/connection_handler_impl.h"
+#include "source/server/guarddog_impl.h"
+#include "source/server/listener_hooks.h"
+#include "source/server/ssl_context_manager.h"
 
 namespace Envoy {
 namespace Server {
@@ -74,10 +77,10 @@ InstanceImpl::InstanceImpl(
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       random_generator_(std::move(random_generator)),
-      api_(new Api::Impl(thread_factory, store, time_system, file_system, *random_generator_,
-                         process_context ? ProcessContextOptRef(std::ref(*process_context))
-                                         : absl::nullopt,
-                         watermark_factory)),
+      api_(new Api::Impl(
+          thread_factory, store, time_system, file_system, *random_generator_, bootstrap_,
+          process_context ? ProcessContextOptRef(std::ref(*process_context)) : absl::nullopt,
+          watermark_factory)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
@@ -89,7 +92,8 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
-      hooks_(hooks), server_contexts_(*this), stats_flush_in_progress_(false) {
+      hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
+      stats_flush_in_progress_(false) {
   TRY_ASSERT_MAIN_THREAD {
     if (!options.logPath().empty()) {
       TRY_ASSERT_MAIN_THREAD {
@@ -105,7 +109,7 @@ InstanceImpl::InstanceImpl(
 
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
-    initialize(options, std::move(local_address), component_factory, hooks);
+    initialize(std::move(local_address), component_factory);
   }
   END_TRY
   catch (const EnvoyException& e) {
@@ -146,6 +150,16 @@ InstanceImpl::~InstanceImpl() {
   listener_manager_.reset();
   ENVOY_LOG(debug, "destroyed listener manager");
   dispatcher_->shutdown();
+
+#ifdef ENVOY_PERFETTO
+  if (tracing_session_ != nullptr) {
+    // Flush the trace data.
+    perfetto::TrackEvent::Flush();
+    // Disable tracing and block until tracing has stopped.
+    tracing_session_->StopBlocking();
+    close(tracing_fd_);
+  }
+#endif
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() {
@@ -165,30 +179,46 @@ void InstanceImpl::failHealthcheck(bool fail) {
 }
 
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source) {
-  snapped_counters_ = store.counters();
-  counters_.reserve(snapped_counters_.size());
-  for (const auto& counter : snapped_counters_) {
-    counters_.push_back({counter->latch(), *counter});
-  }
+  store.forEachSinkedCounter(
+      [this](std::size_t size) {
+        snapped_counters_.reserve(size);
+        counters_.reserve(size);
+      },
+      [this](Stats::Counter& counter) {
+        snapped_counters_.push_back(Stats::CounterSharedPtr(&counter));
+        counters_.push_back({counter.latch(), counter});
+      });
 
-  snapped_gauges_ = store.gauges();
-  gauges_.reserve(snapped_gauges_.size());
-  for (const auto& gauge : snapped_gauges_) {
-    ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
-    gauges_.push_back(*gauge);
-  }
+  store.forEachSinkedGauge(
+      [this](std::size_t size) {
+        snapped_gauges_.reserve(size);
+        gauges_.reserve(size);
+      },
+      [this](Stats::Gauge& gauge) {
+        ASSERT(gauge.importMode() != Stats::Gauge::ImportMode::Uninitialized);
+        snapped_gauges_.push_back(Stats::GaugeSharedPtr(&gauge));
+        gauges_.push_back(gauge);
+      });
 
-  snapped_histograms_ = store.histograms();
-  histograms_.reserve(snapped_histograms_.size());
-  for (const auto& histogram : snapped_histograms_) {
-    histograms_.push_back(*histogram);
-  }
+  store.forEachHistogram(
+      [this](std::size_t size) {
+        snapped_histograms_.reserve(size);
+        histograms_.reserve(size);
+      },
+      [this](Stats::ParentHistogram& histogram) {
+        snapped_histograms_.push_back(Stats::ParentHistogramSharedPtr(&histogram));
+        histograms_.push_back(histogram);
+      });
 
-  snapped_text_readouts_ = store.textReadouts();
-  text_readouts_.reserve(snapped_text_readouts_.size());
-  for (const auto& text_readout : snapped_text_readouts_) {
-    text_readouts_.push_back(*text_readout);
-  }
+  store.forEachSinkedTextReadout(
+      [this](std::size_t size) {
+        snapped_text_readouts_.reserve(size);
+        text_readouts_.reserve(size);
+      },
+      [this](Stats::TextReadout& text_readout) {
+        snapped_text_readouts_.push_back(Stats::TextReadoutSharedPtr(&text_readout));
+        text_readouts_.push_back(text_readout);
+      });
 
   snapshot_time_ = time_source.systemTime();
 }
@@ -278,21 +308,46 @@ ProcessContextOptRef InstanceImpl::processContext() {
 }
 
 namespace {
-// Loads a bootstrap object, potentially at a specific version (upgrading if necessary).
-void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
-                   envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                   std::function<void(Protobuf::Message&, bool)> load_function) {
 
-  if (!bootstrap_version.has_value()) {
-    load_function(bootstrap, true);
-  } else if (*bootstrap_version == 3) {
-    load_function(bootstrap, false);
-  } else if (*bootstrap_version == 2) {
-    throw EnvoyException("v2 bootstrap is deprecated and no longer supported.");
-  } else {
-    throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
+bool canBeRegisteredAsInlineHeader(const Http::LowerCaseString& header_name) {
+  // 'set-cookie' cannot currently be registered as an inline header.
+  if (header_name == Http::Headers::get().SetCookie) {
+    return false;
+  }
+  return true;
+}
+
+void registerCustomInlineHeadersFromBootstrap(
+    const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  for (const auto& inline_header : bootstrap.inline_headers()) {
+    const Http::LowerCaseString lower_case_name(inline_header.inline_header_name());
+    if (!canBeRegisteredAsInlineHeader(lower_case_name)) {
+      throw EnvoyException(fmt::format("Header {} cannot be registered as an inline header.",
+                                       inline_header.inline_header_name()));
+    }
+    switch (inline_header.inline_header_type()) {
+    case envoy::config::bootstrap::v3::CustomInlineHeader::REQUEST_HEADER:
+      Http::CustomInlineHeaderRegistry::registerInlineHeader<
+          Http::RequestHeaderMap::header_map_type>(lower_case_name);
+      break;
+    case envoy::config::bootstrap::v3::CustomInlineHeader::REQUEST_TRAILER:
+      Http::CustomInlineHeaderRegistry::registerInlineHeader<
+          Http::RequestTrailerMap::header_map_type>(lower_case_name);
+      break;
+    case envoy::config::bootstrap::v3::CustomInlineHeader::RESPONSE_HEADER:
+      Http::CustomInlineHeaderRegistry::registerInlineHeader<
+          Http::ResponseHeaderMap::header_map_type>(lower_case_name);
+      break;
+    case envoy::config::bootstrap::v3::CustomInlineHeader::RESPONSE_TRAILER:
+      Http::CustomInlineHeaderRegistry::registerInlineHeader<
+          Http::ResponseTrailerMap::header_map_type>(lower_case_name);
+      break;
+    default:
+      PANIC("not implemented");
+    }
   }
 }
+
 } // namespace
 
 void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
@@ -310,19 +365,11 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
 
   if (!config_path.empty()) {
-    loadBootstrap(
-        options.bootstrapVersion(), bootstrap,
-        [&config_path, &validation_visitor, &api](Protobuf::Message& message, bool do_boosting) {
-          MessageUtil::loadFromFile(config_path, message, validation_visitor, api, do_boosting);
-        });
+    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
-    loadBootstrap(
-        options.bootstrapVersion(), bootstrap_override,
-        [&config_yaml, &validation_visitor](Protobuf::Message& message, bool do_boosting) {
-          MessageUtil::loadFromYaml(config_yaml, message, validation_visitor, do_boosting);
-        });
+    MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
   }
@@ -332,11 +379,10 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   MessageUtil::validate(bootstrap, validation_visitor);
 }
 
-void InstanceImpl::initialize(const Options& options,
-                              Network::Address::InstanceConstSharedPtr local_address,
-                              ComponentFactory& component_factory, ListenerHooks& hooks) {
+void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_address,
+                              ComponentFactory& component_factory) {
   ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
-            options.restartEpoch(), restarter_.baseId(), restarter_.version());
+            options_.restartEpoch(), restarter_.baseId(), restarter_.version());
 
   ENVOY_LOG(info, "statically linked extensions:");
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
@@ -344,9 +390,39 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options,
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options_,
                                     messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
+
+#ifdef ENVOY_PERFETTO
+  perfetto::TracingInitArgs args;
+  // Include in-process events only.
+  args.backends = perfetto::kInProcessBackend;
+  perfetto::Tracing::Initialize(args);
+  perfetto::TrackEvent::Register();
+
+  // Prepare a configuration for a new "Perfetto" tracing session.
+  perfetto::TraceConfig cfg;
+  // TODO(rojkov): make the tracer configurable with either "Perfetto"'s native
+  // message or custom one embedded into Bootstrap.
+  cfg.add_buffers()->set_size_kb(1024);
+  auto* ds_cfg = cfg.add_data_sources()->mutable_config();
+  ds_cfg->set_name("track_event");
+
+  const std::string pftrace_path =
+      PROTOBUF_GET_STRING_OR_DEFAULT(bootstrap_, perf_tracing_file_path, "envoy.pftrace");
+  // Instantiate a new tracing session.
+  tracing_session_ = perfetto::Tracing::NewTrace();
+  tracing_fd_ = open(pftrace_path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
+  if (tracing_fd_ == -1) {
+    throw EnvoyException(
+        fmt::format("unable to open tracing file {}: {}", pftrace_path, errorDetails(errno)));
+  }
+  // Configure the tracing session.
+  tracing_session_->Setup(cfg, tracing_fd_);
+  // Enable tracing and block until tracing has started.
+  tracing_session_->StartBlocking();
+#endif
 
   // Immediate after the bootstrap has been loaded, override the header prefix, if configured to
   // do so. This must be set before any other code block references the HeaderValues ConstSingleton.
@@ -354,8 +430,10 @@ void InstanceImpl::initialize(const Options& options,
     // setPrefix has a release assert verifying that setPrefix() is not called after prefix()
     ThreadSafeSingleton<Http::PrefixValue>::get().setPrefix(bootstrap_.header_prefix().c_str());
   }
-  // TODO(mattklein123): Custom O(1) headers can be registered at this point for creating/finalizing
-  // any header maps.
+
+  // Register Custom O(1) headers from bootstrap.
+  registerCustomInlineHeadersFromBootstrap(bootstrap_);
+
   ENVOY_LOG(info, "HTTP header map info:");
   for (const auto& info : Http::HeaderMapImplUtility::getAllHeaderMapImplInfo()) {
     ENVOY_LOG(info, "  {}: {} bytes: {}", info.name_, info.size_,
@@ -364,8 +442,9 @@ void InstanceImpl::initialize(const Options& options,
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
-  stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
-  stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
+  stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_, options_.statsTags()));
+  stats_store_.setStatsMatcher(
+      Config::Utility::createStatsMatcher(bootstrap_, stats_store_.symbolTable()));
   stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
 
   const std::string server_stats_prefix = "server.";
@@ -380,10 +459,9 @@ void InstanceImpl::initialize(const Options& options,
               POOL_COUNTER_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
               POOL_GAUGE_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
               POOL_HISTOGRAM_PREFIX(stats_store_, server_compilation_settings_stats_prefix))});
-  validation_context_.staticWarningValidationVisitor().setUnknownCounter(
-      server_stats_->static_unknown_fields_);
-  validation_context_.dynamicWarningValidationVisitor().setUnknownCounter(
-      server_stats_->dynamic_unknown_fields_);
+  validation_context_.setCounters(server_stats_->static_unknown_fields_,
+                                  server_stats_->dynamic_unknown_fields_,
+                                  server_stats_->wip_protos_);
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
@@ -412,9 +490,18 @@ void InstanceImpl::initialize(const Options& options,
     server_compilation_settings_stats_->fips_mode_.set(1);
   }
 
-  bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
-  bootstrap_.mutable_node()->set_user_agent_name("envoy");
-  *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
+  // If user has set user_agent_name in the bootstrap config, use it.
+  // Default to "envoy" if unset.
+  if (bootstrap_.node().user_agent_name().empty()) {
+    bootstrap_.mutable_node()->set_user_agent_name("envoy");
+  }
+
+  // If user has set user_agent_build_version in the bootstrap config, use it.
+  // Default to the internal server version.
+  if (!bootstrap_.node().user_agent_build_version().has_version()) {
+    *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
+  }
+
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
     for (const auto& name : ext.second->allRegisteredNames()) {
       auto* extension = bootstrap_.mutable_node()->add_extensions();
@@ -430,13 +517,23 @@ void InstanceImpl::initialize(const Options& options,
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
-      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
+      options_.serviceZone(), options_.serviceClusterName(), options_.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap_, options, *this);
+  Configuration::InitialImpl initial_config(bootstrap_);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
-  restarter_.sendParentAdminShutdownRequest(original_start_time_);
-  admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this);
+  const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
+  if (parent_admin_shutdown_response.has_value()) {
+    original_start_time_ = parent_admin_shutdown_response.value().original_start_time_;
+    enable_reuse_port_default_ = parent_admin_shutdown_response.value().enable_reuse_port_default_
+                                     ? ReusePortDefault::True
+                                     : ReusePortDefault::False;
+  } else {
+    // This is needed so that we don't read the value until runtime is fully initialized.
+    enable_reuse_port_default_ = ReusePortDefault::Runtime;
+  }
+  admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this,
+                                       initial_config.admin().ignoreGlobalConnLimit());
 
   loadServerFlags(initial_config.flagsPath());
 
@@ -445,7 +542,7 @@ void InstanceImpl::initialize(const Options& options,
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
-      messageValidationContext().staticValidationVisitor(), *api_, options);
+      messageValidationContext().staticValidationVisitor(), *api_, options_);
 
   heap_shrinker_ =
       std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
@@ -490,8 +587,9 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   // Workers get created first so they register for thread local updates.
-  listener_manager_ = std::make_unique<ListenerManagerImpl>(
-      *this, listener_component_factory_, worker_factory_, bootstrap_.enable_dispatcher_stats());
+  listener_manager_ =
+      std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_, worker_factory_,
+                                            bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -503,20 +601,6 @@ void InstanceImpl::initialize(const Options& options,
   // It's now safe to start writing stats from the main thread's dispatcher.
   if (bootstrap_.enable_dispatcher_stats()) {
     dispatcher_->initializeStats(stats_store_, "server.");
-  }
-
-  if (initial_config.admin().address()) {
-    admin_->startHttpListener(initial_config.admin().accessLogs(), options.adminAddressPath(),
-                              initial_config.admin().address(),
-                              initial_config.admin().socketOptions(),
-                              stats_store_.createScope("listener.admin."));
-  } else {
-    ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
-  }
-  config_tracker_entry_ =
-      admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });
-  if (initial_config.admin().address()) {
-    admin_->addListenerToHandler(handler_.get());
   }
 
   // The broad order of initialization from this point on is the following:
@@ -538,19 +622,36 @@ void InstanceImpl::initialize(const Options& options,
   // load things may grab a reference to the loader for later use.
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
-  hooks.onRuntimeCreated();
+  initial_config.initAdminAccessLog(bootstrap_, *this);
+
+  if (initial_config.admin().address()) {
+    admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
+                              initial_config.admin().address(),
+                              initial_config.admin().socketOptions(),
+                              stats_store_.createScope("listener.admin."));
+  } else {
+    ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
+  }
+  config_tracker_entry_ = admin_->getConfigTracker().add(
+      "bootstrap", [this](const Matchers::StringMatcher&) { return dumpBootstrapConfig(); });
+  if (initial_config.admin().address()) {
+    admin_->addListenerToHandler(handler_.get());
+  }
 
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
 
-  const bool use_tcp_for_dns_lookups = bootstrap_.use_tcp_for_dns_lookups();
-  dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  Network::DnsResolverFactory& dns_resolver_factory =
+      Network::createDnsResolverFactoryFromProto(bootstrap_, typed_dns_resolver_config);
+  dns_resolver_ =
+      dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,
       *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
       messageValidationContext(), *api_, http_context_, grpc_context_, router_context_,
-      access_log_manager_, *singleton_manager_, options_);
+      access_log_manager_, *singleton_manager_, options_, quic_stat_names_);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -623,14 +724,14 @@ void InstanceImpl::onRuntimeReady() {
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
         *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
     TRY_ASSERT_MAIN_THREAD {
+      Config::Utility::checkTransportVersion(hds_config);
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           stats_store_,
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
                                                          stats_store_, false)
-              ->create(),
-          Config::Utility::getAndCheckTransportVersion(hds_config), *dispatcher_,
-          Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_, info_factory_,
-          access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
+              ->createUncachedRawAsyncClient(),
+          *dispatcher_, Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_,
+          info_factory_, access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
           *singleton_manager_, thread_local_, messageValidationContext().dynamicValidationVisitor(),
           *api_, options_);
     }
@@ -740,14 +841,13 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       return;
     }
 
-    const auto type_urls =
-        Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
+    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>();
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
     Config::ScopedResume maybe_resume_rds;
     if (cm.adsMux()) {
-      maybe_resume_rds = cm.adsMux()->pause(type_urls);
+      maybe_resume_rds = cm.adsMux()->pause(type_url);
     }
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
@@ -792,6 +892,12 @@ void InstanceImpl::terminate() {
 
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();
+
+  // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
+  Config::GrpcMuxImpl::shutdownAll();
+  Config::NewGrpcMuxImpl::shutdownAll();
+  Config::XdsMux::GrpcMuxSotw::shutdownAll();
+  Config::XdsMux::GrpcMuxDelta::shutdownAll();
 
   if (overload_manager_) {
     overload_manager_->stop();
@@ -860,7 +966,7 @@ InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
-  ASSERT(Thread::MainThread::isMainThread());
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
     for (const StageCallback& callback : it->second) {
@@ -894,6 +1000,21 @@ ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
   TimestampUtil::systemClockToTimestamp(bootstrap_config_update_time_,
                                         *(config_dump->mutable_last_updated()));
   return config_dump;
+}
+
+bool InstanceImpl::enableReusePortDefault() {
+  ASSERT(enable_reuse_port_default_.has_value());
+  switch (enable_reuse_port_default_.value()) {
+  case ReusePortDefault::True:
+    return true;
+  case ReusePortDefault::False:
+    return false;
+  case ReusePortDefault::Runtime:
+    return Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.listener_reuse_port_default_enabled");
+  }
+
+  return false; // for gcc
 }
 
 } // namespace Server

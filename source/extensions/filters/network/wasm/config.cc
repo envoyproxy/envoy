@@ -1,13 +1,12 @@
-#include "extensions/filters/network/wasm/config.h"
+#include "source/extensions/filters/network/wasm/config.h"
 
 #include "envoy/extensions/filters/network/wasm/v3/wasm.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/common/empty_string.h"
-#include "common/config/datasource.h"
-
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/filters/network/wasm/wasm_filter.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/config/datasource.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/filters/network/wasm/wasm_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,6 +16,8 @@ namespace Wasm {
 Network::FilterFactoryCb WasmFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::wasm::v3::Wasm& proto_config,
     Server::Configuration::FactoryContext& context) {
+  context.api().customStatNamespaces().registerStatNamespace(
+      Extensions::Common::Wasm::CustomStatNamespace);
   auto filter_config = std::make_shared<FilterConfig>(proto_config, context);
   return [filter_config](Network::FilterManager& filter_manager) -> void {
     auto filter = filter_config->createFilter();

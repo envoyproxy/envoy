@@ -5,7 +5,7 @@
 
 #include "envoy/network/io_handle.h"
 
-#include "common/network/io_socket_error_impl.h"
+#include "source/common/network/io_socket_error_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -138,6 +138,7 @@ public:
   void activateFileEvents(uint32_t events) override { io_handle_.activateFileEvents(events); }
   void enableFileEvents(uint32_t events) override { io_handle_.enableFileEvents(events); }
   void resetFileEvents() override { return io_handle_.resetFileEvents(); };
+  absl::optional<std::string> interfaceName() override { return io_handle_.interfaceName(); }
 
   Api::SysCallIntResult shutdown(int how) override { return io_handle_.shutdown(how); }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }

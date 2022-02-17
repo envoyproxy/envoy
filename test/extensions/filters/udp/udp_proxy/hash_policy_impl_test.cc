@@ -2,10 +2,9 @@
 
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 
-#include "common/common/hash.h"
-#include "common/network/utility.h"
-
-#include "extensions/filters/udp/udp_proxy/hash_policy_impl.h"
+#include "source/common/common/hash.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/udp/udp_proxy/hash_policy_impl.h"
 
 #include "gtest/gtest.h"
 
@@ -63,7 +62,7 @@ public:
 
 // Check invalid policy type
 TEST_F(HashPolicyImplBaseTest, NotSupportedPolicy) {
-  EXPECT_DEATH(setup(), ".*panic: not reached.*");
+  EXPECT_DEATH(setup(), ".*panic: corrupted enum.*");
 }
 
 // Check if generate correct hash

@@ -6,9 +6,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "proxy_protocol_header.h"

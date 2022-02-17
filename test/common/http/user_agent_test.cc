@@ -1,5 +1,5 @@
-#include "common/http/header_map_impl.h"
-#include "common/http/user_agent.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/user_agent.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/stats/mocks.h"

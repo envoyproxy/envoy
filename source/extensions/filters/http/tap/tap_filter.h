@@ -6,8 +6,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "extensions/common/tap/extension_config_base.h"
-#include "extensions/filters/http/tap/tap_config.h"
+#include "source/extensions/common/tap/extension_config_base.h"
+#include "source/extensions/filters/http/tap/tap_config.h"
 
 #include "absl/strings/string_view.h"
 
@@ -93,7 +93,7 @@ public:
   }
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
+  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,

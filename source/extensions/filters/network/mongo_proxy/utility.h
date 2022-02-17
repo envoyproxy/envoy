@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "extensions/filters/network/mongo_proxy/codec.h"
+#include "source/extensions/filters/network/mongo_proxy/codec.h"
 
 namespace Envoy {
 namespace Extensions {

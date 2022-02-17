@@ -1,9 +1,9 @@
-#include "extensions/transport_sockets/common/passthrough.h"
+#include "source/extensions/transport_sockets/common/passthrough.h"
 
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 namespace Envoy {
 namespace Extensions {

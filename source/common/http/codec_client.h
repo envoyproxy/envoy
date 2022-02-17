@@ -12,11 +12,11 @@
 #include "envoy/network/filter.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/assert.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/http/codec_wrappers.h"
-#include "common/network/filter_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/codec_wrappers.h"
+#include "source/common/network/filter_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -55,7 +55,8 @@ public:
   /**
    * Type of HTTP codec to use.
    */
-  enum class Type { HTTP1, HTTP2, HTTP3 };
+  // This is a legacy alias.
+  using Type = Envoy::Http::CodecType;
 
   ~CodecClient() override;
 
@@ -125,7 +126,7 @@ public:
 
   bool remoteClosed() const { return remote_closed_; }
 
-  Type type() const { return type_; }
+  CodecType type() const { return type_; }
 
   // Note this is the L4 stream info, not L7.
   const StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
@@ -137,7 +138,7 @@ protected:
    * @param connection supplies the connection to communicate on.
    * @param host supplies the owning host.
    */
-  CodecClient(Type type, Network::ClientConnectionPtr&& connection,
+  CodecClient(CodecType type, Network::ClientConnectionPtr&& connection,
               Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
 
   /**
@@ -155,6 +156,11 @@ protected:
   void onSettings(ReceivedSettings& settings) override {
     if (codec_callbacks_) {
       codec_callbacks_->onSettings(settings);
+    }
+  }
+  void onMaxStreamsChanged(uint32_t num_streams) override {
+    if (codec_callbacks_) {
+      codec_callbacks_->onMaxStreamsChanged(num_streams);
     }
   }
 
@@ -175,7 +181,7 @@ protected:
     }
   }
 
-  const Type type_;
+  const CodecType type_;
   // The order of host_, connection_, and codec_ matter as during destruction each can refer to
   // the previous, at least in tests.
   Upstream::HostDescriptionConstSharedPtr host_;
@@ -273,7 +279,7 @@ using CodecClientPtr = std::unique_ptr<CodecClient>;
  */
 class CodecClientProd : public CodecClient {
 public:
-  CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
+  CodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
                   Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
                   Random::RandomGenerator& random_generator);
 };

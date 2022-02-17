@@ -11,10 +11,12 @@
 #include "envoy/common/interval_set.h"
 #include "envoy/common/time.h"
 
-#include "common/common/assert.h"
-#include "common/common/hash.h"
-#include "common/common/non_copyable.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/non_copyable.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -56,7 +58,7 @@ private:
 
   using SpecifierOffsets = std::vector<int32_t>;
   std::string fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
-                                                 const std::string& seconds_str) const;
+                                                 const absl::string_view seconds_str) const;
 
   // A container to hold a specifiers (%f, %Nf, %s) found in a format string.
   struct Specifier {
@@ -237,7 +239,7 @@ public:
   using CaseUnorderedSet =
       absl::flat_hash_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>;
 
-  static const char WhitespaceChars[];
+  static constexpr absl::string_view WhitespaceChars = " \t\f\v\n\r";
 
   /**
    * Convert a string to an unsigned long, checking for error.
@@ -404,7 +406,7 @@ public:
    * @param source supplies the string to escape.
    * @return escaped string.
    */
-  static std::string escape(const std::string& source);
+  static std::string escape(const absl::string_view source);
 
   /**
    * Outputs the string to the provided ostream, while escaping \n, \r, \t, and "
@@ -440,6 +442,21 @@ public:
    */
   static std::string removeCharacters(const absl::string_view& str,
                                       const IntervalSet<size_t>& remove_characters);
+
+  /**
+   * Check whether a string contains empty characters or space (' ', '\t', '\f', '\v', '\n', '\r').
+   * @param view string.
+   * @return true if string contains ' ', '\t', '\f', '\v', '\n', '\r'.
+   */
+  static bool hasEmptySpace(absl::string_view view);
+
+  /**
+   * Replace all empty characters or space (' ', '\t', '\f', '\v', '\n', '\r') in the string with
+   * '_'.
+   * @param view string.
+   * @return std::string the string after replaced all empty characters or space.
+   */
+  static std::string replaceAllEmptySpace(absl::string_view view);
 };
 
 /**
@@ -499,7 +516,7 @@ public:
       begin = end;
     }
 
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpectedly reached");
   }
 };
 

@@ -1,4 +1,4 @@
-#include "common/json/json_internal_legacy.h"
+#include "source/common/json/json_internal_legacy.h"
 
 #include <cstdint>
 #include <fstream>
@@ -9,11 +9,11 @@
 #include <string>
 #include <vector>
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/hash.h"
-#include "common/common/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/utility.h"
+#include "source/common/protobuf/utility.h"
 
 // Do not let RapidJson leak outside of this file.
 #include "rapidjson/document.h"
@@ -115,7 +115,7 @@ private:
       return "String";
     }
 
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    return "";
   }
 
   struct Value {
@@ -308,8 +308,14 @@ void Field::buildRapidJsonDocument(const Field& field, rapidjson::Value& value,
     value.SetNull();
     break;
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case Type::Boolean:
+    FALLTHRU;
+  case Type::Double:
+    FALLTHRU;
+  case Type::Integer:
+    FALLTHRU;
+  case Type::String:
+    PANIC("not implemented");
   }
 }
 
@@ -546,7 +552,7 @@ bool ObjectHandler::StartObject() {
     state_ = State::ExpectKeyOrEndObject;
     return true;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 }
 
@@ -565,7 +571,7 @@ bool ObjectHandler::EndObject(rapidjson::SizeType) {
     }
     return true;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 }
 
@@ -576,7 +582,7 @@ bool ObjectHandler::Key(const char* value, rapidjson::SizeType size, bool) {
     state_ = State::ExpectValueOrStartObjectArray;
     return true;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 }
 
@@ -600,7 +606,7 @@ bool ObjectHandler::StartArray() {
     state_ = State::ExpectArrayValueOrEndArray;
     return true;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 }
 
@@ -620,7 +626,7 @@ bool ObjectHandler::EndArray(rapidjson::SizeType) {
 
     return true;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 }
 
@@ -650,7 +656,7 @@ bool ObjectHandler::String(const char* value, rapidjson::SizeType size, bool) {
 
 bool ObjectHandler::RawNumber(const char*, rapidjson::SizeType, bool) {
   // Only called if kParseNumbersAsStrings is set as a parse flag, which it is not.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {

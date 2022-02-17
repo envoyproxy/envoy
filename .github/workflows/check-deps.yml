@@ -1,0 +1,27 @@
+name: Check dependencies
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'envoyproxy'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run dependency checker
+        run: |
+          export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          bazel run //tools/dependency:check -- -c release_issues --fix
+          bazel run //tools/dependency:check -- -c cves -w error

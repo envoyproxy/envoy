@@ -11,11 +11,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/cleanup.h"
-#include "common/runtime/runtime_protos.h"
-
-#include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/runtime/runtime_protos.h"
+#include "source/extensions/filters/http/adaptive_concurrency/controller/controller.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {

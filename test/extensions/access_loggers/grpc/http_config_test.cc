@@ -4,8 +4,7 @@
 #include "envoy/server/access_log_config.h"
 #include "envoy/stats/scope.h"
 
-#include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
-#include "extensions/access_loggers/well_known_names.h"
+#include "source/extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 
 #include "test/mocks/server/factory_context.h"
 
@@ -26,22 +25,36 @@ public:
   void SetUp() override {
     factory_ =
         Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-            AccessLogNames::get().HttpGrpc);
+            "envoy.access_loggers.http_grpc");
     ASSERT_NE(nullptr, factory_);
 
     message_ = factory_->createEmptyConfigProto();
     ASSERT_NE(nullptr, message_);
+  }
 
-    EXPECT_CALL(context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
-        }));
+  void run(const std::string cluster_name) {
+    const auto good_cluster = "good_cluster";
 
     auto* common_config = http_grpc_access_log_.mutable_common_config();
     common_config->set_log_name("foo");
-    common_config->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("bar");
+    common_config->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(cluster_name);
     common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
     TestUtility::jsonConvert(http_grpc_access_log_, *message_);
+
+    if (cluster_name == good_cluster) {
+      EXPECT_CALL(context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+          .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+            return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+          }));
+      AccessLog::InstanceSharedPtr instance =
+          factory_->createAccessLogInstance(*message_, std::move(filter_), context_);
+      EXPECT_NE(nullptr, instance);
+      EXPECT_NE(nullptr, dynamic_cast<HttpGrpcAccessLog*>(instance.get()));
+    } else {
+      EXPECT_THROW_WITH_MESSAGE(
+          factory_->createAccessLogInstance(*message_, std::move(filter_), context_),
+          EnvoyException, "fake");
+    }
   }
 
   AccessLog::FilterPtr filter_;
@@ -52,12 +65,7 @@ public:
 };
 
 // Normal OK configuration.
-TEST_F(HttpGrpcAccessLogConfigTest, Ok) {
-  AccessLog::InstanceSharedPtr instance =
-      factory_->createAccessLogInstance(*message_, std::move(filter_), context_);
-  EXPECT_NE(nullptr, instance);
-  EXPECT_NE(nullptr, dynamic_cast<HttpGrpcAccessLog*>(instance.get()));
-}
+TEST_F(HttpGrpcAccessLogConfigTest, Ok) { run("good_cluster"); }
 
 } // namespace
 } // namespace HttpGrpc

@@ -34,7 +34,7 @@ Currently there are three build images for Linux and one for Windows:
 * `envoyproxy/envoy-build` &mdash; alias to `envoyproxy/envoy-build-ubuntu`.
 * `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 18.04 (Bionic) with GCC 9 and Clang 10 compiler.
 * `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 9 and Clang 10 compiler, this image is experimental and not well tested.
-* `envoyproxy/envoy-build-windows2019` &mdash; based on Windows 2019 LTS with VS 2019 Build Tools.
+* `envoyproxy/envoy-build-windows2019` &mdash; based on Windows ltsc2019 with VS 2019 Build Tools, as well as LLVM.
 
 The source for these images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
 repository.
@@ -122,7 +122,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.sizeopt <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt --config=sizeopt` with clang.
 * `bazel.sizeopt.server_only` &mdash; build Envoy static binary under `-c opt --config=sizeopt` with clang.
 * `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
-* `bazel.coverage <test>` &mdash; build and run a specified test or test dir under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
+* `bazel.coverage <test>` &mdash; build and run a specified test or test dir under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`. Specify `//contrib/...` to get contrib coverage.
 * `bazel.coverity` &mdash; build Envoy static binary and run Coverity Scan static analysis.
 * `bazel.msan` &mdash; build and run tests under `-c dbg --config=clang-msan` with clang.
 * `bazel.msan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-msan` with clang.
@@ -135,9 +135,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.clang_tidy <files>` &mdash; build and run clang-tidy specified source files, if no files specified, runs against the diff with the last GitHub commit.
 * `check_format`&mdash; run `clang-format` and `buildifier` on entire source tree.
 * `fix_format`&mdash; run and enforce `clang-format` and `buildifier` on entire source tree.
-* `check_spelling`&mdash; run `misspell` on entire project.
-* `fix_spelling`&mdash; run and enforce `misspell` on entire project.
-* `check_spelling_pedantic`&mdash; run `aspell` on C++ and proto comments.
+* `format_pre`&mdash; run validation and linting tools.
 * `docs`&mdash; build documentation tree in `generated/docs`.
 
 ## On Windows
@@ -148,15 +146,15 @@ An example basic invocation to build the Envoy static binary and run tests is:
 ./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
 ```
 
-You can modify `./ci/windows_ci_steps.sh` to modify `bazel` arguments, tests to run, etc. as well
+You can pass additional command line arguments to `./ci/windows_ci_steps.sh` to list specific `bazel` arguments and build/test targets.
 as set environment variables to adjust your container build environment as described above.
 
-The Envoy binary can be found in `C:\Windows\Temp\envoy-docker-build\envoy\source\exe` on the Docker host. You
+The Envoy binary can be found in `${TEMP}\envoy-docker-build\envoy\source\exe` on the Docker host. You
 can control this by setting `ENVOY_DOCKER_BUILD_DIR` in the environment, e.g. to
 generate the binary in `C:\Users\foo\build\envoy\source\exe` you can run:
 
 ```bash
-ENVOY_DOCKER_BUILD_DIR="C:\Users\foo\build" ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+ENVOY_DOCKER_BUILD_DIR="C:\Users\foo\build" ./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
 ```
 
 Note the quotations around the `ENVOY_DOCKER_BUILD_DIR` value to preserve the backslashes in the
@@ -168,24 +166,16 @@ If you would like to run an interactive session to keep the build container runn
 ./ci/run_envoy_docker.sh 'bash'
 ```
 
-From an interactive session, you can invoke `bazel` manually or use the `./ci/windows_ci_steps.sh` script to build and run tests.
+From an interactive session, you can invoke `bazel` directly, or use the `./ci/windows_ci_steps.sh` script to build and run tests.
+Bazel will look for .bazelrc in the `${HOME}` path, which is mapped to the persistent path `${TEMP}\envoy-docker-build\` on the
+Docker host.
 
 # Testing changes to the build image as a developer
 
-While all changes to the build image should eventually be upstreamed, it can be useful to
-test those changes locally before sending out a pull request. To experiment
-with a local clone of the upstream build image you can make changes to files such as
-build_container.sh locally and then run:
-
-```bash
-DISTRO=ubuntu
-cd ci/build_container
-LINUX_DISTRO="${DISTRO}" CIRCLE_SHA1=my_tag ./docker_build.sh  # Wait patiently for quite some time
-cd ../..
-IMAGE_NAME="envoyproxy/envoy-build-${DISTRO}" IMAGE_ID=my_tag ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.whatever'
-```
-
-This build the Ubuntu based `envoyproxy/envoy-build-ubuntu` image, and the final call will run against your local copy of the build image.
+The base build image used in the CI flows here lives in the [envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
+repository. If you need to make and/or test changes to the build image, instructions to do so can be found in
+the [build_container](https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/README.md) folder.
+See the Dockerfiles and build scripts there for building a new image.
 
 # macOS Build Flow
 

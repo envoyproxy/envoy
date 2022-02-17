@@ -1,7 +1,8 @@
-#include "common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/client_connection_factory_impl.h"
 
-#include "common/quic/envoy_quic_session_cache.h"
-#include "common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
+
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 
 namespace Envoy {
 namespace Quic {
@@ -19,55 +20,72 @@ getContext(Network::TransportSocketFactory& transport_socket_factory) {
   auto* quic_socket_factory =
       dynamic_cast<QuicClientTransportSocketFactory*>(&transport_socket_factory);
   ASSERT(quic_socket_factory != nullptr);
-  ASSERT(quic_socket_factory->sslCtx() != nullptr);
   return quic_socket_factory->sslCtx();
+}
+
+std::shared_ptr<quic::QuicCryptoClientConfig> PersistentQuicInfoImpl::cryptoConfig() {
+  auto context = getContext(transport_socket_factory_);
+  // If the secrets haven't been loaded, there is no crypto config.
+  if (context == nullptr) {
+    return nullptr;
+  }
+
+  // If the secret has been updated, update the proof source.
+  if (context.get() != client_context_.get()) {
+    client_context_ = context;
+    client_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
+        std::make_unique<EnvoyQuicProofVerifier>(getContext(transport_socket_factory_)),
+        std::make_unique<quic::QuicClientSessionCache>());
+  }
+  // Return the latest client config.
+  return client_config_;
 }
 
 PersistentQuicInfoImpl::PersistentQuicInfoImpl(
     Event::Dispatcher& dispatcher, Network::TransportSocketFactory& transport_socket_factory,
-    TimeSource& time_source, Network::Address::InstanceConstSharedPtr server_addr)
+    TimeSource& time_source, uint32_t remote_port, const quic::QuicConfig& quic_config,
+    uint32_t buffer_limit)
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
       server_id_{getConfig(transport_socket_factory).serverNameIndication(),
-                 static_cast<uint16_t>(server_addr->ip()->port()), false},
-      crypto_config_(std::make_unique<quic::QuicCryptoClientConfig>(
-          std::make_unique<EnvoyQuicProofVerifier>(getContext(transport_socket_factory)),
-          std::make_unique<EnvoyQuicSessionCache>(time_source))) {
+                 static_cast<uint16_t>(remote_port)},
+      transport_socket_factory_(transport_socket_factory), time_source_(time_source),
+      quic_config_(quic_config), buffer_limit_(buffer_limit) {
   quiche::FlagRegistry::getInstance();
 }
-
-namespace {
-// TODO(alyssawilk, danzh2010): This is mutable static info that is required for the QUICHE code.
-// This was preexisting but should either be removed or potentially moved inside
-// PersistentQuicInfoImpl.
-struct StaticInfo {
-  quic::QuicClientPushPromiseIndex push_promise_index_;
-
-  static StaticInfo& get() { MUTABLE_CONSTRUCT_ON_FIRST_USE(StaticInfo); }
-};
-} // namespace
 
 std::unique_ptr<Network::ClientConnection>
 createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& dispatcher,
                             Network::Address::InstanceConstSharedPtr server_addr,
-                            Network::Address::InstanceConstSharedPtr local_addr) {
-  // This flag fix a QUICHE issue which may crash Envoy during connection close.
-  SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
+                            Network::Address::InstanceConstSharedPtr local_addr,
+                            QuicStatNames& quic_stat_names,
+                            OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope) {
+  ASSERT(GetQuicReloadableFlag(quic_single_ack_in_packet2));
   PersistentQuicInfoImpl* info_impl = reinterpret_cast<PersistentQuicInfoImpl*>(&info);
-
+  auto config = info_impl->cryptoConfig();
+  if (config == nullptr) {
+    return nullptr; // no secrets available yet.
+  }
+  quic::ParsedQuicVersionVector quic_versions = quic::CurrentSupportedHttp3Versions();
+  ASSERT(!quic_versions.empty());
   auto connection = std::make_unique<EnvoyQuicClientConnection>(
       quic::QuicUtils::CreateRandomConnectionId(), server_addr, info_impl->conn_helper_,
-      info_impl->alarm_factory_, quic::ParsedQuicVersionVector{info_impl->supported_versions_[0]},
-      local_addr, dispatcher, nullptr);
-  auto& static_info = StaticInfo::get();
+      info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, nullptr);
 
-  ASSERT(!info_impl->supported_versions_.empty());
+  // Update config with latest srtt, if available.
+  if (rtt_cache.has_value()) {
+    quic::QuicServerId& server_id = info_impl->server_id_;
+    Http::AlternateProtocolsCache::Origin origin("https", server_id.host(), server_id.port());
+    std::chrono::microseconds rtt = rtt_cache.value().get().getSrtt(origin);
+    if (rtt.count() != 0) {
+      info_impl->quic_config_.SetInitialRoundTripTimeUsToSend(rtt.count());
+    }
+  }
+
   // QUICHE client session always use the 1st version to start handshake.
-  // TODO(alyssawilk) pass in ClusterInfo::perConnectionBufferLimitBytes() for
-  // send_buffer_limit instead of using 0.
   auto ret = std::make_unique<EnvoyQuicClientSession>(
-      info_impl->quic_config_, info_impl->supported_versions_, std::move(connection),
-      info_impl->server_id_, info_impl->crypto_config_.get(), &static_info.push_promise_index_,
-      dispatcher, /*send_buffer_limit=*/0);
+      info_impl->quic_config_, quic_versions, std::move(connection), info_impl->server_id_,
+      std::move(config), &info_impl->push_promise_index_, dispatcher, info_impl->buffer_limit_,
+      info_impl->crypto_stream_factory_, quic_stat_names, rtt_cache, scope);
   return ret;
 }
 

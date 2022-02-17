@@ -1,6 +1,6 @@
-#include "common/network/upstream_socket_options_filter_state.h"
+#include "source/common/network/upstream_socket_options_filter_state.h"
 
-#include "common/common/macros.h"
+#include "source/common/common/macros.h"
 
 namespace Envoy {
 namespace Network {

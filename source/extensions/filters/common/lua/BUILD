@@ -27,7 +27,7 @@ envoy_cc_library(
     srcs = ["lua.cc"],
     hdrs = ["lua.h"],
     deps = [
-        "//include/envoy/thread_local:thread_local_interface",
+        "//envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:lock_guard_lib",
         "//source/common/common:thread_lib",
@@ -45,7 +45,7 @@ envoy_cc_library(
     hdrs = ["wrappers.h"],
     deps = [
         ":lua_lib",
-        "//include/envoy/buffer:buffer_interface",
+        "//envoy/buffer:buffer_interface",
         "//source/common/common:hex_lib",
         "//source/common/protobuf",
     ],

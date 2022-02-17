@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common/common/thread.h"
-#include "common/common/thread_synchronizer.h"
-#include "common/common/token_bucket_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/thread_synchronizer.h"
+#include "source/common/common/token_bucket_impl.h"
 
 namespace Envoy {
 

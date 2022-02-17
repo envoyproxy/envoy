@@ -1,11 +1,11 @@
-#include "extensions/tracers/zipkin/util.h"
+#include "source/extensions/tracers/zipkin/util.h"
 
 #include <chrono>
 #include <random>
 #include <regex>
 
-#include "common/common/hex.h"
-#include "common/common/utility.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"

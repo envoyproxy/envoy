@@ -1,5 +1,6 @@
 # This configuration terminates a POST request and sends the POST payload upstream.
-# It can be used to test TCP tunneling as described in docs/root/intro/arch_overview/http/upgrades.rst
+# It can be used to test TCP tunneling as described in
+# https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/upgrades
 # or used to test POST directly, by running `curl -k -v -x 127.0.0.1:10001 https://www.google.com`
 admin:
   address:
@@ -26,19 +27,20 @@ static_resources:
             virtual_hosts:
             - name: local_service
               domains:
-                - "*"
+              - "*"
               routes:
-                - match:
-                    prefix: "/"
-                    headers:
-                      - name: ":method"
-                        exact_match: "POST"
-                  route:
-                    cluster: service_google
-                    upgrade_configs:
-                      - upgrade_type: CONNECT
-                        connect_config:
-                          allow_post: true
+              - match:
+                  prefix: "/"
+                  headers:
+                  - name: ":method"
+                    string_match:
+                      exact: "POST"
+                route:
+                  cluster: service_google
+                  upgrade_configs:
+                  - upgrade_type: CONNECT
+                    connect_config:
+                      allow_post: true
           http_filters:
           - name: envoy.filters.http.router
           http2_protocol_options:

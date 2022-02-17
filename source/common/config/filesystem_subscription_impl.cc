@@ -1,29 +1,46 @@
-#include "common/config/filesystem_subscription_impl.h"
+#include "source/common/config/filesystem_subscription_impl.h"
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/config/decoded_resource_impl.h"
-#include "common/config/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Config {
 
+envoy::config::core::v3::PathConfigSource makePathConfigSource(const std::string& path) {
+  envoy::config::core::v3::PathConfigSource path_config_source;
+  path_config_source.set_path(path);
+  return path_config_source;
+}
+
 FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
-    Event::Dispatcher& dispatcher, absl::string_view path, SubscriptionCallbacks& callbacks,
-    OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
-    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
-    : path_(path), watcher_(dispatcher.createFilesystemWatcher()), callbacks_(callbacks),
-      resource_decoder_(resource_decoder), stats_(stats), api_(api),
-      validation_visitor_(validation_visitor) {
-  watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
-    if (started_) {
-      refresh();
-    }
-  });
+    Event::Dispatcher& dispatcher,
+    const envoy::config::core::v3::PathConfigSource& path_config_source,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    SubscriptionStats stats, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+    : path_(path_config_source.path()), callbacks_(callbacks), resource_decoder_(resource_decoder),
+      stats_(stats), api_(api), validation_visitor_(validation_visitor) {
+  if (!path_config_source.has_watched_directory()) {
+    file_watcher_ = dispatcher.createFilesystemWatcher();
+    file_watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
+      if (started_) {
+        refresh();
+      }
+    });
+  } else {
+    directory_watcher_ =
+        std::make_unique<WatchedDirectory>(path_config_source.watched_directory(), dispatcher);
+    directory_watcher_->setCallback([this]() {
+      if (started_) {
+        refresh();
+      }
+    });
+  }
 }
 
 // Config::Subscription
@@ -88,10 +105,11 @@ void FilesystemSubscriptionImpl::refresh() {
 }
 
 FilesystemCollectionSubscriptionImpl::FilesystemCollectionSubscriptionImpl(
-    Event::Dispatcher& dispatcher, absl::string_view path, SubscriptionCallbacks& callbacks,
-    OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
-    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
-    : FilesystemSubscriptionImpl(dispatcher, path, callbacks, resource_decoder, stats,
+    Event::Dispatcher& dispatcher,
+    const envoy::config::core::v3::PathConfigSource& path_config_source,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    SubscriptionStats stats, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+    : FilesystemSubscriptionImpl(dispatcher, path_config_source, callbacks, resource_decoder, stats,
                                  validation_visitor, api) {}
 
 std::string

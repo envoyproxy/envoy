@@ -1,4 +1,4 @@
-#include "extensions/retry/priority/previous_priorities/config.h"
+#include "source/extensions/retry/priority/previous_priorities/config.h"
 
 #include "envoy/extensions/retry/priority/previous_priorities/v3/previous_priorities_config.pb.h"
 #include "envoy/extensions/retry/priority/previous_priorities/v3/previous_priorities_config.pb.validate.h"

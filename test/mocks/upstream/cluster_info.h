@@ -13,11 +13,11 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/thread.h"
-#include "common/http/http1/codec_stats.h"
-#include "common/http/http2/codec_stats.h"
-#include "common/http/http3/codec_stats.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/http/http1/codec_stats.h"
+#include "source/common/http/http2/codec_stats.h"
+#include "source/common/http/http3/codec_stats.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -90,6 +90,7 @@ public:
   MOCK_METHOD(bool, addedViaApi, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, connectTimeout, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
+  MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, maxConnectionDuration, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderMax, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderOffset, (),
@@ -105,6 +106,9 @@ public:
               (const));
   MOCK_METHOD(ProtocolOptionsConfigConstSharedPtr, extensionProtocolOptions, (const std::string&),
               (const));
+  MOCK_METHOD(const envoy::config::cluster::v3::LoadBalancingPolicy_Policy&, loadBalancingPolicy,
+              (), (const));
+  MOCK_METHOD(TypedLoadBalancerFactory*, loadBalancerFactory, (), (const));
   MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
   MOCK_METHOD(LoadBalancerType, lbType, (), (const));
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::DiscoveryType, type, (), (const));
@@ -114,6 +118,8 @@ public:
               lbRingHashConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>&,
               lbMaglevConfig, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>&,
+              lbRoundRobinConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&,
               lbLeastRequestConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&,
@@ -143,6 +149,8 @@ public:
   MOCK_METHOD(bool, warmHosts, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&,
               upstreamHttpProtocolOptions, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&,
+              alternateProtocolsCacheOptions, (), (const));
   MOCK_METHOD(absl::optional<std::string>, edsServiceName, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
   MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
@@ -187,6 +195,9 @@ public:
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;
+  absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+      alternate_protocols_cache_options_;
+  absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lb_round_robin_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
@@ -196,6 +207,7 @@ public:
   envoy::config::core::v3::Metadata metadata_;
   std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
+  Stats::ScopePtr stats_scope_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
@@ -205,6 +217,12 @@ class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {
 public:
   MockIdleTimeEnabledClusterInfo();
   ~MockIdleTimeEnabledClusterInfo() override;
+};
+
+class MockMaxConnectionDurationEnabledClusterInfo : public MockClusterInfo {
+public:
+  MockMaxConnectionDurationEnabledClusterInfo();
+  ~MockMaxConnectionDurationEnabledClusterInfo() override;
 };
 
 } // namespace Upstream

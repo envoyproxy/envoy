@@ -1,25 +1,25 @@
-#include "common/grpc/common.h"
+#include "source/common/grpc/common.h"
 
 #include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <string>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/common/assert.h"
-#include "common/common/base64.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/macros.h"
-#include "common/common/safe_memcpy.h"
-#include "common/common/utility.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
@@ -36,11 +36,22 @@ bool Common::hasGrpcContentType(const Http::RequestOrResponseHeaderMap& headers)
           content_type[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
 }
 
+bool Common::hasProtobufContentType(const Http::RequestOrResponseHeaderMap& headers) {
+  return headers.getContentTypeValue() == Http::Headers::get().ContentTypeValues.Protobuf;
+}
+
 bool Common::isGrpcRequestHeaders(const Http::RequestHeaderMap& headers) {
   if (!headers.Path()) {
     return false;
   }
   return hasGrpcContentType(headers);
+}
+
+bool Common::isProtobufRequestHeaders(const Http::RequestHeaderMap& headers) {
+  if (!headers.Path()) {
+    return false;
+  }
+  return hasProtobufContentType(headers);
 }
 
 bool Common::isGrpcResponseHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) {

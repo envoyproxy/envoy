@@ -1,8 +1,8 @@
-#include "common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_server_connection.h"
 
-#include "common/network/listen_socket_impl.h"
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/quic_io_handle_wrapper.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_io_handle_wrapper.h"
 
 namespace Envoy {
 namespace Quic {
@@ -29,10 +29,25 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
   }
   // Update local address if QUICHE has updated the self address.
   ASSERT(self_address().IsInitialized());
-  connectionSocket()->addressProvider().setLocalAddress(
+  connectionSocket()->connectionInfoProvider().setLocalAddress(
       quicAddressToEnvoyAddressInstance(self_address()));
 
   return true;
+}
+
+std::unique_ptr<quic::QuicSelfIssuedConnectionIdManager>
+EnvoyQuicServerConnection::MakeSelfIssuedConnectionIdManager() {
+  return std::make_unique<EnvoyQuicSelfIssuedConnectionIdManager>(
+      quic::kMinNumOfActiveConnectionIds, connection_id(), clock(), alarm_factory(), this,
+      context());
+}
+
+quic::QuicConnectionId EnvoyQuicSelfIssuedConnectionIdManager::GenerateNewConnectionId(
+    const quic::QuicConnectionId& old_connection_id) const {
+  quic::QuicConnectionId new_connection_id =
+      quic::QuicSelfIssuedConnectionIdManager::GenerateNewConnectionId(old_connection_id);
+  adjustNewConnectionIdForRoutine(new_connection_id, old_connection_id);
+  return new_connection_id;
 }
 
 } // namespace Quic

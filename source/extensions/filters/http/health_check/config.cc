@@ -1,4 +1,4 @@
-#include "extensions/filters/http/health_check/config.h"
+#include "source/extensions/filters/http/health_check/config.h"
 
 #include <memory>
 
@@ -6,10 +6,9 @@
 #include "envoy/extensions/filters/http/health_check/v3/health_check.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-
-#include "extensions/filters/http/health_check/health_check.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/filters/http/health_check/health_check.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -34,7 +33,7 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
   HealthCheckCacheManagerSharedPtr cache_manager;
   if (cache_time_ms > 0) {
     cache_manager = std::make_shared<HealthCheckCacheManager>(
-        context.dispatcher(), std::chrono::milliseconds(cache_time_ms));
+        context.mainThreadDispatcher(), std::chrono::milliseconds(cache_time_ms));
   }
 
   ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages;

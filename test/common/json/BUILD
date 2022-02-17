@@ -17,7 +17,6 @@ envoy_cc_fuzz_test(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//test/fuzz:utility_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -38,5 +37,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "json_loader_legacy_test",
     srcs = ["json_loader_test.cc"],
+    args = ["--runtime-feature-disable-for-tests=envoy.reloadable_features.remove_legacy_json"],
     deps = JSON_TEST_DEPS,
 )

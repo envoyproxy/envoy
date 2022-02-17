@@ -5,26 +5,17 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "source/common/common/empty_string.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/http3/codec_stats.h"
+#include "source/common/network/connection_impl_base.h"
+#include "source/common/quic/envoy_quic_simulated_watermark_buffer.h"
+#include "source/common/quic/quic_network_connection.h"
+#include "source/common/quic/quic_ssl_connection_info.h"
+#include "source/common/quic/send_buffer_monitor.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "quiche/quic/core/quic_connection.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "common/common/empty_string.h"
-#include "common/common/logger.h"
-#include "common/http/http3/codec_stats.h"
-#include "common/network/connection_impl_base.h"
-#include "common/quic/quic_network_connection.h"
-#include "common/quic/envoy_quic_simulated_watermark_buffer.h"
-#include "common/quic/send_buffer_monitor.h"
-#include "common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 
@@ -32,15 +23,16 @@ class TestPauseFilterForQuic;
 
 namespace Quic {
 
+class QuicNetworkConnectionTest;
+
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
 class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
                                         public SendBufferMonitor {
 public:
   QuicFilterManagerConnectionImpl(QuicNetworkConnection& connection,
                                   const quic::QuicConnectionId& connection_id,
-                                  Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
-  ~QuicFilterManagerConnectionImpl() override = default;
-
+                                  Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
+                                  std::shared_ptr<QuicSslConnectionInfo>&& info);
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
   void addWriteFilter(Network::WriteFilterSharedPtr filter) override;
@@ -53,7 +45,7 @@ public:
   void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override {
     // TODO(danzh): implement to support proxy. This interface is only called from
     // TCP proxy code.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("unexpected call to addBytesSentCallback");
   }
   void enableHalfClose(bool enabled) override;
   bool isHalfCloseEnabled() override;
@@ -68,20 +60,29 @@ public:
   void readDisable(bool /*disable*/) override { ASSERT(false); }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { ASSERT(false); }
   bool readEnabled() const override { return true; }
-  const Network::SocketAddressSetter& addressProvider() const override {
-    return network_connection_->connectionSocket()->addressProvider();
+  const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
+    ENVOY_BUG(network_connection_ && network_connection_->connectionSocket(),
+              "No connection socket.");
+    return network_connection_->connectionSocket()->connectionInfoProvider();
   }
-  Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
-    return network_connection_->connectionSocket()->addressProviderSharedPtr();
+  Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    if (!network_connection_ || !network_connection_->connectionSocket()) {
+      return nullptr;
+    }
+    return network_connection_->connectionSocket()->connectionInfoProviderSharedPtr();
   }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
     // Unix domain socket is not supported.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    return absl::nullopt;
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
     // TODO(danzh): populate stats.
     Network::ConnectionImplBase::setConnectionStats(stats);
+    if (network_connection_ == nullptr) {
+      ENVOY_CONN_LOG(error, "Quic connection has been detached.", *this);
+      return;
+    }
     network_connection_->setConnectionStats(stats);
   }
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
@@ -99,12 +100,12 @@ public:
   }
   void write(Buffer::Instance& /*data*/, bool /*end_stream*/) override {
     // All writes should be handled by Quic internally.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("unexpected write call");
   }
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override {
     // As quic connection is not HTTP1.1, this method shouldn't be called by HCM.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
   bool aboveHighWatermark() const override;
 
@@ -113,6 +114,7 @@ public:
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   absl::string_view transportFailureReason() const override { return transport_failure_reason_; }
   bool startSecureTransport() override { return false; }
+  // TODO(#2557) Implement this.
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; }
 
   // Network::FilterManagerConnection
@@ -121,7 +123,7 @@ public:
   // Network::ReadBufferSource
   Network::StreamBuffer getReadBuffer() override { return {empty_buffer_, false}; }
   // Network::WriteBufferSource
-  Network::StreamBuffer getWriteBuffer() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  Network::StreamBuffer getWriteBuffer() override { PANIC("not implemented"); }
 
   // SendBufferMonitor
   // Update the book keeping of the aggregated buffered bytes cross all the
@@ -133,14 +135,11 @@ public:
 
   uint32_t bytesToSend() { return bytes_to_send_; }
 
-  void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
-    http3_options_ =
-        std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>(http3_options);
+  virtual void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
+    http3_options_ = http3_options;
   }
 
-  void setCodecStats(Http::Http3::CodecStats& stats) {
-    codec_stats_ = std::reference_wrapper<Http::Http3::CodecStats>(stats);
-  }
+  void setCodecStats(Http::Http3::CodecStats& stats) { codec_stats_ = stats; }
 
   uint32_t maxIncomingHeadersCount() { return max_headers_count_; }
 
@@ -151,25 +150,27 @@ public:
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
-                              quic::ConnectionCloseSource source);
+                              quic::ConnectionCloseSource source,
+                              const quic::ParsedQuicVersion& version);
 
   void closeConnectionImmediately() override;
 
   virtual bool hasDataToWrite() PURE;
 
   // Returns a QuicConnection interface if initialized_ is true, otherwise nullptr.
-  virtual const quic::QuicConnection* quicConnection() const = 0;
-  virtual quic::QuicConnection* quicConnection() = 0;
+  virtual const quic::QuicConnection* quicConnection() const PURE;
+  virtual quic::QuicConnection* quicConnection() PURE;
 
   QuicNetworkConnection* network_connection_{nullptr};
 
-  absl::optional<std::reference_wrapper<Http::Http3::CodecStats>> codec_stats_;
-  absl::optional<std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>>
-      http3_options_;
+  OptRef<Http::Http3::CodecStats> codec_stats_;
+  OptRef<const envoy::config::core::v3::Http3ProtocolOptions> http3_options_;
   bool initialized_{false};
+  std::shared_ptr<QuicSslConnectionInfo> quic_ssl_info_;
 
 private:
   friend class Envoy::TestPauseFilterForQuic;
+  friend class Envoy::Quic::QuicNetworkConnectionTest;
 
   // Called when aggregated buffered bytes across all the streams exceeds high watermark.
   void onSendBufferHighWatermark();
@@ -180,7 +181,7 @@ private:
   // filters are added, ConnectionManagerImpl should always be the last one.
   // Its onRead() is only called once to trigger ReadFilter::onNewConnection()
   // and the rest incoming data bypasses these filters.
-  Network::FilterManagerImpl filter_manager_;
+  std::unique_ptr<Network::FilterManagerImpl> filter_manager_;
 
   StreamInfo::StreamInfoImpl stream_info_;
   std::string transport_failure_reason_;

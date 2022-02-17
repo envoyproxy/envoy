@@ -6,7 +6,7 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {

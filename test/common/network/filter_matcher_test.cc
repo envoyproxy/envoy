@@ -1,5 +1,5 @@
-#include "common/network/address_impl.h"
-#include "common/network/filter_matcher.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/filter_matcher.h"
 
 #include "test/mocks/network/mocks.h"
 
@@ -22,7 +22,7 @@ public:
     auto handle = std::make_unique<CallbackHandle>();
     handle->socket_ = std::make_unique<MockConnectionSocket>();
     handle->callback_ = std::make_unique<MockListenerFilterCallbacks>();
-    handle->socket_->address_provider_->setLocalAddress(
+    handle->socket_->connection_info_provider_->setLocalAddress(
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", port));
     EXPECT_CALL(*(handle->callback_), socket()).WillRepeatedly(ReturnRef(*(handle->socket_)));
     return handle;

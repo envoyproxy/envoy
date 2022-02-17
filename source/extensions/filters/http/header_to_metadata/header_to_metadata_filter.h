@@ -7,8 +7,8 @@
 #include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/common/logger.h"
-#include "common/common/matchers.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
 
 #include "absl/strings/string_view.h"
 
@@ -151,7 +151,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
+  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;

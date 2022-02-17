@@ -21,9 +21,10 @@ envoy_cc_win32_library(
     name = "directory_iterator_impl_lib",
     srcs = ["win32/directory_iterator_impl.cc"],
     hdrs = ["win32/directory_iterator_impl.h"],
+    include_prefix = "source/common/filesystem",
     strip_include_prefix = "win32",
     deps = [
-        "//include/envoy/filesystem:filesystem_interface",
+        "//envoy/filesystem:filesystem_interface",
     ],
 )
 
@@ -31,9 +32,10 @@ envoy_cc_posix_library(
     name = "directory_iterator_impl_lib",
     srcs = ["posix/directory_iterator_impl.cc"],
     hdrs = ["posix/directory_iterator_impl.h"],
+    include_prefix = "source/common/filesystem",
     strip_include_prefix = "posix",
     deps = [
-        "//include/envoy/filesystem:filesystem_interface",
+        "//envoy/filesystem:filesystem_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:utility_lib",
     ],
@@ -48,9 +50,11 @@ envoy_cc_posix_library(
     name = "filesystem_impl_lib",
     srcs = ["posix/filesystem_impl.cc"],
     hdrs = ["posix/filesystem_impl.h"],
+    include_prefix = "source/common/filesystem",
     strip_include_prefix = "posix",
     deps = [
         ":file_shared_lib",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 
@@ -58,6 +62,7 @@ envoy_cc_win32_library(
     name = "filesystem_impl_lib",
     srcs = ["win32/filesystem_impl.cc"],
     hdrs = ["win32/filesystem_impl.h"],
+    include_prefix = "source/common/filesystem",
     strip_include_prefix = "win32",
     deps = [
         ":file_shared_lib",
@@ -69,7 +74,7 @@ envoy_cc_library(
     srcs = ["file_shared_impl.cc"],
     hdrs = ["file_shared_impl.h"],
     deps = [
-        "//include/envoy/filesystem:filesystem_interface",
+        "//envoy/filesystem:filesystem_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
     ],
@@ -102,14 +107,15 @@ envoy_cc_library(
     external_deps = [
         "event",
     ],
+    include_prefix = "source/common/filesystem",
     strip_include_prefix = select({
         "//bazel:apple": "kqueue",
         "//bazel:windows_x86_64": "win32",
         "//conditions:default": "inotify",
     }),
     deps = [
-        "//include/envoy/api:api_interface",
-        "//include/envoy/event:dispatcher_interface",
+        "//envoy/api:api_interface",
+        "//envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",

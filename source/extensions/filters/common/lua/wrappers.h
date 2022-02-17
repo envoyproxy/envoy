@@ -2,9 +2,8 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/common/lua/lua.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/lua/lua.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +16,8 @@ namespace Lua {
  */
 class BufferWrapper : public BaseLuaObject<BufferWrapper> {
 public:
-  BufferWrapper(Buffer::Instance& data) : data_(data) {}
+  BufferWrapper(Http::RequestOrResponseHeaderMap& headers, Buffer::Instance& data)
+      : data_(data), headers_(headers) {}
 
   static ExportedFunctions exportedFunctions() {
     return {{"length", static_luaLength},
@@ -47,6 +47,7 @@ private:
   DECLARE_LUA_FUNCTION(BufferWrapper, luaSetBytes);
 
   Buffer::Instance& data_;
+  Http::RequestOrResponseHeaderMap& headers_;
 };
 
 class MetadataMapWrapper;

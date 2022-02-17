@@ -77,9 +77,16 @@ case, an extension will explicitly state this in its documentation.
 Core and extensions
 -------------------
 
-Anything in the Envoy core may be used in both untrusted and trusted deployments. As a consequence,
-it should be hardened with this model in mind. Security issues related to core code will usually
-trigger the security release process as described in this document.
+Anything in the Envoy core may be used in both untrusted and trusted deployments, with the exception
+of features explicitly marked as alpha; alpha features are only supported in trusted deployments
+and do not qualify for treatment under the threat model below. As a consequence, the stable core should be hardened
+with this model in mind. Security issues related to core code will usually trigger the security release process as
+described in this document.
+
+.. note::
+
+  :ref:`contrib <install_contrib>` extensions are noted below and are not officially covered by
+  the threat model or the Envoy security team. All indications below are best effort.
 
 The following extensions are intended to be hardened against untrusted downstream and upstreams:
 

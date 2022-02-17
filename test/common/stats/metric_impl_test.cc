@@ -1,7 +1,7 @@
 #include <string>
 
-#include "common/stats/allocator_impl.h"
-#include "common/stats/utility.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/utility.h"
 
 #include "test/test_common/logging.h"
 

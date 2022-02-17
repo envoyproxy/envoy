@@ -5,12 +5,14 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/regex.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/regex.h"
+#include "source/common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Config {
+
+bool doesTagNameValueMatchInvalidCharRegex(absl::string_view name);
 
 /**
  * Well-known address resolver names.

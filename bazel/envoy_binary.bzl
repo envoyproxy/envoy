@@ -22,7 +22,8 @@ def envoy_cc_binary(
         stamped = False,
         deps = [],
         linkopts = [],
-        tags = []):
+        tags = [],
+        features = []):
     if not linkopts:
         linkopts = _envoy_linkopts()
     if stamped:
@@ -42,6 +43,7 @@ def envoy_cc_binary(
         stamp = 1,
         deps = deps,
         tags = tags,
+        features = features,
     )
 
 # Select the given values if exporting is enabled in the current build.
@@ -54,12 +56,7 @@ def _envoy_select_exported_symbols(xs):
 # Compute the final linkopts based on various options.
 def _envoy_linkopts():
     return select({
-        # The macOS system library transitively links common libraries (e.g., pthread).
-        "@envoy//bazel:apple": [
-            # See note here: https://luajit.org/install.html
-            "-pagezero_size 10000",
-            "-image_base 100000000",
-        ],
+        "@envoy//bazel:apple": [],
         "@envoy//bazel:windows_opt_build": [
             "-DEFAULTLIB:ws2_32.lib",
             "-DEFAULTLIB:iphlpapi.lib",
@@ -81,6 +78,7 @@ def _envoy_linkopts():
             "-Wl,--hash-style=gnu",
         ],
     }) + select({
+        "@envoy//bazel:apple": [],
         "@envoy//bazel:boringssl_fips": [],
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": ["-pie"],

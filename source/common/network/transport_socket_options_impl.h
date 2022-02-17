@@ -11,7 +11,7 @@ namespace Network {
 class AlpnDecoratingTransportSocketOptions : public TransportSocketOptions {
 public:
   AlpnDecoratingTransportSocketOptions(std::vector<std::string>&& alpn,
-                                       TransportSocketOptionsSharedPtr inner_options)
+                                       TransportSocketOptionsConstSharedPtr inner_options)
       : alpn_fallback_(std::move(alpn)), inner_options_(std::move(inner_options)) {}
   // Network::TransportSocketOptions
   const absl::optional<std::string>& serverNameOverride() const override {
@@ -34,7 +34,7 @@ public:
 
 private:
   const std::vector<std::string> alpn_fallback_;
-  const TransportSocketOptionsSharedPtr inner_options_;
+  const TransportSocketOptionsConstSharedPtr inner_options_;
 };
 
 class TransportSocketOptionsImpl : public TransportSocketOptions {
@@ -83,10 +83,10 @@ public:
   /**
    * Construct TransportSocketOptions from StreamInfo::FilterState, using UpstreamServerName
    * and ApplicationProtocols key in the filter state.
-   * @returns TransportSocketOptionsSharedPtr a shared pointer to the transport socket options,
+   * @returns TransportSocketOptionsConstSharedPtr a shared pointer to the transport socket options,
    * nullptr if nothing is in the filter state.
    */
-  static TransportSocketOptionsSharedPtr
+  static TransportSocketOptionsConstSharedPtr
   fromFilterState(const StreamInfo::FilterState& stream_info);
 };
 

@@ -8,11 +8,11 @@
 #include "envoy/common/platform.h"
 #include "envoy/network/address.h"
 
-#include "common/common/assert.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/cidr_range.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/cidr_range.h"
+#include "source/common/network/utility.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/numeric/int128.h"

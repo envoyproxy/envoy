@@ -5,10 +5,9 @@
 #include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
 #include "envoy/runtime/runtime.h"
 
-#include "common/http/message_impl.h"
-#include "common/network/address_impl.h"
-
-#include "extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -23,7 +22,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
@@ -161,10 +159,14 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   // Create a new filter for an SSL connection, with no backing auth data yet.
   createAuthFilter();
   ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_));
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1"));
   std::string expected_sha_1("digest");
   EXPECT_CALL(*ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_1));
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError));
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
+              setResponseCodeDetails("auth_digest_no_match"));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
@@ -184,7 +186,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Create a new filter for an SSL connection with an authorized cert.
   createAuthFilter();
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1"));
   std::string expected_sha_2("1b7d42ef0025ad89c1c911d6c10d7e86a4cb7c5863b2980abcbad1895f8b5314");
   EXPECT_CALL(*ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_2));
@@ -197,7 +199,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // White list case.
   createAuthFilter();
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   EXPECT_CALL(filter_callbacks_, continueReading());
@@ -208,7 +210,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // IPv6 White list case.
   createAuthFilter();
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("2001:abcd::1"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   EXPECT_CALL(filter_callbacks_, continueReading());

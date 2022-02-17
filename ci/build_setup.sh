@@ -10,6 +10,8 @@ export PPROF_PATH=/thirdparty_build/bin/pprof
 [ -z "${ENVOY_SRCDIR}" ] && export ENVOY_SRCDIR=/source
 [ -z "${ENVOY_BUILD_TARGET}" ] && export ENVOY_BUILD_TARGET=//source/exe:envoy-static
 [ -z "${ENVOY_BUILD_DEBUG_INFORMATION}" ] && export ENVOY_BUILD_DEBUG_INFORMATION=//source/exe:envoy-static.dwp
+[ -z "${ENVOY_CONTRIB_BUILD_TARGET}" ] && export ENVOY_CONTRIB_BUILD_TARGET=//contrib/exe:envoy-static
+[ -z "${ENVOY_CONTRIB_BUILD_DEBUG_INFORMATION}" ] && export ENVOY_CONTRIB_BUILD_DEBUG_INFORMATION=//contrib/exe:envoy-static.dwp
 [ -z "${ENVOY_BUILD_ARCH}" ] && {
     ENVOY_BUILD_ARCH=$(uname -m)
     export ENVOY_BUILD_ARCH
@@ -64,8 +66,9 @@ then
 fi
 
 # Environment setup.
-export TEST_TMPDIR=${BUILD_DIR}/tmp
-export PATH=/opt/llvm/bin:${PATH}
+export TEST_TMPDIR="${TEST_TMPDIR:-$BUILD_DIR/tmp}"
+export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
+export PATH=${LLVM_ROOT}/bin:${PATH}
 export CLANG_FORMAT="${CLANG_FORMAT:-clang-format}"
 
 if [[ -f "/etc/redhat-release" ]]; then
@@ -81,7 +84,6 @@ function cleanup() {
 cleanup
 trap cleanup EXIT
 
-export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
 "$(dirname "$0")"/../bazel/setup_clang.sh "${LLVM_ROOT}"
 
 [[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=("--nocache_test_results")

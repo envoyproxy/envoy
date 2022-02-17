@@ -11,15 +11,14 @@
 
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 
-#include "common/api/api_impl.h"
-#include "common/common/assert.h"
-#include "common/common/random_generator.h"
-#include "common/event/real_time_system.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "exe/platform_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/event/real_time_system.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/exe/platform_impl.h"
 
 // NOLINT(namespace-envoy)
 int main(int argc, char** argv) {

@@ -1,15 +1,13 @@
-#include "extensions/filters/network/dubbo_proxy/config.h"
+#include "source/extensions/filters/network/dubbo_proxy/config.h"
 
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/utility.h"
-
-#include "extensions/filters/network/dubbo_proxy/conn_manager.h"
-#include "extensions/filters/network/dubbo_proxy/filters/factory_base.h"
-#include "extensions/filters/network/dubbo_proxy/filters/well_known_names.h"
-#include "extensions/filters/network/dubbo_proxy/stats.h"
+#include "source/common/config/utility.h"
+#include "source/extensions/filters/network/dubbo_proxy/conn_manager.h"
+#include "source/extensions/filters/network/dubbo_proxy/filters/factory_base.h"
+#include "source/extensions/filters/network/dubbo_proxy/stats.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -24,8 +22,9 @@ Network::FilterFactoryCb DubboProxyFilterConfigFactory::createFilterFactoryFromP
   std::shared_ptr<Config> filter_config(std::make_shared<ConfigImpl>(proto_config, context));
 
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
-        *filter_config, context.api().randomGenerator(), context.dispatcher().timeSource()));
+    filter_manager.addReadFilter(
+        std::make_shared<ConnectionManager>(*filter_config, context.api().randomGenerator(),
+                                            context.mainThreadDispatcher().timeSource()));
   };
 }
 
@@ -110,7 +109,7 @@ ConfigImpl::ConfigImpl(const DubboProxyConfig& config,
     ENVOY_LOG(debug, "using default router filter");
 
     envoy::extensions::filters::network::dubbo_proxy::v3::DubboFilter router_config;
-    router_config.set_name(DubboFilters::DubboFilterNames::get().ROUTER);
+    router_config.set_name("envoy.filters.dubbo.router");
     registerFilter(router_config);
   } else {
     for (const auto& filter_config : config.dubbo_filters()) {
@@ -146,7 +145,6 @@ void ConfigImpl::registerFilter(const DubboFilterConfig& proto_config) {
           string_name);
   ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
   Envoy::Config::Utility::translateOpaqueConfig(proto_config.config(),
-                                                ProtobufWkt::Struct::default_instance(),
                                                 context_.messageValidationVisitor(), *message);
   DubboFilters::FilterFactoryCb callback =
       factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);

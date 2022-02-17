@@ -1,8 +1,8 @@
-#include "extensions/filters/http/composite/filter.h"
+#include "source/extensions/filters/http/composite/filter.h"
 
 #include "envoy/http/filter.h"
 
-#include "common/common/stl_helpers.h"
+#include "source/common/common/stl_helpers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -49,8 +49,8 @@ void Filter::decodeComplete() {
   }
 }
 
-Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderMap& headers) {
-  return delegateFilterActionOr(delegated_filter_, &StreamEncoderFilter::encode100ContinueHeaders,
+Http::FilterHeadersStatus Filter::encode1xxHeaders(Http::ResponseHeaderMap& headers) {
+  return delegateFilterActionOr(delegated_filter_, &StreamEncoderFilter::encode1xxHeaders,
                                 Http::FilterHeadersStatus::Continue, headers);
 }
 
@@ -78,7 +78,7 @@ void Filter::encodeComplete() {
 void Filter::onMatchCallback(const Matcher::Action& action) {
   const auto& composite_action = action.getTyped<ExecuteFilterAction>();
 
-  FactoryCallbacksWrapper wrapper(*this);
+  FactoryCallbacksWrapper wrapper(*this, dispatcher_);
   composite_action.createFilters(wrapper);
 
   if (!wrapper.errors_.empty()) {
@@ -104,6 +104,10 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
 
     delegated_filter_->setDecoderFilterCallbacks(*decoder_callbacks_);
     delegated_filter_->setEncoderFilterCallbacks(*encoder_callbacks_);
+
+    // Size should be small, so a copy should be fine.
+    access_loggers_.insert(access_loggers_.end(), wrapper.access_loggers_.begin(),
+                           wrapper.access_loggers_.end());
   }
 
   // TODO(snowp): Make it possible for onMatchCallback to fail the stream by issuing a local reply,
@@ -143,8 +147,8 @@ void Filter::StreamFilterWrapper::decodeComplete() {
 }
 
 Http::FilterHeadersStatus
-Filter::StreamFilterWrapper::encode100ContinueHeaders(Http::ResponseHeaderMap& headers) {
-  return delegateFilterActionOr(encoder_filter_, &StreamEncoderFilter::encode100ContinueHeaders,
+Filter::StreamFilterWrapper::encode1xxHeaders(Http::ResponseHeaderMap& headers) {
+  return delegateFilterActionOr(encoder_filter_, &StreamEncoderFilter::encode1xxHeaders,
                                 Http::FilterHeadersStatus::Continue, headers);
 }
 Http::FilterHeadersStatus

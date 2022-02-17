@@ -5,8 +5,8 @@
 
 #include "envoy/http/codec.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
 
 #include "nghttp2/nghttp2.h"
 
@@ -44,9 +44,16 @@ public:
    */
   bool onMetadataFrameComplete(bool end_metadata);
 
+  /**
+   * Returns the total size of METADATA frame payloads received.
+   */
+  uint64_t totalPayloadSize() const { return total_payload_size_; }
+
 private:
   friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test;
   friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderMultipleMetadataReachSizeLimit_Test;
+  friend class MetadataEncoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test;
+  friend class MetadataEncoderTest_VerifyEncoderDecoderMultipleMetadataReachSizeLimit_Test;
   /**
    * Decodes METADATA payload using nghttp2.
    * @param end_metadata indicates is END_METADATA is true.

@@ -1,9 +1,8 @@
 #include "envoy/extensions/filters/http/decompressor/v3/decompressor.pb.h"
 
-#include "common/http/headers.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/decompressor/decompressor_filter.h"
+#include "source/common/http/headers.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/decompressor/decompressor_filter.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/compression/decompressor/mocks.h"
@@ -389,6 +388,59 @@ response_direction_config:
     EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
 
     expectNoDecompression();
+  }
+}
+
+TEST_P(DecompressorFilterTest, DecompressionDisabledWhenNoTransformIsSet) {
+  EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
+  Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock, br , gzip "},
+                                                       {"content-length", "256"},
+                                                       {"cache-control", "no-transform"}};
+  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
+      doHeaders(headers_before_filter, false /* end_stream */);
+
+  if (isRequestDirection()) {
+    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))[0]
+                  ->value()
+                  .getStringView(),
+              "mock");
+    // The request direction adds Accept-Encoding by default. Other than this header, the rest of
+    // the headers should be the same before and after the filter.
+    headers_after_filter->remove(Http::LowerCaseString("accept-encoding"));
+  }
+  EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
+
+  expectNoDecompression();
+}
+
+TEST_P(DecompressorFilterTest,
+       DecompressionEnabledWhenNoTransformAndIgnoreNoTransformHeaderAreSet) {
+  setUpFilter(R"EOF(
+decompressor_library:
+  typed_config:
+    "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+response_direction_config:
+  common_config:
+    ignore_no_transform_header: true
+)EOF");
+
+  Http::TestRequestHeaderMapImpl headers_before_filter{
+      {"content-encoding", "mock"}, {"content-length", "256"}, {"cache-control", "no-transform"}};
+  if (isRequestDirection()) {
+    EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
+    std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
+        doHeaders(headers_before_filter, false /* end_stream */);
+
+    // The request direction adds Accept-Encoding by default. Other than this header, the rest of
+    // the headers should be the same before and after the filter.
+    headers_after_filter->remove(Http::LowerCaseString("accept-encoding"));
+    EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
+
+    expectNoDecompression();
+  } else {
+    decompressionActive(headers_before_filter, true /* end_with_data */,
+                        absl::nullopt /* expected_content_encoding*/,
+                        "mock" /* expected_accept_encoding */);
   }
 }
 

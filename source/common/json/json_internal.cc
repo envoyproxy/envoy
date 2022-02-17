@@ -1,4 +1,4 @@
-#include "common/json/json_internal.h"
+#include "source/common/json/json_internal.h"
 
 #include <cstdint>
 #include <fstream>
@@ -9,11 +9,11 @@
 #include <string>
 #include <vector>
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/hash.h"
-#include "common/common/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/utility.h"
+#include "source/common/protobuf/utility.h"
 
 // Do not let nlohmann/json leak outside of this file.
 #include "include/nlohmann/json.hpp"
@@ -109,7 +109,7 @@ private:
       return "String";
     }
 
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    return "";
   }
 
   struct Value {
@@ -196,26 +196,36 @@ public:
   bool null() override { return handleValueEvent(Field::createNull()); }
   bool string(std::string& value) override { return handleValueEvent(Field::createValue(value)); }
   bool binary(binary_t&) override { return false; }
-  bool parse_error(std::size_t, const std::string& token,
+  bool parse_error(std::size_t at, const std::string& token,
                    const nlohmann::detail::exception& ex) override {
-    // Errors are formatted like "[json.exception.parse_error.101] parse error: explanatory string."
-    // or "[json.exception.parse_error.101] parser error at (position): explanatory string.".
+    // Parse errors are formatted like "[json.exception.parse_error.101] parse error: explanatory
+    // string." or "[json.exception.parse_error.101] parser error at (position): explanatory
+    // string.". All errors start with "[json.exception.<error_type>.<error_num]" see:
     // https://json.nlohmann.me/home/exceptions/#parse-errors
+    // The `parse_error` method will be called also for non-parse errors.
     absl::string_view error = ex.what();
-    // Colon will always exist in the parse error.
+
+    // Colon will always exist in the parse error. For non-parse error use the
+    // ending ']' as a separator.
     auto end = error.find(": ");
-    if (end == std::string::npos) {
-      ENVOY_BUG(false, "Error string not present. Check nlohmann/json "
-                       "documentation in case error string changed.");
-    } else {
+    auto prefix_end = error.find(']');
+    if (end != std::string::npos) {
       // Extract portion after ": " to get error string.
-      error_ = error.substr(end + 2);
+      error_ = std::string(error.substr(end + 2));
       // Extract position information if present.
       auto start = error.find("at ");
       if (start != std::string::npos && (start + 3) < end) {
         start += 3;
         error_position_ = absl::StrCat(error.substr(start, end - start), ", token ", token);
       }
+    } else if ((prefix_end != std::string::npos) && (absl::StartsWith(error, ErrorPrefix))) {
+      // Non-parse error, fetching position from the arguments as it is not
+      // present in the error string.
+      error_position_ = absl::StrCat("position: ", at);
+      error_ = std::string(error.substr(prefix_end + 1));
+    } else {
+      IS_ENVOY_BUG("Error string not present. Check nlohmann/json "
+                   "documentation in case error string changed.");
     }
     return false;
   }
@@ -247,6 +257,8 @@ private:
 
   std::string error_;
   std::string error_position_;
+
+  static constexpr absl::string_view ErrorPrefix = "[json.exception.";
 };
 
 struct JsonContainer {
@@ -352,8 +364,14 @@ void Field::buildJsonDocument(const Field& field, nlohmann::json& value) {
   case Type::Null: {
     break;
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case Type::Boolean:
+    FALLTHRU;
+  case Type::Double:
+    FALLTHRU;
+  case Type::Integer:
+    FALLTHRU;
+  case Type::String:
+    PANIC("not implemented");
   }
 }
 
@@ -559,14 +577,16 @@ bool ObjectHandler::start_object(std::size_t) {
     stack_.push(object);
     state_ = State::ExpectKeyOrEndObject;
     return true;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case State::ExpectKeyOrEndObject:
+    FALLTHRU;
+  case State::ExpectFinished:
+    PANIC("not implemented");
   }
+  return false;
 }
 
 bool ObjectHandler::end_object() {
-  switch (state_) {
-  case State::ExpectKeyOrEndObject:
+  if (state_ == State::ExpectKeyOrEndObject) {
     stack_.top()->setLineNumberEnd(line_number_);
     stack_.pop();
 
@@ -578,20 +598,17 @@ bool ObjectHandler::end_object() {
       state_ = State::ExpectArrayValueOrEndArray;
     }
     return true;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC("parsing error not handled");
 }
 
 bool ObjectHandler::key(std::string& val) {
-  switch (state_) {
-  case State::ExpectKeyOrEndObject:
+  if (state_ == State::ExpectKeyOrEndObject) {
     key_ = val;
     state_ = State::ExpectValueOrStartObjectArray;
     return true;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC("parsing error not handled");
 }
 
 bool ObjectHandler::start_array(std::size_t) {
@@ -614,7 +631,7 @@ bool ObjectHandler::start_array(std::size_t) {
     state_ = State::ExpectArrayValueOrEndArray;
     return true;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("parsing error not handled");
   }
 }
 
@@ -634,7 +651,7 @@ bool ObjectHandler::end_array() {
 
     return true;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("parsing error not handled");
   }
 }
 

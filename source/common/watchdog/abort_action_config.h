@@ -1,9 +1,9 @@
 #pragma once
 
 #include "envoy/server/guarddog_config.h"
-#include "envoy/watchdog/v3alpha/abort_action.pb.h"
+#include "envoy/watchdog/v3/abort_action.pb.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Watchdog {
@@ -22,7 +22,7 @@ public:
 
   std::string name() const override { return "envoy.watchdog.abort_action"; }
 
-  using AbortActionConfig = envoy::watchdog::v3alpha::AbortActionConfig;
+  using AbortActionConfig = envoy::watchdog::v3::AbortActionConfig;
 };
 
 } // namespace Watchdog

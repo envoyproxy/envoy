@@ -14,7 +14,7 @@ using ::testing::ReturnRef;
 MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
   event_logger_ = new testing::NiceMock<Upstream::MockHealthCheckEventLogger>();
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
-  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+  ON_CALL(*this, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_));
   ON_CALL(*this, eventLogger_()).WillByDefault(Return(event_logger_));

@@ -1,68 +1,66 @@
-#include "common/quic/active_quic_listener.h"
-
-#include "envoy/network/exception.h"
-
-#if defined(__linux__)
-#include <linux/filter.h>
-#endif
+#include "source/common/quic/active_quic_listener.h"
 
 #include <vector>
 
-#include "common/runtime/runtime_features.h"
-#include "common/http/utility.h"
-#include "common/quic/envoy_quic_alarm_factory.h"
-#include "common/quic/envoy_quic_connection_helper.h"
-#include "common/quic/envoy_quic_dispatcher.h"
-#include "common/quic/envoy_quic_proof_source.h"
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/envoy_quic_packet_writer.h"
-#include "common/quic/envoy_quic_utils.h"
+#include "envoy/extensions/quic/crypto_stream/v3/crypto_stream.pb.h"
+#include "envoy/extensions/quic/proof_source/v3/proof_source.pb.h"
+#include "envoy/network/exception.h"
+
+#include "source/common/config/utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_dispatcher.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
+#include "source/common/quic/envoy_quic_proof_source.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_network_connection.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
 
-ActiveQuicListener::ActiveQuicListener(
-    uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
-    Network::UdpConnectionHandler& parent, Network::ListenerConfig& listener_config,
-    const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
-    bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
-    : ActiveQuicListener(worker_index, concurrency, dispatcher, parent,
-                         listener_config.listenSocketFactory().getListenSocket(), listener_config,
-                         quic_config, std::move(options), kernel_worker_routing, enabled) {}
+bool ActiveQuicListenerFactory::disable_kernel_bpf_packet_routing_for_test_ = false;
 
 ActiveQuicListener::ActiveQuicListener(
-    uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
-    Network::UdpConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
+    Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
+    Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
-    Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
-    const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
+    bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+    QuicStatNames& quic_stat_names, uint32_t packets_received_to_connection_count_ratio,
+    EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+    EnvoyQuicProofSourceFactoryInterface& proof_source_factory)
+    : ActiveQuicListener(runtime, worker_index, concurrency, dispatcher, parent,
+                         listener_config.listenSocketFactory().getListenSocket(worker_index),
+                         listener_config, quic_config, kernel_worker_routing, enabled,
+                         quic_stat_names, packets_received_to_connection_count_ratio,
+                         crypto_server_stream_factory, proof_source_factory) {}
+
+ActiveQuicListener::ActiveQuicListener(
+    Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
+    Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
+    Network::SocketSharedPtr listen_socket, Network::ListenerConfig& listener_config,
+    const quic::QuicConfig& quic_config, bool kernel_worker_routing,
+    const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
+    uint32_t packets_to_read_to_connection_count_ratio,
+    EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+    EnvoyQuicProofSourceFactoryInterface& proof_source_factory)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
           dispatcher.createUdpListener(
               listen_socket, *this,
               listener_config.udpListenerConfig()->config().downstream_socket_config()),
           &listener_config),
-      dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
-      kernel_worker_routing_(kernel_worker_routing) {
-  // This flag fix a QUICHE issue which may crash Envoy during connection close.
-  SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
-  // Do not include 32-byte per-entry overhead while counting header size.
-  quiche::FlagRegistry::getInstance();
+      dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedHttp3Versions()),
+      kernel_worker_routing_(kernel_worker_routing),
+      packets_to_read_to_connection_count_ratio_(packets_to_read_to_connection_count_ratio),
+      crypto_server_stream_factory_(crypto_server_stream_factory) {
+  ASSERT(GetQuicReloadableFlag(quic_single_ack_in_packet2));
   ASSERT(!GetQuicFlag(FLAGS_quic_header_size_limit_includes_overhead));
 
   if (Runtime::LoaderSingleton::getExisting()) {
-    enabled_.emplace(Runtime::FeatureFlag(enabled, Runtime::LoaderSingleton::get()));
-  }
-  if (options != nullptr) {
-    const bool ok = Network::Socket::applyOptions(
-        options, listen_socket_, envoy::config::core::v3::SocketOption::STATE_BOUND);
-    if (!ok) {
-      // TODO(fcoras): consider removing the fd from the log message
-      ENVOY_LOG(warn, "Failed to apply socket options to socket {} on listener {} after binding",
-                listen_socket_.ioHandle().fdDoNotUse(), listener_config.name());
-      throw Network::CreateListenerException("Failed to apply socket options.");
-    }
-    listen_socket_.addOptions(options);
+    enabled_.emplace(Runtime::FeatureFlag(enabled, runtime));
   }
 
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
@@ -70,8 +68,8 @@ ActiveQuicListener::ActiveQuicListener(
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
       absl::string_view(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
       quic::QuicRandom::GetInstance(),
-      std::make_unique<EnvoyQuicProofSource>(listen_socket_, listener_config.filterChainManager(),
-                                             stats_),
+      proof_source_factory.createQuicProofSource(listen_socket_,
+                                                 listener_config.filterChainManager(), stats_),
       quic::KeyExchangeSource::Default());
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
   crypto_config_->AddDefaultConfig(random, connection_helper->GetClock(),
@@ -81,7 +79,8 @@ ActiveQuicListener::ActiveQuicListener(
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
-      per_worker_stats_, dispatcher, listen_socket_);
+      per_worker_stats_, dispatcher, listen_socket_, quic_stat_names,
+      crypto_server_stream_factory_);
 
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =
@@ -214,32 +213,76 @@ uint32_t ActiveQuicListener::destination(const Network::UdpRecvData& data) const
   return connection_id_snippet % concurrency_;
 }
 
+size_t ActiveQuicListener::numPacketsExpectedPerEventLoop() const {
+  // Expect each session to read packets_to_read_to_connection_count_ratio_ number of packets in
+  // this read event.
+  return quic_dispatcher_->NumSessions() * packets_to_read_to_connection_count_ratio_;
+}
+
+void ActiveQuicListener::updateListenerConfig(Network::ListenerConfig& config) {
+  config_ = &config;
+  dynamic_cast<EnvoyQuicProofSource*>(crypto_config_->proof_source())
+      ->updateFilterChainManager(config.filterChainManager());
+  quic_dispatcher_->updateListenerConfig(config);
+}
+
+void ActiveQuicListener::onFilterChainDraining(
+    const std::list<const Network::FilterChain*>& draining_filter_chains) {
+  for (auto* filter_chain : draining_filter_chains) {
+    closeConnectionsWithFilterChain(filter_chain);
+  }
+}
+
+void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterChain* filter_chain) {
+  quic_dispatcher_->closeConnectionsWithFilterChain(filter_chain);
+}
+
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
-    const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency)
-    : concurrency_(concurrency), enabled_(config.enabled()) {
-  uint64_t idle_network_timeout_ms =
+    const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
+    QuicStatNames& quic_stat_names)
+    : concurrency_(concurrency), enabled_(config.enabled()), quic_stat_names_(quic_stat_names),
+      packets_to_read_to_connection_count_ratio_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
+                                          DEFAULT_PACKETS_TO_READ_PER_CONNECTION)) {
+  const int64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
-  quic_config_.SetIdleNetworkTimeout(
-      quic::QuicTime::Delta::FromMilliseconds(idle_network_timeout_ms));
-  int32_t max_time_before_crypto_handshake_ms =
+  const int64_t minimal_idle_network_timeout_ms = 1;
+  quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromMilliseconds(
+      std::max(minimal_idle_network_timeout_ms, idle_network_timeout_ms)));
+  const int64_t max_time_before_crypto_handshake_ms =
       config.has_crypto_handshake_timeout()
           ? DurationUtil::durationToMilliseconds(config.crypto_handshake_timeout())
           : 20000;
-  quic_config_.set_max_time_before_crypto_handshake(
-      quic::QuicTime::Delta::FromMilliseconds(max_time_before_crypto_handshake_ms));
-  int32_t max_streams =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.quic_protocol_options(), max_concurrent_streams, 100);
-  quic_config_.SetMaxBidirectionalStreamsToSend(max_streams);
-  quic_config_.SetMaxUnidirectionalStreamsToSend(max_streams);
-  configQuicInitialFlowControlWindow(config.quic_protocol_options(), quic_config_);
-}
+  quic_config_.set_max_time_before_crypto_handshake(quic::QuicTime::Delta::FromMilliseconds(
+      std::max(quic::kInitialIdleTimeoutSecs * 1000, max_time_before_crypto_handshake_ms)));
+  convertQuicConfig(config.quic_protocol_options(), quic_config_);
 
-Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
-    uint32_t worker_index, Network::UdpConnectionHandler& parent, Event::Dispatcher& disptacher,
-    Network::ListenerConfig& config) {
-  bool kernel_worker_routing = false;
-  std::unique_ptr<Network::Socket::Options> options = std::make_unique<Network::Socket::Options>();
+  // Initialize crypto stream factory.
+  envoy::config::core::v3::TypedExtensionConfig crypto_stream_config;
+  if (!config.has_crypto_stream_config()) {
+    // If not specified, use the quic crypto stream created by QUICHE.
+    crypto_stream_config.set_name("envoy.quic.crypto_stream.server.quiche");
+    envoy::extensions::quic::crypto_stream::v3::CryptoServerStreamConfig empty_crypto_stream_config;
+    crypto_stream_config.mutable_typed_config()->PackFrom(empty_crypto_stream_config);
+  } else {
+    crypto_stream_config = config.crypto_stream_config();
+  }
+  crypto_server_stream_factory_ =
+      Config::Utility::getAndCheckFactory<EnvoyQuicCryptoServerStreamFactoryInterface>(
+          crypto_stream_config);
+
+  // Initialize proof source factory.
+  envoy::config::core::v3::TypedExtensionConfig proof_source_config;
+  if (!config.has_proof_source_config()) {
+    proof_source_config.set_name("envoy.quic.proof_source.filter_chain");
+    envoy::extensions::quic::proof_source::v3::ProofSourceConfig empty_proof_source_config;
+    proof_source_config.mutable_typed_config()->PackFrom(empty_proof_source_config);
+  } else {
+    proof_source_config = config.proof_source_config();
+  }
+  proof_source_factory_ = Config::Utility::getAndCheckFactory<EnvoyQuicProofSourceFactoryInterface>(
+      proof_source_config);
 
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   // This BPF filter reads the 1st word of QUIC connection id in the UDP payload and mods it by the
@@ -254,7 +297,7 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
   // Any packet that doesn't belong to any of the three packet header types are dispatched
   // based on 5-tuple source/destination addresses.
   // SPELLCHECKER(off)
-  std::vector<sock_filter> filter = {
+  filter_ = {
       {0x80, 0, 0, 0000000000}, //                   ld len
       {0x35, 0, 9, 0x00000009}, //                   jlt #0x9, packet_too_short
       {0x30, 0, 0, 0000000000}, //                   ldb [0]
@@ -272,24 +315,20 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
       {0x16, 0, 0, 0000000000},   //                 ret a
   };
   // SPELLCHECKER(on)
-  sock_fprog prog;
-  // This option only needs to be applied once to any one of the sockets in SO_REUSEPORT socket
-  // group. One of the listener will be created with this socket option.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing")) {
-    absl::call_once(install_bpf_once_, [&]() {
-      if (concurrency_ > 1) {
-        prog.len = filter.size();
-        prog.filter = filter.data();
-        options->push_back(std::make_shared<Network::SocketOptionImpl>(
-            envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_ATTACH_REUSEPORT_CBPF,
-            absl::string_view(reinterpret_cast<char*>(&prog), sizeof(prog))));
-      } else {
-        ENVOY_LOG(info, "Not applying BPF because concurrency is 1");
-      }
-    });
+  if (!disable_kernel_bpf_packet_routing_for_test_) {
+    if (concurrency_ > 1) {
+      // Note that this option refers to the BPF program data above, which must live until the
+      // option is used. The program is kept as a member variable for this purpose.
+      prog_.len = filter_.size();
+      prog_.filter = filter_.data();
+      options_->push_back(std::make_shared<Network::SocketOptionImpl>(
+          envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_ATTACH_REUSEPORT_CBPF,
+          absl::string_view(reinterpret_cast<char*>(&prog_), sizeof(prog_))));
+    } else {
+      ENVOY_LOG(info, "Not applying BPF because concurrency is 1");
+    }
 
-    kernel_worker_routing = true;
+    kernel_worker_routing_ = true;
   };
 
 #else
@@ -298,11 +337,18 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
                     "not implemented by Envoy on this platform. QUIC performance may be degraded.");
   }
 #endif
+}
 
-  return std::make_unique<ActiveQuicListener>(worker_index, concurrency_, disptacher, parent,
-                                              config, quic_config_, std::move(options),
-                                              kernel_worker_routing, enabled_);
-} // namespace Quic
+Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
+    Runtime::Loader& runtime, uint32_t worker_index, Network::UdpConnectionHandler& parent,
+    Event::Dispatcher& disptacher, Network::ListenerConfig& config) {
+  ASSERT(crypto_server_stream_factory_.has_value());
+  return std::make_unique<ActiveQuicListener>(
+      runtime, worker_index, concurrency_, disptacher, parent, config, quic_config_,
+      kernel_worker_routing_, enabled_, quic_stat_names_,
+      packets_to_read_to_connection_count_ratio_, crypto_server_stream_factory_.value(),
+      proof_source_factory_.value());
+}
 
 } // namespace Quic
 } // namespace Envoy

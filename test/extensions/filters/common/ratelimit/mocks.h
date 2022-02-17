@@ -6,7 +6,7 @@
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "extensions/filters/common/ratelimit/ratelimit.h"
+#include "source/extensions/filters/common/ratelimit/ratelimit.h"
 
 #include "gmock/gmock.h"
 

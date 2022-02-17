@@ -1,50 +1,204 @@
-#include "common/http/alternate_protocols_cache_impl.h"
+#include "source/common/http/alternate_protocols_cache_impl.h"
+
+#include "source/common/common/logger.h"
+
+#include "quiche/spdy/core/spdy_alt_svc_wire_format.h"
+#include "re2/re2.h"
 
 namespace Envoy {
 namespace Http {
+namespace {
 
-AlternateProtocolsCacheImpl::AlternateProtocol::AlternateProtocol(absl::string_view alpn,
-                                                                  absl::string_view hostname,
-                                                                  uint32_t port)
-    : alpn_(alpn), hostname_(hostname), port_(port) {}
+struct RegexHolder {
+  RegexHolder() : origin_regex("(.*)://(.*):(\\d+)") {}
 
-AlternateProtocolsCacheImpl::Origin::Origin(absl::string_view scheme, absl::string_view hostname,
-                                            uint32_t port)
-    : scheme_(scheme), hostname_(hostname), port_(port) {}
+  const re2::RE2 origin_regex;
+};
 
-AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(TimeSource& time_source)
-    : time_source_(time_source) {}
+using ConstRegexHolder = ConstSingleton<RegexHolder>;
+
+} // namespace
+
+std::string
+AlternateProtocolsCacheImpl::originToString(const AlternateProtocolsCache::Origin& origin) {
+  return absl::StrCat(origin.scheme_, "://", origin.hostname_, ":", origin.port_);
+}
+
+absl::optional<AlternateProtocolsCache::Origin>
+AlternateProtocolsCacheImpl::stringToOrigin(const std::string& str) {
+  const re2::RE2& origin_regex = ConstRegexHolder::get().origin_regex;
+  std::string scheme;
+  std::string hostname;
+  int port = 0;
+  if (re2::RE2::FullMatch(str.c_str(), origin_regex, &scheme, &hostname, &port)) {
+    return AlternateProtocolsCache::Origin(scheme, hostname, port);
+  }
+  return {};
+}
+
+std::string AlternateProtocolsCacheImpl::originDataToStringForCache(
+    const std::vector<AlternateProtocol>& protocols, std::chrono::microseconds srtt) {
+  if (protocols.empty()) {
+    return std::string("clear|0");
+  }
+  std::string value;
+  for (auto& protocol : protocols) {
+    if (!value.empty()) {
+      value.push_back(',');
+    }
+    absl::StrAppend(&value, protocol.alpn_, "=\"", protocol.hostname_, ":", protocol.port_, "\"");
+
+    // Note this is _not_ actually the max age, but the absolute time at which
+    // this entry will expire. protocolsFromString will convert back to ma.
+    absl::StrAppend(
+        &value, "; ma=",
+        std::chrono::duration_cast<std::chrono::seconds>(protocol.expiration_.time_since_epoch())
+            .count());
+  }
+  absl::StrAppend(&value, "|", srtt.count());
+  return value;
+}
+
+absl::optional<AlternateProtocolsCacheImpl::OriginData>
+AlternateProtocolsCacheImpl::originDataFromString(absl::string_view origin_data_string,
+                                                  TimeSource& time_source, bool from_cache) {
+  OriginData data;
+  const std::vector<absl::string_view> parts = absl::StrSplit(origin_data_string, '|');
+  if (parts.size() == 2) {
+    int64_t srtt;
+    if (!absl::SimpleAtoi(parts[1], &srtt)) {
+      return {};
+    }
+    data.srtt = std::chrono::microseconds(srtt);
+  } else if (parts.size() != 1) {
+    return {};
+  } else {
+    // Handling raw alt-svc with no endpoint info
+    data.srtt = std::chrono::microseconds(0);
+  }
+
+  spdy::SpdyAltSvcWireFormat::AlternativeServiceVector altsvc_vector;
+  if (!spdy::SpdyAltSvcWireFormat::ParseHeaderFieldValue(parts[0], &altsvc_vector)) {
+    return {};
+  }
+  for (const auto& alt_svc : altsvc_vector) {
+    MonotonicTime expiration;
+    if (from_cache) {
+      auto expire_time_from_epoch = std::chrono::seconds(alt_svc.max_age_seconds);
+      auto time_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(
+          time_source.monotonicTime().time_since_epoch());
+      if (expire_time_from_epoch < time_since_epoch) {
+        expiration = time_source.monotonicTime();
+      } else {
+        expiration = time_source.monotonicTime() + (expire_time_from_epoch - time_since_epoch);
+      }
+    } else {
+      expiration = time_source.monotonicTime() + std::chrono::seconds(alt_svc.max_age_seconds);
+    }
+    Http::AlternateProtocolsCache::AlternateProtocol protocol(alt_svc.protocol_id, alt_svc.host,
+                                                              alt_svc.port, expiration);
+    data.protocols.push_back(protocol);
+  }
+  return data;
+}
+
+AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
+    TimeSource& time_source, std::unique_ptr<KeyValueStore>&& key_value_store, size_t max_entries)
+    : time_source_(time_source), key_value_store_(std::move(key_value_store)),
+      max_entries_(max_entries > 0 ? max_entries : 1024) {
+  if (key_value_store_) {
+    KeyValueStore::ConstIterateCb load = [this](const std::string& key, const std::string& value) {
+      absl::optional<OriginData> origin_data = originDataFromString(value, time_source_, true);
+      absl::optional<Origin> origin = stringToOrigin(key);
+      if (origin_data.has_value() && origin.has_value()) {
+        setAlternativesImpl(origin.value(), origin_data.value().protocols);
+        setSrtt(origin.value(), origin_data.value().srtt);
+      } else {
+        ENVOY_LOG(warn,
+                  fmt::format("Unable to parse cache entry with key: {} value: {}", key, value));
+      }
+      return KeyValueStore::Iterate::Continue;
+    };
+    key_value_store_->iterate(load);
+  }
+}
 
 AlternateProtocolsCacheImpl::~AlternateProtocolsCacheImpl() = default;
 
 void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
-                                                  const std::vector<AlternateProtocol>& protocols,
-                                                  const MonotonicTime& expiration) {
-  Entry& entry = protocols_[origin];
-  if (entry.protocols_ != protocols) {
-    entry.protocols_ = protocols;
-  }
-  if (entry.expiration_ != expiration) {
-    entry.expiration_ = expiration;
+                                                  std::vector<AlternateProtocol>& protocols) {
+  setAlternativesImpl(origin, protocols);
+  if (key_value_store_) {
+    key_value_store_->addOrUpdate(
+        originToString(origin),
+        originDataToStringForCache(protocols, std::chrono::microseconds(0)));
   }
 }
 
-OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>>
+void AlternateProtocolsCacheImpl::setSrtt(const Origin& origin, std::chrono::microseconds srtt) {
+  auto entry_it = protocols_.find(origin);
+  if (entry_it == protocols_.end()) {
+    return;
+  }
+  entry_it->second.srtt = srtt;
+  if (key_value_store_) {
+    key_value_store_->addOrUpdate(originToString(origin),
+                                  originDataToStringForCache(entry_it->second.protocols, srtt));
+  }
+}
+
+std::chrono::microseconds AlternateProtocolsCacheImpl::getSrtt(const Origin& origin) const {
+  auto entry_it = protocols_.find(origin);
+  if (entry_it == protocols_.end()) {
+    return std::chrono::microseconds(0);
+  }
+  return entry_it->second.srtt;
+}
+
+void AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
+                                                      std::vector<AlternateProtocol>& protocols) {
+  static const size_t max_protocols = 10;
+  if (protocols.size() > max_protocols) {
+    ENVOY_LOG_MISC(trace, "Too many alternate protocols: {}, truncating", protocols.size());
+    protocols.erase(protocols.begin() + max_protocols, protocols.end());
+  }
+  while (protocols_.size() >= max_entries_) {
+    auto iter = protocols_.begin();
+    key_value_store_->remove(originToString(iter->first));
+    protocols_.erase(iter);
+  }
+  protocols_[origin] = OriginData{protocols, std::chrono::microseconds(0)};
+}
+
+OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>>
 AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
   auto entry_it = protocols_.find(origin);
   if (entry_it == protocols_.end()) {
-    return makeOptRefFromPtr<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>>(
-        nullptr);
+    return makeOptRefFromPtr<const std::vector<AlternateProtocol>>(nullptr);
+  }
+  std::vector<AlternateProtocol>& protocols = entry_it->second.protocols;
+
+  auto original_size = protocols.size();
+  const MonotonicTime now = time_source_.monotonicTime();
+  protocols.erase(std::remove_if(protocols.begin(), protocols.end(),
+                                 [now](const AlternateProtocol& protocol) {
+                                   return (now > protocol.expiration_);
+                                 }),
+                  protocols.end());
+
+  if (protocols.empty()) {
+    protocols_.erase(entry_it);
+    if (key_value_store_) {
+      key_value_store_->remove(originToString(origin));
+    }
+    return makeOptRefFromPtr<const std::vector<AlternateProtocol>>(nullptr);
+  }
+  if (key_value_store_ && original_size != protocols.size()) {
+    key_value_store_->addOrUpdate(originToString(origin),
+                                  originDataToStringForCache(protocols, entry_it->second.srtt));
   }
 
-  const Entry& entry = entry_it->second;
-  if (time_source_.monotonicTime() > entry.expiration_) {
-    // Expire the entry.
-    protocols_.erase(entry_it);
-    return makeOptRefFromPtr<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>>(
-        nullptr);
-  }
-  return makeOptRef(entry.protocols_);
+  return makeOptRef(const_cast<const std::vector<AlternateProtocol>&>(protocols));
 }
 
 size_t AlternateProtocolsCacheImpl::size() const { return protocols_.size(); }

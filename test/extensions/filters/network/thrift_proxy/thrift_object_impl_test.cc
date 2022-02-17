@@ -1,6 +1,5 @@
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/thrift_object_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift_object_impl.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
@@ -72,7 +71,7 @@ public:
             return true;
           }));
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("reached unexpected code");
     }
   }
 
@@ -126,7 +125,7 @@ public:
       EXPECT_EQ("six", value.getValueTyped<std::string>());
       break;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("reached unexpected code");
     }
   }
 

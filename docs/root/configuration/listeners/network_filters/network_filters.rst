@@ -12,10 +12,12 @@ filters.
 
   dubbo_proxy_filter
   client_ssl_auth_filter
+  connection_limit_filter
   echo_filter
   direct_response_filter
   ext_authz_filter
   kafka_broker_filter
+  kafka_mesh_filter
   local_rate_limit_filter
   mongo_proxy_filter
   mysql_proxy_filter

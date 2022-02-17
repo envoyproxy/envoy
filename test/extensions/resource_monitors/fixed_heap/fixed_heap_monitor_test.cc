@@ -1,6 +1,6 @@
 #include "envoy/extensions/resource_monitors/fixed_heap/v3/fixed_heap.pb.h"
 
-#include "extensions/resource_monitors/fixed_heap/fixed_heap_monitor.h"
+#include "source/extensions/resource_monitors/fixed_heap/fixed_heap_monitor.h"
 
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
@@ -20,7 +20,7 @@ public:
   MOCK_METHOD(uint64_t, unmappedHeapBytes, ());
 };
 
-class ResourcePressure : public Server::ResourceMonitor::Callbacks {
+class ResourcePressure : public Server::ResourceUpdateCallbacks {
 public:
   void onSuccess(const Server::ResourceUsage& usage) override {
     pressure_ = usage.resource_pressure_;

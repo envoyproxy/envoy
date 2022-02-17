@@ -59,6 +59,10 @@ CheckOptions:
   - key:             readability-identifier-naming.EnumConstantCase
     value:           'CamelCase'
 
+  # Ignore GoogleTest function macros.
+  - key:             readability-identifier-naming.FunctionIgnoredRegexp
+    value:           '(TEST|TEST_F|TEST_P|INSTANTIATE_TEST_SUITE_P|MOCK_METHOD|TYPED_TEST)'
+
   - key:             readability-identifier-naming.ParameterCase
     value:           'lower_case'
 

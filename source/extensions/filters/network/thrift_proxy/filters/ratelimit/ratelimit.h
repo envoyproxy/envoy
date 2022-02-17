@@ -9,11 +9,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/stats/symbol_table_impl.h"
-
-#include "extensions/filters/common/ratelimit/ratelimit.h"
-#include "extensions/filters/common/ratelimit/stat_names.h"
-#include "extensions/filters/network/thrift_proxy/filters/pass_through_filter.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/extensions/filters/common/ratelimit/ratelimit.h"
+#include "source/extensions/filters/common/ratelimit/stat_names.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {

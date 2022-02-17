@@ -4,11 +4,11 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "common/quic/platform/quic_mem_slice_impl.h"
+#include "source/common/quic/platform/quic_mem_slice_impl.h"
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace quic {
 
@@ -42,6 +42,11 @@ QuicMemSliceImpl::QuicMemSliceImpl(std::unique_ptr<char[]> buffer, size_t length
           })) {
   single_slice_buffer_.addBufferFragment(*fragment_);
   ASSERT(this->length() == length);
+}
+
+QuicMemSliceImpl::~QuicMemSliceImpl() {
+  ASSERT(fragment_ == nullptr || (firstSliceLength(single_slice_buffer_) == fragment_->size() &&
+                                  data() == fragment_->data()));
 }
 
 const char* QuicMemSliceImpl::data() const {

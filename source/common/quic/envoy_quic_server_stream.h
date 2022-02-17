@@ -1,18 +1,8 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "source/common/quic/envoy_quic_stream.h"
 
 #include "quiche/quic/core/http/quic_spdy_server_stream_base.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "common/quic/envoy_quic_stream.h"
 
 namespace Envoy {
 namespace Quic {
@@ -28,16 +18,10 @@ public:
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                             headers_with_underscores_action);
 
-  EnvoyQuicServerStream(quic::PendingStream* pending, quic::QuicSpdySession* session,
-                        quic::StreamType type, Http::Http3::CodecStats& stats,
-                        const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
-                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                            headers_with_underscores_action);
-
   void setRequestDecoder(Http::RequestDecoder& decoder) { request_decoder_ = &decoder; }
 
   // Http::StreamEncoder
-  void encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) override;
+  void encode1xxHeaders(const Http::ResponseHeaderMap& headers) override;
   void encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(const Http::ResponseTrailerMap& trailers) override;
@@ -51,24 +35,25 @@ public:
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
-  void setFlushTimeout(std::chrono::milliseconds) override {
-    // TODO(mattklein123): Actually implement this for HTTP/3 similar to HTTP/2.
-  }
+
+  // quic::QuicStream
+  void OnStreamFrame(const quic::QuicStreamFrame& frame) override;
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
-  bool OnStopSending(quic::QuicRstStreamErrorCode error) override;
+  bool OnStopSending(quic::QuicResetStreamError error) override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
-  void Reset(quic::QuicRstStreamErrorCode error) override;
+  void ResetWithError(quic::QuicResetStreamError error) override;
   void OnClose() override;
   void OnCanWrite() override;
   // quic::QuicSpdyServerStreamBase
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
+  void CloseWriteSide() override;
 
   void clearWatermarkBuffer();
 
   // EnvoyQuicStream
   Http::HeaderUtility::HeaderValidationResult
-  validateHeader(const std::string& header_name, absl::string_view header_value) override;
+  validateHeader(absl::string_view header_name, absl::string_view header_value) override;
 
 protected:
   // EnvoyQuicStream
@@ -83,15 +68,19 @@ protected:
                                  const quic::QuicHeaderList& header_list) override;
   void OnHeadersTooLarge() override;
 
+  // Http::MultiplexedStreamImplBase
+  void onPendingFlushTimer() override;
+  bool hasPendingData() override;
+
+  void
+  onStreamError(absl::optional<bool> should_close_connection,
+                quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD) override;
+
 private:
   QuicFilterManagerConnectionImpl* filterManagerConnection();
 
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
-
-  // Either reset the stream or close the connection according to
-  // should_close_connection and configured http3 options.
-  void onStreamError(absl::optional<bool> should_close_connection);
 
   Http::RequestDecoder* request_decoder_{nullptr};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction

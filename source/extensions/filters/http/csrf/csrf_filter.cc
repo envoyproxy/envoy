@@ -1,14 +1,12 @@
-#include "extensions/filters/http/csrf/csrf_filter.h"
+#include "source/extensions/filters/http/csrf/csrf_filter.h"
 
 #include "envoy/extensions/filters/http/csrf/v3/csrf.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/empty_string.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -128,7 +126,7 @@ Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::RequestHeaderMap& head
 }
 
 void CsrfFilter::determinePolicy() {
-  const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().Csrf;
+  const std::string& name = "envoy.filters.http.csrf";
   const CsrfPolicy* policy =
       Http::Utility::resolveMostSpecificPerFilterConfig<CsrfPolicy>(name, callbacks_->route());
   if (policy != nullptr) {

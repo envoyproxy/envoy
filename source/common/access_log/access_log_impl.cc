@@ -1,4 +1,4 @@
-#include "common/access_log/access_log_impl.h"
+#include "source/common/access_log/access_log_impl.h"
 
 #include <cstdint>
 #include <string>
@@ -11,17 +11,17 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/assert.h"
-#include "common/common/utility.h"
-#include "common/config/metadata.h"
-#include "common/config/utility.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/stream_info/utility.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stream_info/utility.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -40,15 +40,16 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) const {
   }
 
   switch (config_.op()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::accesslog::v3::ComparisonFilter::GE:
     return lhs >= value;
   case envoy::config::accesslog::v3::ComparisonFilter::EQ:
     return lhs == value;
   case envoy::config::accesslog::v3::ComparisonFilter::LE:
     return lhs <= value;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  IS_ENVOY_BUG("unexpected comparsion op enum");
+  return false;
 }
 
 FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
@@ -86,9 +87,11 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
           Config::Utility::getAndCheckFactory<ExtensionFilterFactory>(config.extension_filter());
       return factory.createFilter(config.extension_filter(), runtime, random);
     }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::FILTER_SPECIFIER_NOT_SET:
+    PANIC_DUE_TO_PROTO_UNSET;
   }
+  IS_ENVOY_BUG("unexpected filter specifier value");
+  return nullptr;
 }
 
 bool TraceableRequestFilter::evaluate(const StreamInfo::StreamInfo& info,
@@ -155,7 +158,10 @@ OperatorFilter::OperatorFilter(
     Runtime::Loader& runtime, Random::RandomGenerator& random,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
   for (const auto& config : configs) {
-    filters_.emplace_back(FilterFactory::fromProto(config, runtime, random, validation_visitor));
+    auto filter = FilterFactory::fromProto(config, runtime, random, validation_visitor);
+    if (filter != nullptr) {
+      filters_.emplace_back(std::move(filter));
+    }
   }
 }
 

@@ -6,8 +6,7 @@
 #include "envoy/extensions/filters/http/dynamo/v3/dynamo.pb.validate.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,7 +19,7 @@ namespace Dynamo {
 class DynamoFilterConfig
     : public Common::FactoryBase<envoy::extensions::filters::http::dynamo::v3::Dynamo> {
 public:
-  DynamoFilterConfig() : FactoryBase(HttpFilterNames::get().Dynamo) {}
+  DynamoFilterConfig() : FactoryBase("envoy.filters.http.dynamo") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

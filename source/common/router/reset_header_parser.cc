@@ -1,8 +1,8 @@
-#include "common/router/reset_header_parser.h"
+#include "source/common/router/reset_header_parser.h"
 
 #include <cstdint>
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/numbers.h"
 
@@ -13,14 +13,13 @@ ResetHeaderParserImpl::ResetHeaderParserImpl(
     const envoy::config::route::v3::RetryPolicy::ResetHeader& config)
     : name_(config.name()) {
   switch (config.format()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::RetryPolicy::SECONDS:
     format_ = ResetHeaderFormat::Seconds;
     break;
   case envoy::config::route::v3::RetryPolicy::UNIX_TIMESTAMP:
     format_ = ResetHeaderFormat::UnixTimestamp;
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -56,9 +55,6 @@ ResetHeaderParserImpl::parseInterval(TimeSource& time_source,
       return absl::optional<std::chrono::milliseconds>(interval * 1000UL);
     }
     break;
-
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   return absl::nullopt;

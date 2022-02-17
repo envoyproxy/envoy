@@ -3,7 +3,7 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/protobuf/message_validator.h"
 
-#include "common/matcher/matcher.h"
+#include "source/common/matcher/matcher.h"
 
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -19,7 +19,7 @@ struct TestData {
 // A CommonProtocolInput that returns the configured value every time.
 struct CommonProtocolTestInput : public CommonProtocolInput {
   explicit CommonProtocolTestInput(const std::string& data) : data_(data) {}
-  absl::optional<absl::string_view> get() override { return data_; }
+  absl::optional<std::string> get() override { return data_; }
 
   const std::string data_;
 };
@@ -28,10 +28,10 @@ public:
   TestCommonProtocolInputFactory(absl::string_view factory_name, absl::string_view data)
       : factory_name_(std::string(factory_name)), value_(std::string(data)), injection_(*this) {}
 
-  CommonProtocolInputPtr
-  createCommonProtocolInput(const Protobuf::Message&,
-                            Server::Configuration::FactoryContext&) override {
-    return std::make_unique<CommonProtocolTestInput>(value_);
+  CommonProtocolInputFactoryCb
+  createCommonProtocolInputFactoryCb(const Protobuf::Message&,
+                                     ProtobufMessage::ValidationVisitor&) override {
+    return [&]() { return std::make_unique<CommonProtocolTestInput>(value_); };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -48,7 +48,7 @@ private:
 // A DataInput that returns the configured value every time.
 struct TestInput : public DataInput<TestData> {
   explicit TestInput(DataInputGetResult result) : result_(result) {}
-  DataInputGetResult get(const TestData&) override { return result_; }
+  DataInputGetResult get(const TestData&) const override { return result_; }
 
   DataInputGetResult result_;
 };
@@ -56,13 +56,15 @@ struct TestInput : public DataInput<TestData> {
 // Self-injecting factory for TestInput.
 class TestDataInputFactory : public DataInputFactory<TestData> {
 public:
+  TestDataInputFactory(absl::string_view factory_name, DataInputGetResult result)
+      : factory_name_(std::string(factory_name)), result_(result), injection_(*this) {}
   TestDataInputFactory(absl::string_view factory_name, absl::string_view data)
-      : factory_name_(std::string(factory_name)), value_(std::string(data)), injection_(*this) {}
+      : TestDataInputFactory(factory_name, {DataInputGetResult::DataAvailability::AllDataAvailable,
+                                            std::string(data)}) {}
 
-  DataInputPtr<TestData> createDataInput(const Protobuf::Message&,
-                                         Server::Configuration::FactoryContext&) override {
-    return std::make_unique<TestInput>(
-        DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, value_});
+  DataInputFactoryCb<TestData>
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+    return [&]() { return std::make_unique<TestInput>(result_); };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -72,7 +74,7 @@ public:
 
 private:
   const std::string factory_name_;
-  const std::string value_;
+  const DataInputGetResult result_;
   Registry::InjectFactory<DataInputFactory<TestData>> injection_;
 };
 
@@ -105,10 +107,10 @@ struct StringAction : public ActionBase<ProtobufWkt::StringValue> {
 };
 
 // Factory for StringAction.
-class StringActionFactory : public ActionFactory {
+class StringActionFactory : public ActionFactory<absl::string_view> {
 public:
-  ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config, const std::string&,
-                                        Server::Configuration::FactoryContext&) override {
+  ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config, absl::string_view&,
+                                        ProtobufMessage::ValidationVisitor&) override {
     const auto& string = dynamic_cast<const ProtobufWkt::StringValue&>(config);
     return [string]() { return std::make_unique<StringAction>(string.value()); };
   }
@@ -132,9 +134,10 @@ class NeverMatchFactory : public InputMatcherFactory {
 public:
   NeverMatchFactory() : inject_factory_(*this) {}
 
-  InputMatcherPtr createInputMatcher(const Protobuf::Message&,
-                                     Server::Configuration::FactoryContext&) override {
-    return std::make_unique<NeverMatch>();
+  InputMatcherFactoryCb
+  createInputMatcherFactoryCb(const Protobuf::Message&,
+                              Server::Configuration::ServerFactoryContext&) override {
+    return []() { return std::make_unique<NeverMatch>(); };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -158,7 +161,8 @@ createSingleMatcher(absl::optional<absl::string_view> input,
                     DataInputGetResult::DataAvailability availability =
                         DataInputGetResult::DataAvailability::AllDataAvailable) {
   return std::make_unique<SingleFieldMatcher<TestData>>(
-      std::make_unique<TestInput>(DataInputGetResult{availability, input}),
+      std::make_unique<TestInput>(DataInputGetResult{
+          availability, input ? absl::make_optional(std::string(*input)) : absl::nullopt}),
       std::make_unique<TestMatcher>(predicate));
 }
 

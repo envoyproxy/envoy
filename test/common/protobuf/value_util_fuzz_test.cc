@@ -1,4 +1,4 @@
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/fuzz/fuzz_runner.h"
 

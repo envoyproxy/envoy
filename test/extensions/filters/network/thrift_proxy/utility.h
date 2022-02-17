@@ -4,10 +4,9 @@
 
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/byte_order.h"
-
-#include "extensions/filters/network/thrift_proxy/thrift.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/byte_order.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift.h"
 
 #include "test/common/buffer/utility.h"
 
@@ -73,7 +72,7 @@ transportTypeToProto(TransportType transport_type) {
   case TransportType::Header:
     return envoy::extensions::filters::network::thrift_proxy::v3::HEADER;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 }
 
@@ -85,7 +84,7 @@ protocolTypeToProto(ProtocolType protocol_type) {
   case ProtocolType::Compact:
     return envoy::extensions::filters::network::thrift_proxy::v3::COMPACT;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 }
 
@@ -150,6 +149,7 @@ MATCHER_P(HasFrameSize, n, "") {
 
 MATCHER_P(HasProtocol, p, "") { return arg.hasProtocol() && arg.protocol() == p; }
 MATCHER_P(HasSequenceId, id, "") { return arg.hasSequenceId() && arg.sequenceId() == id; }
+MATCHER_P(HasHeaderFlags, flags, "") { return arg.hasHeaderFlags() && arg.headerFlags() == flags; }
 MATCHER(HasNoHeaders, "") { return arg.headers().size() == 0; }
 
 MATCHER_P2(HasAppException, t, m, "") {

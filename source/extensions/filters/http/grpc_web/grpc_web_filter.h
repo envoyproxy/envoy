@@ -3,10 +3,10 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/non_copyable.h"
-#include "common/grpc/codec.h"
-#include "common/grpc/context_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/grpc/context_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,7 +14,7 @@ namespace HttpFilters {
 namespace GrpcWeb {
 
 /**
- * See docs/configuration/http_filters/grpc_web_filter.rst
+ * See https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/grpc_web_filter
  */
 class GrpcWebFilter : public Http::StreamFilter, NonCopyable {
 public:
@@ -35,7 +35,7 @@ public:
   }
 
   // Implements StreamEncoderFilter.
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
+  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override;

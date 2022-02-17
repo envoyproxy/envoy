@@ -39,6 +39,14 @@ public:
   virtual void waitForCounterExists(const std::string& name) PURE;
 
   /**
+   * Wait until a histogram has samples.
+   * @param name histogram name.
+   */
+  virtual void waitUntilHistogramHasSamples(
+      const std::string& name,
+      std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
+
+  /**
    * Wait for a gauge to >= a given value.
    * @param name gauge name.
    * @param value target value.
@@ -57,6 +65,12 @@ public:
   virtual void
   waitForGaugeEq(const std::string& name, uint64_t value,
                  std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
+
+  /**
+   * Wait for a gauge to be destroyed. Note that MockStatStore does not destroy stat.
+   * @param name gauge name.
+   */
+  virtual void waitForGaugeDestroyed(const std::string& name) PURE;
 
   /**
    * Counter lookup. This is not thread safe, since we don't get a consistent
@@ -83,6 +97,11 @@ public:
    * @return std::vector<Stats::GaugeSharedPtr> snapshot of server counters.
    */
   virtual std::vector<Stats::GaugeSharedPtr> gauges() PURE;
+
+  /**
+   * @return std::vector<Stats::ParentHistogramSharedPtr> snapshot of server histograms.
+   */
+  virtual std::vector<Stats::ParentHistogramSharedPtr> histograms() PURE;
 };
 
 } // namespace Envoy

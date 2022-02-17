@@ -1,8 +1,8 @@
-#include "extensions/filters/http/jwt_authn/filter_config.h"
+#include "source/extensions/filters/http/jwt_authn/filter_config.h"
 
 #include <algorithm> // std::sort
 
-#include "common/common/empty_string.h"
+#include "source/common/common/empty_string.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::RequirementRule;
 
@@ -15,12 +15,11 @@ FilterConfigImpl::FilterConfigImpl(
     envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
     : proto_config_(std::move(proto_config)), stats_(generateStats(stats_prefix, context.scope())),
-      cm_(context.clusterManager()), time_source_(context.dispatcher().timeSource()) {
+      cm_(context.clusterManager()), time_source_(context.mainThreadDispatcher().timeSource()) {
 
   ENVOY_LOG(debug, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
 
-  jwks_cache_ =
-      JwksCache::create(proto_config_, time_source_, context.api(), context.threadLocal());
+  jwks_cache_ = JwksCache::create(proto_config_, context, Common::JwksFetcher::create, stats_);
 
   std::vector<std::string> names;
   for (const auto& it : proto_config_.requirement_map()) {
@@ -51,8 +50,6 @@ FilterConfigImpl::FilterConfigImpl(
     case RequirementRule::RequirementTypeCase::REQUIREMENT_TYPE_NOT_SET:
       rule_pairs_.emplace_back(Matcher::create(rule), nullptr);
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 

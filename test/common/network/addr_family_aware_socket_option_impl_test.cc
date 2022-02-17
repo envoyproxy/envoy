@@ -1,10 +1,10 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/network/addr_family_aware_socket_option_impl.h"
-#include "common/network/io_socket_handle_impl.h"
-#include "common/network/socket_interface.h"
-#include "common/network/utility.h"
+#include "source/common/network/addr_family_aware_socket_option_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/socket_interface.h"
+#include "source/common/network/utility.h"
 
 #include "test/common/network/socket_option_test.h"
 
@@ -22,6 +22,53 @@ protected:
     EXPECT_CALL(os_sys_calls_, close(_)).Times(testing::AnyNumber());
   }
 };
+
+// Set options directly
+TEST_F(AddrFamilyAwareSocketOptionImplTest, SetSocketOptionsDirectly) {
+  AddrFamilyAwareSocketOptionImpl socket_option(
+      std::make_unique<SocketOptionImpl>(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                                         ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 1),
+      std::make_unique<SocketOptionImpl>(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                                         ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 2));
+
+  EXPECT_CALL(socket_, ipVersion()).WillRepeatedly(testing::Return(Address::IpVersion::v4));
+  testSetSocketOptionSuccess(socket_option, ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 1,
+                             {envoy::config::core::v3::SocketOption::STATE_PREBIND});
+  EXPECT_CALL(socket_, ipVersion()).WillRepeatedly(testing::Return(Address::IpVersion::v6));
+  testSetSocketOptionSuccess(socket_option, ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 2,
+                             {envoy::config::core::v3::SocketOption::STATE_PREBIND});
+}
+
+// Different values for v4 and v6
+TEST_F(AddrFamilyAwareSocketOptionImplTest, DifferentV4AndV6OptionValue) {
+  AddrFamilyAwareSocketOptionImpl socket_option{
+      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 1,
+      ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 2};
+  EXPECT_CALL(socket_, ipVersion()).WillRepeatedly(testing::Return(Address::IpVersion::v4));
+  testSetSocketOptionSuccess(socket_option, ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 1,
+                             {envoy::config::core::v3::SocketOption::STATE_PREBIND});
+  EXPECT_CALL(socket_, ipVersion()).WillRepeatedly(testing::Return(Address::IpVersion::v6));
+  testSetSocketOptionSuccess(socket_option, ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 2,
+                             {envoy::config::core::v3::SocketOption::STATE_PREBIND});
+}
+
+// Different string values for v4 and v6.
+TEST_F(AddrFamilyAwareSocketOptionImplTest, DifferentV4AndV6OptionData) {
+  AddrFamilyAwareSocketOptionImpl socket_option{
+      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10),
+      "hello", ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), "world"};
+  EXPECT_TRUE(socket_option.isSupported());
+  EXPECT_CALL(socket_, ipVersion()).WillRepeatedly(testing::Return(Address::IpVersion::v4));
+  EXPECT_EQ(
+      "hello",
+      socket_option.getOptionDetails(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND)
+          ->value_);
+  EXPECT_CALL(socket_, ipVersion()).WillRepeatedly(testing::Return(Address::IpVersion::v6));
+  EXPECT_EQ(
+      "world",
+      socket_option.getOptionDetails(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND)
+          ->value_);
+}
 
 // We fail to set the option when the underlying setsockopt syscall fails.
 TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionFailure) {

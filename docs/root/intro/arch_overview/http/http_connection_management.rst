@@ -245,3 +245,16 @@ Timeouts
 Various configurable timeouts apply to an HTTP connection and its constituent streams. Please see
 :ref:`this FAQ entry <faq_configuration_timeouts>` for an overview of important timeout
 configuration.
+
+.. _arch_overview_http_header_map_settings:
+
+HTTP header map settings
+------------------------
+
+Envoy maintains the insertion order of headers (and pseudo headers that begin with ":") in the
+HTTP header map using a linked list data-structure, which is very fast when the number of headers
+is small. In addition it can use a map data-structure to ensure fast access to the various headers.
+The map will be used once the number of headers in a HTTP request/response reaches the value of the
+``envoy.http.headermap.lazy_map_min_size`` runtime feature. The default threshold value is set to
+3, as previous experiments empirically showed that this value provides good performance for many
+use-cases.

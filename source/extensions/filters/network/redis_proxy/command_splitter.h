@@ -5,7 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 
-#include "extensions/filters/network/common/redis/codec.h"
+#include "source/extensions/filters/network/common/redis/codec.h"
 
 namespace Envoy {
 namespace Extensions {

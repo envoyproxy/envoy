@@ -1,6 +1,6 @@
 #include "envoy/common/exception.h"
 
-#include "common/stream_info/filter_state_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 
 #include "test/test_common/utility.h"
 
@@ -68,7 +68,7 @@ TEST_F(FilterStateImplTest, Simple) {
   EXPECT_EQ(0u, access_count);
   EXPECT_EQ(0u, destruction_count);
 
-  EXPECT_EQ(5, filter_state().getDataReadOnly<TestStoredTypeTracking>("test_name").access());
+  EXPECT_EQ(5, filter_state().getDataReadOnly<TestStoredTypeTracking>("test_name")->access());
   EXPECT_EQ(1u, access_count);
   EXPECT_EQ(0u, destruction_count);
 
@@ -96,10 +96,10 @@ TEST_F(FilterStateImplTest, SameTypes) {
   EXPECT_EQ(0u, access_count_2);
   EXPECT_EQ(0u, destruction_count);
 
-  EXPECT_EQ(ValueOne, filter_state().getDataReadOnly<TestStoredTypeTracking>("test_1").access());
+  EXPECT_EQ(ValueOne, filter_state().getDataReadOnly<TestStoredTypeTracking>("test_1")->access());
   EXPECT_EQ(1u, access_count_1);
   EXPECT_EQ(0u, access_count_2);
-  EXPECT_EQ(ValueTwo, filter_state().getDataReadOnly<TestStoredTypeTracking>("test_2").access());
+  EXPECT_EQ(ValueTwo, filter_state().getDataReadOnly<TestStoredTypeTracking>("test_2")->access());
   EXPECT_EQ(1u, access_count_1);
   EXPECT_EQ(1u, access_count_2);
   resetFilterState();
@@ -112,8 +112,8 @@ TEST_F(FilterStateImplTest, SimpleTypeReadOnly) {
   filter_state().setData("test_2", std::make_unique<SimpleType>(2),
                          FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
 
-  EXPECT_EQ(1, filter_state().getDataReadOnly<SimpleType>("test_1").access());
-  EXPECT_EQ(2, filter_state().getDataReadOnly<SimpleType>("test_2").access());
+  EXPECT_EQ(1, filter_state().getDataReadOnly<SimpleType>("test_1")->access());
+  EXPECT_EQ(2, filter_state().getDataReadOnly<SimpleType>("test_2")->access());
 }
 
 TEST_F(FilterStateImplTest, SimpleTypeMutable) {
@@ -122,13 +122,13 @@ TEST_F(FilterStateImplTest, SimpleTypeMutable) {
   filter_state().setData("test_2", std::make_unique<SimpleType>(2), FilterState::StateType::Mutable,
                          FilterState::LifeSpan::FilterChain);
 
-  EXPECT_EQ(1, filter_state().getDataReadOnly<SimpleType>("test_1").access());
-  EXPECT_EQ(2, filter_state().getDataReadOnly<SimpleType>("test_2").access());
+  EXPECT_EQ(1, filter_state().getDataReadOnly<SimpleType>("test_1")->access());
+  EXPECT_EQ(2, filter_state().getDataReadOnly<SimpleType>("test_2")->access());
 
-  filter_state().getDataMutable<SimpleType>("test_1").set(100);
-  filter_state().getDataMutable<SimpleType>("test_2").set(200);
-  EXPECT_EQ(100, filter_state().getDataReadOnly<SimpleType>("test_1").access());
-  EXPECT_EQ(200, filter_state().getDataReadOnly<SimpleType>("test_2").access());
+  filter_state().getDataMutable<SimpleType>("test_1")->set(100);
+  filter_state().getDataMutable<SimpleType>("test_2")->set(200);
+  EXPECT_EQ(100, filter_state().getDataReadOnly<SimpleType>("test_1")->access());
+  EXPECT_EQ(200, filter_state().getDataReadOnly<SimpleType>("test_2")->access());
 }
 
 TEST_F(FilterStateImplTest, NameConflictReadOnly) {
@@ -143,7 +143,7 @@ TEST_F(FilterStateImplTest, NameConflictReadOnly) {
       filter_state().setData("test_1", std::make_unique<SimpleType>(2),
                              FilterState::StateType::Mutable, FilterState::LifeSpan::FilterChain),
       EnvoyException, "FilterState::setData<T> called twice on same ReadOnly state.");
-  EXPECT_EQ(1, filter_state().getDataReadOnly<SimpleType>("test_1").access());
+  EXPECT_EQ(1, filter_state().getDataReadOnly<SimpleType>("test_1")->access());
 }
 
 TEST_F(FilterStateImplTest, NameConflictDifferentTypesReadOnly) {
@@ -174,29 +174,26 @@ TEST_F(FilterStateImplTest, NoNameConflictMutableAndMutable) {
                          FilterState::LifeSpan::FilterChain);
   filter_state().setData("test_2", std::make_unique<SimpleType>(4), FilterState::StateType::Mutable,
                          FilterState::LifeSpan::FilterChain);
-  EXPECT_EQ(4, filter_state().getDataMutable<SimpleType>("test_2").access());
+  EXPECT_EQ(4, filter_state().getDataMutable<SimpleType>("test_2")->access());
 
   // mutable + mutable - different types
   filter_state().setData("test_4", std::make_unique<SimpleType>(7), FilterState::StateType::Mutable,
                          FilterState::LifeSpan::FilterChain);
   filter_state().setData("test_4", std::make_unique<TestStoredTypeTracking>(8, nullptr, nullptr),
                          FilterState::StateType::Mutable, FilterState::LifeSpan::FilterChain);
-  EXPECT_EQ(8, filter_state().getDataReadOnly<TestStoredTypeTracking>("test_4").access());
+  EXPECT_EQ(8, filter_state().getDataReadOnly<TestStoredTypeTracking>("test_4")->access());
 }
 
 TEST_F(FilterStateImplTest, UnknownName) {
-  EXPECT_THROW_WITH_MESSAGE(filter_state().getDataReadOnly<SimpleType>("test_1"), EnvoyException,
-                            "FilterState::getDataReadOnly<T> called for unknown data name.");
-  EXPECT_THROW_WITH_MESSAGE(filter_state().getDataMutable<SimpleType>("test_1"), EnvoyException,
-                            "FilterState::getDataMutable<T> called for unknown data name.");
+  EXPECT_EQ(nullptr, filter_state().getDataReadOnly<SimpleType>("test_1"));
+  EXPECT_EQ(nullptr, filter_state().getDataMutable<SimpleType>("test_1"));
 }
 
 TEST_F(FilterStateImplTest, WrongTypeGet) {
   filter_state().setData("test_name", std::make_unique<TestStoredTypeTracking>(5, nullptr, nullptr),
                          FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
-  EXPECT_EQ(5, filter_state().getDataReadOnly<TestStoredTypeTracking>("test_name").access());
-  EXPECT_THROW_WITH_MESSAGE(filter_state().getDataReadOnly<SimpleType>("test_name"), EnvoyException,
-                            "Data stored under test_name cannot be coerced to specified type");
+  EXPECT_EQ(5, filter_state().getDataReadOnly<TestStoredTypeTracking>("test_name")->access());
+  EXPECT_EQ(nullptr, filter_state().getDataReadOnly<SimpleType>("test_name"));
 }
 
 TEST_F(FilterStateImplTest, ErrorAccessingReadOnlyAsMutable) {
@@ -267,11 +264,14 @@ TEST_F(FilterStateImplTest, LifeSpanInitFromParent) {
   EXPECT_THROW_WITH_MESSAGE(
       new_filter_state.getDataMutable<SimpleType>("test_3"), EnvoyException,
       "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
-  EXPECT_EQ(4, new_filter_state.getDataMutable<SimpleType>("test_4").access());
+
+  EXPECT_EQ(4, new_filter_state.getDataMutable<SimpleType>("test_4")->access());
+
   EXPECT_THROW_WITH_MESSAGE(
       new_filter_state.getDataMutable<SimpleType>("test_5"), EnvoyException,
       "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
-  EXPECT_EQ(6, new_filter_state.getDataMutable<SimpleType>("test_6").access());
+
+  EXPECT_EQ(6, new_filter_state.getDataMutable<SimpleType>("test_6")->access());
 }
 
 TEST_F(FilterStateImplTest, LifeSpanInitFromGrandparent) {
@@ -299,7 +299,7 @@ TEST_F(FilterStateImplTest, LifeSpanInitFromGrandparent) {
   EXPECT_THROW_WITH_MESSAGE(
       new_filter_state.getDataMutable<SimpleType>("test_5"), EnvoyException,
       "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
-  EXPECT_EQ(6, new_filter_state.getDataMutable<SimpleType>("test_6").access());
+  EXPECT_EQ(6, new_filter_state.getDataMutable<SimpleType>("test_6")->access());
 }
 
 TEST_F(FilterStateImplTest, LifeSpanInitFromNonParent) {
@@ -363,7 +363,7 @@ TEST_F(FilterStateImplTest, SetSameDataWithDifferentLifeSpan) {
   // Still mutable on the correct LifeSpan.
   filter_state().setData("test_1", std::make_unique<SimpleType>(2), FilterState::StateType::Mutable,
                          FilterState::LifeSpan::Connection);
-  EXPECT_EQ(2, filter_state().getDataMutable<SimpleType>("test_1").access());
+  EXPECT_EQ(2, filter_state().getDataMutable<SimpleType>("test_1")->access());
 
   filter_state().setData("test_2", std::make_unique<SimpleType>(1), FilterState::StateType::Mutable,
                          FilterState::LifeSpan::Request);
@@ -382,7 +382,7 @@ TEST_F(FilterStateImplTest, SetSameDataWithDifferentLifeSpan) {
   // Still mutable on the correct LifeSpan.
   filter_state().setData("test_2", std::make_unique<SimpleType>(2), FilterState::StateType::Mutable,
                          FilterState::LifeSpan::Request);
-  EXPECT_EQ(2, filter_state().getDataMutable<SimpleType>("test_2").access());
+  EXPECT_EQ(2, filter_state().getDataMutable<SimpleType>("test_2")->access());
 }
 
 } // namespace StreamInfo

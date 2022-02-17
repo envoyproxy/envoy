@@ -1,12 +1,11 @@
 #include <array>
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/buffer/watermark_buffer.h"
-#include "common/network/io_socket_handle_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/network/io_socket_handle_impl.h"
 
 #include "test/common/buffer/utility.h"
-#include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 
@@ -247,7 +246,7 @@ TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
   os_fd_t pipe_fds[2] = {0, 0};
 #ifdef WIN32
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-  ASSERT_EQ(0, os_sys_calls.socketpair(AF_INET, SOCK_STREAM, 0, pipe_fds).rc_);
+  ASSERT_EQ(0, os_sys_calls.socketpair(AF_INET, SOCK_STREAM, 0, pipe_fds).return_value_);
 #else
   ASSERT_EQ(0, pipe(pipe_fds));
 #endif
@@ -264,7 +263,7 @@ TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
     if (!result.ok()) {
       ASSERT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
     } else {
-      bytes_written_total += result.rc_;
+      bytes_written_total += result.return_value_;
     }
   }
   EXPECT_EQ(1, times_high_watermark_called_);
@@ -275,7 +274,7 @@ TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
   Network::IoSocketHandleImpl io_handle2(pipe_fds[0]);
   while (bytes_read_total < 20) {
     Api::IoCallUint64Result result = io_handle2.read(buffer_, 20);
-    bytes_read_total += result.rc_;
+    bytes_read_total += result.return_value_;
   }
   EXPECT_EQ(2, times_high_watermark_called_);
   EXPECT_EQ(20, buffer_.length());
@@ -384,16 +383,13 @@ TEST_F(WatermarkBufferTest, MoveBackWithWatermarks) {
 }
 
 TEST_F(WatermarkBufferTest, OverflowWatermark) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues({{"envoy.buffer.overflow_multiplier", "2"}});
-
   int high_watermark_buffer1 = 0;
   int low_watermark_buffer1 = 0;
   int overflow_watermark_buffer1 = 0;
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
                                   [&]() -> void { ++high_watermark_buffer1; },
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
-  buffer1.setWatermarks(10);
+  buffer1.setWatermarks(10, 2);
 
   buffer1.add(TEN_BYTES, 10);
   EXPECT_EQ(0, high_watermark_buffer1);
@@ -430,16 +426,13 @@ TEST_F(WatermarkBufferTest, OverflowWatermark) {
 }
 
 TEST_F(WatermarkBufferTest, OverflowWatermarkDisabled) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues({{"envoy.buffer.overflow_multiplier", "0"}});
-
   int high_watermark_buffer1 = 0;
   int low_watermark_buffer1 = 0;
   int overflow_watermark_buffer1 = 0;
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
                                   [&]() -> void { ++high_watermark_buffer1; },
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
-  buffer1.setWatermarks(10);
+  buffer1.setWatermarks(10, 0);
 
   buffer1.add(TEN_BYTES, 10);
   EXPECT_EQ(0, high_watermark_buffer1);
@@ -462,8 +455,6 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabledOnVeryHighValue) {
 #else
   // Verifies that the overflow watermark is disabled when its value is higher
   // than uint32_t max value
-  TestScopedRuntime scoped_runtime;
-
   int high_watermark_buffer1 = 0;
   int overflow_watermark_buffer1 = 0;
   Buffer::WatermarkBuffer buffer1{[&]() -> void {}, [&]() -> void { ++high_watermark_buffer1; },
@@ -471,11 +462,9 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabledOnVeryHighValue) {
 
   // Make sure the overflow threshold will be above std::numeric_limits<uint32_t>::max()
   const uint64_t overflow_multiplier = 3;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.buffer.overflow_multiplier", std::to_string(overflow_multiplier)}});
   const uint32_t high_watermark_threshold =
       (std::numeric_limits<uint32_t>::max() / overflow_multiplier) + 1;
-  buffer1.setWatermarks(high_watermark_threshold);
+  buffer1.setWatermarks(high_watermark_threshold, overflow_multiplier);
 
   // Add many segments instead of full uint32_t::max to get around std::bad_alloc exception
   const uint32_t segment_denominator = 128;
@@ -501,16 +490,13 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabledOnVeryHighValue) {
 }
 
 TEST_F(WatermarkBufferTest, OverflowWatermarkEqualHighWatermark) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues({{"envoy.buffer.overflow_multiplier", "1"}});
-
   int high_watermark_buffer1 = 0;
   int low_watermark_buffer1 = 0;
   int overflow_watermark_buffer1 = 0;
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
                                   [&]() -> void { ++high_watermark_buffer1; },
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
-  buffer1.setWatermarks(10);
+  buffer1.setWatermarks(10, 1);
 
   buffer1.add(TEN_BYTES, 10);
   EXPECT_EQ(0, high_watermark_buffer1);
@@ -531,34 +517,31 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkEqualHighWatermark) {
 }
 
 TEST_F(WatermarkBufferTest, MoveWatermarksOverflow) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues({{"envoy.buffer.overflow_multiplier", "2"}});
-
   int high_watermark_buffer1 = 0;
   int low_watermark_buffer1 = 0;
   int overflow_watermark_buffer1 = 0;
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
                                   [&]() -> void { ++high_watermark_buffer1; },
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
-  buffer1.setWatermarks(10);
+  buffer1.setWatermarks(10, 2);
   buffer1.add(TEN_BYTES, 9);
   EXPECT_EQ(0, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
-  buffer1.setWatermarks(9);
+  buffer1.setWatermarks(9, 2);
   EXPECT_EQ(0, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
-  buffer1.setWatermarks(8);
+  buffer1.setWatermarks(8, 2);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
-  buffer1.setWatermarks(5);
+  buffer1.setWatermarks(5, 2);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
-  buffer1.setWatermarks(4);
+  buffer1.setWatermarks(4, 2);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(1, overflow_watermark_buffer1);
 
   // Overflow is only triggered once
-  buffer1.setWatermarks(6);
+  buffer1.setWatermarks(6, 2);
   EXPECT_EQ(0, low_watermark_buffer1);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(1, overflow_watermark_buffer1);
@@ -568,6 +551,22 @@ TEST_F(WatermarkBufferTest, MoveWatermarksOverflow) {
   EXPECT_EQ(1, low_watermark_buffer1);
   EXPECT_EQ(2, high_watermark_buffer1);
   EXPECT_EQ(1, overflow_watermark_buffer1);
+}
+
+TEST_F(WatermarkBufferTest, AddFragments) {
+  int high_watermark_buffer = 0;
+  Buffer::WatermarkBuffer buffer{nullptr, [&]() -> void { ++high_watermark_buffer; }, nullptr};
+
+  buffer.setWatermarks(23);
+
+  buffer.addFragments({"aaaaa", "bbbbb"});
+  EXPECT_EQ(high_watermark_buffer, 0);
+
+  buffer.addFragments({"ccccc", "ddddd"});
+  EXPECT_EQ(high_watermark_buffer, 0);
+
+  buffer.addFragments({"eeeee", "fffff"});
+  EXPECT_EQ(high_watermark_buffer, 1);
 }
 
 } // namespace

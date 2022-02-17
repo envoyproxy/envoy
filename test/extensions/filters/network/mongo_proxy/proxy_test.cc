@@ -7,11 +7,11 @@
 #include "envoy/stats/stats.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "extensions/filters/network/mongo_proxy/bson_impl.h"
-#include "extensions/filters/network/mongo_proxy/codec_impl.h"
-#include "extensions/filters/network/mongo_proxy/mongo_stats.h"
-#include "extensions/filters/network/mongo_proxy/proxy.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/mongo_proxy/bson_impl.h"
+#include "source/extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "source/extensions/filters/network/mongo_proxy/mongo_stats.h"
+#include "source/extensions/filters/network/mongo_proxy/proxy.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/access_log/mocks.h"
@@ -61,7 +61,8 @@ class MongoProxyFilterTest : public testing::Test {
 public:
   MongoProxyFilterTest()
       : mongo_stats_(std::make_shared<MongoStats>(store_, "test",
-                                                  std::vector<std::string>{"insert", "count"})) {
+                                                  std::vector<std::string>{"insert", "count"})),
+        stream_info_(time_source_) {
     setup();
   }
 
@@ -127,6 +128,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
   Envoy::AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Network::MockDrainDecision> drain_decision_;
+  NiceMock<MockTimeSystem> time_source_;
   TestStreamInfo stream_info_;
 };
 

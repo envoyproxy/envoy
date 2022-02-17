@@ -1,4 +1,4 @@
-#include "extensions/filters/common/ext_authz/check_request_utils.h"
+#include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 
 #include <chrono>
 #include <cstdint>
@@ -10,18 +10,17 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/ssl/connection.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/grpc/async_client_impl.h"
-#include "common/http/codes.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/common/ext_authz/ext_authz.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/grpc/async_client_impl.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -39,11 +38,11 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v3::AttributeCo
   // Set the address
   auto addr = peer.mutable_address();
   if (local) {
-    Envoy::Network::Utility::addressToProtobufAddress(*connection.addressProvider().localAddress(),
-                                                      *addr);
+    Envoy::Network::Utility::addressToProtobufAddress(
+        *connection.connectionInfoProvider().localAddress(), *addr);
   } else {
-    Envoy::Network::Utility::addressToProtobufAddress(*connection.addressProvider().remoteAddress(),
-                                                      *addr);
+    Envoy::Network::Utility::addressToProtobufAddress(
+        *connection.connectionInfoProvider().remoteAddress(), *addr);
   }
 
   // Set the principal. Preferably the URI SAN, DNS SAN or Subject in that order from the peer's
@@ -123,8 +122,13 @@ void CheckRequestUtils::setHttpRequest(
   headers.iterate([mutable_headers](const Envoy::Http::HeaderEntry& e) {
     // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
     if (e.key().getStringView() != Headers::get().EnvoyAuthPartialBody.get()) {
-      (*mutable_headers)[std::string(e.key().getStringView())] =
-          std::string(e.value().getStringView());
+      const std::string key(e.key().getStringView());
+      if (mutable_headers->find(key) == mutable_headers->end()) {
+        (*mutable_headers)[key] = std::string(e.value().getStringView());
+      } else {
+        // Merge duplicate headers.
+        (*mutable_headers)[key].append(",").append(std::string(e.value().getStringView()));
+      }
     }
     return Envoy::Http::HeaderMap::Iterate::Continue;
   });
@@ -165,7 +169,8 @@ void CheckRequestUtils::createHttpCheck(
     Protobuf::Map<std::string, std::string>&& context_extensions,
     envoy::config::core::v3::Metadata&& metadata_context,
     envoy::service::auth::v3::CheckRequest& request, uint64_t max_request_bytes, bool pack_as_bytes,
-    bool include_peer_certificate) {
+    bool include_peer_certificate,
+    const Protobuf::Map<std::string, std::string>& destination_labels) {
 
   auto attrs = request.mutable_attributes();
   const std::string service = getHeaderStr(headers.EnvoyDownstreamServiceCluster());
@@ -180,22 +185,27 @@ void CheckRequestUtils::createHttpCheck(
   setAttrContextRequest(*attrs->mutable_request(), cb->streamId(), cb->streamInfo(),
                         cb->decodingBuffer(), headers, max_request_bytes, pack_as_bytes);
 
+  (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
   // Fill in the context extensions and metadata context.
   (*attrs->mutable_context_extensions()) = std::move(context_extensions);
   (*attrs->mutable_metadata_context()) = std::move(metadata_context);
 }
 
-void CheckRequestUtils::createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                                       envoy::service::auth::v3::CheckRequest& request,
-                                       bool include_peer_certificate) {
+void CheckRequestUtils::createTcpCheck(
+    const Network::ReadFilterCallbacks* callbacks, envoy::service::auth::v3::CheckRequest& request,
+    bool include_peer_certificate,
+    const Protobuf::Map<std::string, std::string>& destination_labels) {
 
   auto attrs = request.mutable_attributes();
 
   auto* cb = const_cast<Network::ReadFilterCallbacks*>(callbacks);
+  const std::string server_name(cb->connection().requestedServerName());
+
   setAttrContextPeer(*attrs->mutable_source(), cb->connection(), "", false,
                      include_peer_certificate);
-  setAttrContextPeer(*attrs->mutable_destination(), cb->connection(), "", true,
+  setAttrContextPeer(*attrs->mutable_destination(), cb->connection(), server_name, true,
                      include_peer_certificate);
+  (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
 }
 
 } // namespace ExtAuthz

@@ -5,9 +5,8 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/server/factory_context.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/matching/common_inputs/environment_variable/input.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/matching/common_inputs/environment_variable/input.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,9 +16,9 @@ namespace EnvironmentVariable {
 
 class Config : public Envoy::Matcher::CommonProtocolInputFactory {
 public:
-  Envoy::Matcher::CommonProtocolInputPtr
-  createCommonProtocolInput(const Protobuf::Message& config,
-                            Server::Configuration::FactoryContext& factory_context) override;
+  Envoy::Matcher::CommonProtocolInputFactoryCb createCommonProtocolInputFactoryCb(
+      const Protobuf::Message& config,
+      ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
   std::string name() const override { return "envoy.matching.common_inputs.environment_variable"; }
 

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "envoy/extensions/watchdog/profile_action/v3alpha/profile_action.pb.h"
+#include "envoy/extensions/watchdog/profile_action/v3/profile_action.pb.h"
 #include "envoy/server/guarddog_config.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,8 +25,7 @@ public:
   std::string name() const override { return "envoy.watchdog.profile_action"; }
 
 private:
-  using ProfileActionConfig =
-      envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig;
+  using ProfileActionConfig = envoy::extensions::watchdog::profile_action::v3::ProfileActionConfig;
 };
 
 } // namespace ProfileAction

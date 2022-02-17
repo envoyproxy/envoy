@@ -4,11 +4,9 @@
 #include "envoy/extensions/internal_redirect/allow_listed_routes/v3/allow_listed_routes_config.pb.validate.h"
 #include "envoy/router/internal_redirect.h"
 
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/internal_redirect/allow_listed_routes/allow_listed_routes.h"
-#include "extensions/internal_redirect/well_known_names.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/internal_redirect/allow_listed_routes/allow_listed_routes.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,7 +24,7 @@ public:
   }
 
   std::string name() const override {
-    return InternalRedirectPredicateValues::get().AllowListedRoutesPredicate;
+    return "envoy.internal_redirect_predicates.allow_listed_routes";
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

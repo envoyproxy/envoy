@@ -1,18 +1,17 @@
-#include "server/config_validation/server.h"
+#include "source/server/config_validation/server.h"
 
 #include <memory>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/event/real_time_system.h"
-#include "common/local_info/local_info_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/singleton/manager_impl.h"
-#include "common/version/version.h"
-
-#include "server/ssl_context_manager.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/event/real_time_system.h"
+#include "source/common/local_info/local_info_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/version/version.h"
+#include "source/server/ssl_context_manager.h"
 
 namespace Envoy {
 namespace Server {
@@ -46,15 +45,17 @@ ValidationInstance::ValidationInstance(
     : options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields(),
                                              !options.ignoreUnknownDynamicFields()),
-      stats_store_(store), api_(new Api::ValidationImpl(thread_factory, store, time_system,
-                                                        file_system, random_generator_)),
+      stats_store_(store),
+      api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system,
+                                   random_generator_, bootstrap_)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
       http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
-      time_system_(time_system), server_contexts_(*this) {
+      time_system_(time_system), server_contexts_(*this),
+      quic_stat_names_(stats_store_.symbolTable()) {
   TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
   END_TRY
   catch (const EnvoyException& e) {
@@ -78,23 +79,26 @@ void ValidationInstance::initialize(const Options& options,
   // If we get all the way through that stripped-down initialization flow, to the point where we'd
   // be ready to serve, then the config has passed validation.
   // Handle configuration that needs to take place prior to the main configuration load.
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  InstanceUtil::loadBootstrapConfig(bootstrap, options,
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
-  Config::Utility::createTagProducer(bootstrap);
-  bootstrap.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
+  Config::Utility::createTagProducer(bootstrap_, options_.statsTags());
+  if (!bootstrap_.node().user_agent_build_version().has_version()) {
+    *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
+  }
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      stats().symbolTable(), bootstrap.node(), bootstrap.node_context_params(), local_address,
+      stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      dispatcher(), stats(), threadLocal(), bootstrap.overload_manager(),
+      dispatcher(), stats(), threadLocal(), bootstrap_.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
-  Configuration::InitialImpl initial_config(bootstrap, options, *this);
+  Configuration::InitialImpl initial_config(bootstrap_);
+  initial_config.initAdminAccessLog(bootstrap_, *this);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
-  listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
+  listener_manager_ =
+      std::make_unique<ListenerManagerImpl>(*this, *this, *this, false, quic_stat_names_);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
@@ -103,8 +107,9 @@ void ValidationInstance::initialize(const Options& options,
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), dnsResolver(), sslContextManager(), dispatcher(),
       localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
-      grpc_context_, router_context_, accessLogManager(), singletonManager(), options);
-  config_.initialize(bootstrap, *this, *cluster_manager_factory_);
+      grpc_context_, router_context_, accessLogManager(), singletonManager(), options,
+      quic_stat_names_);
+  config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
   runtime().initialize(clusterManager());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
 }

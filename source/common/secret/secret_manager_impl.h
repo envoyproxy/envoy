@@ -8,8 +8,8 @@
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
-#include "common/common/logger.h"
-#include "common/secret/sds_api.h"
+#include "source/common/common/logger.h"
+#include "source/common/secret/sds_api.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -68,7 +68,7 @@ public:
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
 private:
-  ProtobufTypes::MessagePtr dumpSecretConfigs();
+  ProtobufTypes::MessagePtr dumpSecretConfigs(const Matchers::StringMatcher& name_matcher);
 
   template <class SecretType>
   class DynamicSecretProviders : public Logger::Loggable<Logger::Id::secret> {

@@ -7,9 +7,9 @@
 #include "envoy/network/resolver.h"
 #include "envoy/registry/registry.h"
 
-#include "common/common/thread.h"
-#include "common/network/address_impl.h"
-#include "common/network/resolver_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/resolver_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
@@ -74,7 +74,9 @@ TEST(ResolverTest, InternalListenerNameFromProtoAddress) {
 TEST(ResolverTest, UninitializedInternalAddressFromProtoAddress) {
   envoy::config::core::v3::Address internal_address;
   internal_address.mutable_envoy_internal_address();
-  EXPECT_DEATH(resolveProtoAddress(internal_address), "panic");
+  EXPECT_THROW_WITH_MESSAGE(
+      resolveProtoAddress(internal_address), EnvoyException,
+      fmt::format("Failed to resolve address:{}", internal_address.DebugString()));
 }
 
 // Validate correct handling of ipv4_compat field.

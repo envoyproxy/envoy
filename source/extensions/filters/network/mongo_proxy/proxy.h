@@ -16,16 +16,15 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-#include "common/network/filter_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/singleton/const_singleton.h"
-
-#include "extensions/filters/common/fault/fault_config.h"
-#include "extensions/filters/network/mongo_proxy/codec.h"
-#include "extensions/filters/network/mongo_proxy/mongo_stats.h"
-#include "extensions/filters/network/mongo_proxy/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/filter_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/singleton/const_singleton.h"
+#include "source/extensions/filters/common/fault/fault_config.h"
+#include "source/extensions/filters/network/mongo_proxy/codec.h"
+#include "source/extensions/filters/network/mongo_proxy/mongo_stats.h"
+#include "source/extensions/filters/network/mongo_proxy/utility.h"
 
 namespace Envoy {
 namespace Extensions {

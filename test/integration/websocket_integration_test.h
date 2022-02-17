@@ -10,8 +10,8 @@ namespace Envoy {
 
 struct WebsocketProtocolTestParams {
   Network::Address::IpVersion version;
-  Http::CodecClient::Type downstream_protocol;
-  FakeHttpConnection::Type upstream_protocol;
+  Http::CodecType downstream_protocol;
+  Http::CodecType upstream_protocol;
 };
 
 class WebsocketIntegrationTest : public HttpProtocolIntegrationTest {
@@ -30,7 +30,7 @@ protected:
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult waitForUpstreamDisconnectOrReset() {
-    if (upstreamProtocol() != FakeHttpConnection::Type::HTTP1) {
+    if (upstreamProtocol() != Http::CodecType::HTTP1) {
       return upstream_request_->waitForReset();
     } else {
       return fake_upstream_connection_->waitForDisconnect();
@@ -39,7 +39,7 @@ protected:
 
   void waitForClientDisconnectOrReset(
       Http::StreamResetReason reason = Http::StreamResetReason::RemoteReset) {
-    if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
+    if (downstreamProtocol() != Http::CodecType::HTTP1) {
       ASSERT_TRUE(response_->waitForReset());
       ASSERT_EQ(reason, response_->resetReason());
     } else {

@@ -1,12 +1,13 @@
-#include "common/common/base64.h"
+#include "source/common/common/base64.h"
 
 #include <cstdint>
 #include <string>
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
 
 #include "absl/container/fixed_array.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace {
@@ -142,7 +143,7 @@ inline void encodeLast(uint64_t pos, uint8_t last_char, std::string& ret,
 
 } // namespace
 
-std::string Base64::decode(const std::string& input) {
+std::string Base64::decode(absl::string_view input) {
   if (input.length() % 4) {
     return EMPTY_STRING;
   }
@@ -237,11 +238,11 @@ std::string Base64::encode(const char* input, uint64_t length, bool add_padding)
 void Base64::completePadding(std::string& encoded) {
   if (encoded.length() % 4 != 0) {
     std::string trailing_padding(4 - encoded.length() % 4, '=');
-    encoded.append(trailing_padding);
+    absl::StrAppend(&encoded, trailing_padding);
   }
 }
 
-std::string Base64Url::decode(const std::string& input) {
+std::string Base64Url::decode(absl::string_view input) {
   if (input.empty()) {
     return EMPTY_STRING;
   }

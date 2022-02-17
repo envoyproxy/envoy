@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # HTTP L7 filter that injects faults into the request flow
-# Public docs: docs/root/configuration/http_filters/fault_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/fault_filter
 
 envoy_extension_package()
 
@@ -17,13 +17,13 @@ envoy_cc_library(
     srcs = ["fault_filter.cc"],
     hdrs = ["fault_filter.h"],
     deps = [
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/http:header_map_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/event:timer_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/runtime:runtime_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -35,7 +35,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/filters/common/fault:fault_config_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:stream_rate_limiter_lib",
         "@envoy_api//envoy/extensions/filters/http/fault/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
@@ -46,11 +45,8 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.http",
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
-        "//include/envoy/registry",
-        "//source/extensions/filters/http:well_known_names",
+        "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/fault:fault_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/fault/v3:pkg_cc_proto",

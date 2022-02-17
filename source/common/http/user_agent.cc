@@ -1,4 +1,4 @@
-#include "common/http/user_agent.h"
+#include "source/common/http/user_agent.h"
 
 #include <cstdint>
 #include <memory>
@@ -8,9 +8,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/http/headers.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Http {

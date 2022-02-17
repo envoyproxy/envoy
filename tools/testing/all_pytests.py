@@ -10,12 +10,21 @@
 import os
 import sys
 from functools import cached_property
+from typing import Optional
 
-from tools.base import checker, runner
+from aio.api import bazel
+from aio.core.functional import async_property
+from aio.run import checker
+
+import envoy_repo
 
 
-class PytestChecker(checker.BazelChecker):
+class PytestChecker(checker.Checker):
     checks = ("pytests",)
+
+    @cached_property
+    def bazel(self):
+        return bazel.BazelEnv(envoy_repo.PATH)
 
     @property
     def cov_enabled(self) -> bool:
@@ -36,9 +45,13 @@ class PytestChecker(checker.BazelChecker):
             if self.cov_enabled
             else [])
 
-    @cached_property
-    def pytest_targets(self) -> set:
-        return set(target for target in self.bazel.query("tools/...") if ":pytest_" in target)
+    @async_property(cache=True)
+    async def pytest_targets(self) -> set:
+        return set(
+            target
+            for target
+            in await self.bazel.query("tools/...")
+            if ":pytest_" in target)
 
     def add_arguments(self, parser):
         super().add_arguments(parser)
@@ -51,28 +64,28 @@ class PytestChecker(checker.BazelChecker):
             default=None,
             help="Specify a path to collect html coverage with")
 
-    def check_pytests(self) -> int:
-        for target in self.pytest_targets:
+    async def check_pytests(self) -> None:
+        for target in await self.pytest_targets:
             try:
-                self.bazel.run(target, *self.pytest_bazel_args)
-                self.succeed("pytest", [target])
-            except runner.BazelRunError:
-                self.error("pytest", [f"{target} failed"])
+                result = await self.bazel.run(target, *self.pytest_bazel_args)
+                self.succeed("pytests", [target])
+            except bazel.BazelRunError:
+                self.error("pytests", [f"{target} failed"])
 
-    def on_checks_begin(self):
+    async def on_checks_begin(self):
         if self.cov_path and os.path.exists(self.cov_path):
             os.unlink(self.cov_path)
 
-    def on_checks_complete(self):
+    async def on_checks_complete(self):
         if self.cov_html:
-            self.bazel.run(
+            await self.bazel.run(
                 "//tools/testing:python_coverage",
                 self.cov_path, self.cov_html)
-        return super().on_checks_complete()
+        return await super().on_checks_complete()
 
 
-def main(*args: list) -> None:
-    return PytestChecker(*args).run()
+def main(*args: str) -> Optional[int]:
+    return PytestChecker(*args)()
 
 
 if __name__ == "__main__":

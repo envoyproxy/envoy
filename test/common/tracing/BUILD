@@ -20,6 +20,7 @@ envoy_cc_test(
         "//source/common/http:message_lib",
         "//source/common/network:address_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/common/tracing:custom_tag_lib",
         "//source/common/tracing:http_tracer_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",

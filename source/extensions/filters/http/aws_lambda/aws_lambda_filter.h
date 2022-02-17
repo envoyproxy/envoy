@@ -5,10 +5,9 @@
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/common/aws/signer.h"
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/common/aws/signer.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"

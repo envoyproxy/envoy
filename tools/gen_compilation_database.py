@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 
-# This method is equivalent to https://github.com/grailbio/bazel-compilation-database/blob/master/generate.sh
+# This method is equivalent to https://github.com/grailbio/bazel-compilation-database/blob/master/generate.py
 def generate_compilation_database(args):
     # We need to download all remote outputs for generated source code. This option lives here to override those
     # specified in bazelrc.
@@ -25,11 +25,19 @@ def generate_compilation_database(args):
     execroot = subprocess.check_output(["bazel", "info", "execution_root"]
                                        + bazel_options).decode().strip()
 
-    compdb = []
-    for compdb_file in Path(execroot).glob("**/*.compile_commands.json"):
-        compdb.extend(
-            json.loads("[" + compdb_file.read_text().replace("__EXEC_ROOT__", execroot) + "]"))
-    return compdb
+    db_entries = []
+    for db in Path(execroot).glob('**/*.compile_commands.json'):
+        db_entries.extend(json.loads(db.read_text()))
+
+    def replace_execroot_marker(db_entry):
+        if 'directory' in db_entry and db_entry['directory'] == '__EXEC_ROOT__':
+            db_entry['directory'] = execroot
+        if 'command' in db_entry:
+            db_entry['command'] = (
+                db_entry['command'].replace('-isysroot __BAZEL_XCODE_SDKROOT__', ''))
+        return db_entry
+
+    return list(map(replace_execroot_marker, db_entries))
 
 
 def is_header(filename):
@@ -41,15 +49,22 @@ def is_header(filename):
 
 def is_compile_target(target, args):
     filename = target["file"]
-    if not args.include_headers and is_header(filename):
-        return False
-
-    if not args.include_genfiles:
-        if filename.startswith("bazel-out/"):
+    if is_header(filename):
+        if args.include_all:
+            return True
+        if not args.include_headers:
             return False
 
-    if not args.include_external:
-        if filename.startswith("external/"):
+    if filename.startswith("bazel-out/"):
+        if args.include_all:
+            return True
+        if not args.include_genfiles:
+            return False
+
+    if filename.startswith("external/"):
+        if args.include_all:
+            return True
+        if not args.include_external:
             return False
 
     return True
@@ -71,7 +86,10 @@ def modify_compile_command(target, args):
     if is_header(target["file"]):
         options += " -Wno-pragma-once-outside-header -Wno-unused-const-variable"
         options += " -Wno-unused-function"
-        if not target["file"].startswith("external/"):
+        # By treating external/envoy* as C++ files we are able to use this script from subrepos that
+        # depend on Envoy targets.
+        if not target["file"].startswith("external/") or target["file"].startswith(
+                "external/envoy"):
             # *.h file is treated as C header by default while our headers files are all C++17.
             options = "-x c++ -std=c++17 -fexceptions " + options
 
@@ -92,7 +110,15 @@ if __name__ == "__main__":
     parser.add_argument('--include_genfiles', action='store_true')
     parser.add_argument('--include_headers', action='store_true')
     parser.add_argument('--vscode', action='store_true')
+    parser.add_argument('--include_all', action='store_true')
     parser.add_argument(
-        'bazel_targets', nargs='*', default=["//source/...", "//test/...", "//tools/..."])
+        'bazel_targets',
+        nargs='*',
+        default=[
+            "//source/...",
+            "//test/...",
+            "//tools/...",
+            "//contrib/...",
+        ])
     args = parser.parse_args()
     fix_compilation_database(args, generate_compilation_database(args))

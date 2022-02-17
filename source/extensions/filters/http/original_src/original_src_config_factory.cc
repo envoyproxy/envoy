@@ -1,12 +1,11 @@
-#include "extensions/filters/http/original_src/original_src_config_factory.h"
+#include "source/extensions/filters/http/original_src/original_src_config_factory.h"
 
 #include "envoy/extensions/filters/http/original_src/v3/original_src.pb.h"
 #include "envoy/extensions/filters/http/original_src/v3/original_src.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/http/original_src/config.h"
-#include "extensions/filters/http/original_src/original_src.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/original_src/config.h"
+#include "source/extensions/filters/http/original_src/original_src.h"
 
 namespace Envoy {
 namespace Extensions {

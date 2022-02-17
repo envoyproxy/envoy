@@ -1,12 +1,12 @@
-#include "common/access_log/access_log_manager_impl.h"
+#include "source/common/access_log/access_log_manager_impl.h"
 
 #include <string>
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/lock_guard.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/lock_guard.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -53,7 +53,7 @@ AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatch
       thread_factory_(thread_factory), flush_interval_msec_(flush_interval_msec), stats_(stats) {
   flush_timer_->enableTimer(flush_interval_msec_);
   auto open_result = open();
-  if (!open_result.rc_) {
+  if (!open_result.return_value_) {
     throw EnvoyException(fmt::format("unable to open file '{}': {}", file_->path(),
                                      open_result.err_->getErrorDetails()));
   }
@@ -91,8 +91,8 @@ AccessLogFileImpl::~AccessLogFileImpl() {
       doWrite(flush_buffer_);
     }
     const Api::IoCallBoolResult result = file_->close();
-    ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", file_->path(),
-                                   result.err_->getErrorDetails()));
+    ASSERT(result.return_value_, fmt::format("unable to close file '{}': {}", file_->path(),
+                                             result.err_->getErrorDetails()));
   }
 }
 
@@ -112,7 +112,7 @@ void AccessLogFileImpl::doWrite(Buffer::Instance& buffer) {
     for (const Buffer::RawSlice& slice : slices) {
       absl::string_view data(static_cast<char*>(slice.mem_), slice.len_);
       const Api::IoCallSizeResult result = file_->write(data);
-      if (result.ok() && result.rc_ == static_cast<ssize_t>(slice.len_)) {
+      if (result.ok() && result.return_value_ == static_cast<ssize_t>(slice.len_)) {
         stats_.write_completed_.inc();
       } else {
         // Probably disk full.
@@ -149,21 +149,22 @@ void AccessLogFileImpl::flushThreadFunc() {
       ASSERT(flush_buffer_.length() == 0);
     }
 
-    // if we failed to open file before, then simply ignore
-    if (file_->isOpen()) {
-      if (reopen_file_) {
-        reopen_file_ = false;
+    // if we failed to reopen before, do it next loop.
+    if (reopen_file_) {
+      if (file_->isOpen()) {
         const Api::IoCallBoolResult result = file_->close();
-        ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", file_->path(),
-                                       result.err_->getErrorDetails()));
-        const Api::IoCallBoolResult open_result = open();
-        if (!open_result.rc_) {
-          stats_.reopen_failed_.inc();
-          return;
-        }
+        ASSERT(result.return_value_, fmt::format("unable to close file '{}': {}", file_->path(),
+                                                 result.err_->getErrorDetails()));
       }
-      doWrite(about_to_write_buffer_);
+      const Api::IoCallBoolResult open_result = open();
+      if (!open_result.return_value_) {
+        stats_.reopen_failed_.inc();
+      } else {
+        reopen_file_ = false;
+      }
     }
+    // doWrite no matter file isOpen, if not, we can drain buffer
+    doWrite(about_to_write_buffer_);
   }
 }
 

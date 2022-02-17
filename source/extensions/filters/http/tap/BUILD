@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # L7 HTTP Tap filter
-# Public docs: docs/root/configuration/http_filters/tap_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/tap_filter
 
 envoy_extension_package()
 
@@ -16,8 +16,8 @@ envoy_cc_library(
     name = "tap_config_interface",
     hdrs = ["tap_config.h"],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/http:header_map_interface",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/http:header_map_interface",
         "//source/extensions/common/tap:tap_interface",
     ],
 )
@@ -41,8 +41,8 @@ envoy_cc_library(
     hdrs = ["tap_filter.h"],
     deps = [
         ":tap_config_interface",
-        "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/http:filter_interface",
+        "//envoy/access_log:access_log_interface",
+        "//envoy/http:filter_interface",
         "//source/extensions/common/tap:extension_config_base",
         "@envoy_api//envoy/extensions/filters/http/tap/v3:pkg_cc_proto",
     ],
@@ -52,14 +52,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.http",
-    security_posture = "requires_trusted_downstream_and_upstream",
-    status = "alpha",
     deps = [
         ":tap_config_impl",
         ":tap_filter_lib",
-        "//include/envoy/registry",
-        "//source/extensions/filters/http:well_known_names",
+        "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/tap/v3:pkg_cc_proto",

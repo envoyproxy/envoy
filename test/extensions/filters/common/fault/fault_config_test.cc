@@ -1,6 +1,6 @@
 #include "envoy/extensions/filters/common/fault/v3/fault.pb.h"
 
-#include "extensions/filters/common/fault/fault_config.h"
+#include "source/extensions/filters/common/fault/fault_config.h"
 
 #include "test/test_common/utility.h"
 

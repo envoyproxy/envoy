@@ -1,8 +1,8 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route.pb.validate.h"
 
-#include "common/common/assert.h"
-#include "common/router/config_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/router/config_impl.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -69,7 +69,7 @@ static RouteConfiguration genRouteConfig(benchmark::State& state,
       break;
     }
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("reached unexpected code");
     }
   }
 
@@ -93,7 +93,7 @@ static void bmRouteTableSize(benchmark::State& state, RouteMatch::PathSpecifierC
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
 
   // Create router config.
-  ConfigImpl config(genRouteConfig(state, match_type), factory_context,
+  ConfigImpl config(genRouteConfig(state, match_type), OptionalHttpFilters(), factory_context,
                     ProtobufMessage::getNullValidationVisitor(), true);
 
   for (auto _ : state) { // NOLINT

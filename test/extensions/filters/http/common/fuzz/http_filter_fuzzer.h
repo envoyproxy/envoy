@@ -2,7 +2,7 @@
 
 #include "envoy/http/filter.h"
 
-#include "common/http/utility.h"
+#include "source/common/http/utility.h"
 
 #include "test/fuzz/common.pb.h"
 #include "test/fuzz/utility.h"

@@ -1,4 +1,4 @@
-#include "extensions/filters/network/mongo_proxy/mongo_stats.h"
+#include "source/extensions/filters/network/mongo_proxy/mongo_stats.h"
 
 #include <memory>
 #include <string>
@@ -6,7 +6,7 @@
 
 #include "envoy/stats/scope.h"
 
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Extensions {

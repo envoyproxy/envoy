@@ -1,4 +1,4 @@
-#include "common/grpc/stat_names.h"
+#include "source/common/grpc/stat_names.h"
 
 namespace Envoy {
 namespace Grpc {

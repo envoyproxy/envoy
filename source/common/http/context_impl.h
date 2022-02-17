@@ -2,8 +2,8 @@
 
 #include "envoy/http/context.h"
 
-#include "common/http/codes.h"
-#include "common/http/user_agent.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/user_agent.h"
 
 namespace Envoy {
 namespace Http {

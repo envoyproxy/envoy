@@ -7,11 +7,11 @@
 #include "envoy/init/manager.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/backoff_strategy.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/config/remote_data_fetcher.h"
-#include "common/init/target_impl.h"
+#include "source/common/common/backoff_strategy.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/config/remote_data_fetcher.h"
+#include "source/common/init/target_impl.h"
 
 #include "absl/types/optional.h"
 

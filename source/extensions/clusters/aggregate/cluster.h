@@ -8,11 +8,10 @@
 #include "envoy/thread_local/thread_local_object.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
-#include "common/common/logger.h"
-#include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/clusters/aggregate/lb_context.h"
+#include "source/common/common/logger.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/clusters/aggregate/lb_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -79,10 +78,12 @@ public:
 
   // Upstream::LoadBalancer
   Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
-  // Preconnecting not yet implemented for extensions.
-  Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
-    return nullptr;
-  }
+  Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override;
+  absl::optional<Upstream::SelectedPoolAndConnection>
+  selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                           const Upstream::Host& /*host*/,
+                           std::vector<uint8_t>& /*hash_key*/) override;
+  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override;
 
 private:
   // Use inner class to extend LoadBalancerBase. When initializing AggregateClusterLoadBalancer, the
@@ -102,10 +103,14 @@ private:
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
-
-    // Upstream::LoadBalancerBase
-    Upstream::HostConstSharedPtr chooseHostOnce(Upstream::LoadBalancerContext*) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    absl::optional<Upstream::SelectedPoolAndConnection>
+    selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                             const Upstream::Host& /*host*/,
+                             std::vector<uint8_t>& /*hash_key*/) override {
+      return {};
+    }
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+      return {};
     }
 
     absl::optional<uint32_t> hostToLinearizedPriority(const Upstream::HostDescription& host) const;
@@ -160,8 +165,7 @@ struct AggregateThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalanc
 class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
                            envoy::extensions::clusters::aggregate::v3::ClusterConfig> {
 public:
-  ClusterFactory()
-      : ConfigurableClusterFactoryBase(Extensions::Clusters::ClusterTypes::get().Aggregate) {}
+  ClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.aggregate") {}
 
 private:
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>

@@ -1,5 +1,6 @@
-#include "extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
-#include "extensions/filters/network/dubbo_proxy/protocol.h"
+#include "source/extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/hessian_utils.h"
+#include "source/extensions/filters/network/dubbo_proxy/protocol.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/extensions/filters/network/dubbo_proxy/utility.h"
@@ -33,6 +34,7 @@ TEST(DubboProtocolImplTest, Name) {
 
 TEST(DubboProtocolImplTest, Normal) {
   DubboProtocolImpl dubbo_protocol;
+  dubbo_protocol.initSerializer(SerializationType::Hessian2);
   // Normal dubbo request message
   {
     Buffer::OwnedImpl buffer;
@@ -62,6 +64,69 @@ TEST(DubboProtocolImplTest, Normal) {
     EXPECT_EQ(1, metadata->requestId());
     EXPECT_EQ(1, context->bodySize());
     EXPECT_EQ(MessageType::Response, metadata->messageType());
+  }
+
+  // Normal dubbo response with exception.
+  {
+    Buffer::OwnedImpl buffer;
+    Buffer::OwnedImpl body_buffer;
+    buffer.add(std::string({'\xda', '\xbb', 0x42, 20}));
+    addInt64(buffer, 1);
+
+    Hessian2::Encoder encoder(std::make_unique<BufferWriter>(body_buffer));
+    // Encode the fake response type. `0` means the response is an exception without attachments.
+    encoder.encode<int32_t>(0);
+    encoder.encode<std::string>("fake_exception");
+
+    auto body_size = body_buffer.length();
+    addInt32(buffer, body_size);
+    buffer.move(body_buffer);
+
+    MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
+    auto result = dubbo_protocol.decodeHeader(buffer, metadata);
+    auto context = result.first;
+    EXPECT_TRUE(result.second);
+    EXPECT_EQ(1, metadata->requestId());
+    EXPECT_EQ(body_size, context->bodySize());
+    EXPECT_EQ(MessageType::Response, metadata->messageType());
+
+    context->originMessage().move(buffer, context->headerSize());
+
+    auto body_result = dubbo_protocol.decodeData(buffer, context, metadata);
+
+    EXPECT_TRUE(body_result);
+    EXPECT_EQ(MessageType::Exception, metadata->messageType());
+  }
+
+  // Normal dubbo response with error.
+  {
+    Buffer::OwnedImpl buffer;
+    Buffer::OwnedImpl body_buffer;
+    buffer.add(std::string({'\xda', '\xbb', 0x42, 40}));
+    addInt64(buffer, 1);
+
+    Hessian2::Encoder encoder(std::make_unique<BufferWriter>(body_buffer));
+    // No response type in the body for non `20` response.
+    encoder.encode<std::string>("error_string");
+
+    auto body_size = body_buffer.length();
+    addInt32(buffer, body_size);
+    buffer.move(body_buffer);
+
+    MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
+    auto result = dubbo_protocol.decodeHeader(buffer, metadata);
+    auto context = result.first;
+    EXPECT_TRUE(result.second);
+    EXPECT_EQ(1, metadata->requestId());
+    EXPECT_EQ(body_size, context->bodySize());
+    EXPECT_EQ(MessageType::Response, metadata->messageType());
+
+    context->originMessage().move(buffer, context->headerSize());
+
+    auto body_result = dubbo_protocol.decodeData(buffer, context, metadata);
+
+    EXPECT_TRUE(body_result);
+    EXPECT_EQ(MessageType::Exception, metadata->messageType());
   }
 }
 
@@ -149,6 +214,21 @@ TEST(DubboProtocolImplTest, encode) {
 
   buffer.drain(context->headerSize());
   EXPECT_TRUE(dubbo_protocol.decodeData(buffer, context, output_metadata));
+}
+
+TEST(DubboProtocolImplTest, HeartBeatResponseTest) {
+  MessageMetadata metadata;
+  metadata.setMessageType(MessageType::HeartbeatResponse);
+  metadata.setResponseStatus(ResponseStatus::Ok);
+  metadata.setSerializationType(SerializationType::Hessian2);
+  metadata.setRequestId(100);
+
+  Buffer::OwnedImpl buffer;
+  DubboProtocolImpl dubbo_protocol;
+  dubbo_protocol.initSerializer(SerializationType::Hessian2);
+  EXPECT_TRUE(dubbo_protocol.encode(buffer, metadata, "", RpcResponseType::ResponseWithValue));
+  // 16 bytes header and one byte null object body.
+  EXPECT_EQ(17, buffer.length());
 }
 
 TEST(DubboProtocolImplTest, decode) {

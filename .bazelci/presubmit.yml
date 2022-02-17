@@ -2,36 +2,39 @@
 tasks:
   rbe:
     name: "RBE"
-    platform: ubuntu1804
+    platform: ubuntu2004
     test_targets:
-      - "//test/common/common/..."
-      - "//test/integration/..."
-      - "//test/exe/..."
+    - "//test/common/common/..."
+    - "//test/integration/..."
+    - "//test/exe/..."
     test_flags:
-      - "--config=remote-clang-libc++"
-      - "--config=remote-ci"
-      - "--define=wasm=disabled"
-      - "--jobs=75"
+    - "--config=remote-clang-libc++"
+    - "--config=remote-ci"
+    - "--define=wasm=disabled"
+    - "--jobs=75"
   coverage:
     name: "Coverage"
-    platform: ubuntu1804
+    platform: ubuntu2004
     shell_commands:
-      - "bazel/setup_clang.sh /usr/lib/llvm-10"
+    - "sudo apt -y update && sudo apt -y install automake autotools-dev cmake libtool m4 ninja-build"
+    - "wget https://apt.llvm.org/llvm.sh && sudo bash llvm.sh 10"
+    - "bazel/setup_clang.sh /usr/lib/llvm-10"
     test_targets:
-      - "//test/common/common/..."
-      - "//test/integration/..."
-      - "//test/exe/..."
+    - "//test/common/common/..."
+    - "//test/integration/..."
+    - "//test/exe/..."
     test_flags:
-      - "--config=coverage"
-      - "--config=clang"
-  fuzz_coverage:
-    name: "Fuzz-Coverage"
-    platform: ubuntu1804
-    shell_commands:
-      - "bazel/setup_clang.sh /usr/lib/llvm-10"
-    test_targets:
-      - "//test/server:server_fuzz_test"
-    test_flags:
-      - "--config=fuzz-coverage"
-      - "--config=coverage"
-      - "--config=clang"
+    - "--config=coverage"
+    - "--config=clang"
+# Re-enable after fixing https://github.com/envoyproxy/envoy/issues/16542
+#   fuzz_coverage:
+#     name: "Fuzz-Coverage"
+#     platform: ubuntu1804
+#     shell_commands:
+#     - "bazel/setup_clang.sh /usr/lib/llvm-10"
+#     test_targets:
+#     - "//test/server:server_fuzz_test"
+#     test_flags:
+#     - "--config=fuzz-coverage"
+#     - "--config=coverage"
+#     - "--config=clang"

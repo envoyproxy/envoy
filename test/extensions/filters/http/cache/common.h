@@ -1,8 +1,8 @@
 #pragma once
 
-#include "extensions/filters/http/cache/cache_headers_utils.h"
-#include "extensions/filters/http/cache/http_cache.h"
-#include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/http_cache.h"
+#include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -56,24 +56,6 @@ std::ostream& operator<<(std::ostream& os, const ResponseCacheControl& response_
 
   s += "}";
   return os << s;
-}
-
-std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {
-  switch (status) {
-  case CacheEntryStatus::Ok:
-    return os << "Ok";
-  case CacheEntryStatus::Unusable:
-    return os << "Unusable";
-  case CacheEntryStatus::RequiresValidation:
-    return os << "RequiresValidation";
-  case CacheEntryStatus::FoundNotModified:
-    return os << "FoundNotModified";
-  case CacheEntryStatus::SatisfiableRange:
-    return os << "SatisfiableRange";
-  case CacheEntryStatus::NotSatisfiableRange:
-    return os << "NotSatisfiableRange";
-  }
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range) {

@@ -2,7 +2,7 @@
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.validate.h"
 
-#include "extensions/filters/network/ratelimit/config.h"
+#include "source/extensions/filters/network/ratelimit/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
@@ -48,10 +48,11 @@ TEST(RateLimitFilterConfigTest, CorrectProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
-      }));
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
+      .WillOnce(Invoke(
+          [](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool, Grpc::CacheOption) {
+            return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+          }));
 
   RateLimitConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
@@ -85,16 +86,6 @@ ip_allowlist: '12'
   envoy::extensions::filters::network::ratelimit::v3::RateLimit proto_config;
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException,
                           "ip_allowlist: Cannot find field");
-}
-
-// Test that the deprecated extension name still functions.
-TEST(RateLimitFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.ratelimit";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
-          deprecated_name));
 }
 
 } // namespace RateLimitFilter

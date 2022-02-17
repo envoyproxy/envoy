@@ -1,9 +1,9 @@
 #include "envoy/common/platform.h"
 
-#include "common/grpc/common.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
 
 #include "test/mocks/stream_info/mocks.h"
 #include "test/proto/helloworld.pb.h"
@@ -325,6 +325,16 @@ TEST(GrpcContextTest, IsGrpcResponseHeader) {
                                                        {"content-type", "application/json"}};
   EXPECT_FALSE(Common::isGrpcResponseHeaders(json_response_header, true));
   EXPECT_FALSE(Common::isGrpcResponseHeaders(json_response_header, false));
+}
+
+TEST(GrpcContextTest, IsProtobufRequestHeader) {
+  Http::TestRequestHeaderMapImpl is{
+      {":method", "GET"}, {":path", "/"}, {"content-type", "application/x-protobuf"}};
+  EXPECT_TRUE(Common::isProtobufRequestHeaders(is));
+
+  Http::TestRequestHeaderMapImpl is_not{{":method", "CONNECT"},
+                                        {"content-type", "application/x-protobuf"}};
+  EXPECT_FALSE(Common::isProtobufRequestHeaders(is_not));
 }
 
 TEST(GrpcContextTest, ValidateResponse) {

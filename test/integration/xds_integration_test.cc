@@ -1,7 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
@@ -21,13 +21,13 @@ using testing::HasSubstr;
 class XdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
-  XdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  XdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
+    setUpstreamProtocol(Http::CodecType::HTTP2);
   }
 
   void createEnvoy() override {
     createEnvoyServer({
-        "test/config/integration/server_xds.bootstrap.yaml",
+        "test/config/integration/server_xds.bootstrap.yml",
         "test/config/integration/server_xds.cds.yaml",
         "test/config/integration/server_xds.eds.yaml",
         "test/config/integration/server_xds.lds.yaml",
@@ -59,7 +59,7 @@ public:
 
   void createEnvoy() override {
     createEnvoyServer({
-        "test/config/integration/server_xds.bootstrap.yaml",
+        "test/config/integration/server_xds.bootstrap.yml",
         "test/config/integration/server_xds.cds.yaml",
         "test/config/integration/server_xds.eds.yaml",
         "test/config/integration/server_xds.lds.typed_struct.yaml",
@@ -291,8 +291,7 @@ class LdsInplaceUpdateHttpIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
 public:
-  LdsInplaceUpdateHttpIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  LdsInplaceUpdateHttpIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void inplaceInitialize(bool add_default_filter_chain = false) {
     autonomous_upstream_ = true;
@@ -302,6 +301,9 @@ public:
     std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
     config_helper_.addListenerFilter(tls_inspector_config);
     config_helper_.addSslConfig();
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) { hcm.mutable_stat_prefix()->assign("hcm0"); });
     config_helper_.addConfigModifier([this, add_default_filter_chain](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       if (!use_default_balancer_) {
@@ -336,6 +338,7 @@ public:
           ->mutable_routes(0)
           ->mutable_route()
           ->set_cluster("cluster_1");
+      hcm_config.mutable_stat_prefix()->assign("hcm1");
       config_blob->PackFrom(hcm_config);
       bootstrap.mutable_static_resources()->mutable_clusters()->Add()->MergeFrom(
           *bootstrap.mutable_static_resources()->mutable_clusters(0));
@@ -382,7 +385,7 @@ public:
     }
   }
 
-  void expectConnenctionServed(std::string alpn = "alpn0") {
+  void expectConnectionServed(std::string alpn = "alpn0") {
     auto codec_client_after_config_update = createHttpCodec(alpn);
     expectResponseHeaderConnectionClose(*codec_client_after_config_update, false);
     codec_client_after_config_update->close();
@@ -396,7 +399,7 @@ public:
 };
 
 // Verify that http response on filter chain 1 and default filter chain have "Connection: close"
-// header when these 2 filter chains are  deleted during the listener update.
+// header when these 2 filter chains are deleted during the listener update.
 TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
   inplaceInitialize(/*add_default_filter_chain=*/true);
 
@@ -404,12 +407,6 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
   auto codec_client_0 = createHttpCodec("alpn0");
   auto codec_client_default = createHttpCodec("alpndefault");
 
-  Cleanup cleanup([c1 = codec_client_1.get(), c0 = codec_client_0.get(),
-                   c_default = codec_client_default.get()]() {
-    c1->close();
-    c0->close();
-    c_default->close();
-  });
   ConfigHelper new_config_helper(
       version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
@@ -423,12 +420,20 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
 
+  test_server_->waitForGaugeGe("http.hcm0.downstream_cx_active", 1);
+  test_server_->waitForGaugeGe("http.hcm1.downstream_cx_active", 1);
+
   expectResponseHeaderConnectionClose(*codec_client_1, true);
   expectResponseHeaderConnectionClose(*codec_client_default, true);
 
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 0);
   expectResponseHeaderConnectionClose(*codec_client_0, false);
-  expectConnenctionServed();
+  expectConnectionServed();
+
+  codec_client_1->close();
+  test_server_->waitForGaugeDestroyed("http.hcm1.downstream_cx_active");
+  codec_client_0->close();
+  codec_client_default->close();
 }
 
 // Verify that http clients of filter chain 0 survives if new listener config adds new filter
@@ -439,15 +444,19 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
 
   auto codec_client_0 = createHttpCodec("alpn0");
   Cleanup cleanup0([c0 = codec_client_0.get()]() { c0->close(); });
+  test_server_->waitForGaugeGe("http.hcm0.downstream_cx_active", 1);
+
   ConfigHelper new_config_helper(
       version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
                                           -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->mutable_filter_chains()->Add()->MergeFrom(*listener->mutable_filter_chains(1));
+    // Note that HCM2 copies the stats prefix from HCM0
+    listener->mutable_filter_chains()->Add()->MergeFrom(*listener->mutable_filter_chains(0));
     *listener->mutable_filter_chains(2)
          ->mutable_filter_chain_match()
          ->mutable_application_protocols(0) = "alpn2";
+
     auto default_filter_chain =
         bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_default_filter_chain();
     default_filter_chain->MergeFrom(*listener->mutable_filter_chains(1));
@@ -459,6 +468,9 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
   auto codec_client_2 = createHttpCodec("alpn2");
   auto codec_client_default = createHttpCodec("alpndefault");
 
+  // 1 connection from filter chain 0 and 1 connection from filter chain 2.
+  test_server_->waitForGaugeGe("http.hcm0.downstream_cx_active", 2);
+
   Cleanup cleanup2([c2 = codec_client_2.get(), c_default = codec_client_default.get()]() {
     c2->close();
     c_default->close();
@@ -466,7 +478,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
   expectResponseHeaderConnectionClose(*codec_client_2, false);
   expectResponseHeaderConnectionClose(*codec_client_default, false);
   expectResponseHeaderConnectionClose(*codec_client_0, false);
-  expectConnenctionServed();
+  expectConnectionServed();
 }
 
 // Verify that http clients of default filter chain is drained and recreated if the default filter
@@ -494,7 +506,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigUpdatingDefaultFilterCha
   Cleanup cleanup2([c_default_v3 = codec_client_default_v3.get()]() { c_default_v3->close(); });
   expectResponseHeaderConnectionClose(*codec_client_default, true);
   expectResponseHeaderConnectionClose(*codec_client_default_v3, false);
-  expectConnenctionServed();
+  expectConnectionServed();
 }
 
 // Verify that balancer is inherited. Test only default balancer because ExactConnectionBalancer
@@ -516,7 +528,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, OverlappingFilterChainServesNewConne
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
   expectResponseHeaderConnectionClose(*codec_client_0, false);
-  expectConnenctionServed();
+  expectConnectionServed();
 }
 
 // Verify default filter chain update is filter chain only update.
@@ -533,7 +545,7 @@ using LdsIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, LdsIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP1}, {FakeHttpConnection::Type::HTTP1})),
+                             {Http::CodecType::HTTP1}, {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Sample test making sure our config framework correctly reloads listeners.
@@ -568,6 +580,34 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
   std::string response2;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response2, false);
   EXPECT_THAT(response2, HasSubstr("HTTP/1.0 200 OK\r\n"));
+}
+
+// Verify that a listener that goes through the individual warming path (not server init) is
+// failed and removed correctly if there are issues with final pre-worker init.
+TEST_P(LdsIntegrationTest, NewListenerWithBadPostListenSocketOption) {
+  autonomous_upstream_ = true;
+  initialize();
+  // Given we're using LDS in this test, initialize() will not complete until
+  // the initial LDS file has loaded.
+  EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
+
+  // Reserve a port that we can then use on the integration listener with reuse_port.
+  auto addr_socket =
+      Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  new_config_helper.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        listener->mutable_address()->mutable_socket_address()->set_port_value(
+            addr_socket.second->connectionInfoProvider().localAddress()->ip()->port());
+        auto socket_option = listener->add_socket_options();
+        socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
+        socket_option->set_level(10000);     // Invalid level.
+        socket_option->set_int_value(10000); // Invalid value.
+      });
+  new_config_helper.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
 }
 
 // Sample test making sure our config framework informs on listener failure.

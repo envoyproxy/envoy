@@ -8,10 +8,9 @@
 #include "envoy/singleton/instance.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
-
-#include "extensions/common/redis/cluster_refresh_manager.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
+#include "source/extensions/common/redis/cluster_refresh_manager.h"
 
 namespace Envoy {
 namespace Extensions {

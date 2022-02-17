@@ -1,12 +1,11 @@
-#include "extensions/filters/http/ip_tagging/config.h"
+#include "source/extensions/filters/http/ip_tagging/config.h"
 
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/ip_tagging/ip_tagging_filter.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/ip_tagging/ip_tagging_filter.h"
 
 namespace Envoy {
 namespace Extensions {

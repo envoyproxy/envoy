@@ -8,11 +8,10 @@
 #include "envoy/router/router.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/config/utility.h"
-#include "common/singleton/const_singleton.h"
-
-#include "extensions/filters/network/dubbo_proxy/metadata.h"
-#include "extensions/filters/network/dubbo_proxy/router/router.h"
+#include "source/common/config/utility.h"
+#include "source/common/singleton/const_singleton.h"
+#include "source/extensions/filters/network/dubbo_proxy/metadata.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/router.h"
 
 namespace Envoy {
 namespace Extensions {

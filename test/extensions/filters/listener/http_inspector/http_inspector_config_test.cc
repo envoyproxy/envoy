@@ -1,5 +1,4 @@
-#include "extensions/filters/listener/http_inspector/http_inspector.h"
-#include "extensions/filters/listener/well_known_names.h"
+#include "source/extensions/filters/listener/http_inspector/http_inspector.h"
 
 #include "test/mocks/server/listener_factory_context.h"
 
@@ -15,11 +14,11 @@ namespace HttpInspector {
 namespace {
 
 TEST(HttpInspectorConfigFactoryTest, TestCreateFactory) {
-  Server::Configuration::NamedListenerFilterConfigFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::NamedListenerFilterConfigFactory>::
-          getFactory(ListenerFilters::ListenerFilterNames::get().HttpInspector);
+  const std::string HttpInspector = "envoy.filters.listener.http_inspector";
+  Server::Configuration::NamedListenerFilterConfigFactory* factory = Registry::FactoryRegistry<
+      Server::Configuration::NamedListenerFilterConfigFactory>::getFactory(HttpInspector);
 
-  EXPECT_EQ(factory->name(), ListenerFilters::ListenerFilterNames::get().HttpInspector);
+  EXPECT_EQ(factory->name(), HttpInspector);
 
   const std::string yaml = R"EOF(
       {}
@@ -44,16 +43,6 @@ TEST(HttpInspectorConfigFactoryTest, TestCreateFactory) {
 
   // Make sure we actually create the correct type!
   EXPECT_NE(dynamic_cast<HttpInspector::Filter*>(added_filter.get()), nullptr);
-}
-
-// Test that the deprecated extension name still functions.
-TEST(HttpInspectorConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.listener.http_inspector";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<
-          Server::Configuration::NamedListenerFilterConfigFactory>::getFactory(deprecated_name));
 }
 
 } // namespace

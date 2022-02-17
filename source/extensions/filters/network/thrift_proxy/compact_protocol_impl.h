@@ -6,7 +6,8 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 
-#include "extensions/filters/network/thrift_proxy/protocol.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift.h"
 
 #include "absl/types/optional.h"
 
@@ -28,6 +29,7 @@ public:
   ProtocolType type() const override { return ProtocolType::Compact; }
   bool readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) override;
   bool readMessageEnd(Buffer::Instance& buffer) override;
+  bool peekReplyPayload(Buffer::Instance& buffer, ReplyType& reply_type) override;
   bool readStructBegin(Buffer::Instance& buffer, std::string& name) override;
   bool readStructEnd(Buffer::Instance& buffer) override;
   bool readFieldBegin(Buffer::Instance& buffer, std::string& name, FieldType& field_type,

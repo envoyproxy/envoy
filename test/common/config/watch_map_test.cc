@@ -6,7 +6,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/watch_map.h"
+#include "source/common/config/watch_map.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/test_common/utility.h"

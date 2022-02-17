@@ -13,13 +13,14 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.local_ratelimit.v3";
 option java_outer_classname = "LocalRateLimitProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/local_ratelimit/v3;local_ratelimitv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Local Rate limit]
 // Local Rate limit :ref:`configuration overview <config_http_filters_local_rate_limit>`.
 // [#extension: envoy.filters.http.local_ratelimit]
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message LocalRateLimit {
   // The human readable prefix to use when emitting stats.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
@@ -97,4 +98,13 @@ message LocalRateLimit {
   //
   //  The filter supports a range of 0 - 10 inclusively for stage numbers.
   uint32 stage = 9 [(validate.rules).uint32 = {lte: 10}];
+
+  // Specifies the scope of the rate limiter's token bucket.
+  // If set to false, the token bucket is shared across all worker threads,
+  // thus the rate limits are applied per Envoy process.
+  // If set to true, a token bucket is allocated for each connection.
+  // Thus the rate limits are applied per connection thereby allowing
+  // one to rate limit requests on a per connection basis.
+  // If unspecified, the default value is false.
+  bool local_rate_limit_per_downstream_connection = 11;
 }

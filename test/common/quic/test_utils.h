@@ -1,31 +1,22 @@
 #pragma once
 
-#include "common/quic/envoy_quic_client_connection.h"
-#include "common/quic/envoy_quic_server_connection.h"
-#include "common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_client_session.h"
+#include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "test/test_common/environment.h"
 
 #include "quiche/quic/core/http/quic_spdy_session.h"
-#include "quiche/quic/core/http/quic_spdy_client_session.h"
-#include "quiche/quic/test_tools/quic_test_utils.h"
-#include "quiche/quic/test_tools/first_flight.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
-#include "quiche/quic/test_tools/quic_config_peer.h"
-#include "quiche/quic/test_tools/qpack/qpack_test_utils.h"
+#include "quiche/quic/test_tools/first_flight.h"
 #include "quiche/quic/test_tools/qpack/qpack_encoder_test_utils.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "common/quic/envoy_quic_utils.h"
-#include "test/test_common/environment.h"
+#include "quiche/quic/test_tools/qpack/qpack_test_utils.h"
+#include "quiche/quic/test_tools/quic_config_peer.h"
+#include "quiche/quic/test_tools/quic_test_utils.h"
 
 namespace Envoy {
 namespace Quic {
@@ -63,6 +54,15 @@ public:
   MOCK_METHOD(void, SendConnectionClosePacket,
               (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes, const std::string&));
   MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
+};
+
+class TestQuicCryptoStream : public quic::test::MockQuicCryptoStream {
+public:
+  explicit TestQuicCryptoStream(quic::QuicSession* session)
+      : quic::test::MockQuicCryptoStream(session) {}
+
+  bool encryption_established() const override { return true; }
 };
 
 class MockEnvoyQuicSession : public quic::QuicSpdySession, public QuicFilterManagerConnectionImpl {
@@ -73,9 +73,8 @@ public:
                        uint32_t send_buffer_limit)
       : quic::QuicSpdySession(connection, /*visitor=*/nullptr, config, supported_versions),
         QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
-                                        send_buffer_limit) {
-    crypto_stream_ = std::make_unique<quic::test::MockQuicCryptoStream>(this);
-  }
+                                        send_buffer_limit, {nullptr}),
+        crypto_stream_(std::make_unique<TestQuicCryptoStream>(this)) {}
 
   void Initialize() override {
     quic::QuicSpdySession::Initialize();
@@ -93,13 +92,14 @@ public:
   MOCK_METHOD(quic::QuicConsumedData, WritevData,
               (quic::QuicStreamId id, size_t write_length, quic::QuicStreamOffset offset,
                quic::StreamSendingState state, quic::TransmissionType type,
-               absl::optional<quic::EncryptionLevel> level));
+               quic::EncryptionLevel level));
   MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id));
   MOCK_METHOD(void, MaybeSendRstStreamFrame,
-              (quic::QuicStreamId id, quic::QuicRstStreamErrorCode error,
+              (quic::QuicStreamId id, quic::QuicResetStreamError error,
                quic::QuicStreamOffset bytes_written));
   MOCK_METHOD(void, MaybeSendStopSendingFrame,
-              (quic::QuicStreamId id, quic::QuicRstStreamErrorCode error));
+              (quic::QuicStreamId id, quic::QuicResetStreamError error));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   absl::string_view requestedServerName() const override {
     return {GetCryptoStream()->crypto_negotiated_params().sni};
@@ -122,22 +122,48 @@ private:
   std::unique_ptr<quic::QuicCryptoStream> crypto_stream_;
 };
 
-class MockEnvoyQuicClientSession : public quic::QuicSpdyClientSession,
-                                   public QuicFilterManagerConnectionImpl {
+class TestQuicCryptoClientStream : public quic::QuicCryptoClientStream {
+public:
+  TestQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
+                             std::unique_ptr<quic::ProofVerifyContext> verify_context,
+                             quic::QuicCryptoClientConfig* crypto_config,
+                             ProofHandler* proof_handler, bool has_application_state)
+      : quic::QuicCryptoClientStream(server_id, session, std::move(verify_context), crypto_config,
+                                     proof_handler, has_application_state) {}
+
+  bool encryption_established() const override { return true; }
+};
+
+class TestQuicCryptoClientStreamFactory : public EnvoyQuicCryptoClientStreamFactoryInterface {
+public:
+  std::unique_ptr<quic::QuicCryptoClientStreamBase>
+  createEnvoyQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
+                                    std::unique_ptr<quic::ProofVerifyContext> verify_context,
+                                    quic::QuicCryptoClientConfig* crypto_config,
+                                    quic::QuicCryptoClientStream::ProofHandler* proof_handler,
+                                    bool has_application_state) override {
+    return std::make_unique<TestQuicCryptoClientStream>(server_id, session,
+                                                        std::move(verify_context), crypto_config,
+                                                        proof_handler, has_application_state);
+  }
+};
+
+class MockEnvoyQuicClientSession : public EnvoyQuicClientSession {
 public:
   MockEnvoyQuicClientSession(const quic::QuicConfig& config,
                              const quic::ParsedQuicVersionVector& supported_versions,
-                             EnvoyQuicClientConnection* connection, Event::Dispatcher& dispatcher,
-                             uint32_t send_buffer_limit)
-      : quic::QuicSpdyClientSession(config, supported_versions, connection,
-                                    quic::QuicServerId("example.com", 443, false), &crypto_config_,
-                                    nullptr),
-        QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
-                                        send_buffer_limit),
-        crypto_config_(quic::test::crypto_test_utils::ProofVerifierForTesting()) {}
+                             std::unique_ptr<EnvoyQuicClientConnection> connection,
+                             Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
+                             EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory)
+      : EnvoyQuicClientSession(config, supported_versions, std::move(connection),
+                               quic::QuicServerId("example.com", 443, false),
+                               std::make_shared<quic::QuicCryptoClientConfig>(
+                                   quic::test::crypto_test_utils::ProofVerifierForTesting()),
+                               nullptr, dispatcher, send_buffer_limit, crypto_stream_factory,
+                               quic_stat_names_, {}, stats_store_) {}
 
   void Initialize() override {
-    quic::QuicSpdyClientSession::Initialize();
+    EnvoyQuicClientSession::Initialize();
     initialized_ = true;
   }
 
@@ -152,8 +178,9 @@ public:
   MOCK_METHOD(quic::QuicConsumedData, WritevData,
               (quic::QuicStreamId id, size_t write_length, quic::QuicStreamOffset offset,
                quic::StreamSendingState state, quic::TransmissionType type,
-               absl::optional<quic::EncryptionLevel> level));
+               quic::EncryptionLevel level));
   MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   absl::string_view requestedServerName() const override {
     return {GetCryptoStream()->crypto_negotiated_params().sni};
@@ -169,48 +196,16 @@ protected:
   }
   quic::QuicConnection* quicConnection() override { return initialized_ ? connection() : nullptr; }
 
-private:
-  quic::QuicCryptoClientConfig crypto_config_;
+  Stats::IsolatedStoreImpl stats_store_;
+  QuicStatNames quic_stat_names_{stats_store_.symbolTable()};
 };
 
-Buffer::OwnedImpl
-generateChloPacketToSend(quic::ParsedQuicVersion quic_version, quic::QuicConfig& quic_config,
-                         quic::QuicCryptoServerConfig& crypto_config,
-                         quic::QuicConnectionId connection_id, quic::QuicClock& clock,
-                         const quic::QuicSocketAddress& server_address,
-                         const quic::QuicSocketAddress& client_address, std::string sni) {
-  if (quic_version.UsesTls()) {
-    std::unique_ptr<quic::QuicReceivedPacket> packet =
-        std::move(quic::test::GetFirstFlightOfPackets(quic_version, quic_config, connection_id)[0]);
-    return Buffer::OwnedImpl(packet->data(), packet->length());
-  }
-  quic::CryptoHandshakeMessage chlo = quic::test::crypto_test_utils::GenerateDefaultInchoateCHLO(
-      &clock, quic_version.transport_version, &crypto_config);
-  chlo.SetVector(quic::kCOPT, quic::QuicTagVector{quic::kREJ});
-  chlo.SetStringPiece(quic::kSNI, sni);
-  quic::CryptoHandshakeMessage full_chlo;
-  quic::QuicReferenceCountedPointer<quic::QuicSignedServerConfig> signed_config(
-      new quic::QuicSignedServerConfig);
-  quic::QuicCompressedCertsCache cache(
-      quic::QuicCompressedCertsCache::kQuicCompressedCertsCacheSize);
-  quic::test::crypto_test_utils::GenerateFullCHLO(chlo, &crypto_config, server_address,
-                                                  client_address, quic_version.transport_version,
-                                                  &clock, signed_config, &cache, &full_chlo);
-  // Overwrite version label to the version passed in.
-  full_chlo.SetVersion(quic::kVER, quic_version);
-  quic::QuicConfig quic_config_tmp;
-  quic_config_tmp.ToHandshakeMessage(&full_chlo, quic_version.transport_version);
-
-  std::string packet_content(full_chlo.GetSerialized().AsStringPiece());
-  quic::ParsedQuicVersionVector supported_versions{quic_version};
-  auto encrypted_packet =
-      std::unique_ptr<quic::QuicEncryptedPacket>(quic::test::ConstructEncryptedPacket(
-          connection_id, quic::EmptyQuicConnectionId(),
-          /*version_flag=*/true, /*reset_flag*/ false,
-          /*packet_number=*/1, packet_content, quic::CONNECTION_ID_PRESENT,
-          quic::CONNECTION_ID_ABSENT, quic::PACKET_4BYTE_PACKET_NUMBER, &supported_versions));
-
-  return Buffer::OwnedImpl(encrypted_packet->data(), encrypted_packet->length());
+Buffer::OwnedImpl generateChloPacketToSend(quic::ParsedQuicVersion quic_version,
+                                           quic::QuicConfig& quic_config,
+                                           quic::QuicConnectionId connection_id) {
+  std::unique_ptr<quic::QuicReceivedPacket> packet =
+      std::move(quic::test::GetFirstFlightOfPackets(quic_version, quic_config, connection_id)[0]);
+  return Buffer::OwnedImpl(packet->data(), packet->length());
 }
 
 void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
@@ -228,12 +223,6 @@ void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
       config, quic::kMinimumFlowControlSendWindow);
 }
 
-enum class QuicVersionType {
-  GquicQuicCrypto,
-  GquicTls,
-  Iquic,
-};
-
 std::string spdyHeaderToHttp3StreamPayload(const spdy::SpdyHeaderBlock& header) {
   quic::test::NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
   quic::test::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
@@ -250,41 +239,31 @@ std::string spdyHeaderToHttp3StreamPayload(const spdy::SpdyHeaderBlock& header) 
 }
 
 std::string bodyToHttp3StreamPayload(const std::string& body) {
-  std::unique_ptr<char[]> data_buffer;
-  quic::QuicByteCount data_frame_header_length =
-      quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &data_buffer);
-  absl::string_view data_frame_header(data_buffer.get(), data_frame_header_length);
-  return absl::StrCat(data_frame_header, body);
+  quic::SimpleBufferAllocator allocator;
+  quic::QuicBuffer header = quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &allocator);
+  return absl::StrCat(header.AsStringView(), body);
 }
 
 // A test suite with variation of ip version and a knob to turn on/off IETF QUIC implementation.
-class QuicMultiVersionTest
-    : public testing::TestWithParam<std::pair<Network::Address::IpVersion, QuicVersionType>> {};
+class QuicMultiVersionTest : public testing::TestWithParam<
+                                 std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> {
+};
 
-std::vector<std::pair<Network::Address::IpVersion, QuicVersionType>> generateTestParam() {
-  std::vector<std::pair<Network::Address::IpVersion, QuicVersionType>> param;
+std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> generateTestParam() {
+  std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> param;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    param.emplace_back(ip_version, QuicVersionType::GquicQuicCrypto);
-    param.emplace_back(ip_version, QuicVersionType::GquicTls);
-    param.emplace_back(ip_version, QuicVersionType::Iquic);
+    for (const auto& quic_version : quic::CurrentSupportedHttp3Versions()) {
+      param.emplace_back(ip_version, quic_version);
+    }
   }
-
   return param;
 }
 
 std::string testParamsToString(
-    const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, QuicVersionType>>&
+    const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>>&
         params) {
   std::string ip_version = params.param.first == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
-  switch (params.param.second) {
-  case QuicVersionType::GquicQuicCrypto:
-    return absl::StrCat(ip_version, "_UseGQuicWithQuicCrypto");
-  case QuicVersionType::GquicTls:
-    return absl::StrCat(ip_version, "_UseGQuicWithTLS");
-  case QuicVersionType::Iquic:
-    return absl::StrCat(ip_version, "_UseHttp3");
-  }
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  return absl::StrCat(ip_version, quic::QuicVersionToString(params.param.second.transport_version));
 }
 
 } // namespace Quic

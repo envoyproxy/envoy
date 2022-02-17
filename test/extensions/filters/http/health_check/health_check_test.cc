@@ -3,11 +3,10 @@
 
 #include "envoy/config/route/v3/route_components.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/header_utility.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/filters/http/health_check/health_check.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/filters/http/health_check/health_check.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -51,7 +50,7 @@ public:
     header_data_ = std::make_shared<std::vector<Http::HeaderUtility::HeaderDataPtr>>();
     envoy::config::route::v3::HeaderMatcher matcher;
     matcher.set_name(":path");
-    matcher.set_exact_match("/healthcheck");
+    matcher.mutable_string_match()->set_exact("/healthcheck");
     header_data_->emplace_back(std::make_unique<Http::HeaderUtility::HeaderData>(matcher));
     filter_ = std::make_unique<HealthCheckFilter>(context_, pass_through, cache_manager_,
                                                   header_data_, cluster_min_healthy_percentages);
@@ -253,37 +252,6 @@ TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
 }
 
-// Verifies that header is not sent on HC requests when
-// "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster" is disabled.
-TEST_F(HealthCheckFilterNoPassThroughTest,
-       HealthCheckFailedCallbackCalledImmediateFailureExcludeDisabled) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster", "false"}});
-
-  EXPECT_CALL(context_, healthCheckFailed()).Times(2).WillRepeatedly(Return(true));
-  EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
-  EXPECT_CALL(callbacks_.active_span_, setSampled(false));
-  Http::TestResponseHeaderMapImpl health_check_response{{":status", "503"}};
-  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
-      .Times(1)
-      .WillRepeatedly(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
-        filter_->encodeHeaders(headers, end_stream);
-        EXPECT_EQ("cluster_name", headers.getEnvoyUpstreamHealthCheckedClusterValue());
-        EXPECT_EQ(nullptr, headers.EnvoyImmediateHealthCheckFail());
-      }));
-
-  EXPECT_CALL(callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers_, false));
-  Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, false));
-  Http::TestRequestTrailerMapImpl request_trailers;
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
-}
-
 TEST_F(HealthCheckFilterPassThroughTest, Ok) {
   EXPECT_CALL(context_, healthCheckFailed()).Times(2).WillRepeatedly(Return(false));
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
@@ -306,8 +274,7 @@ TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
   // Goodness only knows why there would be a 100-Continue response in health
   // checks but we can still verify Envoy handles it.
   Http::TestResponseHeaderMapImpl continue_response{{":status", "100"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->encode100ContinueHeaders(continue_response));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(continue_response));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
   Http::TestResponseHeaderMapImpl service_hc_response{{":status", "200"}};

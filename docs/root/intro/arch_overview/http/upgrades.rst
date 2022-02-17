@@ -52,10 +52,13 @@ a deployment of the form:
 In this case, if a client is for example using WebSocket, we want the Websocket to arrive at the
 upstream server functionally intact, which means it needs to traverse the HTTP/2+ hop.
 
-This is accomplished via `Extended CONNECT (RFC8441) <https://tools.ietf.org/html/rfc8441>`_ support,
+This is accomplished for HTTP/2 via `Extended CONNECT (RFC8441) <https://tools.ietf.org/html/rfc8441>`_ support,
 turned on by setting :ref:`allow_connect <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.allow_connect>`
-true at the second layer Envoy. The
-WebSocket request will be transformed into an HTTP/2+ CONNECT stream, with :protocol header
+true at the second layer Envoy. For HTTP/3 there is parallel support configured by the alpha option
+:ref:`allow_extended_connect <envoy_v3_api_field_config.core.v3.Http3ProtocolOptions.allow_extended_connect>` as
+there is no formal RFC yet.
+
+The WebSocket request will be transformed into an HTTP/2+ CONNECT stream, with :protocol header
 indicating the original upgrade, traverse the HTTP/2+ hop, and be downgraded back into an HTTP/1
 WebSocket Upgrade. This same Upgrade-CONNECT-Upgrade transformation will be performed on any
 HTTP/2+ hop, with the documented flaw that the HTTP/1.1 method is always assumed to be GET.
@@ -96,7 +99,7 @@ will synthesize 200 response headers, and then forward the TCP data as the HTTP 
   will be forwarded *unsanitized* headers if they are in the body payload. Please use with caution
 
 For an example of proxying connect, please see :repo:`configs/proxy_connect.yaml <configs/proxy_connect.yaml>`
-For an example of terminating connect, please see :repo:`configs/terminate_connect.yaml <configs/terminate_connect.yaml>`
+For an example of terminating connect, please see :repo:`configs/terminate_http1_connect.yaml <configs/terminate_http1_connect.yaml>` and :repo:`configs/terminate_http2_connect.yaml <configs/terminate_http2_connect.yaml>`
 
 Note that for CONNECT-over-tls, Envoy can not currently be configured to do the CONNECT request in the clear
 and encrypt previously unencrypted payload in one hop. To send CONNECT in plaintext and encrypt the payload,

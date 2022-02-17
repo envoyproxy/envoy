@@ -5,7 +5,7 @@
 #include "envoy/extensions/filters/network/wasm/v3/wasm.pb.validate.h"
 #include "envoy/stats/sink.h"
 
-#include "extensions/common/wasm/wasm.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,7 +21,7 @@ public:
       : plugin_(plugin), singleton_(singleton) {}
 
   void flush(Stats::MetricSnapshot& snapshot) override {
-    singleton_->wasm()->onStatsUpdate(plugin_, snapshot);
+    singleton_->wasmHandle()->wasm()->onStatsUpdate(plugin_, snapshot);
   }
 
   void setSingleton(PluginHandleSharedPtr singleton) {

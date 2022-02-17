@@ -7,10 +7,6 @@ static_resources:
         port_value: 5432
     filter_chains:
     - filters:
-      - name: envoy.filters.network.postgres_proxy
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy
-          stat_prefix: egress_postgres
       - name: envoy.filters.network.tcp_proxy
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
@@ -19,7 +15,6 @@ static_resources:
 
   clusters:
   - name: postgres_cluster
-    connect_timeout: 1s
     type: STRICT_DNS
     load_assignment:
       cluster_name: postgres_cluster
@@ -41,7 +36,9 @@ static_resources:
             private_key:
               filename: certs/clientkey.pem
           validation_context:
-            match_subject_alt_names:
-            - exact: proxy-postgres-backend.example.com
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: proxy-postgres-backend.example.com
             trusted_ca:
               filename: certs/cacert.pem

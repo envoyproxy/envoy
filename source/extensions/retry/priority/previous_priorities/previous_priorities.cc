@@ -1,4 +1,4 @@
-#include "extensions/retry/priority/previous_priorities/previous_priorities.h"
+#include "source/extensions/retry/priority/previous_priorities/previous_priorities.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -2,18 +2,20 @@
 
 #include "envoy/router/router.h"
 
-#include "extensions/filters/network/thrift_proxy/conn_manager.h"
-#include "extensions/filters/network/thrift_proxy/conn_state.h"
-#include "extensions/filters/network/thrift_proxy/filters/factory_base.h"
-#include "extensions/filters/network/thrift_proxy/filters/filter.h"
-#include "extensions/filters/network/thrift_proxy/metadata.h"
-#include "extensions/filters/network/thrift_proxy/protocol.h"
-#include "extensions/filters/network/thrift_proxy/router/router.h"
-#include "extensions/filters/network/thrift_proxy/router/router_ratelimit.h"
-#include "extensions/filters/network/thrift_proxy/transport.h"
+#include "source/extensions/filters/network/thrift_proxy/conn_manager.h"
+#include "source/extensions/filters/network/thrift_proxy/conn_state.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/factory_base.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
+#include "source/extensions/filters/network/thrift_proxy/metadata.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router_ratelimit.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift.h"
+#include "source/extensions/filters/network/thrift_proxy/transport.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -64,6 +66,7 @@ public:
   MOCK_METHOD(void, setType, (ProtocolType));
   MOCK_METHOD(bool, readMessageBegin, (Buffer::Instance & buffer, MessageMetadata& metadata));
   MOCK_METHOD(bool, readMessageEnd, (Buffer::Instance & buffer));
+  MOCK_METHOD(bool, peekReplyPayload, (Buffer::Instance & buffer, ReplyType& reply_type));
   MOCK_METHOD(bool, readStructBegin, (Buffer::Instance & buffer, std::string& name));
   MOCK_METHOD(bool, readStructEnd, (Buffer::Instance & buffer));
   MOCK_METHOD(bool, readFieldBegin,
@@ -333,10 +336,13 @@ public:
   MOCK_METHOD(RateLimitPolicy&, rateLimitPolicy, (), (const));
   MOCK_METHOD(bool, stripServiceName, (), (const));
   MOCK_METHOD(const Http::LowerCaseString&, clusterHeader, (), (const));
+  MOCK_METHOD(const std::vector<std::shared_ptr<RequestMirrorPolicy>>&, requestMirrorPolicies, (),
+              (const));
 
   std::string cluster_name_{"fake_cluster"};
   Http::LowerCaseString cluster_header_{""};
   NiceMock<MockRateLimitPolicy> rate_limit_policy_;
+  std::vector<std::shared_ptr<RequestMirrorPolicy>> policies_;
 };
 
 class MockRoute : public Route {
@@ -348,6 +354,19 @@ public:
   MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
 
   NiceMock<MockRouteEntry> route_entry_;
+};
+
+class MockShadowWriter : public ShadowWriter {
+public:
+  MockShadowWriter();
+  ~MockShadowWriter() override;
+
+  MOCK_METHOD(Upstream::ClusterManager&, clusterManager, (), ());
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), ());
+  MOCK_METHOD(absl::optional<std::reference_wrapper<ShadowRouterHandle>>, submit,
+              (const std::string&, MessageMetadataSharedPtr, TransportType, ProtocolType), ());
+
+  absl::optional<std::reference_wrapper<ShadowRouterHandle>> router_handle_{absl::nullopt};
 };
 
 } // namespace Router

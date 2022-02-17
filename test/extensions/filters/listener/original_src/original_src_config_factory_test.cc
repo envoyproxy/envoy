@@ -1,6 +1,6 @@
-#include "extensions/filters/listener/original_src/config.h"
-#include "extensions/filters/listener/original_src/original_src.h"
-#include "extensions/filters/listener/original_src/original_src_config_factory.h"
+#include "source/extensions/filters/listener/original_src/config.h"
+#include "source/extensions/filters/listener/original_src/original_src.h"
+#include "source/extensions/filters/listener/original_src/original_src_config_factory.h"
 
 #include "test/mocks/server/listener_factory_context.h"
 
@@ -41,16 +41,6 @@ TEST(OriginalSrcConfigFactoryTest, TestCreateFactory) {
 
   // Make sure we actually create the correct type!
   EXPECT_NE(dynamic_cast<OriginalSrcFilter*>(added_filter.get()), nullptr);
-}
-
-// Test that the deprecated extension name still functions.
-TEST(OriginalSrcConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.listener.original_src";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<
-          Server::Configuration::NamedListenerFilterConfigFactory>::getFactory(deprecated_name));
 }
 
 } // namespace

@@ -1,14 +1,14 @@
-#include "extensions/filters/listener/http_inspector/http_inspector.h"
+#include "source/extensions/filters/listener/http_inspector/http_inspector.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/macros.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_split.h"
@@ -61,10 +61,6 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
         cb.dispatcher(),
         [this](uint32_t events) {
           ENVOY_LOG(trace, "http inspector event: {}", events);
-          // inspector is always peeking and can never determine EOF.
-          // Use this event type to avoid listener timeout on the OS supporting
-          // FileReadyType::Closed.
-          bool end_stream = events & Event::FileReadyType::Closed;
 
           const ParseState parse_state = onRead();
           switch (parse_state) {
@@ -78,27 +74,19 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
             cb_->continueFilterChain(true);
             break;
           case ParseState::Continue:
-            if (end_stream) {
-              // Parser fails to determine http but the end of stream is reached. Fallback to
-              // non-http.
-              done(false);
-              cb_->socket().ioHandle().resetFileEvents();
-              cb_->continueFilterChain(true);
-            }
             // do nothing but wait for the next event
             break;
           }
         },
-        Event::PlatformDefaultTriggerType,
-        Event::FileReadyType::Read | Event::FileReadyType::Closed);
+        Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
     return Network::FilterStatus::StopIteration;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM
 }
 
 ParseState Filter::onRead() {
   auto result = cb_->socket().ioHandle().recv(buf_, Config::MAX_INSPECT_SIZE, MSG_PEEK);
-  ENVOY_LOG(trace, "http inspector: recv: {}", result.rc_);
+  ENVOY_LOG(trace, "http inspector: recv: {}", result.return_value_);
   if (!result.ok()) {
     if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
       return ParseState::Continue;
@@ -107,8 +95,13 @@ ParseState Filter::onRead() {
     return ParseState::Error;
   }
 
+  // Remote closed
+  if (result.return_value_ == 0) {
+    return ParseState::Error;
+  }
+
   const auto parse_state =
-      parseHttpHeader(absl::string_view(reinterpret_cast<const char*>(buf_), result.rc_));
+      parseHttpHeader(absl::string_view(reinterpret_cast<const char*>(buf_), result.return_value_));
   switch (parse_state) {
   case ParseState::Continue:
     // do nothing but wait for the next event
@@ -120,7 +113,7 @@ ParseState Filter::onRead() {
     done(true);
     return ParseState::Done;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 ParseState Filter::parseHttpHeader(absl::string_view data) {

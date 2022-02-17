@@ -9,13 +9,11 @@
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/empty_string.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-
-#include "extensions/filters/http/fault/fault_filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/filters/http/fault/fault_filter.h"
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/fault/utility.h"
@@ -116,7 +114,8 @@ public:
     http_status: 503
   headers:
   - name: X-Foo1
-    exact_match: Bar
+    string_match:
+      exact: Bar
   - name: X-Foo2
   )EOF";
 
@@ -147,9 +146,6 @@ public:
     EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(duration_ms), _));
     EXPECT_CALL(*timer_, disableTimer());
   }
-
-  void TestPerFilterConfigFault(const Router::RouteSpecificFilterConfig* route_fault,
-                                const Router::RouteSpecificFilterConfig* vhost_fault);
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
   FaultFilterConfigSharedPtr config_;
@@ -1193,16 +1189,13 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 }
 
-void FaultFilterTest::TestPerFilterConfigFault(
-    const Router::RouteSpecificFilterConfig* route_fault,
-    const Router::RouteSpecificFilterConfig* vhost_fault) {
+TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
+  setUpTest(v2_empty_fault_config_yaml);
+  Fault::FaultSettings delay_fault(convertYamlStrToProtoConfig(delay_with_upstream_cluster_yaml));
 
-  ON_CALL(decoder_filter_callbacks_.route_->route_entry_,
-          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().Fault))
-      .WillByDefault(Return(route_fault));
-  ON_CALL(decoder_filter_callbacks_.route_->route_entry_.virtual_host_,
-          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().Fault))
-      .WillByDefault(Return(vhost_fault));
+  ON_CALL(*decoder_filter_callbacks_.route_,
+          mostSpecificPerFilterConfig("envoy.filters.http.fault"))
+      .WillByDefault(Return(&delay_fault));
 
   const std::string upstream_cluster("www1");
 
@@ -1239,34 +1232,6 @@ void FaultFilterTest::TestPerFilterConfigFault(
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
-}
-
-TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
-
-  Fault::FaultSettings abort_fault(convertYamlStrToProtoConfig(abort_only_yaml));
-  Fault::FaultSettings delay_fault(convertYamlStrToProtoConfig(delay_with_upstream_cluster_yaml));
-
-  // route-level fault overrides listener-level fault
-  {
-    setUpTest(v2_empty_fault_config_yaml); // This is a valid listener level fault
-    TestPerFilterConfigFault(&delay_fault, nullptr);
-  }
-
-  // virtual-host-level fault overrides listener-level fault
-  {
-    config_->stats().aborts_injected_.reset();
-    config_->stats().delays_injected_.reset();
-    setUpTest(v2_empty_fault_config_yaml);
-    TestPerFilterConfigFault(nullptr, &delay_fault);
-  }
-
-  // route-level fault overrides virtual-host-level fault
-  {
-    config_->stats().aborts_injected_.reset();
-    config_->stats().delays_injected_.reset();
-    setUpTest(v2_empty_fault_config_yaml);
-    TestPerFilterConfigFault(&delay_fault, &abort_fault);
-  }
 }
 
 class FaultFilterRateLimitTest : public FaultFilterTest {
@@ -1403,8 +1368,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   EXPECT_EQ(1UL, config_->stats().response_rl_injected_.value());
   EXPECT_EQ(1UL, config_->stats().active_faults_.value());
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));

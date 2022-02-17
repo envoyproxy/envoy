@@ -2,7 +2,7 @@
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 
-#include "extensions/filters/network/rbac/config.h"
+#include "source/extensions/filters/network/rbac/config.h"
 
 #include "test/mocks/server/factory_context.h"
 

@@ -1,13 +1,12 @@
-#include "extensions/filters/http/cdn_loop/filter.h"
+#include "source/extensions/filters/http/cdn_loop/filter.h"
 
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/statusor.h"
-#include "common/http/headers.h"
-
-#include "extensions/filters/http/cdn_loop/utils.h"
+#include "source/common/common/statusor.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/filters/http/cdn_loop/utils.h"
 
 namespace Envoy {
 namespace Extensions {

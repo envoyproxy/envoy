@@ -28,7 +28,7 @@ class PreserveCaseIntegrationTest : public testing::TestWithParam<Network::Addre
                                     public HttpIntegrationTest {
 public:
   PreserveCaseIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()), registration_(factory_) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()), registration_(factory_) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::extensions::filters::network::
@@ -70,7 +70,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, PreserveCaseIntegrationTest,
 
 // Verify that we preserve case in both directions.
 TEST_P(PreserveCaseIntegrationTest, EndToEnd) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: preserve-case-filter
   )EOF");
   initialize();

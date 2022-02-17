@@ -1,4 +1,4 @@
-#include "extensions/transport_sockets/common/passthrough.h"
+#include "source/extensions/transport_sockets/common/passthrough.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -86,6 +86,26 @@ TEST_F(PassthroughTest, SslDefersToInnerSocket) {
 // Test invoking startSecureTransport.
 TEST_F(PassthroughTest, FailOnStartSecureTransport) {
   EXPECT_FALSE(passthrough_socket_->startSecureTransport());
+}
+
+TEST(PassthroughFactoryTest, TestDelegation) {
+  auto inner_factory_ptr = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
+  Network::MockTransportSocketFactory* inner_factory = inner_factory_ptr.get();
+  Network::TransportSocketFactoryPtr factory{std::move(inner_factory_ptr)};
+
+  {
+    EXPECT_CALL(*inner_factory, implementsSecureTransport());
+    factory->implementsSecureTransport();
+  }
+
+  {
+    EXPECT_CALL(*inner_factory, supportsAlpn());
+    factory->supportsAlpn();
+  }
+  {
+    EXPECT_CALL(*inner_factory, usesProxyProtocolOptions());
+    factory->usesProxyProtocolOptions();
+  }
 }
 
 } // namespace

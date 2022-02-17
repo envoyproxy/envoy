@@ -2,8 +2,8 @@
 
 #include "envoy/network/listener.h"
 
-#include "common/event/dispatcher_impl.h"
-#include "common/network/listen_socket_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/listen_socket_impl.h"
 
 namespace Envoy {
 namespace Network {

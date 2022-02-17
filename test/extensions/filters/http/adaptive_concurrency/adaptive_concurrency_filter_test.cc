@@ -3,8 +3,8 @@
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.validate.h"
 
-#include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
-#include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
+#include "source/extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
+#include "source/extensions/filters/http/adaptive_concurrency/controller/controller.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"

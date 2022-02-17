@@ -1,8 +1,8 @@
-#include "common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.validate.h"
 
-#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
 namespace Envoy {
 namespace Quic {

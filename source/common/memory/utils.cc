@@ -1,7 +1,7 @@
-#include "common/memory/utils.h"
+#include "source/common/memory/utils.h"
 
-#include "common/common/assert.h"
-#include "common/memory/stats.h"
+#include "source/common/common/assert.h"
+#include "source/common/memory/stats.h"
 
 #if defined(TCMALLOC)
 #include "tcmalloc/malloc_extension.h"

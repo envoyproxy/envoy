@@ -1,4 +1,4 @@
-#include "extensions/filters/http/adaptive_concurrency/controller/gradient_controller.h"
+#include "source/extensions/filters/http/adaptive_concurrency/controller/gradient_controller.h"
 
 #include <atomic>
 #include <chrono>
@@ -9,11 +9,10 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
 
-#include "common/common/cleanup.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/adaptive_concurrency/controller/controller.h"
 
 #include "absl/synchronization/mutex.h"
 

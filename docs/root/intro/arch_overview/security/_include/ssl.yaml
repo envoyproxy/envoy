@@ -1,7 +1,7 @@
 static_resources:
   listeners:
   - name: listener_0
-    address: { socket_address: { address: 127.0.0.1, port_value: 10000 } }
+    address: {socket_address: {address: 127.0.0.1, port_value: 10000}}
     filter_chains:
     - filters:
       - name: envoy.filters.network.http_connection_manager
@@ -13,7 +13,7 @@ static_resources:
             - name: default
               domains: ["*"]
               routes:
-              - match: { prefix: "/" }
+              - match: {prefix: "/"}
                 route:
                   cluster: some_service
       transport_socket:
@@ -22,14 +22,13 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "certs/servercert.pem" }
-                private_key: { filename: "certs/serverkey.pem" }
+            - certificate_chain: {filename: "certs/servercert.pem"}
+              private_key: {filename: "certs/serverkey.pem"}
             validation_context:
               trusted_ca:
                 filename: certs/cacert.pem
   clusters:
   - name: some_service
-    connect_timeout: 0.25s
     type: STATIC
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -39,7 +38,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: 127.0.0.2
+                address: 127.0.0.1
                 port_value: 1234
     transport_socket:
       name: envoy.transport_sockets.tls
@@ -47,11 +46,13 @@ static_resources:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         common_tls_context:
           tls_certificates:
-          - certificate_chain: { "filename": "certs/servercert.pem" }
-            private_key: { "filename": "certs/serverkey.pem" }
-            ocsp_staple: { "filename": "certs/server_ocsp_resp.der" }
+          - certificate_chain: {"filename": "certs/servercert.pem"}
+            private_key: {"filename": "certs/serverkey.pem"}
+            ocsp_staple: {"filename": "certs/server_ocsp_resp.der"}
           validation_context:
-            match_subject_alt_names:
-            - exact: "foo"
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: "foo"
             trusted_ca:
               filename: /etc/ssl/certs/ca-certificates.crt

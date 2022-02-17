@@ -1,4 +1,4 @@
-#include "extensions/common/wasm/wasm.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/integration/http_protocol_integration.h"
@@ -10,14 +10,15 @@ namespace Extensions {
 namespace Wasm {
 namespace {
 
-class WasmIntegrationTest : public HttpIntegrationTest, public testing::TestWithParam<std::string> {
+class WasmIntegrationTest : public HttpIntegrationTest,
+                            public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
   WasmIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
   }
 
   void cleanup() {
@@ -58,7 +59,7 @@ typed_config:
         local:
           filename: {}
   )EOF",
-                                                     GetParam(), httpwasm));
+                                                     std::get<0>(GetParam()), httpwasm));
     HttpIntegrationTest::initialize();
   }
 
@@ -68,17 +69,11 @@ typed_config:
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmIntegrationTest,
-                         Envoy::Extensions::Common::Wasm::sandbox_runtime_values,
+                         Envoy::Extensions::Common::Wasm::sandbox_runtime_and_cpp_values,
                          Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmIntegrationTest);
 
 TEST_P(WasmIntegrationTest, FilterMakesCallInConfigureTime) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   initialize();
   ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, wasm_connection_));
 

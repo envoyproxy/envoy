@@ -5,9 +5,8 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_config.h"
 
-#include "common/common/assert.h"
-
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/common/assert.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 namespace Envoy {
 namespace Quic {
@@ -46,8 +45,8 @@ public:
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr /*options*/) const override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr /*options*/) const override {
+    PANIC("not implemented");
   }
   bool implementsSecureTransport() const override { return true; }
   bool usesProxyProtocolOptions() const override { return false; }
@@ -96,9 +95,7 @@ public:
       Ssl::ClientContextConfigPtr config,
       Server::Configuration::TransportSocketFactoryContext& factory_context);
 
-  void initialize() override {
-    // TODO(14829) fallback_factory_ needs to call onSecretUpdated() upon SDS update.
-  }
+  void initialize() override {}
 
   // As documented above for QuicTransportSocketFactoryBase, the actual HTTP/3
   // code does not create transport sockets.
@@ -107,21 +104,19 @@ public:
   // is needed. In this case the QuicClientTransportSocketFactory falls over to
   // using the fallback factory.
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override {
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override {
     return fallback_factory_->createTransportSocket(options);
   }
 
-  Envoy::Ssl::ClientContextSharedPtr sslCtx() { return fallback_factory_->sslCtx(); }
+  virtual Envoy::Ssl::ClientContextSharedPtr sslCtx() { return fallback_factory_->sslCtx(); }
 
   const Ssl::ClientContextConfig& clientContextConfig() const {
     return fallback_factory_->config();
   }
 
 protected:
-  void onSecretUpdated() override {
-    // fallback_factory_ will update the stats.
-    // TODO(14829) Client transport socket factory may also need to update quic crypto.
-  }
+  // fallback_factory_ will update the context.
+  void onSecretUpdated() override {}
 
 private:
   // The QUIC client transport socket can create TLS sockets for fallback to TCP.

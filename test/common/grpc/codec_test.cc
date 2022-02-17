@@ -3,8 +3,8 @@
 #include <string>
 #include <vector>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/grpc/codec.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/grpc/codec.h"
 
 #include "test/common/buffer/utility.h"
 #include "test/proto/helloworld.pb.h"

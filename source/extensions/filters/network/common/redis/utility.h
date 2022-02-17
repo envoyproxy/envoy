@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "extensions/filters/network/common/redis/codec.h"
+#include "source/extensions/filters/network/common/redis/codec.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -34,6 +34,14 @@ In addition, the following conventions should be followed:
   implementation. These indicate that the entity is not implemented in Envoy and the entity
   should be hidden from the Envoy documentation.
 
+* Use a `(xds.annotations.v3.file_status).work_in_progress`,
+  `(xds.annotations.v3.message_status).work_in_progress`, or
+  `(xds.annotations.v3.field_status).work_in_progress` option annotation for files,
+  messages, or fields, respectively, that are considered work in progress and are not subject to the
+  threat model or the breaking change policy. This is similar to the work-in-progress/alpha tagging
+  of extensions described below, but allows tagging protos that are used as part of the core API
+  as work in progress without having to break them into their own file.
+
 * Always use plural field names for `repeated` fields, such as `filters`.
 
 * Due to the fact that we consider JSON/YAML to be first class inputs, we cannot easily change a
@@ -107,12 +115,11 @@ Extensions must currently be added as v3 APIs following the [package
 organization](#package-organization) above.
 To add an extension config to the API, the steps below should be followed:
 
-1. If this is still WiP and subject to breaking changes, use `vNalpha` instead of `vN` in steps
-   below. Refer to the [Cache filter config](envoy/extensions/filter/http/cache/v3alpha/cache.proto)
-   as an example of `v3alpha`, and the
-   [Buffer filter config](envoy/extensions/filter/http/buffer/v3/buffer.proto) as an example of `v3`.
+1. If this is still WiP and subject to breaking changes, please tag it
+   `option (udpa.annotations.file_status).work_in_progress = true;` and
+   optionally hide it from the docs (`[#not-implemented-hide:]`.
 1. Place the v3 extension configuration `.proto` in `api/envoy/extensions`, e.g.
-   `api/envoy/extensions/filter/http/foobar/v3/foobar.proto` together with an initial BUILD file:
+   `api/envoy/extensions/filters/http/foobar/v3/foobar.proto` together with an initial BUILD file:
    ```bazel
    load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 
@@ -122,17 +129,26 @@ To add an extension config to the API, the steps below should be followed:
        deps = ["@com_github_cncf_udpa//udpa/annotations:pkg"],
    )
    ```
-1. Add to the v3 extension config proto `import "udpa/annotations/status.proto";`
-1. If this is still WiP and subject to breaking changes, set
-   `option (udpa.annotations.file_status).work_in_progress = true;`.
-1. Add to the v3 extension config proto a file level
-   `option (udpa.annotations.file_status).package_version_status = ACTIVE;`.
+1. Update [source/extensions/extensions_metadata.yaml](../source/extensions/extensions_metadata.yaml)
+   with the category, security posture, and status. The category field will have to match an
+   annotation of the form `// [#extension-category: your.extension.category]`
+   in one of the proto files for the docs build to pass.
+1. Update
+   [source/extensions/extensions_build_config.bzl](source/extensions/extensions_build_config.bzl)
+   to include the new extension.
+1. If the extension is not hidden, find or create a docs file with a toctree
+   and to reference your proto to make sure users can navigate to it from the API docs
+   (and to not break the docs build).
+   See the [key-value-store PR](https://github.com/envoyproxy/envoy/pull/17745/files) for an example of adding a new extension point to common.
+1. Make sure your proto imports the v3 extension config proto (`import "udpa/annotations/status.proto";`)
+1. Make sure your proto is either tracked as a work in progress
+   (`option (udpa.annotations.file_status).work_in_progress = true;`)
+   or ready to be used
+   (`option (udpa.annotations.file_status).package_version_status = ACTIVE;`).
    This is required to automatically include the config proto in [api/versioning/BUILD](versioning/BUILD).
 1. Add a reference to the v3 extension config in (1) in [api/versioning/BUILD](versioning/BUILD) under `active_protos`.
-1. Run `./tools/proto_format/proto_format.sh fix`. This should regenerate the `BUILD` file,
-   reformat `foobar.proto` as needed and also generate the v4alpha extension config (if needed),
-   together with shadow API protos.
-1. `git add api/ generated_api_shadow/` to add any new files to your Git index.
+1. Run `./tools/proto_format/proto_format.sh fix`. This should regenerate the `BUILD` file and
+   reformat `foobar.proto` as needed.
 
 ## API annotations
 
@@ -225,7 +241,7 @@ xDS APIs:
   breaking changes where there is no substantial gain in functionality,
   performance, security or implementation simplification. We will tolerate
   technical debt in the API itself, e.g. in the form of vestigial deprecated
-  fields or reduced ergnomics (such as not using `oneof` when we would prefer
+  fields or reduced ergonomics (such as not using `oneof` when we would prefer
   to), in order to meet this principle.
 
 * Namespaces for extensions, metadata, etc. use a reverse DNS naming scheme,

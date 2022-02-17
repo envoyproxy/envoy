@@ -1,10 +1,10 @@
-#include "extensions/filters/http/csrf/config.h"
+#include "source/extensions/filters/http/csrf/config.h"
 
 #include "envoy/extensions/filters/http/csrf/v3/csrf.pb.h"
 #include "envoy/extensions/filters/http/csrf/v3/csrf.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/http/csrf/csrf_filter.h"
+#include "source/extensions/filters/http/csrf/csrf_filter.h"
 
 namespace Envoy {
 namespace Extensions {

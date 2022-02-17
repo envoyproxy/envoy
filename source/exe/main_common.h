@@ -4,22 +4,20 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/platform.h"
 
-#include "common/common/thread.h"
-#include "common/event/real_time_system.h"
-#include "common/grpc/google_grpc_context.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/thread_local_store.h"
-#include "common/thread_local/thread_local_impl.h"
-
-#include "exe/process_wide.h"
-
-#include "server/listener_hooks.h"
-#include "server/options_impl.h"
-#include "server/server.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/real_time_system.h"
+#include "source/common/grpc/google_grpc_context.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/common/thread_local/thread_local_impl.h"
+#include "source/exe/process_wide.h"
+#include "source/server/listener_hooks.h"
+#include "source/server/options_impl.h"
+#include "source/server/server.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "common/signal/signal_action.h"
-#include "exe/terminate_handler.h"
+#include "source/common/signal/signal_action.h"
+#include "source/exe/terminate_handler.h"
 #endif
 
 namespace Envoy {
@@ -140,6 +138,8 @@ public:
   static int main(int argc, char** argv, PostServerHook hook = nullptr);
 
 private:
+  Thread::MainThread main_thread_;
+
 #ifdef ENVOY_HANDLE_SIGNALS
   Envoy::SignalAction handle_sigs_;
   Envoy::TerminateHandler log_on_terminate_;

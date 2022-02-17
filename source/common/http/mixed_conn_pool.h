@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/http/conn_pool_base.h"
+#include "source/common/http/conn_pool_base.h"
 
 namespace Envoy {
 namespace Http {
@@ -8,11 +8,12 @@ namespace Http {
 // An HTTP connection pool which supports both HTTP/1 and HTTP/2 based on ALPN
 class HttpConnPoolImplMixed : public HttpConnPoolImplBase {
 public:
-  HttpConnPoolImplMixed(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
-                        Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
-                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                        const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                        Upstream::ClusterConnectivityState& state)
+  HttpConnPoolImplMixed(
+      Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+      Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      Upstream::ClusterConnectivityState& state)
       : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
                              transport_socket_options, random_generator, state,
                              {Protocol::Http2, Protocol::Http11}) {}

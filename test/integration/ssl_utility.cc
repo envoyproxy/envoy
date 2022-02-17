@@ -1,12 +1,13 @@
 #include "test/integration/ssl_utility.h"
 
-#include "common/http/utility.h"
-#include "common/json/json_loader.h"
-#include "common/network/utility.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/config/utility.h"
 #include "test/integration/server.h"
@@ -65,8 +66,23 @@ void initializeUpstreamTlsContextConfig(
     common_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http3);
   }
   if (!options.san_.empty()) {
-    common_context->mutable_validation_context()->add_match_subject_alt_names()->set_exact(
-        options.san_);
+    envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher* matcher =
+        common_context->mutable_validation_context()->add_match_typed_subject_alt_names();
+    matcher->mutable_matcher()->set_exact(options.san_);
+    matcher->set_san_type(
+        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
+    matcher = common_context->mutable_validation_context()->add_match_typed_subject_alt_names();
+    matcher->mutable_matcher()->set_exact(options.san_);
+    matcher->set_san_type(
+        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
+    matcher = common_context->mutable_validation_context()->add_match_typed_subject_alt_names();
+    matcher->mutable_matcher()->set_exact(options.san_);
+    matcher->set_san_type(
+        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL);
+    matcher = common_context->mutable_validation_context()->add_match_typed_subject_alt_names();
+    matcher->mutable_matcher()->set_exact(options.san_);
+    matcher->set_san_type(
+        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS);
   }
   for (const std::string& cipher_suite : options.cipher_suites_) {
     common_context->mutable_tls_params()->add_cipher_suites(cipher_suite);
@@ -96,7 +112,7 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
 }
 
 Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager,
-                                                            Api::Api& api) {
+                                                            Api::Api& api, bool use_http3) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
 
@@ -106,8 +122,18 @@ Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& cont
       tls_context, mock_factory_ctx);
 
   static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-      std::move(cfg), context_manager, *upstream_stats_store, std::vector<std::string>{});
+  if (!use_http3) {
+    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+        std::move(cfg), context_manager, *upstream_stats_store, std::vector<std::string>{});
+  }
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
+  quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
+
+  std::vector<std::string> server_names;
+  auto& config_factory = Config::Utility::getAndCheckFactoryByName<
+      Server::Configuration::DownstreamTransportSocketConfigFactory>(
+      "envoy.transport_sockets.quic");
+  return config_factory.createTransportSocketFactory(quic_config, mock_factory_ctx, server_names);
 }
 
 Network::TransportSocketFactoryPtr createFakeUpstreamSslContext(

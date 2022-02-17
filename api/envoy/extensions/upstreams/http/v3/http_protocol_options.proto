@@ -10,6 +10,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.upstreams.http.v3";
 option java_outer_classname = "HttpProtocolOptionsProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/upstreams/http/v3;httpv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP Protocol Options]
@@ -69,22 +70,25 @@ message HttpProtocolOptions {
       config.core.v3.Http2ProtocolOptions http2_protocol_options = 2;
 
       // .. warning::
-      //   QUIC support is currently alpha and should be used with caution. Please
-      //   see :ref:`here <arch_overview_http3>` for details.
+      //   QUIC upstream support is currently not ready for internet use.
+      //   Please see :ref:`here <arch_overview_http3>` for details.
       config.core.v3.Http3ProtocolOptions http3_protocol_options = 3;
     }
   }
 
   // If this is used, the cluster can use either of the configured protocols, and
   // will use whichever protocol was used by the downstream connection.
+  //
+  // If HTTP/3 is configured for downstream and not configured for upstream,
+  // HTTP/3 requests will fail over to HTTP/2.
   message UseDownstreamHttpConfig {
     config.core.v3.Http1ProtocolOptions http_protocol_options = 1;
 
     config.core.v3.Http2ProtocolOptions http2_protocol_options = 2;
 
     // .. warning::
-    //   QUIC support is currently alpha and should be used with caution. Please
-    //   see :ref:`here <arch_overview_http3>` for details.
+    //   QUIC upstream support is currently not ready for internet use.
+    //   Please see :ref:`here <arch_overview_http3>` for details.
     config.core.v3.Http3ProtocolOptions http3_protocol_options = 3;
   }
 
@@ -109,11 +113,18 @@ message HttpProtocolOptions {
     // when HTTP/3 will be used, and when Envoy will fail over to TCP.
     //
     // .. warning::
-    //   QUIC support is currently alpha and should be used with caution. Please
-    //   see :ref:`here <arch_overview_http3>` for details.
-    //   AutoHttpConfig config is undergoing especially rapid change and as it
-    //   is alpha is not guaranteed to be API-stable.
+    //   QUIC upstream support is currently not ready for internet use.
+    //   Please see :ref:`here <arch_overview_http3>` for details.
     config.core.v3.Http3ProtocolOptions http3_protocol_options = 3;
+
+    // The presence of alternate protocols cache options causes the use of the
+    // alternate protocols cache, which is responsible for parsing and caching
+    // HTTP Alt-Svc headers. This enables the use of HTTP/3 for origins that
+    // advertise supporting it.
+    //
+    // .. note::
+    //   This is required when HTTP/3 is enabled.
+    config.core.v3.AlternateProtocolsCacheOptions alternate_protocols_cache_options = 4;
   }
 
   // This contains options common across HTTP/1 and HTTP/2

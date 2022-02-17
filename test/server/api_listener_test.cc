@@ -2,8 +2,8 @@
 
 #include "envoy/config/listener/v3/listener.pb.h"
 
-#include "server/api_listener_impl.h"
-#include "server/listener_manager_impl.h"
+#include "source/server/api_listener_impl.h"
+#include "source/server/listener_manager_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
@@ -22,8 +22,8 @@ namespace Server {
 class ApiListenerTest : public testing::Test {
 protected:
   ApiListenerTest()
-      : listener_manager_(std::make_unique<ListenerManagerImpl>(server_, listener_factory_,
-                                                                worker_factory_, false)) {}
+      : listener_manager_(std::make_unique<ListenerManagerImpl>(
+            server_, listener_factory_, worker_factory_, false, server_.quic_stat_names_)) {}
 
   NiceMock<MockInstance> server_;
   NiceMock<MockListenerComponentFactory> listener_factory_;
@@ -65,6 +65,41 @@ api_listener:
   ASSERT_TRUE(http_api_listener.http().has_value());
 }
 
+TEST_F(ApiListenerTest, MobileApiListener) {
+  const std::string yaml = R"EOF(
+name: test_api_listener
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+api_listener:
+  api_listener:
+    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager
+    config:
+      stat_prefix: hcm
+      route_config:
+        name: api_router
+        virtual_hosts:
+          - name: api
+            domains:
+              - "*"
+            routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: dynamic_forward_proxy_cluster
+  )EOF";
+
+  const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
+  server_.server_factory_context_->cluster_manager_.initializeClusters(
+      {"dynamic_forward_proxy_cluster"}, {});
+  auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
+
+  ASSERT_EQ("test_api_listener", http_api_listener.name());
+  ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener.type());
+  ASSERT_TRUE(http_api_listener.http().has_value());
+}
+
 TEST_F(ApiListenerTest, HttpApiListenerThrowsWithBadConfig) {
   const std::string yaml = R"EOF(
 name: test_api_listener
@@ -74,22 +109,32 @@ address:
     port_value: 1234
 api_listener:
   api_listener:
-    "@type": type.googleapis.com/envoy.api.v2.Cluster
+    "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
     name: cluster1
     type: EDS
     eds_cluster_config:
       eds_config:
-        path: eds path
+        path_config_source:
+          path: eds path
   )EOF";
 
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
 
+  ProtobufWkt::Any expected_any_proto;
+  envoy::config::cluster::v3::Cluster expected_cluster_proto;
+  expected_cluster_proto.set_name("cluster1");
+  expected_cluster_proto.set_type(envoy::config::cluster::v3::Cluster::EDS);
+  expected_cluster_proto.mutable_eds_cluster_config()
+      ->mutable_eds_config()
+      ->mutable_path_config_source()
+      ->set_path("eds path");
+  expected_any_proto.PackFrom(expected_cluster_proto);
   EXPECT_THROW_WITH_MESSAGE(
       HttpApiListener(config, *listener_manager_, config.name()), EnvoyException,
-      "Unable to unpack as "
-      "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager: "
-      "[type.googleapis.com/envoy.api.v2.Cluster] {\n  name: \"cluster1\"\n  type: EDS\n  "
-      "eds_cluster_config {\n    eds_config {\n      path: \"eds path\"\n    }\n  }\n}\n");
+      fmt::format("Unable to unpack as "
+                  "envoy.extensions.filters.network.http_connection_manager.v3."
+                  "HttpConnectionManager: {}",
+                  expected_any_proto.DebugString()));
 }
 
 TEST_F(ApiListenerTest, HttpApiListenerShutdown) {

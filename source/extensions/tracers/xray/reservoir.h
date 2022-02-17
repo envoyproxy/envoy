@@ -4,8 +4,8 @@
 
 #include "envoy/common/time.h"
 
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
 
 namespace Envoy {
 namespace Extensions {

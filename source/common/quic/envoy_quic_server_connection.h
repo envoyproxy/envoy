@@ -2,22 +2,11 @@
 
 #include "envoy/network/listener.h"
 
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/quic_network_connection.h"
-
-#include "server/connection_handler_impl.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_network_connection.h"
+#include "source/server/connection_handler_impl.h"
 
 #include "quiche/quic/core/quic_connection.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
 
 namespace Envoy {
 namespace Quic {
@@ -36,6 +25,22 @@ public:
   // QuicNetworkConnection
   // Overridden to set connection_socket_ with initialized self address and retrieve filter chain.
   bool OnPacketHeader(const quic::QuicPacketHeader& header) override;
+
+  // quic::QuicConnection
+  // Overridden to provide a CID manager which issues CIDs compatible with the existing BPF routing.
+  std::unique_ptr<quic::QuicSelfIssuedConnectionIdManager>
+  MakeSelfIssuedConnectionIdManager() override;
+};
+
+// An implementation that issues connection IDs with stable first 4 types.
+class EnvoyQuicSelfIssuedConnectionIdManager : public quic::QuicSelfIssuedConnectionIdManager {
+public:
+  using QuicSelfIssuedConnectionIdManager::QuicSelfIssuedConnectionIdManager;
+
+  // quic::QuicSelfIssuedConnectionIdManager
+  // Overridden to return a new CID with the same first 4 bytes.
+  quic::QuicConnectionId
+  GenerateNewConnectionId(const quic::QuicConnectionId& old_connection_id) const override;
 };
 
 } // namespace Quic

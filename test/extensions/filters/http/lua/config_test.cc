@@ -3,7 +3,7 @@
 #include "envoy/extensions/filters/http/lua/v3/lua.pb.h"
 #include "envoy/extensions/filters/http/lua/v3/lua.pb.validate.h"
 
-#include "extensions/filters/http/lua/config.h"
+#include "source/extensions/filters/http/lua/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
@@ -39,16 +39,6 @@ TEST(LuaFilterConfigTest, LuaFilterInJson) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
-}
-
-// Test that the deprecated extension name still functions.
-TEST(LuaFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.lua";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
-          deprecated_name));
 }
 
 } // namespace

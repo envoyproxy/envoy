@@ -1,6 +1,6 @@
-#include "extensions/filters/network/dubbo_proxy/decoder.h"
+#include "source/extensions/filters/network/dubbo_proxy/decoder.h"
 
-#include "common/common/macros.h"
+#include "source/common/common/macros.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -64,7 +64,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState(Buffer::Inst
   case ProtocolState::OnDecodeStreamData:
     return onDecodeStreamData(buffer);
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
   }
 }
 

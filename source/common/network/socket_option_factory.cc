@@ -1,11 +1,11 @@
-#include "common/network/socket_option_factory.h"
+#include "source/common/network/socket_option_factory.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/common/fmt.h"
-#include "common/network/addr_family_aware_socket_option_impl.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/win32_redirect_records_option_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/network/addr_family_aware_socket_option_impl.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/win32_redirect_records_option_impl.h"
 
 namespace Envoy {
 namespace Network {

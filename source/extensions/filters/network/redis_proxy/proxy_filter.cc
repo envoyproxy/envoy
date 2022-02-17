@@ -1,4 +1,4 @@
-#include "extensions/filters/network/redis_proxy/proxy_filter.h"
+#include "source/extensions/filters/network/redis_proxy/proxy_filter.h"
 
 #include <cstdint>
 #include <string>
@@ -6,10 +6,10 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/config/datasource.h"
-#include "common/config/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/datasource.h"
+#include "source/common/config/utility.h"
 
 namespace Envoy {
 namespace Extensions {

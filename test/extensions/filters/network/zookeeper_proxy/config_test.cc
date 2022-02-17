@@ -1,7 +1,7 @@
 #include "envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.pb.h"
 #include "envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.pb.validate.h"
 
-#include "extensions/filters/network/zookeeper_proxy/config.h"
+#include "source/extensions/filters/network/zookeeper_proxy/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
@@ -49,7 +49,7 @@ stat_prefix: test_prefix
   )EOF";
 
   ZooKeeperProxyProtoConfig proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config, false, true);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   ZooKeeperConfigFactory factory;

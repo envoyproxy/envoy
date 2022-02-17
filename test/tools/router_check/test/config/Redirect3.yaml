@@ -3,19 +3,19 @@ virtual_hosts:
   domains:
   - www.lyft.com
   routes:
-    - match:
-        prefix: /
-      route:
-        weighted_clusters:
-          clusters:
-            - name: www2
-              weight: 100
-          total_weight: 100
+  - match:
+      prefix: /
+    route:
+      weighted_clusters:
+        clusters:
+        - name: www2
+          weight: 100
+        total_weight: 100
 - name: redirect
   domains:
   - redirect.lyft.com
   routes:
-    - match:
-        prefix: /foo
-      redirect:
-        host_redirect: new.lyft.com
+  - match:
+      prefix: /foo
+    redirect:
+      host_redirect: new.lyft.com

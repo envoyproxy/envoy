@@ -14,10 +14,9 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/matchers.h"
-
-#include "extensions/filters/common/ext_authz/ext_authz.h"
-#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
+#include "source/common/common/matchers.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -48,21 +47,32 @@ struct InstanceStats {
  * Global configuration for ExtAuthz filter.
  */
 class Config {
+  using LabelsMap = Protobuf::Map<std::string, std::string>;
+
 public:
   Config(const envoy::extensions::filters::network::ext_authz::v3::ExtAuthz& config,
-         Stats::Scope& scope)
+         Stats::Scope& scope, envoy::config::bootstrap::v3::Bootstrap& bootstrap)
       : stats_(generateStats(config.stat_prefix(), scope)),
         failure_mode_allow_(config.failure_mode_allow()),
         include_peer_certificate_(config.include_peer_certificate()),
         filter_enabled_metadata_(
             config.has_filter_enabled_metadata()
                 ? absl::optional<Matchers::MetadataMatcher>(config.filter_enabled_metadata())
-                : absl::nullopt) {}
+                : absl::nullopt) {
+    auto labels_key_it =
+        bootstrap.node().metadata().fields().find(config.bootstrap_metadata_labels_key());
+    if (labels_key_it != bootstrap.node().metadata().fields().end()) {
+      for (const auto& labels_it : labels_key_it->second.struct_value().fields()) {
+        destination_labels_[labels_it.first] = labels_it.second.string_value();
+      }
+    }
+  }
 
   const InstanceStats& stats() { return stats_; }
   bool failureModeAllow() const { return failure_mode_allow_; }
   void setFailModeAllow(bool value) { failure_mode_allow_ = value; }
   bool includePeerCertificate() const { return include_peer_certificate_; }
+  const LabelsMap& destinationLabels() const { return destination_labels_; }
   bool filterEnabledMetadata(const envoy::config::core::v3::Metadata& metadata) const {
     return filter_enabled_metadata_.has_value() ? filter_enabled_metadata_->match(metadata) : true;
   }
@@ -71,6 +81,7 @@ private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
   const InstanceStats stats_;
   bool failure_mode_allow_;
+  LabelsMap destination_labels_;
   const bool include_peer_certificate_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
 };
@@ -86,6 +97,8 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
 class Filter : public Network::ReadFilter,
                public Network::ConnectionCallbacks,
                public Filters::Common::ExtAuthz::RequestCallbacks {
+  using LabelsMap = std::map<std::string, std::string>;
+
 public:
   Filter(ConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
@@ -121,6 +134,7 @@ private:
   bool filterEnabled(const envoy::config::core::v3::Metadata& metadata) {
     return config_->filterEnabledMetadata(metadata);
   }
+  absl::optional<MonotonicTime> start_time_;
 
   ConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;

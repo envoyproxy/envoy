@@ -1,31 +1,31 @@
-#include "common/http/codec_client.h"
+#include "source/common/http/codec_client.h"
 
 #include <cstdint>
 #include <memory>
 
 #include "envoy/http/codec.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/config/utility.h"
-#include "common/http/exception.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
-#include "common/http/status.h"
-#include "common/http/utility.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/status.h"
+#include "source/common/http/utility.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/quic/codec_impl.h"
+#include "source/common/quic/codec_impl.h"
 #endif
 
 namespace Envoy {
 namespace Http {
 
-CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
+CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connection,
                          Upstream::HostDescriptionConstSharedPtr host,
                          Event::Dispatcher& dispatcher)
     : type_(type), host_(host), connection_(std::move(connection)),
       idle_timeout_(host_->cluster().idleTimeout()) {
-  if (type_ != Type::HTTP3) {
+  if (type_ != CodecType::HTTP3) {
     // Make sure upstream connections process data and then the FIN, rather than processing
     // TCP disconnects immediately. (see https://github.com/envoyproxy/envoy/issues/1679 for
     // details)
@@ -79,6 +79,10 @@ RequestEncoder& CodecClient::newStream(ResponseDecoder& response_decoder) {
   request->encoder_ = &codec_->newStream(*request);
   request->encoder_->getStream().addCallbacks(*request);
   LinkedList::moveIntoList(std::move(request), active_requests_);
+
+  auto upstream_info = connection_->streamInfo().upstreamInfo();
+  upstream_info->setUpstreamNumStreams(upstream_info->upstreamNumStreams() + 1);
+
   disableIdleTimer();
   return *active_requests_.front()->encoder_;
 }
@@ -86,7 +90,6 @@ RequestEncoder& CodecClient::newStream(ResponseDecoder& response_decoder) {
 void CodecClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::Connected) {
     ENVOY_CONN_LOG(debug, "connected", *connection_);
-    connection_->streamInfo().setDownstreamSslConnection(connection_->ssl());
     connected_ = true;
   }
 
@@ -95,7 +98,7 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
   }
 
   // HTTP/1 can signal end of response by disconnecting. We need to handle that case.
-  if (type_ == Type::HTTP1 && event == Network::ConnectionEvent::RemoteClose &&
+  if (type_ == CodecType::HTTP1 && event == Network::ConnectionEvent::RemoteClose &&
       !active_requests_.empty()) {
     Buffer::OwnedImpl empty;
     onData(empty);
@@ -111,12 +114,8 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
     if (connected_) {
       reason = StreamResetReason::ConnectionTermination;
       if (protocol_error_) {
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
-          reason = StreamResetReason::ProtocolError;
-          connection_->streamInfo().setResponseFlag(
-              StreamInfo::ResponseFlag::UpstreamProtocolError);
-        }
+        reason = StreamResetReason::ProtocolError;
+        connection_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
       }
     }
     while (!active_requests_.empty()) {
@@ -169,26 +168,26 @@ void CodecClient::onData(Buffer::Instance& data) {
          absl::StrCat("extraneous bytes after response complete: ", data.length()));
 }
 
-CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
+CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
                                  Upstream::HostDescriptionConstSharedPtr host,
                                  Event::Dispatcher& dispatcher,
                                  Random::RandomGenerator& random_generator)
     : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
-  case Type::HTTP1: {
+  case CodecType::HTTP1: {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
         *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
         host->cluster().maxResponseHeadersCount());
     break;
   }
-  case Type::HTTP2: {
+  case CodecType::HTTP2: {
     codec_ = std::make_unique<Http2::ClientConnectionImpl>(
         *connection_, *this, host->cluster().http2CodecStats(), random_generator,
         host->cluster().http2Options(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
         host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
     break;
   }
-  case Type::HTTP3: {
+  case CodecType::HTTP3: {
 #ifdef ENVOY_ENABLE_QUIC
     auto& quic_session = dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_);
     codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
@@ -200,7 +199,7 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     break;
 #else
     // Should be blocked by configuration checking at an earlier point.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
 #endif
   }
   }

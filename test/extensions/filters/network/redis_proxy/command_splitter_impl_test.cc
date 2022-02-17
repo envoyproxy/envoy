@@ -3,12 +3,11 @@
 #include <string>
 #include <vector>
 
-#include "common/common/fmt.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/filters/network/common/redis/fault_impl.h"
-#include "extensions/filters/network/common/redis/supported_commands.h"
-#include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/filters/network/common/redis/fault_impl.h"
+#include "source/extensions/filters/network/common/redis/supported_commands.h"
+#include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"

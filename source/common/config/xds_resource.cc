@@ -1,9 +1,9 @@
-#include "common/config/xds_resource.h"
+#include "source/common/config/xds_resource.h"
 
 #include <algorithm>
 
-#include "common/common/fmt.h"
-#include "common/http/utility.h"
+#include "source/common/common/fmt.h"
+#include "source/common/http/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
@@ -59,8 +59,8 @@ std::string encodeDirectives(
       fragment_components.emplace_back(
           absl::StrCat("entry=", PercentEncoding::encode(directive.entry(), DirectiveEscapeChars)));
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case xds::core::v3::ResourceLocator::Directive::DirectiveCase::DIRECTIVE_NOT_SET:
+      PANIC_DUE_TO_PROTO_UNSET;
     }
   }
   return fragment_components.empty() ? "" : "#" + absl::StrJoin(fragment_components, ",");
@@ -84,6 +84,7 @@ std::string XdsResourceIdentifier::encodeUrl(const xds::core::v3::ResourceLocato
   const std::string fragment = encodeDirectives(resource_locator.directives());
   std::string scheme = "xdstp:";
   switch (resource_locator.scheme()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case xds::core::v3::ResourceLocator::HTTP:
     scheme = "http:";
     FALLTHRU;
@@ -97,9 +98,8 @@ std::string XdsResourceIdentifier::encodeUrl(const xds::core::v3::ResourceLocato
   case xds::core::v3::ResourceLocator::FILE: {
     return absl::StrCat("file://", id_path, fragment);
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  return "";
 }
 
 namespace {

@@ -5,7 +5,7 @@
 
 #include "envoy/ssl/context.h"
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 #include "absl/types/optional.h"
 #include "openssl/ssl.h"
@@ -17,31 +17,28 @@ namespace TransportSockets {
 namespace Tls {
 namespace Utility {
 
-static constexpr absl::string_view SSL_ERROR_NONE_MESSAGE = "NONE";
-static constexpr absl::string_view SSL_ERROR_SSL_MESSAGE = "SSL";
-static constexpr absl::string_view SSL_ERROR_WANT_READ_MESSAGE = "WANT_READ";
-static constexpr absl::string_view SSL_ERROR_WANT_WRITE_MESSAGE = "WANT_WRITE";
-static constexpr absl::string_view SSL_ERROR_WANT_X509_LOOPUP_MESSAGE = "WANT_X509_LOOKUP";
-static constexpr absl::string_view SSL_ERROR_SYSCALL_MESSAGE = "SYSCALL";
-static constexpr absl::string_view SSL_ERROR_ZERO_RETURN_MESSAGE = "ZERO_RETURN";
-static constexpr absl::string_view SSL_ERROR_WANT_CONNECT_MESSAGE = "WANT_CONNECT";
-static constexpr absl::string_view SSL_ERROR_WANT_ACCEPT_MESSAGE = "WANT_ACCEPT";
-static constexpr absl::string_view SSL_ERROR_WANT_CHANNEL_ID_LOOKUP_MESSAGE =
-    "WANT_CHANNEL_ID_LOOKUP";
-static constexpr absl::string_view SSL_ERROR_PENDING_SESSION_MESSAGE = "PENDING_SESSION";
-static constexpr absl::string_view SSL_ERROR_PENDING_CERTIFICATE_MESSAGE = "PENDING_CERTIFICATE";
-static constexpr absl::string_view SSL_ERROR_WANT_PRIVATE_KEY_OPERATION_MESSAGE =
-    "WANT_PRIVATE_KEY_OPERATION";
-static constexpr absl::string_view SSL_ERROR_PENDING_TICKET_MESSAGE = "PENDING_TICKET";
-static constexpr absl::string_view SSL_ERROR_EARLY_DATA_REJECTED_MESSAGE = "EARLY_DATA_REJECTED";
-static constexpr absl::string_view SSL_ERROR_WANT_CERTIFICATE_VERIFY_MESSAGE =
-    "WANT_CERTIFICATE_VERIFY";
-static constexpr absl::string_view SSL_ERROR_HANDOFF_MESSAGE = "HANDOFF";
-static constexpr absl::string_view SSL_ERROR_HANDBACK_MESSAGE = "HANDBACK";
-static constexpr absl::string_view SSL_ERROR_UNKNOWN_ERROR_MESSAGE = "UNKNOWN_ERROR";
-
 Envoy::Ssl::CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path,
                                                      TimeSource& time_source);
+
+/**
+ * Determines whether the given name matches 'pattern' which may optionally begin with a wildcard
+ * or contain a wildcard inside the pattern's first label.
+ * See: https://www.rfc-editor.org/rfc/rfc6125#section-6.4.3.
+ * @param dns_name the DNS name to match
+ * @param pattern the pattern to match against (*.example.com) or (test*.example.com)
+ * @return true if the san matches pattern
+ */
+bool dnsNameMatch(absl::string_view dns_name, absl::string_view pattern);
+
+/**
+ * Determines whether the given DNS label matches 'pattern' which may contain a wildcard. e.g.,
+ * patterns "baz*" and "*baz" and "b*z" would match DNS labels "baz1" and "foobaz" and "buzz",
+ * respectively.
+ * @param dns_label the DNS name label to match in lower case
+ * @param pattern the pattern to match against in lower case
+ * @return true if the dns_label matches pattern
+ */
+bool labelWildcardMatch(absl::string_view dns_label, absl::string_view pattern);
 
 /**
  * Retrieves the serial number of a certificate.
@@ -123,6 +120,14 @@ absl::optional<std::string> getLastCryptoError();
  * @return string message corresponding error code.
  */
 absl::string_view getErrorDescription(int err);
+
+/**
+ * Extracts the X509 certificate validation error information.
+ *
+ * @param ctx the store context
+ * @return the error details
+ */
+std::string getX509VerificationErrorInfo(X509_STORE_CTX* ctx);
 
 } // namespace Utility
 } // namespace Tls

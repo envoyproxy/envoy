@@ -1,8 +1,7 @@
-#include "server/admin/profiling_handler.h"
+#include "source/server/admin/profiling_handler.h"
 
-#include "common/profiler/profiler.h"
-
-#include "server/admin/utils.h"
+#include "source/common/profiler/profiler.h"
+#include "source/server/admin/utils.h"
 
 namespace Envoy {
 namespace Server {
@@ -54,11 +53,8 @@ Http::Code ProfilingHandler::handlerHeapProfiler(absl::string_view url, Http::Re
       response.add("Fail to start heap profiler: already started");
       res = Http::Code::BadRequest;
     } else if (!Profiler::Heap::startProfiler(profile_path_)) {
-      // GCOVR_EXCL_START
-      // TODO(silentdai) remove the GCOVR when startProfiler is better implemented
       response.add("Fail to start the heap profiler");
       res = Http::Code::InternalServerError;
-      // GCOVR_EXCL_STOP
     } else {
       response.add("Starting heap profiler");
       res = Http::Code::OK;

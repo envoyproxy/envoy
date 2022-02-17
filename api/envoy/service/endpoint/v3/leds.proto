@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package envoy.service.endpoint.v3;
+
+import "envoy/service/discovery/v3/discovery.proto";
+
+import "envoy/annotations/resource.proto";
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.service.endpoint.v3";
+option java_outer_classname = "LedsProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/endpoint/v3;endpointv3";
+option java_generic_services = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#not-implemented-hide:]
+// [#protodoc-title: LEDS]
+// Locality-Endpoint discovery
+// [#comment:TODO(adisuissa): Link to unified matching docs:
+// :ref:`architecture overview<arch_overview_service_discovery_types_leds>`]
+
+service LocalityEndpointDiscoveryService {
+  option (envoy.annotations.resource).type = "envoy.config.endpoint.v3.LbEndpoint";
+
+  // State-of-the-World (DiscoveryRequest) and REST are not supported.
+
+  // The resource_names_subscribe resource_names_unsubscribe fields in DeltaDiscoveryRequest
+  // specify a list of glob collections to subscribe to updates for.
+  rpc DeltaLocalityEndpoints(stream discovery.v3.DeltaDiscoveryRequest)
+      returns (stream discovery.v3.DeltaDiscoveryResponse) {
+  }
+}
+
+// [#not-implemented-hide:] Not configuration. Workaround c++ protobuf issue with importing
+// services: https://github.com/google/protobuf/issues/4221 and protoxform to upgrade the file.
+message LedsDummy {
+}

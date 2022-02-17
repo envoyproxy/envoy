@@ -3,8 +3,8 @@
 
 #include <random>
 
-#include "common/common/assert.h"
-#include "common/common/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
 
 #include "absl/strings/string_view.h"
 #include "benchmark/benchmark.h"

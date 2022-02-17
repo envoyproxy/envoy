@@ -8,16 +8,15 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-#include "common/stats/timespan_impl.h"
-
-#include "extensions/filters/network/common/redis/client_impl.h"
-#include "extensions/filters/network/common/redis/fault_impl.h"
-#include "extensions/filters/network/common/redis/utility.h"
-#include "extensions/filters/network/redis_proxy/command_splitter.h"
-#include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
-#include "extensions/filters/network/redis_proxy/router.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/extensions/filters/network/common/redis/client_impl.h"
+#include "source/extensions/filters/network/common/redis/fault_impl.h"
+#include "source/extensions/filters/network/common/redis/utility.h"
+#include "source/extensions/filters/network/redis_proxy/command_splitter.h"
+#include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
+#include "source/extensions/filters/network/redis_proxy/router.h"
 
 namespace Envoy {
 namespace Extensions {

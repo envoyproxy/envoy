@@ -7,12 +7,11 @@
 #include "envoy/network/dns.h"
 #include "envoy/network/listener.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/empty_string.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/stats/timespan_impl.h"
-
-#include "extensions/filters/udp/dns_filter/dns_filter_constants.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter_constants.h"
 
 namespace Envoy {
 namespace Extensions {

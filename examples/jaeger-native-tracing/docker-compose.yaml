@@ -6,49 +6,49 @@ services:
       context: .
       dockerfile: Dockerfile-frontenvoy
     networks:
-      - envoymesh
+    - envoymesh
     ports:
-      - "8000:8000"
+    - "8000:8000"
     dns:
-      - 8.8.8.8
-      - 8.8.4.4
+    - 8.8.8.8
+    - 8.8.4.4
 
   service1:
     build:
       context: ../front-proxy
       dockerfile: Dockerfile-jaeger-service
     volumes:
-      - ./service1-envoy-jaeger.yaml:/etc/service-envoy.yaml
+    - ./service1-envoy-jaeger.yaml:/etc/service-envoy.yaml
     networks:
-      - envoymesh
+    - envoymesh
     environment:
-      - SERVICE_NAME=1
+    - SERVICE_NAME=1
     dns:
-      - 8.8.8.8
-      - 8.8.4.4
+    - 8.8.8.8
+    - 8.8.4.4
 
   service2:
     build:
       context: ../front-proxy
       dockerfile: Dockerfile-jaeger-service
     volumes:
-      - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
+    - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
     networks:
-      - envoymesh
+    - envoymesh
     environment:
-      - SERVICE_NAME=2
+    - SERVICE_NAME=2
     dns:
-      - 8.8.8.8
-      - 8.8.4.4
+    - 8.8.8.8
+    - 8.8.4.4
 
   jaeger:
     image: jaegertracing/all-in-one
     environment:
-      - COLLECTOR_ZIPKIN_HTTP_PORT=9411
+    - COLLECTOR_ZIPKIN_HOST_PORT=9411
     networks:
-      - envoymesh
+    - envoymesh
     ports:
-      - "16686:16686"
+    - "16686:16686"
 
 networks:
   envoymesh: {}

@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "common/filesystem/file_shared_impl.h"
+#include "source/common/filesystem/file_shared_impl.h"
 
 namespace Envoy {
 namespace Filesystem {
@@ -27,6 +27,7 @@ protected:
 
 private:
   friend class FileSystemImplTest;
+  bool truncate_{};
 };
 
 template <DWORD std_handle_> struct StdStreamFileImplWin32 : public FileImplWin32 {

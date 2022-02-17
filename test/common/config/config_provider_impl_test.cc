@@ -3,9 +3,9 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/config/config_provider_impl.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/config/config_provider_impl.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/mocks/server/instance.h"
@@ -93,7 +93,7 @@ public:
   // Envoy::Config::SubscriptionCallbacks
   void onConfigUpdate(const std::vector<DecodedResourceRef>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
@@ -140,8 +140,12 @@ public:
 
   ~DummyConfigProviderManager() override = default;
 
+  ProtobufTypes::MessagePtr dumpConfigs() const {
+    return dumpConfigs(Matchers::UniversalStringMatcher());
+  }
+
   // Envoy::Config::ConfigProviderManagerImplBase
-  ProtobufTypes::MessagePtr dumpConfigs() const override {
+  ProtobufTypes::MessagePtr dumpConfigs(const Matchers::StringMatcher&) const override {
     auto config_dump = std::make_unique<test::common::config::DummyConfigsDump>();
     for (const auto& element : configSubscriptions()) {
       auto subscription = element.second.lock();
@@ -411,7 +415,8 @@ TEST_F(ConfigProviderImplTest, ConfigDump) {
   initialize();
   // Empty dump first.
   auto message_ptr =
-      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"]();
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"](
+          Matchers::UniversalStringMatcher());
   const auto& dummy_config_dump =
       static_cast<const test::common::config::DummyConfigsDump&>(*message_ptr);
 
@@ -430,7 +435,8 @@ dynamic_dummy_configs:
   ConfigProviderPtr static_config = provider_manager_->createStaticConfigProvider(
       parseDummyConfigFromYaml(config_yaml), server_factory_context_,
       ConfigProviderManager::NullOptionalArg());
-  message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"]();
+  message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"](
+      Matchers::UniversalStringMatcher());
   const auto& dummy_config_dump2 =
       static_cast<const test::common::config::DummyConfigsDump&>(*message_ptr);
   TestUtility::loadFromYaml(R"EOF(
@@ -457,7 +463,8 @@ dynamic_dummy_configs:
   const auto decoded_resources = TestUtility::decodeResources({dummy_config}, "a");
   subscription.onConfigUpdate(decoded_resources.refvec_, "v1");
 
-  message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"]();
+  message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"](
+      Matchers::UniversalStringMatcher());
   const auto& dummy_config_dump3 =
       static_cast<const test::common::config::DummyConfigsDump&>(*message_ptr);
   TestUtility::loadFromYaml(R"EOF(
@@ -475,7 +482,8 @@ dynamic_dummy_configs:
   ConfigProviderPtr static_config2 = provider_manager_->createStaticConfigProvider(
       parseDummyConfigFromYaml("a: another static dummy config"), server_factory_context_,
       ConfigProviderManager::NullOptionalArg());
-  message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"]();
+  message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"](
+      Matchers::UniversalStringMatcher());
   const auto& dummy_config_dump4 =
       static_cast<const test::common::config::DummyConfigsDump&>(*message_ptr);
   TestUtility::loadFromYaml(R"EOF(
@@ -556,7 +564,7 @@ public:
   }
   void onConfigUpdate(const std::vector<DecodedResourceRef>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
                             const EnvoyException*) override {
@@ -602,8 +610,12 @@ public:
   DeltaDummyConfigProviderManager(Server::Admin& admin)
       : ConfigProviderManagerImplBase(admin, "dummy") {}
 
+  ProtobufTypes::MessagePtr dumpConfigs() const {
+    return dumpConfigs(Matchers::UniversalStringMatcher());
+  }
+
   // Envoy::Config::ConfigProviderManagerImplBase
-  ProtobufTypes::MessagePtr dumpConfigs() const override {
+  ProtobufTypes::MessagePtr dumpConfigs(const Matchers::StringMatcher&) const override {
     auto config_dump = std::make_unique<test::common::config::DeltaDummyConfigsDump>();
     for (const auto& element : configSubscriptions()) {
       auto subscription = element.second.lock();

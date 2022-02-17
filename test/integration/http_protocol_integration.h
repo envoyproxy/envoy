@@ -8,8 +8,9 @@ namespace Envoy {
 
 struct HttpProtocolTestParams {
   Network::Address::IpVersion version;
-  Http::CodecClient::Type downstream_protocol;
-  FakeHttpConnection::Type upstream_protocol;
+  Http::CodecType downstream_protocol;
+  Http::CodecType upstream_protocol;
+  bool http2_new_codec_wrapper;
 };
 
 // Allows easy testing of Envoy code for HTTP/HTTP2 upstream/downstream.
@@ -37,11 +38,11 @@ public:
   //
   // Upstream and downstream protocols may be changed via the input vectors.
   // Address combinations are propagated from TestEnvironment::getIpVersionsForTest()
-  static std::vector<HttpProtocolTestParams>
-  getProtocolTestParams(const std::vector<Http::CodecClient::Type>& downstream_protocols =
-                            {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
-                        const std::vector<FakeHttpConnection::Type>& upstream_protocols = {
-                            FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP2});
+  static std::vector<HttpProtocolTestParams> getProtocolTestParams(
+      const std::vector<Http::CodecType>& downstream_protocols = {Http::CodecType::HTTP1,
+                                                                  Http::CodecType::HTTP2},
+      const std::vector<Http::CodecType>& upstream_protocols = {Http::CodecType::HTTP1,
+                                                                Http::CodecType::HTTP2});
 
   // Allows pretty printed test names of the form
   // FooTestCase.BarInstance/IPv4_Http2Downstream_HttpUpstream
@@ -52,12 +53,35 @@ public:
       : HttpIntegrationTest(
             GetParam().downstream_protocol, GetParam().version,
             ConfigHelper::httpProxyConfig(/*downstream_is_quic=*/GetParam().downstream_protocol ==
-                                          Http::CodecClient::Type::HTTP3)) {}
+                                          Http::CodecType::HTTP3)) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                      GetParam().http2_new_codec_wrapper ? "true" : "false");
+  }
 
   void SetUp() override {
     setDownstreamProtocol(GetParam().downstream_protocol);
     setUpstreamProtocol(GetParam().upstream_protocol);
   }
+
+protected:
+  struct BytesCountExpectation {
+    BytesCountExpectation(int wire_bytes_sent, int wire_bytes_received, int header_bytes_sent,
+                          int header_bytes_received)
+        : wire_bytes_sent_{wire_bytes_sent}, wire_bytes_received_{wire_bytes_received},
+          header_bytes_sent_{header_bytes_sent}, header_bytes_received_{header_bytes_received} {}
+    int wire_bytes_sent_;
+    int wire_bytes_received_;
+    int header_bytes_sent_;
+    int header_bytes_received_;
+  };
+
+  void expectUpstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
+                                          BytesCountExpectation h2_expectation,
+                                          BytesCountExpectation h3_expectation, const int id = 0);
+
+  void expectDownstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
+                                            BytesCountExpectation h2_expectation,
+                                            BytesCountExpectation h3_expectation, const int id = 0);
 };
 
 } // namespace Envoy

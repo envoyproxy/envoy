@@ -7,9 +7,9 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/cds_api_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/upstream/cds_api_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -92,7 +92,8 @@ resources:
   eds_cluster_config:
     eds_config:
       resource_api_version: V3
-      path: eds path
+      path_config_source:
+        path: eds path
 )EOF";
   auto response1 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
@@ -208,11 +209,11 @@ TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
     {
       envoy::config::cluster::v3::Cluster cluster;
       cluster.set_name("cluster_3");
-      expectAdd("cluster_3", "v2");
+      expectAdd("cluster_3", "v3");
       auto* resource = resources.Add();
       resource->mutable_resource()->PackFrom(cluster);
       resource->set_name("cluster_3");
-      resource->set_version("v2");
+      resource->set_version("v3");
     }
     Protobuf::RepeatedPtrField<std::string> removed;
     *removed.Add() = "cluster_1";
@@ -264,14 +265,16 @@ resources:
   eds_cluster_config:
     eds_config:
       resource_api_version: V3
-      path: eds path
+      path_config_source:
+        path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster2
   type: EDS
   eds_cluster_config:
     eds_config:
       resource_api_version: V3
-      path: eds path
+      path_config_source:
+        path: eds path
 )EOF";
   auto response1 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
@@ -295,14 +298,16 @@ resources:
   eds_cluster_config:
     eds_config:
       resource_api_version: V3
-      path: eds path
+      path_config_source:
+        path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster3
   type: EDS
   eds_cluster_config:
     eds_config:
       resource_api_version: V3
-      path: eds path
+      path_config_source:
+        path: eds path
 )EOF";
   auto response2 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_yaml);
@@ -333,14 +338,16 @@ resources:
   eds_cluster_config:
     eds_config:
       resource_api_version: V3
-      path: eds path
+      path_config_source:
+        path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
   type: EDS
   eds_cluster_config:
     eds_config:
       resource_api_version: V3
-      path: eds path
+      path_config_source:
+        path: eds path
 )EOF";
   auto response1 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);

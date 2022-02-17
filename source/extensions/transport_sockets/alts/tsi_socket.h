@@ -2,18 +2,21 @@
 
 #include "envoy/network/transport_socket.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/buffer/watermark_buffer.h"
-#include "common/network/raw_buffer_socket.h"
-
-#include "extensions/transport_sockets/alts/noop_transport_socket_callbacks.h"
-#include "extensions/transport_sockets/alts/tsi_frame_protector.h"
-#include "extensions/transport_sockets/alts/tsi_handshaker.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/extensions/transport_sockets/alts/noop_transport_socket_callbacks.h"
+#include "source/extensions/transport_sockets/alts/tsi_frame_protector.h"
+#include "source/extensions/transport_sockets/alts/tsi_handshaker.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
+
+struct TsiInfo {
+  std::string name_;
+};
 
 /**
  * A factory function to create TsiHandshaker
@@ -32,7 +35,8 @@ using HandshakerFactory = std::function<TsiHandshakerPtr(
  * output param that should be populated by the function implementation.
  * @return true if the peer is valid or false if the peer is invalid.
  */
-using HandshakeValidator = std::function<bool(const tsi_peer& peer, std::string& err)>;
+using HandshakeValidator =
+    std::function<bool(const tsi_peer& peer, TsiInfo& tsi_info, std::string& err)>;
 
 /* Forward declaration */
 class TsiTransportSocketCallbacks;
@@ -118,7 +122,6 @@ private:
   bool handshake_complete_{};
   bool end_stream_read_{};
   bool read_error_{};
-  bool write_buffer_contains_handshake_bytes_{};
   uint64_t prev_bytes_to_drain_{};
 };
 
@@ -132,7 +135,7 @@ public:
   bool implementsSecureTransport() const override;
   bool usesProxyProtocolOptions() const override { return false; }
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
 
 private:
   HandshakerFactory handshaker_factory_;

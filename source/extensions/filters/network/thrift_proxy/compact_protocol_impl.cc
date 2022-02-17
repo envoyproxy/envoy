@@ -1,14 +1,13 @@
-#include "extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
 
 #include <limits>
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/macros.h"
-
-#include "extensions/filters/network/thrift_proxy/buffer_helper.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/macros.h"
+#include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -77,6 +76,46 @@ bool CompactProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMeta
 
 bool CompactProtocolImpl::readMessageEnd(Buffer::Instance& buffer) {
   UNREFERENCED_PARAMETER(buffer);
+  return true;
+}
+
+bool CompactProtocolImpl::peekReplyPayload(Buffer::Instance& buffer, ReplyType& reply_type) {
+  // compact protocol does not transmit struct names so go straight to peek for field begin
+  // Minimum size: FieldType::Stop is encoded as 1 byte.
+  if (buffer.length() < 1) {
+    return false;
+  }
+
+  uint8_t delta_and_type = buffer.peekInt<int8_t>();
+  if ((delta_and_type & 0x0f) == 0) {
+    // Type is stop, no need to do further decoding
+    // If the first field is stop then response is void success
+    reply_type = ReplyType::Success;
+    return true;
+  }
+
+  if ((delta_and_type >> 4) != 0) {
+    // field id delta is non zero and so is an IDL exception (success field id is 0)
+    reply_type = ReplyType::Error;
+    return true;
+  }
+
+  int id_size = 0;
+  // Field ID delta is zero: this is a long-form field header, followed by zig-zag field id.
+  if (buffer.length() < 2) {
+    return false;
+  }
+
+  int32_t id = BufferHelper::peekZigZagI32(buffer, 1, id_size);
+  if (id_size < 0) {
+    return false;
+  }
+
+  if (id < 0 || id > std::numeric_limits<int16_t>::max()) {
+    throw EnvoyException(absl::StrCat("invalid compact protocol field id ", id));
+  }
+  // successful response struct in field id 0, error (IDL exception) in field id greater than 0
+  reply_type = id == 0 ? ReplyType::Success : ReplyType::Error;
   return true;
 }
 

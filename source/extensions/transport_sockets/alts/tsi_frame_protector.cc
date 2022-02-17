@@ -1,7 +1,7 @@
-#include "extensions/transport_sockets/alts/tsi_frame_protector.h"
+#include "source/extensions/transport_sockets/alts/tsi_frame_protector.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 
 #include "src/core/tsi/transport_security_grpc.h"
 #include "src/core/tsi/transport_security_interface.h"

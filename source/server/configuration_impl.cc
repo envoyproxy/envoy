@@ -1,4 +1,4 @@
-#include "server/configuration_impl.h"
+#include "source/server/configuration_impl.h"
 
 #include <chrono>
 #include <list>
@@ -16,15 +16,14 @@
 #include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/common/assert.h"
-#include "common/common/utility.h"
-#include "common/config/runtime_utility.h"
-#include "common/config/utility.h"
-#include "common/network/socket_option_factory.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/access_loggers/common/file_access_log_impl.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/runtime_utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -193,9 +192,36 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
   actions_ = watchdog.actions();
 }
 
-InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                         const Options& options, Instance& server)
-    : enable_deprecated_v2_api_(options.bootstrapVersion() == 2u) {
+InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  const auto& admin = bootstrap.admin();
+
+  admin_.profile_path_ =
+      admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
+  if (admin.has_address()) {
+    admin_.address_ = Network::Address::resolveProtoAddress(admin.address());
+  }
+  admin_.socket_options_ = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
+  if (!admin.socket_options().empty()) {
+    Network::Socket::appendOptions(
+        admin_.socket_options_,
+        Network::SocketOptionFactory::buildLiteralOptions(admin.socket_options()));
+  }
+  admin_.ignore_global_conn_limit_ = admin.ignore_global_conn_limit();
+
+  if (!bootstrap.flags_path().empty()) {
+    flags_path_ = bootstrap.flags_path();
+  }
+
+  if (bootstrap.has_layered_runtime()) {
+    layered_runtime_.MergeFrom(bootstrap.layered_runtime());
+    if (layered_runtime_.layers().empty()) {
+      layered_runtime_.add_layers()->mutable_admin_layer();
+    }
+  }
+}
+
+void InitialImpl::initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                     Instance& server) {
   const auto& admin = bootstrap.admin();
 
   for (const auto& access_log : admin.access_log()) {
@@ -210,39 +236,6 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
     admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
         file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
         server.accessLogManager()));
-  }
-
-  admin_.profile_path_ =
-      admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
-  if (admin.has_address()) {
-    admin_.address_ = Network::Address::resolveProtoAddress(admin.address());
-  }
-  admin_.socket_options_ = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
-  if (!admin.socket_options().empty()) {
-    Network::Socket::appendOptions(
-        admin_.socket_options_,
-        Network::SocketOptionFactory::buildLiteralOptions(admin.socket_options()));
-  }
-
-  if (!bootstrap.flags_path().empty()) {
-    flags_path_ = bootstrap.flags_path();
-  }
-
-  if (bootstrap.has_layered_runtime()) {
-    layered_runtime_.MergeFrom(bootstrap.layered_runtime());
-    if (layered_runtime_.layers().empty()) {
-      layered_runtime_.add_layers()->mutable_admin_layer();
-    }
-  }
-  if (enable_deprecated_v2_api_) {
-    auto* enabled_deprecated_v2_api_layer = layered_runtime_.add_layers();
-    enabled_deprecated_v2_api_layer->set_name("enabled_deprecated_v2_api (auto-injected)");
-    auto* static_layer = enabled_deprecated_v2_api_layer->mutable_static_layer();
-    ProtobufWkt::Value val;
-    val.set_bool_value(true);
-    (*static_layer
-          ->mutable_fields())["envoy.test_only.broken_in_production.enable_deprecated_v2_api"] =
-        val;
   }
 }
 

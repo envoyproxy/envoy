@@ -1,4 +1,4 @@
-#include "common/router/router_ratelimit.h"
+#include "source/common/router/router_ratelimit.h"
 
 #include <cstdint>
 #include <memory>
@@ -8,11 +8,11 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/config/metadata.h"
-#include "common/config/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Router {
@@ -76,7 +76,10 @@ bool SourceClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descrip
 bool DestinationClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                                                   const std::string&, const Http::RequestHeaderMap&,
                                                   const StreamInfo::StreamInfo& info) const {
-  descriptor_entry = {"destination_cluster", info.routeEntry()->clusterName()};
+  if (info.route() == nullptr || info.route()->routeEntry() == nullptr) {
+    return false;
+  }
+  descriptor_entry = {"destination_cluster", info.route()->routeEntry()->clusterName()};
   return true;
 }
 
@@ -133,14 +136,13 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
   const envoy::config::core::v3::Metadata* metadata_source;
 
   switch (source_) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::RateLimit::Action::MetaData::DYNAMIC:
     metadata_source = &info.dynamicMetadata();
     break;
   case envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY:
-    metadata_source = &info.routeEntry()->metadata();
+    metadata_source = &info.route()->metadata();
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const std::string metadata_string_value =
@@ -225,8 +227,8 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       }
       break;
     }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::ACTION_SPECIFIER_NOT_SET:
+      throw EnvoyException("invalid config");
     }
   }
   if (config.has_limit()) {
@@ -235,8 +237,9 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       limit_override_.emplace(
           new DynamicMetadataRateLimitOverride(config.limit().dynamic_metadata()));
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::route::v3::RateLimit_Override::OverrideSpecifierCase::
+        OVERRIDE_SPECIFIER_NOT_SET:
+      throw EnvoyException("invalid config");
     }
   }
 }

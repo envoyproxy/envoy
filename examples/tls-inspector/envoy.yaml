@@ -1,5 +1,4 @@
 admin:
-  access_log_path: "/dev/null"
   address:
     socket_address:
       address: 0.0.0.0
@@ -11,9 +10,9 @@ static_resources:
         address: 0.0.0.0
         port_value: 10000
     listener_filters:
-      - name: "envoy.filters.listener.tls_inspector"
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+    - name: "envoy.filters.listener.tls_inspector"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
     filter_chains:
     - filter_chain_match:
         transport_protocol: tls
@@ -43,7 +42,6 @@ static_resources:
 
   clusters:
   - name: service-https-http2
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -56,7 +54,6 @@ static_resources:
                 address: service-https-http2
                 port_value: 443
   - name: service-https-http1.1
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -69,7 +66,6 @@ static_resources:
                 address: service-https-http1.1
                 port_value: 443
   - name: service-http
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:

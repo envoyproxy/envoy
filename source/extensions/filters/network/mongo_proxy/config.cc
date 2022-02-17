@@ -1,4 +1,4 @@
-#include "extensions/filters/network/mongo_proxy/config.h"
+#include "source/extensions/filters/network/mongo_proxy/config.h"
 
 #include <memory>
 
@@ -7,9 +7,8 @@
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
-#include "common/common/fmt.h"
-
-#include "extensions/filters/network/mongo_proxy/proxy.h"
+#include "source/common/common/fmt.h"
+#include "source/extensions/filters/network/mongo_proxy/proxy.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,7 +25,7 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
   AccessLogSharedPtr access_log;
   if (!proto_config.access_log().empty()) {
     access_log = std::make_shared<AccessLog>(proto_config.access_log(), context.accessLogManager(),
-                                             context.dispatcher().timeSource());
+                                             context.mainThreadDispatcher().timeSource());
   }
 
   Filters::Common::Fault::FaultDelayConfigSharedPtr fault_config;
@@ -46,7 +45,8 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
           stats](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<ProdProxyFilter>(
         stat_prefix, context.scope(), context.runtime(), access_log, fault_config,
-        context.drainDecision(), context.dispatcher().timeSource(), emit_dynamic_metadata, stats));
+        context.drainDecision(), context.mainThreadDispatcher().timeSource(), emit_dynamic_metadata,
+        stats));
   };
 }
 

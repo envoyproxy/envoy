@@ -2,12 +2,11 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/thrift_proxy/filters/filter.h"
-#include "extensions/filters/network/thrift_proxy/protocol.h"
-#include "extensions/filters/network/thrift_proxy/transport.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol.h"
+#include "source/extensions/filters/network/thrift_proxy/transport.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,6 +19,7 @@ namespace ThriftProxy {
   FUNCTION(PassthroughData)                                                                        \
   FUNCTION(MessageBegin)                                                                           \
   FUNCTION(MessageEnd)                                                                             \
+  FUNCTION(ReplyPayload)                                                                           \
   FUNCTION(StructBegin)                                                                            \
   FUNCTION(StructEnd)                                                                              \
   FUNCTION(FieldBegin)                                                                             \
@@ -135,6 +135,7 @@ private:
   DecoderStatus passthroughData(Buffer::Instance& buffer);
   DecoderStatus messageBegin(Buffer::Instance& buffer);
   DecoderStatus messageEnd(Buffer::Instance& buffer);
+  DecoderStatus replyPayload(Buffer::Instance& buffer);
   DecoderStatus structBegin(Buffer::Instance& buffer);
   DecoderStatus structEnd(Buffer::Instance& buffer);
   DecoderStatus fieldBegin(Buffer::Instance& buffer);
@@ -150,6 +151,10 @@ private:
   DecoderStatus setBegin(Buffer::Instance& buffer);
   DecoderStatus setValue(Buffer::Instance& buffer);
   DecoderStatus setEnd(Buffer::Instance& buffer);
+
+  // handleMessageBegin calls the handler for messageBegin and then determines whether to
+  // perform payload passthrough or not
+  DecoderStatus handleMessageBegin();
 
   // handleValue represents the generic Value state from the state machine documentation. It
   // returns either ProtocolState::WaitForData if more data is required or the next state. For
@@ -172,6 +177,7 @@ private:
   DecoderCallbacks& callbacks_;
   ProtocolState state_;
   std::vector<Frame> stack_;
+  uint32_t body_start_{};
   uint32_t body_bytes_{};
 };
 

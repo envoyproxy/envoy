@@ -7,16 +7,19 @@ virtual_hosts:
       prefix: /
       headers:
       - name: test_header
-        exact_match: test
+        string_match:
+          exact: test
     route:
       cluster: local_service_with_headers
   - match:
       prefix: /
       headers:
       - name: test_header_multiple1
-        exact_match: test1
+        string_match:
+          exact: test1
       - name: test_header_multiple2
-        exact_match: test2
+        string_match:
+          exact: test2
     route:
       cluster: local_service_with_multiple_headers
 
@@ -30,16 +33,18 @@ virtual_hosts:
       prefix: /
       headers:
       - name: test_header_pattern
-        safe_regex_match:
-          google_re2: {}
-          regex: ^user=test-\d+$
+        string_match:
+          safe_regex:
+            google_re2: {}
+            regex: ^user=test-\d+$
     route:
       cluster: local_service_with_header_pattern_set_regex
   - match:
       prefix: /
       headers:
       - name: test_header_pattern
-        exact_match: ^customer=test-\d+$
+        string_match:
+          exact: ^customer=test-\d+$
     route:
       cluster: local_service_with_header_pattern_unset_regex
   - match:
@@ -47,7 +52,8 @@ virtual_hosts:
       grpc: {}
       headers:
       - name: test_header
-        exact_match: some_value
+        string_match:
+          exact: some_value
     route:
       cluster: local_service_with_grpc_and_other_header
   - match:

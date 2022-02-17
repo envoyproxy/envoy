@@ -14,16 +14,14 @@
 #include "envoy/extensions/upstreams/http/generic/v3/generic_connection_pool.pb.h"
 #include "envoy/extensions/upstreams/tcp/generic/v3/generic_connection_pool.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/application_protocol.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/network/upstream_server_name.h"
-#include "common/router/metadatamatchcriteria_impl.h"
-#include "common/tcp_proxy/tcp_proxy.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/access_loggers/well_known_names.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/application_protocol.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/upstream_server_name.h"
+#include "source/common/router/metadatamatchcriteria_impl.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
@@ -53,18 +51,9 @@ using ::testing::SaveArg;
 } // namespace
 
 inline Config constructConfigFromYaml(const std::string& yaml,
-                                      Server::Configuration::FactoryContext& context,
-                                      bool avoid_boosting = true) {
+                                      Server::Configuration::FactoryContext& context) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy, false, avoid_boosting);
-  return Config(tcp_proxy, context);
-}
-
-inline Config constructConfigFromV3Yaml(const std::string& yaml,
-                                        Server::Configuration::FactoryContext& context,
-                                        bool avoid_boosting = true) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy, false, avoid_boosting);
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
   return Config(tcp_proxy, context);
 }
 
@@ -73,11 +62,6 @@ public:
   TcpProxyTestBase() {
     ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));
-    ON_CALL(filter_callbacks_.connection_.stream_info_, onUpstreamHostSelected(_))
-        .WillByDefault(Invoke(
-            [this](Upstream::HostDescriptionConstSharedPtr host) { upstream_host_ = host; }));
-    ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamHost())
-        .WillByDefault(ReturnPointee(&upstream_host_));
     ON_CALL(filter_callbacks_.connection_.stream_info_, setUpstreamClusterInfo(_))
         .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
           upstream_cluster_ = cluster_info;
@@ -100,8 +84,7 @@ public:
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy defaultConfig() {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
     config.set_stat_prefix("name");
-    auto* route = config.mutable_hidden_envoy_deprecated_deprecated_v1()->mutable_routes()->Add();
-    route->set_cluster("fake_cluster");
+    config.set_cluster("fake_cluster");
     return config;
   }
 
@@ -110,7 +93,7 @@ public:
   accessLogConfig(const std::string& access_log_format) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
     envoy::config::accesslog::v3::AccessLog* access_log = config.mutable_access_log()->Add();
-    access_log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
+    access_log->set_name("envoy.access_loggers.file");
     envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
     file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
@@ -152,7 +135,7 @@ public:
 
   void raiseEventUpstreamConnectFailed(uint32_t conn_index,
                                        ConnectionPool::PoolFailureReason reason) {
-    conn_pool_callbacks_.at(conn_index)->onPoolFailure(reason, upstream_hosts_.at(conn_index));
+    conn_pool_callbacks_.at(conn_index)->onPoolFailure(reason, "", upstream_hosts_.at(conn_index));
   }
 
   Tcp::ConnectionPool::Cancellable* onNewConnection(Tcp::ConnectionPool::Cancellable* connection) {

@@ -1,4 +1,4 @@
-#include "common/http/codes.h"
+#include "source/common/http/codes.h"
 
 #include <cstdint>
 #include <string>
@@ -6,10 +6,10 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/utility.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -60,23 +60,28 @@ void CodeStatsImpl::recordHistogram(Stats::Scope& scope, const Stats::StatNameVe
 }
 
 void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
-                                            Code response_code) const {
+                                            Code response_code,
+                                            bool exclude_http_code_stats) const {
   ASSERT(&symbol_table_ == &scope.symbolTable());
 
   // Build a dynamic stat for the response code and increment it.
   incCounter(scope, prefix, upstream_rq_completed_);
-  const Stats::StatName rq_group = upstreamRqGroup(response_code);
-  if (!rq_group.empty()) {
-    incCounter(scope, prefix, rq_group);
+
+  if (!exclude_http_code_stats) {
+    const Stats::StatName rq_group = upstreamRqGroup(response_code);
+    if (!rq_group.empty()) {
+      incCounter(scope, prefix, rq_group);
+    }
+    incCounter(scope, prefix, upstreamRqStatName(response_code));
   }
-  incCounter(scope, prefix, upstreamRqStatName(response_code));
 }
 
-void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
+void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info,
+                                       bool exclude_http_code_stats) const {
   const Code code = static_cast<Code>(info.response_status_code_);
 
   ASSERT(&info.cluster_scope_.symbolTable() == &symbol_table_);
-  chargeBasicResponseStat(info.cluster_scope_, info.prefix_, code);
+  chargeBasicResponseStat(info.cluster_scope_, info.prefix_, code, exclude_http_code_stats);
 
   const Stats::StatName rq_group = upstreamRqGroup(code);
   const Stats::StatName rq_code = upstreamRqStatName(code);
@@ -256,6 +261,7 @@ const char* CodeUtility::toString(Code code) {
   case Code::PreconditionRequired:          return "Precondition Required";
   case Code::TooManyRequests:               return "Too Many Requests";
   case Code::RequestHeaderFieldsTooLarge:   return "Request Header Fields Too Large";
+  case Code::TooEarly:                      return "Too Early";
 
   // 5xx
   case Code::InternalServerError:           return "Internal Server Error";

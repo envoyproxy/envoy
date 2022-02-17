@@ -3,8 +3,8 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
@@ -20,11 +20,10 @@ public:
   // This test is using HTTP integration test to use the utilities to pass SNI from downstream
   // to upstream. The config being tested is tcp_proxy.
   SniDynamicProxyFilterIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(),
-                            ConfigHelper::tcpProxyConfig()) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam(), ConfigHelper::tcpProxyConfig()) {}
 
   void setup(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024) {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+    setUpstreamProtocol(Http::CodecType::HTTP1);
 
     config_helper_.addListenerFilter(ConfigHelper::tlsInspectorFilter());
 
@@ -33,14 +32,17 @@ public:
       // Switch predefined cluster_0 to CDS filesystem sourcing.
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
           envoy::config::core::v3::ApiVersion::V3);
-      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
+      bootstrap.mutable_dynamic_resources()
+          ->mutable_cds_config()
+          ->mutable_path_config_source()
+          ->set_path(cds_helper_.cds_path());
       bootstrap.mutable_static_resources()->clear_clusters();
 
       const std::string filter =
           fmt::format(R"EOF(
 name: envoy.filters.http.dynamic_forward_proxy
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3alpha.FilterConfig
+  "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
   dns_cache_config:
     name: foo
     dns_lookup_family: {}
@@ -86,7 +88,7 @@ typed_config:
   void createUpstreams() override {
     addFakeUpstream(
         Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_, factory_context_),
-        FakeHttpConnection::Type::HTTP1);
+        Http::CodecType::HTTP1);
   }
 
   Network::ClientConnectionPtr

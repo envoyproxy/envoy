@@ -1,4 +1,4 @@
-#include "extensions/retry/host/previous_hosts/config.h"
+#include "source/extensions/retry/host/previous_hosts/config.h"
 
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/retry.h"

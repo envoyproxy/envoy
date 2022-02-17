@@ -5,13 +5,12 @@ namespace {
 
 using DrainCloseIntegrationTest = HttpProtocolIntegrationTest;
 
-// Add a health check filter and verify correct behavior when draining.
 TEST_P(DrainCloseIntegrationTest, DrainCloseGradual) {
+  autonomous_upstream_ = true;
   // The probability of drain close increases over time. With a high timeout,
   // the probability will be very low, but the rapid retries prevent this from
   // increasing total test time.
   drain_time_ = std::chrono::seconds(100);
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
   absl::Notification drain_sequence_started;
@@ -35,7 +34,7 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseGradual) {
   EXPECT_TRUE(response->complete());
 
   EXPECT_EQ("200", response->headers().getStatusValue());
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
+  if (downstream_protocol_ == Http::CodecType::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   } else {
     EXPECT_EQ("close", response->headers().getConnectionValue());
@@ -43,9 +42,9 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseGradual) {
 }
 
 TEST_P(DrainCloseIntegrationTest, DrainCloseImmediate) {
+  autonomous_upstream_ = true;
   drain_strategy_ = Server::DrainStrategy::Immediate;
   drain_time_ = std::chrono::seconds(100);
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
   absl::Notification drain_sequence_started;
@@ -66,7 +65,7 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseImmediate) {
   EXPECT_TRUE(response->complete());
 
   EXPECT_EQ("200", response->headers().getStatusValue());
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
+  if (downstream_protocol_ == Http::CodecType::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   } else {
     EXPECT_EQ("close", response->headers().getConnectionValue());
@@ -108,7 +107,7 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
 
   // Connections will terminate on request complete
   ASSERT_TRUE(codec_client_->waitForDisconnect());
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
+  if (downstream_protocol_ == Http::CodecType::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   } else {
     EXPECT_EQ("close", response->headers().getConnectionValue());
@@ -169,8 +168,8 @@ TEST_P(DrainCloseIntegrationTest, RepeatedAdminGracefulDrain) {
 
 INSTANTIATE_TEST_SUITE_P(Protocols, DrainCloseIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
-                             {FakeHttpConnection::Type::HTTP1})),
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+                             {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 } // namespace

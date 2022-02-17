@@ -1,11 +1,9 @@
 #include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.h"
 
-#include "common/event/dispatcher_impl.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "server/resource_monitor_config_impl.h"
-
-#include "extensions/resource_monitors/injected_resource/injected_resource_monitor.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/resource_monitors/injected_resource/injected_resource_monitor.h"
+#include "source/server/resource_monitor_config_impl.h"
 
 #include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
@@ -28,7 +26,7 @@ public:
       const envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig&
           config,
       Server::Configuration::ResourceMonitorFactoryContext& context)
-      : InjectedResourceMonitor(config, context), dispatcher_(context.dispatcher()) {}
+      : InjectedResourceMonitor(config, context), dispatcher_(context.mainThreadDispatcher()) {}
 
 protected:
   void onFileChanged() override {
@@ -40,7 +38,7 @@ private:
   Event::Dispatcher& dispatcher_;
 };
 
-class MockedCallbacks : public Server::ResourceMonitor::Callbacks {
+class MockedCallbacks : public Server::ResourceUpdateCallbacks {
 public:
   MOCK_METHOD(void, onSuccess, (const Server::ResourceUsage&));
   MOCK_METHOD(void, onFailure, (const EnvoyException&));

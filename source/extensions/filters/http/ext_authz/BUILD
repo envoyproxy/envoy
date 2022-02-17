@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # External authorization L7 HTTP filter
-# Public docs: TODO(saumoh): Docs needed in docs/root/configuration/http_filters
+# Public docs: TODO(saumoh): Docs needed in docs/root/configuration/http/http_filters
 
 envoy_extension_package()
 
@@ -17,8 +17,8 @@ envoy_cc_library(
     srcs = ["ext_authz.cc"],
     hdrs = ["ext_authz.h"],
     deps = [
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/http:codes_interface",
+        "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -40,17 +40,13 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.http",
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":ext_authz",
-        "//include/envoy/registry",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/registry",
+        "//envoy/stats:stats_macros",
         "//source/common/config:utility_lib",
-        "//source/common/grpc:google_async_client_cache",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",

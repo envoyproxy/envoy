@@ -1,4 +1,4 @@
-#include "extensions/filters/http/grpc_http1_bridge/config.h"
+#include "source/extensions/filters/http/grpc_http1_bridge/config.h"
 
 #include "test/mocks/server/factory_context.h"
 
@@ -21,16 +21,6 @@ TEST(GrpcHttp1BridgeFilterConfigTest, GrpcHttp1BridgeFilter) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
-}
-
-// Test that the deprecated extension name still functions.
-TEST(GrpcHttp1BridgeFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.grpc_http1_bridge";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
-          deprecated_name));
 }
 
 } // namespace

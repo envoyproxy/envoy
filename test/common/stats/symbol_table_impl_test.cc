@@ -1,9 +1,9 @@
 #include <string>
 
-#include "common/common/macros.h"
-#include "common/common/mutex_tracer_impl.h"
-#include "common/memory/stats.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/mutex_tracer_impl.h"
+#include "source/common/memory/stats.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
@@ -28,7 +28,7 @@ protected:
   }
 
   SymbolVec getSymbols(StatName stat_name) {
-    return SymbolTableImpl::Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
+    return SymbolTableImpl::Encoding::decodeSymbols(stat_name);
   }
   Symbol monotonicCounter() { return table_.monotonicCounter(); }
   std::string encodeDecode(absl::string_view stat_name) {
@@ -435,7 +435,10 @@ TEST_F(StatNameTest, Sort) {
   const StatNameVec sorted_names{makeStat("a.b"), makeStat("a.c"),   makeStat("a.c"),
                                  makeStat("d.a"), makeStat("d.a.a"), makeStat("d.e")};
   EXPECT_NE(names, sorted_names);
-  std::sort(names.begin(), names.end(), StatNameLessThan(table_));
+  struct GetStatName {
+    StatName operator()(const StatName& stat_name) const { return stat_name; }
+  };
+  table_.sortByStatNames<StatName>(names.begin(), names.end(), GetStatName());
   EXPECT_EQ(names, sorted_names);
 }
 
@@ -694,6 +697,20 @@ TEST_F(StatNameTest, StatNameEmptyEquivalent) {
   EXPECT_NE(empty2.hash(), non_empty.hash());
 }
 
+TEST_F(StatNameTest, StartsWith) {
+  StatName prefix = makeStat("prefix");
+  EXPECT_TRUE(prefix.startsWith(prefix));
+  EXPECT_TRUE(makeStat("prefix").startsWith(prefix));
+  EXPECT_TRUE(makeStat("prefix.foo").startsWith(prefix));
+  EXPECT_TRUE(makeStat("prefix.foo.bar").startsWith(prefix));
+  EXPECT_FALSE(makeStat("").startsWith(prefix));
+  EXPECT_FALSE(makeStat("foo").startsWith(prefix));
+  StatNameDynamicPool dynamic(table_);
+  StatName dynamic_prefix = dynamic.add("prefix");
+  EXPECT_FALSE(dynamic_prefix.startsWith(prefix));
+  EXPECT_FALSE(dynamic_prefix.startsWith(dynamic_prefix));
+}
+
 TEST_F(StatNameTest, SupportsAbslHash) {
   EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
       StatName(),
@@ -709,7 +726,7 @@ TEST(SymbolTableTest, Memory) {
   // Tests a stat-name allocation strategy.
   auto test_memory_usage = [](std::function<void(absl::string_view)> fn) -> size_t {
     TestUtil::MemoryTest memory_test;
-    TestUtil::forEachSampleStat(1000, fn);
+    TestUtil::forEachSampleStat(1000, true, fn);
     return memory_test.consumedBytes();
   };
 

@@ -3,10 +3,10 @@
 #include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
-#include "common/common/logger.h"
-#include "common/config/metadata.h"
-#include "common/config/well_known_names.h"
-#include "common/upstream/load_balancer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/upstream/load_balancer_impl.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
@@ -87,12 +87,21 @@ public:
   LoadBalancerFactorySharedPtr factory() override { return factory_; }
   void initialize() override;
 
-  // Upstream::LoadBalancerBase
-  HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  // Upstream::LoadBalancer
+  HostConstSharedPtr chooseHost(LoadBalancerContext*) override { return nullptr; }
   // Preconnect not implemented for hash based load balancing
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
+  // Pool selection not implemented.
+  absl::optional<Upstream::SelectedPoolAndConnection>
+  selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                           const Upstream::Host& /*host*/,
+                           std::vector<uint8_t>& /*hash_key*/) override {
+    return absl::nullopt;
+  }
+  // Lifetime tracking not implemented.
+  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+    return {};
+  }
 
 protected:
   ThreadAwareLoadBalancerBase(
@@ -117,12 +126,24 @@ private:
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
     // Preconnect not implemented for hash based load balancing
     HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
+    absl::optional<Upstream::SelectedPoolAndConnection>
+    selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                             const Upstream::Host& /*host*/,
+                             std::vector<uint8_t>& /*hash_key*/) override {
+      return absl::nullopt;
+    }
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+      return {};
+    }
 
     ClusterStats& stats_;
     Random::RandomGenerator& random_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_;
     std::shared_ptr<DegradedLoad> degraded_per_priority_load_;
+
+    // Cross priority host map.
+    HostMapConstSharedPtr cross_priority_host_map_;
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
@@ -139,6 +160,16 @@ private:
     // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriority can be reused.
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_ ABSL_GUARDED_BY(mutex_);
     std::shared_ptr<DegradedLoad> degraded_per_priority_load_ ABSL_GUARDED_BY(mutex_);
+
+    // Whenever the membership changes, the cross_priority_host_map_ will be updated automatically.
+    // And all workers will create a new worker local load balancer and copy the
+    // cross_priority_host_map_.
+    // This leads to the possibility of simultaneous reading and writing of cross_priority_host_map_
+    // in different threads. For this reason, mutex is necessary to guard cross_priority_host_map_.
+    //
+    // Cross priority host map for fast cross priority host searching. When the priority update
+    // callback is executed, the host map will also be updated.
+    HostMapConstSharedPtr cross_priority_host_map_ ABSL_GUARDED_BY(mutex_);
   };
 
   virtual HashingLoadBalancerSharedPtr

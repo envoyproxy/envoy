@@ -1,10 +1,9 @@
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/router/string_accessor_impl.h"
-#include "common/stream_info/filter_state_impl.h"
-
-#include "extensions/filters/common/expr/cel_state.h"
-#include "extensions/filters/common/expr/context.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/extensions/filters/common/expr/cel_state.h"
+#include "source/extensions/filters/common/expr/context.h"
 
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -33,6 +32,7 @@ TEST(Context, EmptyHeadersAttributes) {
   EXPECT_FALSE(header.has_value());
   EXPECT_EQ(0, headers.size());
   EXPECT_TRUE(headers.empty());
+  EXPECT_EQ(0, headers.ListKeys()->size());
 }
 
 TEST(Context, InvalidRequest) {
@@ -63,8 +63,7 @@ TEST(Context, RequestAttributes) {
   EXPECT_CALL(info, requestComplete()).WillRepeatedly(Return(dur));
   EXPECT_CALL(info, protocol()).WillRepeatedly(Return(Http::Protocol::Http2));
 
-  // stub methods
-  EXPECT_EQ(0, request.size());
+  EXPECT_EQ(14, request.size());
   EXPECT_FALSE(request.empty());
 
   {
@@ -174,7 +173,8 @@ TEST(Context, RequestAttributes) {
     ASSERT_TRUE(value.value().IsMap());
     auto& map = *value.value().MapOrDie();
     EXPECT_FALSE(map.empty());
-    EXPECT_EQ(10, map.size());
+    EXPECT_EQ(9, map.size());
+    EXPECT_EQ(9, map.ListKeys()->size());
 
     auto header = map[CelValue::CreateStringView(Referer)];
     EXPECT_TRUE(header.has_value());
@@ -258,6 +258,8 @@ TEST(Context, ResponseAttributes) {
   const absl::optional<std::string> code_details = "unauthorized";
   EXPECT_CALL(info, responseCodeDetails()).WillRepeatedly(ReturnRef(code_details));
 
+  EXPECT_EQ(8, response.size());
+  EXPECT_FALSE(response.empty());
   {
     auto value = response[CelValue::CreateStringView(Undefined)];
     EXPECT_FALSE(value.has_value());
@@ -439,17 +441,17 @@ TEST(Context, ConnectionAttributes) {
   Network::Address::InstanceConstSharedPtr upstream_local_address =
       Network::Utility::parseInternetAddress("10.1.2.3", 1000, false);
   const std::string sni_name = "kittens.com";
-  info.downstream_address_provider_->setLocalAddress(local);
-  info.downstream_address_provider_->setRemoteAddress(remote);
-  EXPECT_CALL(info, downstreamSslConnection()).WillRepeatedly(Return(downstream_ssl_info));
-  EXPECT_CALL(info, upstreamSslConnection()).WillRepeatedly(Return(upstream_ssl_info));
-  EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(upstream_host));
-  EXPECT_CALL(info, requestedServerName()).WillRepeatedly(ReturnRef(sni_name));
-  EXPECT_CALL(info, upstreamLocalAddress()).WillRepeatedly(ReturnRef(upstream_local_address));
+  info.downstream_connection_info_provider_->setLocalAddress(local);
+  info.downstream_connection_info_provider_->setRemoteAddress(remote);
+  info.downstream_connection_info_provider_->setRequestedServerName(sni_name);
+  info.downstream_connection_info_provider_->setSslConnection(downstream_ssl_info);
   const std::string upstream_transport_failure_reason = "ConnectionTermination";
-  EXPECT_CALL(info, upstreamTransportFailureReason())
-      .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
+  info.upstreamInfo()->setUpstreamSslConnection(upstream_ssl_info);
+  info.upstreamInfo()->setUpstreamHost(upstream_host);
+  info.upstreamInfo()->setUpstreamLocalAddress(upstream_local_address);
+  info.upstreamInfo()->setUpstreamTransportFailureReason(upstream_transport_failure_reason);
   EXPECT_CALL(info, connectionID()).WillRepeatedly(Return(123));
+  info.downstream_connection_info_provider_->setConnectionID(123);
   const absl::optional<std::string> connection_termination_details = "unauthorized";
   EXPECT_CALL(info, connectionTerminationDetails())
       .WillRepeatedly(ReturnRef(connection_termination_details));
@@ -483,6 +485,18 @@ TEST(Context, ConnectionAttributes) {
   EXPECT_CALL(*downstream_ssl_info, subjectPeerCertificate())
       .WillRepeatedly(ReturnRef(subject_peer));
   EXPECT_CALL(*upstream_ssl_info, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject_peer));
+
+  EXPECT_EQ(11, connection.size());
+  EXPECT_FALSE(connection.empty());
+
+  EXPECT_EQ(11, upstream.size());
+  EXPECT_FALSE(connection.empty());
+
+  EXPECT_EQ(2, source.size());
+  EXPECT_FALSE(connection.empty());
+
+  EXPECT_EQ(2, destination.size());
+  EXPECT_FALSE(connection.empty());
 
   {
     auto value = connection[CelValue::CreateStringView(Undefined)];
@@ -699,6 +713,9 @@ TEST(Context, FilterStateAttributes) {
 
   auto accessor = std::make_shared<Envoy::Router::StringAccessorImpl>(serialized);
   filter_state.setData(key, accessor, StreamInfo::FilterState::StateType::ReadOnly);
+
+  EXPECT_EQ(0, wrapper.size());
+  EXPECT_TRUE(wrapper.empty());
 
   {
     auto value = wrapper[CelValue::CreateStringView(missing)];

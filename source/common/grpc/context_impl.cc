@@ -1,10 +1,10 @@
-#include "common/grpc/context_impl.h"
+#include "source/common/grpc/context_impl.h"
 
 #include <cstdint>
 #include <string>
 
-#include "common/grpc/common.h"
-#include "common/stats/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -85,12 +85,16 @@ void ContextImpl::chargeUpstreamStat(const Upstream::ClusterInfo& cluster,
 absl::optional<ContextImpl::RequestStatNames>
 ContextImpl::resolveDynamicServiceAndMethod(const Http::HeaderEntry* path) {
   absl::optional<Common::RequestNames> request_names = Common::resolveServiceAndMethod(path);
+
   if (!request_names) {
     return {};
   }
 
-  Stats::Element service = Stats::DynamicName(request_names->service_);
-  Stats::Element method = Stats::DynamicName(request_names->method_);
+  // service/method will live until the request is finished to emit resulting stats (e.g. request
+  // status) values in request_names_ might get changed, for example by routing rules (i.e.
+  // "prefix_rewrite"), so we copy them here to preserve the initial value and get a proper stat
+  Stats::Element service = Stats::DynamicSavedName(request_names->service_);
+  Stats::Element method = Stats::DynamicSavedName(request_names->method_);
   return RequestStatNames{service, method};
 }
 

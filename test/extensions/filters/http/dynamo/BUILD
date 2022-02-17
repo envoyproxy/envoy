@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "dynamo_filter_test",
     srcs = ["dynamo_filter_test.cc"],
-    extension_name = "envoy.filters.http.dynamo",
+    extension_names = ["envoy.filters.http.dynamo"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "dynamo_request_parser_test",
     srcs = ["dynamo_request_parser_test.cc"],
-    extension_name = "envoy.filters.http.dynamo",
+    extension_names = ["envoy.filters.http.dynamo"],
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
@@ -42,7 +42,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "dynamo_stats_test",
     srcs = ["dynamo_stats_test.cc"],
-    extension_name = "envoy.filters.http.dynamo",
+    extension_names = ["envoy.filters.http.dynamo"],
     deps = [
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/http/dynamo:dynamo_stats_lib",
@@ -53,7 +53,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.http.dynamo",
+    extension_names = ["envoy.filters.http.dynamo"],
     deps = [
         "//source/extensions/filters/http/dynamo:config",
         "//test/mocks/server:factory_context_mocks",

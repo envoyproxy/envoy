@@ -1,6 +1,6 @@
 #include "envoy/extensions/filters/common/dependency/v3/dependency.pb.h"
 
-#include "extensions/filters/network/http_connection_manager/config.h"
+#include "source/extensions/filters/network/http_connection_manager/config.h"
 
 #include "test/extensions/filters/network/http_connection_manager/config_test_base.h"
 #include "test/mocks/config/mocks.h"

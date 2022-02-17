@@ -17,9 +17,9 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 
-#include "common/common/logger.h"
-#include "common/network/resolver_impl.h"
-#include "common/network/utility.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Server {
@@ -170,8 +170,7 @@ private:
  */
 class InitialImpl : public Initial {
 public:
-  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options,
-              Instance& server);
+  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
@@ -180,6 +179,12 @@ public:
     return layered_runtime_;
   }
 
+  /**
+   * Initialize admin access log.
+   */
+  void initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                          Instance& server);
+
 private:
   struct AdminImpl : public Admin {
     // Server::Configuration::Initial::Admin
@@ -187,14 +192,15 @@ private:
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
     Network::Socket::OptionsSharedPtr socketOptions() override { return socket_options_; }
     std::list<AccessLog::InstanceSharedPtr> accessLogs() const override { return access_logs_; }
+    bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
 
     std::string profile_path_;
     std::list<AccessLog::InstanceSharedPtr> access_logs_;
     Network::Address::InstanceConstSharedPtr address_;
     Network::Socket::OptionsSharedPtr socket_options_;
+    bool ignore_global_conn_limit_;
   };
 
-  const bool enable_deprecated_v2_api_;
   AdminImpl admin_;
   absl::optional<std::string> flags_path_;
   envoy::config::bootstrap::v3::LayeredRuntime layered_runtime_;

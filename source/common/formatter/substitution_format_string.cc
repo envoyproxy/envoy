@@ -1,10 +1,11 @@
-#include "common/formatter/substitution_format_string.h"
+#include "source/common/formatter/substitution_format_string.h"
 
 #include "envoy/api/api.h"
 
-#include "common/config/datasource.h"
-#include "common/config/utility.h"
-#include "common/formatter/substitution_formatter.h"
+#include "source/common/config/datasource.h"
+#include "source/common/config/utility.h"
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/protobuf/message_validator_impl.h"
 
 namespace Envoy {
 namespace Formatter {
@@ -18,7 +19,8 @@ SubstitutionFormatStringUtils::createJsonFormatter(const ProtobufWkt::Struct& st
 }
 
 FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
-    const envoy::config::core::v3::SubstitutionFormatString& config, Api::Api& api) {
+    const envoy::config::core::v3::SubstitutionFormatString& config,
+    Server::Configuration::CommonFactoryContext& context) {
   // Instantiate formatter extensions.
   std::vector<CommandParserPtr> commands;
   for (const auto& formatter : config.formatters()) {
@@ -26,7 +28,9 @@ FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
     if (!factory) {
       throw EnvoyException(absl::StrCat("Formatter not found: ", formatter.name()));
     }
-    auto parser = factory->createCommandParserFromProto(formatter.typed_config());
+    auto typed_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+        formatter.typed_config(), context.messageValidationVisitor(), *factory);
+    auto parser = factory->createCommandParserFromProto(*typed_config);
     if (!parser) {
       throw EnvoyException(absl::StrCat("Failed to create command parser: ", formatter.name()));
     }
@@ -42,9 +46,10 @@ FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
                                                config.omit_empty_values(), commands);
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormatSource:
     return std::make_unique<FormatterImpl>(
-        Config::DataSource::read(config.text_format_source(), true, api), false, commands);
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+        Config::DataSource::read(config.text_format_source(), true, context.api()), false,
+        commands);
+  case envoy::config::core::v3::SubstitutionFormatString::FormatCase::FORMAT_NOT_SET:
+    PANIC_DUE_TO_PROTO_UNSET;
   }
 
   return nullptr;

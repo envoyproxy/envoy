@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Request buffering and timeout L7 HTTP filter
-# Public docs: docs/root/configuration/http_filters/buffer_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/buffer_filter
 
 envoy_extension_package()
 
@@ -17,9 +17,9 @@ envoy_cc_library(
     srcs = ["buffer_filter.cc"],
     hdrs = ["buffer_filter.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:filter_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/http:filter_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
@@ -28,7 +28,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/extensions/filters/http/buffer/v3:pkg_cc_proto",
     ],
 )
@@ -37,13 +36,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.http",
-    security_posture = "robust_to_untrusted_downstream",
     # Legacy test use. TODO(#9953) clean up.
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/registry",
-        "//source/extensions/filters/http:well_known_names",
+        "//envoy/registry",
         "//source/extensions/filters/http/buffer:buffer_filter_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/buffer/v3:pkg_cc_proto",

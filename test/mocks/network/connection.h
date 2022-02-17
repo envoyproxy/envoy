@@ -1,10 +1,11 @@
 #pragma once
 
 #include <list>
+#include <ostream>
 
 #include "envoy/network/connection.h"
 
-#include "common/network/filter_manager_impl.h"
+#include "source/common/network/filter_manager_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -64,13 +65,14 @@ public:
   MOCK_METHOD(void, readDisable, (bool disable));                                                  \
   MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));                                     \
   MOCK_METHOD(bool, readEnabled, (), (const));                                                     \
-  MOCK_METHOD(const SocketAddressProvider&, addressProvider, (), (const));                         \
-  MOCK_METHOD(SocketAddressProviderSharedPtr, addressProviderSharedPtr, (), (const));              \
+  MOCK_METHOD(const ConnectionInfoProvider&, connectionInfoProvider, (), (const));                 \
+  MOCK_METHOD(ConnectionInfoProviderSharedPtr, connectionInfoProviderSharedPtr, (), (const));      \
   MOCK_METHOD(absl::optional<Connection::UnixDomainSocketPeerCredentials>,                         \
               unixSocketPeerCredentials, (), (const));                                             \
   MOCK_METHOD(void, setConnectionStats, (const ConnectionStats& stats));                           \
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));                                \
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));                                \
+  MOCK_METHOD(absl::string_view, ja3Hash, (), (const));                                            \
   MOCK_METHOD(State, state, (), (const));                                                          \
   MOCK_METHOD(bool, connecting, (), (const));                                                      \
   MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));                            \
@@ -83,7 +85,8 @@ public:
   MOCK_METHOD(void, setDelayedCloseTimeout, (std::chrono::milliseconds));                          \
   MOCK_METHOD(absl::string_view, transportFailureReason, (), (const));                             \
   MOCK_METHOD(bool, startSecureTransport, ());                                                     \
-  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, (), (const))
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, (), (const));          \
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
 class MockConnection : public Connection, public MockConnectionBase {
 public:
@@ -100,7 +103,7 @@ public:
   DEFINE_MOCK_CONNECTION_MOCK_METHODS;
 
   // Network::ServerConnection
-  MOCK_METHOD(void, setTransportSocketConnectTimeout, (std::chrono::milliseconds));
+  MOCK_METHOD(void, setTransportSocketConnectTimeout, (std::chrono::milliseconds, Stats::Counter&));
 };
 
 /**

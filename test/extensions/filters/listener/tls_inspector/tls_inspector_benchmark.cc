@@ -1,11 +1,10 @@
 #include <vector>
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/http/utility.h"
-#include "common/network/io_socket_handle_impl.h"
-#include "common/network/listen_socket_impl.h"
-
-#include "extensions/filters/listener/tls_inspector/tls_inspector.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 #include "test/mocks/api/mocks.h"
@@ -75,7 +74,8 @@ static void BM_TlsInspector(benchmark::State& state) {
       "\x02h2\x08http/1.1"));
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls};
   NiceMock<Stats::MockStore> store;
-  ConfigSharedPtr cfg(std::make_shared<Config>(store));
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  ConfigSharedPtr cfg(std::make_shared<Config>(store, proto_config));
   Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>();
   Network::ConnectionSocketImpl socket(std::move(io_handle), nullptr, nullptr);
   NiceMock<FastMockDispatcher> dispatcher;

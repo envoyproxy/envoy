@@ -4,10 +4,10 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
-#include "extensions/filters/network/thrift_proxy/metadata.h"
-#include "extensions/filters/network/thrift_proxy/thrift.h"
-#include "extensions/filters/network/thrift_proxy/transport.h"
+#include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/metadata.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift.h"
+#include "source/extensions/filters/network/thrift_proxy/transport.h"
 
 #include "absl/types/optional.h"
 

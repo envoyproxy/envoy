@@ -17,7 +17,7 @@ namespace null_plugin {
 #include "proxy_wasm_api.h"
 #undef _THE_FOLLOWING_INCLUDE_MUST_COME_AFTER_THOSE_ABOVE_
 #define _THE_FOLLOWING_INCLUDE_MUST_COME_AFTER_THOSE_ABOVE_ 1
-#include "extensions/common/wasm/ext/envoy_proxy_wasm_api.h"
+#include "source/extensions/common/wasm/ext/envoy_proxy_wasm_api.h"
 #undef _THE_FOLLOWING_INCLUDE_MUST_COME_AFTER_THOSE_ABOVE_
 
 } // namespace null_plugin

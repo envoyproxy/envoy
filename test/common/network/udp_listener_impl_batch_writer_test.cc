@@ -21,13 +21,13 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/network/address_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/udp_listener_impl.h"
-#include "common/network/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/udp_listener_impl.h"
+#include "source/common/network/utility.h"
 
-#include "common/quic/udp_gso_batch_writer.h"
+#include "source/common/quic/udp_gso_batch_writer.h"
 
 #include "test/common/network/udp_listener_impl_test_base.h"
 #include "test/mocks/api/mocks.h"
@@ -113,7 +113,7 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
 
     auto send_result = listener_->send(send_data);
     EXPECT_TRUE(send_result.ok()) << "send() failed : " << send_result.err_->getErrorDetails();
-    EXPECT_EQ(send_result.rc_, payload.length());
+    EXPECT_EQ(send_result.return_value_, payload.length());
 
     // Verify udp_packet_writer stats for batch writing
     if (internal_buffer.length() == 0 ||       /* internal buffer is empty*/
@@ -197,12 +197,13 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
     // First have initial payload added to the udp_packet_writer's internal buffer.
     Buffer::InstancePtr initial_buffer(new Buffer::OwnedImpl());
     initial_buffer->add(initial_payload);
-    UdpSendData initial_send_data{
-        send_to_addr_->ip(), *server_socket_->addressProvider().localAddress(), *initial_buffer};
+    UdpSendData initial_send_data{send_to_addr_->ip(),
+                                  *server_socket_->connectionInfoProvider().localAddress(),
+                                  *initial_buffer};
     auto send_result = listener_->send(initial_send_data);
     internal_buffer.append(initial_payload);
     EXPECT_TRUE(send_result.ok());
-    EXPECT_EQ(send_result.rc_, initial_payload.length());
+    EXPECT_EQ(send_result.return_value_, initial_payload.length());
     EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
     EXPECT_EQ(listener_config_.listenerScope()
                   .gaugeFromString("internal_buffer_size", Stats::Gauge::ImportMode::NeverImport)
@@ -221,32 +222,22 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
     // Now send the following payload
     Buffer::InstancePtr following_buffer(new Buffer::OwnedImpl());
     following_buffer->add(following_payload);
-    UdpSendData following_send_data{
-        send_to_addr_->ip(), *server_socket_->addressProvider().localAddress(), *following_buffer};
+    UdpSendData following_send_data{send_to_addr_->ip(),
+                                    *server_socket_->connectionInfoProvider().localAddress(),
+                                    *following_buffer};
     send_result = listener_->send(following_send_data);
 
     if (following_payload.length() < initial_payload.length()) {
       // The following payload should get buffered if it is
       // shorter than initial payload
       EXPECT_TRUE(send_result.ok());
-      EXPECT_EQ(send_result.rc_, following_payload.length());
-      EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
+      EXPECT_EQ(send_result.return_value_, following_payload.length());
+      EXPECT_TRUE(udp_packet_writer_->isWriteBlocked());
       internal_buffer.append(following_payload);
-      // Send another packet and verify that writer gets blocked later
-      EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _))
-          .WillOnce(Invoke([](int /*sockfd*/, const msghdr* /*msg*/, int /*flags*/) {
-            errno = EWOULDBLOCK;
-            return -1;
-          }));
-      following_buffer->add(following_payload);
-      UdpSendData final_send_data{send_to_addr_->ip(),
-                                  *server_socket_->addressProvider().localAddress(),
-                                  *following_buffer};
-      send_result = listener_->send(final_send_data);
+    } else {
+      EXPECT_FALSE(send_result.ok());
+      EXPECT_EQ(send_result.return_value_, 0);
     }
-
-    EXPECT_FALSE(send_result.ok());
-    EXPECT_EQ(send_result.rc_, 0);
     EXPECT_TRUE(udp_packet_writer_->isWriteBlocked());
     EXPECT_EQ(listener_config_.listenerScope().counterFromString("total_bytes_sent").value(),
               total_bytes_sent);
@@ -264,7 +255,7 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
         }));
     auto flush_result = udp_packet_writer_->flush();
     EXPECT_TRUE(flush_result.ok());
-    EXPECT_EQ(flush_result.rc_, 0);
+    EXPECT_EQ(flush_result.return_value_, 0);
     EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
     EXPECT_EQ(listener_config_.listenerScope()
                   .gaugeFromString("internal_buffer_size", Stats::Gauge::ImportMode::NeverImport)

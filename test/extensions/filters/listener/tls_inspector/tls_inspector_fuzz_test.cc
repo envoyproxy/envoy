@@ -1,4 +1,4 @@
-#include "extensions/filters/listener/tls_inspector/tls_inspector.h"
+#include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.h"
 #include "test/extensions/filters/listener/tls_inspector/tls_inspector_fuzz_test.pb.validate.h"
@@ -23,15 +23,15 @@ DEFINE_PROTO_FUZZER(
 
   if (input.max_size() == 0) {
     // If max_size not set, use default constructor
-    cfg = std::make_shared<Config>(store);
+    cfg = std::make_shared<Config>(store, input.config());
   } else {
-    cfg = std::make_shared<Config>(store, input.max_size());
+    cfg = std::make_shared<Config>(store, input.config(), input.max_size());
   }
 
   auto filter = std::make_unique<Filter>(std::move(cfg));
 
   ListenerFilterFuzzer fuzzer;
-  fuzzer.fuzz(*filter, input.fuzzed());
+  fuzzer.fuzz(std::move(filter), input.fuzzed());
 }
 
 } // namespace TlsInspector

@@ -12,9 +12,9 @@ public:
   MockWorker();
   ~MockWorker() override;
 
-  void callAddCompletion(bool success) {
+  void callAddCompletion() {
     EXPECT_NE(nullptr, add_listener_completion_);
-    add_listener_completion_(success);
+    add_listener_completion_();
     add_listener_completion_ = nullptr;
   }
 
@@ -33,11 +33,11 @@ public:
   // Server::Worker
   MOCK_METHOD(void, addListener,
               (absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
-               AddListenerCompletion completion));
+               AddListenerCompletion completion, Runtime::Loader&));
   MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(void, removeListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
-  MOCK_METHOD(void, start, (GuardDog & guard_dog));
+  MOCK_METHOD(void, start, (GuardDog & guard_dog, const Event::PostCb& cb));
   MOCK_METHOD(void, initializeStats, (Stats::Scope & scope));
   MOCK_METHOD(void, stop, ());
   MOCK_METHOD(void, stopListener,

@@ -7,8 +7,8 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -58,7 +58,7 @@ public:
   }
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
+  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
 

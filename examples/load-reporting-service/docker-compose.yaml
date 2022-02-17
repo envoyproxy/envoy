@@ -1,29 +1,24 @@
 version: '3.7'
 services:
 
+  envoy:
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy
+    ports:
+    - "80-81:80"
+    - "8081:8081"
+
   http_service:
     build:
       context: .
       dockerfile: Dockerfile-http-server
-    volumes:
-      - ./service-envoy-w-lrs.yaml:/etc/service-envoy-w-lrs.yaml
-    environment:
-      ENVOY_UID: 0
-    networks:
-      - envoymesh
-    ports:
-      - "80-81:80"
 
   lrs_server:
     build:
       context: .
       dockerfile: Dockerfile-lrs
-    networks:
-      - envoymesh
     volumes:
-      - /go/src/github.com/envoyproxy/envoy/examples/load-reporting-service
+    - /go/src/github.com/envoyproxy/envoy/examples/load-reporting-service
     ports:
-      - "18000:18000"
-
-networks:
-  envoymesh: {}
+    - "18000:18000"

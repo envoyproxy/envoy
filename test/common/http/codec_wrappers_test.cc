@@ -1,4 +1,4 @@
-#include "common/http/codec_wrappers.h"
+#include "source/common/http/codec_wrappers.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"

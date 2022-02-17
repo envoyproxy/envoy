@@ -2,10 +2,12 @@
 
 #include "envoy/http/codec.h"
 
-#include "common/http/http2/codec_impl.h"
-#include "common/http/utility.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/utility.h"
 
 #include "test/mocks/common.h"
+
+#include "quiche/http2/adapter/http2_adapter.h"
 
 namespace Envoy {
 namespace Http {
@@ -75,8 +77,16 @@ public:
                              max_request_headers_kb, max_request_headers_count,
                              headers_with_underscores_action) {}
 
-  nghttp2_session* session() { return session_; }
+  nghttp2_session* session() {
+    ASSERT(!use_new_codec_wrapper_);
+    return session_;
+  }
+  http2::adapter::Http2Adapter* adapter() {
+    ASSERT(use_new_codec_wrapper_);
+    return adapter_.get();
+  }
   using ServerConnectionImpl::getStream;
+  using ServerConnectionImpl::sendPendingFrames;
 
 protected:
   // Overrides ServerConnectionImpl::onSettings().
@@ -100,7 +110,14 @@ public:
                              max_request_headers_kb, max_request_headers_count,
                              http2_session_factory) {}
 
-  nghttp2_session* session() { return session_; }
+  nghttp2_session* session() {
+    ASSERT(!use_new_codec_wrapper_);
+    return session_;
+  }
+  http2::adapter::Http2Adapter* adapter() {
+    ASSERT(use_new_codec_wrapper_);
+    return adapter_.get();
+  }
   // Submits an H/2 METADATA frame to the peer.
   // Returns true on success, false otherwise.
   virtual bool submitMetadata(const MetadataMapVector& mm_vector, int32_t stream_id) {

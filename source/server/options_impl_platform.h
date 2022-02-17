@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 class OptionsImplPlatform : protected Logger::Loggable<Logger::Id::config> {

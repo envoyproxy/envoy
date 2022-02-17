@@ -1,5 +1,5 @@
-#include "common/common/utility.h"
-#include "common/http/http2/protocol_constraints.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/http2/protocol_constraints.h"
 
 #include "test/common/stats/stat_test_utility.h"
 

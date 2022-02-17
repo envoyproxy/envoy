@@ -1,4 +1,4 @@
-#include "extensions/stat_sinks/dog_statsd/config.h"
+#include "source/extensions/stat_sinks/dog_statsd/config.h"
 
 #include <memory>
 
@@ -6,10 +6,8 @@
 #include "envoy/config/metrics/v3/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/network/resolver_impl.h"
-
-#include "extensions/stat_sinks/common/statsd/statsd.h"
-#include "extensions/stat_sinks/well_known_names.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/extensions/stat_sinks/common/statsd/statsd.h"
 
 #include "absl/types/optional.h"
 
@@ -39,7 +37,7 @@ ProtobufTypes::MessagePtr DogStatsdSinkFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::config::metrics::v3::DogStatsdSink>();
 }
 
-std::string DogStatsdSinkFactory::name() const { return StatsSinkNames::get().DogStatsd; }
+std::string DogStatsdSinkFactory::name() const { return DogStatsdName; }
 
 /**
  * Static registration for the this sink factory. @see RegisterFactory.

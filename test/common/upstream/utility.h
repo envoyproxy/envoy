@@ -8,12 +8,12 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/utility.h"
-#include "common/config/metadata.h"
-#include "common/config/well_known_names.h"
-#include "common/json/json_loader.h"
-#include "common/network/utility.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/test_common/utility.h"
 
@@ -55,23 +55,21 @@ inline std::string defaultStaticClusterJson(const std::string& name) {
 }
 
 inline envoy::config::bootstrap::v3::Bootstrap
-parseBootstrapFromV3Json(const std::string& json_string, bool avoid_boosting = true) {
+parseBootstrapFromV3Json(const std::string& json_string) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromJson(json_string, bootstrap, true, avoid_boosting);
+  TestUtility::loadFromJson(json_string, bootstrap);
   return bootstrap;
 }
 
-inline envoy::config::cluster::v3::Cluster parseClusterFromV3Json(const std::string& json_string,
-                                                                  bool avoid_boosting = true) {
+inline envoy::config::cluster::v3::Cluster parseClusterFromV3Json(const std::string& json_string) {
   envoy::config::cluster::v3::Cluster cluster;
-  TestUtility::loadFromJson(json_string, cluster, true, avoid_boosting);
+  TestUtility::loadFromJson(json_string, cluster);
   return cluster;
 }
 
-inline envoy::config::cluster::v3::Cluster parseClusterFromV3Yaml(const std::string& yaml,
-                                                                  bool avoid_boosting = true) {
+inline envoy::config::cluster::v3::Cluster parseClusterFromV3Yaml(const std::string& yaml) {
   envoy::config::cluster::v3::Cluster cluster;
-  TestUtility::loadFromYaml(yaml, cluster, true, avoid_boosting);
+  TestUtility::loadFromYaml(yaml, cluster);
   return cluster;
 }
 
@@ -166,9 +164,9 @@ makeLocalityWeights(std::initializer_list<uint32_t> locality_weights) {
 }
 
 inline envoy::config::core::v3::HealthCheck
-parseHealthCheckFromV3Yaml(const std::string& yaml_string, bool avoid_boosting = true) {
+parseHealthCheckFromV3Yaml(const std::string& yaml_string) {
   envoy::config::core::v3::HealthCheck health_check;
-  TestUtility::loadFromYamlAndValidate(yaml_string, health_check, false, avoid_boosting);
+  TestUtility::loadFromYamlAndValidate(yaml_string, health_check);
   return health_check;
 }
 

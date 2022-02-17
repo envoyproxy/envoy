@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 
 # 1. Take protoxform artifacts from Bazel cache and pretty-print with protoprint.py.
-# 2. In the case where we are generating an Envoy internal shadow, it may be
-#    necessary to combine the current active proto, subject to hand editing, with
-#    shadow artifacts from the previous version; this is done via
-#    merge_active_shadow.py.
 # 3. Diff or copy resulting artifacts to the source tree.
 
 import argparse
@@ -39,6 +35,15 @@ API_BUILD_SYSTEM_IMPORT_PREFIXES = [
     'google/protobuf/',
     'google/rpc/status.proto',
     'validate/validate.proto',
+]
+
+# Each of the following contrib extensions are allowed to be in the v3 namespace. Indicate why.
+CONTRIB_V3_ALLOW_LIST = [
+    # Extensions moved from core to contrib.
+    'envoy.extensions.filters.http.squash.v3',
+    'envoy.extensions.filters.network.kafka_broker.v3',
+    'envoy.extensions.filters.network.mysql_proxy.v3',
+    'envoy.extensions.filters.network.rocketmq_proxy.v3',
 ]
 
 BUILD_FILE_TEMPLATE = string.Template(
@@ -90,8 +95,27 @@ def get_destination_path(src):
     if len(matches) != 1:
         raise RequiresReformatError(
             "Expect {} has only one package declaration but has {}".format(src, len(matches)))
-    return pathlib.Path(get_directory_from_package(
-        matches[0])).joinpath(src_path.name.split('.')[0] + ".proto")
+    package = matches[0]
+    dst_path = pathlib.Path(
+        get_directory_from_package(package)).joinpath(src_path.name.split('.')[0] + ".proto")
+    # contrib API files have the standard namespace but are in a contrib folder for clarity.
+    # The following prepends contrib for contrib packages so we wind up with the real final path.
+    if 'contrib' in src:
+        if 'v3alpha' not in package and 'v4alpha' not in package and package not in CONTRIB_V3_ALLOW_LIST:
+            raise ProtoSyncError(
+                "contrib extension package '{}' does not use v3alpha namespace. "
+                "Add to CONTRIB_V3_ALLOW_LIST with an explanation if this is on purpose.".format(
+                    package))
+
+        dst_path = pathlib.Path('contrib').joinpath(dst_path)
+    # Non-contrib can not use alpha.
+    if not 'contrib' in src:
+        if (not 'v2alpha' in package and not 'v1alpha1' in package) and 'alpha' in package:
+            raise ProtoSyncError(
+                "package '{}' uses an alpha namespace. This is not allowed. Instead mark with "
+                "(xds.annotations.v3.file_status).work_in_progress or related annotation.".format(
+                    package))
+    return dst_path
 
 
 def get_abs_rel_destination_path(dst_root, src):
@@ -125,30 +149,8 @@ def proto_print(src, dst):
     ])
 
 
-def merge_active_shadow(active_src, shadow_src, dst):
-    """Merge active/shadow FileDescriptorProto to a destination file.
-
-    Args:
-        active_src: source path for active FileDescriptorProto.
-        shadow_src: source path for active FileDescriptorProto.
-        dst: destination path for FileDescriptorProto.
-    """
-    print('merge_active_shadow %s' % dst)
-    subprocess.check_output([
-        'bazel-bin/tools/protoxform/merge_active_shadow',
-        active_src,
-        shadow_src,
-        dst,
-    ])
-
-
 def sync_proto_file(dst_srcs):
     """Pretty-print a proto descriptor from protoxform.py Bazel cache artifacts."
-
-    In the case where we are generating an Envoy internal shadow, it may be
-    necessary to combine the current active proto, subject to hand editing, with
-    shadow artifacts from the previous verion; this is done via
-    merge_active_shadow().
 
     Args:
         dst_srcs: destination/sources path tuple.
@@ -163,19 +165,8 @@ def sync_proto_file(dst_srcs):
         # We should only see an active and next major version candidate from
         # previous version today.
         assert (len(srcs) == 2)
-        shadow_srcs = [
-            s for s in srcs if s.endswith('.next_major_version_candidate.envoy_internal.proto')
-        ]
         active_src = [s for s in srcs if s.endswith('active_or_frozen.proto')][0]
-        # If we're building the shadow, we need to combine the next major version
-        # candidate shadow with the potentially hand edited active version.
-        if len(shadow_srcs) > 0:
-            assert (len(shadow_srcs) == 1)
-            with tempfile.NamedTemporaryFile() as f:
-                merge_active_shadow(active_src, shadow_srcs[0], f.name)
-                proto_print(f.name, dst)
-        else:
-            proto_print(active_src, dst)
+        proto_print(active_src, dst)
         src = active_src
     rel_dst_path = get_destination_path(src)
     return ['//%s:pkg' % str(rel_dst_path.parent)]
@@ -203,7 +194,14 @@ def get_import_deps(proto_path):
                 if import_path.startswith('udpa/annotations/'):
                     imports.append('@com_github_cncf_udpa//udpa/annotations:pkg')
                     continue
-                # Special case handling for UDPA core.
+                if import_path.startswith('xds/type/matcher/v3/'):
+                    imports.append('@com_github_cncf_udpa//xds/type/matcher/v3:pkg')
+                    continue
+                # Special case for handling XDS annotations.
+                if import_path.startswith('xds/annotations/v3/'):
+                    imports.append('@com_github_cncf_udpa//xds/annotations/v3:pkg')
+                    continue
+                # Special case handling for XDS core.
                 if import_path.startswith('xds/core/v3/'):
                     imports.append('@com_github_cncf_udpa//xds/core/v3:pkg')
                     continue
@@ -212,7 +210,7 @@ def get_import_deps(proto_path):
                     imports.append(
                         external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP[import_path])
                     continue
-                if import_path.startswith('envoy/'):
+                if import_path.startswith('envoy/') or import_path.startswith('contrib/'):
                     # Ignore package internal imports.
                     if os.path.dirname(proto_path).endswith(os.path.dirname(import_path)):
                         continue
@@ -222,26 +220,6 @@ def get_import_deps(proto_path):
                     'Unknown import path mapping for %s, please update the mappings in tools/proto_format/proto_sync.py.\n'
                     % import_path)
     return imports
-
-
-def get_previous_message_type_deps(proto_path):
-    """Obtain the Bazel dependencies for the previous version of messages in a .proto file.
-
-    We need to link in earlier proto descriptors to support Envoy reflection upgrades.
-
-    Args:
-        proto_path: path to .proto.
-
-    Returns:
-        A list of Bazel targets reflecting the previous message types in the .proto at proto_path.
-    """
-    contents = pathlib.Path(proto_path).read_text(encoding='utf8')
-    matches = re.findall(PREVIOUS_MESSAGE_TYPE_REGEX, contents)
-    deps = []
-    for m in matches:
-        target = '//%s:pkg' % get_directory_from_package(m)
-        deps.append(target)
-    return deps
 
 
 def has_services(proto_path):
@@ -275,10 +253,7 @@ def build_file_contents(root, files):
     Returns:
         A string containing the canonical BUILD file content for root.
     """
-    import_deps = set(sum([get_import_deps(os.path.join(root, f)) for f in files], []))
-    history_deps = set(
-        sum([get_previous_message_type_deps(os.path.join(root, f)) for f in files], []))
-    deps = import_deps.union(history_deps)
+    deps = set(sum([get_import_deps(os.path.join(root, f)) for f in files], []))
     _has_services = any(has_services(os.path.join(root, f)) for f in files)
     fields = []
     if _has_services:
@@ -318,14 +293,18 @@ def generate_current_api_dir(api_dir, dst_dir):
         api_dir: the original api directory
         dst_dir: the api directory to be compared in temporary directory
     """
+    contrib_dst = dst_dir.joinpath("contrib")
+    shutil.copytree(str(api_dir.joinpath("contrib")), str(contrib_dst))
+
     dst = dst_dir.joinpath("envoy")
     shutil.copytree(str(api_dir.joinpath("envoy")), str(dst))
 
-    for p in dst.glob('**/*.md'):
-        p.unlink()
     # envoy.service.auth.v2alpha exist for compatibility while we don't run in protoxform
     # so we ignore it here.
     shutil.rmtree(str(dst.joinpath("service", "auth", "v2alpha")))
+
+    for p in dst.glob('**/*.md'):
+        p.unlink()
 
 
 def git_status(path):
@@ -373,7 +352,7 @@ def should_sync(path, api_proto_modified_files, py_tools_modified_files):
     return False
 
 
-def sync(api_root, mode, labels, shadow):
+def sync(api_root, mode, is_ci, labels):
     api_proto_modified_files = git_modified_files('api', 'proto')
     py_tools_modified_files = git_modified_files('tools', 'py')
     with tempfile.TemporaryDirectory() as tmp:
@@ -383,11 +362,10 @@ def sync(api_root, mode, labels, shadow):
             paths.append(utils.bazel_bin_path_for_output_artifact(label, '.active_or_frozen.proto'))
             paths.append(
                 utils.bazel_bin_path_for_output_artifact(
-                    label, '.next_major_version_candidate.envoy_internal.proto'
-                    if shadow else '.next_major_version_candidate.proto'))
+                    label, '.next_major_version_candidate.proto'))
         dst_src_paths = defaultdict(list)
         for path in paths:
-            if os.stat(path).st_size > 0:
+            if os.path.exists(path) and os.stat(path).st_size > 0:
                 abs_dst_path, rel_dst_path = get_abs_rel_destination_path(dst_dir, path)
                 if should_sync(path, api_proto_modified_files, py_tools_modified_files):
                     dst_src_paths[abs_dst_path].append(path)
@@ -427,7 +405,7 @@ def sync(api_root, mode, labels, shadow):
                     print(
                         'Proto formatting may overwrite or delete files in the above list with no git backup.'
                     )
-                    if input('Continue? [yN] ').strip().lower() != 'y':
+                    if not is_ci and input('Continue? [yN] ').strip().lower() != 'y':
                         sys.exit(1)
                 src_files = set(
                     str(p.relative_to(current_api_dir)) for p in current_api_dir.rglob('*'))
@@ -438,12 +416,12 @@ def sync(api_root, mode, labels, shadow):
                     print(
                         'If this is not intended, please see https://github.com/envoyproxy/envoy/blob/main/api/STYLE.md#adding-an-extension-configuration-to-the-api.'
                     )
-                    if input('Delete files? [yN] ').strip().lower() == 'y':
+                    if not is_ci and input('Delete files? [yN] ').strip().lower() != 'y':
+                        sys.exit(1)
+                    else:
                         subprocess.run(['patch', '-p1'],
                                        input=diff,
                                        cwd=str(api_root_path.resolve()))
-                    else:
-                        sys.exit(1)
                 else:
                     subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root_path.resolve()))
 
@@ -452,9 +430,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=['check', 'fix'])
     parser.add_argument('--api_root', default='./api')
-    parser.add_argument('--api_shadow_root', default='./generated_api_shadow')
+    parser.add_argument('--ci', action="store_true", default=False)
     parser.add_argument('labels', nargs='*')
     args = parser.parse_args()
 
-    sync(args.api_root, args.mode, args.labels, False)
-    sync(args.api_shadow_root, args.mode, args.labels, True)
+    sync(args.api_root, args.mode, args.ci, args.labels)

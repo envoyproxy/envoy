@@ -40,32 +40,28 @@
 #include "envoy/upstream/locality.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/callback_impl.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/logger.h"
-#include "common/config/datasource.h"
-#include "common/config/metadata.h"
-#include "common/config/well_known_names.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/stats/isolated_store_impl.h"
-#include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/load_balancer_impl.h"
-#include "common/upstream/outlier_detection_impl.h"
-#include "common/upstream/resource_manager_impl.h"
-#include "common/upstream/upstream_impl.h"
-
+#include "source/common/common/callback_impl.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/datasource.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/outlier_detection_impl.h"
+#include "source/common/upstream/resource_manager_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/redis/redis_cluster_lb.h"
-
-#include "server/transport_socket_config_impl.h"
-
-#include "extensions/clusters/well_known_names.h"
-#include "extensions/common/redis/cluster_refresh_manager_impl.h"
-#include "extensions/filters/network/common/redis/client.h"
-#include "extensions/filters/network/common/redis/client_impl.h"
-#include "extensions/filters/network/common/redis/codec.h"
-#include "extensions/filters/network/common/redis/utility.h"
-#include "extensions/filters/network/redis_proxy/config.h"
+#include "source/extensions/common/redis/cluster_refresh_manager_impl.h"
+#include "source/extensions/filters/network/common/redis/client.h"
+#include "source/extensions/filters/network/common/redis/client_impl.h"
+#include "source/extensions/filters/network/common/redis/codec.h"
+#include "source/extensions/filters/network/common/redis/utility.h"
+#include "source/extensions/filters/network/redis_proxy/config.h"
+#include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -280,7 +276,6 @@ private:
   const ClusterSlotUpdateCallBackSharedPtr lb_factory_;
 
   Upstream::HostVector hosts_;
-  Upstream::HostMap all_hosts_;
 
   const std::string auth_username_;
   const std::string auth_password_;
@@ -292,8 +287,7 @@ private:
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
                                 envoy::extensions::clusters::redis::v3::RedisClusterConfig> {
 public:
-  RedisClusterFactory()
-      : ConfigurableClusterFactoryBase(Extensions::Clusters::ClusterTypes::get().Redis) {}
+  RedisClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.redis") {}
 
 private:
   friend class RedisClusterTest;

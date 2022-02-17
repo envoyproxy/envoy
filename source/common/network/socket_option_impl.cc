@@ -1,12 +1,13 @@
-#include "common/network/socket_option_impl.h"
+#include "source/common/network/socket_option_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/scalar_to_byte_vector.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -22,7 +23,7 @@ bool SocketOptionImpl::setOption(Socket& socket,
 
     const Api::SysCallIntResult result =
         SocketOptionImpl::setSocketOption(socket, optname_, value_.data(), value_.size());
-    if (result.rc_ != 0) {
+    if (result.return_value_ != 0) {
       ENVOY_LOG(warn, "Setting {} option on socket failed: {}", optname_.name(),
                 errorDetails(result.errno_));
       return false;
@@ -30,6 +31,14 @@ bool SocketOptionImpl::setOption(Socket& socket,
   }
 
   return true;
+}
+
+void SocketOptionImpl::hashKey(std::vector<uint8_t>& hash_key) const {
+  if (optname_.hasValue()) {
+    pushScalarToByteVector(optname_.level(), hash_key);
+    pushScalarToByteVector(optname_.option(), hash_key);
+    hash_key.insert(hash_key.end(), value_.begin(), value_.end());
+  }
 }
 
 absl::optional<Socket::Option::Details>

@@ -61,6 +61,8 @@ mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 
 export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:${IMAGE_ID}"
 
+time docker pull "${ENVOY_BUILD_IMAGE}"
+
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
 docker run --rm \
        "${ENVOY_DOCKER_OPTIONS[@]}" \
@@ -83,6 +85,7 @@ docker run --rm \
        -e ENVOY_BUILD_IMAGE \
        -e ENVOY_SRCDIR \
        -e ENVOY_BUILD_TARGET \
+       -e ENVOY_BUILD_DEBUG_INFORMATION \
        -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
        -e GCS_ARTIFACT_BUCKET \
        -e GITHUB_TOKEN \

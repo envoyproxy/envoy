@@ -1,10 +1,8 @@
-#include "common/crypto/utility.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
-
+#include "source/common/crypto/utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/oauth2/filter.h"
 #include "source/extensions/filters/http/oauth2/oauth_response.pb.h"
-
-#include "extensions/filters/http/oauth2/filter.h"
 
 #include "test/integration/http_integration.h"
 
@@ -20,7 +18,7 @@ namespace {
 class OauthIntegrationTest : public testing::Test, public HttpIntegrationTest {
 public:
   OauthIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, Network::Address::IpVersion::v4) {
+      : HttpIntegrationTest(Http::CodecType::HTTP2, Network::Address::IpVersion::v4) {
     enableHalfClose(true);
   }
 
@@ -38,7 +36,7 @@ public:
   }
 
   void initialize() override {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
 
     TestEnvironment::writeStringToFileForTest("token_secret.yaml", R"EOF(
 resources:
@@ -76,10 +74,10 @@ resources:
         inline_string: "hmac_secret_1")EOF",
                                               false);
 
-    config_helper_.addFilter(TestEnvironment::substitute(R"EOF(
+    config_helper_.prependFilter(TestEnvironment::substitute(R"EOF(
 name: oauth
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3alpha.OAuth2
+  "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
   config:
     token_endpoint:
       cluster: oauth
@@ -98,12 +96,14 @@ typed_config:
       token_secret:
         name: token
         sds_config:
-          path: "{{ test_tmpdir }}/token_secret.yaml"
+          path_config_source:
+            path: "{{ test_tmpdir }}/token_secret.yaml"
           resource_api_version: V3
       hmac_secret:
         name: hmac
         sds_config:
-          path: "{{ test_tmpdir }}/hmac_secret.yaml"
+          path_config_source:
+            path: "{{ test_tmpdir }}/hmac_secret.yaml"
           resource_api_version: V3
     auth_scopes:
     - user
@@ -128,19 +128,24 @@ typed_config:
 
   bool validateHmac(const Http::ResponseHeaderMap& headers, absl::string_view host,
                     absl::string_view hmac_secret) {
-    std::string expires = Http::Utility::parseSetCookieValue(headers, "OauthExpires");
-    std::string token = Http::Utility::parseSetCookieValue(headers, "BearerToken");
-    std::string hmac = Http::Utility::parseSetCookieValue(headers, "OauthHMAC");
+    std::string expires =
+        Http::Utility::parseSetCookieValue(headers, default_cookie_names_.oauth_expires_);
+    std::string token =
+        Http::Utility::parseSetCookieValue(headers, default_cookie_names_.bearer_token_);
+    std::string hmac =
+        Http::Utility::parseSetCookieValue(headers, default_cookie_names_.oauth_hmac_);
 
     Http::TestRequestHeaderMapImpl validate_headers{{":authority", std::string(host)}};
 
-    validate_headers.addReferenceKey(Http::Headers::get().Cookie, absl::StrCat("OauthHMAC=", hmac));
     validate_headers.addReferenceKey(Http::Headers::get().Cookie,
-                                     absl::StrCat("OauthExpires=", expires));
+                                     absl::StrCat(default_cookie_names_.oauth_hmac_, "=", hmac));
+    validate_headers.addReferenceKey(
+        Http::Headers::get().Cookie,
+        absl::StrCat(default_cookie_names_.oauth_expires_, "=", expires));
     validate_headers.addReferenceKey(Http::Headers::get().Cookie,
-                                     absl::StrCat("BearerToken=", token));
+                                     absl::StrCat(default_cookie_names_.bearer_token_, "=", token));
 
-    OAuth2CookieValidator validator{api_->timeSource()};
+    OAuth2CookieValidator validator{api_->timeSource(), default_cookie_names_};
     validator.setParams(validate_headers, std::string(hmac_secret));
     return validator.isValid();
   }
@@ -193,6 +198,8 @@ typed_config:
     RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
     codec_client_->close();
   }
+
+  const CookieNames default_cookie_names_{"BearerToken", "OauthHMAC", "OauthExpires"};
 };
 
 // Regular request gets redirected to the login page.

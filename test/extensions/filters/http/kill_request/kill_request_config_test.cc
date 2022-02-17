@@ -2,7 +2,7 @@
 #include "envoy/extensions/filters/http/kill_request/v3/kill_request.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "extensions/filters/http/kill_request/kill_request_config.h"
+#include "source/extensions/filters/http/kill_request/kill_request_config.h"
 
 #include "test/mocks/server/factory_context.h"
 

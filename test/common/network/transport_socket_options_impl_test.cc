@@ -1,10 +1,10 @@
-#include "common/http/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/application_protocol.h"
-#include "common/network/proxy_protocol_filter_state.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/network/upstream_server_name.h"
-#include "common/stream_info/filter_state_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/application_protocol.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/upstream_server_name.h"
+#include "source/common/stream_info/filter_state_impl.h"
 
 #include "gtest/gtest.h"
 

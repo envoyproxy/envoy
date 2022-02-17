@@ -25,7 +25,8 @@
                 prefix: "/"
                 headers:
                 - name: content-type
-                  exact_match: application/grpc
+                  string_match:
+                    exact: application/grpc
               route:
                 cluster: local_service_grpc
             - match:
@@ -39,14 +40,14 @@
             pass_through_mode: true
             headers:
               - name: ":path"
-                exact_match: "/healthcheck"
+                string_match:
+                  exact: "/healthcheck"
             cache_time: 2.5s
         - name: envoy.filters.http.buffer
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
             max_request_bytes: 5242880
         - name: envoy.filters.http.router
-          typed_config: {}
         access_log:
         - name: envoy.access_loggers.file
           filter:
@@ -164,10 +165,7 @@ static_resources:
                     envoy_grpc:
                        cluster_name: ratelimit
           - name: envoy.filters.http.grpc_http1_bridge
-            typed_config: {}
           - name: envoy.filters.http.router
-            typed_config: {}
-
   - address:
       socket_address:
         protocol: TCP
@@ -228,9 +226,7 @@ static_resources:
                     envoy_grpc:
                        cluster_name: ratelimit
           - name: envoy.filters.http.grpc_http1_bridge
-            typed_config: {}
           - name: envoy.filters.http.router
-            typed_config: {}
   {% if external_virtual_hosts|length > 0 or mongos_servers|length > 0 %}{% endif -%}
   {% for mapping in external_virtual_hosts -%}
   - name: "{{ mapping['address']}}"
@@ -269,10 +265,8 @@ static_resources:
           http_filters:
           {% if mapping['name'] in ['dynamodb_iad', 'dynamodb_legacy'] -%}
           - name: envoy.filters.http.dynamo
-            typed_config: {}
           {% endif -%}
           - name: envoy.filters.http.router
-            typed_config: {}
           access_log:
           - name: envoy.access_loggers.file
             filter:
@@ -356,8 +350,10 @@ static_resources:
             trusted_ca:
               filename: certs/cacert.pem
             {% if host.get('verify_subject_alt_name', False) %}
-            match_subject_alt_names:
-              exact: "{{host['verify_subject_alt_name'] }}"
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: "{{host['verify_subject_alt_name'] }}"
             {% endif %}
         {% if host.get('sni', False) %}
         sni: "{{ host['sni'] }}"
@@ -526,8 +522,10 @@ static_resources:
           validation_context:
             trusted_ca:
               filename: certs/cacert.pem
-            match_subject_alt_names:
-              exact: "collector-grpc.lightstep.com"
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: "collector-grpc.lightstep.com"
   - name: cds_cluster
     connect_timeout: 0.25s
     type: STRICT_DNS

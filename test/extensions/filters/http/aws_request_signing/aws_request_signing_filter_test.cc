@@ -1,7 +1,7 @@
 #include "envoy/http/filter.h"
 
-#include "extensions/common/aws/signer.h"
-#include "extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
+#include "source/extensions/common/aws/signer.h"
+#include "source/extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/http/mocks.h"

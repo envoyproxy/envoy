@@ -1,8 +1,7 @@
-#include "extensions/io_socket/user_space/file_event_impl.h"
+#include "source/extensions/io_socket/user_space/file_event_impl.h"
 
-#include "common/common/assert.h"
-
-#include "extensions/io_socket/user_space/io_handle.h"
+#include "source/common/common/assert.h"
+#include "source/extensions/io_socket/user_space/io_handle.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -58,8 +57,8 @@ void FileEventImpl::setEnabled(uint32_t events) {
   }
   ENVOY_LOG(
       trace,
-      "User space file event {} set enabled events {} and events {} is active. Will {} reschedule.",
-      static_cast<void*>(this), events, was_enabled ? "not " : "");
+      "User space file event {} set enabled events {} and events {} is active. Will {}reschedule.",
+      static_cast<void*>(this), events, events_to_notify, was_enabled ? "not " : "");
 }
 
 void FileEventImpl::activateIfEnabled(uint32_t events) {

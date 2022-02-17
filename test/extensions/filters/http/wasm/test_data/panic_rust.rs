@@ -3,17 +3,15 @@ use proxy_wasm::types::*;
 
 #[no_mangle]
 pub fn _start() {
-    proxy_wasm::set_http_context(|_, _| -> Box<dyn HttpContext> {
-        Box::new(TestStream{})
-    });
+    proxy_wasm::set_http_context(|_, _| -> Box<dyn HttpContext> { Box::new(TestStream) });
 }
 
-struct TestStream {}
+struct TestStream;
 
 impl Context for TestStream {}
 
 impl HttpContext for TestStream {
-    fn on_http_request_headers(&mut self, _: usize) -> Action {
+    fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
         panic!("");
     }
 
@@ -25,7 +23,7 @@ impl HttpContext for TestStream {
         panic!("");
     }
 
-    fn on_http_response_headers(&mut self, _: usize) -> Action {
+    fn on_http_response_headers(&mut self, _: usize, _: bool) -> Action {
         panic!("");
     }
 

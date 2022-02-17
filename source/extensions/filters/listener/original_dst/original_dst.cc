@@ -1,11 +1,11 @@
-#include "extensions/filters/listener/original_dst/original_dst.h"
+#include "source/extensions/filters/listener/original_dst/original_dst.h"
 
 #include "envoy/network/listen_socket.h"
 
-#include "common/common/assert.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/upstream_socket_options_filter_state.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/upstream_socket_options_filter_state.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +17,7 @@ Network::Address::InstanceConstSharedPtr OriginalDstFilter::getOriginalDst(Netwo
 }
 
 Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbacks& cb) {
-  ENVOY_LOG(debug, "original_dst: New connection accepted");
+  ENVOY_LOG(debug, "original_dst: new connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
 
   if (socket.addressType() == Network::Address::Type::Ip) {
@@ -38,7 +38,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
           auto status = socket.ioctl(SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS, NULL, 0,
                                      redirect_records->buf_, sizeof(redirect_records->buf_),
                                      &redirect_records->buf_size_);
-          if (status.rc_ != 0) {
+          if (status.return_value_ != 0) {
             ENVOY_LOG(debug,
                       "closing connection: cannot broker connection to original destination "
                       "[Query redirect record failed] with error {}",
@@ -58,13 +58,13 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
           filter_state
               .getDataMutable<Network::UpstreamSocketOptionsFilterState>(
                   Network::UpstreamSocketOptionsFilterState::key())
-              .addOption(
+              ->addOption(
                   Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
         }
       }
 #endif
       // Restore the local address to the original one.
-      socket.addressProvider().restoreLocalAddress(original_local_address);
+      socket.connectionInfoProvider().restoreLocalAddress(original_local_address);
     }
   }
 

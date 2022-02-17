@@ -1,10 +1,10 @@
-#include "common/http/mixed_conn_pool.h"
+#include "source/common/http/mixed_conn_pool.h"
 
-#include "common/http/codec_client.h"
-#include "common/http/http1/conn_pool.h"
-#include "common/http/http2/conn_pool.h"
-#include "common/http/utility.h"
-#include "common/tcp/conn_pool.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/http/http1/conn_pool.h"
+#include "source/common/http/http2/conn_pool.h"
+#include "source/common/http/utility.h"
+#include "source/common/tcp/conn_pool.h"
 
 namespace Envoy {
 namespace Http {
@@ -16,8 +16,7 @@ Envoy::ConnectionPool::ActiveClientPtr HttpConnPoolImplMixed::instantiateActiveC
 
 CodecClientPtr
 HttpConnPoolImplMixed::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  auto protocol =
-      protocol_ == Protocol::Http11 ? CodecClient::Type::HTTP1 : CodecClient::Type::HTTP2;
+  auto protocol = protocol_ == Protocol::Http11 ? CodecType::HTTP1 : CodecType::HTTP2;
   CodecClientPtr codec{new CodecClientProd(protocol, std::move(data.connection_),
                                            data.host_description_, dispatcher_, random_generator_)};
   return codec;

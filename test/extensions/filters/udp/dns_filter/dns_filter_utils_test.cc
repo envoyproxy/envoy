@@ -1,9 +1,8 @@
-#include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.h"
-#include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.validate.h"
+#include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
+#include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.validate.h"
 
-#include "common/network/address_impl.h"
-
-#include "extensions/filters/udp/dns_filter/dns_filter_utils.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
 #include "test/test_common/environment.h"
 
@@ -98,6 +97,26 @@ TEST_F(DnsFilterUtilsTest, GetAddressRecordTypeTest) {
   addr_type = getAddressRecordType(ipv4addr);
   EXPECT_TRUE(addr_type.has_value());
   EXPECT_EQ(addr_type.value(), DNS_RECORD_TYPE_A);
+}
+
+TEST_F(DnsFilterUtilsTest, GetDomainSuffixTest) {
+  struct DomainSuffixTestData {
+    const std::string domain;
+    const std::string expected_suffix;
+  } suffix_data[] = {
+      {"_ldap._tcp.Default-First-Site-Name._sites.dc._msdcs.utelsystems.local",
+       "utelsystems.local"},
+      {"primary.voip.subzero.com", "subzero.com"},
+      {"subzero.com", "subzero.com"},
+      {"subzero", "subzero"},
+      {".com", "com"},
+      {"", ""},
+  };
+
+  for (auto& ptr : suffix_data) {
+    const absl::string_view result = Utils::getDomainSuffix(ptr.domain);
+    EXPECT_EQ(ptr.expected_suffix, result);
+  }
 }
 
 } // namespace

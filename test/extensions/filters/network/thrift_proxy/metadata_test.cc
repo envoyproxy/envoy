@@ -1,4 +1,4 @@
-#include "extensions/filters/network/thrift_proxy/metadata.h"
+#include "source/extensions/filters/network/thrift_proxy/metadata.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -36,6 +36,12 @@ TEST(MessageMetadataTest, Fields) {
   metadata.setMessageType(MessageType::Call);
   EXPECT_TRUE(metadata.hasMessageType());
   EXPECT_EQ(MessageType::Call, metadata.messageType());
+
+  EXPECT_FALSE(metadata.hasHeaderFlags());
+  EXPECT_THROW(metadata.headerFlags(), absl::bad_optional_access);
+  metadata.setHeaderFlags(11);
+  EXPECT_TRUE(metadata.hasHeaderFlags());
+  EXPECT_EQ(11, metadata.headerFlags());
 
   EXPECT_FALSE(metadata.hasSequenceId());
   EXPECT_THROW(metadata.sequenceId(), absl::bad_optional_access);

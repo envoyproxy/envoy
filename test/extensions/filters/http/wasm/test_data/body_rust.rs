@@ -18,8 +18,17 @@ struct TestStream {
     body_chunks: usize,
 }
 
+impl TestStream {
+    fn log_body(&mut self, body: Option<Bytes>) {
+        error!(
+            "onBody {}",
+            body.map_or(String::from(""), |b| String::from_utf8(b).unwrap())
+        );
+    }
+}
+
 impl HttpContext for TestStream {
-    fn on_http_request_headers(&mut self, _: usize) -> Action {
+    fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
         self.test = self.get_http_request_header("x-test-operation");
         self.body_chunks = 0;
         Action::Continue
@@ -28,35 +37,37 @@ impl HttpContext for TestStream {
     fn on_http_request_body(&mut self, body_size: usize, end_of_stream: bool) -> Action {
         match self.test.as_deref() {
             Some("ReadBody") => {
-                let body = self.get_http_request_body(0, body_size).unwrap();
-                error!("onBody {}", String::from_utf8(body).unwrap());
+                self.log_body(self.get_http_request_body(0, 0xffffffff));
                 Action::Continue
             }
             Some("PrependAndAppendToBody") => {
                 self.set_http_request_body(0, 0, b"prepend.");
                 self.set_http_request_body(0xffffffff, 0, b".append");
-                let body = self.get_http_request_body(0, 0xffffffff).unwrap();
-                error!("onBody {}", String::from_utf8(body).unwrap());
+                self.log_body(self.get_http_request_body(0, 0xffffffff));
                 Action::Continue
             }
             Some("ReplaceBody") => {
                 self.set_http_request_body(0, 0xffffffff, b"replace");
-                let body = self.get_http_request_body(0, 0xffffffff).unwrap();
-                error!("onBody {}", String::from_utf8(body).unwrap());
+                self.log_body(self.get_http_request_body(0, 0xffffffff));
+                Action::Continue
+            }
+            Some("PartialReplaceBody") => {
+                self.set_http_request_body(0, 1, b"partial.replace.");
+                self.log_body(self.get_http_request_body(0, 0xffffffff));
                 Action::Continue
             }
             Some("RemoveBody") => {
                 self.set_http_request_body(0, 0xffffffff, b"");
-                if let Some(body) = self.get_http_request_body(0, 0xffffffff) {
-                    error!("onBody {}", String::from_utf8(body).unwrap());
-                } else {
-                    error!("onBody ");
-                }
+                self.log_body(self.get_http_request_body(0, 0xffffffff));
+                Action::Continue
+            }
+            Some("PartialRemoveBody") => {
+                self.set_http_request_body(0, 1, b"");
+                self.log_body(self.get_http_request_body(0, 0xffffffff));
                 Action::Continue
             }
             Some("BufferBody") => {
-                let body = self.get_http_request_body(0, body_size).unwrap();
-                error!("onBody {}", String::from_utf8(body).unwrap());
+                self.log_body(self.get_http_request_body(0, 0xffffffff));
                 if end_of_stream {
                     Action::Continue
                 } else {
@@ -66,8 +77,7 @@ impl HttpContext for TestStream {
             Some("PrependAndAppendToBufferedBody") => {
                 self.set_http_request_body(0, 0, b"prepend.");
                 self.set_http_request_body(0xffffffff, 0, b".append");
-                let body = self.get_http_request_body(0, 0xffffffff).unwrap();
-                error!("onBody {}", String::from_utf8(body).unwrap());
+                self.log_body(self.get_http_request_body(0, 0xffffffff));
                 if end_of_stream {
                     Action::Continue
                 } else {
@@ -76,8 +86,16 @@ impl HttpContext for TestStream {
             }
             Some("ReplaceBufferedBody") => {
                 self.set_http_request_body(0, 0xffffffff, b"replace");
-                let body = self.get_http_request_body(0, 0xffffffff).unwrap();
-                error!("onBody {}", String::from_utf8(body).unwrap());
+                self.log_body(self.get_http_request_body(0, 0xffffffff));
+                if end_of_stream {
+                    Action::Continue
+                } else {
+                    Action::Pause
+                }
+            }
+            Some("PartialReplaceBufferedBody") => {
+                self.set_http_request_body(0, 1, b"partial.replace.");
+                self.log_body(self.get_http_request_body(0, 0xffffffff));
                 if end_of_stream {
                     Action::Continue
                 } else {
@@ -86,11 +104,16 @@ impl HttpContext for TestStream {
             }
             Some("RemoveBufferedBody") => {
                 self.set_http_request_body(0, 0xffffffff, b"");
-                if let Some(body) = self.get_http_request_body(0, 0xffffffff) {
-                    error!("onBody {}", String::from_utf8(body).unwrap());
+                self.log_body(self.get_http_request_body(0, 0xffffffff));
+                if end_of_stream {
+                    Action::Continue
                 } else {
-                    error!("onBody ");
+                    Action::Pause
                 }
+            }
+            Some("PartialRemoveBufferedBody") => {
+                self.set_http_request_body(0, 1, b"");
+                self.log_body(self.get_http_request_body(0, 0xffffffff));
                 if end_of_stream {
                     Action::Continue
                 } else {
@@ -112,7 +135,7 @@ impl HttpContext for TestStream {
         }
     }
 
-    fn on_http_response_headers(&mut self, _: usize) -> Action {
+    fn on_http_response_headers(&mut self, _: usize, _: bool) -> Action {
         self.test = self.get_http_response_header("x-test-operation");
         Action::Continue
     }
@@ -120,35 +143,37 @@ impl HttpContext for TestStream {
     fn on_http_response_body(&mut self, body_size: usize, end_of_stream: bool) -> Action {
         match self.test.as_deref() {
             Some("ReadBody") => {
-                let body = self.get_http_response_body(0, body_size).unwrap();
-                error!("onBody {}", String::from_utf8(body).unwrap());
+                self.log_body(self.get_http_response_body(0, 0xffffffff));
                 Action::Continue
             }
             Some("PrependAndAppendToBody") => {
                 self.set_http_response_body(0, 0, b"prepend.");
                 self.set_http_response_body(0xffffffff, 0, b".append");
-                let body = self.get_http_response_body(0, 0xffffffff).unwrap();
-                error!("onBody {}", String::from_utf8(body).unwrap());
+                self.log_body(self.get_http_response_body(0, 0xffffffff));
                 Action::Continue
             }
             Some("ReplaceBody") => {
                 self.set_http_response_body(0, 0xffffffff, b"replace");
-                let body = self.get_http_response_body(0, 0xffffffff).unwrap();
-                error!("onBody {}", String::from_utf8(body).unwrap());
+                self.log_body(self.get_http_response_body(0, 0xffffffff));
+                Action::Continue
+            }
+            Some("PartialReplaceBody") => {
+                self.set_http_response_body(0, 1, b"partial.replace.");
+                self.log_body(self.get_http_response_body(0, 0xffffffff));
                 Action::Continue
             }
             Some("RemoveBody") => {
                 self.set_http_response_body(0, 0xffffffff, b"");
-                if let Some(body) = self.get_http_response_body(0, 0xffffffff) {
-                    error!("onBody {}", String::from_utf8(body).unwrap());
-                } else {
-                    error!("onBody ");
-                }
+                self.log_body(self.get_http_response_body(0, 0xffffffff));
+                Action::Continue
+            }
+            Some("PartialRemoveBody") => {
+                self.set_http_response_body(0, 1, b"");
+                self.log_body(self.get_http_response_body(0, 0xffffffff));
                 Action::Continue
             }
             Some("BufferBody") => {
-                let body = self.get_http_response_body(0, body_size).unwrap();
-                error!("onBody {}", String::from_utf8(body).unwrap());
+                self.log_body(self.get_http_response_body(0, 0xffffffff));
                 if end_of_stream {
                     Action::Continue
                 } else {
@@ -158,8 +183,7 @@ impl HttpContext for TestStream {
             Some("PrependAndAppendToBufferedBody") => {
                 self.set_http_response_body(0, 0, b"prepend.");
                 self.set_http_response_body(0xffffffff, 0, b".append");
-                let body = self.get_http_response_body(0, 0xffffffff).unwrap();
-                error!("onBody {}", String::from_utf8(body).unwrap());
+                self.log_body(self.get_http_response_body(0, 0xffffffff));
                 if end_of_stream {
                     Action::Continue
                 } else {
@@ -168,8 +192,16 @@ impl HttpContext for TestStream {
             }
             Some("ReplaceBufferedBody") => {
                 self.set_http_response_body(0, 0xffffffff, b"replace");
-                let body = self.get_http_response_body(0, 0xffffffff).unwrap();
-                error!("onBody {}", String::from_utf8(body).unwrap());
+                self.log_body(self.get_http_response_body(0, 0xffffffff));
+                if end_of_stream {
+                    Action::Continue
+                } else {
+                    Action::Pause
+                }
+            }
+            Some("PartialReplaceBufferedBody") => {
+                self.set_http_response_body(0, 1, b"partial.replace.");
+                self.log_body(self.get_http_response_body(0, 0xffffffff));
                 if end_of_stream {
                     Action::Continue
                 } else {
@@ -178,11 +210,16 @@ impl HttpContext for TestStream {
             }
             Some("RemoveBufferedBody") => {
                 self.set_http_response_body(0, 0xffffffff, b"");
-                if let Some(body) = self.get_http_response_body(0, 0xffffffff) {
-                    error!("onBody {}", String::from_utf8(body).unwrap());
+                self.log_body(self.get_http_response_body(0, 0xffffffff));
+                if end_of_stream {
+                    Action::Continue
                 } else {
-                    error!("onBody ");
+                    Action::Pause
                 }
+            }
+            Some("PartialRemoveBufferedBody") => {
+                self.set_http_response_body(0, 1, b"");
+                self.log_body(self.get_http_response_body(0, 0xffffffff));
                 if end_of_stream {
                     Action::Continue
                 } else {

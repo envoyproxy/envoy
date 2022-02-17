@@ -1,19 +1,18 @@
-#include "extensions/filters/http/grpc_web/grpc_web_filter.h"
+#include "source/extensions/filters/http/grpc_web/grpc_web_filter.h"
 
 #ifndef WIN32
 #include <arpa/inet.h>
 #endif
 
-#include "common/common/assert.h"
-#include "common/common/base64.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/utility.h"
-#include "common/grpc/common.h"
-#include "common/grpc/context_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/grpc/context_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -112,11 +111,8 @@ bool GrpcWebFilter::hasProtoEncodedGrpcWebContentType(
 // If response headers do not contain valid response headers, it needs transformation.
 bool GrpcWebFilter::needsTransformationForNonProtoEncodedResponse(Http::ResponseHeaderMap& headers,
                                                                   bool end_stream) const {
-  return Runtime::runtimeFeatureEnabled(
-             "envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling") &&
-         // We transform the response unless it is already a gRPC or proto-encoded gRPC-Web
-         // response.
-         !Grpc::Common::isGrpcResponseHeaders(headers, end_stream) &&
+  // We transform the response unless it is already a gRPC or proto-encoded gRPC-Web response.
+  return !Grpc::Common::isGrpcResponseHeaders(headers, end_stream) &&
          !isProtoEncodedGrpcWebResponseHeaders(headers);
 }
 

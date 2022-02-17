@@ -1,4 +1,4 @@
-#include "common/upstream/upstream_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -28,30 +28,28 @@
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/http/http1/codec_stats.h"
-#include "common/http/http2/codec_stats.h"
-#include "common/http/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/resolver_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/socket_option_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/router/config_utility.h"
-#include "common/runtime/runtime_features.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/upstream/eds.h"
-#include "common/upstream/health_checker_impl.h"
-#include "common/upstream/logical_dns_cluster.h"
-#include "common/upstream/original_dst_cluster.h"
-
-#include "server/transport_socket_config_impl.h"
-
-#include "extensions/filters/network/common/utility.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/http1/codec_stats.h"
+#include "source/common/http/http2/codec_stats.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/happy_eyeballs_connection_impl.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/config_utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/upstream/eds.h"
+#include "source/common/upstream/health_checker_impl.h"
+#include "source/common/upstream/logical_dns_cluster.h"
+#include "source/common/upstream/original_dst_cluster.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/str_cat.h"
@@ -125,7 +123,6 @@ parseClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
 
 ProtocolOptionsConfigConstSharedPtr
 createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
-                            const ProtobufWkt::Struct& config,
                             Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   Server::Configuration::ProtocolOptionsFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
@@ -153,42 +150,18 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
   }
 
   Envoy::Config::Utility::translateOpaqueConfig(
-      typed_config, config, factory_context.messageValidationVisitor(), *proto_config);
+      typed_config, factory_context.messageValidationVisitor(), *proto_config);
   return factory->createProtocolOptionsConfig(*proto_config, factory_context);
 }
 
 absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtocolOptions(
     const envoy::config::cluster::v3::Cluster& config,
     Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
-  if (!config.typed_extension_protocol_options().empty() &&
-      !config.hidden_envoy_deprecated_extension_protocol_options().empty()) {
-    throw EnvoyException("Only one of typed_extension_protocol_options or "
-                         "extension_protocol_options can be specified");
-  }
-
   absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
 
   for (const auto& it : config.typed_extension_protocol_options()) {
-    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
-    // We only handle deprecated network filter names here because no existing HTTP filter has
-    // protocol options.
-    auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
-
-    auto object = createProtocolOptionsConfig(
-        name, it.second, ProtobufWkt::Struct::default_instance(), factory_context);
-    if (object != nullptr) {
-      options[name] = std::move(object);
-    }
-  }
-
-  for (const auto& it : config.hidden_envoy_deprecated_extension_protocol_options()) {
-    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
-    // We only handle deprecated network filter names here because no existing HTTP filter has
-    // protocol options.
-    auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
-
-    auto object = createProtocolOptionsConfig(name, ProtobufWkt::Any::default_instance(), it.second,
-                                              factory_context);
+    auto& name = it.first;
+    auto object = createProtocolOptionsConfig(name, it.second, factory_context);
     if (object != nullptr) {
       options[name] = std::move(object);
     }
@@ -240,6 +213,27 @@ HostVector filterHosts(const absl::node_hash_set<HostSharedPtr>& hosts,
 
 } // namespace
 
+// TODO(pianiststickman): this implementation takes a lock on the hot path and puts a copy of the
+// stat name into every host that receives a copy of that metric. This can be improved by putting
+// a single copy of the stat name into a thread-local key->index map so that the lock can be avoided
+// and using the index as the key to the stat map instead.
+void LoadMetricStatsImpl::add(const absl::string_view key, double value) {
+  absl::MutexLock lock(&mu_);
+  if (map_ == nullptr) {
+    map_ = std::make_unique<StatMap>();
+  }
+  Stat& stat = (*map_)[key];
+  ++stat.num_requests_with_metric;
+  stat.total_metric_value += value;
+}
+
+LoadMetricStats::StatMapPtr LoadMetricStatsImpl::latch() {
+  absl::MutexLock lock(&mu_);
+  StatMapPtr latched = std::move(map_);
+  map_ = nullptr;
+  return latched;
+}
+
 HostDescriptionImpl::HostDescriptionImpl(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
@@ -282,9 +276,9 @@ Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFact
 
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
-  return {createConnection(dispatcher, cluster(), address(), transportSocketFactory(), options,
-                           transport_socket_options),
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
+  return {createConnection(dispatcher, cluster(), address(), addressList(),
+                           transportSocketFactory(), options, transport_socket_options),
           shared_from_this()};
 }
 
@@ -300,7 +294,7 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
   case envoy::config::core::v3::DEGRADED:
     healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
     break;
-  default:;
+  default:
     break;
     // No health flags should be set.
   }
@@ -308,23 +302,24 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
 
 Host::CreateConnectionData HostImpl::createHealthCheckConnection(
     Event::Dispatcher& dispatcher,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     const envoy::config::core::v3::Metadata* metadata) const {
 
   Network::TransportSocketFactory& factory =
       (metadata != nullptr) ? resolveTransportSocketFactory(healthCheckAddress(), metadata)
                             : transportSocketFactory();
-  return {createConnection(dispatcher, cluster(), healthCheckAddress(), factory, nullptr,
+  return {createConnection(dispatcher, cluster(), healthCheckAddress(), {}, factory, nullptr,
                            transport_socket_options),
           shared_from_this()};
 }
 
-Network::ClientConnectionPtr
-HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
-                           const Network::Address::InstanceConstSharedPtr& address,
-                           Network::TransportSocketFactory& socket_factory,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options,
-                           Network::TransportSocketOptionsSharedPtr transport_socket_options) {
+Network::ClientConnectionPtr HostImpl::createConnection(
+    Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
+    const Network::Address::InstanceConstSharedPtr& address,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
+    Network::TransportSocketFactory& socket_factory,
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
   if (cluster.clusterSocketOptions() != nullptr) {
     if (options) {
@@ -338,11 +333,20 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   } else {
     connection_options = options;
   }
-  ASSERT(!address->envoyInternalAddress());
-  Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, cluster.sourceAddress(),
-      socket_factory.createTransportSocket(std::move(transport_socket_options)),
-      connection_options);
+
+  ASSERT(!address->envoyInternalAddress() ||
+         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address"));
+
+  Network::ClientConnectionPtr connection =
+      address_list.size() > 1
+          ? std::make_unique<Network::HappyEyeballsConnectionImpl>(
+                dispatcher, address_list, cluster.sourceAddress(), socket_factory,
+                transport_socket_options, connection_options)
+          : dispatcher.createClientConnection(
+                address, cluster.sourceAddress(),
+                socket_factory.createTransportSocket(std::move(transport_socket_options)),
+                connection_options);
+
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);
   return connection;
@@ -564,7 +568,14 @@ PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
 void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                                   LocalityWeightsConstSharedPtr locality_weights,
                                   const HostVector& hosts_added, const HostVector& hosts_removed,
-                                  absl::optional<uint32_t> overprovisioning_factor) {
+                                  absl::optional<uint32_t> overprovisioning_factor,
+                                  HostMapConstSharedPtr cross_priority_host_map) {
+  // Update cross priority host map first. In this way, when the update callbacks of the priority
+  // set are executed, the latest host map can always be obtained.
+  if (cross_priority_host_map != nullptr) {
+    const_cross_priority_host_map_ = std::move(cross_priority_host_map);
+  }
+
   // Ensure that we have a HostSet for the given priority.
   getOrCreateHostSet(priority, overprovisioning_factor);
   static_cast<HostSetImpl*>(host_sets_[priority].get())
@@ -609,6 +620,52 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
                       hosts_removed, overprovisioning_factor);
 }
 
+void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
+                                      LocalityWeightsConstSharedPtr locality_weights,
+                                      const HostVector& hosts_added,
+                                      const HostVector& hosts_removed,
+                                      absl::optional<uint32_t> overprovisioning_factor,
+                                      HostMapConstSharedPtr cross_priority_host_map) {
+  ASSERT(cross_priority_host_map == nullptr,
+         "External cross-priority host map is meaningless to MainPrioritySetImpl");
+  updateCrossPriorityHostMap(hosts_added, hosts_removed);
+
+  PrioritySetImpl::updateHosts(priority, std::move(update_hosts_params), locality_weights,
+                               hosts_added, hosts_removed, overprovisioning_factor);
+}
+
+HostMapConstSharedPtr MainPrioritySetImpl::crossPriorityHostMap() const {
+  // Check if the host set in the main thread PrioritySet has been updated.
+  if (mutable_cross_priority_host_map_ != nullptr) {
+    const_cross_priority_host_map_ = std::move(mutable_cross_priority_host_map_);
+    ASSERT(mutable_cross_priority_host_map_ == nullptr);
+  }
+  return const_cross_priority_host_map_;
+}
+
+void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_added,
+                                                     const HostVector& hosts_removed) {
+  if (hosts_added.empty() && hosts_removed.empty()) {
+    // No new hosts have been added and no old hosts have been removed.
+    return;
+  }
+
+  // Since read_only_all_host_map_ may be shared by multiple threads, when the host set changes, we
+  // cannot directly modify read_only_all_host_map_.
+  if (mutable_cross_priority_host_map_ == nullptr) {
+    // Copy old read only host map to mutable host map.
+    mutable_cross_priority_host_map_ = std::make_shared<HostMap>(*const_cross_priority_host_map_);
+  }
+
+  for (const auto& host : hosts_removed) {
+    mutable_cross_priority_host_map_->erase(host->address()->asString());
+  }
+
+  for (const auto& host : hosts_added) {
+    mutable_cross_priority_host_map_->insert({host->address()->asString(), host});
+  }
+}
+
 ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope,
                                             const ClusterStatNames& stat_names) {
   return ClusterStats(stat_names, scope);
@@ -638,29 +695,31 @@ public:
   // other contexts taken from TransportSocketFactoryContext.
   FactoryContextImpl(Stats::Scope& stats_scope, Envoy::Runtime::Loader& runtime,
                      Server::Configuration::TransportSocketFactoryContext& c)
-      : admin_(c.admin()), stats_scope_(stats_scope), cluster_manager_(c.clusterManager()),
-        local_info_(c.localInfo()), dispatcher_(c.dispatcher()), runtime_(runtime),
+      : admin_(c.admin()), server_scope_(c.stats()), stats_scope_(stats_scope),
+        cluster_manager_(c.clusterManager()), local_info_(c.localInfo()),
+        dispatcher_(c.mainThreadDispatcher()), runtime_(runtime),
         singleton_manager_(c.singletonManager()), tls_(c.threadLocal()), api_(c.api()),
         options_(c.options()), message_validation_visitor_(c.messageValidationVisitor()) {}
 
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
   const Server::Options& options() override { return options_; }
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Stats::Scope& scope() override { return stats_scope_; }
+  Stats::Scope& serverScope() override { return server_scope_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
   Server::Admin& admin() override { return admin_; }
   TimeSource& timeSource() override { return api().timeSource(); }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unimplemented");
   }
 
   AccessLog::AccessLogManager& accessLogManager() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unimplemented");
   }
 
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
@@ -669,18 +728,19 @@ public:
 
   Server::ServerLifecycleNotifier& lifecycleNotifier() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unimplemented");
   }
 
   Init::Manager& initManager() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unimplemented");
   }
 
   Api::Api& api() override { return api_; }
 
 private:
   Server::Admin& admin_;
+  Stats::Scope& server_scope_;
   Stats::Scope& stats_scope_;
   Upstream::ClusterManager& cluster_manager_;
   const LocalInfo::LocalInfo& local_info_;
@@ -734,14 +794,15 @@ ClusterInfoImpl::ClusterInfoImpl(
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
                             "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
                         factory_context.messageValidationVisitor())),
-      max_requests_per_connection_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
+      max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          http_protocol_options_->common_http_protocol_options_, max_requests_per_connection,
+          config.max_requests_per_connection().value())),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http_protocol_options_->common_http_protocol_options_, max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
       connect_timeout_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, connect_timeout, 5000))),
       per_upstream_preconnect_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.preconnect_policy(), per_upstream_preconnect_ratio, 1.0)),
       peekahead_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(),
@@ -763,6 +824,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                          factory_context.clusterManager().clusterCircuitBreakersStatNames()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       source_address_(getSourceAddress(config, bind_config)),
+      lb_round_robin_config_(config.round_robin_lb_config()),
       lb_least_request_config_(config.least_request_lb_config()),
       lb_ring_hash_config_(config.ring_hash_lb_config()),
       lb_maglev_config_(config.maglev_lb_config()),
@@ -788,49 +850,47 @@ ClusterInfoImpl::ClusterInfoImpl(
               : absl::nullopt),
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)) {
-  switch (config.lb_policy()) {
-  case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
-    lb_type_ = LoadBalancerType::RoundRobin;
-    break;
-  case envoy::config::cluster::v3::Cluster::LEAST_REQUEST:
-    lb_type_ = LoadBalancerType::LeastRequest;
-    break;
-  case envoy::config::cluster::v3::Cluster::RANDOM:
-    lb_type_ = LoadBalancerType::Random;
-    break;
-  case envoy::config::cluster::v3::Cluster::RING_HASH:
-    lb_type_ = LoadBalancerType::RingHash;
-    break;
-  case envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB:
-    if (config.type() != envoy::config::cluster::v3::Cluster::ORIGINAL_DST) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} is not valid for Cluster type {}. 'ORIGINAL_DST_LB' "
-                      "is allowed only with cluster type 'ORIGINAL_DST'",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy()),
-                      envoy::config::cluster::v3::Cluster::DiscoveryType_Name(config.type())));
-    }
-    if (config.has_lb_subset_config()) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
-    }
+  if (config.has_max_requests_per_connection() &&
+      http_protocol_options_->common_http_protocol_options_.has_max_requests_per_connection()) {
+    throw EnvoyException("Only one of max_requests_per_connection from Cluster or "
+                         "HttpProtocolOptions can be specified");
+  }
 
-    lb_type_ = LoadBalancerType::ClusterProvided;
-    break;
-  case envoy::config::cluster::v3::Cluster::MAGLEV:
-    lb_type_ = LoadBalancerType::Maglev;
-    break;
-  case envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED:
-    if (config.has_lb_subset_config()) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
-    }
+  // If load_balancing_policy is set we will use it directly, ignoring lb_policy.
+  if (config.has_load_balancing_policy()) {
+    configureLbPolicies(config);
+  } else {
+    switch (config.lb_policy()) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
+      lb_type_ = LoadBalancerType::RoundRobin;
+      break;
+    case envoy::config::cluster::v3::Cluster::LEAST_REQUEST:
+      lb_type_ = LoadBalancerType::LeastRequest;
+      break;
+    case envoy::config::cluster::v3::Cluster::RANDOM:
+      lb_type_ = LoadBalancerType::Random;
+      break;
+    case envoy::config::cluster::v3::Cluster::RING_HASH:
+      lb_type_ = LoadBalancerType::RingHash;
+      break;
+    case envoy::config::cluster::v3::Cluster::MAGLEV:
+      lb_type_ = LoadBalancerType::Maglev;
+      break;
+    case envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED:
+      if (config.has_lb_subset_config()) {
+        throw EnvoyException(
+            fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                        envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+      }
 
-    lb_type_ = LoadBalancerType::ClusterProvided;
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+      lb_type_ = LoadBalancerType::ClusterProvided;
+      break;
+    case envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG: {
+      configureLbPolicies(config);
+      break;
+    }
+    }
   }
 
   if (config.lb_subset_config().locality_weight_aware() &&
@@ -848,6 +908,16 @@ ClusterInfoImpl::ClusterInfoImpl(
     }
   } else {
     idle_timeout_ = std::chrono::hours(1);
+  }
+
+  if (http_protocol_options_->common_http_protocol_options_.has_max_connection_duration()) {
+    max_connection_duration_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+        http_protocol_options_->common_http_protocol_options_.max_connection_duration()));
+    if (max_connection_duration_.value().count() == 0) {
+      max_connection_duration_ = absl::nullopt;
+    }
+  } else {
+    max_connection_duration_ = absl::nullopt;
   }
 
   if (config.has_eds_cluster_config()) {
@@ -871,12 +941,51 @@ ClusterInfoImpl::ClusterInfoImpl(
     auto& factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(proto_config);
     auto message = factory.createEmptyConfigProto();
-    Config::Utility::translateOpaqueConfig(proto_config.typed_config(), ProtobufWkt::Struct(),
+    Config::Utility::translateOpaqueConfig(proto_config.typed_config(),
                                            factory_context.messageValidationVisitor(), *message);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, *factory_context_);
     filter_factories_.push_back(callback);
   }
+}
+
+// Configures the load balancer based on config.load_balancing_policy
+void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Cluster& config) {
+  if (config.has_lb_subset_config()) {
+    throw EnvoyException(
+        fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+  }
+
+  if (config.has_common_lb_config()) {
+    throw EnvoyException(
+        fmt::format("cluster: LB policy {} cannot be combined with common_lb_config",
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+  }
+
+  if (!config.has_load_balancing_policy()) {
+    throw EnvoyException(
+        fmt::format("cluster: LB policy {} requires load_balancing_policy to be set",
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+  }
+
+  for (const auto& policy : config.load_balancing_policy().policies()) {
+    TypedLoadBalancerFactory* factory =
+        Config::Utility::getAndCheckFactory<TypedLoadBalancerFactory>(
+            policy.typed_extension_config(), /*is_optional=*/true);
+    if (factory != nullptr) {
+      load_balancing_policy_ = policy;
+      load_balancer_factory_ = factory;
+      break;
+    }
+  }
+
+  if (load_balancer_factory_ == nullptr) {
+    throw EnvoyException(fmt::format(
+        "Didn't find a registered load balancer factory implementation for cluster: '{}'", name_));
+  }
+
+  lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
 }
 
 ProtocolOptionsConfigConstSharedPtr
@@ -896,13 +1005,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   // if necessary.
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
-    if (config.has_hidden_envoy_deprecated_tls_context()) {
-      transport_socket.set_name("envoy.transport_sockets.tls");
-      transport_socket.mutable_typed_config()->PackFrom(
-          config.hidden_envoy_deprecated_tls_context());
-    } else {
-      transport_socket.set_name("envoy.transport_sockets.raw_buffer");
-    }
+    transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
@@ -922,6 +1025,10 @@ std::vector<Http::Protocol>
 ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const {
   if (downstream_protocol.has_value() &&
       features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
+    if (downstream_protocol.value() == Http::Protocol::Http3 &&
+        !(features_ & Upstream::ClusterInfo::Features::HTTP3)) {
+      return {Http::Protocol::Http2};
+    }
     return {downstream_protocol.value()};
   }
 
@@ -946,18 +1053,20 @@ ClusterImplBase::ClusterImplBase(
     Stats::ScopePtr&& stats_scope, bool added_via_api, TimeSource& time_source)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
       init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime),
+      wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_warm_on_init, true)),
       time_source_(time_source),
       local_cluster_(factory_context.clusterManager().localClusterName().value_or("") ==
                      cluster.name()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
-          factory_context.singletonManager(), factory_context.dispatcher())) {
+          factory_context.singletonManager(), factory_context.mainThreadDispatcher())) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   auto* raw_factory_pointer = socket_factory.get();
 
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
       cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
-  auto& dispatcher = factory_context.dispatcher();
+  const bool matcher_supports_alpn = socket_matcher->allMatchesSupportAlpn();
+  auto& dispatcher = factory_context.mainThreadDispatcher();
   info_ = std::shared_ptr<const ClusterInfoImpl>(
       new ClusterInfoImpl(cluster, factory_context.clusterManager().bindConfig(), runtime,
                           std::move(socket_matcher), std::move(stats_scope), added_via_api,
@@ -968,11 +1077,18 @@ ClusterImplBase::ClusterImplBase(
             std::unique_ptr<const Event::DispatcherThreadDeletable>(self));
       });
 
-  if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN) &&
-      !raw_factory_pointer->supportsAlpn()) {
-    throw EnvoyException(
-        fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
-                    cluster.name(), cluster.DebugString()));
+  if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN)) {
+    if (!raw_factory_pointer->supportsAlpn()) {
+      throw EnvoyException(
+          fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
+                      cluster.name(), cluster.DebugString()));
+    }
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.correctly_validate_alpn") &&
+        !matcher_supports_alpn) {
+      throw EnvoyException(fmt::format(
+          "ALPN configured for cluster {} which has a non-ALPN transport socket matcher: {}",
+          cluster.name(), cluster.DebugString()));
+    }
   }
 
   if (info_->features() & ClusterInfoImpl::Features::HTTP3) {
@@ -1017,9 +1133,7 @@ namespace {
 
 bool excludeBasedOnHealthFlag(const Host& host) {
   return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
-         (host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL) &&
-          Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster"));
+         host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
 }
 
 } // namespace
@@ -1146,6 +1260,11 @@ void ClusterImplBase::setOutlierDetector(const Outlier::DetectorSharedPtr& outli
   outlier_detector_ = outlier_detector;
   outlier_detector_->addChangedStateCb(
       [this](const HostSharedPtr& host) -> void { reloadHealthyHosts(host); });
+}
+
+void ClusterImplBase::setTransportFactoryContext(
+    Server::Configuration::TransportSocketFactoryContextPtr transport_factory_context) {
+  transport_factory_context_ = std::move(transport_factory_context);
 }
 
 void ClusterImplBase::reloadHealthyHosts(const HostSharedPtr& host) {
@@ -1297,6 +1416,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
   Stats::StatName priority_stat_name;
   std::string priority_name;
   switch (priority) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::core::v3::DEFAULT:
     priority_stat_name = circuit_breakers_stat_names_.default_;
     priority_name = "default";
@@ -1305,8 +1425,6 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
     priority_stat_name = circuit_breakers_stat_names_.high_;
     priority_name = "high";
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const std::string runtime_prefix =
@@ -1401,8 +1519,16 @@ void PriorityStateManager::updateClusterPrioritySet(
   LocalityWeightsSharedPtr locality_weights;
   std::vector<HostVector> per_locality;
 
-  // If we are configured for locality weighted LB we populate the locality weights.
-  const bool locality_weighted_lb = parent_.info()->lbConfig().has_locality_weighted_lb_config();
+  // If we are configured for locality weighted LB we populate the locality weights. We also
+  // populate locality weights if the cluster uses load balancing extensions, since the extension
+  // may want to make use of locality weights and we cannot tell by inspecting the config whether
+  // this is the case.
+  //
+  // TODO: have the load balancing extension indicate, programmatically, whether it needs locality
+  // weights, as an optimization in cases where it doesn't.
+  const bool locality_weighted_lb =
+      parent_.info()->lbConfig().has_locality_weighted_lb_config() ||
+      parent_.info()->lbType() == LoadBalancerType::LoadBalancingPolicyConfig;
   if (locality_weighted_lb) {
     locality_weights = std::make_shared<LocalityWeights>();
   }
@@ -1465,8 +1591,7 @@ void PriorityStateManager::updateClusterPrioritySet(
 bool BaseDynamicClusterImpl::updateDynamicHostList(
     const HostVector& new_hosts, HostVector& current_priority_hosts,
     HostVector& hosts_added_to_current_priority, HostVector& hosts_removed_from_current_priority,
-    HostMap& updated_hosts, const HostMap& all_hosts,
-    const absl::flat_hash_set<std::string>& all_new_hosts) {
+    const HostMap& all_hosts, const absl::flat_hash_set<std::string>& all_new_hosts) {
   uint64_t max_host_weight = 1;
 
   // Did hosts change?
@@ -1493,12 +1618,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       current_priority_hosts.size());
   // Keep track of hosts we're adding (or replacing)
   absl::flat_hash_set<std::string> new_hosts_for_current_priority(new_hosts.size());
+  // Keep track of hosts for which locality is changed.
+  absl::flat_hash_set<std::string> hosts_with_updated_locality_for_current_priority(
+      current_priority_hosts.size());
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
-    if (updated_hosts.count(host->address()->asString())) {
-      continue;
-    }
-
     // To match a new host with an existing host means comparing their addresses.
     auto existing_host = all_hosts.find(host->address()->asString());
     const bool existing_host_found = existing_host != all_hosts.end();
@@ -1513,13 +1637,25 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     // (currently there is only one criterion, but we might add more in the future):
     // - The cluster health checker is activated and a new host is matched with the existing one,
     //   but the health check address is different.
-    const bool skip_inplace_host_update =
-        health_checker_ != nullptr && existing_host_found &&
-        *existing_host->second->healthCheckAddress() != *host->healthCheckAddress();
+    const bool health_check_address_changed =
+        (health_checker_ != nullptr && existing_host_found &&
+         *existing_host->second->healthCheckAddress() != *host->healthCheckAddress());
+    bool locality_changed = false;
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints")) {
+      locality_changed =
+          (existing_host_found &&
+           (!LocalityEqualTo()(host->locality(), existing_host->second->locality())));
+      if (locality_changed) {
+        hosts_with_updated_locality_for_current_priority.emplace(existing_host->first);
+      }
+    }
 
-    // When there is a match and we decided to do in-place update, we potentially update the host's
-    // health check flag and metadata. Afterwards, the host is pushed back into the final_hosts,
-    // i.e. hosts that should be preserved in the current priority.
+    const bool skip_inplace_host_update = health_check_address_changed || locality_changed;
+
+    // When there is a match and we decided to do in-place update, we potentially update the
+    // host's health check flag and metadata. Afterwards, the host is pushed back into the
+    // final_hosts, i.e. hosts that should be preserved in the current priority.
     if (existing_host_found && !skip_inplace_host_update) {
       existing_hosts_for_current_priority.emplace(existing_host->first);
       // If we find a host matched based on address, we keep it. However we do change weight inline
@@ -1529,14 +1665,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       }
       if (existing_host->second->weight() != host->weight()) {
         existing_host->second->weight(host->weight());
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild")) {
-          // We do full host set rebuilds so that load balancers can do pre-computation of data
-          // structures based on host weight. This may become a performance problem in certain
-          // deployments so it is runtime feature guarded and may also need to be configurable
-          // and/or dynamic in the future.
-          hosts_changed = true;
-        }
+        // We do full host set rebuilds so that load balancers can do pre-computation of data
+        // structures based on host weight. This may become a performance problem in certain
+        // deployments so it is runtime feature guarded and may also need to be configurable
+        // and/or dynamic in the future.
+        hosts_changed = true;
       }
 
       hosts_changed |=
@@ -1574,7 +1707,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       }
 
       final_hosts.push_back(existing_host->second);
-      updated_hosts[existing_host->second->address()->asString()] = existing_host->second;
     } else {
       new_hosts_for_current_priority.emplace(host->address()->asString());
       if (host->weight() > max_host_weight) {
@@ -1592,7 +1724,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
         }
       }
 
-      updated_hosts[host->address()->asString()] = host;
       final_hosts.push_back(host);
       hosts_added_to_current_priority.push_back(host);
     }
@@ -1631,33 +1762,41 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
-    erase_from =
-        std::remove_if(current_priority_hosts.begin(), current_priority_hosts.end(),
-                       [&all_new_hosts, &new_hosts_for_current_priority, &updated_hosts,
-                        &final_hosts, &max_host_weight](const HostSharedPtr& p) {
-                         if (all_new_hosts.contains(p->address()->asString()) &&
-                             !new_hosts_for_current_priority.contains(p->address()->asString())) {
-                           // If the address is being completely deleted from this priority, but is
-                           // referenced from another priority, then we assume that the other
-                           // priority will perform an in-place update to re-use the existing Host.
-                           // We should therefore not mark it as PENDING_DYNAMIC_REMOVAL, but
-                           // instead remove it immediately from this priority.
-                           return false;
-                         }
+    erase_from = std::remove_if(
+        current_priority_hosts.begin(), current_priority_hosts.end(),
+        [&all_new_hosts, &new_hosts_for_current_priority,
+         &hosts_with_updated_locality_for_current_priority, &final_hosts,
+         &max_host_weight](const HostSharedPtr& p) {
+          // This host has already been added as a new host in the
+          // new_hosts_for_current_priority. Return false here to make sure that host
+          // reference with older locality gets cleaned up from the priority.
+          if (hosts_with_updated_locality_for_current_priority.contains(p->address()->asString())) {
+            return false;
+          }
 
-                         if (!(p->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
-                               p->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
-                           if (p->weight() > max_host_weight) {
-                             max_host_weight = p->weight();
-                           }
+          if (all_new_hosts.contains(p->address()->asString()) &&
+              !new_hosts_for_current_priority.contains(p->address()->asString())) {
+            // If the address is being completely deleted from this priority, but is
+            // referenced from another priority, then we assume that the other
+            // priority will perform an in-place update to re-use the existing Host.
+            // We should therefore not mark it as PENDING_DYNAMIC_REMOVAL, but
+            // instead remove it immediately from this priority.
+            // Example: health check address changed and priority also changed
+            return false;
+          }
 
-                           final_hosts.push_back(p);
-                           updated_hosts[p->address()->asString()] = p;
-                           p->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
-                           return true;
-                         }
-                         return false;
-                       });
+          if (!(p->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
+                p->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
+            if (p->weight() > max_host_weight) {
+              max_host_weight = p->weight();
+            }
+
+            final_hosts.push_back(p);
+            p->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
+            return true;
+          }
+          return false;
+        });
     current_priority_hosts.erase(erase_from, current_priority_hosts.end());
   }
 
@@ -1689,15 +1828,19 @@ getDnsLookupFamilyFromCluster(const envoy::config::cluster::v3::Cluster& cluster
 Network::DnsLookupFamily
 getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily family) {
   switch (family) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::cluster::v3::Cluster::V6_ONLY:
     return Network::DnsLookupFamily::V6Only;
   case envoy::config::cluster::v3::Cluster::V4_ONLY:
     return Network::DnsLookupFamily::V4Only;
   case envoy::config::cluster::v3::Cluster::AUTO:
     return Network::DnsLookupFamily::Auto;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::cluster::v3::Cluster::V4_PREFERRED:
+    return Network::DnsLookupFamily::V4Preferred;
+  case envoy::config::cluster::v3::Cluster::ALL:
+    return Network::DnsLookupFamily::All;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void reportUpstreamCxDestroy(const Upstream::HostDescriptionConstSharedPtr& host,

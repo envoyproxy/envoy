@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Extensions {

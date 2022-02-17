@@ -54,7 +54,8 @@
             pass_through_mode: false
             headers:
               - name: ":path"
-                exact_match: "/healthcheck"
+                string_match:
+                  exact: "/healthcheck"
         - name: envoy.filters.http.buffer
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
@@ -70,7 +71,6 @@
                 envoy_grpc:
                   cluster_name: ratelimit
         - name: envoy.filters.http.router
-          typed_config: {}
         add_user_agent: true
         {% if tracing %}
         tracing:

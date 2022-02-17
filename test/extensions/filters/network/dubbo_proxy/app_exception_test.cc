@@ -1,10 +1,10 @@
-#include "extensions/filters/network/dubbo_proxy/app_exception.h"
-#include "extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
-#include "extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
-#include "extensions/filters/network/dubbo_proxy/filters/filter.h"
-#include "extensions/filters/network/dubbo_proxy/hessian_utils.h"
-#include "extensions/filters/network/dubbo_proxy/message_impl.h"
-#include "extensions/filters/network/dubbo_proxy/metadata.h"
+#include "source/extensions/filters/network/dubbo_proxy/app_exception.h"
+#include "source/extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/filters/filter.h"
+#include "source/extensions/filters/network/dubbo_proxy/hessian_utils.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/metadata.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 

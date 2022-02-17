@@ -2,7 +2,7 @@
 
 #include "envoy/grpc/status.h"
 
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "absl/container/flat_hash_map.h"
 

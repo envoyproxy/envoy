@@ -1,8 +1,8 @@
-#include "extensions/transport_sockets/tap/tap.h"
+#include "source/extensions/transport_sockets/tap/tap.h"
 
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -54,20 +54,12 @@ TapSocketFactory::TapSocketFactory(
     Network::TransportSocketFactoryPtr&& transport_socket_factory)
     : ExtensionConfigBase(proto_config.common_config(), std::move(config_factory), admin,
                           singleton_manager, tls, main_thread_dispatcher),
-      transport_socket_factory_(std::move(transport_socket_factory)) {}
+      PassthroughFactory(std::move(transport_socket_factory)) {}
 
-Network::TransportSocketPtr
-TapSocketFactory::createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const {
+Network::TransportSocketPtr TapSocketFactory::createTransportSocket(
+    Network::TransportSocketOptionsConstSharedPtr options) const {
   return std::make_unique<TapSocket>(currentConfigHelper<SocketTapConfig>(),
                                      transport_socket_factory_->createTransportSocket(options));
-}
-
-bool TapSocketFactory::implementsSecureTransport() const {
-  return transport_socket_factory_->implementsSecureTransport();
-}
-
-bool TapSocketFactory::usesProxyProtocolOptions() const {
-  return transport_socket_factory_->usesProxyProtocolOptions();
 }
 
 } // namespace Tap

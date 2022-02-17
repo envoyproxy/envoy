@@ -7,7 +7,7 @@
 #include "envoy/network/address.h"
 #include "envoy/server/options.h"
 
-#include "common/json/json_loader.h"
+#include "source/common/json/json_loader.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
@@ -200,11 +200,13 @@ public:
    * @param filename: the name of the file to use
    * @param contents: the data to go in the file.
    * @param fully_qualified_path: if true, will write to filename without prepending the tempdir.
+   * @param unlink: if true will delete any prior file before writing.
    * @return the fully qualified path of the output file.
    */
   static std::string writeStringToFileForTest(const std::string& filename,
                                               const std::string& contents,
-                                              bool fully_qualified_path = false);
+                                              bool fully_qualified_path = false,
+                                              bool unlink = true);
   /**
    * Dumps the contents of the file into the string.
    *

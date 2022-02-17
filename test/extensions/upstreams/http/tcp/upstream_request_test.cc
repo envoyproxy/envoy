@@ -1,11 +1,10 @@
-#include "common/buffer/buffer_impl.h"
-#include "common/network/address_impl.h"
-#include "common/router/config_impl.h"
-#include "common/router/router.h"
-#include "common/router/upstream_request.h"
-
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
-#include "extensions/upstreams/http/tcp/upstream_request.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/router/config_impl.h"
+#include "source/common/router/router.h"
+#include "source/common/router/upstream_request.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/extensions/upstreams/http/tcp/upstream_request.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/common.h"
@@ -39,7 +38,8 @@ public:
     NiceMock<Router::MockRouteEntry> route_entry;
     NiceMock<Upstream::MockClusterManager> cm;
     cm.initializeThreadLocalClusters({"fake_cluster"});
-    EXPECT_CALL(cm.thread_local_cluster_, tcpConnPool(_, _)).WillOnce(Return(&mock_pool_));
+    EXPECT_CALL(cm.thread_local_cluster_, tcpConnPool(_, _))
+        .WillOnce(Return(Upstream::TcpPoolData([]() {}, &mock_pool_)));
     conn_pool_ = std::make_unique<TcpConnPool>(cm.thread_local_cluster_, true, route_entry,
                                                Envoy::Http::Protocol::Http11, nullptr);
   }
@@ -68,9 +68,9 @@ TEST_F(TcpConnPoolTest, OnPoolFailure) {
   EXPECT_CALL(mock_pool_, newConnection(_)).WillOnce(Return(&cancellable_));
   conn_pool_->newStream(&mock_generic_callbacks_);
 
-  EXPECT_CALL(mock_generic_callbacks_, onPoolFailure(_, _, _));
+  EXPECT_CALL(mock_generic_callbacks_, onPoolFailure(_, "foo", _));
   conn_pool_->onPoolFailure(Envoy::Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure,
-                            host_);
+                            "foo", host_);
 
   // Make sure that the pool failure nulled out the pending request.
   EXPECT_FALSE(conn_pool_->cancelAnyPendingStream());
@@ -93,8 +93,14 @@ TEST_F(TcpConnPoolTest, Cancel) {
 class TcpUpstreamTest : public ::testing::Test {
 public:
   TcpUpstreamTest() {
+    EXPECT_CALL(mock_router_filter_, downstreamHeaders())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(&request_));
+    EXPECT_CALL(mock_router_filter_, cluster()).Times(AnyNumber());
+    EXPECT_CALL(mock_router_filter_, callbacks()).Times(AnyNumber());
     mock_router_filter_.requests_.push_back(std::make_unique<UpstreamRequest>(
-        mock_router_filter_, std::make_unique<NiceMock<Router::MockGenericConnPool>>()));
+        mock_router_filter_, std::make_unique<NiceMock<Router::MockGenericConnPool>>(), false,
+        false));
     auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
     EXPECT_CALL(*data, connection()).Times(AnyNumber()).WillRepeatedly(ReturnRef(connection_));
     tcp_upstream_ =
@@ -103,15 +109,15 @@ public:
   ~TcpUpstreamTest() override { EXPECT_CALL(mock_router_filter_, config()).Times(AnyNumber()); }
 
 protected:
-  NiceMock<Network::MockClientConnection> connection_;
-  NiceMock<Router::MockRouterFilterInterface> mock_router_filter_;
-  Envoy::Tcp::ConnectionPool::MockConnectionData* mock_connection_data_;
-  std::unique_ptr<TcpUpstream> tcp_upstream_;
   TestRequestHeaderMapImpl request_{{":method", "CONNECT"},
                                     {":path", "/"},
                                     {":protocol", "bytestream"},
                                     {":scheme", "https"},
                                     {":authority", "host"}};
+  NiceMock<Network::MockClientConnection> connection_;
+  NiceMock<Router::MockRouterFilterInterface> mock_router_filter_;
+  Envoy::Tcp::ConnectionPool::MockConnectionData* mock_connection_data_;
+  std::unique_ptr<TcpUpstream> tcp_upstream_;
 };
 
 TEST_F(TcpUpstreamTest, Basic) {
@@ -144,10 +150,10 @@ TEST_F(TcpUpstreamTest, V1Header) {
   envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
       mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
   proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V1);
-  mock_router_filter_.client_connection_.stream_info_.downstream_address_provider_
+  mock_router_filter_.client_connection_.stream_info_.downstream_connection_info_provider_
       ->setRemoteAddress(std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5));
-  mock_router_filter_.client_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
-      std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8));
+  mock_router_filter_.client_connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8));
 
   Buffer::OwnedImpl expected_data;
   Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
@@ -167,10 +173,10 @@ TEST_F(TcpUpstreamTest, V2Header) {
   envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
       mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
   proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V2);
-  mock_router_filter_.client_connection_.stream_info_.downstream_address_provider_
+  mock_router_filter_.client_connection_.stream_info_.downstream_connection_info_provider_
       ->setRemoteAddress(std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5));
-  mock_router_filter_.client_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
-      std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8));
+  mock_router_filter_.client_connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8));
 
   Buffer::OwnedImpl expected_data;
   Extensions::Common::ProxyProtocol::generateProxyProtoHeader(

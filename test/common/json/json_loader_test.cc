@@ -1,8 +1,8 @@
 #include <string>
 #include <vector>
 
-#include "common/json/json_loader.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/test_common/utility.h"
 
@@ -210,6 +210,48 @@ TEST_F(JsonLoaderTest, Basic) {
   {
     ObjectSharedPtr json = Factory::loadFromString("{}");
     EXPECT_TRUE(json->getObjectArray("hello", true).empty());
+  }
+
+  {
+    ObjectSharedPtr json = Factory::loadFromString("[ null ]");
+    EXPECT_EQ(json->asJsonString(), "[null]");
+  }
+
+  {
+    ObjectSharedPtr json1 = Factory::loadFromString("[ [ ] , { } ]");
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_json")) {
+      EXPECT_EQ(json1->asJsonString(), "[[],{}]");
+    } else {
+      EXPECT_EQ(json1->asJsonString(), "[null,null]");
+    }
+  }
+
+  {
+    ObjectSharedPtr json1 = Factory::loadFromString("[ true ]");
+    EXPECT_EQ(json1->asJsonString(), "[true]");
+  }
+
+  {
+    ObjectSharedPtr json1 = Factory::loadFromString("{\"foo\": 123, \"bar\": \"cat\"}");
+    EXPECT_EQ(json1->asJsonString(), "{\"bar\":\"cat\",\"foo\":123}");
+  }
+
+  {
+    ObjectSharedPtr json = Factory::loadFromString("{\"hello\": {}}");
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_json")) {
+      EXPECT_EQ(json->getObject("hello")->asJsonString(), "{}");
+    } else {
+      EXPECT_EQ(json->getObject("hello")->asJsonString(), "null");
+    }
+  }
+
+  {
+    ObjectSharedPtr json = Factory::loadFromString("{\"hello\": [] }");
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_json")) {
+      EXPECT_EQ(json->asJsonString(), "{\"hello\":[]}");
+    } else {
+      EXPECT_EQ(json->asJsonString(), "{\"hello\":null}");
+    }
   }
 }
 

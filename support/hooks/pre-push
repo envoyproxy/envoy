@@ -12,6 +12,7 @@
 DUMMY_SHA=0000000000000000000000000000000000000000
 
 echo "Running pre-push check; to skip this step use 'push --no-verify'"
+AUTHOR=$(git var GIT_AUTHOR_IDENT | sed -n 's/^\(.*>\).*$/\1/p')
 
 # shellcheck disable=SC2034
 while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA
@@ -37,8 +38,8 @@ do
     #
     # In general, we can't assume that the commits are signed off by author
     # pushing, so we settle for just checking that there is a signoff at all.
-    SIGNED_OFF=$(git rev-list --no-merges --grep "^Signed-off-by: " "$RANGE")
-    NOT_SIGNED_OFF=$(git rev-list --no-merges "$RANGE" | grep -Fxv "$SIGNED_OFF")
+    SIGNED_OFF=$(git rev-list --no-merges --author "$AUTHOR" --grep "^Signed-off-by: " "$RANGE")
+    NOT_SIGNED_OFF=$(git rev-list --no-merges --author "$AUTHOR" "$RANGE" | grep -Fxv "$SIGNED_OFF")
     if [ -n "$NOT_SIGNED_OFF" ]
     then
       echo >&2 "ERROR: The following commits do not have DCO signoff:"
@@ -62,8 +63,11 @@ do
       echo -ne "  Checking format for $i - "
       "$SCRIPT_DIR"/code_format/check_format.py check "$i" || exit 1
 
-      echo "  Checking spelling for $i"
-      "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "$i" || exit 1
+      # TODO(phlax): It seems this is not running in CI anymore and is now finding issues
+      # in merged PRs. Unify this hook and format checks in CI when the new format tool is rolled
+      # out.
+      # echo "  Checking spelling for $i"
+      # "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "$i" || exit 1
     done
 
     # TODO(mattklein123): Optimally we would be able to do this on a per-file basis.

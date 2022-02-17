@@ -1,12 +1,11 @@
-#include "extensions/filters/network/thrift_proxy/twitter_protocol_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/twitter_protocol_impl.h"
 
 #include "envoy/common/exception.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/buffer_helper.h"
-#include "extensions/filters/network/thrift_proxy/thrift_object_impl.h"
-#include "extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift_object_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
 
 #include "absl/strings/str_replace.h"
 
@@ -974,8 +973,6 @@ bool TwitterProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMeta
   case MessageType::Exception:
     updateMetadataWithResponseHeader(*header_, metadata);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   header_complete_ = false;
@@ -995,8 +992,6 @@ void TwitterProtocolImpl::writeMessageBegin(Buffer::Instance& buffer,
     case MessageType::Exception:
       writeResponseHeader(buffer, metadata);
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 

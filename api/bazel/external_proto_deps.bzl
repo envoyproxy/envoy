@@ -11,7 +11,7 @@
 EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP = {
     "google/api/expr/v1alpha1/checked.proto": "@com_google_googleapis//google/api/expr/v1alpha1:checked_proto",
     "google/api/expr/v1alpha1/syntax.proto": "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto",
-    "metrics.proto": "@prometheus_metrics_model//:client_model",
+    "io/prometheus/client/metrics.proto": "@prometheus_metrics_model//:client_model",
     "opencensus/proto/trace/v1/trace.proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto",
     "opencensus/proto/trace/v1/trace_config.proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto",
     "opentelemetry/proto/common/v1/common.proto": "@opentelemetry_proto//:common",

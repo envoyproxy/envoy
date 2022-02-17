@@ -1,8 +1,8 @@
-#include "extensions/filters/common/rbac/engine_impl.h"
+#include "source/extensions/filters/common/rbac/engine_impl.h"
 
 #include "envoy/config/rbac/v3/rbac.pb.h"
 
-#include "common/http/header_map_impl.h"
+#include "source/common/http/header_map_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,7 +11,8 @@ namespace Common {
 namespace RBAC {
 
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
-    const envoy::config::rbac::v3::RBAC& rules, const EnforcementMode mode)
+    const envoy::config::rbac::v3::RBAC& rules,
+    ProtobufMessage::ValidationVisitor& validation_visitor, const EnforcementMode mode)
     : action_(rules.action()), mode_(mode) {
   // guard expression builder by presence of a condition in policies
   for (const auto& policy : rules.policies()) {
@@ -22,7 +23,8 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
   }
 
   for (const auto& policy : rules.policies()) {
-    policies_.emplace(policy.first, std::make_unique<PolicyMatcher>(policy.second, builder_.get()));
+    policies_.emplace(policy.first, std::make_unique<PolicyMatcher>(policy.second, builder_.get(),
+                                                                    validation_visitor));
   }
 }
 
@@ -40,6 +42,7 @@ bool RoleBasedAccessControlEngineImpl::handleAction(const Network::Connection& c
   bool matched = checkPolicyMatch(connection, info, headers, effective_policy_id);
 
   switch (action_) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::rbac::v3::RBAC::ALLOW:
     return matched;
   case envoy::config::rbac::v3::RBAC::DENY:
@@ -55,9 +58,8 @@ bool RoleBasedAccessControlEngineImpl::handleAction(const Network::Connection& c
 
     return true;
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 bool RoleBasedAccessControlEngineImpl::checkPolicyMatch(

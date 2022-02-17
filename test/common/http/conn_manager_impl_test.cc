@@ -83,7 +83,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
   EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
+TEST_F(HttpConnectionManagerImplTest, 1xxResponse) {
   proxy_100_continue_ = true;
   setup(false, "envoy-custom-server", false);
 
@@ -118,7 +118,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
         decoder_->decodeHeaders(std::move(headers), true);
 
         ResponseHeaderMapPtr continue_headers{new TestResponseHeaderMapImpl{{":status", "100"}}};
-        filter->callbacks_->encode100ContinueHeaders(std::move(continue_headers));
+        filter->callbacks_->encode1xxHeaders(std::move(continue_headers));
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
         filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
@@ -139,20 +139,20 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
   EXPECT_EQ(2U, listener_stats_.downstream_rq_completed_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFiltersProxyingDisabled) {
+TEST_F(HttpConnectionManagerImplTest, 1xxResponseWithEncoderFiltersProxyingDisabled) {
   proxy_100_continue_ = false;
   setup(false, "envoy-custom-server", false);
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
 
-  // Akin to 100ContinueResponseWithEncoderFilters below, but with
+  // Akin to 1xxResponseWithEncoderFilters below, but with
   // proxy_100_continue_ false. Verify the filters do not get the 100 continue
   // headers.
-  EXPECT_CALL(*encoder_filters_[0], encode100ContinueHeaders(_)).Times(0);
-  EXPECT_CALL(*encoder_filters_[1], encode100ContinueHeaders(_)).Times(0);
-  EXPECT_CALL(response_encoder_, encode100ContinueHeaders(_)).Times(0);
+  EXPECT_CALL(*encoder_filters_[0], encode1xxHeaders(_)).Times(0);
+  EXPECT_CALL(*encoder_filters_[1], encode1xxHeaders(_)).Times(0);
+  EXPECT_CALL(response_encoder_, encode1xxHeaders(_)).Times(0);
   ResponseHeaderMapPtr continue_headers{new TestResponseHeaderMapImpl{{":status", "100"}}};
-  decoder_filters_[0]->callbacks_->encode100ContinueHeaders(std::move(continue_headers));
+  decoder_filters_[0]->callbacks_->encode1xxHeaders(std::move(continue_headers));
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
@@ -166,19 +166,19 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFiltersProxy
   doRemoteClose();
 }
 
-TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFilters) {
+TEST_F(HttpConnectionManagerImplTest, 1xxResponseWithEncoderFilters) {
   proxy_100_continue_ = true;
   setup(false, "envoy-custom-server", false);
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
 
-  EXPECT_CALL(*encoder_filters_[0], encode100ContinueHeaders(_))
+  EXPECT_CALL(*encoder_filters_[0], encode1xxHeaders(_))
       .WillOnce(Return(FilterHeadersStatus::Continue));
-  EXPECT_CALL(*encoder_filters_[1], encode100ContinueHeaders(_))
+  EXPECT_CALL(*encoder_filters_[1], encode1xxHeaders(_))
       .WillOnce(Return(FilterHeadersStatus::Continue));
-  EXPECT_CALL(response_encoder_, encode100ContinueHeaders(_));
+  EXPECT_CALL(response_encoder_, encode1xxHeaders(_));
   ResponseHeaderMapPtr continue_headers{new TestResponseHeaderMapImpl{{":status", "100"}}};
-  decoder_filters_[0]->callbacks_->encode100ContinueHeaders(std::move(continue_headers));
+  decoder_filters_[0]->callbacks_->encode1xxHeaders(std::move(continue_headers));
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
@@ -192,7 +192,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFilters) {
   doRemoteClose();
 }
 
-TEST_F(HttpConnectionManagerImplTest, PauseResume100Continue) {
+TEST_F(HttpConnectionManagerImplTest, PauseResume1xx) {
   proxy_100_continue_ = true;
   setup(false, "envoy-custom-server", false);
   setUpEncoderAndDecoder(false, false);
@@ -200,17 +200,17 @@ TEST_F(HttpConnectionManagerImplTest, PauseResume100Continue) {
 
   // Stop the 100-Continue at encoder filter 1. Encoder filter 0 should not yet receive the
   // 100-Continue
-  EXPECT_CALL(*encoder_filters_[1], encode100ContinueHeaders(_))
+  EXPECT_CALL(*encoder_filters_[1], encode1xxHeaders(_))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
-  EXPECT_CALL(*encoder_filters_[0], encode100ContinueHeaders(_)).Times(0);
-  EXPECT_CALL(response_encoder_, encode100ContinueHeaders(_)).Times(0);
+  EXPECT_CALL(*encoder_filters_[0], encode1xxHeaders(_)).Times(0);
+  EXPECT_CALL(response_encoder_, encode1xxHeaders(_)).Times(0);
   ResponseHeaderMapPtr continue_headers{new TestResponseHeaderMapImpl{{":status", "100"}}};
-  decoder_filters_[1]->callbacks_->encode100ContinueHeaders(std::move(continue_headers));
+  decoder_filters_[1]->callbacks_->encode1xxHeaders(std::move(continue_headers));
 
   // Have the encoder filter 1 continue. Make sure the 100-Continue is resumed as expected.
-  EXPECT_CALL(*encoder_filters_[0], encode100ContinueHeaders(_))
+  EXPECT_CALL(*encoder_filters_[0], encode1xxHeaders(_))
       .WillOnce(Return(FilterHeadersStatus::Continue));
-  EXPECT_CALL(response_encoder_, encode100ContinueHeaders(_));
+  EXPECT_CALL(response_encoder_, encode1xxHeaders(_));
   encoder_filters_[1]->callbacks_->continueEncoding();
 
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
@@ -226,7 +226,7 @@ TEST_F(HttpConnectionManagerImplTest, PauseResume100Continue) {
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10923.
-TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithDecoderPause) {
+TEST_F(HttpConnectionManagerImplTest, 1xxResponseWithDecoderPause) {
   proxy_100_continue_ = true;
   setup(false, "envoy-custom-server", false);
 
@@ -265,7 +265,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithDecoderPause) {
         decoder_->decodeData(data, false);
 
         ResponseHeaderMapPtr continue_headers{new TestResponseHeaderMapImpl{{":status", "100"}}};
-        filter->callbacks_->encode100ContinueHeaders(std::move(continue_headers));
+        filter->callbacks_->encode1xxHeaders(std::move(continue_headers));
 
         // Resume decode pipeline after encoding 100 continue headers, we're now
         // ready to trigger #10923.
@@ -289,6 +289,26 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithDecoderPause) {
   EXPECT_EQ(1U, listener_stats_.downstream_rq_2xx_.value());
   EXPECT_EQ(2U, stats_.named_.downstream_rq_completed_.value());
   EXPECT_EQ(2U, listener_stats_.downstream_rq_completed_.value());
+}
+
+// When create new stream, the stream info will be populated from the connection.
+TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
+  setup(true, "", false);
+
+  // Set up the codec.
+  Buffer::OwnedImpl fake_input("input");
+  conn_manager_->createCodec(fake_input);
+
+  decoder_ = &conn_manager_->newStream(response_encoder_);
+
+  EXPECT_EQ(requestIDExtension().get(), decoder_->streamInfo().getRequestIDProvider());
+  EXPECT_EQ(ssl_connection_, decoder_->streamInfo().downstreamAddressProvider().sslConnection());
+  EXPECT_EQ(filter_callbacks_.connection_.id_,
+            decoder_->streamInfo().downstreamAddressProvider().connectionID().value());
+  EXPECT_EQ(server_name_, decoder_->streamInfo().downstreamAddressProvider().requestedServerName());
+
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 // By default, Envoy will set the server header to the server name, here "custom-value"
@@ -678,8 +698,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
     EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
-          EXPECT_EQ(default_route->routeEntry(),
-                    decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
           // Not clearing cached route returns cached route and doesn't invoke cb.
@@ -730,8 +749,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
 
           EXPECT_EQ(default_route, route);
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
-          EXPECT_EQ(default_route->routeEntry(),
-                    decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
           return FilterHeadersStatus::Continue;
@@ -759,8 +777,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
     EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
           EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->route());
-          EXPECT_EQ(default_route->routeEntry(),
-                    decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+          EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->streamInfo().route());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
 
           int ctr = 0;
@@ -788,8 +805,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           decoder_filters_[1]->callbacks_->route(cb);
 
           EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->route());
-          EXPECT_EQ(foo_bar_route->routeEntry(),
-                    decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+          EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->streamInfo().route());
           EXPECT_EQ(foo_bar_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
 
           return FilterHeadersStatus::Continue;
@@ -867,8 +883,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
         EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
         EXPECT_EQ(default_cluster_name,
                   decoder_filters_[0]->callbacks_->route()->routeEntry()->clusterName());
-        EXPECT_EQ(default_route->routeEntry(),
-                  decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
         EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
         // Instantiate a DelegatingRoute child class object and invoke setRoute from
@@ -892,8 +907,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
         // clusterName() method.
         EXPECT_EQ(foo_cluster_name,
                   decoder_filters_[1]->callbacks_->route()->routeEntry()->clusterName());
-        EXPECT_EQ(foo_route_override->routeEntry(),
-                  decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(foo_route_override, decoder_filters_[1]->callbacks_->streamInfo().route());
         // Tests that setRoute correctly sets cached_cluster_info_
         EXPECT_EQ(foo_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
 
@@ -1055,12 +1069,8 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
         EXPECT_EQ(default_route->routeEntry()->includeVirtualHostRateLimits(),
                   delegating_route_foo->routeEntry()->includeVirtualHostRateLimits());
 
-        // NOTE: no coverage for routeEntry()->typedMetadata()
         // "The mock function has no default action set, and its return type has no default value
         // set"
-
-        EXPECT_EQ(default_route->routeEntry()->metadata().filter_metadata().size(),
-                  delegating_route_foo->routeEntry()->metadata().filter_metadata().size());
         EXPECT_EQ(default_route->routeEntry()->tlsContextMatchCriteria(),
                   delegating_route_foo->routeEntry()->tlsContextMatchCriteria());
 
@@ -1069,8 +1079,6 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
         EXPECT_EQ(default_route->routeEntry()->pathMatchCriterion().matchType(),
                   delegating_route_foo->routeEntry()->pathMatchCriterion().matchType());
 
-        EXPECT_EQ(default_route->routeEntry()->perFilterConfig("bar"),
-                  delegating_route_foo->routeEntry()->perFilterConfig("bar"));
         EXPECT_EQ(default_route->routeEntry()->includeAttemptCountInRequest(),
                   delegating_route_foo->routeEntry()->includeAttemptCountInRequest());
         EXPECT_EQ(default_route->routeEntry()->includeAttemptCountInResponse(),
@@ -1194,6 +1202,47 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Observe that we strip the trailing dot.
+TEST_F(HttpConnectionManagerImplTest, StripTrailingHostDot) {
+  setup(false, "");
+  // Enable removal of host's trailing dot.
+  strip_trailing_host_dot_ = true;
+  const std::string original_host = "host.";
+  const std::string updated_host = "host";
+  // Set up the codec.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->createCodec(fake_input);
+  // Create a new stream.
+  decoder_ = &conn_manager_->newStream(response_encoder_);
+  RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+      {":authority", original_host}, {":path", "/"}, {":method", "GET"}}};
+  RequestHeaderMap* updated_headers = headers.get();
+  decoder_->decodeHeaders(std::move(headers), true);
+  EXPECT_EQ(updated_host, updated_headers->getHostValue());
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(HttpConnectionManagerImplTest, HostWithoutTrailingDot) {
+  setup(false, "");
+  // Enable removal of host's trailing dot.
+  strip_trailing_host_dot_ = true;
+  const std::string original_host = "host";
+  const std::string updated_host = "host";
+  // Set up the codec.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->createCodec(fake_input);
+  // Create a new stream.
+  decoder_ = &conn_manager_->newStream(response_encoder_);
+  RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+      {":authority", original_host}, {":path", "/"}, {":method", "GET"}}};
+  RequestHeaderMap* updated_headers = headers.get();
+  decoder_->decodeHeaders(std::move(headers), true);
+  EXPECT_EQ(updated_host, updated_headers->getHostValue());
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(HttpConnectionManagerImplTest, DateHeaderNotPresent) {
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
@@ -1225,8 +1274,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
-                     const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const RequestHeaderMap&,
+                     const StreamInfo::StreamInfo&, const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
             return span;
@@ -1383,8 +1432,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
-                     const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const RequestHeaderMap&,
+                     const StreamInfo::StreamInfo&, const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
             return span;
@@ -1449,8 +1498,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
-                     const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const RequestHeaderMap&,
+                     const StreamInfo::StreamInfo&, const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
             return span;
@@ -1516,8 +1565,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
-                     const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const RequestHeaderMap&,
+                     const StreamInfo::StreamInfo&, const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
             return span;
@@ -1597,8 +1646,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
-                     const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const RequestHeaderMap&,
+                     const StreamInfo::StreamInfo&, const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
 
             return span;
@@ -1679,8 +1728,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
-                     const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const RequestHeaderMap&,
+                     const StreamInfo::StreamInfo&, const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
 
             return span;
@@ -1763,8 +1812,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
-                     const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const RequestHeaderMap&,
+                     const StreamInfo::StreamInfo&, const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
 
             return span;
@@ -1902,7 +1951,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.routeEntry());
+        EXPECT_NE(nullptr, stream_info.route());
 
         EXPECT_EQ(stream_info.downstreamAddressProvider().remoteAddress()->ip()->addressAsString(),
                   xff_address);
@@ -2043,7 +2092,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.routeEntry());
+        EXPECT_NE(nullptr, stream_info.route());
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -2093,7 +2142,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        EXPECT_EQ(nullptr, stream_info.routeEntry());
+        EXPECT_EQ(nullptr, stream_info.route());
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -2114,7 +2163,8 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
 
 class StreamErrorOnInvalidHttpMessageTest : public HttpConnectionManagerImplTest {
 public:
-  void sendInvalidRequestAndVerifyConnectionState(bool stream_error_on_invalid_http_message) {
+  void sendInvalidRequestAndVerifyConnectionState(bool stream_error_on_invalid_http_message,
+                                                  bool send_complete_request = true) {
     setup(false, "");
 
     EXPECT_CALL(*codec_, dispatch(_))
@@ -2124,7 +2174,7 @@ public:
           // These request headers are missing the necessary ":host"
           RequestHeaderMapPtr headers{
               new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
-          decoder_->decodeHeaders(std::move(headers), true);
+          decoder_->decodeHeaders(std::move(headers), send_complete_request);
           data.drain(0);
           return Http::okStatus();
         }));
@@ -2142,6 +2192,19 @@ public:
         .WillOnce(Return(stream_error_on_invalid_http_message));
     EXPECT_CALL(*filter, encodeComplete());
     EXPECT_CALL(*filter, encodeHeaders(_, true));
+    if (!stream_error_on_invalid_http_message) {
+      EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(AnyNumber());
+      if (send_complete_request) {
+        // The request is complete, so we should not flush close.
+        EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+            .Times(AnyNumber());
+      } else {
+        // If the request isn't complete, avoid a FIN/RST race with delay close.
+        EXPECT_CALL(filter_callbacks_.connection_,
+                    close(Network::ConnectionCloseType::FlushWriteAndDelay))
+            .Times(AnyNumber());
+      }
+    }
     EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
         .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
           EXPECT_EQ("400", headers.getStatusValue());
@@ -2165,6 +2228,12 @@ public:
 
 TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionTerminatedIfCodecStreamErrorIsFalse) {
   sendInvalidRequestAndVerifyConnectionState(false);
+}
+
+TEST_F(StreamErrorOnInvalidHttpMessageTest,
+       ConnectionTerminatedWithDelayIfCodecStreamErrorIsFalse) {
+  // Same as above, only with an incomplete request.
+  sendInvalidRequestAndVerifyConnectionState(false, false);
 }
 
 TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionOpenIfCodecStreamErrorIsTrue) {
@@ -2191,8 +2260,8 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamSslConnection());
-        EXPECT_NE(nullptr, stream_info.routeEntry());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().sslConnection());
+        EXPECT_NE(nullptr, stream_info.route());
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -2896,7 +2965,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
     ResponseHeaderMapPtr response_continue_headers{
         new TestResponseHeaderMapImpl{{":status", "100"}}};
     EXPECT_CALL(*idle_timer, enableTimer(_, _));
-    filter->callbacks_->encode100ContinueHeaders(std::move(response_continue_headers));
+    filter->callbacks_->encode1xxHeaders(std::move(response_continue_headers));
 
     ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
     EXPECT_CALL(*idle_timer, enableTimer(_, _));
@@ -2922,7 +2991,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
   }));
 
   // 100 continue.
-  EXPECT_CALL(response_encoder_, encode100ContinueHeaders(_));
+  EXPECT_CALL(response_encoder_, encode1xxHeaders(_));
 
   // 200 upstream response.
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
@@ -3317,7 +3386,7 @@ TEST_F(HttpConnectionManagerImplTest, Http10Rejected) {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":method", "GET"}, {":path", "/"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
+    decoder_->decodeHeaders(std::move(headers), false);
     data.drain(4);
     return Http::okStatus();
   }));
@@ -3327,6 +3396,12 @@ TEST_F(HttpConnectionManagerImplTest, Http10Rejected) {
         EXPECT_EQ("426", headers.getStatusValue());
         EXPECT_EQ("close", headers.getConnectionValue());
       }));
+  // No delay close for HTTP/1.0, even if the request is not complete.
+  // Note there may be more than one close: the important thing is one does not
+  // kick off delay.
+  EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(AnyNumber());
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+      .Times(AnyNumber());
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
@@ -3637,6 +3712,141 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   EXPECT_EQ(1U, listener_stats_.downstream_rq_3xx_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_rq_completed_.value());
   EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
+}
+
+// Tests for the presence/absence and contents of the synthesized Proxy-Status
+// HTTP response header. NB: proxy_status_config_ persists in the test base.
+class ProxyStatusTest : public HttpConnectionManagerImplTest {
+public:
+  void initialize() {
+    setup(/*ssl=*/false, servername_, /*tracing=*/false);
+    setUpEncoderAndDecoder(/*request_with_data_and_trailers=*/false,
+                           /*decode_headers_stop_all=*/false);
+    sendRequestHeadersAndData();
+  }
+  const ResponseHeaderMap*
+  sendRequestWith(int status, StreamInfo::ResponseFlag response_flag, std::string details,
+                  absl::optional<std::string> proxy_status = absl::nullopt) {
+    auto response_headers = new TestResponseHeaderMapImpl{{":status", std::to_string(status)}};
+    if (proxy_status.has_value()) {
+      response_headers->setProxyStatus(proxy_status.value());
+    }
+    return sendResponseHeaders(ResponseHeaderMapPtr{response_headers}, response_flag, details);
+  }
+  void TearDown() override { doRemoteClose(); }
+
+protected:
+  const std::string servername_{"custom_server_name"};
+};
+
+TEST_F(ProxyStatusTest, NoPopulateProxyStatus) {
+  proxy_status_config_ = nullptr;
+
+  initialize();
+
+  const ResponseHeaderMap* altered_headers =
+      sendRequestWith(403, StreamInfo::ResponseFlag::FailedLocalHealthCheck, "foo");
+  ASSERT_TRUE(altered_headers);
+  ASSERT_FALSE(altered_headers->ProxyStatus());
+  EXPECT_EQ(altered_headers->getStatusValue(), "403"); // unchanged from request.
+}
+
+TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCodeAndServerName) {
+  proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
+  proxy_status_config_->set_remove_details(false);
+  proxy_status_config_->set_set_recommended_response_code(true);
+  proxy_status_config_->set_use_node_id(true);
+
+  initialize();
+
+  const ResponseHeaderMap* altered_headers =
+      sendRequestWith(403, StreamInfo::ResponseFlag::FailedLocalHealthCheck, /*details=*/"foo");
+
+  ASSERT_TRUE(altered_headers);
+  ASSERT_TRUE(altered_headers->ProxyStatus());
+  EXPECT_EQ(altered_headers->getProxyStatusValue(),
+            "node_name; error=destination_unavailable; details=\"foo; LH\"");
+  // Changed from request, since set_recommended_response_code is true. Here,
+  // 503 is the recommended response code for FailedLocalHealthCheck.
+  EXPECT_EQ(altered_headers->getStatusValue(), "503");
+}
+
+TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCode) {
+  proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
+  proxy_status_config_->set_remove_details(false);
+  proxy_status_config_->set_set_recommended_response_code(true);
+
+  initialize();
+
+  const ResponseHeaderMap* altered_headers =
+      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"bar");
+
+  ASSERT_TRUE(altered_headers);
+  ASSERT_TRUE(altered_headers->ProxyStatus());
+  EXPECT_EQ(altered_headers->getProxyStatusValue(),
+            "custom_server_name; error=connection_timeout; details=\"bar; UT\"");
+  // Changed from request, since set_recommended_response_code is true. Here,
+  // 504 is the recommended response code for UpstreamRequestTimeout.
+  EXPECT_EQ(altered_headers->getStatusValue(), "504");
+}
+
+TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetails) {
+  proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
+  proxy_status_config_->set_remove_details(false);
+  proxy_status_config_->set_remove_connection_termination_details(false);
+  proxy_status_config_->set_remove_response_flags(false);
+  proxy_status_config_->set_set_recommended_response_code(false);
+
+  initialize();
+
+  const ResponseHeaderMap* altered_headers =
+      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"bar");
+
+  ASSERT_TRUE(altered_headers);
+  ASSERT_TRUE(altered_headers->ProxyStatus());
+  EXPECT_EQ(altered_headers->getProxyStatusValue(),
+            "custom_server_name; error=connection_timeout; details=\"bar; UT\"");
+  // Unchanged from request, since set_recommended_response_code is false. Here,
+  // 504 would be the recommended response code for UpstreamRequestTimeout,
+  EXPECT_NE(altered_headers->getStatusValue(), "504");
+  EXPECT_EQ(altered_headers->getStatusValue(), "403");
+}
+
+TEST_F(ProxyStatusTest, PopulateProxyStatusWithoutDetails) {
+  proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
+  proxy_status_config_->set_remove_details(true);
+  proxy_status_config_->set_set_recommended_response_code(false);
+
+  initialize();
+
+  const ResponseHeaderMap* altered_headers =
+      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"baz");
+
+  ASSERT_TRUE(altered_headers);
+  ASSERT_TRUE(altered_headers->ProxyStatus());
+  EXPECT_EQ(altered_headers->getProxyStatusValue(), "custom_server_name; error=connection_timeout");
+  // Unchanged.
+  EXPECT_EQ(altered_headers->getStatusValue(), "403");
+  // Since remove_details=true, we should not have "baz", the value of
+  // response_code_details, in the Proxy-Status header.
+  EXPECT_THAT(altered_headers->getProxyStatusValue(), Not(HasSubstr("baz")));
+}
+
+TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
+  proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
+  proxy_status_config_->set_remove_details(false);
+
+  initialize();
+
+  const ResponseHeaderMap* altered_headers =
+      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"baz",
+                      /*proxy_status=*/"SomeCDN");
+
+  ASSERT_TRUE(altered_headers);
+  ASSERT_TRUE(altered_headers->ProxyStatus());
+  // Expect to see the appended previous value: "SomeCDN; custom_server_name; ...".
+  EXPECT_EQ(altered_headers->getProxyStatusValue(),
+            "SomeCDN, custom_server_name; error=connection_timeout; details=\"baz; UT\"");
 }
 
 } // namespace Http

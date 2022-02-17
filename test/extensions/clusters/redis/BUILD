@@ -16,7 +16,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "redis_cluster_test",
     srcs = ["redis_cluster_test.cc"],
-    extension_name = "envoy.clusters.redis",
+    extension_names = ["envoy.clusters.redis"],
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
@@ -54,9 +54,9 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "redis_cluster_lb_test",
     srcs = ["redis_cluster_lb_test.cc"],
-    extension_name = "envoy.clusters.redis",
+    extension_names = ["envoy.clusters.redis"],
     deps = [
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:cluster_factory_lib",
@@ -92,11 +92,15 @@ envoy_extension_cc_test(
     name = "redis_cluster_integration_test",
     size = "small",
     srcs = ["redis_cluster_integration_test.cc"],
-    extension_name = "envoy.clusters.redis",
+    extension_names = ["envoy.clusters.redis"],
+    # This test takes a while to run specially under tsan.
+    # Shard it to avoid test timeout.
+    shard_count = 2,
     deps = [
         "//source/extensions/clusters/redis:redis_cluster",
         "//source/extensions/clusters/redis:redis_cluster_lb",
         "//source/extensions/filters/network/redis_proxy:config",
+        "//test/integration:ads_integration_lib",
         "//test/integration:integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
@@ -107,7 +111,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/upstream:upstream_interface",
+        "//envoy/upstream:upstream_interface",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters/redis:redis_cluster",

@@ -11,3 +11,4 @@ Listeners
   tcp_proxy
   udp_proxy
   dns_filter
+  connection_limiting

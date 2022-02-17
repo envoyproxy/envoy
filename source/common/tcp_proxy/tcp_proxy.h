@@ -20,14 +20,14 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/logger.h"
-#include "common/network/cidr_range.h"
-#include "common/network/filter_impl.h"
-#include "common/network/hash_policy.h"
-#include "common/network/utility.h"
-#include "common/stream_info/stream_info_impl.h"
-#include "common/tcp_proxy/upstream.h"
-#include "common/upstream/load_balancer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/cidr_range.h"
+#include "source/common/network/filter_impl.h"
+#include "source/common/network/hash_policy.h"
+#include "source/common/network/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tcp_proxy/upstream.h"
+#include "source/common/upstream/load_balancer_impl.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -161,24 +161,17 @@ public:
   const Network::HashPolicy* hashPolicy() { return hash_policy_.get(); }
 
 private:
-  struct RouteImpl : public Route {
-    RouteImpl(
-        const Config& parent,
-        const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute&
-            config);
+  struct SimpleRouteImpl : public Route {
+    SimpleRouteImpl(const Config& parent, absl::string_view cluster_name);
 
     // Route
-    bool matches(Network::Connection& connection) const override;
+    bool matches(Network::Connection&) const override { return true; }
     const std::string& clusterName() const override { return cluster_name_; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
       return parent_.metadataMatchCriteria();
     }
 
     const Config& parent_;
-    Network::Address::IpList source_ips_;
-    Network::PortRangeList source_port_ranges_;
-    Network::Address::IpList destination_ips_;
-    Network::PortRangeList destination_port_ranges_;
     std::string cluster_name_;
   };
 
@@ -208,7 +201,7 @@ private:
   };
   using WeightedClusterEntryConstSharedPtr = std::shared_ptr<const WeightedClusterEntry>;
 
-  std::vector<RouteConstSharedPtr> routes_;
+  RouteConstSharedPtr default_route_;
   std::vector<WeightedClusterEntryConstSharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
@@ -266,9 +259,7 @@ public:
   absl::optional<uint64_t> computeHashKey() override {
     auto hash_policy = config_->hashPolicy();
     if (hash_policy) {
-      return hash_policy->generateHash(
-          downstreamConnection()->addressProvider().remoteAddress().get(),
-          downstreamConnection()->addressProvider().localAddress().get());
+      return hash_policy->generateHash(*downstreamConnection());
     }
 
     return {};
@@ -278,7 +269,7 @@ public:
     return &read_callbacks_->connection();
   }
 
-  Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
+  Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
     return transport_socket_options_;
   }
 
@@ -380,7 +371,7 @@ protected:
   std::unique_ptr<GenericConnPool> generic_conn_pool_;
   RouteConstSharedPtr route_;
   Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
-  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::Socket::OptionsSharedPtr upstream_options_;
   uint32_t connect_attempts_{};
   bool connecting_{};
@@ -389,7 +380,7 @@ protected:
 // This class deals with an upstream connection that needs to finish flushing, when the downstream
 // connection has been closed. The TcpProxy is destroyed when the downstream connection is closed,
 // so handling the upstream connection here allows it to finish draining or timeout.
-class Drainer : public Event::DeferredDeletable {
+class Drainer : public Event::DeferredDeletable, protected Logger::Loggable<Logger::Id::filter> {
 public:
   Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
           const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
@@ -401,6 +392,7 @@ public:
   void onIdleTimeout();
   void onBytesSent();
   void cancelDrain();
+  Event::Dispatcher& dispatcher();
 
 private:
   UpstreamDrainManager& parent_;

@@ -10,7 +10,7 @@
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
@@ -31,7 +31,7 @@ public:
    * Parse a header format rule of the form: %REQ(X?Y):Z% .
    * Will populate a main_header and an optional alternative header if specified.
    * See doc:
-   * docs/root/configuration/access_log.rst#format-rules
+   * https://envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/access_log#format-rules
    */
   static void parseCommandHeader(const std::string& token, const size_t start,
                                  std::string& main_header, std::string& alternative_header,
@@ -81,13 +81,15 @@ public:
             if constexpr (std::is_same_v<typename std::remove_reference<decltype(param)>::type,
                                          std::string>) {
               // Compile time handler for std::string.
-              param = *it;
+              param = std::string(*it);
               it++;
             } else {
               // Compile time handler for container type. It will catch all remaining tokens and
               // move iterator to the end.
-              param.insert(param.begin(), it, tokens.end());
-              it = tokens.end();
+              do {
+                param.push_back(std::string(*it));
+                it++;
+              } while (it != tokens.end());
             }
           }
         }(params),
@@ -435,20 +437,37 @@ public:
     virtual ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const PURE;
   };
   using FieldExtractorPtr = std::unique_ptr<FieldExtractor>;
+  using FieldExtractorCreateFunc = std::function<FieldExtractorPtr()>;
 
   enum class StreamInfoAddressFieldExtractionType { WithPort, WithoutPort, JustPort };
 
 private:
   FieldExtractorPtr field_extractor_;
+
+  using FieldExtractorLookupTbl =
+      absl::flat_hash_map<absl::string_view, StreamInfoFormatter::FieldExtractorCreateFunc>;
+  static const FieldExtractorLookupTbl& getKnownFieldExtractors();
 };
 
 /**
  * Base formatter for formatting Metadata objects
  */
-class MetadataFormatter {
+class MetadataFormatter : public FormatterProvider {
 public:
+  using GetMetadataFunction =
+      std::function<const envoy::config::core::v3::Metadata*(const StreamInfo::StreamInfo&)>;
   MetadataFormatter(const std::string& filter_namespace, const std::vector<std::string>& path,
-                    absl::optional<size_t> max_length);
+                    absl::optional<size_t> max_length, GetMetadataFunction get);
+
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&,
+                                     const StreamInfo::StreamInfo& stream_info,
+                                     absl::string_view) const override;
+
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
+                                 const StreamInfo::StreamInfo& stream_info,
+                                 absl::string_view) const override;
 
 protected:
   absl::optional<std::string>
@@ -459,40 +478,25 @@ private:
   std::string filter_namespace_;
   std::vector<std::string> path_;
   absl::optional<size_t> max_length_;
+  GetMetadataFunction get_func_;
 };
 
 /**
  * FormatterProvider for DynamicMetadata from StreamInfo.
  */
-class DynamicMetadataFormatter : public FormatterProvider, MetadataFormatter {
+class DynamicMetadataFormatter : public MetadataFormatter {
 public:
   DynamicMetadataFormatter(const std::string& filter_namespace,
                            const std::vector<std::string>& path, absl::optional<size_t> max_length);
-
-  // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view) const override;
 };
 
 /**
  * FormatterProvider for ClusterMetadata from StreamInfo.
  */
-class ClusterMetadataFormatter : public FormatterProvider, MetadataFormatter {
+class ClusterMetadataFormatter : public MetadataFormatter {
 public:
   ClusterMetadataFormatter(const std::string& filter_namespace,
                            const std::vector<std::string>& path, absl::optional<size_t> max_length);
-
-  // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view) const override;
 };
 
 /**

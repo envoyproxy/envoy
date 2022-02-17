@@ -1,7 +1,7 @@
-#include "extensions/filters/udp/udp_proxy/hash_policy_impl.h"
+#include "source/extensions/filters/udp/udp_proxy/hash_policy_impl.h"
 
-#include "common/common/assert.h"
-#include "common/common/macros.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,8 +47,8 @@ HashPolicyImpl::HashPolicyImpl(
   case UdpProxyConfig::HashPolicy::PolicySpecifierCase::kKey:
     hash_impl_ = std::make_unique<KeyHashMethod>(hash_policies[0]->key());
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case UdpProxyConfig::HashPolicy::PolicySpecifierCase::POLICY_SPECIFIER_NOT_SET:
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 }
 

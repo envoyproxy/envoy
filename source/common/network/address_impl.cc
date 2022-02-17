@@ -1,4 +1,4 @@
-#include "common/network/address_impl.h"
+#include "source/common/network/address_impl.h"
 
 #include <array>
 #include <cstdint>
@@ -7,37 +7,18 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/safe_memcpy.h"
-#include "common/common/utility.h"
-#include "common/network/socket_interface.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/socket_interface.h"
 
 namespace Envoy {
 namespace Network {
 namespace Address {
 
 namespace {
-
-// Validate that IPv4 is supported on this platform, raise an exception for the
-// given address if not.
-void validateIpv4Supported(const std::string& address) {
-  static const bool supported = SocketInterfaceSingleton::get().ipFamilySupported(AF_INET);
-  if (!supported) {
-    throw EnvoyException(
-        fmt::format("IPv4 addresses are not supported on this machine: {}", address));
-  }
-}
-
-// Validate that IPv6 is supported on this platform, raise an exception for the
-// given address if not.
-void validateIpv6Supported(const std::string& address) {
-  static const bool supported = SocketInterfaceSingleton::get().ipFamilySupported(AF_INET6);
-  if (!supported) {
-    throw EnvoyException(
-        fmt::format("IPv6 addresses are not supported on this machine: {}", address));
-  }
-}
 
 // Constructs a readable string with the embedded nulls in the abstract path replaced with '@'.
 std::string friendlyNameFromAbstractPath(absl::string_view path) {
@@ -50,17 +31,30 @@ const SocketInterface* sockInterfaceOrDefault(const SocketInterface* sock_interf
   return sock_interface == nullptr ? &SocketInterfaceSingleton::get() : sock_interface;
 }
 
+void throwOnError(absl::Status status) {
+  if (!status.ok()) {
+    throw EnvoyException(status.ToString());
+  }
+}
+
+InstanceConstSharedPtr throwOnError(StatusOr<InstanceConstSharedPtr> address) {
+  if (!address.ok()) {
+    throwOnError(address.status());
+  }
+  return *address;
+}
+
 } // namespace
 
-Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t ss_len,
-                                                    bool v6only) {
+StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_storage& ss,
+                                                              socklen_t ss_len, bool v6only) {
   RELEASE_ASSERT(ss_len == 0 || static_cast<unsigned int>(ss_len) >= sizeof(sa_family_t), "");
   switch (ss.ss_family) {
   case AF_INET: {
     RELEASE_ASSERT(ss_len == 0 || static_cast<unsigned int>(ss_len) == sizeof(sockaddr_in), "");
     const struct sockaddr_in* sin = reinterpret_cast<const struct sockaddr_in*>(&ss);
     ASSERT(AF_INET == sin->sin_family);
-    return std::make_shared<Address::Ipv4Instance>(sin);
+    return Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(sin);
   }
   case AF_INET6: {
     RELEASE_ASSERT(ss_len == 0 || static_cast<unsigned int>(ss_len) == sizeof(sockaddr_in6), "");
@@ -77,9 +71,9 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
 #else
       struct sockaddr_in sin = {AF_INET, sin6->sin6_port, {sin6->sin6_addr.s6_addr32[3]}, {}};
 #endif
-      return std::make_shared<Address::Ipv4Instance>(&sin);
+      return Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sin);
     } else {
-      return std::make_shared<Address::Ipv6Instance>(*sin6, v6only);
+      return Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(*sin6, v6only);
     }
   }
   case AF_UNIX: {
@@ -88,27 +82,45 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
     RELEASE_ASSERT(ss_len == 0 || static_cast<unsigned int>(ss_len) >=
                                       offsetof(struct sockaddr_un, sun_path) + 1,
                    "");
-    return std::make_shared<Address::PipeInstance>(sun, ss_len);
+    return Address::InstanceFactory::createInstancePtr<Address::PipeInstance>(sun, ss_len);
   }
   default:
-    throw EnvoyException(fmt::format("Unexpected sockaddr family: {}", ss.ss_family));
+    return absl::InvalidArgumentError(fmt::format("Unexpected sockaddr family: {}", ss.ss_family));
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+Address::InstanceConstSharedPtr addressFromSockAddrOrThrow(const sockaddr_storage& ss,
+                                                           socklen_t ss_len, bool v6only) {
+  // Though we don't have any test coverage where address validation in addressFromSockAddr() fails,
+  // this code is called in worker thread and can throw in theory. In that case, the program will
+  // crash due to uncaught exception. In practice, we don't expect any address validation in
+  // addressFromSockAddr() to fail in worker thread.
+  StatusOr<InstanceConstSharedPtr> address = addressFromSockAddr(ss, ss_len, v6only);
+  return throwOnError(address);
+}
+
+Address::InstanceConstSharedPtr
+addressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len, os_fd_t fd, bool v6only) {
+  // Set v6only to false so that mapped-v6 address can be normalize to v4
+  // address. Though dual stack may be disabled, it's still okay to assume the
+  // address is from a dual stack socket. This is because mapped-v6 address
+  // must come from a dual stack socket. An actual v6 address can come from
+  // both dual stack socket and v6 only socket. If |peer_addr| is an actual v6
+  // address and the socket is actually v6 only, the returned address will be
+  // regarded as a v6 address from dual stack socket. However, this address is not going to be
+  // used to create socket. Wrong knowledge of dual stack support won't hurt.
+  StatusOr<Address::InstanceConstSharedPtr> address =
+      Address::addressFromSockAddr(ss, ss_len, v6only);
+  if (!address.ok()) {
+    PANIC(fmt::format("Invalid address for fd: {}, error: {}", fd, address.status().ToString()));
+  }
+  return *address;
 }
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address, const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
-  ip_.ipv4_.address_ = *address;
-  ip_.friendly_address_ = sockaddrToString(*address);
-
-  // Based on benchmark testing, this reserve+append implementation runs faster than absl::StrCat.
-  fmt::format_int port(ntohs(address->sin_port));
-  friendly_name_.reserve(ip_.friendly_address_.size() + 1 + port.size());
-  friendly_name_.append(ip_.friendly_address_);
-  friendly_name_.push_back(':');
-  friendly_name_.append(port.data(), port.size());
-  validateIpv4Supported(friendly_name_);
+  throwOnError(validateProtocolSupported());
+  initHelper(address);
 }
 
 Ipv4Instance::Ipv4Instance(const std::string& address, const SocketInterface* sock_interface)
@@ -117,6 +129,7 @@ Ipv4Instance::Ipv4Instance(const std::string& address, const SocketInterface* so
 Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
+  throwOnError(validateProtocolSupported());
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_.sin_family = AF_INET;
   ip_.ipv4_.address_.sin_port = htons(port);
@@ -126,19 +139,28 @@ Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port,
   }
 
   friendly_name_ = absl::StrCat(address, ":", port);
-  validateIpv4Supported(friendly_name_);
   ip_.friendly_address_ = address;
 }
 
 Ipv4Instance::Ipv4Instance(uint32_t port, const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
+  throwOnError(validateProtocolSupported());
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_.sin_family = AF_INET;
   ip_.ipv4_.address_.sin_port = htons(port);
   ip_.ipv4_.address_.sin_addr.s_addr = INADDR_ANY;
   friendly_name_ = absl::StrCat("0.0.0.0:", port);
-  validateIpv4Supported(friendly_name_);
   ip_.friendly_address_ = "0.0.0.0";
+}
+
+Ipv4Instance::Ipv4Instance(absl::Status& status, const sockaddr_in* address,
+                           const SocketInterface* sock_interface)
+    : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
+  status = validateProtocolSupported();
+  if (!status.ok()) {
+    return;
+  }
+  initHelper(address);
 }
 
 bool Ipv4Instance::operator==(const Instance& rhs) const {
@@ -173,6 +195,27 @@ std::string Ipv4Instance::sockaddrToString(const sockaddr_in& addr) {
   return std::string(start, str + BufferSize - start);
 }
 
+absl::Status Ipv4Instance::validateProtocolSupported() {
+  static const bool supported = SocketInterfaceSingleton::get().ipFamilySupported(AF_INET);
+  if (supported) {
+    return absl::OkStatus();
+  }
+  return absl::FailedPreconditionError("IPv4 addresses are not supported on this machine");
+}
+
+void Ipv4Instance::initHelper(const sockaddr_in* address) {
+  memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
+  ip_.ipv4_.address_ = *address;
+  ip_.friendly_address_ = sockaddrToString(*address);
+
+  // Based on benchmark testing, this reserve+append implementation runs faster than absl::StrCat.
+  fmt::format_int port(ntohs(address->sin_port));
+  friendly_name_.reserve(ip_.friendly_address_.size() + 1 + port.size());
+  friendly_name_.append(ip_.friendly_address_);
+  friendly_name_.push_back(':');
+  friendly_name_.append(port.data(), port.size());
+}
+
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
   static_assert(sizeof(absl::uint128) == 16, "The size of asbl::uint128 is not 16.");
@@ -194,11 +237,8 @@ std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress() const {
 Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  ip_.ipv6_.address_ = address;
-  ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
-  ip_.ipv6_.v6only_ = v6only;
-  friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
-  validateIpv6Supported(friendly_name_);
+  throwOnError(validateProtocolSupported());
+  initHelper(address, v6only);
 }
 
 Ipv6Instance::Ipv6Instance(const std::string& address, const SocketInterface* sock_interface)
@@ -207,6 +247,7 @@ Ipv6Instance::Ipv6Instance(const std::string& address, const SocketInterface* so
 Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
+  throwOnError(validateProtocolSupported());
   ip_.ipv6_.address_.sin6_family = AF_INET6;
   ip_.ipv6_.address_.sin6_port = htons(port);
   if (!address.empty()) {
@@ -219,7 +260,6 @@ Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port,
   // Just in case address is in a non-canonical format, format from network address.
   ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
   friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
-  validateIpv6Supported(friendly_name_);
 }
 
 Ipv6Instance::Ipv6Instance(uint32_t port, const SocketInterface* sock_interface)
@@ -229,6 +269,31 @@ bool Ipv6Instance::operator==(const Instance& rhs) const {
   const auto* rhs_casted = dynamic_cast<const Ipv6Instance*>(&rhs);
   return (rhs_casted && (ip_.ipv6_.address() == rhs_casted->ip_.ipv6_.address()) &&
           (ip_.port() == rhs_casted->ip_.port()));
+}
+
+Ipv6Instance::Ipv6Instance(absl::Status& status, const sockaddr_in6& address, bool v6only,
+                           const SocketInterface* sock_interface)
+    : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
+  status = validateProtocolSupported();
+  if (!status.ok()) {
+    return;
+  }
+  initHelper(address, v6only);
+}
+
+absl::Status Ipv6Instance::validateProtocolSupported() {
+  static const bool supported = SocketInterfaceSingleton::get().ipFamilySupported(AF_INET6);
+  if (supported) {
+    return absl::OkStatus();
+  }
+  return absl::FailedPreconditionError("IPv6 addresses are not supported on this machine");
+}
+
+void Ipv6Instance::initHelper(const sockaddr_in6& address, bool v6only) {
+  ip_.ipv6_.address_ = address;
+  ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
+  ip_.ipv6_.v6only_ = v6only;
+  friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
 }
 
 PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t mode,
@@ -243,18 +308,8 @@ PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t 
     pipe_.abstract_namespace_ = true;
     pipe_.address_length_ = ss_len - offsetof(struct sockaddr_un, sun_path);
   }
-  pipe_.address_ = *address;
-  if (pipe_.abstract_namespace_) {
-    if (mode != 0) {
-      throw EnvoyException("Cannot set mode for Abstract AF_UNIX sockets");
-    }
-    // Replace all null characters with '@' in friendly_name_.
-    friendly_name_ = friendlyNameFromAbstractPath(
-        absl::string_view(pipe_.address_.sun_path, pipe_.address_length_));
-  } else {
-    friendly_name_ = address->sun_path;
-  }
-  pipe_.mode_ = mode;
+  absl::Status status = initHelper(address, mode);
+  throwOnError(status);
 }
 
 PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
@@ -300,7 +355,39 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
   pipe_.mode_ = mode;
 }
 
+PipeInstance::PipeInstance(absl::Status& error, const sockaddr_un* address, socklen_t ss_len,
+                           mode_t mode, const SocketInterface* sock_interface)
+    : InstanceBase(Type::Pipe, sockInterfaceOrDefault(sock_interface)) {
+  if (address->sun_path[0] == '\0') {
+#if !defined(__linux__)
+    error = absl::FailedPreconditionError("Abstract AF_UNIX sockets are only supported on linux.");
+    return;
+#endif
+    RELEASE_ASSERT(static_cast<unsigned int>(ss_len) >= offsetof(struct sockaddr_un, sun_path) + 1,
+                   "");
+    pipe_.abstract_namespace_ = true;
+    pipe_.address_length_ = ss_len - offsetof(struct sockaddr_un, sun_path);
+  }
+  error = initHelper(address, mode);
+}
+
 bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
+
+absl::Status PipeInstance::initHelper(const sockaddr_un* address, mode_t mode) {
+  pipe_.address_ = *address;
+  if (pipe_.abstract_namespace_) {
+    if (mode != 0) {
+      return absl::FailedPreconditionError("Cannot set mode for Abstract AF_UNIX sockets");
+    }
+    // Replace all null characters with '@' in friendly_name_.
+    friendly_name_ = friendlyNameFromAbstractPath(
+        absl::string_view(pipe_.address_.sun_path, pipe_.address_length_));
+  } else {
+    friendly_name_ = address->sun_path;
+  }
+  pipe_.mode_ = mode;
+  return absl::OkStatus();
+}
 
 EnvoyInternalInstance::EnvoyInternalInstance(const std::string& address_id,
                                              const SocketInterface* sock_interface)

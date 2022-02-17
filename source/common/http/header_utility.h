@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "envoy/common/matchers.h"
 #include "envoy/common/regex.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -9,8 +10,8 @@
 #include "envoy/http/protocol.h"
 #include "envoy/type/v3/range.pb.h"
 
-#include "common/http/status.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/http/status.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Http {
@@ -20,7 +21,16 @@ namespace Http {
  */
 class HeaderUtility {
 public:
-  enum class HeaderMatchType { Value, Regex, Range, Present, Prefix, Suffix, Contains };
+  enum class HeaderMatchType {
+    Value,
+    Regex,
+    Range,
+    Present,
+    Prefix,
+    Suffix,
+    Contains,
+    StringMatch
+  };
 
   /**
    * Get all header values as a single string. Multiple headers are concatenated with ','.
@@ -65,7 +75,9 @@ public:
     std::string value_;
     Regex::CompiledMatcherPtr regex_;
     envoy::type::v3::Int64Range range_;
+    Matchers::StringMatcherPtr string_match_;
     const bool invert_match_;
+    bool present_;
 
     // HeaderMatcher
     bool matchesHeaders(const HeaderMap& headers) const override {
@@ -141,6 +153,11 @@ public:
   static bool authorityIsValid(const absl::string_view authority_value);
 
   /**
+   * @brief return if the 1xx should be handled by the [encode|decode]1xx calls.
+   */
+  static bool isSpecial1xx(const ResponseHeaderMap& response_headers);
+
+  /**
    * @brief a helper function to determine if the headers represent a CONNECT request.
    */
   static bool isConnect(const RequestHeaderMap& headers);
@@ -152,13 +169,6 @@ public:
                                 const ResponseHeaderMap& response_headers);
 
   static bool requestShouldHaveNoBody(const RequestHeaderMap& headers);
-
-  /**
-   * Add headers from one HeaderMap to another
-   * @param headers target where headers will be added
-   * @param headers_to_add supplies the headers to be added
-   */
-  static void addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add);
 
   /**
    * @brief a helper function to determine if the headers represent an envoy internal request
@@ -184,6 +194,11 @@ public:
                                     const RequestOrResponseHeaderMap& headers);
 
   /**
+   * @brief Remove the trailing host dot from host/authority header.
+   */
+  static void stripTrailingHostDot(RequestHeaderMap& headers);
+
+  /**
    * @brief Remove the port part from host/authority header if it is equal to provided port.
    * @return absl::optional<uint32_t> containing the port, if removed, else absl::nullopt.
    * If port is not passed, port part from host/authority header is removed.
@@ -199,13 +214,20 @@ public:
    */
   static absl::string_view::size_type getPortStart(absl::string_view host);
 
-  /* Does a common header check ensuring required headers are present.
+  /* Does a common header check ensuring required request headers are present.
    * Required request headers include :method header, :path for non-CONNECT requests, and
    * host/authority for HTTP/1.1 or CONNECT requests.
    * @return Status containing the result. If failed, message includes details on which header was
    * missing.
    */
-  static Http::Status checkRequiredHeaders(const Http::RequestHeaderMap& headers);
+  static Http::Status checkRequiredRequestHeaders(const Http::RequestHeaderMap& headers);
+
+  /* Does a common header check ensuring required response headers are present.
+   * Current required response headers only includes :status.
+   * @return Status containing the result. If failed, message includes details on which header was
+   * missing.
+   */
+  static Http::Status checkRequiredResponseHeaders(const Http::ResponseHeaderMap& headers);
 
   /**
    * Returns true if a header may be safely removed without causing additional
@@ -233,7 +255,7 @@ public:
    * headers_with_underscores_action.
    */
   static HeaderValidationResult checkHeaderNameForUnderscores(
-      const std::string& header_name,
+      absl::string_view header_name,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action,
       Stats::Counter& dropped_headers_with_underscores,
@@ -241,13 +263,14 @@ public:
 
   /**
    * Check if header_value represents a valid value for HTTP content-length header.
-   * Return HeaderValidationResult and populate should_close_connection
-   * according to override_stream_error_on_invalid_http_message.
+   * Return HeaderValidationResult and populate content_length_output if the value is valid,
+   * otherwise populate should_close_connection according to
+   * override_stream_error_on_invalid_http_message.
    */
   static HeaderValidationResult
   validateContentLength(absl::string_view header_value,
                         bool override_stream_error_on_invalid_http_message,
-                        bool& should_close_connection);
+                        bool& should_close_connection, size_t& content_length_output);
 };
 
 } // namespace Http

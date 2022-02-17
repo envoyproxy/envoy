@@ -23,6 +23,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "BaseProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/core/v3;corev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common types]
@@ -236,7 +237,19 @@ message Metadata {
 
   // Key is the reverse DNS filter name, e.g. com.acme.widget. The envoy.*
   // namespace is reserved for Envoy's built-in filters.
+  // If both *filter_metadata* and
+  // :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>`
+  // fields are present in the metadata with same keys,
+  // only *typed_filter_metadata* field will be parsed.
   map<string, google.protobuf.Struct> filter_metadata = 1;
+
+  // Key is the reverse DNS filter name, e.g. com.acme.widget. The envoy.*
+  // namespace is reserved for Envoy's built-in filters.
+  // The value is encoded as google.protobuf.Any.
+  // If both :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>`
+  // and *typed_filter_metadata* fields are present in the metadata with same keys,
+  // only *typed_filter_metadata* field will be parsed.
+  map<string, google.protobuf.Any> typed_filter_metadata = 2;
 }
 
 // Runtime derived uint32 with a default when not specified.
@@ -284,6 +297,15 @@ message RuntimeFeatureFlag {
   string runtime_key = 2 [(validate.rules).string = {min_len: 1}];
 }
 
+// Query parameter name/value pair.
+message QueryParameter {
+  // The key of the query parameter. Case sensitive.
+  string key = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The value of the query parameter.
+  string value = 2;
+}
+
 // Header name/value pair.
 message HeaderValue {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderValue";
@@ -308,12 +330,33 @@ message HeaderValueOption {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HeaderValueOption";
 
+  // Describes the supported actions types for header append action.
+  enum HeaderAppendAction {
+    // This action will append the specified value to the existing values if the header
+    // already exists. If the header doesn't exist then this will add the header with
+    // specified key and value.
+    APPEND_IF_EXISTS_OR_ADD = 0;
+
+    // This action will add the header if it doesn't already exist. If the header
+    // already exists then this will be a no-op.
+    ADD_IF_ABSENT = 1;
+
+    // This action will overwrite the specified value by discarding any existing values if
+    // the header already exists. If the header doesn't exist then this will add the header
+    // with specified key and value.
+    OVERWRITE_IF_EXISTS_OR_ADD = 2;
+  }
+
   // Header name/value pair that this option applies to.
   HeaderValue header = 1 [(validate.rules).message = {required: true}];
 
   // Should the value be appended? If true (default), the value is appended to
   // existing values. Otherwise it replaces any existing values.
   google.protobuf.BoolValue append = 2;
+
+  // [#not-implemented-hide:] Describes the action taken to append/overwrite the given value for an existing header
+  // or to only add this header if it's absent. Value defaults to :ref:`APPEND_IF_EXISTS_OR_ADD<envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.APPEND_IF_EXISTS_OR_ADD>`.
+  HeaderAppendAction append_action = 3 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Wrapper for a set of headers.
@@ -330,7 +373,7 @@ message WatchedDirectory {
   string path = 1 [(validate.rules).string = {min_len: 1}];
 }
 
-// Data source consisting of either a file or an inline value.
+// Data source consisting of a file, an inline value, or an environment variable.
 message DataSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.DataSource";
 
@@ -345,6 +388,9 @@ message DataSource {
 
     // String inlined in the configuration.
     string inline_string = 3;
+
+    // Environment variable data source.
+    string environment_variable = 4 [(validate.rules).string = {min_len: 1}];
   }
 }
 

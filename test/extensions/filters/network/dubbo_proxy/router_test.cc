@@ -1,10 +1,10 @@
 #include <memory>
 
-#include "extensions/filters/network/dubbo_proxy/app_exception.h"
-#include "extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
-#include "extensions/filters/network/dubbo_proxy/message_impl.h"
-#include "extensions/filters/network/dubbo_proxy/protocol.h"
-#include "extensions/filters/network/dubbo_proxy/router/router_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/app_exception.h"
+#include "source/extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/protocol.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/router_impl.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/extensions/filters/network/dubbo_proxy/utility.h"
@@ -97,6 +97,140 @@ public:
     context_.cluster_manager_.initializeThreadLocalClusters({"cluster"});
   }
 
+  void verifyMetadataMatchCriteriaFromRequest(bool route_entry_has_match) {
+    ProtobufWkt::Struct request_struct;
+    ProtobufWkt::Value val;
+
+    // Populate metadata like StreamInfo.setDynamicMetadata() would.
+    auto& fields_map = *request_struct.mutable_fields();
+    val.set_string_value("v3.1");
+    fields_map["version"] = val;
+    val.set_string_value("devel");
+    fields_map["stage"] = val;
+    val.set_string_value("1");
+    fields_map["xkey_in_request"] = val;
+    (*callbacks_.stream_info_.metadata_
+          .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
+        request_struct;
+
+    // Populate route entry's metadata which will be overridden.
+    val.set_string_value("v3.0");
+    fields_map = *request_struct.mutable_fields();
+    fields_map["version"] = val;
+    fields_map.erase("xkey_in_request");
+    Envoy::Router::MetadataMatchCriteriaImpl route_entry_matches(request_struct);
+
+    if (route_entry_has_match) {
+      ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(&route_entry_matches));
+    } else {
+      ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
+    }
+
+    auto match = router_->metadataMatchCriteria()->metadataMatchCriteria();
+
+    EXPECT_EQ(match.size(), 3);
+    auto it = match.begin();
+
+    // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
+    // below matters.
+
+    // `stage` was only set by the request, not by the route entry.
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "devel");
+    it++;
+
+    // `version` should be what came from the request, overriding the route entry.
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+    it++;
+
+    // `key_in_request` was only set by the request
+    EXPECT_EQ((*it)->name(), "xkey_in_request");
+    EXPECT_EQ((*it)->value().value().string_value(), "1");
+  }
+
+  void verifyMetadataMatchCriteriaFromRoute(bool route_entry_has_match) {
+    ProtobufWkt::Struct route_struct;
+    ProtobufWkt::Value val;
+
+    // Populate metadata like StreamInfo.setDynamicMetadata() would.
+    auto& fields_map = *route_struct.mutable_fields();
+    val.set_string_value("v3.1");
+    fields_map["version"] = val;
+    val.set_string_value("devel");
+    fields_map["stage"] = val;
+    val.set_string_value("1");
+    fields_map["xkey_in_request"] = val;
+
+    Envoy::Router::MetadataMatchCriteriaImpl route_entry_matches(route_struct);
+
+    if (route_entry_has_match) {
+      ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(&route_entry_matches));
+
+      EXPECT_NE(nullptr, router_->metadataMatchCriteria());
+      auto match = router_->metadataMatchCriteria()->metadataMatchCriteria();
+      EXPECT_EQ(match.size(), 3);
+      auto it = match.begin();
+
+      // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
+      // below matters.
+
+      EXPECT_EQ((*it)->name(), "stage");
+      EXPECT_EQ((*it)->value().value().string_value(), "devel");
+      it++;
+
+      EXPECT_EQ((*it)->name(), "version");
+      EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+      it++;
+
+      EXPECT_EQ((*it)->name(), "xkey_in_request");
+      EXPECT_EQ((*it)->value().value().string_value(), "1");
+    } else {
+      ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
+
+      EXPECT_EQ(nullptr, router_->metadataMatchCriteria());
+    }
+  }
+
+  void verifyMetadataMatchCriteriaFromPreviousCompute() {
+    ProtobufWkt::Struct request_struct;
+    ProtobufWkt::Value val;
+
+    // Populate metadata like StreamInfo.setDynamicMetadata() would.
+    auto& fields_map = *request_struct.mutable_fields();
+    val.set_string_value("v3.1");
+    fields_map["version"] = val;
+    val.set_string_value("devel");
+    fields_map["stage"] = val;
+    (*callbacks_.stream_info_.metadata_
+          .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
+        request_struct;
+
+    ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
+
+    auto match = router_->metadataMatchCriteria()->metadataMatchCriteria();
+    EXPECT_EQ(match.size(), 2);
+
+    val.set_string_value("1");
+    fields_map["xkey_in_request"] = val;
+
+    (*callbacks_.stream_info_.metadata_
+          .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
+        request_struct;
+
+    match = router_->metadataMatchCriteria()->metadataMatchCriteria();
+    EXPECT_EQ(match.size(), 2);
+
+    auto it = match.begin();
+
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "devel");
+    it++;
+
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+  }
+
   void initializeRouter() {
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
@@ -106,6 +240,7 @@ public:
     EXPECT_EQ(nullptr, router_->downstreamConnection());
 
     router_->setDecoderFilterCallbacks(callbacks_);
+    router_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
   void initializeMetadata(MessageType msg_type) {
@@ -237,6 +372,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Network::MockClientConnection> connection_;
   NiceMock<DubboFilters::MockDecoderFilterCallbacks> callbacks_;
+  NiceMock<DubboFilters::MockEncoderFilterCallbacks> encoder_callbacks_;
   NiceMock<MockSerializer>* serializer_{};
   NiceMock<MockProtocol>* protocol_{};
   NiceMock<MockRoute>* route_{};
@@ -335,7 +471,7 @@ TEST_F(DubboRouterTest, NoHealthyHosts) {
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(Return(nullptr));
+      .WillOnce(Return(absl::nullopt));
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
@@ -397,6 +533,41 @@ TEST_F(DubboRouterTest, NoCluster) {
         EXPECT_FALSE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
+}
+
+TEST_F(DubboRouterTest, MetadataMatchCriteriaFromRequest) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+
+  verifyMetadataMatchCriteriaFromRequest(true);
+}
+
+TEST_F(DubboRouterTest, MetadataMatchCriteriaFromRequestNoRouteEntryMatch) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+
+  verifyMetadataMatchCriteriaFromRequest(false);
+}
+
+TEST_F(DubboRouterTest, MetadataMatchCriteriaFromRoute) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+
+  verifyMetadataMatchCriteriaFromRoute(true);
+}
+
+TEST_F(DubboRouterTest, MetadataMatchCriteriaFromRouteNoRouteEntryMatch) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+
+  verifyMetadataMatchCriteriaFromRoute(false);
+}
+
+TEST_F(DubboRouterTest, MetadataMatchCriteriaFromPreviousCompute) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+
+  verifyMetadataMatchCriteriaFromPreviousCompute();
 }
 
 TEST_F(DubboRouterTest, UnexpectedRouterDestroy) {
@@ -624,6 +795,74 @@ TEST_F(DubboRouterTest, LocalClosedWhileResponseComplete) {
   router_->onUpstreamData(buffer, false);
 
   upstream_connection_.close(Network::ConnectionCloseType::NoFlush);
+
+  destroyRouter();
+}
+
+TEST_F(DubboRouterTest, ResponseOk) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+  connectUpstream();
+
+  auto response_meta = std::make_shared<MessageMetadata>();
+  response_meta->setMessageType(MessageType::Response);
+  response_meta->setResponseStatus(ResponseStatus::Ok);
+
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  EXPECT_EQ(FilterStatus::Continue, router_->onMessageEncoded(response_meta, message_context_));
+
+  destroyRouter();
+}
+
+TEST_F(DubboRouterTest, ResponseException) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+  connectUpstream();
+
+  auto response_meta = std::make_shared<MessageMetadata>();
+  response_meta->setMessageType(MessageType::Exception);
+  response_meta->setResponseStatus(ResponseStatus::Ok);
+
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
+  EXPECT_EQ(FilterStatus::Continue, router_->onMessageEncoded(response_meta, message_context_));
+
+  destroyRouter();
+}
+
+TEST_F(DubboRouterTest, ResponseServerTimeout) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+  connectUpstream();
+
+  auto response_meta = std::make_shared<MessageMetadata>();
+  response_meta->setMessageType(MessageType::Response);
+  response_meta->setResponseStatus(ResponseStatus::ServerTimeout);
+
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  EXPECT_EQ(FilterStatus::Continue, router_->onMessageEncoded(response_meta, message_context_));
+
+  destroyRouter();
+}
+
+TEST_F(DubboRouterTest, ResponseServerError) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+  connectUpstream();
+
+  auto response_meta = std::make_shared<MessageMetadata>();
+  response_meta->setMessageType(MessageType::Response);
+  response_meta->setResponseStatus(ResponseStatus::ServiceError);
+
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
+  EXPECT_EQ(FilterStatus::Continue, router_->onMessageEncoded(response_meta, message_context_));
 
   destroyRouter();
 }

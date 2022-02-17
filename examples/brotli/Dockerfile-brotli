@@ -1,0 +1,5 @@
+FROM envoyproxy/envoy-dev:latest
+
+COPY ./brotli-envoy.yaml /etc/brotli-envoy.yaml
+RUN chmod go+r /etc/brotli-envoy.yaml
+CMD ["/usr/local/bin/envoy", "-c", "/etc/brotli-envoy.yaml", "--service-cluster", "brotli"]

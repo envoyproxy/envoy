@@ -1,6 +1,5 @@
 config {
   name: "envoy.filters.http.grpc_json_transcoder"
-  typed_config: {}
 }
 
 data {

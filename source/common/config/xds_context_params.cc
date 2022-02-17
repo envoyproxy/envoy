@@ -1,7 +1,7 @@
-#include "common/config/xds_context_params.h"
+#include "source/common/config/xds_context_params.h"
 
-#include "common/common/macros.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/macros.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Config {

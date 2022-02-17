@@ -1,6 +1,6 @@
 #include "envoy/http/header_map.h"
 
-#include "extensions/filters/http/cache/cacheability_utils.h"
+#include "source/extensions/filters/http/cache/cacheability_utils.h"
 
 #include "test/test_common/utility.h"
 
@@ -14,24 +14,20 @@ namespace {
 
 class CanServeRequestFromCacheTest : public testing::Test {
 protected:
-  Http::TestRequestHeaderMapImpl request_headers_ = {{":path", "/"},
-                                                     {":method", "GET"},
-                                                     {"x-forwarded-proto", "http"},
-                                                     {":authority", "test.com"}};
+  Http::TestRequestHeaderMapImpl request_headers_ = {
+      {":path", "/"}, {":method", "GET"}, {":scheme", "http"}, {":authority", "test.com"}};
 };
 
 class RequestConditionalHeadersTest : public testing::TestWithParam<std::string> {
 protected:
-  Http::TestRequestHeaderMapImpl request_headers_ = {{":path", "/"},
-                                                     {":method", "GET"},
-                                                     {"x-forwarded-proto", "http"},
-                                                     {":authority", "test.com"}};
+  Http::TestRequestHeaderMapImpl request_headers_ = {
+      {":path", "/"}, {":method", "GET"}, {":scheme", "http"}, {":authority", "test.com"}};
   std::string conditionalHeader() const { return GetParam(); }
 };
 
-envoy::extensions::filters::http::cache::v3alpha::CacheConfig getConfig() {
+envoy::extensions::filters::http::cache::v3::CacheConfig getConfig() {
   // Allows 'accept' to be varied in the tests.
-  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
+  envoy::extensions::filters::http::cache::v3::CacheConfig config;
   const auto& add_accept = config.mutable_allowed_vary_headers()->Add();
   add_accept->set_exact("accept");
   return config;
@@ -46,7 +42,7 @@ protected:
   Http::TestResponseHeaderMapImpl response_headers_ = {{":status", "200"},
                                                        {"date", "Sun, 06 Nov 1994 08:49:37 GMT"},
                                                        {"cache-control", cache_control_}};
-  VaryHeader vary_allow_list_;
+  VaryAllowList vary_allow_list_;
 };
 
 TEST_F(CanServeRequestFromCacheTest, CacheableRequest) {
@@ -78,11 +74,11 @@ TEST_F(CanServeRequestFromCacheTest, MethodHeader) {
   EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
 }
 
-TEST_F(CanServeRequestFromCacheTest, ForwardedProtoHeader) {
+TEST_F(CanServeRequestFromCacheTest, SchemeHeader) {
   EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
-  request_headers_.setForwardedProto("ftp");
+  request_headers_.setScheme("ftp");
   EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
-  request_headers_.removeForwardedProto();
+  request_headers_.removeScheme();
   EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
 }
 

@@ -1,8 +1,7 @@
-#include "server/config_validation/dispatcher.h"
+#include "source/server/config_validation/dispatcher.h"
 
-#include "common/common/assert.h"
-
-#include "server/config_validation/connection.h"
+#include "source/common/common/assert.h"
+#include "source/server/config_validation/connection.h"
 
 namespace Envoy {
 namespace Event {
@@ -16,15 +15,10 @@ Network::ClientConnectionPtr ValidationDispatcher::createClientConnection(
                                                              std::move(transport_socket), options);
 }
 
-Network::DnsResolverSharedPtr ValidationDispatcher::createDnsResolver(
-    const std::vector<Network::Address::InstanceConstSharedPtr>&, const bool) {
-  return dns_resolver_;
-}
-
 Network::ListenerPtr ValidationDispatcher::createListener(Network::SocketSharedPtr&&,
-                                                          Network::TcpListenerCallbacks&, bool,
-                                                          uint32_t) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+                                                          Network::TcpListenerCallbacks&,
+                                                          Runtime::Loader&, bool, bool) {
+  return nullptr;
 }
 
 } // namespace Event

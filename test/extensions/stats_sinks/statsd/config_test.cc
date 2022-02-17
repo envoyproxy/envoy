@@ -3,12 +3,10 @@
 #include "envoy/network/address.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/well_known_names.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/stat_sinks/common/statsd/statsd.h"
-#include "extensions/stat_sinks/statsd/config.h"
-#include "extensions/stat_sinks/well_known_names.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/stat_sinks/common/statsd/statsd.h"
+#include "source/extensions/stat_sinks/statsd/config.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
@@ -27,13 +25,11 @@ namespace Statsd {
 namespace {
 
 TEST(StatsConfigTest, ValidTcpStatsd) {
-  const std::string name = StatsSinkNames::get().Statsd;
-
   envoy::config::metrics::v3::StatsdSink sink_config;
   sink_config.set_tcp_cluster_name("fake_cluster");
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(StatsdName);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -46,14 +42,6 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
   EXPECT_NE(dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get()), nullptr);
 }
 
-// Test that the deprecated extension name still functions.
-TEST(StatsConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.statsd";
-
-  ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
-                         deprecated_name));
-}
-
 class StatsConfigParameterizedTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, StatsConfigParameterizedTest,
@@ -61,7 +49,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, StatsConfigParameterizedTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(StatsConfigParameterizedTest, UdpSinkDefaultPrefix) {
-  const std::string name = StatsSinkNames::get().Statsd;
   const auto& defaultPrefix = Common::Statsd::getDefaultPrefix();
 
   envoy::config::metrics::v3::StatsdSink sink_config;
@@ -77,7 +64,7 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkDefaultPrefix) {
   EXPECT_EQ(sink_config.prefix(), "");
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(StatsdName);
   ASSERT_NE(factory, nullptr);
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
@@ -92,7 +79,6 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkDefaultPrefix) {
 }
 
 TEST_P(StatsConfigParameterizedTest, UdpSinkCustomPrefix) {
-  const std::string name = StatsSinkNames::get().Statsd;
   const std::string customPrefix = "prefix.test";
 
   envoy::config::metrics::v3::StatsdSink sink_config;
@@ -109,7 +95,7 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkCustomPrefix) {
   EXPECT_NE(sink_config.prefix(), "");
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(StatsdName);
   ASSERT_NE(factory, nullptr);
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
@@ -124,14 +110,12 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkCustomPrefix) {
 }
 
 TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
-  const std::string name = StatsSinkNames::get().Statsd;
-
   envoy::config::metrics::v3::StatsdSink sink_config;
   const auto& defaultPrefix = Common::Statsd::getDefaultPrefix();
   sink_config.set_tcp_cluster_name("fake_cluster");
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(StatsdName);
   ASSERT_NE(factory, nullptr);
   EXPECT_EQ(sink_config.prefix(), "");
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -148,8 +132,6 @@ TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
 }
 
 TEST(StatsConfigTest, TcpSinkCustomPrefix) {
-  const std::string name = StatsSinkNames::get().Statsd;
-
   envoy::config::metrics::v3::StatsdSink sink_config;
   std::string prefix = "prefixTest";
   sink_config.set_tcp_cluster_name("fake_cluster");
@@ -157,7 +139,7 @@ TEST(StatsConfigTest, TcpSinkCustomPrefix) {
   sink_config.set_prefix(prefix);
   EXPECT_EQ(sink_config.prefix(), prefix);
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(StatsdName);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -179,8 +161,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, StatsConfigLoopbackTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
-  const std::string name = StatsSinkNames::get().Statsd;
-
   envoy::config::metrics::v3::StatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
   envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
@@ -190,7 +170,7 @@ TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
   socket_address.set_port_value(8125);
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(StatsdName);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();

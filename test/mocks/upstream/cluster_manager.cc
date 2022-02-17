@@ -9,8 +9,6 @@
 namespace Envoy {
 namespace Upstream {
 
-using ::testing::_;
-using ::testing::Eq;
 using ::testing::Return;
 using ::testing::ReturnRef;
 
@@ -26,6 +24,12 @@ MockClusterManager::MockClusterManager()
   ON_CALL(*this, grpcAsyncClientManager()).WillByDefault(ReturnRef(async_client_manager_));
   ON_CALL(*this, localClusterName()).WillByDefault((ReturnRef(local_cluster_name_)));
   ON_CALL(*this, subscriptionFactory()).WillByDefault(ReturnRef(subscription_factory_));
+  ON_CALL(*this, allocateOdCdsApi(_, _, _))
+      .WillByDefault(Invoke([](const envoy::config::core::v3::ConfigSource&,
+                               OptRef<xds::core::v3::ResourceLocator>,
+                               ProtobufMessage::ValidationVisitor&) -> OdCdsApiHandlePtr {
+        return MockOdCdsApiHandle::create();
+      }));
 }
 
 MockClusterManager::~MockClusterManager() = default;
@@ -51,7 +55,7 @@ void MockClusterManager::initializeThreadLocalClusters(
   // TODO(mattklein123): This should create a dedicated and new mock for each initialized cluster,
   // but this has larger test implications. I will fix this in a follow up.
   for (const auto& cluster_name : cluster_names) {
-    ON_CALL(*this, getThreadLocalCluster(cluster_name))
+    ON_CALL(*this, getThreadLocalCluster(absl::string_view(cluster_name)))
         .WillByDefault(Return(&thread_local_cluster_));
   }
 }

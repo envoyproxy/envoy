@@ -11,9 +11,9 @@
 #include "envoy/type/matcher/string.pb.h"
 #include "envoy/upstream/health_checker.h"
 
-#include "common/common/logger.h"
-#include "common/common/matchers.h"
-#include "common/network/transport_socket_options_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
+#include "source/common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -76,7 +76,8 @@ protected:
   class ActiveHealthCheckSession : public Event::DeferredDeletable {
   public:
     ~ActiveHealthCheckSession() override;
-    HealthTransition setUnhealthy(envoy::data::core::v3::HealthCheckFailureType type);
+    HealthTransition setUnhealthy(envoy::data::core::v3::HealthCheckFailureType type,
+                                  bool retriable);
     void onDeferredDeleteBase();
     void start() { onInitialInterval(); }
 
@@ -85,7 +86,7 @@ protected:
 
     void handleSuccess(bool degraded = false);
     void handleDegraded();
-    void handleFailure(envoy::data::core::v3::HealthCheckFailureType type);
+    void handleFailure(envoy::data::core::v3::HealthCheckFailureType type, bool retriable = false);
 
     HostSharedPtr host_;
 

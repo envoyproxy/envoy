@@ -16,7 +16,7 @@ envoy_cc_library(
     # This extension is core code.
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/http:original_ip_detection_interface",
+        "//envoy/http:original_ip_detection_interface",
         "//source/common/http:utility_lib",
         "@envoy_api//envoy/extensions/http/original_ip_detection/xff/v3:pkg_cc_proto",
     ],
@@ -26,14 +26,12 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.http.original_ip_detection",
-    security_posture = "robust_to_untrusted_downstream",
     # This extension is core code.
     visibility = ["//visibility:public"],
     deps = [
         ":xff_lib",
-        "//include/envoy/http:original_ip_detection_interface",
-        "//include/envoy/registry",
+        "//envoy/http:original_ip_detection_interface",
+        "//envoy/registry",
         "//source/common/config:utility_lib",
         "@envoy_api//envoy/extensions/http/original_ip_detection/xff/v3:pkg_cc_proto",
     ],

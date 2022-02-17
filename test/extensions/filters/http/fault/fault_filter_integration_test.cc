@@ -13,7 +13,7 @@ class FaultIntegrationTest : public Event::TestUsingSimulatedTime,
                              public HttpProtocolIntegrationTest {
 public:
   void initializeFilter(const std::string& filter_config) {
-    config_helper_.addFilter(filter_config);
+    config_helper_.prependFilter(filter_config);
     initialize();
   }
 
@@ -393,7 +393,7 @@ TEST_P(FaultIntegrationTestAllProtocols, FaultAbortGrpcConfig) {
 class FaultIntegrationTestHttp2 : public FaultIntegrationTest {};
 INSTANTIATE_TEST_SUITE_P(Protocols, FaultIntegrationTestHttp2,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
+                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Rate limiting with trailers received after the body has been flushed.

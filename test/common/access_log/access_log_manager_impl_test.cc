@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "common/access_log/access_log_manager_impl.h"
-#include "common/filesystem/file_shared_impl.h"
+#include "source/common/access_log/access_log_manager_impl.h"
+#include "source/common/filesystem/file_shared_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/access_log/mocks.h"
@@ -370,29 +370,25 @@ TEST_F(AccessLogManagerImplTest, ReopenFileOnTimerOnly) {
   }
 }
 
-TEST_F(AccessLogManagerImplTest, ReopenThrows) {
+TEST_F(AccessLogManagerImplTest, ReopenRetry) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
-
-  EXPECT_CALL(*file_, write_(_))
-      .WillRepeatedly(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
-        return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
-      }));
 
   Sequence sq;
   EXPECT_CALL(*file_, open_(_))
       .InSequence(sq)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 
+  EXPECT_CALL(*file_, write_(_))
+      .InSequence(sq)
+      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
+        EXPECT_EQ(0, data.compare("before reopen"));
+        return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
+      }));
+
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog(
       Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"});
-  EXPECT_CALL(*file_, close_())
-      .InSequence(sq)
-      .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
-  EXPECT_CALL(*file_, open_(_))
-      .InSequence(sq)
-      .WillOnce(Return(ByMove(Filesystem::resultFailure<bool>(false, 0))));
 
-  log_file->write("test write");
+  log_file->write("before reopen");
   timer->invokeCallback();
   {
     Thread::LockGuard lock(file_->write_mutex_);
@@ -400,23 +396,55 @@ TEST_F(AccessLogManagerImplTest, ReopenThrows) {
       file_->write_event_.wait(file_->write_mutex_);
     }
   }
+
+  EXPECT_CALL(*file_, close_())
+      .InSequence(sq)
+      .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+
+  EXPECT_CALL(*file_, open_(_))
+      .InSequence(sq)
+      .WillOnce(Return(ByMove(Filesystem::resultFailure<bool>(false, 0))));
+
+  EXPECT_CALL(*file_, open_(_))
+      .InSequence(sq)
+      .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+
+  EXPECT_CALL(*file_, write_(_))
+      .InSequence(sq)
+      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
+        EXPECT_EQ(0, data.compare("after reopen"));
+        return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
+      }));
+
+  EXPECT_CALL(*file_, close_())
+      .InSequence(sq)
+      .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+
   log_file->reopen();
 
-  log_file->write("this is to force reopen");
+  log_file->write("drop data during reopen fail");
   timer->invokeCallback();
 
   {
     Thread::LockGuard lock(file_->open_mutex_);
-    while (file_->num_opens_ != 2) {
+    while (file_->num_opens_ != 3) {
       file_->open_event_.wait(file_->open_mutex_);
     }
   }
 
-  // write call should not cause any exceptions
-  log_file->write("random data");
+  log_file->write("after reopen");
   timer->invokeCallback();
 
+  {
+    Thread::LockGuard lock(file_->write_mutex_);
+    while (file_->num_writes_ != 2) {
+      file_->write_event_.wait(file_->write_mutex_);
+    }
+  }
   waitForCounterEq("filesystem.reopen_failed", 1);
+  EXPECT_EQ(0UL,
+            store_.gauge("filesystem.write_total_buffered", Stats::Gauge::ImportMode::Accumulate)
+                .value());
 }
 
 TEST_F(AccessLogManagerImplTest, BigDataChunkShouldBeFlushedWithoutTimer) {

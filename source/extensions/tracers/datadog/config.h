@@ -5,7 +5,7 @@
 #include "envoy/config/trace/v3/datadog.pb.h"
 #include "envoy/config/trace/v3/datadog.pb.validate.h"
 
-#include "extensions/tracers/common/factory_base.h"
+#include "source/extensions/tracers/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {

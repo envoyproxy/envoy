@@ -20,8 +20,8 @@ envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/event:dispatcher_interface",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:exception_lib",

@@ -1,7 +1,7 @@
-#include "server/admin/utils.h"
+#include "source/server/admin/utils.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/http/headers.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/http/headers.h"
 
 namespace Envoy {
 namespace Server {
@@ -18,7 +18,7 @@ envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
     return health_check_failed ? envoy::admin::v3::ServerInfo::DRAINING
                                : envoy::admin::v3::ServerInfo::LIVE;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& header_map) {

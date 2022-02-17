@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # External authorization L4 network filter
-# Public docs: TODO(saumoh): Docs needed in docs/root/configuration/network_filters
+# Public docs: TODO(saumoh): Docs needed in docs/root/configuration/listeners/network_filters
 
 envoy_extension_package()
 
@@ -17,11 +17,11 @@ envoy_cc_library(
     srcs = ["ext_authz.cc"],
     hdrs = ["ext_authz.h"],
     deps = [
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/stats:stats_macros",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/runtime:runtime_interface",
+        "//envoy/stats:stats_macros",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:matchers_lib",
         "//source/common/tracing:http_tracer_lib",
@@ -37,10 +37,8 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.network",
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network:well_known_names",

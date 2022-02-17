@@ -1,0 +1,30 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_package()
+
+envoy_cc_library(
+    name = "conn_pool_interface",
+    hdrs = ["conn_pool.h"],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/common:conn_pool_interface",
+        "//envoy/event:deferred_deletable",
+        "//envoy/upstream:upstream_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_interface",
+    hdrs = ["upstream.h"],
+    deps = [
+        "//envoy/tcp:conn_pool_interface",
+        "//envoy/upstream:upstream_interface",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+    ],
+)

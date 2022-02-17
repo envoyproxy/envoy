@@ -1,9 +1,8 @@
 #pragma once
 
-#include "envoy/stats/symbol_table.h"
 #include "envoy/stats/tag.h"
 
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Stats {
@@ -54,6 +53,11 @@ private:
   SymbolTable::StoragePtr joinNameAndTags(StatName name, const StatNameTagVector& stat_name_tags,
                                           SymbolTable& symbol_table);
 };
+
+bool isTagNameValid(absl::string_view name);
+
+bool isTagValueValid(absl::string_view value);
+
 } // namespace TagUtility
 } // namespace Stats
 } // namespace Envoy

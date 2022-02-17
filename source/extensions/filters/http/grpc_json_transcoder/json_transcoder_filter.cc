@@ -1,4 +1,4 @@
-#include "extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
 #include <memory>
 #include <unordered_set>
@@ -7,18 +7,16 @@
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
 #include "envoy/http/filter.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/utility.h"
-#include "common/grpc/common.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
-
-#include "extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
 
 #include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"
@@ -63,9 +61,6 @@ struct RcDetailsValues {
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
-
-constexpr absl::string_view buffer_limits_runtime_feature =
-    "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits";
 
 const Http::LowerCaseString& trailerHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "trailer");
@@ -138,8 +133,9 @@ JsonTranscoderConfig::JsonTranscoderConfig(
       throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
     }
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
+      DescriptorSetCase::DESCRIPTOR_SET_NOT_SET:
+    throw EnvoyException("transcoding_filter: descriptor not set");
   }
 
   for (const auto& file : descriptor_set.file()) {
@@ -200,6 +196,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   }
 
   switch (proto_config.url_unescape_spec()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       ALL_CHARACTERS_EXCEPT_RESERVED:
     pmb.SetUrlUnescapeSpec(
@@ -213,9 +210,9 @@ JsonTranscoderConfig::JsonTranscoderConfig(
       ALL_CHARACTERS:
     pmb.SetUrlUnescapeSpec(google::grpc::transcoding::UrlUnescapeSpec::kAllCharacters);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  pmb.SetQueryParamUnescapePlus(proto_config.query_param_unescape_plus());
+  pmb.SetMatchUnregisteredCustomVerb(proto_config.match_unregistered_custom_verb());
 
   path_matcher_ = pmb.Build();
 
@@ -419,14 +416,8 @@ JsonTranscoderConfig::translateProtoMessageToJson(const Protobuf::Message& messa
 JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : config_(config) {}
 
 void JsonTranscoderFilter::initPerRouteConfig() {
-  if (!decoder_callbacks_->route() || !decoder_callbacks_->route()->routeEntry()) {
-    per_route_config_ = &config_;
-    return;
-  }
-
-  const std::string& name = HttpFilterNames::get().GrpcJsonTranscoder;
-  const auto* entry = decoder_callbacks_->route()->routeEntry();
-  const auto* route_local = entry->mostSpecificPerFilterConfigTyped<JsonTranscoderConfig>(name);
+  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<JsonTranscoderConfig>(
+      "envoy.filters.http.grpc_json_transcoder", decoder_callbacks_->route());
 
   per_route_config_ = route_local ? route_local : &config_;
 }
@@ -473,7 +464,8 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     decoder_callbacks_->sendLocalReply(
         static_cast<Http::Code>(http_code), status.message().ToString(), nullptr, absl::nullopt,
         absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{",
-                     MessageUtil::codeEnumToString(status.code()), "}"));
+                     StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(status.code())),
+                     "}"));
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -753,7 +745,10 @@ bool JsonTranscoderFilter::checkIfTranscoderFailed(const std::string& details) {
         Http::Code::BadRequest,
         absl::string_view(request_status.message().data(), request_status.message().size()),
         nullptr, absl::nullopt,
-        absl::StrCat(details, "{", MessageUtil::codeEnumToString(request_status.code()), "}"));
+        absl::StrCat(
+            details, "{",
+            StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(request_status.code())),
+            "}"));
 
     return true;
   }
@@ -900,10 +895,6 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
 }
 
 bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
-  if (!Runtime::runtimeFeatureEnabled(buffer_limits_runtime_feature)) {
-    return false;
-  }
-
   if (buffer_length > decoder_callbacks_->decoderBufferLimit()) {
     ENVOY_LOG(debug,
               "Request rejected because the transcoder's internal buffer size exceeds the "
@@ -922,10 +913,6 @@ bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
 }
 
 bool JsonTranscoderFilter::encoderBufferLimitReached(uint64_t buffer_length) {
-  if (!Runtime::runtimeFeatureEnabled(buffer_limits_runtime_feature)) {
-    return false;
-  }
-
   if (buffer_length > encoder_callbacks_->encoderBufferLimit()) {
     ENVOY_LOG(debug,
               "Response not transcoded because the transcoder's internal buffer size exceeds the "

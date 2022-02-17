@@ -6,11 +6,14 @@
 /api/ @envoyproxy/api-shepherds
 # access loggers
 /*/extensions/access_loggers/common @auni53 @zuercher
+/*/extensions/access_loggers/filters/cel @dio @douglas-reid
 /*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov
 /*/extensions/access_loggers/stream @mattklein123 @davinci26
 # compression extensions
 /*/extensions/compression/common/compressor @rojkov @junr03
 /*/extensions/compression/gzip/compressor @rojkov @junr03
+# alternate protocols cache extensions
+/*/extensions/filters/http/alternate_protocols_cache @RyanTheOptimist @alyssawilk
 # csrf extension
 /*/extensions/filters/http/csrf @dschaller @mattklein123
 # original_src http filter extension
@@ -20,9 +23,7 @@
 # original_src common extension
 extensions/filters/common/original_src @snowp @klarose
 # dubbo_proxy extension
-/*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan
-# rocketmq_proxy extension
-/*/extensions/filters/network/rocketmq_proxy @aaron-ai @lizhanhui @lizan
+/*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan @wbpcode
 # thrift_proxy extension
 /*/extensions/filters/network/thrift_proxy @zuercher @rgs1
 # cdn_loop extension
@@ -32,6 +33,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/compressor @rojkov @dio
 # external processing filter
 /*/extensions/filters/http/ext_proc @gbrail @snowp
+/*/extensions/filters/common/mutation_rules @gbrail @snowp
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
@@ -39,9 +41,11 @@ extensions/filters/common/original_src @snowp @klarose
 # header_to_metadata extension
 /*/extensions/filters/http/header_to_metadata @rgs1 @zuercher
 # alts transport socket extension
-/*/extensions/transport_sockets/alts @antoniovicente @asraa @yangminzhu
+/*/extensions/transport_sockets/alts @antoniovicente @adisuissa @yangminzhu
+# tcp_stats transport socket extension
+/*/extensions/transport_sockets/tcp_stats @ggreenway @mattklein123
 # tls transport socket extension
-/*/extensions/transport_sockets/tls @lizan @asraa @ggreenway
+/*/extensions/transport_sockets/tls @lizan @ggreenway
 # tls SPIFFE certificate validator extension
 /*/extensions/transport_sockets/tls/cert_validator/spiffe @mathetake @lizan
 # proxy protocol socket extension
@@ -57,15 +61,11 @@ extensions/filters/common/original_src @snowp @klarose
 # tracers.datadog extension
 /*/extensions/tracers/datadog @cgilmour @palazzem @mattklein123
 # tracers.xray extension
-/*/extensions/tracers/xray @abaptiste @lavignes @mattklein123
+/*/extensions/tracers/xray @abaptiste @suniltheta @mattklein123
 # tracers.skywalking extension
 /*/extensions/tracers/skywalking @wbpcode @dio @lizan @Shikugawa
-# mysql_proxy extension
-/*/extensions/filters/network/mysql_proxy @rshriram @venilnoronha @mattklein123
-# postgres_proxy extension
-/*/extensions/filters/network/postgres_proxy @fabriziomello @cpakulski @dio
 # quic extension
-/*/extensions/quic_listeners/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
+/*/extensions/quic/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
 # zookeeper_proxy extension
 /*/extensions/filters/network/zookeeper_proxy @rgs1 @snowp
 # redis cluster extension
@@ -79,7 +79,7 @@ extensions/filters/common/original_src @snowp @klarose
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @snowp
 # HTTP caching extension
-/*/extensions/filters/http/cache @toddmgreer @jmarantz
+/*/extensions/filters/http/cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
 # aws_iam grpc credentials
 /*/extensions/grpc_credentials/aws_iam @lavignes @mattklein123 @tonya11en
 /*/extensions/common/aws @lavignes @mattklein123 @tonya11en
@@ -105,25 +105,23 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/wasm_runtime/ @PiotrSikora @mathetake @lizan
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
-# common crypto extension
-/*/extensions/common/crypto @lizan @bdecoste @asraa
 /*/extensions/common/proxy_protocol @alyssawilk @wez470
-/*/extensions/common/sqlutils @cpakulski @dio
 /*/extensions/filters/http/grpc_http1_bridge @snowp @jose
 /*/extensions/filters/http/gzip @gsagula @dio
 /*/extensions/filters/http/fault @rshriram @alyssawilk
 /*/extensions/filters/common/fault @rshriram @alyssawilk
 /*/extensions/filters/http/grpc_json_transcoder @qiwzhang @lizan
 /*/extensions/filters/http/router @alyssawilk @mattklein123 @snowp
+/*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway @alyssawilk
 /*/extensions/filters/http/grpc_web @fengli79 @lizan
 /*/extensions/filters/http/grpc_stats @kyessenov @lizan
-/*/extensions/filters/http/squash @yuval-k @alyssawilk
 /*/extensions/filters/common/original_src @klarose @snowp
-/*/extensions/filters/listener/tls_inspector @ggreenway @asraa
+/*/extensions/filters/listener/tls_inspector @ggreenway @KBaichoo
 /*/extensions/grpc_credentials/example @wozz @htuch
 /*/extensions/grpc_credentials/file_based_metadata @wozz @htuch
 /*/extensions/internal_redirect @alyssawilk @penguingao
 /*/extensions/stat_sinks/dog_statsd @taiki45 @jmarantz
+/*/extensions/stat_sinks/graphite_statsd @vaccarium @mattklein123
 /*/extensions/stat_sinks/hystrix @trabetti @jmarantz
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz
 # webassembly stat-sink extensions
@@ -137,12 +135,13 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/http_connection_manager @alyssawilk @mattklein123
 /*/extensions/filters/network/tcp_proxy @alyssawilk @zuercher @ggreenway
 /*/extensions/filters/network/echo @htuch @alyssawilk
-/*/extensions/filters/udp/dns_filter @abaptiste @mattklein123
+/*/extensions/filters/udp/dns_filter @abaptiste @mattklein123 @yanjunxiang-google
 /*/extensions/filters/network/direct_response @kyessenov @zuercher
 /*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010
 /*/extensions/clusters/aggregate @yxue @snowp
 # support for on-demand VHDS requests
 /*/extensions/filters/http/on_demand @dmitri-d @htuch @lambdai
+/*/extensions/filters/network/connection_limit @mattklein123 @alyssawilk @rojkov @delong-coder
 /*/extensions/filters/network/local_ratelimit @mattklein123 @junr03
 /*/extensions/filters/http/aws_request_signing @rgs1 @derekargueta @mattklein123 @marcomagdy @tonya11en
 /*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @lavignes @tonya11en
@@ -163,6 +162,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/common/local_ratelimit @mattklein123 @rgs1
 # HTTP Kill Request
 /*/extensions/filters/http/kill_request @qqustc @htuch
+# HTTP Stateful Session
+/*/extensions/filters/http/stateful_session @wbpcode @dio
 # Rate limit expression descriptor
 /*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
 # hash input matcher
@@ -183,6 +184,35 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/common/ext_authz @esmet @gsagula @dio
 /*/extensions/filters/http/ext_authz @esmet @gsagula @dio
 /*/extensions/filters/network/ext_authz @esmet @gsagula @dio
+# HTTP Bandwidth Limit
+/*/extensions/filters/http/bandwidth_limit @nitgoy @mattklein123 @yanavlasov @tonya11en
 # Original IP detection
 /*/extensions/http/original_ip_detection/custom_header @rgs1 @alyssawilk @antoniovicente
 /*/extensions/http/original_ip_detection/xff @rgs1 @alyssawilk @antoniovicente
+# set_metadata extension
+/*/extensions/filters/http/set_metadata @aguinet @snowp
+# Formatters
+/*/extensions/formatter/metadata @cpakulski @lizan
+/*/extensions/formatter/req_without_query @dio @tsaarni
+# IP address input matcher
+/*/extensions/matching/input_matchers/ip @aguinet @snowp
+# Key Value store
+/*/extensions/key_value @alyssawilk @ryantheoptimist
+# Stateful session
+/*/extensions/http/stateful_session/cookie @wbpcode @dio
+# DNS Resolver
+/*/extensions/network/dns_resolver/cares @junr03 @yanavlasov
+/*/extensions/network/dns_resolver/apple @junr03 @yanavlasov
+
+# Contrib
+/contrib/exe/ @mattklein123 @lizan
+/contrib/common/sqlutils/ @cpakulski @dio
+/contrib/squash/ @yuval-k @alyssawilk
+/contrib/kafka/ @mattklein123 @adamkotwasinski
+/contrib/rocketmq_proxy/ @aaron-ai @lizhanhui @lizan
+/contrib/mysql_proxy/ @rshriram @venilnoronha
+/contrib/postgres_proxy/ @fabriziomello @cpakulski @dio
+/contrib/sxg/ @cpapazian @rgs1 @alyssawilk
+/contrib/sip_proxy/ @durd07 @nearbyfly @dorisd0102
+/contrib/cryptomb/ @rojkov @ipuustin
+/contrib/vcl/ @florincoras @rojkov

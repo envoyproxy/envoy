@@ -1,9 +1,8 @@
-#include "extensions/tracers/xray/localized_sampling.h"
+#include "source/extensions/tracers/xray/localized_sampling.h"
 
-#include "common/http/exception.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/tracers/xray/util.h"
+#include "source/common/http/exception.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/tracers/xray/util.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -178,16 +177,16 @@ LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_jso
 }
 
 bool LocalizedSamplingStrategy::shouldTrace(const SamplingRequest& sampling_request) {
-  if (!custom_manifest_.hasCustomRules()) {
-    return shouldTrace(default_manifest_.defaultRule());
+  if (!manifest_.hasCustomRules()) {
+    return shouldTrace(manifest_.defaultRule());
   }
 
-  for (auto&& rule : custom_manifest_.customRules()) {
+  for (auto&& rule : manifest_.customRules()) {
     if (rule.appliesTo(sampling_request)) {
       return shouldTrace(rule);
     }
   }
-  return shouldTrace(custom_manifest_.defaultRule());
+  return shouldTrace(manifest_.defaultRule());
 }
 
 bool LocalizedSamplingStrategy::shouldTrace(LocalizedSamplingRule& rule) {

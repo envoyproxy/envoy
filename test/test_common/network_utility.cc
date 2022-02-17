@@ -5,15 +5,15 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/network/address_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/network/socket_interface.h"
-#include "common/network/socket_option_factory.h"
-#include "common/runtime/runtime_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/socket_interface.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/runtime/runtime_impl.h"
 
 #include "test/test_common/utility.h"
 
@@ -28,18 +28,18 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
                   << (addr_port == nullptr ? "nullptr" : addr_port->asString());
     return nullptr;
   }
-  SocketImpl sock(type, addr_port, nullptr);
+  SocketImpl sock(type, addr_port, nullptr, {});
   // Not setting REUSEADDR, therefore if the address has been recently used we won't reuse it here.
   // However, because we're going to use the address while checking if it is available, we'll need
   // to set REUSEADDR on listener sockets created by tests using an address validated by this means.
   Api::SysCallIntResult result = sock.bind(addr_port);
   const char* failing_fn = nullptr;
-  if (result.rc_ != 0) {
+  if (result.return_value_ != 0) {
     failing_fn = "bind";
   } else if (type == Socket::Type::Stream) {
     // Try listening on the port also, if the type is TCP.
     result = sock.listen(1);
-    if (result.rc_ != 0) {
+    if (result.return_value_ != 0) {
       failing_fn = "listen";
     }
   }
@@ -57,7 +57,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
                   << ")";
     return nullptr;
   }
-  return sock.addressProvider().localAddress();
+  return sock.connectionInfoProvider().localAddress();
 }
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
@@ -158,20 +158,20 @@ std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
   }
 
   // This seems to be needed on the coverage build for some reason.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("reached unexpected code");
 }
 
 std::pair<Address::InstanceConstSharedPtr, Network::SocketPtr>
 bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type, bool reuse_port) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  SocketPtr sock = std::make_unique<SocketImpl>(type, addr, nullptr);
+  SocketPtr sock = std::make_unique<SocketImpl>(type, addr, nullptr, SocketCreationOptions{});
   if (reuse_port) {
     sock->addOptions(SocketOptionFactory::buildReusePortOptions());
     Socket::applyOptions(sock->options(), *sock,
                          envoy::config::core::v3::SocketOption::STATE_PREBIND);
   }
   Api::SysCallIntResult result = sock->bind(addr);
-  if (0 != result.rc_) {
+  if (0 != result.return_value_) {
     sock->close();
     std::string msg = fmt::format("bind failed for address {} with error: {} ({})",
                                   addr->asString(), errorDetails(result.errno_), result.errno_);
@@ -179,7 +179,7 @@ bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type, bool reuse_p
     throw EnvoyException(msg);
   }
 
-  return std::make_pair(sock->addressProvider().localAddress(), std::move(sock));
+  return std::make_pair(sock->connectionInfoProvider().localAddress(), std::move(sock));
 }
 
 TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }
@@ -211,6 +211,9 @@ struct SyncPacketProcessor : public Network::UdpPacketProcessor {
   }
   uint64_t maxDatagramSize() const override { return max_rx_datagram_size_; }
   void onDatagramsDropped(uint32_t) override {}
+  size_t numPacketsExpectedPerEventLoop() const override {
+    return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
+  }
 
   std::list<Network::UdpRecvData>& data_;
   const uint64_t max_rx_datagram_size_;
@@ -229,19 +232,19 @@ UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version, uint64_t max_rx_da
     : socket_(
           std::make_unique<UdpListenSocket>(getCanonicalLoopbackAddress(version), nullptr, true)),
       max_rx_datagram_size_(max_rx_datagram_size) {
-  RELEASE_ASSERT(socket_->setBlockingForTest(true).rc_ != -1, "");
+  RELEASE_ASSERT(socket_->setBlockingForTest(true).return_value_ != -1, "");
 }
 
 void UdpSyncPeer::write(const std::string& buffer, const Network::Address::Instance& peer) {
   const auto rc = Network::Utility::writeToSocket(socket_->ioHandle(), Buffer::OwnedImpl(buffer),
                                                   nullptr, peer);
-  ASSERT_EQ(rc.rc_, buffer.length());
+  ASSERT_EQ(rc.return_value_, buffer.length());
 }
 
 void UdpSyncPeer::recv(Network::UdpRecvData& datagram) {
   if (received_datagrams_.empty()) {
     const auto rc = Network::Test::readFromSocket(socket_->ioHandle(),
-                                                  *socket_->addressProvider().localAddress(),
+                                                  *socket_->connectionInfoProvider().localAddress(),
                                                   received_datagrams_, max_rx_datagram_size_);
     ASSERT_TRUE(rc.ok());
   }

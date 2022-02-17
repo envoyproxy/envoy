@@ -11,11 +11,12 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-#include "common/filesystem/filesystem_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/filesystem/filesystem_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -25,8 +26,9 @@ namespace Filesystem {
 
 FileImplPosix::~FileImplPosix() {
   if (isOpen()) {
+    // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
     const Api::IoCallBoolResult result = close();
-    ASSERT(result.rc_);
+    ASSERT(result.return_value_);
   }
 }
 
@@ -62,6 +64,9 @@ FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
 
   if (in.test(File::Operation::Append)) {
     out |= O_APPEND;
+  } else if (in.test(File::Operation::Write) &&
+             Runtime::runtimeFeatureEnabled("envoy.reloadable_features.append_or_truncate")) {
+    out |= O_TRUNC;
   }
 
   if (in.test(File::Operation::Read) && in.test(File::Operation::Write)) {
@@ -84,7 +89,7 @@ FilePtr InstanceImplPosix::createFile(const FilePathAndType& file_info) {
   case DestinationType::Stdout:
     return std::make_unique<FileImplPosix>(FilePathAndType{DestinationType::Stdout, "/dev/stdout"});
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return nullptr; // for gcc
 }
 
 bool InstanceImplPosix::fileExists(const std::string& path) {
@@ -152,7 +157,7 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
   }
 
   const Api::SysCallStringResult canonical_path = canonicalPath(path);
-  if (canonical_path.rc_.empty()) {
+  if (canonical_path.return_value_.empty()) {
     ENVOY_LOG_MISC(debug, "Unable to determine canonical path for {}: {}", path,
                    errorDetails(canonical_path.errno_));
     return true;
@@ -163,9 +168,9 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
   // platform in the future, growing these or relaxing some constraints (e.g.
   // there are valid reasons to go via /proc for file paths).
   // TODO(htuch): Optimize this as a hash lookup if we grow any further.
-  if (absl::StartsWith(canonical_path.rc_, "/dev") ||
-      absl::StartsWith(canonical_path.rc_, "/sys") ||
-      absl::StartsWith(canonical_path.rc_, "/proc")) {
+  if (absl::StartsWith(canonical_path.return_value_, "/dev") ||
+      absl::StartsWith(canonical_path.return_value_, "/sys") ||
+      absl::StartsWith(canonical_path.return_value_, "/proc")) {
     return true;
   }
   return false;

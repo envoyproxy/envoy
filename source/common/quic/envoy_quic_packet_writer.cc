@@ -1,8 +1,8 @@
-#include "common/quic/envoy_quic_packet_writer.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
 
 #include <memory>
 
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {
@@ -11,12 +11,12 @@ namespace {
 
 quic::WriteResult convertToQuicWriteResult(Api::IoCallUint64Result& result) {
   if (result.ok()) {
-    return {quic::WRITE_STATUS_OK, static_cast<int>(result.rc_)};
+    return {quic::WRITE_STATUS_OK, static_cast<int>(result.return_value_)};
   }
   quic::WriteStatus status = result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again
                                  ? quic::WRITE_STATUS_BLOCKED
                                  : quic::WRITE_STATUS_ERROR;
-  return {status, static_cast<int>(result.err_->getErrorCode())};
+  return {status, static_cast<int>(result.err_->getSystemErrorCode())};
 }
 
 } // namespace

@@ -2,9 +2,9 @@
 
 #include "envoy/event/timer.h"
 
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
-#include "common/common/utility.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/utility.h"
 
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
@@ -96,6 +96,8 @@ private:
   }
   void waitForNoPendingLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
+  void maybeLogTimerWarning();
+
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
   MonotonicTime monotonic_time_ ABSL_GUARDED_BY(mutex_);
   SystemTime system_time_ ABSL_GUARDED_BY(mutex_);
@@ -103,6 +105,7 @@ private:
   std::set<SimulatedScheduler*> schedulers_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
   uint32_t pending_updates_ ABSL_GUARDED_BY(mutex_);
+  std::atomic<uint32_t> warning_logged_{};
 };
 
 // Represents a simulated time system, where time is advanced by calling

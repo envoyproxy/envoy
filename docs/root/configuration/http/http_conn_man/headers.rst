@@ -9,6 +9,27 @@ is being received) as well as during encoding (when the response is being sent).
 .. contents::
   :local:
 
+.. _config_http_conn_man_headers_scheme:
+
+:scheme
+-------
+
+Envoy will always set the *:scheme* header while processing a request. It should always be available to filters, and should be forwarded upstream for HTTP/2 and HTTP/3, where :ref:`config_http_conn_man_headers_x-forwarded-proto` will be sent for HTTP/1.1.
+
+For HTTP/2, and HTTP/3, incoming *:scheme* headers are trusted and propogated through upstream.
+For HTTP/1, the *:scheme* header will be set
+1) From the absolute URL if present and valid. An invalid (not "http" or "https") scheme, or an https scheme over an unencrypted connection will result in Envoy rejecting the request. This is the only scheme validation Envoy performs as it avoids a HTTP/1.1-specific privledge escalation attack for edge Envoys [1]_ which doesn't have a comparable vector for HTTP/2 and above [2]_.
+2) From the value of the :ref:`config_http_conn_man_headers_x-forwarded-proto` header after sanitization (to valid *x-forwarded-proto* from trusted downstreams, otherwise based on downstream encryption level).
+
+This default behavior can be overridden via the :ref:`scheme_header_transformation
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme_header_transformation>`
+configuration option.
+
+The *:scheme* header will be used by Envoy over *x-forwarded-proto* where the URI scheme is wanted, for example serving content from cache based on the *:scheme* header rather than X-Forwarded-Proto, or setting the scheme of redirects based on the scheme of the original URI. See :ref:`why_is_envoy_using_xfp_or_scheme` for more details.
+
+.. [1] Edge Envoys often have plaintext HTTP/1.1 listeners. If Envoy trusts absolute URL scheme from fully qualfied URLs, a MiTM can adjust relative URLs to https absolute URLs, and inadvertantly cause the Envoy's upstream to send PII or other sensitive data over what it then believes is a secure connection.
+.. [2] Unlike HTTP/1.1, HTTP/2 is in practice always served over TLS via ALPN for edge Envoys. In mesh networks using insecure HTTP/2, if the downstream is not trusted to set scheme, the :ref:`scheme_header_transformation <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme_header_transformation>` should be used.
+
 .. _config_http_conn_man_headers_user-agent:
 
 user-agent
@@ -26,6 +47,13 @@ server
 
 The *server* header will be set during encoding to the value in the :ref:`server_name
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.server_name>` option.
+
+.. _config_http_conn_man_headers_referer:
+
+referer
+-------
+
+The *referer* header will be sanitized during decoding. Multiple URLs or invalid URLs will be removed.
 
 .. _config_http_conn_man_headers_x-client-trace-id:
 
@@ -189,9 +217,15 @@ Given an HTTP request that has traveled through a series of zero or more proxies
 Envoy, the trusted client address is the earliest source IP address that is known to be
 accurate. The source IP address of the immediate downstream node's connection to Envoy is
 trusted. XFF *sometimes* can be trusted. Malicious clients can forge XFF, but the last
-address in XFF can be trusted if it was put there by a trusted proxy. Alternatively, Envoy
-supports :ref:`extensions <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
+address in XFF can be trusted if it was put there by a trusted proxy.
+
+Alternatively, Envoy supports
+:ref:`extensions <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
 for determining the *trusted client address* or original IP address.
+
+.. note::
+
+ The use of such extensions cannot be mixed with *use_remote_address* nor *xff_num_trusted_hops*.
 
 Envoy's default rules for determining the trusted client address (*before* appending anything
 to XFF) are:
@@ -202,11 +236,8 @@ to XFF) are:
   node's connection to Envoy.
 
 In an environment where there are one or more trusted proxies in front of an edge
-Envoy instance, the :ref:`XFF extension <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
-can be configured via the :ref:`original_ip_detection_extensions field
-<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
-to set the *xff_num_trusted_hops* option which controls the number of additional
-addresses that are to be trusted:
+Envoy instance, the *xff_num_trusted_hops* configuration option can be used to trust
+additional addresses from XFF:
 
 * If *use_remote_address* is false and *xff_num_trusted_hops* is set to a value *N* that is
   greater than zero, the trusted client address is the (N+1)th address from the right end
@@ -332,6 +363,25 @@ A few very important notes about XFF:
      XFF is parsed to determine if a request is internal. In this scenario, do not forward XFF and
      allow Envoy to generate a new one with a single internal origin IP.
 
+.. _config_http_conn_man_headers_x-forwarded-host:
+
+x-forwarded-host
+----------------
+
+The *x-forwarded-host* header is a de-facto standard proxy header which indicates the original host
+requested by the client in the *:authority* (*host* in HTTP1) header. A compliant proxy *appends*
+the original value of the *:authority* header to *x-forwarded-host* only if the *:authority* header
+is modified.
+
+Envoy updates the *:authority* header if a host rewrite option (one of
+:ref:`host_rewrite_literal <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>`,
+:ref:`auto_host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>`,
+:ref:`host_rewrite_header <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_header>`, or
+:ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_path_regex>`)
+is used and appends its original value to *x-forwarded-host* if
+:ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
+is set.
+
 .. _config_http_conn_man_headers_x-forwarded-proto:
 
 x-forwarded-proto
@@ -340,6 +390,16 @@ x-forwarded-proto
 It is a common case where a service wants to know what the originating protocol (HTTP or HTTPS) was
 of the connection terminated by front/edge Envoy. *x-forwarded-proto* contains this information. It
 will be set to either *http* or *https*.
+
+Downstream *x-forwarded-proto* headers will only be trusted if *xff_num_trusted_hops* is non-zero.
+If *xff_num_trusted_hops* is zero, downstream *x-forwarded-proto* headers and *:scheme* headers
+will be set to http or https based on if the downstream connection is TLS or not.
+
+If the scheme is changed via the :ref:`scheme_header_transformation
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme_header_transformation>`
+configuration option, *x-forwarded-proto* will be updated as well.
+
+The *x-forwarded-proto* header will be used by Envoy over *:scheme* where the underlying encryption is wanted, for example clearing default ports based on *x-forwarded-proto*. See :ref:`why_is_envoy_using_xfp_or_scheme` for more details.
 
 .. _config_http_conn_man_headers_x-request-id:
 
@@ -527,11 +587,60 @@ Supported variable names are:
       <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
-    Same as **%DOWNSTREAM_REMOTE_ADDRESS%** excluding port if the address is an IP address.
+    Remote address of the downstream connection, without any port component.
+    IP addresses are the only address type with a port component.
+
+    .. note::
+
+      This may not be the physical remote address of the peer if the address has been inferred from
+      :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
+      <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_REMOTE_PORT%
+    Remote port of the downstream connection.
+    IP addresses are the only address type with a port component.
+
+    .. note::
+
+      This may not be the physical remote address of the peer if the address has been inferred from
+      :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
+      <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_DIRECT_REMOTE_ADDRESS%
+    Direct remote address of the downstream connection. If the address is an IP address it includes both
+    address and port.
+
+    .. note::
+
+      This is always the physical remote address of the peer even if the downstream remote address has
+      been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
+      or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%
+    Direct remote address of the downstream connection, without any port component.
+    IP addresses are the only address type with a port component.
+
+    .. note::
+
+      This is always the physical remote address of the peer even if the downstream remote address has
+      been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
+      or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_DIRECT_REMOTE_PORT%
+    Direct remote port of the downstream connection.
+    IP addresses are the only address type with a port component.
+
+    .. note::
+
+      This is always the physical remote address of the peer even if the downstream remote address has
+      been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
+      or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+
 
 %DOWNSTREAM_LOCAL_ADDRESS%
     Local address of the downstream connection. If the address is an IP address it includes both
     address and port.
+
     If the original connection was redirected by iptables REDIRECT, this represents
     the original destination address restored by the
     :ref:`Original Destination Filter <config_listener_filters_original_dst>` using SO_ORIGINAL_DST socket option.
@@ -539,10 +648,12 @@ Supported variable names are:
     option was set to true, this represents the original destination address and port.
 
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
-    Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+    Local address of the downstream connection, without any port component.
+    IP addresses are the only address type with a port component.
 
 %DOWNSTREAM_LOCAL_PORT%
-    Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
+    Local port of the downstream connection.
+    IP addresses are the only address type with a port component.
 
 %DOWNSTREAM_LOCAL_URI_SAN%
   HTTP
@@ -641,6 +752,12 @@ Supported variable names are:
     The original protocol which is already added by Envoy as a
     :ref:`x-forwarded-proto <config_http_conn_man_headers_x-forwarded-proto>` request header.
 
+%REQUESTED_SERVER_NAME%
+  HTTP
+    String value set on ssl connection socket for Server Name Indication (SNI)
+  TCP
+    String value set on ssl connection socket for Server Name Indication (SNI)
+
 %UPSTREAM_METADATA(["namespace", "key", ...])%
     Populates the header with :ref:`EDS endpoint metadata <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.metadata>` from the
     upstream host selected by the router. Metadata may be selected from any namespace. In general,
@@ -660,10 +777,35 @@ Supported variable names are:
 
     This works both on request and response headers.
 
+%UPSTREAM_LOCAL_ADDRESS%
+    Local address of the upstream connection. If the address is an IP address it includes both
+    address and port.
+
+    The upstream local address cannot be added to request headers as the upstream host
+    hremote as not been selected when custom request headers are generated.
+
+%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
+    Local address of the upstream connection, without any port component.
+    IP addresses are the only address type with a port component.
+
+%UPSTREAM_LOCAL_PORT%
+    Local port of the upstream connection.
+    IP addresses are the only address type with a port component.
+
 %UPSTREAM_REMOTE_ADDRESS%
-    Remote address of the upstream host. If the address is an IP address it includes both address
-    and port. The upstream remote address cannot be added to request headers as the upstream host
+    Remote address of the upstream connection. If the address is an IP address it includes both
+    address and port.
+
+    The upstream remote address cannot be added to request headers as the upstream host
     has not been selected when custom request headers are generated.
+
+%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
+    Remote address of the upstream connection, without any port component.
+    IP addresses are the only address type with a port component.
+
+%UPSTREAM_REMOTE_PORT%
+    Remote port of the upstream connection.
+    IP addresses are the only address type with a port component.
 
 %PER_REQUEST_STATE(reverse.dns.data.name)%
     Populates the header with values set on the stream info filterState() object. To be
@@ -697,3 +839,6 @@ Supported variable names are:
 %RESPONSE_CODE_DETAILS%
     Response code details provides additional information about the HTTP response code, such as
     who set it (the upstream or envoy) and why.
+
+%VIRTUAL_CLUSTER_NAME%
+  Name of the Virtual Cluster which gets matched (if any).

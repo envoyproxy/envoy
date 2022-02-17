@@ -1,4 +1,4 @@
-#include "common/upstream/ring_hash_lb.h"
+#include "source/common/upstream/ring_hash_lb.h"
 
 #include <cstdint>
 #include <iostream>
@@ -7,8 +7,8 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
-#include "common/common/assert.h"
-#include "common/upstream/load_balancer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/upstream/load_balancer_impl.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"

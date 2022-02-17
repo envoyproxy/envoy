@@ -21,12 +21,12 @@ https://github.com/envoyproxy/envoy/issues/8416.
 
 In everyday discussion and GitHub labels, we refer to the `v2`, `v3`, `vN`, `...` APIs. This has a
 specific technical meaning. Any given message in the Envoy API, e.g. the `Bootstrap` at
-`envoy.config.bootstrap.v3.Boostrap`, will transitively reference a number of packages in the Envoy
+`envoy.config.bootstrap.v3.Bootstrap`, will transitively reference a number of packages in the Envoy
 API. These may be at `vN`, `v(N-1)`, etc. The Envoy API is technically a DAG of versioned package
 namespaces. When we talk about the `vN xDS API`, we really refer to the `N` of the root
 configuration resources (e.g. bootstrap, xDS resources such as `Cluster`). The
-v3 API bootstrap configuration is `envoy.config.bootstrap.v3.Boostrap`, even
-though it might might transitively reference `envoy.service.trace.v2`.
+v3 API bootstrap configuration is `envoy.config.bootstrap.v3.Bootstrap`, even
+though it might transitively reference `envoy.service.trace.v2`.
 
 # Backwards compatibility
 
@@ -68,10 +68,14 @@ experience a backward compatible break on a change. Specifically:
     structurally or by documentation.
 
 An exception to the above policy exists for:
-* Changes made within 14 days of the introduction of a new API field or message.
+* Changes made within 14 days of the introduction of a new API field or message, provided the new field
+or message has not been included in an Envoy release.
 * API versions tagged `vNalpha`. Within an alpha major version, arbitrary breaking changes are allowed.
 * Any field, message or enum with a `[#not-implemented-hide:..` comment.
-* Any proto with a `(udpa.annotations.file_status).work_in_progress` option annotation.
+* Any proto with a `(udpa.annotations.file_status).work_in_progress`,
+  `(xds.annotations.v3.file_status).work_in_progress`
+  `(xds.annotations.v3.message_status).work_in_progress`, or
+  `(xds.annotations.v3.field_status).work_in_progress` option annotation.
 
 Note that changes to default values for wrapped types, e.g. `google.protobuf.UInt32Value` are not
 governed by the above policy. Any management server requiring stability across Envoy API or

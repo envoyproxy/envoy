@@ -2,13 +2,10 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
-#include "envoy/server/resource_monitor.h"
-#include "envoy/server/resource_monitor_config.h"
 
-#include "test/common/config/dummy_config.pb.h"
+#include "test/integration/base_overload_integration_test.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
-#include "test/test_common/registry.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -18,104 +15,25 @@ namespace Envoy {
 
 using testing::HasSubstr;
 
-class FakeResourceMonitorFactory;
-
-class FakeResourceMonitor : public Server::ResourceMonitor {
-public:
-  FakeResourceMonitor(Event::Dispatcher& dispatcher, FakeResourceMonitorFactory& factory)
-      : dispatcher_(dispatcher), factory_(factory), pressure_(0.0) {}
-  ~FakeResourceMonitor() override;
-  void updateResourceUsage(Callbacks& callbacks) override;
-
-  void setResourcePressure(double pressure) {
-    dispatcher_.post([this, pressure] { pressure_ = pressure; });
-  }
-
-private:
-  Event::Dispatcher& dispatcher_;
-  FakeResourceMonitorFactory& factory_;
-  double pressure_;
-};
-
-class FakeResourceMonitorFactory : public Server::Configuration::ResourceMonitorFactory {
-public:
-  FakeResourceMonitor* monitor() const { return monitor_; }
-  Server::ResourceMonitorPtr
-  createResourceMonitor(const Protobuf::Message& config,
-                        Server::Configuration::ResourceMonitorFactoryContext& context) override;
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::common::config::DummyConfig>();
-  }
-
-  std::string name() const override {
-    return "envoy.resource_monitors.testonly.fake_resource_monitor";
-  }
-
-  void onMonitorDestroyed(FakeResourceMonitor* monitor);
-
-private:
-  FakeResourceMonitor* monitor_{nullptr};
-};
-
-FakeResourceMonitor::~FakeResourceMonitor() { factory_.onMonitorDestroyed(this); }
-
-void FakeResourceMonitor::updateResourceUsage(Callbacks& callbacks) {
-  Server::ResourceUsage usage;
-  usage.resource_pressure_ = pressure_;
-  callbacks.onSuccess(usage);
-}
-
-void FakeResourceMonitorFactory::onMonitorDestroyed(FakeResourceMonitor* monitor) {
-  ASSERT(monitor_ == monitor);
-  monitor_ = nullptr;
-}
-
-Server::ResourceMonitorPtr FakeResourceMonitorFactory::createResourceMonitor(
-    const Protobuf::Message&, Server::Configuration::ResourceMonitorFactoryContext& context) {
-  auto monitor = std::make_unique<FakeResourceMonitor>(context.dispatcher(), *this);
-  monitor_ = monitor.get();
-  return monitor;
-}
-
-class OverloadIntegrationTest : public HttpProtocolIntegrationTest {
+class OverloadIntegrationTest : public BaseOverloadIntegrationTest,
+                                public HttpProtocolIntegrationTest {
 protected:
   void
   initializeOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action) {
-    const std::string overload_config = R"EOF(
-        refresh_interval:
-          seconds: 0
-          nanos: 1000000
-        resource_monitors:
-          - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.Empty
-      )EOF";
-    envoy::config::overload::v3::OverloadManager overload_manager_config =
-        TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(overload_config);
-    *overload_manager_config.add_actions() = overload_action;
-
-    config_helper_.addConfigModifier(
-        [overload_manager_config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          *bootstrap.mutable_overload_manager() = overload_manager_config;
-        });
+    setupOverloadManagerConfig(overload_action);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
     initialize();
     updateResource(0);
   }
-
-  void updateResource(double pressure) {
-    auto* monitor = fake_resource_monitor_factory_.monitor();
-    ASSERT(monitor != nullptr);
-    monitor->setResourcePressure(pressure);
-  }
-
-  FakeResourceMonitorFactory fake_resource_monitor_factory_;
-  Registry::InjectFactory<Server::Configuration::ResourceMonitorFactory> inject_factory_{
-      fake_resource_monitor_factory_};
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, OverloadIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2,
+                              Http::CodecClient::Type::HTTP3},
+                             {FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP2})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
@@ -168,7 +86,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
 }
 
 TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
-  if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
     return; // only relevant for downstream HTTP1.x connections
   }
 
@@ -221,17 +139,29 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   updateResource(0.95);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
                                1);
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
-  auto response = codec_client_->makeRequestWithBody(request_headers, 10);
-  EXPECT_FALSE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
-                                                         std::chrono::milliseconds(1000)));
+  IntegrationStreamDecoderPtr response;
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    // For HTTP/3, excess connections are force-rejected.
+    codec_client_ =
+        makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt);
+    EXPECT_TRUE(codec_client_->disconnected());
+  } else {
+    // For HTTP/2 and below, excess connection won't be accepted, but will hang out
+    // in a pending state and resume below.
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+    response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+    EXPECT_FALSE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
+                                                           std::chrono::milliseconds(1000)));
+  }
 
   // Reduce load a little to allow the connection to be accepted.
   updateResource(0.9);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
                                0);
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+    response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  }
   EXPECT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   EXPECT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
@@ -305,7 +235,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_idle_timeout", 1);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  if (GetParam().downstream_protocol == Http::CodecClient::Type::HTTP1) {
+  if (GetParam().downstream_protocol == Http::CodecType::HTTP1) {
     // For HTTP1, Envoy will start draining but will wait to close the
     // connection. If a new stream comes in, it will set the connection header
     // to "close" on the response and close the connection after.
@@ -390,7 +320,8 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
     transport_callbacks->connection().dispatcher().exit();
     // Read some amount of data; what's more important is whether the socket was remote-closed. That
     // needs to be propagated to the socket.
-    return Network::IoResult{transport_callbacks->ioHandle().read(buffer, 2 * 1024).rc_ == 0
+    return Network::IoResult{transport_callbacks->ioHandle().read(buffer, 2 * 1024).return_value_ ==
+                                     0
                                  ? Network::PostIoAction::Close
                                  : Network::PostIoAction::KeepOpen,
                              0, false};

@@ -7,6 +7,8 @@
 
 FAILED=()
 CURRENT=""
+# AZP appears to make lines with this prefix red
+BASH_ERR_PREFIX="##[error]: "
 
 DIFF_OUTPUT="${DIFF_OUTPUT:-/build/fix_format_pre.diff}"
 
@@ -24,6 +26,13 @@ trap_errors () {
             FAILED+=("  > ${sub}@ ${file} :${line}")
         else
             FAILED+=("${sub}@ ${file} :${line}${command}")
+            if [[ "$CURRENT" == "glint" ]]; then
+                FAILED+=(
+                    "    Please fix your editor to ensure:"
+                    "      - no trailing whitespace"
+                    "      - no mixed tabs/spaces"
+                    "      - all files end with a newline")
+            fi
         fi
         ((frame++))
     done
@@ -44,12 +53,22 @@ CURRENT=configs
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
 
 CURRENT=python
-bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:python_check -- --diff-file="$DIFF_OUTPUT" --fix "$(pwd)"
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:python_check -- --diff-file="$DIFF_OUTPUT" -werror --fix
+
+CURRENT=extensions
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:extensions_check
+
+CURRENT=spelling
+"${ENVOY_SRCDIR}"/tools/spelling/check_spelling_pedantic.py --mark check
+
+CURRENT=rst
+# TODO(phlax): Move this to general docs checking of all rst files
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:rst_check
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
-    echo "TESTS FAILED:" >&2
+    echo "${BASH_ERR_PREFIX}TESTS FAILED:" >&2
     for failed in "${FAILED[@]}"; do
-        echo "  $failed" >&2
+        echo "${BASH_ERR_PREFIX} $failed" >&2
     done
     exit 1
 fi

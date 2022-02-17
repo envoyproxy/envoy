@@ -5,9 +5,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/local_info/local_info.h"
 
-#include "common/config/context_provider_impl.h"
-#include "common/config/version_converter.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/config/context_provider_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace LocalInfo {
@@ -55,8 +54,9 @@ public:
         zone_stat_name_(zone_stat_name_storage_.statName()),
         dynamic_update_callback_handle_(context_provider_.addDynamicContextUpdateCallback(
             [this](absl::string_view resource_type_url) {
-              (*node_.mutable_dynamic_parameters())[resource_type_url].CopyFrom(
-                  context_provider_.dynamicContext(resource_type_url));
+              (*node_.mutable_dynamic_parameters())
+                  [toStdStringView(resource_type_url)] // NOLINT(std::string_view)
+                      .CopyFrom(context_provider_.dynamicContext(resource_type_url));
             })) {}
 
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }

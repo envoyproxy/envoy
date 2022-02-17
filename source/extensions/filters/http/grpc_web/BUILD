@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # L7 HTTP filter that implements the grpc-web protocol (https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-WEB.md)
-# Public docs: docs/root/configuration/http_filters/grpc_web_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/grpc_web_filter
 
 envoy_extension_package()
 
@@ -17,8 +17,8 @@ envoy_cc_library(
     srcs = ["grpc_web_filter.cc"],
     hdrs = ["grpc_web_filter.h"],
     deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:base64_lib",
         "//source/common/common:utility_lib",
         "//source/common/grpc:codec_lib",
@@ -32,12 +32,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.http",
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/http:well_known_names",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/grpc_web:grpc_web_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/grpc_web/v3:pkg_cc_proto",

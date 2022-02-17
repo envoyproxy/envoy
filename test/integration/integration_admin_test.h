@@ -3,7 +3,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/metrics/v3/stats.pb.h"
 
-#include "common/json/json_loader.h"
+#include "source/common/json/json_loader.h"
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/utility.h"
@@ -15,7 +15,6 @@ namespace Envoy {
 class IntegrationAdminTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
-    config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
     config_helper_.addConfigModifier(
         [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           auto& hist_settings =
@@ -28,14 +27,6 @@ public:
           setting->mutable_buckets()->Add(4);
         });
     HttpIntegrationTest::initialize();
-  }
-
-  void initialize(envoy::config::metrics::v3::StatsMatcher stats_matcher) {
-    config_helper_.addConfigModifier(
-        [stats_matcher](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-          *bootstrap.mutable_stats_config()->mutable_stats_matcher() = stats_matcher;
-        });
-    initialize();
   }
 
   absl::string_view request(const std::string port_key, const std::string method,

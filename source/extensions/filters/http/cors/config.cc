@@ -1,8 +1,8 @@
-#include "extensions/filters/http/cors/config.h"
+#include "source/extensions/filters/http/cors/config.h"
 
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/http/cors/cors_filter.h"
+#include "source/extensions/filters/http/cors/cors_filter.h"
 
 namespace Envoy {
 namespace Extensions {

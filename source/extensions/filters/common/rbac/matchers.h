@@ -10,11 +10,10 @@
 #include "envoy/type/matcher/v3/path.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/matchers.h"
-#include "common/http/header_utility.h"
-#include "common/network/cidr_range.h"
-
-#include "extensions/filters/common/expr/evaluator.h"
+#include "source/common/common/matchers.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/network/cidr_range.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -48,7 +47,8 @@ public:
    * Creates a shared instance of a matcher based off the rules defined in the Permission config
    * proto message.
    */
-  static MatcherConstSharedPtr create(const envoy::config::rbac::v3::Permission& permission);
+  static MatcherConstSharedPtr create(const envoy::config::rbac::v3::Permission& permission,
+                                      ProtobufMessage::ValidationVisitor& validation_visitor);
 
   /**
    * Creates a shared instance of a matcher based off the rules defined in the Principal config
@@ -74,7 +74,8 @@ public:
  */
 class AndMatcher : public Matcher {
 public:
-  AndMatcher(const envoy::config::rbac::v3::Permission::Set& rules);
+  AndMatcher(const envoy::config::rbac::v3::Permission::Set& rules,
+             ProtobufMessage::ValidationVisitor& validation_visitor);
   AndMatcher(const envoy::config::rbac::v3::Principal::Set& ids);
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
@@ -90,9 +91,12 @@ private:
  */
 class OrMatcher : public Matcher {
 public:
-  OrMatcher(const envoy::config::rbac::v3::Permission::Set& set) : OrMatcher(set.rules()) {}
+  OrMatcher(const envoy::config::rbac::v3::Permission::Set& set,
+            ProtobufMessage::ValidationVisitor& validation_visitor)
+      : OrMatcher(set.rules(), validation_visitor) {}
   OrMatcher(const envoy::config::rbac::v3::Principal::Set& set) : OrMatcher(set.ids()) {}
-  OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Permission>& rules);
+  OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Permission>& rules,
+            ProtobufMessage::ValidationVisitor& validation_visitor);
   OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal>& ids);
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
@@ -104,8 +108,9 @@ private:
 
 class NotMatcher : public Matcher {
 public:
-  NotMatcher(const envoy::config::rbac::v3::Permission& permission)
-      : matcher_(Matcher::create(permission)) {}
+  NotMatcher(const envoy::config::rbac::v3::Permission& permission,
+             ProtobufMessage::ValidationVisitor& validation_visitor)
+      : matcher_(Matcher::create(permission, validation_visitor)) {}
   NotMatcher(const envoy::config::rbac::v3::Principal& principal)
       : matcher_(Matcher::create(principal)) {}
 
@@ -164,6 +169,18 @@ private:
   const uint32_t port_;
 };
 
+class PortRangeMatcher : public Matcher {
+public:
+  PortRangeMatcher(const ::envoy::type::v3::Int32Range& range);
+
+  bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+               const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const uint32_t start_;
+  const uint32_t end_;
+};
+
 /**
  * Matches the principal name as described in the peer certificate. Uses the URI SAN first. If that
  * field is not present, uses the subject instead.
@@ -172,14 +189,17 @@ class AuthenticatedMatcher : public Matcher {
 public:
   AuthenticatedMatcher(const envoy::config::rbac::v3::Principal::Authenticated& auth)
       : matcher_(auth.has_principal_name()
-                     ? absl::make_optional<Matchers::StringMatcherImpl>(auth.principal_name())
+                     ? absl::make_optional<
+                           Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+                           auth.principal_name())
                      : absl::nullopt) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
-  const absl::optional<Matchers::StringMatcherImpl> matcher_;
+  const absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
+      matcher_;
 };
 
 /**
@@ -189,8 +209,9 @@ private:
  */
 class PolicyMatcher : public Matcher, NonCopyable {
 public:
-  PolicyMatcher(const envoy::config::rbac::v3::Policy& policy, Expr::Builder* builder)
-      : permissions_(policy.permissions()), principals_(policy.principals()),
+  PolicyMatcher(const envoy::config::rbac::v3::Policy& policy, Expr::Builder* builder,
+                ProtobufMessage::ValidationVisitor& validation_visitor)
+      : permissions_(policy.permissions(), validation_visitor), principals_(policy.principals()),
         condition_(policy.condition()) {
     if (policy.has_condition()) {
       expr_ = Expr::createExpression(*builder, condition_);
@@ -203,7 +224,6 @@ public:
 private:
   const OrMatcher permissions_;
   const OrMatcher principals_;
-
   const google::api::expr::v1alpha1::Expr condition_;
   Expr::ExpressionPtr expr_;
 };
@@ -223,10 +243,13 @@ private:
  * Perform a match against the request server from the client's connection
  * request. This is typically TLS SNI.
  */
-class RequestedServerNameMatcher : public Matcher, Envoy::Matchers::StringMatcherImpl {
+class RequestedServerNameMatcher
+    : public Matcher,
+      Envoy::Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> {
 public:
   RequestedServerNameMatcher(const envoy::type::matcher::v3::StringMatcher& requested_server_name)
-      : Envoy::Matchers::StringMatcherImpl(requested_server_name) {}
+      : Envoy::Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>(
+            requested_server_name) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;

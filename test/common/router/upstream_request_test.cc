@@ -1,6 +1,6 @@
-#include "common/common/utility.h"
-#include "common/network/utility.h"
-#include "common/router/upstream_request.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/utility.h"
+#include "source/common/router/upstream_request.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/router/router_filter_interface.h"
@@ -19,9 +19,17 @@ namespace {
 
 class UpstreamRequestTest : public testing::Test {
 public:
+  UpstreamRequestTest() {
+    HttpTestUtility::addDefaultHeaders(downstream_request_header_map_);
+    ON_CALL(router_filter_interface_, downstreamHeaders())
+        .WillByDefault(Return(&downstream_request_header_map_));
+  }
+
+  Http::TestRequestHeaderMapImpl downstream_request_header_map_{};
   NiceMock<MockRouterFilterInterface> router_filter_interface_;
   UpstreamRequest upstream_request_{router_filter_interface_,
-                                    std::make_unique<NiceMock<Router::MockGenericConnPool>>()};
+                                    std::make_unique<NiceMock<Router::MockGenericConnPool>>(),
+                                    false, true};
 };
 
 // UpstreamRequest is responsible processing for passing 101 upgrade headers to onUpstreamHeaders.
@@ -51,17 +59,14 @@ TEST_F(UpstreamRequestTest, Decode200UpgradeHeaders) {
 // UpstreamRequest dumpState without allocating memory.
 TEST_F(UpstreamRequestTest, DumpsStateWithoutAllocatingMemory) {
   // Set up router filter
-  auto address_provider =
-      router_filter_interface_.client_connection_.stream_info_.downstream_address_provider_;
-  address_provider->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:5678"));
-  address_provider->setLocalAddress(Network::Utility::parseInternetAddressAndPort("5.6.7.8:5678"));
-  address_provider->setDirectRemoteAddressForTest(
+  auto connection_info_provider =
+      router_filter_interface_.client_connection_.stream_info_.downstream_connection_info_provider_;
+  connection_info_provider->setRemoteAddress(
       Network::Utility::parseInternetAddressAndPort("1.2.3.4:5678"));
-  Http::TestRequestHeaderMapImpl downstream_request_header_map;
-  HttpTestUtility::addDefaultHeaders(downstream_request_header_map);
-
-  EXPECT_CALL(router_filter_interface_, downstreamHeaders())
-      .WillOnce(Return(&downstream_request_header_map));
+  connection_info_provider->setLocalAddress(
+      Network::Utility::parseInternetAddressAndPort("5.6.7.8:5678"));
+  connection_info_provider->setDirectRemoteAddressForTest(
+      Network::Utility::parseInternetAddressAndPort("1.2.3.4:5678"));
 
   // Dump State
   std::array<char, 1024> buffer;
@@ -72,7 +77,7 @@ TEST_F(UpstreamRequestTest, DumpsStateWithoutAllocatingMemory) {
 
   // Check Contents
   EXPECT_THAT(ostream.contents(), HasSubstr("UpstreamRequest "));
-  EXPECT_THAT(ostream.contents(), HasSubstr("addressProvider: \n  SocketAddressSetterImpl "));
+  EXPECT_THAT(ostream.contents(), HasSubstr("addressProvider: \n  ConnectionInfoSetterImpl "));
   EXPECT_THAT(ostream.contents(), HasSubstr("request_headers: \n"));
 }
 

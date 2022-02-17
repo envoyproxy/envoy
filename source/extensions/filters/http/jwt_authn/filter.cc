@@ -1,9 +1,7 @@
-#include "extensions/filters/http/jwt_authn/filter.h"
+#include "source/extensions/filters/http/jwt_authn/filter.h"
 
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 #include "absl/strings/str_split.h"
 #include "jwt_verify_lib/status.h"
@@ -16,7 +14,8 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 namespace {
-
+constexpr absl::string_view InvalidTokenErrorString = ", error=\"invalid_token\"";
+constexpr uint32_t MaximumUriLength = 256;
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     access_control_request_method_handle(Http::CustomHeaders::get().AccessControlRequestMethod);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
@@ -34,8 +33,8 @@ constexpr absl::string_view kRcDetailJwtAuthnPrefix = "jwt_authn_access_denied";
 std::string generateRcDetails(absl::string_view error_msg) {
   // Replace space with underscore since RCDetails may be written to access log.
   // Some log processors assume each log segment is separated by whitespace.
-  return absl::StrCat(kRcDetailJwtAuthnPrefix, "{",
-                      absl::StrJoin(absl::StrSplit(error_msg, ' '), "_"), "}");
+  return absl::StrCat(kRcDetailJwtAuthnPrefix, "{", StringUtil::replaceAllEmptySpace(error_msg),
+                      "}");
 }
 
 } // namespace
@@ -68,7 +67,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   const Verifier* verifier = nullptr;
   const auto* per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteFilterConfig>(
-          HttpFilterNames::get().JwtAuthn, decoder_callbacks_->route());
+          "envoy.filters.http.jwt_authn", decoder_callbacks_->route());
   if (per_route_config != nullptr) {
     std::string error_msg;
     std::tie(verifier, error_msg) = config_->findPerRouteVerifier(*per_route_config);
@@ -87,6 +86,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (verifier == nullptr) {
     onComplete(Status::Ok);
   } else {
+    original_uri_ = Http::Utility::buildOriginalUri(headers, MaximumUriLength);
     // Verify the JWT token, onComplete() will be called when completed.
     context_ = Verifier::createContext(headers, decoder_callbacks_->activeSpan(), this);
     verifier->verify(context_);
@@ -100,8 +100,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-void Filter::setPayload(const ProtobufWkt::Struct& payload) {
-  decoder_callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().JwtAuthn, payload);
+void Filter::setExtractedData(const ProtobufWkt::Struct& extracted_data) {
+  decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.jwt_authn",
+                                                      extracted_data);
 }
 
 void Filter::onComplete(const Status& status) {
@@ -119,8 +120,15 @@ void Filter::onComplete(const Status& status) {
         status == Status::JwtAudienceNotAllowed ? Http::Code::Forbidden : Http::Code::Unauthorized;
     // return failure reason as message body
     decoder_callbacks_->sendLocalReply(
-        code, ::google::jwt_verify::getStatusString(status), nullptr, absl::nullopt,
-        generateRcDetails(::google::jwt_verify::getStatusString(status)));
+        code, ::google::jwt_verify::getStatusString(status),
+        [uri = this->original_uri_, status](Http::ResponseHeaderMap& headers) {
+          std::string value = absl::StrCat("Bearer realm=\"", uri, "\"");
+          if (status != Status::JwtMissed) {
+            absl::StrAppend(&value, InvalidTokenErrorString);
+          }
+          headers.setCopy(Http::Headers::get().WWWAuthenticate, value);
+        },
+        absl::nullopt, generateRcDetails(::google::jwt_verify::getStatusString(status)));
     return;
   }
   stats_.allowed_.inc();

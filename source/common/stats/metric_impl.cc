@@ -1,8 +1,8 @@
-#include "common/stats/metric_impl.h"
+#include "source/common/stats/metric_impl.h"
 
 #include "envoy/stats/tag.h"
 
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Stats {

@@ -6,8 +6,7 @@ namespace Envoy {
 class DirectResponseIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                       public HttpIntegrationTest {
 public:
-  DirectResponseIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  DirectResponseIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void TearDown() override { cleanupUpstreamAndDownstream(); }
 

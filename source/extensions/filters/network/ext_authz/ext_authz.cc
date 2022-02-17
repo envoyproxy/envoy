@@ -1,14 +1,14 @@
-#include "extensions/filters/network/ext_authz/ext_authz.h"
+#include "source/extensions/filters/network/ext_authz/ext_authz.h"
 
+#include <chrono>
 #include <cstdint>
 #include <string>
 
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,8 +23,10 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
 
 void Filter::callCheck() {
   Filters::Common::ExtAuthz::CheckRequestUtils::createTcpCheck(filter_callbacks_, check_request_,
-                                                               config_->includePeerCertificate());
-
+                                                               config_->includePeerCertificate(),
+                                                               config_->destinationLabels());
+  // Store start time of ext_authz filter call
+  start_time_ = filter_callbacks_->connection().dispatcher().timeSource().monotonicTime();
   status_ = Status::Calling;
   config_->stats().active_.inc();
   config_->stats().total_.inc();
@@ -74,6 +76,16 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   switch (response->status) {
   case Filters::Common::ExtAuthz::CheckStatus::OK:
     config_->stats().ok_.inc();
+    // Add duration of call to dynamic metadata if applicable
+    if (start_time_.has_value()) {
+      ProtobufWkt::Value ext_authz_duration_value;
+      auto duration = filter_callbacks_->connection().dispatcher().timeSource().monotonicTime() -
+                      start_time_.value();
+      ext_authz_duration_value.set_number_value(
+          std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+      (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
+          ext_authz_duration_value;
+    }
     break;
   case Filters::Common::ExtAuthz::CheckStatus::Error:
     config_->stats().error_.inc();
@@ -83,12 +95,24 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     break;
   }
 
+  if (!response->dynamic_metadata.fields().empty()) {
+
+    filter_callbacks_->connection().streamInfo().setDynamicMetadata(
+        NetworkFilterNames::get().ExtAuthorization, response->dynamic_metadata);
+  }
+
   // Fail open only if configured to do so and if the check status was a error.
   if (response->status == Filters::Common::ExtAuthz::CheckStatus::Denied ||
       (response->status == Filters::Common::ExtAuthz::CheckStatus::Error &&
        !config_->failureModeAllow())) {
     config_->stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    filter_callbacks_->connection().streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::UnauthorizedExternalService);
+    filter_callbacks_->connection().streamInfo().setResponseCodeDetails(
+        response->status == Filters::Common::ExtAuthz::CheckStatus::Denied
+            ? Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied
+            : Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
   } else {
     // Let the filter chain continue.
     filter_return_ = FilterReturn::Continue;
@@ -96,11 +120,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         response->status == Filters::Common::ExtAuthz::CheckStatus::Error) {
       // Status is Error and yet we are configured to allow traffic. Click a counter.
       config_->stats().failure_mode_allowed_.inc();
-    }
-
-    if (!response->dynamic_metadata.fields().empty()) {
-      filter_callbacks_->connection().streamInfo().setDynamicMetadata(
-          NetworkFilterNames::get().ExtAuthorization, response->dynamic_metadata);
     }
 
     // We can get completion inline, so only call continue if that isn't happening.

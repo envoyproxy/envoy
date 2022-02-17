@@ -7,16 +7,13 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/network/address_impl.h"
-#include "common/upstream/load_balancer_impl.h"
-#include "common/upstream/upstream_impl.h"
-
+#include "source/common/network/address_impl.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/redis/crc16.h"
-
-#include "extensions/clusters/well_known_names.h"
-#include "extensions/filters/network/common/redis/client.h"
-#include "extensions/filters/network/common/redis/codec.h"
-#include "extensions/filters/network/common/redis/supported_commands.h"
+#include "source/extensions/filters/network/common/redis/client.h"
+#include "source/extensions/filters/network/common/redis/codec.h"
+#include "source/extensions/filters/network/common/redis/supported_commands.h"
 
 #include "absl/container/btree_map.h"
 #include "absl/synchronization/mutex.h"
@@ -112,7 +109,7 @@ public:
    * @param all_hosts provides the updated hosts.
    * @return indicate if the cluster slot is updated or not.
    */
-  virtual bool onClusterSlotUpdate(ClusterSlotsPtr&& slots, Upstream::HostMap all_hosts) PURE;
+  virtual bool onClusterSlotUpdate(ClusterSlotsPtr&& slots, Upstream::HostMap& all_hosts) PURE;
 
   /**
    * Callback when a host's health status is updated
@@ -132,7 +129,7 @@ public:
   RedisClusterLoadBalancerFactory(Random::RandomGenerator& random) : random_(random) {}
 
   // ClusterSlotUpdateCallBack
-  bool onClusterSlotUpdate(ClusterSlotsPtr&& slots, Upstream::HostMap all_hosts) override;
+  bool onClusterSlotUpdate(ClusterSlotsPtr&& slots, Upstream::HostMap& all_hosts) override;
 
   void onHostHealthUpdate() override;
 
@@ -190,6 +187,17 @@ private:
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override;
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
+    }
+    // Pool selection not implemented.
+    absl::optional<Upstream::SelectedPoolAndConnection>
+    selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                             const Upstream::Host& /*host*/,
+                             std::vector<uint8_t>& /*hash_key*/) override {
+      return absl::nullopt;
+    }
+    // Lifetime tracking not implemented.
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+      return {};
     }
 
   private:

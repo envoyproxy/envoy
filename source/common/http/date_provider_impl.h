@@ -7,7 +7,7 @@
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 #include "date_provider.h"
 

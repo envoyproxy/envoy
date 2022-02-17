@@ -5,10 +5,10 @@
 #include "envoy/network/connection.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/common/linked_object.h"
-#include "common/conn_pool/conn_pool_base.h"
-#include "common/http/codec_client.h"
-#include "common/http/utility.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/conn_pool/conn_pool_base.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/http/utility.h"
 
 #include "absl/strings/string_view.h"
 
@@ -28,8 +28,9 @@ public:
   // OnPoolSuccess for HTTP requires both the decoder and callbacks. OnPoolFailure
   // requires only the callbacks, but passes both for consistency.
   HttpPendingStream(Envoy::ConnectionPool::ConnPoolImplBase& parent, Http::ResponseDecoder& decoder,
-                    Http::ConnectionPool::Callbacks& callbacks)
-      : Envoy::ConnectionPool::PendingStream(parent), context_(&decoder, &callbacks) {}
+                    Http::ConnectionPool::Callbacks& callbacks, bool can_send_early_data)
+      : Envoy::ConnectionPool::PendingStream(parent, can_send_early_data),
+        context_(&decoder, &callbacks) {}
 
   Envoy::ConnectionPool::AttachContext& context() override { return context_; }
   HttpAttachContext context_;
@@ -47,29 +48,33 @@ class ActiveClient;
 class HttpConnPoolImplBase : public Envoy::ConnectionPool::ConnPoolImplBase,
                              public Http::ConnectionPool::Instance {
 public:
-  HttpConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
-                       Event::Dispatcher& dispatcher,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                       const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                       Random::RandomGenerator& random_generator,
-                       Upstream::ClusterConnectivityState& state,
-                       std::vector<Http::Protocol> protocols);
+  HttpConnPoolImplBase(
+      Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+      Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
+      std::vector<Http::Protocol> protocols);
   ~HttpConnPoolImplBase() override;
 
+  // Event::DeferredDeletable
+  void deleteIsPending() override { deleteIsPendingImpl(); }
+
   // ConnectionPool::Instance
-  void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
-  void drainConnections() override { drainConnectionsImpl(); }
+  void addIdleCallback(IdleCb cb) override { addIdleCallbackImpl(cb); }
+  bool isIdle() const override { return isIdleImpl(); }
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override {
+    drainConnectionsImpl(drain_behavior);
+  }
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
-                                         Http::ConnectionPool::Callbacks& callbacks) override;
-  bool maybePreconnect(float ratio) override {
-    return Envoy::ConnectionPool::ConnPoolImplBase::maybePreconnect(ratio);
-  }
+                                         Http::ConnectionPool::Callbacks& callbacks,
+                                         const Instance::StreamOptions& options) override;
+  bool maybePreconnect(float ratio) override { return maybePreconnectImpl(ratio); }
   bool hasActiveConnections() const override;
 
   // Creates a new PendingStream and enqueues it into the queue.
-  ConnectionPool::Cancellable*
-  newPendingStream(Envoy::ConnectionPool::AttachContext& context) override;
+  ConnectionPool::Cancellable* newPendingStream(Envoy::ConnectionPool::AttachContext& context,
+                                                bool can_send_early_data) override;
   void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
                      absl::string_view failure_reason, ConnectionPool::PoolFailureReason reason,
                      Envoy::ConnectionPool::AttachContext& context) override {
@@ -143,13 +148,12 @@ public:
   using CreateCodecFn = std::function<CodecClientPtr(Upstream::Host::CreateConnectionData& data,
                                                      HttpConnPoolImplBase* pool)>;
 
-  FixedHttpConnPoolImpl(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
-                        Event::Dispatcher& dispatcher,
-                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                        const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                        Random::RandomGenerator& random_generator,
-                        Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
-                        CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols)
+  FixedHttpConnPoolImpl(
+      Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+      Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
+      CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols)
       : HttpConnPoolImplBase(host, priority, dispatcher, options, transport_socket_options,
                              random_generator, state, protocols),
         codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocols[0]) {
@@ -198,19 +202,6 @@ public:
   // Http::ConnectionCallbacks
   void onGoAway(Http::GoAwayErrorCode error_code) override;
   void onSettings(ReceivedSettings& settings) override;
-
-  // As this is called once when the stream is closed, it's a good place to
-  // update the counter as one stream has been "returned" and the negative
-  // capacity should be reduced.
-  bool hadNegativeDeltaOnStreamClosed() override {
-    int ret = negative_capacity_ != 0;
-    if (negative_capacity_ > 0) {
-      negative_capacity_--;
-    }
-    return ret;
-  }
-
-  uint64_t negative_capacity_{};
 
 protected:
   MultiplexedActiveClientBase(Envoy::Http::HttpConnPoolImplBase& parent,

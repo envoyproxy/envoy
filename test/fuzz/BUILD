@@ -33,6 +33,7 @@ envoy_cc_test_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/stats:isolated_store_lib",
+        "//test:test_listener_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ] + select({
@@ -78,7 +79,7 @@ envoy_cc_test_library(
     name = "random_lib",
     hdrs = ["random.h"],
     deps = [
-        "//include/envoy/common:random_generator_interface",
+        "//envoy/common:random_generator_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
     ],

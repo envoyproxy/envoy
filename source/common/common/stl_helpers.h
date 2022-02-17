@@ -28,12 +28,26 @@ std::string accumulateToString(const ContainerT& source,
   if (source.empty()) {
     return "[]";
   }
-  return std::accumulate(std::next(source.begin()), source.end(), "[" + string_func(source[0]),
+  return std::accumulate(std::next(source.begin()), source.end(),
+                         "[" + string_func(*source.begin()),
                          [string_func](std::string acc, const T& element) {
                            return acc + ", " + string_func(element);
                          }) +
          "]";
 }
+
+// Used for converting sanctioned uses of std string_view (e.g. extensions) to absl::string_view
+// for internal use.
+inline absl::string_view toAbslStringView(std::string_view view) { // NOLINT(std::string_view)
+  return absl::string_view(view.data(), view.size());              // NOLINT(std::string_view)
+}
+
+// Used for converting internal absl::string_view to sanctioned uses of std string_view (e.g.
+// extensions).
+inline std::string_view toStdStringView(absl::string_view view) { // NOLINT(std::string_view)
+  return std::string_view(view.data(), view.size());              // NOLINT(std::string_view)
+}
+
 } // namespace Envoy
 
 // NOLINT(namespace-envoy)
@@ -45,4 +59,10 @@ template <class T> std::ostream& operator<<(std::ostream& out, const std::vector
   return out;
 }
 
+// Overload std::operator<< to output a pair.
+template <class T1, class T2>
+std::ostream& operator<<(std::ostream& out, const std::pair<T1, T2>& v) {
+  out << "pair(" << v.first << ", " << v.second << ")";
+  return out;
+}
 } // namespace std

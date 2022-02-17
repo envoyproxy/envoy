@@ -3,7 +3,7 @@
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 
-#include "extensions/filters/network/rbac/config.h"
+#include "source/extensions/filters/network/rbac/config.h"
 
 #include "test/integration/integration.h"
 #include "test/test_common/environment.h"

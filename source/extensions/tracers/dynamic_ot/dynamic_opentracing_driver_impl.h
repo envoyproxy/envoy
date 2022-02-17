@@ -4,7 +4,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "extensions/tracers/common/ot/opentracing_driver_impl.h"
+#include "source/extensions/tracers/common/ot/opentracing_driver_impl.h"
 
 #include "opentracing/dynamic_load.h"
 

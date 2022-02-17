@@ -1,4 +1,4 @@
-#include "extensions/filters/http/fault/fault_filter.h"
+#include "source/extensions/filters/http/fault/fault_filter.h"
 
 #include <chrono>
 #include <cstdint>
@@ -12,17 +12,15 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/utility.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -113,14 +111,9 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
   // faults. In other words, runtime is supported only when faults are
   // configured at the filter level.
   fault_settings_ = config_->settings();
-  if (decoder_callbacks_->route() && decoder_callbacks_->route()->routeEntry()) {
-    const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().Fault;
-    const auto* route_entry = decoder_callbacks_->route()->routeEntry();
-
-    const auto* per_route_settings =
-        route_entry->mostSpecificPerFilterConfigTyped<FaultSettings>(name);
-    fault_settings_ = per_route_settings ? per_route_settings : fault_settings_;
-  }
+  const auto* per_route_settings = Http::Utility::resolveMostSpecificPerFilterConfig<FaultSettings>(
+      "envoy.filters.http.fault", decoder_callbacks_->route());
+  fault_settings_ = per_route_settings ? per_route_settings : fault_settings_;
 
   if (!matchesTargetUpstreamCluster()) {
     return Http::FilterHeadersStatus::Continue;
@@ -219,7 +212,7 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& requ
         encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
       },
       [this] { encoder_callbacks_->continueEncoding(); },
-      [](uint64_t) {
+      [](uint64_t, bool) {
         // write stats callback.
       },
       config_->timeSource(), decoder_callbacks_->dispatcher(), decoder_callbacks_->scope());

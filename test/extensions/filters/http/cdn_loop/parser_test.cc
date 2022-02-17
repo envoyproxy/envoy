@@ -1,6 +1,6 @@
 #include <sstream>
 
-#include "extensions/filters/http/cdn_loop/parser.h"
+#include "source/extensions/filters/http/cdn_loop/parser.h"
 
 #include "test/test_common/status_utility.h"
 

@@ -1,15 +1,16 @@
 #pragma once
 
 #include "envoy/common/time.h"
-#include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
+#include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/matchers.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/matchers.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/protobuf/protobuf.h"
 
+#include "absl/container/btree_set.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
@@ -93,57 +94,66 @@ struct ResponseCacheControl {
 bool operator==(const RequestCacheControl& lhs, const RequestCacheControl& rhs);
 bool operator==(const ResponseCacheControl& lhs, const ResponseCacheControl& rhs);
 
-class CacheHeadersUtils {
+namespace CacheHeadersUtils {
+// Parses header_entry as an HTTP time. Returns SystemTime() if
+// header_entry is null or malformed.
+SystemTime httpTime(const Http::HeaderEntry* header_entry);
+
+// Calculates the age of a cached response
+Seconds calculateAge(const Http::ResponseHeaderMap& response_headers, SystemTime response_time,
+                     SystemTime now);
+
+/**
+ * Read a leading positive decimal integer value and advance "*str" past the
+ * digits read. If overflow occurs, or no digits exist, return
+ * absl::nullopt without advancing "*str".
+ */
+absl::optional<uint64_t> readAndRemoveLeadingDigits(absl::string_view& str);
+
+// Add to out all header names from the given map that match any of the given rules.
+void getAllMatchingHeaderNames(const Http::HeaderMap& headers,
+                               const std::vector<Matchers::StringMatcherPtr>& ruleset,
+                               absl::flat_hash_set<absl::string_view>& out);
+
+// Parses the values of a comma-delimited list as defined per
+// https://tools.ietf.org/html/rfc7230#section-7.
+std::vector<absl::string_view> parseCommaDelimitedHeader(const Http::HeaderMap::GetResult& entry);
+} // namespace CacheHeadersUtils
+
+class VaryAllowList {
 public:
-  // Parses header_entry as an HTTP time. Returns SystemTime() if
-  // header_entry is null or malformed.
-  static SystemTime httpTime(const Http::HeaderEntry* header_entry);
-
-  // Calculates the age of a cached response
-  static Seconds calculateAge(const Http::ResponseHeaderMap& response_headers,
-                              SystemTime response_time, SystemTime now);
-
-  /**
-   * Read a leading positive decimal integer value and advance "*str" past the
-   * digits read. If overflow occurs, or no digits exist, return
-   * absl::nullopt without advancing "*str".
-   */
-  static absl::optional<uint64_t> readAndRemoveLeadingDigits(absl::string_view& str);
-
-  // Add to out all header names from the given map that match any of the given rules.
-  static void getAllMatchingHeaderNames(const Http::HeaderMap& headers,
-                                        const std::vector<Matchers::StringMatcherPtr>& ruleset,
-                                        absl::flat_hash_set<absl::string_view>& out);
-
-  // Parses the values of a comma-delimited list as defined per
-  // https://tools.ietf.org/html/rfc7230#section-7.
-  static std::vector<std::string> parseCommaDelimitedList(const Http::HeaderMap::GetResult& entry);
-};
-
-class VaryHeader {
-public:
-  // Checks if the headers contain a non-empty value in the Vary header.
-  static bool hasVary(const Http::ResponseHeaderMap& headers);
-
-  // Creates a single string combining the values of the varied headers from entry_headers.
-  static std::string createVaryKey(const Http::HeaderMap::GetResult& vary_header,
-                                   const Http::RequestHeaderMap& entry_headers);
-
   // Parses the allow list from the Cache Config into the object's private allow_list_.
-  VaryHeader(const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allow_list);
+  VaryAllowList(
+      const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allow_list);
 
   // Checks if the headers contain an allowed value in the Vary header.
-  bool isAllowed(const Http::ResponseHeaderMap& headers) const;
+  bool allowsHeaders(const Http::ResponseHeaderMap& headers) const;
 
-  // Returns a header map containing the subset of the original headers that can be varied from the
-  // request.
-  Http::RequestHeaderMapPtr
-  possibleVariedHeaders(const Http::RequestHeaderMap& request_headers) const;
+  // Checks if this vary header value is allowed to vary cache entries.
+  bool allowsValue(const absl::string_view header) const;
 
 private:
   // Stores the matching rules that define whether a header is allowed to be varied.
   std::vector<Matchers::StringMatcherPtr> allow_list_;
 };
+
+namespace VaryHeaderUtils {
+// Checks if the headers contain a non-empty value in the Vary header.
+bool hasVary(const Http::ResponseHeaderMap& headers);
+
+// Retrieve all the individual header values from the provided response header
+// map across all vary header entries.
+absl::btree_set<absl::string_view> getVaryValues(const Envoy::Http::ResponseHeaderMap& headers);
+
+// Creates a single string combining the values of the varied headers from
+// entry_headers. Returns an absl::nullopt if no valid vary key can be created
+// and the response should not be cached (eg. when disallowed vary headers are
+// present in the response).
+absl::optional<std::string>
+createVaryIdentifier(const VaryAllowList& allow_list,
+                     const absl::btree_set<absl::string_view>& vary_header_values,
+                     const Envoy::Http::RequestHeaderMap& request_headers);
+} // namespace VaryHeaderUtils
 
 } // namespace Cache
 } // namespace HttpFilters

@@ -4,9 +4,9 @@
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/network/transport_socket.h"
 
-#include "extensions/common/tap/extension_config_base.h"
-#include "extensions/transport_sockets/common/passthrough.h"
-#include "extensions/transport_sockets/tap/tap_config.h"
+#include "source/extensions/common/tap/extension_config_base.h"
+#include "source/extensions/transport_sockets/common/passthrough.h"
+#include "source/extensions/transport_sockets/tap/tap_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,8 +28,7 @@ private:
   PerSocketTapperPtr tapper_;
 };
 
-class TapSocketFactory : public Network::TransportSocketFactory,
-                         public Common::Tap::ExtensionConfigBase {
+class TapSocketFactory : public Common::Tap::ExtensionConfigBase, public PassthroughFactory {
 public:
   TapSocketFactory(const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,
                    Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
@@ -39,12 +38,7 @@ public:
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
-  bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override;
-
-private:
-  Network::TransportSocketFactoryPtr transport_socket_factory_;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
 };
 
 } // namespace Tap

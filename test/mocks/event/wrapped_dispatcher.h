@@ -50,12 +50,6 @@ public:
                                         std::move(transport_socket), options);
   }
 
-  Network::DnsResolverSharedPtr
-  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                    const bool use_tcp_for_dns_lookups) override {
-    return impl_.createDnsResolver(resolvers, use_tcp_for_dns_lookups);
-  }
-
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override {
     return impl_.createFileEvent(fd, cb, trigger, events);
@@ -66,9 +60,10 @@ public:
   }
 
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::TcpListenerCallbacks& cb, bool bind_to_port,
-                                      uint32_t backlog_size) override {
-    return impl_.createListener(std::move(socket), cb, bind_to_port, backlog_size);
+                                      Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
+                                      bool bind_to_port, bool ignore_global_conn_limit) override {
+    return impl_.createListener(std::move(socket), cb, runtime, bind_to_port,
+                                ignore_global_conn_limit);
   }
 
   Network::UdpListenerPtr
@@ -116,6 +111,8 @@ public:
   void popTrackedObject(const ScopeTrackedObject* expected_object) override {
     return impl_.popTrackedObject(expected_object);
   }
+
+  bool trackedObjectStackIsEmpty() const override { return impl_.trackedObjectStackIsEmpty(); }
 
   MonotonicTime approximateMonotonicTime() const override {
     return impl_.approximateMonotonicTime();

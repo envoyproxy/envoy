@@ -16,15 +16,14 @@ namespace {
 class AwsLambdaFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                        public HttpIntegrationTest {
 public:
-  AwsLambdaFilterIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+  AwsLambdaFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {}
 
   void SetUp() override {
     // Set these environment variables to quickly sign credentials instead of attempting to query
     // instance metadata and timing-out.
     TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "aws-user", 1 /*overwrite*/);
     TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1 /*overwrite*/);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+    setUpstreamProtocol(Http::CodecType::HTTP1);
   }
 
   void TearDown() override { fake_upstream_connection_.reset(); }
@@ -38,7 +37,7 @@ public:
               arn: "arn:aws:lambda:us-west-2:123456789:function:test"
               payload_passthrough: {}
             )EOF";
-    config_helper_.addFilter(fmt::format(filter, passthrough));
+    config_helper_.prependFilter(fmt::format(filter, passthrough));
 
     constexpr auto metadata_yaml = R"EOF(
         com.amazonaws.lambda:

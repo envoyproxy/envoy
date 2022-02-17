@@ -4,8 +4,7 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.validate.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,7 +18,7 @@ class FilterFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication,
                                  envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig> {
 public:
-  FilterFactory() : FactoryBase(HttpFilterNames::get().JwtAuthn) {}
+  FilterFactory() : FactoryBase("envoy.filters.http.jwt_authn") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

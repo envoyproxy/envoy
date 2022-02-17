@@ -1,8 +1,7 @@
 #include "envoy/network/address.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 #include "test/mocks/network/connection.h"
 #include "test/test_common/utility.h"
@@ -32,9 +31,9 @@ TEST(ProxyProtocolHeaderTest, GeneratesV1IPv4Header) {
 
   // Make sure the wrapper utility generates the same output.
   testing::NiceMock<Network::MockClientConnection> connection;
-  connection.stream_info_.downstream_address_provider_->setRemoteAddress(
+  connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       Network::Utility::resolveUrl("tcp://174.2.2.222:50000"));
-  connection.stream_info_.downstream_address_provider_->setLocalAddress(
+  connection.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       Network::Utility::resolveUrl("tcp://172.0.0.1:80"));
   Buffer::OwnedImpl util_buf;
   envoy::config::core::v3::ProxyProtocolConfig config;
@@ -95,9 +94,9 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2IPv6Header) {
 
   // Make sure the wrapper utility generates the same output.
   testing::NiceMock<Network::MockConnection> connection;
-  connection.stream_info_.downstream_address_provider_->setRemoteAddress(
+  connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       Network::Utility::resolveUrl("tcp://[1:2:3::4]:8"));
-  connection.stream_info_.downstream_address_provider_->setLocalAddress(
+  connection.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       Network::Utility::resolveUrl("tcp://[1:100:200:3::]:2"));
   Buffer::OwnedImpl util_buf;
   envoy::config::core::v3::ProxyProtocolConfig config;

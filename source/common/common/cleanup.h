@@ -3,7 +3,7 @@
 #include <functional>
 #include <list>
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 

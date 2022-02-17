@@ -1,9 +1,8 @@
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -13,10 +12,6 @@ namespace Fuzz {
 // We fuzz nlohmann/JSON and protobuf and compare their results, since RapidJSON is deprecated and
 // has known limitations. See https://github.com/envoyproxy/envoy/issues/4705.
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
-  TestScopedRuntime runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.remove_legacy_json", "true"}});
-
   std::string json_string{reinterpret_cast<const char*>(buf), len};
 
   // Load via Protobuf JSON parsing, if we can.
@@ -39,10 +34,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     // round-trip.
     std::string yaml = MessageUtil::getYamlStringFromMessage(message);
     ProtobufWkt::Struct yaml_message;
-    MessageUtil::loadFromYaml(yaml, yaml_message);
+    TestUtility::loadFromYaml(yaml, yaml_message);
 
     ProtobufWkt::Struct message3;
-    MessageUtil::loadFromYaml(MessageUtil::getYamlStringFromMessage(yaml_message), message3);
+    TestUtility::loadFromYaml(MessageUtil::getYamlStringFromMessage(yaml_message), message3);
     FUZZ_ASSERT(TestUtility::protoEqual(yaml_message, message3));
   } catch (const Envoy::EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "Failed due to {}", e.what());

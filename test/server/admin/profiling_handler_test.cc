@@ -1,4 +1,4 @@
-#include "common/profiler/profiler.h"
+#include "source/common/profiler/profiler.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
@@ -67,7 +67,7 @@ TEST_P(AdminInstanceTest, AdminHeapProfiler) {
 TEST_P(AdminInstanceTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
   AdminImpl admin_bad_profile_path(TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"),
-                                   server_);
+                                   server_, false);
   Http::TestResponseHeaderMapImpl header_map;
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
   request_headers_.setMethod(post);

@@ -9,11 +9,10 @@
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/network/utility.h"
-
-#include "extensions/filters/network/common/factory_base.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/config/api_version.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/network/common/factory_base.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/integration/ssl_utility.h"
 #include "test/integration/tcp_proxy_integration_test.pb.h"
@@ -114,7 +113,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
 // Test TLS upstream.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
   upstream_tls_ = true;
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+  setUpstreamProtocol(Http::CodecType::HTTP1);
   config_helper_.configureUpstreamTls();
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -173,8 +172,24 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
 
 TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
   autonomous_upstream_ = true;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    for (int i = 0; i < static_resources->clusters_size(); ++i) {
+      auto* cluster = static_resources->mutable_clusters(i);
+      auto* thresholds = cluster->mutable_circuit_breakers()->add_thresholds();
+      thresholds->mutable_max_connections()->set_value(1027);
+      thresholds->mutable_max_pending_requests()->set_value(1027);
+    }
+  });
   initialize();
+// The large number of connection is meant to regression test
+// https://github.com/envoyproxy/envoy/issues/19033 but fails on apple CI
+// TODO(alyssawilk) debug.
+#if defined(__APPLE__)
   const int num_connections = 50;
+#else
+  const int num_connections = 1026;
+#endif
   std::vector<IntegrationTcpClientPtr> clients(num_connections);
 
   for (int i = 0; i < num_connections; ++i) {
@@ -868,27 +883,6 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   expectEndpointToMatchRoute();
 }
 
-// Test subset load balancing for a deprecated_v1 route when endpoint selector is defined at the top
-// level.
-TEST_P(TcpProxyMetadataMatchIntegrationTest,
-       DEPRECATED_FEATURE_TEST(EndpointShouldMatchRouteWithTopLevelMetadataMatch)) {
-  tcp_proxy_.set_stat_prefix("tcp_stats");
-  tcp_proxy_.set_cluster("fallback");
-  tcp_proxy_.mutable_hidden_envoy_deprecated_deprecated_v1()->add_routes()->set_cluster(
-      "cluster_0");
-  tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
-
-  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
-
-  config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.extensions.filters.network."
-                                    "tcp_proxy.v3.TcpProxy.hidden_envoy_deprecated_deprecated_v1",
-                                    "true");
-  initialize();
-
-  expectEndpointToMatchRoute();
-}
-
 // Test subset load balancing for a weighted cluster when endpoint selector is defined on a weighted
 // cluster.
 TEST_P(TcpProxyMetadataMatchIntegrationTest, EndpointShouldMatchWeightedClusterWithMetadataMatch) {
@@ -954,27 +948,6 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
 
   endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
 
-  initialize();
-
-  expectEndpointNotToMatchRoute();
-}
-
-// Test subset load balancing for a deprecated_v1 route when endpoint selector is defined at the top
-// level.
-TEST_P(TcpProxyMetadataMatchIntegrationTest,
-       DEPRECATED_FEATURE_TEST(EndpointShouldNotMatchRouteWithTopLevelMetadataMatch)) {
-  tcp_proxy_.set_stat_prefix("tcp_stats");
-  tcp_proxy_.set_cluster("fallback");
-  tcp_proxy_.mutable_hidden_envoy_deprecated_deprecated_v1()->add_routes()->set_cluster(
-      "cluster_0");
-  tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
-
-  endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
-
-  config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.extensions.filters.network."
-                                    "tcp_proxy.v3.TcpProxy.hidden_envoy_deprecated_deprecated_v1",
-                                    "true");
   initialize();
 
   expectEndpointNotToMatchRoute();
@@ -1181,7 +1154,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
   // Set up the mock buffer factory so the newly created SSL client will have a mock write
   // buffer. This allows us to track the bytes actually written to the socket.
 
-  EXPECT_CALL(*mock_buffer_factory_, create_(_, _, _))
+  EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       .Times(AtLeast(1))
       .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                            std::function<void()> above_overflow) -> Buffer::Instance* {
@@ -1320,7 +1293,7 @@ public:
   void createUpstreams() override {
     for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
       Network::TransportSocketFactoryPtr factory =
-          upstream_tls_ ? createUpstreamTlsContext()
+          upstream_tls_ ? createUpstreamTlsContext(upstreamConfig())
                         : Network::Test::createRawBufferSocketFactory();
       auto endpoint = upstream_address_fn_(i);
       fake_upstreams_.emplace_back(
@@ -1469,7 +1442,7 @@ TEST_P(MysqlIntegrationTest, Preconnect) { testPreconnect(); }
 
 TEST_P(MysqlIntegrationTest, PreconnectWithTls) {
   upstream_tls_ = true;
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+  setUpstreamProtocol(Http::CodecType::HTTP1);
   config_helper_.configureUpstreamTls();
   testPreconnect();
 }

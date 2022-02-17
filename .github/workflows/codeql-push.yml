@@ -12,10 +12,11 @@ jobs:
 
     # CodeQL runs on ubuntu-latest and windows-latest
     runs-on: ubuntu-latest
+    if: github.repository == 'envoyproxy/envoy'
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
       with:
         # We must fetch at least the immediate parents so that if this is
         # a pull request then we can checkout the head.
@@ -34,15 +35,16 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v1
+      uses: github/codeql-action/init@474bbf07f9247ffe1856c6a0f94aeeb10e7afee6
       # Override language selection by uncommenting this and choosing your languages
       with:
-         languages: cpp
+        languages: cpp
 
     - name: Install deps
       shell: bash
       run: |
-       sudo apt-get update && sudo apt-get install libtool cmake automake autoconf make ninja-build curl unzip virtualenv openjdk-11-jdk build-essential libc++1
+       sudo apt-get update --error-on=any
+       sudo apt-get install --yes libtool cmake automake autoconf make ninja-build curl unzip virtualenv openjdk-11-jdk build-essential libc++1
        mkdir -p bin/clang11
        cd bin/clang11
        wget https://github.com/llvm/llvm-project/releases/download/llvmorg-11.0.1/clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
@@ -63,4 +65,4 @@ jobs:
 
     - name: Perform CodeQL Analysis
       if: env.BUILD_TARGETS != ''
-      uses: github/codeql-action/analyze@v1
+      uses: github/codeql-action/analyze@474bbf07f9247ffe1856c6a0f94aeeb10e7afee6

@@ -1,6 +1,6 @@
-#include "common/event/dispatcher_impl.h"
-#include "common/memory/heap_shrinker.h"
-#include "common/memory/stats.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/memory/heap_shrinker.h"
+#include "source/common/memory/stats.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"

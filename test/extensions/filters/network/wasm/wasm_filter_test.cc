@@ -1,8 +1,8 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/server/lifecycle_notifier.h"
 
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/filters/network/wasm/wasm_filter.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/filters/network/wasm/wasm_filter.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/network/mocks.h"
@@ -28,8 +28,8 @@ using proxy_wasm::ContextBase;
 
 class TestFilter : public Context {
 public:
-  TestFilter(Wasm* wasm, uint32_t root_context_id, PluginSharedPtr plugin)
-      : Context(wasm, root_context_id, plugin) {}
+  TestFilter(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
+      : Context(wasm, root_context_id, plugin_handle) {}
   MOCK_CONTEXT_LOG_;
 
   void testClose() { onCloseTCP(); }
@@ -91,7 +91,8 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmNetworkFilterTest,
-                         Envoy::Extensions::Common::Wasm::runtime_and_language_values);
+                         Envoy::Extensions::Common::Wasm::runtime_and_language_values,
+                         Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 // Bad code in initial config.
 TEST_P(WasmNetworkFilterTest, BadCode) {
@@ -282,11 +283,6 @@ TEST_P(WasmNetworkFilterTest, RestrictLog) {
 }
 
 TEST_P(WasmNetworkFilterTest, StopAndResumeDownstreamViaAsyncCall) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(PiotrSikora): not yet supported in the Rust SDK.
-    return;
-  }
-
   setupConfig("", "resume_call");
   setupFilter();
 
@@ -332,10 +328,6 @@ TEST_P(WasmNetworkFilterTest, StopAndResumeDownstreamViaAsyncCall) {
 }
 
 TEST_P(WasmNetworkFilterTest, StopAndResumeUpstreamViaAsyncCall) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(PiotrSikora): not yet supported in the Rust SDK.
-    return;
-  }
   setupConfig("", "resume_call");
   setupFilter();
 
@@ -366,8 +358,12 @@ TEST_P(WasmNetworkFilterTest, StopAndResumeUpstreamViaAsyncCall) {
         callbacks->onSuccess(request, std::move(response_message));
         return proxy_wasm::WasmResult::Ok;
       }));
-  EXPECT_CALL(filter(),
-              log_(spdlog::level::info, Eq(absl::string_view("continueUpstream unimplemented"))));
+
+  if (std::get<1>(GetParam()) != "rust") {
+    // Rust SDK panics on Status::Unimplemented and other non-recoverable errors.
+    EXPECT_CALL(filter(),
+                log_(spdlog::level::info, Eq(absl::string_view("continueUpstream unimplemented"))));
+  }
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter().onNewConnection());
   Buffer::OwnedImpl fake_upstream_data("");
@@ -432,10 +428,6 @@ TEST_P(WasmNetworkFilterTest, PanicOnUpstreamData) {
 }
 
 TEST_P(WasmNetworkFilterTest, CloseDownstream) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(mathetake): not yet supported in the Rust SDK.
-    return;
-  }
   setupConfig("", "close_stream");
   setupFilter();
   EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
@@ -450,10 +442,6 @@ TEST_P(WasmNetworkFilterTest, CloseDownstream) {
 }
 
 TEST_P(WasmNetworkFilterTest, CloseUpstream) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(mathetake): not yet supported in the Rust SDK.
-    return;
-  }
   setupConfig("", "close_stream");
   setupFilter();
   EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);

@@ -1,6 +1,7 @@
 load("@rules_python//python:defs.bzl", "py_binary")
-load("@protodoc_pip3//:requirements.bzl", "requirement")
+load("@base_pip3//:requirements.bzl", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package", "envoy_proto_library")
+load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
 
 licenses(["notice"])  # Apache 2
 
@@ -22,8 +23,10 @@ py_binary(
     name = "protodoc",
     srcs = ["protodoc.py"],
     data = [
+        "//contrib:extensions_metadata.yaml",
         "//docs:protodoc_manifest.yaml",
         "//docs:v2_mapping.json",
+        "//source/extensions:extensions_metadata.yaml",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -32,8 +35,14 @@ py_binary(
         "//tools/config_validation:validate_fragment",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
+        "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
         "@com_google_protobuf//:protobuf_python",
+        requirement("envoy.base.utils"),
         requirement("Jinja2"),
-        requirement("PyYAML"),
     ],
+)
+
+protodoc_rule(
+    name = "api_v3_protodoc",
+    deps = ["@envoy_api//:v3_protos"],
 )

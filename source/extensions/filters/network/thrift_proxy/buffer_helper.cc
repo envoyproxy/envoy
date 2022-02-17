@@ -1,7 +1,7 @@
-#include "extensions/filters/network/thrift_proxy/buffer_helper.h"
+#include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
 
-#include "common/common/byte_order.h"
-#include "common/common/safe_memcpy.h"
+#include "source/common/common/byte_order.h"
+#include "source/common/common/safe_memcpy.h"
 
 namespace Envoy {
 namespace Extensions {

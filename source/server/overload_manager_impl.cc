@@ -1,4 +1,4 @@
-#include "server/overload_manager_impl.h"
+#include "source/server/overload_manager_impl.h"
 
 #include <chrono>
 
@@ -7,13 +7,12 @@
 #include "envoy/config/overload/v3/overload.pb.validate.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/fmt.h"
-#include "common/config/utility.h"
-#include "common/event/scaled_range_timer_manager_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "server/resource_monitor_config_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/utility.h"
+#include "source/common/event/scaled_range_timer_manager_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/server/resource_monitor_config_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
@@ -26,9 +25,13 @@ namespace Server {
  */
 class ThreadLocalOverloadStateImpl : public ThreadLocalOverloadState {
 public:
-  explicit ThreadLocalOverloadStateImpl(const NamedOverloadActionSymbolTable& action_symbol_table)
+  explicit ThreadLocalOverloadStateImpl(
+      const NamedOverloadActionSymbolTable& action_symbol_table,
+      std::shared_ptr<absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>&
+          proactive_resources)
       : action_symbol_table_(action_symbol_table),
-        actions_(action_symbol_table.size(), OverloadActionState(UnitFloat::min())) {}
+        actions_(action_symbol_table.size(), OverloadActionState(UnitFloat::min())),
+        proactive_resources_(proactive_resources) {}
 
   const OverloadActionState& getState(const std::string& action) override {
     if (const auto symbol = action_symbol_table_.lookup(action); symbol != absl::nullopt) {
@@ -41,10 +44,44 @@ public:
     actions_[action.index()] = state;
   }
 
+  bool tryAllocateResource(OverloadProactiveResourceName resource_name,
+                           int64_t increment) override {
+    const auto proactive_resource = proactive_resources_->find(resource_name);
+    if (proactive_resource != proactive_resources_->end()) {
+      return proactive_resource->second.tryAllocateResource(increment);
+    } else {
+      ENVOY_LOG_MISC(warn, " {Failed to allocate unknown proactive resource }");
+      // Resource monitor is not configured.
+      return false;
+    }
+  }
+
+  bool tryDeallocateResource(OverloadProactiveResourceName resource_name,
+                             int64_t decrement) override {
+    const auto proactive_resource = proactive_resources_->find(resource_name);
+    if (proactive_resource != proactive_resources_->end()) {
+      if (proactive_resource->second.tryDeallocateResource(decrement)) {
+        return true;
+      } else {
+        return false;
+      }
+    } else {
+      ENVOY_LOG_MISC(warn, " {Failed to deallocate unknown proactive resource }");
+      return false;
+    }
+  }
+
+  bool isResourceMonitorEnabled(OverloadProactiveResourceName resource_name) override {
+    const auto proactive_resource = proactive_resources_->find(resource_name);
+    return proactive_resource != proactive_resources_->end();
+  }
+
 private:
   static const OverloadActionState always_inactive_;
   const NamedOverloadActionSymbolTable& action_symbol_table_;
   std::vector<OverloadActionState> actions_;
+  std::shared_ptr<absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>
+      proactive_resources_;
 };
 
 const OverloadActionState ThreadLocalOverloadStateImpl::always_inactive_{UnitFloat::min()};
@@ -107,10 +144,13 @@ private:
   OverloadActionState state_;
 };
 
-Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
-  Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", a, ".", b),
-                                          scope.symbolTable());
+Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view name_of_stat) {
+  Stats::StatNameManagedStorage stat_name(name_of_stat, scope.symbolTable());
   return scope.counterFromStatName(stat_name.statName());
+}
+
+Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
+  return makeCounter(scope, absl::StrCat("overload.", a, ".", b));
 }
 
 Stats::Gauge& makeGauge(Stats::Scope& scope, absl::string_view a, absl::string_view b,
@@ -216,8 +256,8 @@ OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction
     case envoy::config::overload::v3::Trigger::TriggerOneofCase::kScaled:
       trigger = std::make_unique<ScaledTriggerImpl>(trigger_config.scaled());
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::overload::v3::Trigger::TriggerOneofCase::TRIGGER_ONEOF_NOT_SET:
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
 
     if (!triggers_.try_emplace(trigger_config.name(), std::move(trigger)).second) {
@@ -266,19 +306,47 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
                                          Api::Api& api, const Server::Options& options)
     : started_(false), dispatcher_(dispatcher), tls_(slot_allocator),
       refresh_interval_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))) {
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))),
+      proactive_resources_(
+          std::make_unique<
+              absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>()) {
   Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, options, api,
                                                            validation_visitor);
+  // We should hide impl details from users, for them there should be no distinction between
+  // proactive and regular resource monitors in configuration API. But internally we will maintain
+  // two distinct collections of proactive and regular resources. Proactive resources are not
+  // subject to periodic flushes and can be recalculated/updated on demand by invoking
+  // `tryAllocateResource/tryDeallocateResource` via thread local overload state.
   for (const auto& resource : config.resource_monitors()) {
     const auto& name = resource.name();
-    ENVOY_LOG(debug, "Adding resource monitor for {}", name);
-    auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::ResourceMonitorFactory>(resource);
-    auto config = Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
-    auto monitor = factory.createResourceMonitor(*config, context);
-
-    auto result = resources_.try_emplace(name, name, std::move(monitor), *this, stats_scope);
-    if (!result.second) {
+    // Check if it is a proactive resource.
+    auto proactive_resource_it =
+        OverloadProactiveResources::get().proactive_action_name_to_resource_.find(name);
+    ENVOY_LOG(debug, "Evaluating resource {}", name);
+    bool result = false;
+    if (proactive_resource_it !=
+        OverloadProactiveResources::get().proactive_action_name_to_resource_.end()) {
+      ENVOY_LOG(debug, "Adding proactive resource monitor for {}", name);
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Configuration::ProactiveResourceMonitorFactory>(
+              resource);
+      auto config =
+          Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
+      auto monitor = factory.createProactiveResourceMonitor(*config, context);
+      result =
+          proactive_resources_
+              ->try_emplace(proactive_resource_it->second, name, std::move(monitor), stats_scope)
+              .second;
+    } else {
+      ENVOY_LOG(debug, "Adding resource monitor for {}", name);
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Configuration::ResourceMonitorFactory>(resource);
+      auto config =
+          Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
+      auto monitor = factory.createResourceMonitor(*config, context);
+      result = resources_.try_emplace(name, name, std::move(monitor), *this, stats_scope).second;
+    }
+    if (!result) {
       throw EnvoyException(absl::StrCat("Duplicate resource monitor ", name));
     }
   }
@@ -300,6 +368,12 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     if (name == OverloadActionNames::get().ReduceTimeouts) {
       timer_minimums_ = std::make_shared<const Event::ScaledTimerTypeMap>(
           parseTimerMinimums(action.typed_config(), validation_visitor));
+    } else if (name == OverloadActionNames::get().ResetStreams) {
+      if (!config.has_buffer_factory_config()) {
+        throw EnvoyException(
+            fmt::format("Overload action \"{}\" requires buffer_factory_config.", name));
+      }
+      makeCounter(api.rootScope(), OverloadActionStatsNames::get().ResetStreamsCount);
     } else if (action.has_typed_config()) {
       throw EnvoyException(fmt::format(
           "Overload action \"{}\" has an unexpected value for the typed_config field", name));
@@ -307,12 +381,15 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
 
     for (const auto& trigger : action.triggers()) {
       const std::string& resource = trigger.name();
+      auto proactive_resource_it =
+          OverloadProactiveResources::get().proactive_action_name_to_resource_.find(resource);
 
-      if (resources_.find(resource) == resources_.end()) {
+      if (resources_.find(resource) == resources_.end() &&
+          proactive_resource_it ==
+              OverloadProactiveResources::get().proactive_action_name_to_resource_.end()) {
         throw EnvoyException(
             fmt::format("Unknown trigger resource {} for overload action {}", resource, name));
       }
-
       resource_to_actions_.insert(std::make_pair(resource, symbol));
     }
   }
@@ -323,7 +400,8 @@ void OverloadManagerImpl::start() {
   started_ = true;
 
   tls_.set([this](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalOverloadStateImpl>(action_symbol_table_);
+    return std::make_shared<ThreadLocalOverloadStateImpl>(action_symbol_table_,
+                                                          proactive_resources_);
   });
 
   if (resources_.empty()) {
@@ -356,6 +434,8 @@ void OverloadManagerImpl::stop() {
 
   // Clear the resource map to block on any pending updates.
   resources_.clear();
+
+  // TODO(nezdolik): wrap proactive monitors into atomic? and clear it here
 }
 
 bool OverloadManagerImpl::registerForAction(const std::string& action,

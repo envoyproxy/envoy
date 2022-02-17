@@ -2,8 +2,8 @@
 
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/header_utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_utility.h"
 
 namespace Envoy {
 namespace Extensions {

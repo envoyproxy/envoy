@@ -50,14 +50,14 @@ The [`ConfigHelper`](../config/utility.h) has utilities for common alterations s
 
 ```c++
 // Set the default protocol to HTTP2
-setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+setDownstreamProtocol(Http::CodecType::HTTP2);
 ```
 
 or
 
 ```c++
 // Add a buffering filter on the request path
-config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+config_helper_.prependFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
 ```
 
 For other edits which are less likely reusable, one can add config modifiers. Config modifiers
@@ -78,7 +78,7 @@ An example of modifying `HttpConnectionManager` to change Envoy’s HTTP/1.1 pro
 
 ```c++
 config_helper_.addConfigModifier([&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) -> void {
-  envoy::api::v2::core::Http1ProtocolOptions options;
+  nvoy::config::core::v3::Http1ProtocolOptions options;
   options.mutable_allow_absolute_url()->set_value(true);
   hcm.mutable_http_protocol_options()->CopyFrom(options);
 };);
@@ -88,7 +88,7 @@ An example of modifying `HttpConnectionManager` to add an additional upstream
 cluster:
 
 ```c++
-   config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       bootstrap.mutable_rate_limit_service()->set_cluster_name("ratelimit");
       auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ratelimit_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);

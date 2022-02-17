@@ -1,29 +1,53 @@
+#include <iostream>
 #include <string>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
-#include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/stop_and_continue_filter_config.pb.h"
+#include "test/integration/filters/stop_and_continue_filter_config.pb.validate.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 
 // A test filter that does StopIterationNoBuffer on end stream, then continues after a 0ms alarm.
+// It can optionally register a ScopeTrackedObject on continuation.
 class StopIterationAndContinueFilter : public Http::PassThroughFilter {
 public:
+  StopIterationAndContinueFilter(bool set_tracked_object)
+      : set_tracked_object_(set_tracked_object) {}
+
   void setEndStreamAndDecodeTimer() {
     decode_end_stream_seen_ = true;
-    decode_delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
-        [this]() -> void { decoder_callbacks_->continueDecoding(); });
+    decode_delay_timer_ = decoder_callbacks_->dispatcher().createTimer([this]() -> void {
+      absl::optional<MessageTrackedObject> msg;
+      absl::optional<ScopeTrackerScopeState> state;
+      if (set_tracked_object_) {
+        msg.emplace("StopIterationAndContinue decode_delay_timer");
+        state.emplace(&msg.value(), decoder_callbacks_->dispatcher());
+      }
+      decoder_callbacks_->continueDecoding();
+    });
     decode_delay_timer_->enableTimer(std::chrono::seconds(0));
   }
 
   void setEndStreamAndEncodeTimer() {
     encode_end_stream_seen_ = true;
-    encode_delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
-        [this]() -> void { encoder_callbacks_->continueEncoding(); });
+    encode_delay_timer_ = decoder_callbacks_->dispatcher().createTimer([this]() -> void {
+      absl::optional<MessageTrackedObject> msg;
+      absl::optional<ScopeTrackerScopeState> state;
+      if (set_tracked_object_) {
+        msg.emplace("StopIterationAndContinue encode_delay_timer");
+        state.emplace(&msg.value(), decoder_callbacks_->dispatcher());
+      }
+      encoder_callbacks_->continueEncoding();
+    });
     encode_delay_timer_->enableTimer(std::chrono::seconds(0));
   }
 
@@ -63,25 +87,28 @@ public:
   bool decode_end_stream_seen_{};
   Event::TimerPtr encode_delay_timer_;
   bool encode_end_stream_seen_{};
+  bool set_tracked_object_{};
 };
 
-class StopIterationAndContinueFilterConfig
-    : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class StopIterationAndContinueFilterFactory
+    : public Extensions::HttpFilters::Common::FactoryBase<
+          test::integration::filters::StopAndContinueConfig> {
 public:
-  StopIterationAndContinueFilterConfig()
-      : EmptyHttpFilterConfig("stop-iteration-and-continue-filter") {}
+  StopIterationAndContinueFilterFactory() : FactoryBase("stop-iteration-and-continue-filter") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
-    return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(std::make_shared<::Envoy::StopIterationAndContinueFilter>());
+private:
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const test::integration::filters::StopAndContinueConfig& proto_config, const std::string&,
+      Server::Configuration::FactoryContext&) override {
+    bool set_scope_tacked_object = proto_config.install_scope_tracked_object();
+    return [set_scope_tacked_object](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamFilter(
+          std::make_shared<::Envoy::StopIterationAndContinueFilter>(set_scope_tacked_object));
     };
   }
 };
 
-// perform static registration
-static Registry::RegisterFactory<StopIterationAndContinueFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(StopIterationAndContinueFilterFactory,
+                 Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace Envoy

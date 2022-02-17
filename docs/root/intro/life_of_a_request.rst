@@ -254,7 +254,7 @@ chain.
    :width: 80%
    :align: center
 
-The TLS inspector filter implements the :repo:`ListenerFilter <include/envoy/network/filter.h>`
+The TLS inspector filter implements the :repo:`ListenerFilter <envoy/network/filter.h>`
 interface. All filter interfaces, whether listener or network/HTTP, require that filters implement
 callbacks for specific connection or stream events. In the case of ``ListenerFilter``, this is:
 
@@ -281,7 +281,7 @@ connection.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Envoy offers pluggable transport sockets via the
-:repo:`TransportSocket <include/envoy/network/transport_socket.h>`
+:repo:`TransportSocket <envoy/network/transport_socket.h>`
 extension interface. Transport sockets follow the lifecycle events of a TCP connection and
 read/write into network buffers. Some key methods that transport sockets must implement are:
 
@@ -323,11 +323,11 @@ lifecycle events and are invoked as data becomes available from the transport so
 Network filters are composed as a pipeline, unlike transport sockets which are one-per-connection.
 Network filters come in three varieties:
 
-* :repo:`ReadFilter <include/envoy/network/filter.h>` implementing ``onData()``, called when data is
+* :repo:`ReadFilter <envoy/network/filter.h>` implementing ``onData()``, called when data is
   available from the connection (due to some request).
-* :repo:`WriteFilter <include/envoy/network/filter.h>` implementing ``onWrite()``, called when data
+* :repo:`WriteFilter <envoy/network/filter.h>` implementing ``onWrite()``, called when data
   is about to be written to the connection (due to some response).
-* :repo:`Filter <include/envoy/network/filter.h>` implementing both *ReadFilter* and *WriteFilter*.
+* :repo:`Filter <envoy/network/filter.h>` implementing both *ReadFilter* and *WriteFilter*.
 
 The method signatures for the key filter methods are:
 
@@ -388,9 +388,9 @@ following the pattern established above for listener and network filter chains.
 
 There are three kinds of HTTP filter interfaces:
 
-* :repo:`StreamDecoderFilter <include/envoy/http/filter.h>` with callbacks for request processing.
-* :repo:`StreamEncoderFilter <include/envoy/http/filter.h>` with callbacks for response processing.
-* :repo:`StreamFilter <include/envoy/http/filter.h>` implementing both ``StreamDecoderFilter`` and
+* :repo:`StreamDecoderFilter <envoy/http/filter.h>` with callbacks for request processing.
+* :repo:`StreamEncoderFilter <envoy/http/filter.h>` with callbacks for response processing.
+* :repo:`StreamFilter <envoy/http/filter.h>` implementing both ``StreamDecoderFilter`` and
   ``StreamEncoderFilter``.
 
 Looking at the decoder filter interface:
@@ -470,8 +470,8 @@ connections are at their maximum concurrent stream limit, a new connection is es
 in the connection pool, unless the circuit breaker for maximum connections for the cluster has
 tripped. If a maximum lifetime stream limit for a connection is configured and reached, a new
 connection is allocated in the pool and the affected HTTP/2 connection is drained. Other circuit
-breakers, e.g. maximum concurrent requests to a cluster are also checked. See :repo:`circuit
-breakers <arch_overview_circuit_breakers>` and :ref:`connection pools <arch_overview_conn_pool>` for
+breakers, e.g. maximum concurrent requests to a cluster are also checked. See :ref:`circuit
+breakers <arch_overview_circuit_break>` and :ref:`connection pools <arch_overview_conn_pool>` for
 further details.
 
 .. image:: /_static/lor-lb.svg

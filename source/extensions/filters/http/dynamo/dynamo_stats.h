@@ -5,8 +5,8 @@
 
 #include "envoy/stats/scope.h"
 
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/utility.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Extensions {

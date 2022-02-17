@@ -1,8 +1,8 @@
 #include "test/common/http/http2/frame_replay.h"
 
-#include "common/common/hex.h"
-#include "common/common/macros.h"
-#include "common/http/utility.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/macros.h"
+#include "source/common/http/utility.h"
 
 #include "test/common/http/common.h"
 #include "test/test_common/environment.h"

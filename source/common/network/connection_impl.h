@@ -9,10 +9,10 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/buffer/watermark_buffer.h"
-#include "common/event/libevent.h"
-#include "common/network/connection_impl_base.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/event/libevent.h"
+#include "source/common/network/connection_impl_base.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -21,6 +21,8 @@ class RandomPauseFilter;
 class TestPauseFilter;
 
 namespace Network {
+
+class HappyEyeballsConnectionImpl;
 
 /**
  * Utility functions for the connection implementation.
@@ -45,9 +47,7 @@ public:
  * Implementation of Network::Connection, Network::FilterManagerConnection and
  * Envoy::ScopeTrackedObject.
  */
-class ConnectionImpl : public ConnectionImplBase,
-                       public TransportSocketCallbacks,
-                       public ScopeTrackedObject {
+class ConnectionImpl : public ConnectionImplBase, public TransportSocketCallbacks {
 public:
   ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                  TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
@@ -72,16 +72,20 @@ public:
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
-  const SocketAddressProvider& addressProvider() const override {
-    return socket_->addressProvider();
+  const ConnectionInfoProvider& connectionInfoProvider() const override {
+    return socket_->connectionInfoProvider();
   }
-  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
-    return socket_->addressProviderSharedPtr();
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    return socket_->connectionInfoProviderSharedPtr();
   }
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }
   State state() const override;
-  bool connecting() const override { return connecting_; }
+  bool connecting() const override {
+    ENVOY_CONN_LOG_EVENT(debug, "connection_connecting_state", "current connecting state: {}",
+                         *this, connecting_);
+    return connecting_;
+  }
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
@@ -149,6 +153,13 @@ protected:
   void onWriteBufferLowWatermark();
   void onWriteBufferHighWatermark();
 
+  // This is called when the underlying socket is connected, not when the
+  // connected event is raised.
+  virtual void onConnected() {}
+
+  void setFailureReason(absl::string_view failure_reason);
+  const std::string& failureReason() const { return failure_reason_; }
+
   TransportSocketPtr transport_socket_;
   ConnectionSocketPtr socket_;
   StreamInfo::StreamInfo& stream_info_;
@@ -170,6 +181,7 @@ protected:
   bool bind_error_{false};
 
 private:
+  friend class HappyEyeballsConnectionImpl;
   friend class Envoy::RandomPauseFilter;
   friend class Envoy::TestPauseFilter;
 
@@ -189,6 +201,8 @@ private:
   static std::atomic<uint64_t> next_global_id_;
 
   std::list<BytesSentCb> bytes_sent_callbacks_;
+  // Should be set with setFailureReason.
+  std::string failure_reason_;
   // Tracks the number of times reads have been disabled. If N different components call
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
   // has been called N times.
@@ -219,7 +233,8 @@ public:
                        bool connected);
 
   // ServerConnection impl
-  void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) override;
+  void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,
+                                        Stats::Counter& timeout_stat) override;
   void raiseEvent(ConnectionEvent event) override;
 
 private:
@@ -229,6 +244,7 @@ private:
   // Implements a timeout for the transport socket signaling connection. The timer is enabled by a
   // call to setTransportSocketConnectTimeout and is reset when the connection is established.
   Event::TimerPtr transport_socket_connect_timer_;
+  Stats::Counter* transport_socket_timeout_stat_;
 };
 
 /**
@@ -241,11 +257,17 @@ public:
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);
+  ClientConnectionImpl(Event::Dispatcher& dispatcher, std::unique_ptr<ConnectionSocket> socket,
+                       const Address::InstanceConstSharedPtr& source_address,
+                       Network::TransportSocketPtr&& transport_socket,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   // Network::ClientConnection
   void connect() override;
 
 private:
+  void onConnected() override;
+
   StreamInfo::StreamInfoImpl stream_info_;
 };
 

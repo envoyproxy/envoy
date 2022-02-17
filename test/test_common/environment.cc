@@ -9,20 +9,20 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/common/assert.h"
-#include "common/common/compiler_requirements.h"
-#include "common/common/logger.h"
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/filesystem/directory.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/compiler_requirements.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/filesystem/directory.h"
 
 #include "absl/container/node_hash_map.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "common/signal/signal_action.h"
+#include "source/common/signal/signal_action.h"
 #endif
 
-#include "server/options_impl.h"
+#include "source/server/options_impl.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/network_utility.h"
@@ -42,7 +42,7 @@ namespace {
 
 std::string makeTempDir(std::string basename_template) {
 #ifdef WIN32
-  std::string name_template = "c:\\Windows\\TEMP\\" + basename_template;
+  std::string name_template = TestEnvironment::temporaryDirectory() + "/" + basename_template;
   char* dirname = ::_mktemp(&name_template[0]);
   RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
                                                  name_template, errorDetails(errno)));
@@ -200,11 +200,7 @@ void TestEnvironment::initializeTestMain(char* program_name) {
   RELEASE_ASSERT(WSAStartup(version_requested, &wsa_data) == 0, "");
 #endif
 
-#ifdef __APPLE__
-  UNREFERENCED_PARAMETER(program_name);
-#else
   absl::InitializeSymbolizer(program_name);
-#endif
 
 #ifdef ENVOY_HANDLE_SIGNALS
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
@@ -268,7 +264,11 @@ const std::string& TestEnvironment::temporaryDirectory() {
 
 std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
-  return runfiles_->Rlocation(workspace);
+  auto path = runfiles_->Rlocation(workspace);
+#ifdef WIN32
+  path = std::regex_replace(path, std::regex("\\\\"), "/");
+#endif
+  return path;
 }
 
 std::string TestEnvironment::runfilesPath(const std::string& path, const std::string& workspace) {
@@ -370,9 +370,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   out_json_string = substitute(out_json_string, version);
 
   auto name = Filesystem::fileSystemForTest().splitPathFromFilename(path).file_;
-  const std::string extension = absl::EndsWith(name, ".yaml")      ? ".yaml"
-                                : absl::EndsWith(name, ".pb_text") ? ".pb_text"
-                                                                   : ".json";
+  const std::string extension = std::string(name.substr(name.rfind('.')));
   const std::string out_json_path =
       TestEnvironment::temporaryPath(name) + ".with.ports" + extension;
   {
@@ -404,19 +402,21 @@ void TestEnvironment::exec(const std::vector<std::string>& args) {
 
 std::string TestEnvironment::writeStringToFileForTest(const std::string& filename,
                                                       const std::string& contents,
-                                                      bool fully_qualified_path) {
+                                                      bool fully_qualified_path, bool do_unlink) {
   const std::string out_path =
       fully_qualified_path ? filename : TestEnvironment::temporaryPath(filename);
-  unlink(out_path.c_str());
+  if (do_unlink) {
+    unlink(out_path.c_str());
+  }
 
   Filesystem::FilePathAndType out_file_info{Filesystem::DestinationType::File, out_path};
   Filesystem::FilePtr file = Filesystem::fileSystemForTest().createFile(out_file_info);
   const Filesystem::FlagSet flags{1 << Filesystem::File::Operation::Write |
                                   1 << Filesystem::File::Operation::Create};
   const Api::IoCallBoolResult open_result = file->open(flags);
-  EXPECT_TRUE(open_result.rc_);
+  EXPECT_TRUE(open_result.return_value_) << open_result.err_->getErrorDetails();
   const Api::IoCallSizeResult result = file->write(contents);
-  EXPECT_EQ(contents.length(), result.rc_);
+  EXPECT_EQ(contents.length(), result.return_value_);
   return out_path;
 }
 

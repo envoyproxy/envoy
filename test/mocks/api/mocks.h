@@ -5,13 +5,14 @@
 
 #include "envoy/api/api.h"
 #include "envoy/api/os_sys_calls.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
-#include "common/api/os_sys_calls_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
 
 #if defined(__linux__)
-#include "common/api/os_sys_calls_impl_linux.h"
+#include "source/common/api/os_sys_calls_impl_linux.h"
 #endif
 
 #include "test/mocks/common.h"
@@ -47,12 +48,15 @@ public:
   MOCK_METHOD(Thread::ThreadFactory&, threadFactory, ());
   MOCK_METHOD(Stats::Scope&, rootScope, ());
   MOCK_METHOD(Random::RandomGenerator&, randomGenerator, ());
+  MOCK_METHOD(const envoy::config::bootstrap::v3::Bootstrap&, bootstrap, (), (const));
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
+  MOCK_METHOD(Stats::CustomStatNamespaces&, customStatNamespaces, ());
 
   testing::NiceMock<Filesystem::MockInstance> file_system_;
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
+  envoy::config::bootstrap::v3::Bootstrap empty_bootstrap_;
 };
 
 class MockOsSysCalls : public OsSysCallsImpl {
@@ -106,6 +110,10 @@ public:
   MOCK_METHOD(bool, supportsMmsg, (), (const));
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
   MOCK_METHOD(bool, supportsIpTransparent, (), (const));
+  MOCK_METHOD(bool, supportsMptcp, (), (const));
+  MOCK_METHOD(bool, supportsGetifaddrs, (), (const));
+  MOCK_METHOD(void, setAlternateGetifaddrs, (AlternateGetifaddrs alternate_getifaddrs));
+  MOCK_METHOD(SysCallIntResult, getifaddrs, (InterfaceAddressVector & interfaces));
 
   // Map from (sockfd,level,optname) to boolean socket option.
   using SockOptKey = std::tuple<os_fd_t, int, int>;

@@ -1,8 +1,8 @@
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 
-#include "extensions/filters/network/thrift_proxy/config.h"
-#include "extensions/filters/network/thrift_proxy/filters/factory_base.h"
+#include "source/extensions/filters/network/thrift_proxy/config.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/factory_base.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/mocks/server/factory_context.h"

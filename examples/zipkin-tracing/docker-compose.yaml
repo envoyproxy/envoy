@@ -6,44 +6,44 @@ services:
       context: .
       dockerfile: Dockerfile-frontenvoy
     networks:
-      - envoymesh
+    - envoymesh
     ports:
-      - "8000:8000"
+    - "8000:8000"
 
   service1:
     build:
       context: ../front-proxy
       dockerfile: Dockerfile-service
     volumes:
-      - ./service1-envoy-zipkin.yaml:/etc/service-envoy.yaml
+    - ./service1-envoy-zipkin.yaml:/etc/service-envoy.yaml
     networks:
       envoymesh:
         aliases:
-          - service1
+        - service1
     environment:
-      - SERVICE_NAME=1
+    - SERVICE_NAME=1
 
   service2:
     build:
       context: ../front-proxy
       dockerfile: Dockerfile-service
     volumes:
-      - ./service2-envoy-zipkin.yaml:/etc/service-envoy.yaml
+    - ./service2-envoy-zipkin.yaml:/etc/service-envoy.yaml
     networks:
       envoymesh:
         aliases:
-          - service2
+        - service2
     environment:
-      - SERVICE_NAME=2
+    - SERVICE_NAME=2
 
   zipkin:
     image: openzipkin/zipkin
     networks:
       envoymesh:
         aliases:
-          - zipkin
+        - zipkin
     ports:
-      - "9411:9411"
+    - "9411:9411"
 
 networks:
   envoymesh: {}

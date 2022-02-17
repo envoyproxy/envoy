@@ -4,9 +4,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/http/header_utility.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/http/header_utility.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
@@ -31,7 +30,7 @@ public:
     }
     if (!headers.get(Http::LowerCaseString("send-reply")).empty()) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "", nullptr, absl::nullopt,
-                                         "InvalidHeaderFilter ready");
+                                         "invalid_header_filter_ready");
       return Http::FilterHeadersStatus::StopIteration;
     }
     return Http::FilterHeadersStatus::Continue;

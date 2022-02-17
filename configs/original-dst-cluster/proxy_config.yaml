@@ -24,11 +24,9 @@ static_resources:
                   cluster: cluster1
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
           codec_type: AUTO
     listener_filters:
     - name: envoy.filters.listener.original_dst
-      typed_config: {}
   clusters:
   - name: cluster1
     type: ORIGINAL_DST

@@ -1,9 +1,9 @@
 #include <string>
 
-#include "envoy/extensions/filters/http/cdn_loop/v3alpha/cdn_loop.pb.h"
+#include "envoy/extensions/filters/http/cdn_loop/v3/cdn_loop.pb.h"
 
-#include "extensions/filters/http/cdn_loop/config.h"
-#include "extensions/filters/http/cdn_loop/filter.h"
+#include "source/extensions/filters/http/cdn_loop/config.h"
+#include "source/extensions/filters/http/cdn_loop/filter.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
@@ -23,7 +23,7 @@ TEST(CdnLoopFilterFactoryTest, ValidValuesWork) {
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
 
-  envoy::extensions::filters::http::cdn_loop::v3alpha::CdnLoopConfig config;
+  envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig config;
   config.set_cdn_id("cdn");
   CdnLoopFilterFactory factory;
 
@@ -36,7 +36,7 @@ TEST(CdnLoopFilterFactoryTest, ValidValuesWork) {
 TEST(CdnLoopFilterFactoryTest, BlankCdnIdThrows) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  envoy::extensions::filters::http::cdn_loop::v3alpha::CdnLoopConfig config;
+  envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig config;
   CdnLoopFilterFactory factory;
 
   EXPECT_THAT_THROWS_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
@@ -46,7 +46,7 @@ TEST(CdnLoopFilterFactoryTest, BlankCdnIdThrows) {
 TEST(CdnLoopFilterFactoryTest, InvalidCdnId) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  envoy::extensions::filters::http::cdn_loop::v3alpha::CdnLoopConfig config;
+  envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig config;
   config.set_cdn_id("[not-token-or-ip");
   CdnLoopFilterFactory factory;
 
@@ -57,7 +57,7 @@ TEST(CdnLoopFilterFactoryTest, InvalidCdnId) {
 TEST(CdnLoopFilterFactoryTest, InvalidCdnIdNonHeaderWhitespace) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  envoy::extensions::filters::http::cdn_loop::v3alpha::CdnLoopConfig config;
+  envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig config;
   config.set_cdn_id("\r\n");
   CdnLoopFilterFactory factory;
 
@@ -68,7 +68,7 @@ TEST(CdnLoopFilterFactoryTest, InvalidCdnIdNonHeaderWhitespace) {
 TEST(CdnLoopFilterFactoryTest, InvalidParsedCdnIdNotInput) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  envoy::extensions::filters::http::cdn_loop::v3alpha::CdnLoopConfig config;
+  envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig config;
   config.set_cdn_id("cdn,cdn");
   CdnLoopFilterFactory factory;
 

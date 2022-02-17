@@ -1,6 +1,6 @@
-#include "common/http/status.h"
+#include "source/common/http/status.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -26,7 +26,7 @@ absl::string_view statusCodeToString(StatusCode code) {
   case StatusCode::InboundFramesWithEmptyPayload:
     return "InboundFramesWithEmptyPayloadError";
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return "";
 }
 
 struct EnvoyStatusPayload {

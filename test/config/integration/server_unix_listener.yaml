@@ -21,8 +21,8 @@ static_resources:
               - "*"
               name: vhost_0
               routes:
-              - match: { prefix: "/" }
-                route: { cluster: cluster_0 }
+              - match: {prefix: "/"}
+                route: {cluster: cluster_0}
   clusters:
   - name: cluster_0
     connect_timeout: 5s
@@ -37,7 +37,6 @@ static_resources:
                 port_value: 0
     dns_lookup_family: V4_ONLY
 cluster_manager: {}
-watchdog: {}
 admin:
   access_log:
   - name: envoy.access_loggers.file

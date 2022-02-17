@@ -1,16 +1,15 @@
-#include "extensions/filters/http/aws_lambda/config.h"
+#include "source/extensions/filters/http/aws_lambda/config.h"
 
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/fmt.h"
-
-#include "extensions/common/aws/credentials_provider_impl.h"
-#include "extensions/common/aws/signer_impl.h"
-#include "extensions/common/aws/utility.h"
-#include "extensions/filters/http/aws_lambda/aws_lambda_filter.h"
+#include "source/common/common/fmt.h"
+#include "source/extensions/common/aws/credentials_provider_impl.h"
+#include "source/extensions/common/aws/signer_impl.h"
+#include "source/extensions/common/aws/utility.h"
+#include "source/extensions/filters/http/aws_lambda/aws_lambda_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,13 +22,13 @@ InvocationMode
 getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config) {
   using namespace envoy::extensions::filters::http::aws_lambda::v3;
   switch (proto_config.invocation_mode()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case Config_InvocationMode_ASYNCHRONOUS:
     return InvocationMode::Asynchronous;
   case Config_InvocationMode_SYNCHRONOUS:
     return InvocationMode::Synchronous;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace
@@ -48,7 +47,11 @@ Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
   }
   const std::string region = arn->region();
   auto signer = std::make_shared<Extensions::Common::Aws::SignerImpl>(
-      service_name, region, std::move(credentials_provider), context.dispatcher().timeSource());
+      service_name, region, std::move(credentials_provider),
+      context.mainThreadDispatcher().timeSource(),
+      // TODO: extend API to allow specifying header exclusion. ref:
+      // https://github.com/envoyproxy/envoy/pull/18998
+      Extensions::Common::Aws::AwsSigV4HeaderExclusionVector{});
 
   FilterSettings filter_settings{*arn, getInvocationMode(proto_config),
                                  proto_config.payload_passthrough()};

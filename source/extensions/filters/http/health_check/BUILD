@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # L7 HTTP filter that implements health check responses
-# Public docs: docs/root/configuration/http_filters/health_check_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/health_check_filter
 
 envoy_extension_package()
 
@@ -17,11 +17,11 @@ envoy_cc_library(
     srcs = ["health_check.cc"],
     hdrs = ["health_check.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/server:filter_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
         "//source/common/http:codes_lib",
@@ -37,18 +37,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.http",
-    # Legacy test use. TODO(#9953) clean up.
-    extra_visibility = [
-        "//test/common/filter/http:__subpackages__",
-        "//test/integration:__subpackages__",
-        "//test/server:__subpackages__",
-    ],
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/http:header_utility_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/health_check:health_check_lib",
         "@envoy_api//envoy/extensions/filters/http/health_check/v3:pkg_cc_proto",

@@ -51,12 +51,12 @@ void quicRecordTestOutputToFile(const std::string& filename, absl::string_view d
   Envoy::Filesystem::FilePathAndType new_file_info{Envoy::Filesystem::DestinationType::File,
                                                    output_path};
   Envoy::Filesystem::FilePtr file = file_system.createFile(new_file_info);
-  if (!file->open(DefaultFlags).rc_) {
+  if (!file->open(DefaultFlags).return_value_) {
     QUIC_LOG(ERROR) << "Failed to open test output file: " << output_path;
     return;
   }
 
-  if (file->write(data).rc_ != static_cast<ssize_t>(data.size())) {
+  if (file->write(data).return_value_ != static_cast<ssize_t>(data.size())) {
     QUIC_LOG(ERROR) << "Failed to write to test output file: " << output_path;
   } else {
     QUIC_LOG(INFO) << "Recorded test output into " << output_path;

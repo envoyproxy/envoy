@@ -170,5 +170,6 @@ func GenerateSnapshot() cache.Snapshot {
 		[]types.Resource{makeHTTPListener(ListenerName, RouteName)},
 		[]types.Resource{}, // runtimes
 		[]types.Resource{}, // secrets
+		[]types.Resource{}, // extensions configs
 	)
 }

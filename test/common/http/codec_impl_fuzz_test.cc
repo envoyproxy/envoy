@@ -9,13 +9,13 @@
 
 #include <functional>
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/http/exception.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
-#include "common/http/conn_manager_utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/conn_manager_utility.h"
 
 #include "test/common/http/codec_impl_fuzz.pb.validate.h"
 #include "test/common/http/http2/codec_impl_test_util.h"
@@ -135,6 +135,13 @@ public:
         stream_state_ = StreamState::Closed;
       }
     }
+
+    void closeLocalAndRemote() {
+      remote_closed_ = true;
+      local_closed_ = true;
+      stream_state_ = StreamState::Closed;
+    }
+
   } request_, response_;
 
   HttpStream(ClientConnection& client, const TestRequestHeaderMapImpl& request_headers,
@@ -176,11 +183,11 @@ public:
       request_.closeRemote();
     }));
     ON_CALL(response_.response_decoder_, decodeHeaders_(_, true))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeRemote(); }));
+        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
     ON_CALL(response_.response_decoder_, decodeData(_, true))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeRemote(); }));
+        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
     ON_CALL(response_.response_decoder_, decodeTrailers_(_))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeRemote(); }));
+        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
     if (!end_stream) {
       request_.request_encoder_->getStream().addCallbacks(request_.stream_callbacks_);
     }
@@ -208,7 +215,7 @@ public:
         auto headers =
             fromSanitizedHeaders<TestResponseHeaderMapImpl>(directional_action.continue_headers());
         headers.setReferenceKey(Headers::get().Status, "100");
-        state.response_encoder_->encode100ContinueHeaders(headers);
+        state.response_encoder_->encode1xxHeaders(headers);
       }
       break;
     }
@@ -218,7 +225,8 @@ public:
           auto headers =
               fromSanitizedHeaders<TestResponseHeaderMapImpl>(directional_action.headers());
           ConnectionManagerUtility::mutateResponseHeaders(headers, &request_.request_headers_,
-                                                          *conn_manager_config_, "");
+                                                          *conn_manager_config_, /*via=*/"",
+                                                          stream_info_, /*node_id=*/"");
           if (headers.Status() == nullptr) {
             headers.setReferenceKey(Headers::get().Status, "200");
           }
@@ -361,7 +369,13 @@ public:
         }
       }
       // Perform the stream action.
-      directionalAction(request_, stream_action.request());
+      // The request_.request_encoder_ is initialized from the response_.response_decoder_.
+      // Fuzz test codec_impl_fuzz_test-5766628005642240 created a situation where the response
+      // stream was in closed state leading to the state.request_encoder_ in directionalAction()
+      // kData case no longer being a valid address.
+      if (response_.stream_state_ != HttpStream::StreamState::Closed) {
+        directionalAction(request_, stream_action.request());
+      }
       break;
     }
     case test::common::http::StreamAction::kResponse: {
@@ -386,6 +400,7 @@ public:
   int32_t stream_index_{-1};
   StreamResetCallbackFn stream_reset_callback_;
   MockConnectionManagerConfig* conn_manager_config_;
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 // Buffer between client and server H1/H2 codecs. This models each write operation
@@ -670,6 +685,10 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     dynamic_cast<Http2::ClientConnectionImpl&>(*client).goAway();
     dynamic_cast<Http2::ServerConnectionImpl&>(*server).goAway();
   }
+
+  // Run deletion as would happen on the dispatchers to avoid inversion of
+  // lifetimes of dispatcher and connection.
+  server_connection.dispatcher_.to_delete_.clear();
 }
 
 } // namespace

@@ -2,9 +2,9 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/grpc/codec.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -2,8 +2,9 @@
 
 #include "envoy/http/metadata_interface.h"
 
-#include "extensions/filters/http/composite/filter.h"
+#include "source/extensions/filters/http/composite/filter.h"
 
+#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/http/mocks.h"
 
 #include "gtest/gtest.h"
@@ -16,7 +17,7 @@ namespace {
 
 class FilterTest : public ::testing::Test {
 public:
-  FilterTest() : filter_(stats_) {
+  FilterTest() : filter_(stats_, decoder_callbacks_.dispatcher()) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -32,8 +33,7 @@ public:
 
   // Templated since MockStreamFilter and MockStreamEncoder filter doesn't share a mock base class.
   template <class T> void expectDelegatedEncoding(T& filter_mock) {
-    EXPECT_CALL(filter_mock,
-                encode100ContinueHeaders(HeaderMapEqualRef(&default_response_headers_)));
+    EXPECT_CALL(filter_mock, encode1xxHeaders(HeaderMapEqualRef(&default_response_headers_)));
     EXPECT_CALL(filter_mock, encodeHeaders(HeaderMapEqualRef(&default_response_headers_), false));
     EXPECT_CALL(filter_mock, encodeMetadata(_));
     EXPECT_CALL(filter_mock, encodeData(_, false));
@@ -56,7 +56,7 @@ public:
   }
 
   void doAllEncodingCallbacks() {
-    filter_.encode100ContinueHeaders(default_response_headers_);
+    filter_.encode1xxHeaders(default_response_headers_);
 
     filter_.encodeHeaders(default_response_headers_, false);
 
@@ -71,7 +71,7 @@ public:
     filter_.encodeComplete();
   }
 
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
   Stats::MockCounter error_counter_;
   Stats::MockCounter success_counter_;
@@ -273,6 +273,36 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleEncodeFilterWithMatchTree) {
   doAllDecodingCallbacks();
   doAllEncodingCallbacks();
   filter_.onDestroy();
+}
+
+// Adding a encoder filter and an access loggers should be permitted and delegate to the access
+// logger.
+TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
+  auto encode_filter = std::make_shared<Http::MockStreamEncoderFilter>();
+  auto access_log_1 = std::make_shared<AccessLog::MockInstance>();
+  auto access_log_2 = std::make_shared<AccessLog::MockInstance>();
+
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamEncoderFilter(encode_filter);
+    cb.addAccessLogHandler(access_log_1);
+    cb.addAccessLogHandler(access_log_2);
+  };
+
+  ExecuteFilterAction action(factory_callback);
+  EXPECT_CALL(*encode_filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(success_counter_, inc());
+  filter_.onMatchCallback(action);
+
+  doAllDecodingCallbacks();
+  expectDelegatedEncoding(*encode_filter);
+  doAllEncodingCallbacks();
+
+  EXPECT_CALL(*encode_filter, onDestroy());
+  filter_.onDestroy();
+
+  EXPECT_CALL(*access_log_1, log(_, _, _, _));
+  EXPECT_CALL(*access_log_2, log(_, _, _, _));
+  filter_.log(nullptr, nullptr, nullptr, StreamInfo::MockStreamInfo());
 }
 
 } // namespace

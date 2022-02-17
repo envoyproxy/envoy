@@ -1,13 +1,13 @@
 #include <memory>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/http/codec_client.h"
-#include "common/http/exception.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/utility.h"
-#include "common/stream_info/stream_info_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/http/exception.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
@@ -15,6 +15,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
@@ -34,7 +35,6 @@ using testing::Pointee;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Throw;
 
 namespace Envoy {
 namespace Http {
@@ -57,13 +57,14 @@ public:
 
     Network::ClientConnectionPtr connection{connection_};
     EXPECT_CALL(dispatcher_, createTimer_(_));
-    client_ = std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(connection),
-                                                   codec_, nullptr, host_, dispatcher_);
+    client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(connection), codec_,
+                                                   nullptr, host_, dispatcher_);
     ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
   }
 
   ~CodecClientTest() override { EXPECT_EQ(0U, client_->numActiveRequests()); }
 
+  NiceMock<Runtime::MockLoader> runtime_;
   Event::MockDispatcher dispatcher_;
   Network::MockClientConnection* connection_;
   Http::MockClientConnection* codec_;
@@ -88,8 +89,8 @@ TEST_F(CodecClientTest, NotCallDetectEarlyCloseWhenReadDiabledUsingHttp3) {
   auto codec = new Http::MockClientConnection();
 
   EXPECT_CALL(dispatcher_, createTimer_(_));
-  client_ = std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP3, std::move(connection),
-                                                 codec, nullptr, host_, dispatcher_);
+  client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP3, std::move(connection), codec,
+                                                 nullptr, host_, dispatcher_);
 }
 
 TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
@@ -281,37 +282,25 @@ TEST_F(CodecClientTest, WatermarkPassthrough) {
   connection_cb_->onBelowWriteBufferLowWatermark();
 }
 
-TEST_F(CodecClientTest, SSLConnectionInfo) {
-  initialize();
-  std::string session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
-  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(session_id));
-  EXPECT_CALL(*connection_, ssl()).WillRepeatedly(Return(connection_info));
-  connection_cb_->onEvent(Network::ConnectionEvent::Connected);
-  EXPECT_NE(nullptr, stream_info_.downstreamSslConnection());
-  EXPECT_EQ(session_id, stream_info_.downstreamSslConnection()->sessionId());
-}
-
 // Test the codec getting input from a real TCP connection.
 class CodecNetworkTest : public Event::TestUsingSimulatedTime,
                          public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   CodecNetworkTest() : api_(Api::createApiForTest()), stream_info_(api_->timeSource(), nullptr) {
     dispatcher_ = api_->allocateDispatcher("test_thread");
-    auto socket = std::make_shared<Network::TcpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
+    auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(GetParam()));
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-        socket->addressProvider().localAddress(), source_address_,
+        socket->connectionInfoProvider().localAddress(), source_address_,
         Network::Test::createRawBufferSocket(), nullptr);
-    upstream_listener_ = dispatcher_->createListener(std::move(socket), listener_callbacks_, true,
-                                                     ENVOY_TCP_BACKLOG_SIZE);
+    upstream_listener_ =
+        dispatcher_->createListener(std::move(socket), listener_callbacks_, runtime_, true, false);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
     codec_ = new Http::MockClientConnection();
-    client_ =
-        std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(client_connection),
-                                             codec_, nullptr, host_, *dispatcher_);
+    client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(client_connection),
+                                                   codec_, nullptr, host_, *dispatcher_);
 
     int expected_callbacks = 2;
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
@@ -362,6 +351,7 @@ public:
 
 protected:
   Api::ApiPtr api_;
+  NiceMock<Runtime::MockLoader> runtime_;
   Event::DispatcherPtr dispatcher_;
   Network::ListenerPtr upstream_listener_;
   Network::MockTcpListenerCallbacks listener_callbacks_;

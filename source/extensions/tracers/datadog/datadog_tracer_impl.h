@@ -8,12 +8,11 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/http/async_client_utility.h"
-#include "common/http/header_map_impl.h"
-#include "common/json/json_loader.h"
-#include "common/upstream/cluster_update_tracker.h"
-
-#include "extensions/tracers/common/ot/opentracing_driver_impl.h"
+#include "source/common/http/async_client_utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/upstream/cluster_update_tracker.h"
+#include "source/extensions/tracers/common/ot/opentracing_driver_impl.h"
 
 namespace Envoy {
 namespace Extensions {

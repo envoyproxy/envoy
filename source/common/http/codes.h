@@ -8,8 +8,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/thread.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Http {
@@ -45,9 +45,10 @@ public:
   explicit CodeStatsImpl(Stats::SymbolTable& symbol_table);
 
   // CodeStats
-  void chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
-                               Code response_code) const override;
-  void chargeResponseStat(const ResponseStatInfo& info) const override;
+  void chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix, Code response_code,
+                               bool exclude_http_code_stats) const override;
+  void chargeResponseStat(const ResponseStatInfo& info,
+                          bool exclude_http_code_stats) const override;
   void chargeResponseTiming(const ResponseTimingInfo& info) const override;
 
 private:

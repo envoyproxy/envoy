@@ -1,8 +1,7 @@
 #pragma once
 
-#include "common/common/hash.h"
-
-#include "server/hot_restarting_base.h"
+#include "source/common/common/hash.h"
+#include "source/server/hot_restarting_base.h"
 
 namespace Envoy {
 namespace Server {

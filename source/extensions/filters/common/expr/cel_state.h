@@ -4,8 +4,8 @@
 
 #include "envoy/stream_info/filter_state.h"
 
-#include "common/protobuf/protobuf.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/singleton/const_singleton.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

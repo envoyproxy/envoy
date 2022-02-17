@@ -1,10 +1,9 @@
-#include "exe/terminate_handler.h"
+#include "source/exe/terminate_handler.h"
 
 #include <cstdlib>
 
-#include "common/common/logger.h"
-
-#include "server/backtrace.h"
+#include "source/common/common/logger.h"
+#include "source/server/backtrace.h"
 
 namespace Envoy {
 

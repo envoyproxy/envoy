@@ -1,10 +1,10 @@
-#include "extensions/filters/network/dubbo_proxy/router/router_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/router_impl.h"
 
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
-#include "extensions/filters/network/dubbo_proxy/app_exception.h"
-#include "extensions/filters/network/dubbo_proxy/message_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/app_exception.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -65,9 +65,8 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
     return FilterStatus::StopIteration;
   }
 
-  Tcp::ConnectionPool::Instance* conn_pool =
-      cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
-  if (!conn_pool) {
+  auto conn_pool_data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
+  if (!conn_pool_data) {
     callbacks_->sendLocalReply(
         AppException(
             ResponseStatus::ServerError,
@@ -112,9 +111,51 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
     upstream_request_buffer_.move(ctx->originMessage(), ctx->messageSize());
   }
 
-  upstream_request_ = std::make_unique<UpstreamRequest>(
-      *this, *conn_pool, metadata, callbacks_->serializationType(), callbacks_->protocolType());
+  upstream_request_ = std::make_unique<UpstreamRequest>(*this, *conn_pool_data, metadata,
+                                                        callbacks_->serializationType(),
+                                                        callbacks_->protocolType());
   return upstream_request_->start();
+}
+
+void Router::setEncoderFilterCallbacks(DubboFilters::EncoderFilterCallbacks& callbacks) {
+  encoder_callbacks_ = &callbacks;
+}
+
+FilterStatus Router::onMessageEncoded(MessageMetadataSharedPtr metadata, ContextSharedPtr) {
+  if (!metadata->hasResponseStatus() || upstream_request_ == nullptr) {
+    return FilterStatus::Continue;
+  }
+
+  ENVOY_STREAM_LOG(trace, "dubbo router: response status: {}", *encoder_callbacks_,
+                   metadata->responseStatus());
+
+  switch (metadata->responseStatus()) {
+  case ResponseStatus::Ok:
+    if (metadata->messageType() == MessageType::Exception) {
+      upstream_request_->upstream_host_->outlierDetector().putResult(
+          Upstream::Outlier::Result::ExtOriginRequestFailed);
+    } else {
+      upstream_request_->upstream_host_->outlierDetector().putResult(
+          Upstream::Outlier::Result::ExtOriginRequestSuccess);
+    }
+    break;
+  case ResponseStatus::ServerTimeout:
+    upstream_request_->upstream_host_->outlierDetector().putResult(
+        Upstream::Outlier::Result::LocalOriginTimeout);
+    break;
+  case ResponseStatus::ServiceError:
+    FALLTHRU;
+  case ResponseStatus::ServerError:
+    FALLTHRU;
+  case ResponseStatus::ServerThreadpoolExhaustedError:
+    upstream_request_->upstream_host_->outlierDetector().putResult(
+        Upstream::Outlier::Result::ExtOriginRequestFailed);
+    break;
+  default:
+    break;
+  }
+
+  return FilterStatus::Continue;
 }
 
 void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
@@ -168,14 +209,43 @@ void Router::onEvent(Network::ConnectionEvent event) {
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
     upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+    upstream_request_->upstream_host_->outlierDetector().putResult(
+        Upstream::Outlier::Result::LocalOriginConnectFailed);
     break;
   case Network::ConnectionEvent::LocalClose:
     upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
-  default:
+  case Network::ConnectionEvent::Connected:
     // Connected is consumed by the connection pool.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("unexpected");
   }
+}
+
+const Envoy::Router::MetadataMatchCriteria* Router::metadataMatchCriteria() {
+  // Have we been called before? If so, there's no need to recompute because
+  // by the time this method is called for the first time, route_entry_ should
+  // not change anymore
+  if (metadata_match_ != nullptr) {
+    return metadata_match_.get();
+  }
+
+  const Envoy::Router::MetadataMatchCriteria* route_criteria =
+      (route_entry_ != nullptr) ? route_entry_->metadataMatchCriteria() : nullptr;
+
+  // The request's metadata, if present, takes precedence over the route's.
+  const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+  const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+
+  if (filter_it == request_metadata.end()) {
+    return route_criteria;
+  }
+
+  if (route_criteria != nullptr) {
+    metadata_match_ = route_criteria->mergeMatchCriteria(filter_it->second);
+  } else {
+    metadata_match_ = std::make_unique<Envoy::Router::MetadataMatchCriteriaImpl>(filter_it->second);
+  }
+  return metadata_match_.get();
 }
 
 const Network::Connection* Router::downstreamConnection() const {
@@ -188,11 +258,11 @@ void Router::cleanup() {
   }
 }
 
-Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
+Router::UpstreamRequest::UpstreamRequest(Router& parent, Upstream::TcpPoolData& pool_data,
                                          MessageMetadataSharedPtr& metadata,
                                          SerializationType serialization_type,
                                          ProtocolType protocol_type)
-    : parent_(parent), conn_pool_(pool), metadata_(metadata),
+    : parent_(parent), conn_pool_data_(pool_data), metadata_(metadata),
       protocol_(
           NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol(serialization_type)),
       request_complete_(false), response_started_(false), response_complete_(false),
@@ -201,7 +271,7 @@ Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::In
 Router::UpstreamRequest::~UpstreamRequest() = default;
 
 FilterStatus Router::UpstreamRequest::start() {
-  Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(*this);
+  Tcp::ConnectionPool::Cancellable* handle = conn_pool_data_.newConnection(*this);
   if (handle) {
     // Pause while we wait for a connection.
     conn_pool_handle_ = handle;
@@ -238,6 +308,7 @@ void Router::UpstreamRequest::encodeData(Buffer::Instance& data) {
 }
 
 void Router::UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                            absl::string_view,
                                             Upstream::HostDescriptionConstSharedPtr host) {
   conn_pool_handle_ = nullptr;
 
@@ -254,6 +325,11 @@ void Router::UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason re
   if (reason == ConnectionPool::PoolFailureReason::Timeout ||
       reason == ConnectionPool::PoolFailureReason::LocalConnectionFailure ||
       reason == ConnectionPool::PoolFailureReason::RemoteConnectionFailure) {
+    if (reason == ConnectionPool::PoolFailureReason::Timeout) {
+      host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
+    } else if (reason == ConnectionPool::PoolFailureReason::RemoteConnectionFailure) {
+      host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
+    }
     parent_.callbacks_->continueDecoding();
   }
 }
@@ -266,6 +342,8 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
   bool continue_decoding = conn_pool_handle_ != nullptr;
 
   onUpstreamHostSelected(host);
+  host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
+
   conn_data_ = std::move(conn_data);
   conn_data_->addUpstreamCallbacks(parent_);
   conn_pool_handle_ = nullptr;
@@ -337,8 +415,6 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
                                  upstream_host_->address()->asString())),
         false);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (parent_.filter_complete_ && !response_complete_) {

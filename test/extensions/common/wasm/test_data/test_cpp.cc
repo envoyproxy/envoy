@@ -76,6 +76,7 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t context_id, uint32_t configur
     std::string message = "before badptr";
     proxy_log(LogLevel::error, message.c_str(), message.size());
     ::free(const_cast<void*>(reinterpret_cast<const void*>(configuration_ptr)));
+    configuration_ptr = nullptr;
     *badptr = 1;
     message = "after badptr";
     proxy_log(LogLevel::error, message.c_str(), message.size());
@@ -83,6 +84,7 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t context_id, uint32_t configur
     std::string message = "before div by zero";
     proxy_log(LogLevel::error, message.c_str(), message.size());
     ::free(const_cast<void*>(reinterpret_cast<const void*>(configuration_ptr)));
+    configuration_ptr = nullptr;
     int zero = context_id & 0x100000;
     message = "divide by zero: " + std::to_string(100 / zero);
     proxy_log(LogLevel::error, message.c_str(), message.size());

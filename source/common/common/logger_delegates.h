@@ -6,8 +6,8 @@
 
 #include "envoy/access_log/access_log.h"
 
-#include "common/common/logger.h"
-#include "common/common/macros.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
 
 #include "absl/strings/string_view.h"
 
@@ -24,7 +24,7 @@ public:
   ~FileSinkDelegate() override;
 
   // SinkDelegate
-  void log(absl::string_view msg) override;
+  void log(absl::string_view msg, const spdlog::details::log_msg& log_msg) override;
   void flush() override;
 
 private:

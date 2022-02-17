@@ -1,10 +1,10 @@
-#include "extensions/filters/network/dubbo_proxy/router/config.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/config.h"
 
 #include "envoy/extensions/filters/network/dubbo_proxy/router/v3/router.pb.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/router/v3/router.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/network/dubbo_proxy/router/router_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/router_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,7 +16,7 @@ DubboFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTy
     const envoy::extensions::filters::network::dubbo_proxy::router::v3::Router&, const std::string&,
     Server::Configuration::FactoryContext& context) {
   return [&context](DubboFilters::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addDecoderFilter(std::make_shared<Router>(context.clusterManager()));
+    callbacks.addFilter(std::make_shared<Router>(context.clusterManager()));
   };
 }
 

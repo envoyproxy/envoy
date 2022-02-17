@@ -1,6 +1,6 @@
-#include "extensions/tracers/dynamic_ot/dynamic_opentracing_driver_impl.h"
+#include "source/extensions/tracers/dynamic_ot/dynamic_opentracing_driver_impl.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Extensions {

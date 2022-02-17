@@ -1,4 +1,4 @@
-#include "common/network/transport_socket_options_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
 
 #include <cstdint>
 #include <memory>
@@ -6,12 +6,12 @@
 #include <utility>
 #include <vector>
 
-#include "common/common/scalar_to_byte_vector.h"
-#include "common/common/utility.h"
-#include "common/network/application_protocol.h"
-#include "common/network/proxy_protocol_filter_state.h"
-#include "common/network/upstream_server_name.h"
-#include "common/network/upstream_subject_alt_names.h"
+#include "source/common/common/scalar_to_byte_vector.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/application_protocol.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
+#include "source/common/network/upstream_server_name.h"
+#include "source/common/network/upstream_subject_alt_names.h"
 
 namespace Envoy {
 namespace Network {
@@ -58,7 +58,7 @@ void TransportSocketOptionsImpl::hashKey(std::vector<uint8_t>& key,
   commonHashKey(*this, key, factory);
 }
 
-TransportSocketOptionsSharedPtr
+TransportSocketOptionsConstSharedPtr
 TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& filter_state) {
   absl::string_view server_name;
   std::vector<std::string> application_protocols;
@@ -67,31 +67,30 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   absl::optional<Network::ProxyProtocolData> proxy_protocol_options;
 
   bool needs_transport_socket_options = false;
-  if (filter_state.hasData<UpstreamServerName>(UpstreamServerName::key())) {
-    const auto& upstream_server_name =
-        filter_state.getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
-    server_name = upstream_server_name.value();
+  if (auto typed_data = filter_state.getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
+      typed_data != nullptr) {
+    server_name = typed_data->value();
     needs_transport_socket_options = true;
   }
 
-  if (filter_state.hasData<Network::ApplicationProtocols>(Network::ApplicationProtocols::key())) {
-    const auto& alpn = filter_state.getDataReadOnly<Network::ApplicationProtocols>(
-        Network::ApplicationProtocols::key());
-    application_protocols = alpn.value();
+  if (auto typed_data = filter_state.getDataReadOnly<Network::ApplicationProtocols>(
+          Network::ApplicationProtocols::key());
+      typed_data != nullptr) {
+    application_protocols = typed_data->value();
     needs_transport_socket_options = true;
   }
 
-  if (filter_state.hasData<UpstreamSubjectAltNames>(UpstreamSubjectAltNames::key())) {
-    const auto& upstream_subject_alt_names =
-        filter_state.getDataReadOnly<UpstreamSubjectAltNames>(UpstreamSubjectAltNames::key());
-    subject_alt_names = upstream_subject_alt_names.value();
+  if (auto typed_data =
+          filter_state.getDataReadOnly<UpstreamSubjectAltNames>(UpstreamSubjectAltNames::key());
+      typed_data != nullptr) {
+    subject_alt_names = typed_data->value();
     needs_transport_socket_options = true;
   }
 
-  if (filter_state.hasData<ProxyProtocolFilterState>(ProxyProtocolFilterState::key())) {
-    const auto& proxy_protocol_filter_state =
-        filter_state.getDataReadOnly<ProxyProtocolFilterState>(ProxyProtocolFilterState::key());
-    proxy_protocol_options.emplace(proxy_protocol_filter_state.value());
+  if (auto typed_data =
+          filter_state.getDataReadOnly<ProxyProtocolFilterState>(ProxyProtocolFilterState::key());
+      typed_data != nullptr) {
+    proxy_protocol_options.emplace(typed_data->value());
     needs_transport_socket_options = true;
   }
 

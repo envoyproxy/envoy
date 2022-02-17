@@ -7,7 +7,7 @@ It is recommended to use [Bazelisk](https://github.com/bazelbuild/bazelisk) inst
 On Linux, run the following commands:
 
 ```console
-sudo wget -O /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
+sudo wget -O /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-$([ $(uname -m) = "aarch64" ] && echo "arm64" || echo "amd64")
 sudo chmod +x /usr/local/bin/bazel
 ```
 
@@ -20,11 +20,8 @@ On Windows, run the following commands:
 ```cmd
 mkdir %USERPROFILE%\bazel
 powershell Invoke-WebRequest https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-windows-amd64.exe -OutFile %USERPROFILE%\bazel\bazel.exe
-set PATH=%PATH%;%USERPROFILE%\bazel
+set PATH=%USERPROFILE%\bazel;%PATH%
 ```
-
-If you're building from an revision of Envoy prior to August 2019, which doesn't contains a `.bazelversion` file, run `ci/run_envoy_docker.sh "bazel version"`
-to find the right version of Bazel and set the version to `USE_BAZEL_VERSION` environment variable to build.
 
 ## Production environments
 
@@ -33,7 +30,7 @@ dependencies](https://www.envoyproxy.io/docs/envoy/latest/start/building#require
 independently sourced, the following steps should be followed:
 
 1. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/start/building#requirements).
-1. `bazel build -c opt //source/exe:envoy-static` from the repository root.
+1. `bazel build -c opt envoy` from the repository root.
 
 ## Quick start Bazel build for developers
 
@@ -116,17 +113,6 @@ for how to update or override dependencies.
     Envoy compiles and passes tests with the version of clang installed by Xcode 11.1:
     Apple clang version 11.0.0 (clang-1100.0.33.8).
 
-    In order for bazel to be aware of the tools installed by brew, the PATH
-    variable must be set for bazel builds. This can be accomplished by setting
-    this in your `user.bazelrc` file:
-
-    ```
-    build --action_env=PATH="/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
-    ```
-
-    Alternatively, you can pass `--action_env` on the command line when running
-    `bazel build`/`bazel test`.
-
     Having the binutils keg installed in Brew is known to cause issues due to putting an incompatible
     version of `ar` on the PATH, so if you run into issues building third party code like luajit
     consider uninstalling binutils.
@@ -167,9 +153,9 @@ for how to update or override dependencies.
     and Bazel rules which follow POSIX python conventions. Add `pip.exe` to the PATH and install the `wheel`
     package.
     ```cmd
-    mklink %USERPROFILE%\Python38\python3.exe %USERPROFILE%\Python38\python.exe
-    set PATH=%PATH%;%USERPROFILE%\Python38
-    set PATH=%PATH%;%USERPROFILE%\Python38\Scripts
+    mklink %USERPROFILE%\Python39\python3.exe %USERPROFILE%\Python39\python.exe
+    set PATH=%USERPROFILE%\Python39;%PATH%
+    set PATH=%USERPROFILE%\Python39\Scripts;%PATH%
     pip install wheel
     ```
 
@@ -183,7 +169,7 @@ for how to update or override dependencies.
     which is determined by their relative ordering in your PATH.
     ```cmd
     set BAZEL_VC=%USERPROFILE%\VSBT2019\VC
-    set PATH=%PATH%;%USERPROFILE%\VSBT2019\VC\Tools\MSVC\14.26.28801\bin\Hostx64\x64
+    set PATH=%USERPROFILE%\VSBT2019\VC\Tools\MSVC\14.26.28801\bin\Hostx64\x64;%PATH%
     ```
 
     The Windows SDK contains header files and libraries you need when building Windows applications. Bazel always uses the latest, but you can specify a different version by setting the environment variable `BAZEL_WINSDK_FULL_VERSION`. See [bazel/windows](https://docs.bazel.build/versions/master/windows.html)
@@ -193,8 +179,8 @@ for how to update or override dependencies.
     the project's GCP CI remote build environment, so 64 bit builds from the CMake and ninja
     projects are used instead.
     ```cmd
-    set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin
-    set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja
+    set PATH=%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;%PATH%
+    set PATH=%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;%PATH%
     ```
 
     [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys64.
@@ -203,7 +189,7 @@ for how to update or override dependencies.
     executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment variable to a value
     of `*` is often advisable to ensure argument parsing in the MSYS2 shell behaves as expected.
     ```cmd
-    set PATH=%PATH%;%USERPROFILE%\msys64\usr\bin
+    set PATH=%USERPROFILE%\msys64\usr\bin;%PATH%
     set BAZEL_SH=%USERPROFILE%\msys64\usr\bin\bash.exe
     set MSYS2_ARG_CONV_EXCL=*
     set MSYS2_PATH_TYPE=inherit
@@ -211,9 +197,9 @@ for how to update or override dependencies.
 
     Set the `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
     `C:\Windows\TEMP`), and create a directory symlink `C:\c` to `C:\`, so that the MSYS2
-    path `/c/Windows/TEMP` is equivalent to the Windows path `C:\Windows\TEMP`:
+    path `/c/Windows/TEMP` is equivalent to the Windows path `C:/Windows/TEMP`:
     ```cmd
-    set TMPDIR=C:\Windows\TEMP
+    set TMPDIR=C:/Windows/TEMP
     mklink /d C:\c C:\
     ```
 
@@ -230,7 +216,7 @@ for how to update or override dependencies.
     [Git](https://git-scm.com/downloads): This version from the Git project, or the version
     distributed using pacman under MSYS2 will both work, ensure one is on the PATH:.
     ```cmd
-    set PATH=%PATH%;%USERPROFILE%\Git\bin
+    set PATH=%USERPROFILE%\Git\bin;%PATH%
     ```
 
     Lastly, persist environment variable changes.
@@ -250,7 +236,7 @@ for how to update or override dependencies.
    in your shell for buildifier to work.
 1. `go get -u github.com/bazelbuild/buildtools/buildozer` to install buildozer. You may need to set `BUILDOZER_BIN` to `$GOPATH/bin/buildozer`
    in your shell for buildozer to work.
-1. `bazel build //source/exe:envoy-static` from the Envoy source directory. Add `-c opt` for an optimized release build or
+1. `bazel build envoy` from the Envoy source directory. Add `-c opt` for an optimized release build or
    `-c dbg` for an unoptimized, fully instrumented debugging build.
 
 ## Building Envoy with the CI Docker image
@@ -284,7 +270,7 @@ To build Envoy with a remote build services, run Bazel with your remote build se
 For example the following command runs build with the GCP RBE service used in CI:
 
 ```
-bazel build //source/exe:envoy-static --config=remote-clang \
+bazel build envoy --config=remote-clang \
     --remote_cache=grpcs://remotebuildexecution.googleapis.com \
     --remote_executor=grpcs://remotebuildexecution.googleapis.com \
     --remote_instance_name=projects/envoy-ci/instances/default_instance
@@ -303,7 +289,7 @@ Building Envoy with Docker sandbox uses the same Docker image used in CI with fi
 output which is not depending on your local C++ toolchain. It can also help debugging issues with RBE. To build Envoy with Docker sandbox:
 
 ```
-bazel build //source/exe:envoy-static --config=docker-clang
+bazel build envoy --config=docker-clang
 ```
 
 Tests can be run in docker sandbox too. Note that the network environment, such as IPv6, may be different in the docker sandbox so you may want
@@ -313,7 +299,7 @@ set different options. See below to configure test IP versions.
 
 To link Envoy against libc++, follow the [quick start](#quick-start-bazel-build-for-developers) to setup Clang+LLVM and run:
 ```
-bazel build --config=libc++ //source/exe:envoy-static
+bazel build --config=libc++ envoy
 ```
 
 Or use our configuration with Remote Execution or Docker sandbox, pass `--config=remote-clang-libc++` or
@@ -536,14 +522,14 @@ that Bazel supports:
 You can use the `-c <compilation_mode>` flag to control this, e.g.
 
 ```
-bazel build -c opt //source/exe:envoy-static
+bazel build -c opt envoy
 ```
 
 To override the compilation mode and optimize the build for binary size, you can
 use the `sizeopt` configuration:
 
 ```
-bazel build //source/exe:envoy-static --config=sizeopt
+bazel build envoy --config=sizeopt
 ```
 
 ## Sanitizers
@@ -682,7 +668,10 @@ The following optional features can be enabled on the Bazel build command-line:
 
 Envoy uses a modular build which allows extensions to be removed if they are not needed or desired.
 Extensions that can be removed are contained in
-[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
+[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl). Contrib build
+extensions are contained in [contrib_build_config.bzl](../contrib/contrib_build_config.bzl). Note
+that contrib extensions are only included by default when building the contrib executable and in
+the default contrib images pushed to Docker Hub.
 
 The extensions disabled by default can be enabled by adding the following parameter to Bazel, for example to enable
 `envoy.filters.http.kill_request` extension, add `--//source/extensions/filters/http/kill_request:enabled`.
@@ -694,6 +683,13 @@ If you're building from a custom build repository, the parameters need to prefix
 `--@envoy//source/extensions/filters/http/kill_request:enabled`.
 
 You may persist those options in `user.bazelrc` in Envoy repo or your `.bazelrc`.
+
+Contrib extensions can be enabled and disabled similarly to above when building the contrib
+executable. For example:
+
+`bazel build //contrib/exe:envoy-static --//contrib/squash/filters/http/source:enabled=false`
+
+Will disable the squash extension when building the contrib executable.
 
 ## Customize extension build config
 
@@ -733,6 +729,11 @@ local_repository(
 ...
 ```
 
+When performing custom builds, it is acceptable to include contrib extensions as well. This can
+be done by including the desired Bazel paths from [contrib_build_config.bzl](../contrib/contrib_build_config.bzl)
+into the overriden `extensions_build_config.bzl`. (There is no need to specifically perform
+a contrib build to include a contrib extension.)
+
 ## Extra extensions
 
 If you are building your own Envoy extensions or custom Envoy builds and encounter visibility
@@ -750,7 +751,7 @@ They should also ignore any local `.bazelrc` for reproducibility. This can be
 achieved with:
 
 ```
-bazel --bazelrc=/dev/null build -c opt //source/exe:envoy-static.stripped
+bazel --bazelrc=/dev/null build -c opt envoy.stripped
 ```
 
 One caveat to note is that the Git SHA1 is truncated to 16 bytes today as a
@@ -817,7 +818,7 @@ resources, you can override Bazel's default job parallelism determination with
 `--jobs=N` to restrict the build to at most `N` simultaneous jobs, e.g.:
 
 ```
-bazel build --jobs=2 //source/exe:envoy-static
+bazel build --jobs=2 envoy
 ```
 
 # Debugging the Bazel build
@@ -826,19 +827,19 @@ When trying to understand what Bazel is doing, the `-s` and `--explain` options
 are useful. To have Bazel provide verbose output on which commands it is executing:
 
 ```
-bazel build -s //source/exe:envoy-static
+bazel build -s envoy
 ```
 
 To have Bazel emit to a text file the rationale for rebuilding a target:
 
 ```
-bazel build --explain=file.txt //source/exe:envoy-static
+bazel build --explain=file.txt envoy
 ```
 
 To get more verbose explanations:
 
 ```
-bazel build --explain=file.txt --verbose_explanations //source/exe:envoy-static
+bazel build --explain=file.txt --verbose_explanations envoy
 ```
 
 # Resolving paths in bazel build output
@@ -866,7 +867,7 @@ TEST_TMPDIR=/tmp tools/gen_compilation_database.py
 ```
 
 
-# Running clang-format without docker
+# Running format linting without docker
 
 The easiest way to run the clang-format check/fix commands is to run them via
 docker, which helps ensure the right toolchain is set up. However you may prefer
@@ -879,10 +880,12 @@ To run the tools directly, you must install the correct version of clang. This
 may change over time, check the version of clang in the docker image. You must
 also have 'buildifier' installed from the bazel distribution.
 
+Note that if you run the `check_spelling.py` script you will need to have `aspell` installed.
+
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-20.04/bin/clang-format"
+export CLANG_FORMAT="$HOME/ext/clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
 
@@ -890,9 +893,9 @@ Once this is set up, you can run clang-format without docker:
 
 ```shell
 ./tools/code_format/check_format.py check
-./tools/spelling/check_spelling.sh check
+./tools/spelling/check_spelling_pedantic.py check
 ./tools/code_format/check_format.py fix
-./tools/spelling/check_spelling.sh fix
+./tools/spelling/check_spelling_pedantic.py fix
 ```
 
 # Advanced caching setup

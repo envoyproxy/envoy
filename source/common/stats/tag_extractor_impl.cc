@@ -1,14 +1,14 @@
-#include "common/stats/tag_extractor_impl.h"
+#include "source/common/stats/tag_extractor_impl.h"
 
 #include <cstring>
 #include <string>
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/perf_annotation.h"
-#include "common/common/regex.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/perf_annotation.h"
+#include "source/common/common/regex.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
@@ -76,7 +76,7 @@ TagExtractorPtr TagExtractorImplBase::createTagExtractor(absl::string_view name,
   case Regex::Type::StdRegex:
     return std::make_unique<TagExtractorStdRegexImpl>(name, regex, substr);
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 bool TagExtractorImplBase::substrMismatch(absl::string_view stat_name) const {
@@ -136,7 +136,7 @@ bool TagExtractorStdRegexImpl::extractTag(TagExtractionContext& context, std::ve
 
 TagExtractorRe2Impl::TagExtractorRe2Impl(absl::string_view name, absl::string_view regex,
                                          absl::string_view substr)
-    : TagExtractorImplBase(name, regex, substr), regex_(regex) {}
+    : TagExtractorImplBase(name, regex, substr), regex_(std::string(regex)) {}
 
 bool TagExtractorRe2Impl::extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
                                      IntervalSet<size_t>& remove_characters) const {
@@ -186,7 +186,7 @@ TagExtractorTokensImpl::TagExtractorTokensImpl(absl::string_view name, absl::str
   if (!tokens_.empty()) {
     const absl::string_view first = tokens_[0];
     if (first != "$" && first != "*" && first != "**") {
-      prefix_ = first;
+      prefix_ = std::string(first);
     }
   }
 }
@@ -236,7 +236,7 @@ bool TagExtractorTokensImpl::extractTag(TagExtractionContext& context, std::vect
   } else if (start > 0) {
     --start; // Remove the dot prior to the lat token, e.g. ".ef"
   }
-  addTag(tags) = tag_value;
+  addTag(tags) = std::string(tag_value);
   remove_characters.insert(start, end);
 
   PERF_RECORD(perf, "tokens-match", name_);

@@ -1,10 +1,9 @@
 #include <sstream>
 #include <vector>
 
-#include "common/common/fmt.h"
-
-#include "extensions/filters/network/common/redis/fault_impl.h"
-#include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/extensions/filters/network/common/redis/fault_impl.h"
+#include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
 #include "test/integration/integration.h"
 
@@ -519,7 +518,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithFaultInjectionIntegrationTest
 
 void RedisProxyIntegrationTest::initialize() {
   setUpstreamCount(num_upstreams_);
-  setDeterministic();
+  setDeterministicValue();
   config_helper_.renameListener("redis_proxy");
   BaseIntegrationTest::initialize();
 }

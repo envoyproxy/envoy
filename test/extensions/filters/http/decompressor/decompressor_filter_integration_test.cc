@@ -1,6 +1,6 @@
 #include "envoy/event/timer.h"
 
-#include "extensions/compression/gzip/compressor/config.h"
+#include "source/extensions/compression/gzip/compressor/config.h"
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/server/factory_context.h"
@@ -14,7 +14,7 @@ namespace Envoy {
 class DecompressorIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public HttpIntegrationTest {
 public:
-  DecompressorIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
+  DecompressorIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
     Extensions::Compression::Gzip::Compressor::GzipCompressorLibraryFactory
         compressor_library_factory;
     envoy::extensions::compression::gzip::compressor::v3::Gzip factory_config;
@@ -29,8 +29,8 @@ public:
   void TearDown() override { cleanupUpstreamAndDownstream(); }
 
   void initializeFilter(const std::string& config) {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    config_helper_.addFilter(config);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+    config_helper_.prependFilter(config);
     HttpIntegrationTest::initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
   }
@@ -284,6 +284,69 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
       compressed_response_length);
   test_server_->waitForCounterGe(
       "http.config_test.decompressor.testlib.gzip.decompressor_library.zlib_data_error", 3);
+}
+
+// Buffer the request after it's been decompressed.
+TEST_P(DecompressorIntegrationTest, DecompressAndBuffer) {
+
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
+
+  config_helper_.prependFilter(R"EOF(
+  name: envoy.filters.http.decompressor
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
+    decompressor_library:
+      name: gzip_default
+      typed_config:
+        "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+        window_bits: 15
+        chunk_size: 8192
+    request_direction_config:
+      common_config:
+        enabled:
+          default_value: true
+          runtime_key: request_decompressor_enabled
+    response_direction_config:
+      common_config:
+        enabled:
+          default_value: false
+          runtime_key: response_decompressor_enabled
+  )EOF");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {"content-encoding", "gzip"},
+                                                                 {":authority", "host"}});
+
+  auto request_encoder = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Compressed JSON.
+  constexpr uint8_t buffer[] = {0x1f, 0x8b, 0x08, 0x00, 0x9c, 0xb3, 0x38, 0x61, 0x00, 0x03, 0xab,
+                                0x56, 0x50, 0xca, 0xad, 0x4c, 0x29, 0xcd, 0xcd, 0xad, 0x54, 0x52,
+                                0xb0, 0x52, 0x50, 0xca, 0x2a, 0xce, 0xcf, 0x53, 0x52, 0xa8, 0xe5,
+                                0x02, 0x00, 0xa6, 0x6a, 0x24, 0x99, 0x17, 0x00, 0x00, 0x00};
+  Buffer::OwnedImpl data(buffer, 43);
+  codec_client_->sendData(*request_encoder, data, true);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(10, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+
+  Stats::Store& stats = test_server_->server().stats();
+  Stats::CounterSharedPtr counter = TestUtility::findCounter(
+      stats, "http.config_test.decompressor.gzip_default.gzip.request.decompressed");
+  ASSERT_NE(nullptr, counter);
+  EXPECT_EQ(1L, counter->value());
 }
 
 } // namespace Envoy

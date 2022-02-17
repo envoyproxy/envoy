@@ -6,8 +6,8 @@
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/dump_state_utils.h"
-#include "common/common/linked_object.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/linked_object.h"
 
 #include "absl/strings/string_view.h"
 
@@ -17,7 +17,7 @@ namespace ConnectionPool {
 class ConnPoolImplBase;
 
 // A placeholder struct for whatever data a given connection pool needs to
-// successfully attach and upstream connection to a downstream connection.
+// successfully attach an upstream connection to a downstream connection.
 struct AttachContext {
   // Add a virtual destructor to allow for the dynamic_cast ASSERT in typedContext.
   virtual ~AttachContext() = default;
@@ -34,26 +34,29 @@ public:
                uint32_t concurrent_stream_limit);
   ~ActiveClient() override;
 
-  void releaseResources();
+  virtual void releaseResources() { releaseResourcesBase(); }
+  void releaseResourcesBase();
 
   // Network::ConnectionCallbacks
-  void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
   // Called if the connection does not complete within the cluster's connectTimeout()
   void onConnectTimeout();
 
+  // Called if the maximum connection duration is reached.
+  void onConnectionDurationTimeout();
+
   // Returns the concurrent stream limit, accounting for if the total stream limit
   // is less than the concurrent stream limit.
-  uint32_t effectiveConcurrentStreamLimit() const {
+  virtual uint32_t effectiveConcurrentStreamLimit() const {
     return std::min(remaining_streams_, concurrent_stream_limit_);
   }
 
   // Returns the application protocol, or absl::nullopt for TCP.
   virtual absl::optional<Http::Protocol> protocol() const PURE;
 
-  int64_t currentUnusedCapacity() const {
+  virtual int64_t currentUnusedCapacity() const {
     int64_t remaining_concurrent_streams =
         static_cast<int64_t>(concurrent_stream_limit_) - numActiveStreams();
 
@@ -99,12 +102,25 @@ public:
   virtual void drain();
 
   ConnPoolImplBase& parent_;
+  // The count of remaining streams allowed for this connection.
+  // This will start out as the total number of streams per connection if capped
+  // by configuration, or it will be set to std::numeric_limits<uint32_t>::max() to be
+  // (functionally) unlimited.
+  // TODO: this could be moved to an optional to make it actually unlimited.
   uint32_t remaining_streams_;
+  // The will start out as the upper limit of max concurrent streams for this connection
+  // if capped by configuration, or it will be set to std::numeric_limits<uint32_t>::max()
+  // to be (functionally) unlimited.
+  uint32_t configured_stream_limit_;
+  // The max concurrent stream for this connection, it's initialized by `configured_stream_limit_`
+  // and can be adjusted by SETTINGS frame, but the max value of it can't exceed
+  // `configured_stream_limit_`.
   uint32_t concurrent_stream_limit_;
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
   Stats::TimespanPtr conn_connect_ms_;
   Stats::TimespanPtr conn_length_;
   Event::TimerPtr connect_timer_;
+  Event::TimerPtr connection_duration_timer_;
   bool resources_released_{false};
   bool timed_out_{false};
 
@@ -116,7 +132,7 @@ private:
 // yet established.
 class PendingStream : public LinkedObject<PendingStream>, public ConnectionPool::Cancellable {
 public:
-  PendingStream(ConnPoolImplBase& parent);
+  PendingStream(ConnPoolImplBase& parent, bool can_send_early_data);
   ~PendingStream() override;
 
   // ConnectionPool::Cancellable
@@ -127,6 +143,8 @@ public:
   virtual AttachContext& context() PURE;
 
   ConnPoolImplBase& parent_;
+  // The request can be sent as early data.
+  bool can_send_early_data_;
 };
 
 using PendingStreamPtr = std::unique_ptr<PendingStream>;
@@ -139,9 +157,15 @@ public:
   ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state);
   virtual ~ConnPoolImplBase();
+
+  void deleteIsPendingImpl();
+  // By default, the connection pool will track connected and connecting stream
+  // capacity as streams are created and destroyed. QUIC does custom stream
+  // accounting so will override this to false.
+  virtual bool trackStreamCapacity() { return true; }
 
   // A helper function to get the specific context type from the base class context.
   template <class T> T& typedContext(AttachContext& context) {
@@ -159,8 +183,14 @@ public:
                             int64_t connecting_and_connected_capacity, float preconnect_ratio,
                             bool anticipate_incoming_stream = false);
 
-  void addDrainedCallbackImpl(Instance::DrainedCb cb);
-  void drainConnectionsImpl();
+  // Envoy::ConnectionPool::Instance implementation helpers
+  void addIdleCallbackImpl(Instance::IdleCb cb);
+  // Returns true if the pool is idle.
+  bool isIdleImpl() const;
+  void drainConnectionsImpl(DrainBehavior drain_behavior);
+  const Upstream::HostConstSharedPtr& host() const { return host_; }
+  // Called if this pool is likely to be picked soon, to determine if it's worth preconnecting.
+  bool maybePreconnectImpl(float global_preconnect_ratio);
 
   // Closes and destroys all connections. This must be called in the destructor of
   // derived classes because the derived ActiveClient will downcast parent_ to a more
@@ -191,14 +221,15 @@ public:
 
   void onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                          Network::ConnectionEvent event);
-  // See if the drain process has started and/or completed.
-  void checkForDrained();
-  void scheduleOnUpstreamReady();
-  ConnectionPool::Cancellable* newStream(AttachContext& context);
-  // Called if this pool is likely to be picked soon, to determine if it's worth preconnecting.
-  bool maybePreconnect(float global_preconnect_ratio);
 
-  virtual ConnectionPool::Cancellable* newPendingStream(AttachContext& context) PURE;
+  // See if the pool has gone idle. If we're draining, this will also close idle connections.
+  void checkForIdleAndCloseIdleConnsIfDraining();
+
+  void scheduleOnUpstreamReady();
+  ConnectionPool::Cancellable* newStreamImpl(AttachContext& context, bool can_send_early_data);
+
+  virtual ConnectionPool::Cancellable* newPendingStream(AttachContext& context,
+                                                        bool can_send_early_data) PURE;
 
   virtual void attachStreamToClient(Envoy::ConnectionPool::ActiveClient& client,
                                     AttachContext& context);
@@ -211,17 +242,19 @@ public:
   // Called by derived classes any time a stream is completed or destroyed for any reason.
   void onStreamClosed(Envoy::ConnectionPool::ActiveClient& client, bool delay_attaching_stream);
 
-  const Upstream::HostConstSharedPtr& host() const { return host_; }
   Event::Dispatcher& dispatcher() { return dispatcher_; }
   Upstream::ResourcePriority priority() const { return priority_; }
   const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() { return socket_options_; }
-  const Network::TransportSocketOptionsSharedPtr& transportSocketOptions() {
+  const Network::TransportSocketOptionsConstSharedPtr& transportSocketOptions() {
     return transport_socket_options_;
   }
   bool hasPendingStreams() const { return !pending_streams_.empty(); }
 
   void decrClusterStreamCapacity(uint32_t delta) {
     state_.decrConnectingAndConnectedStreamCapacity(delta);
+  }
+  void incrClusterStreamCapacity(uint32_t delta) {
+    state_.incrConnectingAndConnectedStreamCapacity(delta);
   }
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
@@ -244,16 +277,24 @@ public:
     connecting_stream_capacity_ -= delta;
   }
 
+  void incrConnectingAndConnectedStreamCapacity(uint32_t delta) {
+    state_.incrConnectingAndConnectedStreamCapacity(delta);
+    connecting_stream_capacity_ += delta;
+  }
+
+  // Called when an upstream is ready to serve pending streams.
+  void onUpstreamReady();
+
 protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
 
   enum class ConnectionResult {
+    FailedToCreateConnection,
     CreatedNewConnection,
     ShouldNotConnect,
     NoConnectionRateLimited,
     CreatedButRateLimited,
   };
-
   // Creates up to 3 connections, based on the preconnect ratio.
   // Returns the ConnectionResult of the last attempt.
   ConnectionResult tryCreateNewConnections();
@@ -283,11 +324,6 @@ protected:
 
   bool hasActiveStreams() const { return num_active_streams_ > 0; }
 
-  void incrConnectingAndConnectedStreamCapacity(uint32_t delta) {
-    state_.incrConnectingAndConnectedStreamCapacity(delta);
-    connecting_stream_capacity_ += delta;
-  }
-
   Upstream::ClusterConnectivityState& state_;
 
   const Upstream::HostConstSharedPtr host_;
@@ -295,9 +331,13 @@ protected:
 
   Event::Dispatcher& dispatcher_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
-  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
 
-  std::list<Instance::DrainedCb> drained_callbacks_;
+  // True if the max requests circuit breakers apply.
+  // This will be false for the TCP pool, true otherwise.
+  virtual bool enforceMaxRequests() const { return true; }
+
+  std::list<Instance::IdleCb> idle_callbacks_;
 
   // When calling purgePendingStreams, this list will be used to hold the streams we are about
   // to purge. We need this if one cancelled streams cancels a different pending stream
@@ -323,7 +363,13 @@ private:
   // The number of streams currently attached to clients.
   uint32_t num_active_streams_{0};
 
-  void onUpstreamReady();
+  // Whether the connection pool is currently in the process of closing
+  // all connections so that it can be gracefully deleted.
+  bool is_draining_for_deletion_{false};
+
+  // True iff this object is in the deferred delete list.
+  bool deferred_deleting_{false};
+
   Event::SchedulableCallbackPtr upstream_ready_cb_;
 };
 

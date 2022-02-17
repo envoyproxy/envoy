@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/stats/utility.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Stats {

@@ -3,8 +3,8 @@
 
 #include <iostream>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/header_map_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_map_impl.h"
 
 namespace Envoy {
 namespace Http {

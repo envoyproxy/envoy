@@ -24,6 +24,8 @@ docker-compose up --build -d go-control-plane
 
 wait_for 30 sh -c "docker-compose ps go-control-plane | grep healthy | grep -v unhealthy"
 
+sleep 2
+
 run_log "Check for response from service1 backend"
 responds_with \
     "Request served by service1" \

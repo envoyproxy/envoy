@@ -1,29 +1,40 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#pragma GCC diagnostic ignored "-Wtype-limits"
-#endif
+#include <memory>
+#include <ostream>
+
+#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
+#include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_server_stream.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_stat_names.h"
+#include "source/common/quic/send_buffer_monitor.h"
 
 #include "quiche/quic/core/http/quic_server_session_base.h"
 #include "quiche/quic/core/quic_crypto_server_stream.h"
 #include "quiche/quic/core/tls_server_handshaker.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include <memory>
-
-#include "common/quic/send_buffer_monitor.h"
-#include "common/quic/quic_filter_manager_connection_impl.h"
-#include "common/quic/envoy_quic_server_connection.h"
-#include "common/quic/envoy_quic_server_stream.h"
-
 namespace Envoy {
 namespace Quic {
+
+using FilterChainToConnectionMap =
+    absl::flat_hash_map<const Network::FilterChain*,
+                        std::list<std::reference_wrapper<Network::Connection>>>;
+using ConnectionMapIter = std::list<std::reference_wrapper<Network::Connection>>::iterator;
+
+// Used to track the matching filter chain and its position in the filter chain to connection map.
+struct ConnectionMapPosition {
+  ConnectionMapPosition(FilterChainToConnectionMap& connection_map,
+                        const Network::FilterChain& filter_chain, ConnectionMapIter iterator)
+      : connection_map_(connection_map), filter_chain_(filter_chain), iterator_(iterator) {}
+
+  // Stores the map from filter chain of connections.
+  FilterChainToConnectionMap& connection_map_;
+  // The matching filter chain of a connection.
+  const Network::FilterChain& filter_chain_;
+  // The position of the connection in the map.
+  ConnectionMapIter iterator_;
+};
 
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
 // TODO(danzh) Lifetime of quic connection and filter manager connection can be
@@ -39,12 +50,17 @@ public:
                          quic::QuicCryptoServerStreamBase::Helper* helper,
                          const quic::QuicCryptoServerConfig* crypto_config,
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
-                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
+                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
+                         QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
+                         EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory);
 
   ~EnvoyQuicServerSession() override;
 
   // Network::Connection
   absl::string_view requestedServerName() const override;
+  void dumpState(std::ostream&, int) const override {
+    // TODO(kbaichoo): Implement dumpState for H3.
+  }
 
   // Called by QuicHttpServerConnectionImpl before creating data streams.
   void setHttpConnectionCallbacks(Http::ServerConnectionCallbacks& callbacks) {
@@ -57,18 +73,21 @@ public:
   void Initialize() override;
   void OnCanWrite() override;
   void OnTlsHandshakeComplete() override;
-  // quic::QuicSpdySession
-  void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
-  size_t WriteHeadersOnHeadersStream(
-      quic::QuicStreamId id, spdy::SpdyHeaderBlock headers, bool fin,
-      const spdy::SpdyStreamPrecedence& precedence,
-      quic::QuicReferenceCountedPointer<quic::QuicAckListenerInterface> ack_listener) override;
+  void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicResetStreamError error,
+                               quic::QuicStreamOffset bytes_written) override;
+  void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
 
   void setHeadersWithUnderscoreAction(
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action) {
     headers_with_underscores_action_ = headers_with_underscores_action;
   }
+
+  void storeConnectionMapPosition(FilterChainToConnectionMap& connection_map,
+                                  const Network::FilterChain& filter_chain,
+                                  ConnectionMapIter position);
+
+  void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) override;
 
   using quic::QuicSession::PerformActionOnActiveStreams;
 
@@ -101,6 +120,12 @@ private:
 
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+
+  QuicStatNames& quic_stat_names_;
+  Stats::Scope& listener_scope_;
+
+  EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
+  absl::optional<ConnectionMapPosition> position_;
 };
 
 } // namespace Quic

@@ -3,9 +3,6 @@ from flask import request
 from flask import make_response, abort
 import yaml
 import os
-import requests
-import socket
-import sys
 import datetime
 
 app = Flask(__name__)
@@ -13,7 +10,7 @@ app = Flask(__name__)
 
 @app.route('/service/<service_number>/<response_id>')
 def get(service_number, response_id):
-    stored_response = yaml.load(open('/etc/responses.yaml', 'r')).get(response_id)
+    stored_response = yaml.safe_load(open('/etc/responses.yaml', 'r')).get(response_id)
 
     if stored_response is None:
         abort(404, 'No response found with the given id')
@@ -41,4 +38,4 @@ if __name__ == "__main__":
     if not os.path.isfile('/etc/responses.yaml'):
         print('Responses file not found at /etc/responses.yaml')
         exit(1)
-    app.run(host='127.0.0.1', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8000, debug=True)

@@ -1,4 +1,4 @@
-#include "server/worker_impl.h"
+#include "source/server/worker_impl.h"
 
 #include <functional>
 #include <memory>
@@ -9,7 +9,7 @@
 #include "envoy/server/configuration.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "server/connection_handler_impl.h"
+#include "source/server/connection_handler_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -20,14 +20,16 @@ WorkerPtr ProdWorkerFactory::createWorker(uint32_t index, OverloadManager& overl
       api_.allocateDispatcher(worker_name, overload_manager.scaledTimerFactory()));
   auto conn_handler = std::make_unique<ConnectionHandlerImpl>(*dispatcher, index);
   return std::make_unique<WorkerImpl>(tls_, hooks_, std::move(dispatcher), std::move(conn_handler),
-                                      overload_manager, api_);
+                                      overload_manager, api_, stat_names_);
 }
 
 WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
                        Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler,
-                       OverloadManager& overload_manager, Api::Api& api)
+                       OverloadManager& overload_manager, Api::Api& api,
+                       WorkerStatNames& stat_names)
     : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),
-      api_(api) {
+      api_(api), reset_streams_counter_(
+                     api_.rootScope().counterFromStatName(stat_names.reset_high_memory_stream_)) {
   tls_.registerThread(*dispatcher_, false);
   overload_manager.registerForAction(
       OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
@@ -35,26 +37,18 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
   overload_manager.registerForAction(
       OverloadActionNames::get().RejectIncomingConnections, *dispatcher_,
       [this](OverloadActionState state) { rejectIncomingConnectionsCb(state); });
+  overload_manager.registerForAction(
+      OverloadActionNames::get().ResetStreams, *dispatcher_,
+      [this](OverloadActionState state) { resetStreamsUsingExcessiveMemory(state); });
 }
 
 void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
-                             Network::ListenerConfig& listener, AddListenerCompletion completion) {
-  // All listener additions happen via post. However, we must deal with the case where the listener
-  // can not be created on the worker. There is a race condition where 2 processes can successfully
-  // bind to an address, but then fail to listen() with `EADDRINUSE`. During initial startup, we
-  // want to surface this.
-  dispatcher_->post([this, overridden_listener, &listener, completion]() -> void {
-    // TODO(chaoqin-li1123): Make add listener return a error status instead of catching an
-    // exception.
-    TRY_NEEDS_AUDIT {
-      handler_->addListener(overridden_listener, listener);
-      hooks_.onWorkerListenerAdded();
-      completion(true);
-    }
-    catch (const Network::CreateListenerException& e) {
-      ENVOY_LOG(error, "failed to add listener on worker: {}", e.what());
-      completion(false);
-    }
+                             Network::ListenerConfig& listener, AddListenerCompletion completion,
+                             Runtime::Loader& runtime) {
+  dispatcher_->post([this, overridden_listener, &listener, &runtime, completion]() -> void {
+    handler_->addListener(overridden_listener, listener, runtime);
+    hooks_.onWorkerListenerAdded();
+    completion();
   });
 }
 
@@ -87,7 +81,7 @@ void WorkerImpl::removeFilterChains(uint64_t listener_tag,
       });
 }
 
-void WorkerImpl::start(GuardDog& guard_dog) {
+void WorkerImpl::start(GuardDog& guard_dog, const Event::PostCb& cb) {
   ASSERT(!thread_);
 
   // In posix, thread names are limited to 15 characters, so contrive to make
@@ -102,7 +96,7 @@ void WorkerImpl::start(GuardDog& guard_dog) {
   // architecture is centralized, resulting in clearer names.
   Thread::Options options{absl::StrCat("wrk:", dispatcher_->name())};
   thread_ = api_.threadFactory().createThread(
-      [this, &guard_dog]() -> void { threadRoutine(guard_dog); }, options);
+      [this, &guard_dog, cb]() -> void { threadRoutine(guard_dog, cb); }, options);
 }
 
 void WorkerImpl::initializeStats(Stats::Scope& scope) { dispatcher_->initializeStats(scope); }
@@ -117,7 +111,6 @@ void WorkerImpl::stop() {
 }
 
 void WorkerImpl::stopListener(Network::ListenerConfig& listener, std::function<void()> completion) {
-  ASSERT(thread_);
   const uint64_t listener_tag = listener.listenerTag();
   dispatcher_->post([this, listener_tag, completion]() -> void {
     handler_->stopListeners(listener_tag);
@@ -127,11 +120,12 @@ void WorkerImpl::stopListener(Network::ListenerConfig& listener, std::function<v
   });
 }
 
-void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
+void WorkerImpl::threadRoutine(GuardDog& guard_dog, const Event::PostCb& cb) {
   ENVOY_LOG(debug, "worker entering dispatch loop");
   // The watch dog must be created after the dispatcher starts running and has post events flushed,
   // as this is when TLS stat scopes start working.
-  dispatcher_->post([this, &guard_dog]() {
+  dispatcher_->post([this, &guard_dog, cb]() {
+    cb();
     watch_dog_ = guard_dog.createWatchDog(api_.threadFactory().currentThreadId(),
                                           dispatcher_->name(), *dispatcher_);
   });
@@ -158,6 +152,12 @@ void WorkerImpl::stopAcceptingConnectionsCb(OverloadActionState state) {
 
 void WorkerImpl::rejectIncomingConnectionsCb(OverloadActionState state) {
   handler_->setListenerRejectFraction(state.value());
+}
+
+void WorkerImpl::resetStreamsUsingExcessiveMemory(OverloadActionState state) {
+  uint64_t streams_reset_count =
+      dispatcher_->getWatermarkFactory().resetAccountsGivenPressure(state.value().value());
+  reset_streams_counter_.add(streams_reset_count);
 }
 
 } // namespace Server

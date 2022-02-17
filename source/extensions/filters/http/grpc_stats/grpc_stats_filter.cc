@@ -1,16 +1,16 @@
-#include "extensions/filters/http/grpc_stats/grpc_stats_filter.h"
+#include "source/extensions/filters/http/grpc_stats/grpc_stats_filter.h"
 
 #include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.h"
 #include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/grpc/codec.h"
-#include "common/grpc/common.h"
-#include "common/grpc/context_impl.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/grpc/common.h"
+#include "source/common/grpc/context_impl.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stream_info/utility.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -53,7 +53,7 @@ private:
     static uint64_t hash(const ViewTuple& key) { return absl::Hash<ViewTuple>()(key); }
 
   public:
-    using is_transparent = void;
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
 
     uint64_t operator()(const OwningKey& key) const { return hash(key); }
     uint64_t operator()(const ViewKey& key) const {
@@ -62,7 +62,7 @@ private:
   };
 
   struct MapEq {
-    using is_transparent = void;
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
     bool operator()(const OwningKey& left, const OwningKey& right) const { return left == right; }
     bool operator()(const OwningKey& left, const ViewKey& right) const {
       return left == std::make_tuple(right.service_, right.method_);
@@ -246,7 +246,7 @@ public:
       auto state = std::make_unique<GrpcStatsObject>();
       filter_object_ = state.get();
       decoder_callbacks_->streamInfo().filterState()->setData(
-          HttpFilterNames::get().GrpcStats, std::move(state),
+          "envoy.filters.http.grpc_stats", std::move(state),
           StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::FilterChain);
     }
@@ -255,13 +255,16 @@ public:
   }
 
   void maybeChargeUpstreamStat() {
-    if (config_->enable_upstream_stats_ &&
-        decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().has_value() &&
-        decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().has_value()) {
+    if (!config_->enable_upstream_stats_) {
+      return;
+    }
+    StreamInfo::TimingUtility timing(decoder_callbacks_->streamInfo());
+    if (config_->enable_upstream_stats_ && timing.lastUpstreamTxByteSent().has_value() &&
+        timing.lastUpstreamRxByteReceived().has_value()) {
       std::chrono::milliseconds chrono_duration =
           std::chrono::duration_cast<std::chrono::milliseconds>(
-              decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().value() -
-              decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().value());
+              timing.lastUpstreamRxByteReceived().value() -
+              timing.lastUpstreamTxByteSent().value());
       config_->context_.chargeUpstreamStat(*cluster_, request_names_, chrono_duration);
     }
   }
@@ -276,7 +279,7 @@ private:
   Grpc::FrameInspector response_counter_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   absl::optional<Grpc::Context::RequestStatNames> request_names_;
-}; // namespace
+};
 
 } // namespace
 

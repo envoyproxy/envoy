@@ -29,15 +29,13 @@ static_resources:
           http_filters:
           - name: "envoy.filters.http.cache"
             typed_config:
-              "@type": "type.googleapis.com/envoy.extensions.filters.http.cache.v3alpha.CacheConfig"
+              "@type": "type.googleapis.com/envoy.extensions.filters.http.cache.v3.CacheConfig"
               typed_config:
-                "@type": "type.googleapis.com/envoy.extensions.cache.simple_http_cache.v3alpha.SimpleHttpCacheConfig"
+                "@type": "type.googleapis.com/envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig"
           - name: envoy.filters.http.router
-            typed_config: {}
 
   clusters:
   - name: service1
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -50,7 +48,6 @@ static_resources:
                 address: service1
                 port_value: 8000
   - name: service2
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:

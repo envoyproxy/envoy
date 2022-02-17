@@ -3,11 +3,10 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/config/datasource.h"
-
-#include "extensions/filters/network/common/factory_base.h"
-#include "extensions/filters/network/direct_response/filter.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/config/datasource.h"
+#include "source/extensions/filters/network/common/factory_base.h"
+#include "source/extensions/filters/network/direct_response/filter.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

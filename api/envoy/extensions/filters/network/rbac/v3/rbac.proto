@@ -11,6 +11,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.rbac.v3";
 option java_outer_classname = "RbacProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/rbac/v3;rbacv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: RBAC]
@@ -39,6 +40,7 @@ message RBAC {
 
   // Specify the RBAC rules to be applied globally.
   // If absent, no enforcing RBAC policy will be applied.
+  // If present and empty, DENY.
   config.rbac.v3.RBAC rules = 1;
 
   // Shadow rules are not enforced by the filter but will emit stats and logs

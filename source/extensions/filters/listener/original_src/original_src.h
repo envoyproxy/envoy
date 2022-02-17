@@ -3,9 +3,8 @@
 #include "envoy/network/address.h"
 #include "envoy/network/filter.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/listener/original_src/config.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/listener/original_src/config.h"
 
 namespace Envoy {
 namespace Extensions {

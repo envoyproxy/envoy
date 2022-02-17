@@ -2,7 +2,7 @@
 #include "envoy/config/trace/v3/lightstep.pb.h"
 #include "envoy/config/trace/v3/lightstep.pb.validate.h"
 
-#include "extensions/tracers/lightstep/config.h"
+#include "source/extensions/tracers/lightstep/config.h"
 
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"
@@ -10,7 +10,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Eq;
 using testing::NiceMock;
 using testing::Return;
 
@@ -69,14 +68,6 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracerAccessToken) {
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   auto lightstep_tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, lightstep_tracer);
-}
-
-// Test that the deprecated extension name still functions.
-TEST(LightstepTracerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.lightstep";
-
-  ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::TracerFactory>::getFactory(
-                         deprecated_name));
 }
 
 } // namespace

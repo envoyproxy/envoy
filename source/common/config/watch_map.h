@@ -7,8 +7,8 @@
 #include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -82,6 +82,10 @@ public:
   // UntypedConfigUpdateCallbacks.
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
+
+  void onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
+                      const std::string& version_info) override;
+
   void onConfigUpdate(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,

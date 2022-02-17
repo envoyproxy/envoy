@@ -51,9 +51,22 @@ envoy_cc_test_library(
     name = "test_common",
     hdrs = ["test_common.h"],
     deps = [
-        "//include/envoy/ssl:context_config_interface",
-        "//include/envoy/ssl:ssl_socket_extended_info_interface",
+        "//envoy/ssl:context_config_interface",
+        "//envoy/ssl:ssl_socket_extended_info_interface",
         "//source/common/common:macros",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "san_matcher_test",
+    srcs = [
+        "san_matcher_test.cc",
+    ],
+    deps = [
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

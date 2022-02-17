@@ -8,7 +8,6 @@ api_proto_package(
     has_services = True,
     deps = [
         "//envoy/config/core/v3:pkg",
-        "//envoy/service/event_reporting/v2alpha:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

@@ -1,4 +1,5 @@
-#include "server/admin/admin_filter.h"
+#include "source/server/admin/admin.h"
+#include "source/server/admin/admin_filter.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
@@ -14,7 +15,7 @@ namespace Server {
 
 class AdminFilterTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdminFilterTest() : filter_(adminServerCallback), request_headers_{{":path", "/"}} {
+  AdminFilterTest() : filter_(adminHandlerCallback), request_headers_{{":path", "/"}} {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
@@ -24,16 +25,12 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;
 
-  static Http::Code adminServerCallback(absl::string_view path_and_query,
-                                        Http::ResponseHeaderMap& response_headers,
-                                        Buffer::OwnedImpl& response, AdminFilter& filter) {
+  static Admin::HandlerPtr adminHandlerCallback(absl::string_view path_and_query,
+                                                AdminStream& admin_stream) {
     // silence compiler warnings for unused params
     UNREFERENCED_PARAMETER(path_and_query);
-    UNREFERENCED_PARAMETER(response_headers);
-    UNREFERENCED_PARAMETER(filter);
-
-    response.add("OK\n");
-    return Http::Code::OK;
+    UNREFERENCED_PARAMETER(admin_stream);
+    return AdminImpl::makeStaticTextHandler("OK\n", Http::Code::OK);
   }
 };
 

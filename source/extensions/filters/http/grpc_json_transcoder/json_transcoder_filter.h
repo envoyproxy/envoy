@@ -6,12 +6,11 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-#include "common/grpc/codec.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
 
 #include "google/api/http.pb.h"
 #include "grpc_transcoding/path_matcher.h"
@@ -49,10 +48,6 @@ struct MethodInfo {
   bool response_type_is_http_body_ = false;
 };
 using MethodInfoSharedPtr = std::shared_ptr<MethodInfo>;
-
-void createHttpBodyEnvelope(Buffer::Instance& output,
-                            const std::vector<const ProtobufWkt::Field*>& request_body_field_path,
-                            std::string content_type, uint64_t content_length);
 
 /**
  * Global configuration for the gRPC JSON transcoder filter. Factory for the Transcoder interface.
@@ -158,7 +153,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
+  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,

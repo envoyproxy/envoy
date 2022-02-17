@@ -3,8 +3,7 @@
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.h"
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.validate.h"
 
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +16,7 @@ namespace OnDemand {
 class OnDemandFilterFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::on_demand::v3::OnDemand> {
 public:
-  OnDemandFilterFactory() : FactoryBase(HttpFilterNames::get().OnDemand) {}
+  OnDemandFilterFactory() : FactoryBase("envoy.filters.http.on_demand") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

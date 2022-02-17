@@ -10,10 +10,10 @@
 #include "envoy/common/optref.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/non_copyable.h"
-#include "common/common/utility.h"
-#include "common/http/headers.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -182,7 +182,7 @@ protected:
    * List of HeaderEntryImpl that keeps the pseudo headers (key starting with ':') in the front
    * of the list (as required by nghttp2) and otherwise maintains insertion order.
    * When the list size is greater or equal to the envoy.http.headermap.lazy_map_min_size runtime
-   * feature value (or uint32_t max value if not set), all headers are added to a map, to allow
+   * feature value (defaults to 3, if not set), all headers are added to a map, to allow
    * fast access given a header key. Once the map is initialized, it will be used even if the number
    * of headers decreases below the threshold.
    *
@@ -200,8 +200,8 @@ protected:
 
     HeaderList()
         : pseudo_headers_end_(headers_.end()),
-          lazy_map_min_size_(static_cast<uint32_t>(Runtime::getInteger(
-              "envoy.http.headermap.lazy_map_min_size", std::numeric_limits<uint32_t>::max()))) {}
+          lazy_map_min_size_(static_cast<uint32_t>(
+              Runtime::getInteger("envoy.http.headermap.lazy_map_min_size", 3))) {}
 
     template <class Key> bool isPseudoHeader(const Key& key) {
       return !key.getStringView().empty() && key.getStringView()[0] == ':';
@@ -322,7 +322,10 @@ protected:
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
-  HeaderMap::NonConstGetResult getExisting(const LowerCaseString& key);
+
+  HeaderMap::NonConstGetResult getExisting(absl::string_view key);
+  size_t removeExisting(absl::string_view key);
+
   size_t removeInline(HeaderEntryImpl** entry);
   void updateSize(uint64_t from_size, uint64_t to_size);
   void addSize(uint64_t size);
@@ -339,8 +342,6 @@ protected:
   StatefulHeaderKeyFormatterPtr formatter_;
   // This holds the internal byte size of the HeaderMap.
   uint64_t cached_byte_size_ = 0;
-  const bool header_map_correctly_coalesce_cookies_ = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.header_map_correctly_coalesce_cookies");
 };
 
 /**
@@ -479,6 +480,17 @@ public:
   INLINE_REQ_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
   INLINE_REQ_RESP_STRING_HEADERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
+
+  // Tracing::TraceContext
+  absl::string_view protocol() const override;
+  absl::string_view authority() const override;
+  absl::string_view path() const override;
+  absl::string_view method() const override;
+  void forEach(Tracing::TraceContext::IterateCallback callback) const override;
+  absl::optional<absl::string_view> getByKey(absl::string_view key) const override;
+  void setByKey(absl::string_view key, absl::string_view val) override;
+  void setByReferenceKey(absl::string_view key, absl::string_view val) override;
+  void setByReference(absl::string_view key, absl::string_view val) override;
 
 protected:
   // NOTE: Because inline_headers_ is a variable size member, it must be the last member in the

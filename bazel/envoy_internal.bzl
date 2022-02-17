@@ -51,9 +51,9 @@ def envoy_copts(repository, test = False):
                # debugging info detailing some 1600 test binaries would be wasteful.
                # targets listed in order from generic to increasing specificity.
                # Bazel adds an implicit -DNDEBUG for opt targets.
-               repository + "//bazel:opt_build": [] if test else ["-ggdb3", "-gsplit-dwarf"],
+               repository + "//bazel:opt_build": [] if test else ["-ggdb3"],
                repository + "//bazel:fastbuild_build": [],
-               repository + "//bazel:dbg_build": ["-ggdb3", "-gsplit-dwarf"],
+               repository + "//bazel:dbg_build": ["-ggdb3"],
                repository + "//bazel:windows_opt_build": [] if test else ["-Z7"],
                repository + "//bazel:windows_fastbuild_build": [],
                repository + "//bazel:windows_dbg_build": [],
@@ -75,6 +75,10 @@ def envoy_copts(repository, test = False):
                # https://docs.microsoft.com/en-us/cpp/build/reference/zc-preprocessor
                repository + "//bazel:windows_x86_64": ["-wd4834", "-Zc:preprocessor", "-Wv:19.4"] if test else ["-Zc:preprocessor", "-Wv:19.4"],
                repository + "//bazel:clang_cl_build": ["-Wno-unused-result"] if test else [],
+               "//conditions:default": [],
+           }) + select({
+               # TODO: Remove once https://reviews.llvm.org/D73007 is in the lowest supported Xcode version
+               repository + "//bazel:apple": ["-Wno-range-loop-analysis"],
                "//conditions:default": [],
            }) + select({
                repository + "//bazel:no_debug_info": ["-g0"],
@@ -117,6 +121,7 @@ def envoy_copts(repository, test = False):
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
            envoy_select_enable_http3(["-DENVOY_ENABLE_QUIC"], repository) + \
            _envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
+           _envoy_select_perfetto(["-DENVOY_PERFETTO"]) + \
            envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository) + \
            _envoy_select_path_normalization_by_default(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository)
 
@@ -173,5 +178,11 @@ def _envoy_select_path_normalization_by_default(xs, repository = ""):
 def _envoy_select_perf_annotation(xs):
     return select({
         "@envoy//bazel:enable_perf_annotation": xs,
+        "//conditions:default": [],
+    })
+
+def _envoy_select_perfetto(xs):
+    return select({
+        "@envoy//bazel:enable_perf_tracing": xs,
         "//conditions:default": [],
     })

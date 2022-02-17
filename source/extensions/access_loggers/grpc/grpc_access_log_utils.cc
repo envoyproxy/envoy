@@ -1,10 +1,12 @@
-#include "extensions/access_loggers/grpc/grpc_access_log_utils.h"
+#include "source/extensions/access_loggers/grpc/grpc_access_log_utils.h"
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/network/utility.h"
+#include "source/common/network/utility.h"
+#include "source/common/stream_info/utility.h"
+#include "source/common/tracing/custom_tag_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,7 +39,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x1000000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x4000000,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -140,11 +142,19 @@ void Utility::responseFlagsToAccessLogResponseFlags(
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoClusterFound)) {
     common_access_log.mutable_response_flags()->set_no_cluster_found(true);
   }
+
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::OverloadManager)) {
+    common_access_log.mutable_response_flags()->set_overload_manager(true);
+  }
+
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DnsResolutionFailed)) {
+    common_access_log.mutable_response_flags()->set_dns_resolution_failure(true);
+  }
 }
 
 void Utility::extractCommonAccessLogProperties(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
-    const StreamInfo::StreamInfo& stream_info,
+    const Http::RequestHeaderMap& request_header, const StreamInfo::StreamInfo& stream_info,
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config) {
   // TODO(mattklein123): Populate sample_rate field.
   if (stream_info.downstreamAddressProvider().remoteAddress() != nullptr) {
@@ -162,12 +172,13 @@ void Utility::extractCommonAccessLogProperties(
         *stream_info.downstreamAddressProvider().localAddress(),
         *common_access_log.mutable_downstream_local_address());
   }
-  if (stream_info.downstreamSslConnection() != nullptr) {
+  if (stream_info.downstreamAddressProvider().sslConnection() != nullptr) {
     auto* tls_properties = common_access_log.mutable_tls_properties();
     const Ssl::ConnectionInfoConstSharedPtr downstream_ssl_connection =
-        stream_info.downstreamSslConnection();
+        stream_info.downstreamAddressProvider().sslConnection();
 
-    tls_properties->set_tls_sni_hostname(stream_info.requestedServerName());
+    tls_properties->set_tls_sni_hostname(
+        std::string(stream_info.downstreamAddressProvider().requestedServerName()));
 
     auto* local_properties = tls_properties->mutable_local_certificate_properties();
     for (const auto& uri_san : downstream_ssl_connection->uriSanLocalCertificate()) {
@@ -196,77 +207,79 @@ void Utility::extractCommonAccessLogProperties(
               stream_info.startTime().time_since_epoch())
               .count()));
 
-  absl::optional<std::chrono::nanoseconds> dur = stream_info.lastDownstreamRxByteReceived();
+  StreamInfo::TimingUtility timing(stream_info);
+  absl::optional<std::chrono::nanoseconds> dur = timing.lastDownstreamRxByteReceived();
   if (dur) {
     common_access_log.mutable_time_to_last_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.firstUpstreamTxByteSent();
+  dur = timing.firstUpstreamTxByteSent();
   if (dur) {
     common_access_log.mutable_time_to_first_upstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.lastUpstreamTxByteSent();
+  dur = timing.lastUpstreamTxByteSent();
   if (dur) {
     common_access_log.mutable_time_to_last_upstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.firstUpstreamRxByteReceived();
+  dur = timing.firstUpstreamRxByteReceived();
   if (dur) {
     common_access_log.mutable_time_to_first_upstream_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.lastUpstreamRxByteReceived();
+  dur = timing.lastUpstreamRxByteReceived();
   if (dur) {
     common_access_log.mutable_time_to_last_upstream_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.firstDownstreamTxByteSent();
+  dur = timing.firstDownstreamTxByteSent();
   if (dur) {
     common_access_log.mutable_time_to_first_downstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.lastDownstreamTxByteSent();
+  dur = timing.lastDownstreamTxByteSent();
   if (dur) {
     common_access_log.mutable_time_to_last_downstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  if (stream_info.upstreamHost() != nullptr) {
-    Network::Utility::addressToProtobufAddress(
-        *stream_info.upstreamHost()->address(),
-        *common_access_log.mutable_upstream_remote_address());
-    common_access_log.set_upstream_cluster(stream_info.upstreamHost()->cluster().name());
+  if (stream_info.upstreamInfo().has_value()) {
+    const auto& upstream_info = stream_info.upstreamInfo().value().get();
+    if (upstream_info.upstreamHost() != nullptr) {
+      Network::Utility::addressToProtobufAddress(
+          *upstream_info.upstreamHost()->address(),
+          *common_access_log.mutable_upstream_remote_address());
+      common_access_log.set_upstream_cluster(upstream_info.upstreamHost()->cluster().name());
+    }
+    if (upstream_info.upstreamLocalAddress() != nullptr) {
+      Network::Utility::addressToProtobufAddress(
+          *upstream_info.upstreamLocalAddress(),
+          *common_access_log.mutable_upstream_local_address());
+    }
+    if (!upstream_info.upstreamTransportFailureReason().empty()) {
+      common_access_log.set_upstream_transport_failure_reason(
+          upstream_info.upstreamTransportFailureReason());
+    }
   }
-
   if (!stream_info.getRouteName().empty()) {
     common_access_log.set_route_name(stream_info.getRouteName());
   }
 
-  if (stream_info.upstreamLocalAddress() != nullptr) {
-    Network::Utility::addressToProtobufAddress(*stream_info.upstreamLocalAddress(),
-                                               *common_access_log.mutable_upstream_local_address());
-  }
   responseFlagsToAccessLogResponseFlags(common_access_log, stream_info);
-  if (!stream_info.upstreamTransportFailureReason().empty()) {
-    common_access_log.set_upstream_transport_failure_reason(
-        stream_info.upstreamTransportFailureReason());
-  }
   if (stream_info.dynamicMetadata().filter_metadata_size() > 0) {
     common_access_log.mutable_metadata()->MergeFrom(stream_info.dynamicMetadata());
   }
 
   for (const auto& key : config.filter_state_objects_to_log()) {
-    if (stream_info.filterState().hasDataWithName(key)) {
-      const auto& obj =
-          stream_info.filterState().getDataReadOnly<StreamInfo::FilterState::Object>(key);
-      ProtobufTypes::MessagePtr serialized_proto = obj.serializeAsProto();
+    if (auto state = stream_info.filterState().getDataReadOnlyGeneric(key); state != nullptr) {
+      ProtobufTypes::MessagePtr serialized_proto = state->serializeAsProto();
       if (serialized_proto != nullptr) {
         auto& filter_state_objects = *common_access_log.mutable_filter_state_objects();
         ProtobufWkt::Any& any = filter_state_objects[key];
@@ -277,6 +290,12 @@ void Utility::extractCommonAccessLogProperties(
         }
       }
     }
+  }
+
+  Tracing::CustomTagContext ctx{&request_header, stream_info};
+  for (const auto& custom_tag : config.custom_tags()) {
+    const auto tag_applier = Tracing::CustomTagUtility::createCustomTag(custom_tag);
+    tag_applier->applyLog(common_access_log, ctx);
   }
 }
 

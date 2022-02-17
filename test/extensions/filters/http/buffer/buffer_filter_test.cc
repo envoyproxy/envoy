@@ -4,11 +4,9 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 
-#include "common/http/header_map_impl.h"
-#include "common/runtime/runtime_impl.h"
-
-#include "extensions/filters/http/buffer/buffer_filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/extensions/filters/http/buffer/buffer_filter.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -37,15 +35,6 @@ public:
 
   BufferFilterTest() : config_(setupConfig()), filter_(config_) {
     filter_.setDecoderFilterCallbacks(callbacks_);
-  }
-
-  void routeLocalConfig(const Router::RouteSpecificFilterConfig* route_settings,
-                        const Router::RouteSpecificFilterConfig* vhost_settings) {
-    ON_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Buffer))
-        .WillByDefault(Return(route_settings));
-    ON_CALL(callbacks_.route_->route_entry_.virtual_host_,
-            perFilterConfig(HttpFilterNames::get().Buffer))
-        .WillByDefault(Return(vhost_settings));
   }
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
@@ -135,16 +124,14 @@ TEST_F(BufferFilterTest, ContentLengthPopulationAlreadyPresent) {
   EXPECT_EQ(headers.getContentLengthValue(), "3");
 }
 
-TEST_F(BufferFilterTest, RouteConfigOverride) {
-  envoy::extensions::filters::http::buffer::v3::BufferPerRoute route_cfg;
-  auto* buf = route_cfg.mutable_buffer();
+TEST_F(BufferFilterTest, PerFilterConfigOverride) {
+  envoy::extensions::filters::http::buffer::v3::BufferPerRoute per_route_cfg;
+  auto* buf = per_route_cfg.mutable_buffer();
   buf->mutable_max_request_bytes()->set_value(123);
-  envoy::extensions::filters::http::buffer::v3::BufferPerRoute vhost_cfg;
-  vhost_cfg.set_disabled(true);
-  BufferFilterSettings route_settings(route_cfg);
-  BufferFilterSettings vhost_settings(vhost_cfg);
-  routeLocalConfig(&route_settings, &vhost_settings);
+  BufferFilterSettings route_settings(per_route_cfg);
 
+  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.buffer"))
+      .WillOnce(Return(&route_settings));
   EXPECT_CALL(callbacks_, setDecoderBufferLimit(123ULL));
 
   Http::TestRequestHeaderMapImpl headers;
@@ -153,26 +140,13 @@ TEST_F(BufferFilterTest, RouteConfigOverride) {
   filter_.onDestroy();
 }
 
-TEST_F(BufferFilterTest, VHostConfigOverride) {
-  envoy::extensions::filters::http::buffer::v3::BufferPerRoute vhost_cfg;
-  auto* buf = vhost_cfg.mutable_buffer();
-  buf->mutable_max_request_bytes()->set_value(789);
-  BufferFilterSettings vhost_settings(vhost_cfg);
-  routeLocalConfig(nullptr, &vhost_settings);
+TEST_F(BufferFilterTest, PerFilterConfigDisabledConfigOverride) {
+  envoy::extensions::filters::http::buffer::v3::BufferPerRoute per_route_cfg;
+  per_route_cfg.set_disabled(true);
+  BufferFilterSettings route_settings(per_route_cfg);
 
-  EXPECT_CALL(callbacks_, setDecoderBufferLimit(789ULL));
-
-  Http::TestRequestHeaderMapImpl headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
-  filter_.onDestroy();
-}
-
-TEST_F(BufferFilterTest, RouteDisabledConfigOverride) {
-  envoy::extensions::filters::http::buffer::v3::BufferPerRoute vhost_cfg;
-  vhost_cfg.set_disabled(true);
-  BufferFilterSettings vhost_settings(vhost_cfg);
-  routeLocalConfig(nullptr, &vhost_settings);
-
+  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.buffer"))
+      .WillOnce(Return(&route_settings));
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
   Buffer::OwnedImpl data1("hello");

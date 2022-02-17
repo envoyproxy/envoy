@@ -1,6 +1,5 @@
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/transport_sockets/alts/tsi_frame_protector.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/transport_sockets/alts/tsi_frame_protector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

@@ -2,9 +2,8 @@
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/bootstrap/wasm/config.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/bootstrap/wasm/config.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/event/mocks.h"
@@ -22,12 +21,12 @@ namespace Wasm {
 
 using Extensions::Bootstrap::Wasm::WasmServicePtr;
 
-class WasmFactoryTest : public testing::TestWithParam<std::string> {
+class WasmFactoryTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   WasmFactoryTest() {
     config_.mutable_config()->mutable_vm_config()->set_runtime(
-        absl::StrCat("envoy.wasm.runtime.", GetParam()));
-    if (GetParam() != "null") {
+        absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+    if (std::get<0>(GetParam()) != "null") {
       config_.mutable_config()->mutable_vm_config()->mutable_code()->mutable_local()->set_filename(
           TestEnvironment::substitute(
               "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/start_cpp.wasm"));
@@ -70,30 +69,22 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmFactoryTest,
-                         Envoy::Extensions::Common::Wasm::runtime_values);
+                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values,
+                         Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 TEST_P(WasmFactoryTest, CreateWasmFromWasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   auto factory = std::make_unique<Bootstrap::Wasm::WasmFactory>();
   auto empty_config = factory->createEmptyConfigProto();
 
   initializeWithConfig(config_);
 
   EXPECT_NE(extension_, nullptr);
+
+  // Check if the custom stat namespace is registered during the initialization.
+  EXPECT_TRUE(api_->customStatNamespaces().registered("wasmcustom"));
 }
 
 TEST_P(WasmFactoryTest, CreateWasmFromWasmPerThread) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   config_.set_singleton(false);
   initializeWithConfig(config_);
 
@@ -103,13 +94,7 @@ TEST_P(WasmFactoryTest, CreateWasmFromWasmPerThread) {
 }
 
 TEST_P(WasmFactoryTest, MissingImport) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   config_.mutable_config()->mutable_vm_config()->mutable_code()->mutable_local()->set_filename(
@@ -120,12 +105,6 @@ TEST_P(WasmFactoryTest, MissingImport) {
 }
 
 TEST_P(WasmFactoryTest, UnspecifiedRuntime) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   config_.mutable_config()->mutable_vm_config()->set_runtime("");
 
   EXPECT_THROW_WITH_REGEX(
@@ -134,12 +113,6 @@ TEST_P(WasmFactoryTest, UnspecifiedRuntime) {
 }
 
 TEST_P(WasmFactoryTest, UnknownRuntime) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   config_.mutable_config()->mutable_vm_config()->set_runtime("envoy.wasm.runtime.invalid");
 
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
@@ -147,12 +120,6 @@ TEST_P(WasmFactoryTest, UnknownRuntime) {
 }
 
 TEST_P(WasmFactoryTest, StartFailed) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   ProtobufWkt::StringValue plugin_configuration;
   plugin_configuration.set_value("bad");
   config_.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(
@@ -163,12 +130,6 @@ TEST_P(WasmFactoryTest, StartFailed) {
 }
 
 TEST_P(WasmFactoryTest, StartFailedOpen) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   ProtobufWkt::StringValue plugin_configuration;
   plugin_configuration.set_value("bad");
   config_.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(
@@ -180,12 +141,6 @@ TEST_P(WasmFactoryTest, StartFailedOpen) {
 }
 
 TEST_P(WasmFactoryTest, ConfigureFailed) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   ProtobufWkt::StringValue plugin_configuration;
   plugin_configuration.set_value("bad");
   config_.mutable_config()->mutable_configuration()->PackFrom(plugin_configuration);

@@ -1,8 +1,8 @@
 #include <iostream>
 
-#include "common/api/api_impl.h"
-#include "common/common/scope_tracker.h"
-#include "common/event/dispatcher_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/event/dispatcher_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/utility.h"
@@ -18,7 +18,7 @@ using testing::_;
 TEST(ScopeTrackerScopeStateTest, ShouldManageTrackedObjectOnDispatcherStack) {
   Api::ApiPtr api(Api::createApiForTest());
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-  MockScopedTrackedObject tracked_object;
+  MockScopeTrackedObject tracked_object;
   {
     ScopeTrackerScopeState scope(&tracked_object, *dispatcher);
     // Check that the tracked_object is on the tracked object stack

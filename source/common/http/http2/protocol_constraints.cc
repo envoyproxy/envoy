@@ -1,7 +1,7 @@
-#include "common/http/http2/protocol_constraints.h"
+#include "source/common/http/http2/protocol_constraints.h"
 
-#include "common/common/assert.h"
-#include "common/common/dump_state_utils.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/dump_state_utils.h"
 
 namespace Envoy {
 namespace Http {

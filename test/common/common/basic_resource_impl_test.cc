@@ -1,6 +1,6 @@
 #include <limits>
 
-#include "common/common/basic_resource_impl.h"
+#include "source/common/common/basic_resource_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 

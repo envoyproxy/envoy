@@ -7,11 +7,10 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/logger.h"
-#include "common/common/matchers.h"
-#include "common/router/header_parser.h"
-
-#include "extensions/filters/common/ext_authz/ext_authz.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
+#include "source/common/router/header_parser.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -101,6 +100,11 @@ public:
   }
 
   /**
+   * Returns a list of matchers used for selecting the headers to emit as dynamic metadata.
+   */
+  const MatcherSharedPtr& dynamicMetadataMatchers() const { return to_dynamic_metadata_matchers_; }
+
+  /**
    * Returns a list of matchers used for selecting the authorization response headers that
    * should be send to an the upstream server.
    */
@@ -132,11 +136,14 @@ private:
   static MatcherSharedPtr
   toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list);
   static MatcherSharedPtr
+  toDynamicMetadataMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
+  static MatcherSharedPtr
   toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
 
   const MatcherSharedPtr request_header_matchers_;
   const MatcherSharedPtr client_header_matchers_;
   const MatcherSharedPtr client_header_on_success_matchers_;
+  const MatcherSharedPtr to_dynamic_metadata_matchers_;
   const MatcherSharedPtr upstream_header_matchers_;
   const MatcherSharedPtr upstream_header_to_append_matchers_;
   const std::string cluster_name_;

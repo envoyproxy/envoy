@@ -1,8 +1,7 @@
-#include "common/common/hex.h"
-#include "common/http/utility.h"
-#include "common/network/io_socket_handle_impl.h"
-
-#include "extensions/filters/listener/http_inspector/http_inspector.h"
+#include "source/common/common/hex.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/extensions/filters/listener/http_inspector/http_inspector.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -45,11 +44,10 @@ public:
 
     if (include_inline_recv) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(Return(Api::SysCallSizeResult{static_cast<ssize_t>(0), 0}));
+          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
 
-      EXPECT_CALL(dispatcher_,
-                  createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
-                                   Event::FileReadyType::Read | Event::FileReadyType::Closed))
+      EXPECT_CALL(dispatcher_, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                                Event::FileReadyType::Read))
           .WillOnce(DoAll(SaveArg<1>(&file_event_callback_),
                           ReturnNew<NiceMock<Event::MockFileEvent>>()));
 
@@ -335,11 +333,10 @@ TEST_F(HttpInspectorTest, InspectHttp2) {
 TEST_F(HttpInspectorTest, ReadClosed) {
   init();
 
-  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK));
-  EXPECT_CALL(socket_, close());
-  EXPECT_CALL(cb_, continueFilterChain(true));
-  socket_.close();
-  file_event_callback_(Event::FileReadyType::Closed);
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Return(Api::SysCallSizeResult{0, 0}));
+  EXPECT_CALL(cb_, continueFilterChain(false));
+  file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(0, cfg_->stats().http2_found_.value());
 }
 

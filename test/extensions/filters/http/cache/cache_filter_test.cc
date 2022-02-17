@@ -1,9 +1,8 @@
 #include "envoy/event/dispatcher.h"
 
-#include "common/http/headers.h"
-
-#include "extensions/filters/http/cache/cache_filter.h"
-#include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/filters/http/cache/cache_filter.h"
+#include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/mocks/server/factory_context.h"
@@ -119,12 +118,12 @@ protected:
   void waitBeforeSecondRequest() { time_source_.advanceTimeWait(delay_); }
 
   SimpleHttpCache simple_cache_;
-  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config_;
+  envoy::extensions::filters::http::cache::v3::CacheConfig config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Event::SimulatedTimeSystem time_source_;
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   Http::TestRequestHeaderMapImpl request_headers_{
-      {":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}};
+      {":path", "/"}, {":method", "GET"}, {":scheme", "https"}};
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
                                                     {"cache-control", "public,max-age=3600"}};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -134,6 +133,13 @@ protected:
   const Seconds delay_ = Seconds(10);
   const std::string age = std::to_string(delay_.count());
 };
+
+TEST_F(CacheFilterTest, FilterIsBeingDestroyed) {
+  CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+  filter->onDestroy();
+  // decodeHeaders should do nothing... at least make sure it doesn't crash.
+  filter->decodeHeaders(request_headers_, true);
+}
 
 TEST_F(CacheFilterTest, UncacheableRequest) {
   request_headers_.setHost("UncacheableRequest");

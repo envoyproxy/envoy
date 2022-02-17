@@ -1,6 +1,6 @@
 #include "instance.h"
 
-#include "common/singleton/manager_impl.h"
+#include "source/common/singleton/manager_impl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -16,7 +16,7 @@ MockInstance::MockInstance()
       cluster_manager_(timeSource()), ssl_context_manager_(timeSource()),
       singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
-      router_context_(stats_store_.symbolTable()),
+      router_context_(stats_store_.symbolTable()), quic_stat_names_(stats_store_.symbolTable()),
       stats_config_(std::make_shared<NiceMock<Configuration::MockStatsConfig>>()),
       server_factory_context_(
           std::make_shared<NiceMock<Configuration::MockServerFactoryContext>>()),
@@ -50,6 +50,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(*server_factory_context_));
   ON_CALL(*this, transportSocketFactoryContext())
       .WillByDefault(ReturnRef(*transport_socket_factory_context_));
+  ON_CALL(*this, enableReusePortDefault()).WillByDefault(Return(true));
 }
 
 MockInstance::~MockInstance() = default;
@@ -60,11 +61,12 @@ MockServerFactoryContext::MockServerFactoryContext()
     : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       grpc_context_(scope_.symbolTable()), router_context_(scope_.symbolTable()) {
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+  ON_CALL(*this, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_loader_));
   ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
+  ON_CALL(*this, serverScope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));

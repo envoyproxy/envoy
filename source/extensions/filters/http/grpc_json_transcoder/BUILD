@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # L7 HTTP filter that implements binary gRPC to JSON transcoding
-# Public docs: docs/root/configuration/http_filters/grpc_json_transcoder_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/grpc_json_transcoder_filter
 
 envoy_extension_package()
 
@@ -25,13 +25,12 @@ envoy_cc_library(
     deps = [
         ":http_body_utils_lib",
         ":transcoder_input_stream_lib",
-        "//include/envoy/http:filter_interface",
+        "//envoy/http:filter_interface",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
         "//source/common/runtime:runtime_features_lib",
-        "//source/extensions/filters/http:well_known_names",
         "@com_google_googleapis//google/api:http_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
     ],
@@ -62,11 +61,8 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.http",
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
-        "//include/envoy/registry",
-        "//source/extensions/filters/http:well_known_names",
+        "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/grpc_json_transcoder:json_transcoder_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",

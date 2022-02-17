@@ -8,7 +8,7 @@
 #include "proxy_wasm_intrinsics.h"
 #include "source/extensions/common/wasm/ext/envoy_proxy_wasm_api.h"
 #else
-#include "extensions/common/wasm/ext/envoy_null_plugin.h"
+#include "source/extensions/common/wasm/ext/envoy_null_plugin.h"
 #endif
 
 START_WASM_PLUGIN(CommonWasmTestContextCpp)
@@ -58,7 +58,7 @@ bool TestRootContext::onDone() {
 
 // Null VM fails on nullptr.
 void TestRootContext::onTick() {
-  if (envoy_resolve_dns(0, 1, &dns_token_) != WasmResult::InvalidMemoryAccess) {
+  if (envoy_resolve_dns(nullptr, 1, &dns_token_) != WasmResult::InvalidMemoryAccess) {
     logInfo("resolve_dns should report invalid memory access");
   }
   if (envoy_resolve_dns("example.com", sizeof("example.com") - 1, nullptr) !=

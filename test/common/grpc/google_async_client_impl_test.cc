@@ -1,12 +1,12 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/api/api_impl.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/grpc/google_async_client_impl.h"
-#include "common/network/address_impl.h"
-#include "common/stats/isolated_store_impl.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/grpc/google_async_client_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/tracing/mocks.h"
@@ -45,7 +45,7 @@ public:
     return shared_stub_;
   }
 
-  MockGenericStub* stub_ = new MockGenericStub();
+  NiceMock<MockGenericStub>* stub_ = new NiceMock<MockGenericStub>();
   GoogleStubSharedPtr shared_stub_{stub_};
 };
 
@@ -86,6 +86,20 @@ public:
   AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
 };
 
+// Verify that grpc client check for thread consistency.
+TEST_F(EnvoyGoogleAsyncClientImplTest, ThreadSafe) {
+  initialize();
+  ON_CALL(*stub_factory_.stub_, PrepareCall_(_, _, _)).WillByDefault(Return(nullptr));
+  Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([&]() {
+    NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+    // Verify that using the grpc client in a different thread cause assertion failure.
+    EXPECT_DEBUG_DEATH(grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                                           Http::AsyncClient::StreamOptions()),
+                       "isThreadSafe");
+  });
+  thread->join();
+}
+
 // Validate that a failure in gRPC stub call creation returns immediately with
 // status UNAVAILABLE.
 TEST_F(EnvoyGoogleAsyncClientImplTest, StreamHttpStartFail) {
@@ -121,9 +135,9 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, MetadataIsInitialized) {
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, ""));
 
   // Prepare the parent context of this call.
-  auto address_provider = std::make_shared<Network::SocketAddressSetterImpl>(
+  auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address), nullptr);
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), address_provider};
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), connection_info_provider};
   Http::AsyncClient::ParentContext parent_context{&stream_info};
 
   Http::AsyncClient::StreamOptions stream_options;
@@ -146,11 +160,12 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, RequestHttpStartFail) {
 
   Tracing::MockSpan active_span;
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
-  EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
+  EXPECT_CALL(active_span, spawnChild_(_, "async helloworld.Greeter.SayHello egress", _))
       .WillOnce(Return(child_span));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("test_cluster")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("fake_address")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span, finishSpan());

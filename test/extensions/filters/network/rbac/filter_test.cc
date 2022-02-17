@@ -3,11 +3,10 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 
-#include "common/network/utility.h"
-
-#include "extensions/filters/common/rbac/utility.h"
-#include "extensions/filters/network/rbac/rbac_filter.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/common/rbac/utility.h"
+#include "source/extensions/filters/network/rbac/rbac_filter.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/mocks/network/mocks.h"
 
@@ -33,8 +32,8 @@ public:
     if (with_policy) {
       envoy::config::rbac::v3::Policy policy;
       auto policy_rules = policy.add_permissions()->mutable_or_rules();
-      policy_rules->add_rules()->mutable_requested_server_name()->set_hidden_envoy_deprecated_regex(
-          ".*cncf.io");
+      policy_rules->add_rules()->mutable_requested_server_name()->MergeFrom(
+          TestUtility::createRegexMatcher(".*cncf.io"));
       policy_rules->add_rules()->set_destination_port(123);
       policy.add_principals()->set_any(true);
       config.mutable_rules()->set_action(action);
@@ -53,7 +52,8 @@ public:
       config.set_enforcement_type(envoy::extensions::filters::network::rbac::v3::RBAC::CONTINUOUS);
     }
 
-    return std::make_shared<RoleBasedAccessControlFilterConfig>(config, store_);
+    return std::make_shared<RoleBasedAccessControlFilterConfig>(
+        config, store_, ProtobufMessage::getStrictValidationVisitor());
   }
 
   RoleBasedAccessControlNetworkFilterTest() : config_(setupConfig()) {
@@ -66,7 +66,7 @@ public:
 
   void setDestinationPort(uint16_t port) {
     address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
-    stream_info_.downstream_address_provider_->setLocalAddress(address_);
+    stream_info_.downstream_connection_info_provider_->setLocalAddress(address_);
   }
 
   void setRequestedServerName(std::string server_name) {
