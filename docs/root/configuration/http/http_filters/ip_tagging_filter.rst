@@ -11,7 +11,7 @@ The implementation for IP Tagging provides a scalable way to compare an IP addre
 ranges efficiently. The underlying algorithm for storing tags and IP address subnets is a Level-Compressed trie
 described in the paper `IP-address lookup using
 LC-tries <https://www.nada.kth.se/~snilsson/publications/IP-address-lookup-using-LC-tries/>`_ by S. Nilsson and
-G. Karlsson.
+G. Karlsson. Envoy's LC-trie implementation supports up to 262144 unique entries.
 
 
 Configuration
