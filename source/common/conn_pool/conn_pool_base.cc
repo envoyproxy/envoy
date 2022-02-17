@@ -186,7 +186,6 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
   // Latch capacity before updating remaining streams.
   uint64_t capacity = client.currentUnusedCapacity();
   client.remaining_streams_--;
-  ActiveClient::State old_state = client.state();
   if (client.remaining_streams_ == 0) {
     ENVOY_CONN_LOG(debug, "maximum streams per connection, start draining", client);
     host_->cluster().stats().upstream_cx_max_requests_.inc();
@@ -199,12 +198,7 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
   // Decrement the capacity, as there's one less stream available for serving.
   // For HTTP/3, the capacity is updated in newStreamEncoder.
   if (trackStreamCapacity()) {
-    if (old_state == Envoy::ConnectionPool::ActiveClient::State::READY) {
-      state_.decrConnectingAndConnectedStreamCapacity(1);
-    } else {
-      // This is handling early data stream.
-      decrConnectingAndConnectedStreamCapacity(1);
-    }
+    decrConnectingAndConnectedStreamCapacity(1, client);
   }
   // Track the new active stream.
   state_.incrActiveStreams(1);
@@ -239,11 +233,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
     // to avoid overflow.
     bool negative_capacity = client.concurrent_stream_limit_ < client.numActiveStreams() + 1;
     if (negative_capacity || limited_by_concurrency) {
-      if (client.isConnecting()) {
-        incrConnectingAndConnectedStreamCapacity(1);
-      } else {
-        state_.incrConnectingAndConnectedStreamCapacity(1);
-      }
+      incrConnectingAndConnectedStreamCapacity(1, client);
     }
   }
   if (client.state() == ActiveClient::State::DRAINING && client.numActiveStreams() == 0) {
@@ -282,7 +272,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
 
   if (can_send_early_data) {
     for (auto& client : connecting_clients_) {
-      if (client->allows_early_data_) {
+      if (client->readyForStream()) {
         attachStreamToClient(*client, context);
         // Even if there's an available client, we may want to preconnect to handle the next
         // incoming stream.
@@ -467,8 +457,9 @@ void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
 
 void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                                          Network::ConnectionEvent event) {
+  bool was_connecting = client.isConnecting();
   if (event != Network::ConnectionEvent::ConnectedZeroRtt) {
-    if (client.isConnecting()) {
+    if (was_connecting) {
       ASSERT(connecting_stream_capacity_ >= client.currentUnusedCapacity(),
              fmt::format("connecting_stream_capacity_ {}, currentUnusedCapacity {}",
                          connecting_stream_capacity_, client.currentUnusedCapacity()));
@@ -484,9 +475,9 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
   case Network::ConnectionEvent::LocalClose: {
+    const bool contributed_to_connecting_stream_capacity = client.currentUnusedCapacity() > 0;
     state_.decrConnectingAndConnectedStreamCapacity(client.currentUnusedCapacity());
     // Make sure that onStreamClosed won't double count.
-    const bool contributed_to_connecting_stream_capacity = client.currentUnusedCapacity() > 0;
     client.remaining_streams_ = 0;
     // The client died.
     ENVOY_CONN_LOG(debug, "client disconnected, failure reason: {}", client, failure_reason);
@@ -497,7 +488,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(host_, event);
     }
 
-    if (client.isConnecting()) {
+    if (was_connecting) {
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
 
@@ -558,7 +549,6 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
   case Network::ConnectionEvent::Connected: {
     client.conn_connect_ms_->complete();
     client.conn_connect_ms_.reset();
-    client.allows_early_data_ = false;
     if (client.state() == ActiveClient::State::CONNECTING) {
       bool streams_available = client.currentUnusedCapacity() > 0;
       transitionActiveClientState(client, streams_available ? ActiveClient::State::READY
@@ -588,7 +578,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
                    client.currentUnusedCapacity());
     ASSERT(client.state() == ActiveClient::State::CONNECTING);
     host()->cluster().stats().upstream_cx_connect_with_0_rtt_.inc();
-    client.allows_early_data_ = true;
+    client.allowEarlyData();
     break;
   }
   }
@@ -666,7 +656,7 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
 }
 
 void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
-  ASSERT(client.allows_early_data_);
+  ASSERT(client.isConnecting() && client.readyForStream());
   // Check pending streams backward for safe request.
   auto it = pending_streams_.end();
   if (it == pending_streams_.begin()) {
@@ -776,13 +766,8 @@ void ActiveClient::drain() {
   if (currentUnusedCapacity() == 0) {
     return;
   }
-  if (isConnecting()) {
-    // If connecting, update both the cluster capacity and the local connecting
-    // capacity.
-    parent_.decrConnectingAndConnectedStreamCapacity(currentUnusedCapacity());
-  } else {
-    parent_.state().decrConnectingAndConnectedStreamCapacity(currentUnusedCapacity());
-  }
+
+  parent_.decrConnectingAndConnectedStreamCapacity(currentUnusedCapacity(), *this);
 
   remaining_streams_ = 0;
 }
@@ -791,9 +776,7 @@ bool ActiveClient::readyForStream() const {
   return state_ == State::READY || (allows_early_data_ && state_ == State::CONNECTING);
 }
 
-bool ActiveClient::isConnecting() const {
-  return state_ == State::CONNECTING || allows_early_data_;
-}
+bool ActiveClient::isConnecting() const { return connect_timer_ != nullptr; }
 
 } // namespace ConnectionPool
 } // namespace Envoy

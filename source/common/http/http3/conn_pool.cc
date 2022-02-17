@@ -33,7 +33,9 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
           return;
         }
         codec_client_->connect();
-        if (state() != Envoy::ConnectionPool::ActiveClient::State::CLOSED && allows_early_data_) {
+        if (state() == Envoy::ConnectionPool::ActiveClient::State::CONNECTING && readyForStream()) {
+          // This client can send early data, so check if there are any pending streams can be sent
+          // as early data.
           parent_.onUpstreamReadyForEarlyData(*this);
         }
       })) {

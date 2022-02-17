@@ -66,18 +66,10 @@ public:
     quiche_capacity_ = new_quiche_capacity;
     uint64_t new_capacity = currentUnusedCapacity();
 
-    if (connect_timer_) {
-      if (new_capacity < old_capacity) {
-        parent_.decrConnectingAndConnectedStreamCapacity(old_capacity - new_capacity);
-      } else if (old_capacity < new_capacity) {
-        parent_.incrConnectingAndConnectedStreamCapacity(new_capacity - old_capacity);
-      }
+    if (new_capacity < old_capacity) {
+      parent_.decrConnectingAndConnectedStreamCapacity(old_capacity - new_capacity, *this);
     } else {
-      if (new_capacity < old_capacity) {
-        parent_.decrClusterStreamCapacity(old_capacity - new_capacity);
-      } else if (old_capacity < new_capacity) {
-        parent_.incrClusterStreamCapacity(new_capacity - old_capacity);
-      }
+      parent_.incrConnectingAndConnectedStreamCapacity(new_capacity - old_capacity, *this);
     }
   }
 

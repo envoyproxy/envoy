@@ -84,7 +84,9 @@ public:
   virtual bool hadNegativeDeltaOnStreamClosed() { return false; }
 
   enum class State {
-    CONNECTING, // Connection is not yet established.
+    CONNECTING, // Connection is not yet established, but might be able to dispatch additional
+                // streams if this connection supports early data and the stream can be sent as
+                // early data.
     READY,      // Any additional streams may be immediately dispatched to this connection.
     BUSY,       // Connection is at its concurrent stream limit.
     DRAINING,   // No more streams can be dispatched to this connection, and it will be closed
@@ -102,6 +104,8 @@ public:
     }
     state_ = state;
   }
+
+  void allowEarlyData() { allows_early_data_ = true; }
 
   // Sets the remaining streams to 0, and updates pool and cluster capacity.
   virtual void drain();
@@ -128,12 +132,12 @@ public:
   Event::TimerPtr connection_duration_timer_;
   bool resources_released_{false};
   bool timed_out_{false};
+
+private:
   // True if the client is connecting and it can send early data. This means if the client is
   // CONNECTING, an early data stream may be immediately dispatched to this connection. Once
   // connected, it will become false.
   bool allows_early_data_{false};
-
-private:
   State state_{State::CONNECTING};
 };
 
@@ -280,15 +284,22 @@ public:
   }
   Upstream::ClusterConnectivityState& state() { return state_; }
 
-  void decrConnectingAndConnectedStreamCapacity(uint32_t delta) {
+  // Update the cluster capacity and the local connecting capacity if applicable.
+  void decrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client) {
     state_.decrConnectingAndConnectedStreamCapacity(delta);
-    ASSERT(connecting_stream_capacity_ >= delta);
-    connecting_stream_capacity_ -= delta;
+    if (client.isConnecting()) {
+      // If connecting, this client must have been serving early data streams, update the local
+      // connecting capacity.
+      ASSERT(connecting_stream_capacity_ >= delta);
+      connecting_stream_capacity_ -= delta;
+    }
   }
 
-  void incrConnectingAndConnectedStreamCapacity(uint32_t delta) {
+  void incrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client) {
     state_.incrConnectingAndConnectedStreamCapacity(delta);
-    connecting_stream_capacity_ += delta;
+    if (client.isConnecting()) {
+      connecting_stream_capacity_ += delta;
+    }
   }
 
   // Called when an upstream is ready to serve pending streams.
