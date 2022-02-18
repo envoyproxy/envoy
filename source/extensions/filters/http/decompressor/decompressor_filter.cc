@@ -75,7 +75,7 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
       config_->requestDirectionConfig().advertiseAcceptEncoding()) {
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.append_to_accept_content_encoding_only_once")) {
-      absl::string_view newAcceptEncodingHeader = Http::HeaderUtility::addEncodingToAcceptEncoding(
+      std::string newAcceptEncodingHeader = Http::HeaderUtility::addEncodingToAcceptEncoding(
           headers.getInlineValue(accept_encoding_handle.handle()), config_->contentEncoding());
       headers.setInline(accept_encoding_handle.handle(), newAcceptEncodingHeader);
     } else {
