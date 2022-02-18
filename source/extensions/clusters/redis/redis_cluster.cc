@@ -328,7 +328,7 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
   for (uint64_t slot_idx = 0; slot_idx < slots->size(); slot_idx++) {
     auto& slot = (*slots)[slot_idx];
     if (slot.primary() == nullptr) {
-      ENVOY_LOG(trace,
+      ENVOY_LOG(debug,
                 "starting async DNS resolution for primary slot address {} at index location {}",
                 slot.primary_hostname_, slot_idx);
       parent_.dns_resolver_->resolve(
@@ -337,7 +337,7 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
            &hostname_resolution_required_cnt](Network::DnsResolver::ResolutionStatus status,
                                               std::list<Network::DnsResponse>&& response) -> void {
             auto& slot = (*slots)[slot_idx];
-            ENVOY_LOG(trace, "async DNS resolution complete for {}", slot.primary_hostname_);
+            ENVOY_LOG(debug, "async DNS resolution complete for {}", slot.primary_hostname_);
             updateDnsStats(status, response.empty());
             // If DNS resolution for a primary fails, we stop resolution for remaining, and reset
             // the timer.
@@ -380,7 +380,7 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
 
   for (uint64_t replica_idx = 0; replica_idx < slot.replicas_to_resolve_.size(); replica_idx++) {
     auto replica = slot.replicas_to_resolve_[replica_idx];
-    ENVOY_LOG(trace, "starting async DNS resolution for replica address {}", replica.first);
+    ENVOY_LOG(debug, "starting async DNS resolution for replica address {}", replica.first);
     parent_.dns_resolver_->resolve(
         replica.first, parent_.dns_lookup_family_,
         [this, index, slots, replica_idx,
@@ -388,7 +388,7 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
                                             std::list<Network::DnsResponse>&& response) -> void {
           auto& slot = (*slots)[index];
           auto& replica = slot.replicas_to_resolve_[replica_idx];
-          ENVOY_LOG(trace, "async DNS resolution complete for {}", replica.first);
+          ENVOY_LOG(debug, "async DNS resolution complete for {}", replica.first);
           updateDnsStats(status, response.empty());
           // If DNS resolution fails here, we move on to resolve other replicas in the list.
           // We log a warn message.

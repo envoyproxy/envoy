@@ -158,6 +158,9 @@ public:
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       uint32_t upstream_idx = 0;
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      if (version_ == Network::Address::IpVersion::v4) {
+        cluster_0->set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
+      }
       for (int j = 0; j < cluster_0->load_assignment().endpoints_size(); ++j) {
         auto locality_lb = cluster_0->mutable_load_assignment()->mutable_endpoints(j);
         for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
