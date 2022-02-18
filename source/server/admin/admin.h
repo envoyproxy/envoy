@@ -200,7 +200,6 @@ public:
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
   void closeSocket();
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
-  Server::Instance& server() { return server_; }
 
   GenHandlerCb createHandlerFunction() {
     return [this](absl::string_view path_and_query, AdminStream& admin_stream) -> HandlerPtr {

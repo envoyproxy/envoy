@@ -220,5 +220,10 @@ TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0, 0));
 }
 
+TEST_P(AdminInstanceTest, Overrides) {
+  admin_.http1Settings();
+  admin_.originalIpDetectionExtensions();
+}
+
 } // namespace Server
 } // namespace Envoy
