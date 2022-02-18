@@ -36,50 +36,6 @@ TEST_P(AdsIntegrationTest, Basic) {
 }
 
 // Basic CDS/EDS update that warms and makes active a single cluster.
-TEST_P(AdsIntegrationTest, AdipTwoEdsClusters) {
-  initialize();
-  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
-  const auto eds_type_url =
-      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-
-  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1");
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0"}, {"cluster_0"}, {}));
-  auto cla_0 = buildClusterLoadAssignment("cluster_0");
-  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(eds_type_url, {cla_0},
-                                                                            {cla_0}, {}, "1");
-
-  // CDS and EDS Ack.
-  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "1", {}, {}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {}, {}, {}));
-
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
-
-  // Add second cluster.
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      cds_type_url, {buildCluster("cluster_0"), buildCluster("cluster_1")},
-      {buildCluster("cluster_1")}, {}, "2");
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-  EXPECT_TRUE(
-      compareDiscoveryRequest(eds_type_url, "", {"cluster_0", "cluster_1"}, {"cluster_1"}, {}));
-  auto cla_1 = buildClusterLoadAssignment("cluster_1");
-  cla_0.mutable_endpoints(0)->mutable_load_balancing_weight()->set_value(7);
-  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      eds_type_url, {cla_0, cla_1}, {cla_0, cla_1}, {}, "2");
-
-  // CDS and EDS Ack.
-  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "2", {}, {}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "2", {}, {}, {}));
-
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
-}
-
-// Basic CDS/EDS update that warms and makes active a single cluster.
 TEST_P(AdsIntegrationTest, BasicClusterInitialWarming) {
   initialize();
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
