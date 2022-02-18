@@ -1,11 +1,31 @@
 #include <memory>
+#include <string>
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "envoy/stats/stats_macros.h"
 
+#include "source/common/event/libevent_scheduler.h"
+#include "source/common/quic/codec_impl.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_server_session.h"
+#include "source/common/quic/envoy_quic_server_stream.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/server/configuration_impl.h"
+
+#include "test/common/quic/test_proof_source.h"
+#include "test/common/quic/test_utils.h"
+#include "test/mocks/event/mocks.h"
+#include "test/mocks/http/mocks.h"
+#include "test/mocks/http/stream_decoder.h"
+#include "test/mocks/network/mocks.h"
+#include "test/mocks/stats/mocks.h"
+#include "test/test_common/global.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/core/quic_crypto_server_stream.h"
 #include "quiche/quic/core/quic_utils.h"
@@ -14,36 +34,6 @@
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_server_session_base_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include <string>
-
-#include "source/common/quic/envoy_quic_server_session.h"
-#include "source/common/quic/envoy_quic_server_stream.h"
-#include "source/common/quic/envoy_quic_server_connection.h"
-#include "source/common/quic/codec_impl.h"
-#include "source/common/quic/envoy_quic_connection_helper.h"
-#include "source/common/quic/envoy_quic_alarm_factory.h"
-#include "source/common/quic/envoy_quic_utils.h"
-#include "test/common/quic/test_proof_source.h"
-#include "test/common/quic/test_utils.h"
-
-#include "envoy/stats/stats_macros.h"
-#include "source/common/event/libevent_scheduler.h"
-#include "source/server/configuration_impl.h"
-#include "test/mocks/event/mocks.h"
-#include "test/mocks/http/stream_decoder.h"
-#include "test/mocks/http/mocks.h"
-#include "test/mocks/network/mocks.h"
-#include "test/mocks/stats/mocks.h"
-#include "test/test_common/global.h"
-#include "test/test_common/logging.h"
-#include "test/test_common/simulated_time_system.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AnyNumber;

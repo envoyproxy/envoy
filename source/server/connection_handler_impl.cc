@@ -7,6 +7,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/event/deferred_task.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/server/active_internal_listener.h"
@@ -28,7 +29,7 @@ void ConnectionHandlerImpl::decNumConnections() {
 }
 
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
-                                        Network::ListenerConfig& config) {
+                                        Network::ListenerConfig& config, Runtime::Loader& runtime) {
   const bool support_udp_in_place_filter_chain_update = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place");
   if (support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
@@ -47,7 +48,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         iter->second->internalListener()->get().updateListenerConfig(config);
         return;
       }
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      IS_ENVOY_BUG("unexpected");
     }
     auto internal_listener = std::make_unique<ActiveInternalListener>(*this, dispatcher(), config);
     details->typed_listener_ = *internal_listener;
@@ -59,19 +60,19 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         iter->second->tcpListener()->get().updateListenerConfig(config);
         return;
       }
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      IS_ENVOY_BUG("unexpected");
     }
     // worker_index_ doesn't have a value on the main thread for the admin server.
     auto tcp_listener = std::make_unique<ActiveTcpListener>(
-        *this, config, worker_index_.has_value() ? *worker_index_ : 0);
+        *this, config, runtime, worker_index_.has_value() ? *worker_index_ : 0);
     details->typed_listener_ = *tcp_listener;
     details->listener_ = std::move(tcp_listener);
   } else {
     ASSERT(config.udpListenerConfig().has_value(), "UDP listener factory is not initialized.");
     ASSERT(worker_index_.has_value());
     ConnectionHandler::ActiveUdpListenerPtr udp_listener =
-        config.udpListenerConfig()->listenerFactory().createActiveUdpListener(*worker_index_, *this,
-                                                                              dispatcher_, config);
+        config.udpListenerConfig()->listenerFactory().createActiveUdpListener(
+            runtime, *worker_index_, *this, dispatcher_, config);
     details->typed_listener_ = *udp_listener;
     details->listener_ = std::move(udp_listener);
   }
@@ -231,7 +232,8 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag) {
   auto active_listener = findActiveListenerByTag(listener_tag);
   if (active_listener.has_value()) {
     ASSERT(absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
-        active_listener->get().typed_listener_));
+               active_listener->get().typed_listener_) &&
+           active_listener->get().listener_->listener() != nullptr);
     return Network::BalancedConnectionHandlerOptRef(
         active_listener->get().tcpListener().value().get());
   }
@@ -240,10 +242,14 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag) {
 
 Network::BalancedConnectionHandlerOptRef
 ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Instance& address) {
+  // Only Ip address can be restored to original address and redirect.
+  ASSERT(address.type() == Network::Address::Type::Ip);
+
   // We do not return stopped listeners.
   // If there is exact address match, return the corresponding listener.
   if (auto listener_it = tcp_listener_map_by_address_.find(address.asStringView());
-      listener_it != tcp_listener_map_by_address_.end()) {
+      listener_it != tcp_listener_map_by_address_.end() &&
+      listener_it->second->listener_->listener() != nullptr) {
     return Network::BalancedConnectionHandlerOptRef(
         listener_it->second->tcpListener().value().get());
   }
@@ -254,13 +260,13 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
   // TODO(wattli): consolidate with previous search for more efficiency.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.listener_wildcard_match_ip_family")) {
-    std::string addr_str =
-        address.ip()->version() == Network::Address::IpVersion::v4
-            ? Network::Utility::getIpv4AnyAddress(address.ip()->port())->asString()
-            : Network::Utility::getIpv6AnyAddress(address.ip()->port())->asString();
+    std::string addr_str = address.ip()->version() == Network::Address::IpVersion::v4
+                               ? Network::Address::Ipv4Instance(address.ip()->port()).asString()
+                               : Network::Address::Ipv6Instance(address.ip()->port()).asString();
 
     auto iter = tcp_listener_map_by_address_.find(addr_str);
-    if (iter != tcp_listener_map_by_address_.end()) {
+    if (iter != tcp_listener_map_by_address_.end() &&
+        iter->second->listener_->listener() != nullptr) {
       details = *iter->second;
     }
   } else {

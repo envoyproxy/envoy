@@ -57,7 +57,7 @@ public:
 class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   Http3ConnPoolImplTest() {
-    EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _, _))
+    EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _))
         .WillRepeatedly(Return(ssl_context_));
     factory_.emplace(std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
                          new NiceMock<Ssl::MockClientContextConfig>),
@@ -160,7 +160,9 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
 
-  ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks);
+  ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks,
+                                                              {/*can_send_early_data_=*/false,
+                                                               /*can_use_http3_=*/true});
   EXPECT_NE(nullptr, cancellable);
   std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
       Http3ConnPoolImplPeer::connectingClients(*pool_);
