@@ -97,15 +97,15 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         config.listenSocketFactory().localAddress()->asStringView(), details);
 
     auto& address = details->address_;
-    // If the address is IPv6 and isn't v6only, parse out the ipv4 compatible address from the ipv6
+    // If the address is Ipv6 and isn't v6only, parse out the ipv4 compatible address from the Ipv6
     // address and put an item to the map. Then this allows the `getBalancedHandlerByAddress`
-    // can match the ipv4 any-address also.
+    // can match the Ipv4 any-address also.
     if (address->type() == Network::Address::Type::Ip &&
         address->ip()->version() == Network::Address::IpVersion::v6 &&
         !address->ip()->ipv6()->v6only()) {
       if (address->ip()->isAnyAddress()) {
         // Since both "::" with ipv4_compat and "0.0.0.0" can be supported.
-        // So use `emplace` here, if there already one and it isn't shutdown for compatible addr,
+        // If there already one and it isn't shutdown for compatible addr,
         // then won't insert a new one.
         auto ipv4_any_listener = tcp_listener_map_by_address_.find(
             Network::Address::Ipv4Instance(address->ip()->port()).asStringView());
@@ -118,6 +118,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
         // Remove this check when runtime flag
         // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
+        // If this isn't a valid Ipv4-mapped address, then do nothing.
         if (v4_compatible_addr.ok()) {
           tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr.value()->asStringView(),
                                                         details);
