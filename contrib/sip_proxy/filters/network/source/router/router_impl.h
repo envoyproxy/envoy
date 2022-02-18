@@ -130,17 +130,11 @@ private:
 
 struct ThreadLocalTransactionInfo : public ThreadLocal::ThreadLocalObject,
                                     public Logger::Loggable<Logger::Id::filter> {
-  ThreadLocalTransactionInfo(
-      std::shared_ptr<TransactionInfo> parent, Event::Dispatcher& dispatcher,
-      std::chrono::milliseconds transaction_timeout,
-      std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>
-          local_services)
+  ThreadLocalTransactionInfo(std::shared_ptr<TransactionInfo> parent, Event::Dispatcher& dispatcher,
+                             std::chrono::milliseconds transaction_timeout)
       : parent_(parent), dispatcher_(dispatcher), transaction_timeout_(transaction_timeout) {
     audit_timer_ = dispatcher.createTimer([this]() -> void { auditTimerAction(); });
     audit_timer_->enableTimer(std::chrono::seconds(2));
-    for (const auto& service : local_services) {
-      local_services_.emplace_back(service);
-    }
   }
   absl::flat_hash_map<std::string, std::shared_ptr<TransactionInfoItem>> transaction_info_map_{};
   absl::flat_hash_map<std::string, std::shared_ptr<UpstreamRequest>> upstream_request_map_{};
@@ -149,8 +143,6 @@ struct ThreadLocalTransactionInfo : public ThreadLocal::ThreadLocalObject,
   Event::Dispatcher& dispatcher_;
   Event::TimerPtr audit_timer_;
   std::chrono::milliseconds transaction_timeout_;
-  std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>
-      local_services_;
 
   void auditTimerAction() {
     const auto p1 = dispatcher_.timeSource().systemTime();
@@ -184,31 +176,23 @@ class TransactionInfo : public std::enable_shared_from_this<TransactionInfo>,
                         Logger::Loggable<Logger::Id::connection> {
 public:
   TransactionInfo(const std::string& cluster_name, ThreadLocal::SlotAllocator& tls,
-                  std::chrono::milliseconds transaction_timeout,
-                  const Protobuf::RepeatedPtrField<
-                      envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>
-                      local_services)
+                  std::chrono::milliseconds transaction_timeout)
       : cluster_name_(cluster_name), tls_(tls.allocateSlot()),
-        transaction_timeout_(transaction_timeout) {
-    for (const auto& service : local_services) {
-      local_services_.emplace_back(service);
-    }
-  }
+        transaction_timeout_(transaction_timeout) {}
 
   void init() {
     // Note: `this` and `cluster_name` have a a lifetime of the filter.
     // That may be shorter than the tls callback if the listener is torn down shortly after it is
     // created. We use a weak pointer to make sure this object outlives the tls callbacks.
     std::weak_ptr<TransactionInfo> this_weak_ptr = this->shared_from_this();
-    tls_->set([this_weak_ptr](
-                  Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      if (auto this_shared_ptr = this_weak_ptr.lock()) {
-        return std::make_shared<ThreadLocalTransactionInfo>(this_shared_ptr, dispatcher,
-                                                            this_shared_ptr->transaction_timeout_,
-                                                            this_shared_ptr->local_services_);
-      }
-      return nullptr;
-    });
+    tls_->set(
+        [this_weak_ptr](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+          if (auto this_shared_ptr = this_weak_ptr.lock()) {
+            return std::make_shared<ThreadLocalTransactionInfo>(
+                this_shared_ptr, dispatcher, this_shared_ptr->transaction_timeout_);
+          }
+          return nullptr;
+        });
 
     (void)cluster_name_;
   }
@@ -253,8 +237,6 @@ private:
   const std::string cluster_name_;
   ThreadLocal::SlotPtr tls_;
   std::chrono::milliseconds transaction_timeout_;
-  std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>
-      local_services_;
 };
 
 class Router : public Upstream::LoadBalancerContextBase,

@@ -153,8 +153,7 @@ public:
   void initializeTransaction() {
     // TODO
     auto transaction_info_ptr = std::make_shared<TransactionInfo>(
-        cluster_name_, thread_local_, static_cast<std::chrono::seconds>(2),
-        sip_proxy_config_.settings().local_services());
+        cluster_name_, thread_local_, static_cast<std::chrono::seconds>(2));
     transaction_info_ptr->init();
     transaction_infos_->emplace(cluster_name_, transaction_info_ptr);
   }

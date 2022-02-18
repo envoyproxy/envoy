@@ -62,8 +62,7 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
     auto transaction_info_ptr = std::make_shared<Router::TransactionInfo>(
         cluster, context.threadLocal(),
         static_cast<std::chrono::milliseconds>(
-            PROTOBUF_GET_MS_OR_DEFAULT(proto_config.settings(), transaction_timeout, 32000)),
-        proto_config.settings().local_services());
+            PROTOBUF_GET_MS_OR_DEFAULT(proto_config.settings(), transaction_timeout, 32000)));
     transaction_info_ptr->init();
     transaction_infos->emplace(cluster, transaction_info_ptr);
   }
