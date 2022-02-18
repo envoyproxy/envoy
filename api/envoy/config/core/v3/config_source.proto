@@ -76,24 +76,6 @@ message ApiConfigSource {
     AGGREGATED_DELTA_GRPC = 6;
   }
 
-  // This is the same as TypedExtensionConfig. However, extensions.proto cannot be
-  // imported as it defines a message (ExtensionConfigSource) that depends on ConfigSource.
-  // [#next-major-version: refactor the file envoy/config/core/v3/extension.proto
-  // to move out ExtensionConfigSource so this proto can import extension.proto.]
-  message ConfigSourceTypedConfig {
-    // The name of an extension. This is not used to select the extension, instead
-    // it serves the role of an opaque identifier.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
-
-    // The typed config for the extension. The type URL will be used to identify
-    // the extension. In the case that the type URL is *xds.type.v3.TypedStruct*
-    // (or, for historical reasons, *udpa.type.v1.TypedStruct*), the inner type
-    // URL of *TypedStruct* will be utilized. See the
-    // :ref:`extension configuration overview
-    // <config_overview_extension_configuration>` for further details.
-    google.protobuf.Any typed_config = 2 [(validate.rules).any = {required: true}];
-  }
-
   // API type (gRPC, REST, delta gRPC)
   ApiType api_type = 1 [(validate.rules).enum = {defined_only: true}];
 
