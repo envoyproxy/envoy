@@ -351,13 +351,10 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   if (address_->type() == Network::Address::Type::Ip &&
       config.address().socket_address().ipv4_compat() &&
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_check_on_ipv4_compat")) {
-    if (address_->ip()->version() == Network::Address::IpVersion::v6) {
-      if (!address_->ip()->ipv6()->v4CompatibleAddress().ok()) {
-        throw EnvoyException("Only the Ipv6 any address and Ipv4-mapped Ipv6 address can be set "
-                             "ipv4_compat as true");
-      }
-    } else {
-      throw EnvoyException("Only Ipv6 address can be set ipv4_compat as true");
+    if (address_->ip()->version() != Network::Address::IpVersion::v6 ||
+        !address_->ip()->ipv6()->v4CompatibleAddress().ok()) {
+      throw EnvoyException(
+          "Only IPv6 address '::' or valid IPv4-mapped IPv6 addresses can set ipv4_compat");
     }
   }
 
