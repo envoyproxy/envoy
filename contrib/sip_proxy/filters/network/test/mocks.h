@@ -58,8 +58,7 @@ public:
   MOCK_METHOD(std::string, getOwnDomain, ());
   MOCK_METHOD(std::string, getDomainMatchParamName, ());
   MOCK_METHOD(void, setMetadata, (MessageMetadataSharedPtr metadata));
-  MOCK_METHOD(std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&,
-              localServices, ());
+  MOCK_METHOD(std::shared_ptr<SipSettings>, settings, ());
 
   std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>
       local_services_;
