@@ -14,8 +14,7 @@ load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
 GO_VERSION = "1.17.5"
 
 def envoy_dependency_imports(go_version = GO_VERSION):
-    # TODO: allow building of tools for easier onboarding
-    rules_foreign_cc_dependencies(register_default_tools = False, register_built_tools = False)
+    rules_foreign_cc_dependencies()
     go_rules_dependencies()
     go_register_toolchains(go_version)
     gazelle_dependencies()
