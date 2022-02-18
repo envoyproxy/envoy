@@ -161,6 +161,7 @@ protected:
         return false;
       }
       absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; };
+      void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
       // ScopeTrackedObject
       void dumpState(std::ostream& os, int) const override { os << "SyntheticConnection"; }
 

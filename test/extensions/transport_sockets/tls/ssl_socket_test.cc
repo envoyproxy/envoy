@@ -370,9 +370,12 @@ void testUtil(const TestUtilOptions& options) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-        server_connection = dispatcher->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
-            stream_info);
+        auto ssl_socket = server_ssl_socket_factory.createTransportSocket(nullptr);
+        // configureInitialCongestionWindow is an unimplemented empty function, this is just to
+        // increase code coverage.
+        ssl_socket->configureInitialCongestionWindow(100, std::chrono::microseconds(123));
+        server_connection = dispatcher->createServerConnection(std::move(socket),
+                                                               std::move(ssl_socket), stream_info);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -4951,6 +4954,8 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                    std::vector<std::string>{});
   auto transport_socket = server_ssl_socket_factory.createTransportSocket(nullptr);
+  EXPECT_FALSE(transport_socket->startSecureTransport());                                  // Noop
+  transport_socket->configureInitialCongestionWindow(200, std::chrono::microseconds(223)); // Noop
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
   EXPECT_EQ(nullptr, transport_socket->ssl());
   EXPECT_EQ(true, transport_socket->canFlushClose());
