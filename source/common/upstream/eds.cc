@@ -28,8 +28,8 @@ EdsClusterImpl::EdsClusterImpl(
   Event::Dispatcher& dispatcher = factory_context.mainThreadDispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
-  if (eds_config.config_source_specifier_case() ==
-      envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath) {
+  if (Config::SubscriptionFactory::isPathBasedConfigSource(
+          eds_config.config_source_specifier_case())) {
     initialize_phase_ = InitializePhase::Primary;
   } else {
     initialize_phase_ = InitializePhase::Secondary;
