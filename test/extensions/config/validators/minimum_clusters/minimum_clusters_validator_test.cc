@@ -61,7 +61,8 @@ TEST_F(MinimumClustersValidatorTest, Minimum1SingleCluster) {
   auto cluster = std::make_unique<envoy::config::cluster::v3::Cluster>();
   cluster->set_name("cluster1");
   std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
-  added_resources.emplace_back(new Envoy::Config::DecodedResourceImpl(std::move(cluster), "name", {}, "ver"));
+  added_resources.emplace_back(
+      new Envoy::Config::DecodedResourceImpl(std::move(cluster), "name", {}, "ver"));
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
   EXPECT_TRUE(validator.validate(server_, added_resources, removed_resources));
@@ -71,8 +72,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1SingleCluster) {
 TEST_F(MinimumClustersValidatorTest, NoMinimumSingleCluster) {
   envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;
   NiceMock<Upstream::MockClusterMockPrioritySet> foo_cluster;
-  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{
-      {{"foo", foo_cluster}}, {}, 1};
+  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{{"foo", foo_cluster}}, {}, 1};
   MinimumClustersValidator validator(config);
 
   const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
@@ -87,8 +87,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1Empty) {
   envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;
   config.set_min_clusters_num(1);
   NiceMock<Upstream::MockClusterMockPrioritySet> foo_cluster;
-  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{
-      {{"foo", foo_cluster}}, {}, 1};
+  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{{"foo", foo_cluster}}, {}, 1};
   MinimumClustersValidator validator(config);
 
   const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
@@ -104,8 +103,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters2Remove1) {
   config.set_min_clusters_num(1);
   NiceMock<Upstream::MockClusterMockPrioritySet> foo_cluster, bar_cluster;
   Upstream::MockClusterManager::ClusterInfoMaps cluster_info{
-      {{"foo", foo_cluster}, {"bar", bar_cluster}},
-      {}, 2};
+      {{"foo", foo_cluster}, {"bar", bar_cluster}}, {}, 2};
   MinimumClustersValidator validator(config);
 
   const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
@@ -121,8 +119,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1RemoveNonExistent) {
   envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;
   config.set_min_clusters_num(1);
   NiceMock<Upstream::MockClusterMockPrioritySet> foo_cluster;
-  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{
-      {{"foo", foo_cluster}}, {}, 1};
+  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{{"foo", foo_cluster}}, {}, 1};
   MinimumClustersValidator validator(config);
 
   const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
@@ -138,8 +135,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1Remove1) {
   envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;
   config.set_min_clusters_num(1);
   NiceMock<Upstream::MockClusterMockPrioritySet> foo_cluster;
-  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{
-      {{"foo", foo_cluster}}, {}, 1};
+  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{{"foo", foo_cluster}}, {}, 1};
   MinimumClustersValidator validator(config);
 
   const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
@@ -159,8 +155,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1Remove1NonApi) {
   envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;
   config.set_min_clusters_num(1);
   NiceMock<Upstream::MockClusterMockPrioritySet> foo_cluster;
-  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{
-      {{"foo", foo_cluster}}, {}, 1};
+  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{{"foo", foo_cluster}}, {}, 1};
   MinimumClustersValidator validator(config);
 
   const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;

@@ -206,15 +206,17 @@ public:
 // it with the right values at the right times.
 class MockedUpdatedClusterManagerImpl : public TestClusterManagerImpl {
 public:
-  MockedUpdatedClusterManagerImpl(
-      const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
-      Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-      const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager,
-      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-      MockLocalClusterUpdate& local_cluster_update, MockLocalHostsRemoved& local_hosts_removed,
-      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
-      Server::Instance& server)
+  MockedUpdatedClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                  ClusterManagerFactory& factory, Stats::Store& stats,
+                                  ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                                  const LocalInfo::LocalInfo& local_info,
+                                  AccessLog::AccessLogManager& log_manager,
+                                  Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                                  ProtobufMessage::ValidationContext& validation_context,
+                                  Api::Api& api, MockLocalClusterUpdate& local_cluster_update,
+                                  MockLocalHostsRemoved& local_hosts_removed,
+                                  Http::Context& http_context, Grpc::Context& grpc_context,
+                                  Router::Context& router_context, Server::Instance& server)
       : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
                                main_thread_dispatcher, admin, validation_context, api, http_context,
                                grpc_context, router_context, server),

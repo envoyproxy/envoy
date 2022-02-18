@@ -24,8 +24,8 @@ ExternalConfigValidatorsImpl::ExternalConfigValidatorsImpl(
   }
 }
 
-void ExternalConfigValidatorsImpl::executeValidators(absl::string_view type_url,
-                                                 const std::vector<DecodedResourcePtr>& resources) {
+void ExternalConfigValidatorsImpl::executeValidators(
+    absl::string_view type_url, const std::vector<DecodedResourcePtr>& resources) {
   auto validators_it = validators_map_.find(type_url);
   if (validators_it != validators_map_.end()) {
     auto& validators = validators_it->second;

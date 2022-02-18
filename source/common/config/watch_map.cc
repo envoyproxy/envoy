@@ -211,9 +211,9 @@ void WatchMap::onConfigUpdate(
   }
 
   // Execute external config validators.
-  config_validators_.executeValidators(type_url_,
-                                       reinterpret_cast<std::vector<DecodedResourcePtr>&>(decoded_resources),
-                                       removed_resources);
+  config_validators_.executeValidators(
+      type_url_, reinterpret_cast<std::vector<DecodedResourcePtr>&>(decoded_resources),
+      removed_resources);
 
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (const auto& [cur_watch, resource_to_add] : per_watch_added) {

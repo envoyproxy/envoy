@@ -71,7 +71,8 @@ public:
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, custom_rate_limit_settings, local_info_, true, std::move(config_validators_));
+        random_, stats_, custom_rate_limit_settings, local_info_, true,
+        std::move(config_validators_));
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -891,7 +892,8 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_, rate_limit_settings_, local_info_, true, std::make_unique<NiceMock<MockExternalConfigValidators>>()),
+          random_, stats_, rate_limit_settings_, local_info_, true,
+          std::make_unique<NiceMock<MockExternalConfigValidators>>()),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
@@ -904,7 +906,8 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_, rate_limit_settings_, local_info_, true, std::make_unique<NiceMock<MockExternalConfigValidators>>()),
+          random_, stats_, rate_limit_settings_, local_info_, true,
+          std::make_unique<NiceMock<MockExternalConfigValidators>>()),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
@@ -939,7 +942,8 @@ TEST_F(GrpcMuxImplTest, AllMuxesStateTest) {
       std::unique_ptr<Grpc::MockAsyncClient>(), dispatcher_,
       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-      random_, stats_, rate_limit_settings_, local_info_, true, std::make_unique<NiceMock<MockExternalConfigValidators>>());
+      random_, stats_, rate_limit_settings_, local_info_, true,
+      std::make_unique<NiceMock<MockExternalConfigValidators>>());
 
   Config::XdsMux::GrpcMuxSotw::shutdownAll();
 

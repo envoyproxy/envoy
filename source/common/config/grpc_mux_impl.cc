@@ -247,7 +247,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
 
     // Execute external config validators if there are any watches.
     if (!api_state.watches_.empty()) {
-      config_validators_->executeValidators(type_url, reinterpret_cast<std::vector<DecodedResourcePtr>&>(resources));
+      config_validators_->executeValidators(
+          type_url, reinterpret_cast<std::vector<DecodedResourcePtr>&>(resources));
     }
 
     for (auto watch : api_state.watches_) {

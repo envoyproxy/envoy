@@ -20,7 +20,7 @@ public:
    * @throw EnvoyException if the config is rejected by one of the validators.
    */
   virtual void executeValidators(absl::string_view type_url,
-                         const std::vector<DecodedResourcePtr>& resources) PURE;
+                                 const std::vector<DecodedResourcePtr>& resources) PURE;
 
   /**
    * Executes the validators that receive the Incremental (delta-xDS) resources.
@@ -32,9 +32,10 @@ public:
    *        config update.
    * @throw EnvoyException if the config is rejected by one of the validators.
    */
-  virtual void executeValidators(absl::string_view type_url,
-                         const std::vector<DecodedResourcePtr>& added_resources,
-                         const Protobuf::RepeatedPtrField<std::string>& removed_resources) PURE;
+  virtual void
+  executeValidators(absl::string_view type_url,
+                    const std::vector<DecodedResourcePtr>& added_resources,
+                    const Protobuf::RepeatedPtrField<std::string>& removed_resources) PURE;
 };
 
 using ExternalConfigValidatorsPtr = std::unique_ptr<ExternalConfigValidators>;
