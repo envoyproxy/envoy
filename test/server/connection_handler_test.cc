@@ -1460,9 +1460,8 @@ TEST_F(ConnectionHandlerTest, NotMatchIPv6WildcardListenerWithoutIpv4CompatFlag)
   EXPECT_CALL(*access_log_, log(_, _, _, _));
 }
 
-// This tests the case both ipv4 listener and ipv4-mapped ipv6 listener are added. And
-// the ipv4 listener's ipv4 address is equal to the mapped ipv4 address in ipv6 listener. The
-// expectation is the connection is going to ipv4 listener.
+// This tests the case both "0.0.0.0" and "::" with ipv4_compat are added. The
+// expectation is the ipv4 connection is going to ipv4 listener.
 TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag) {
   auto scoped_runtime = std::make_unique<TestScopedRuntime>();
 
@@ -1549,8 +1548,8 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag) {
   EXPECT_CALL(*access_log_, log(_, _, _, _));
 }
 
-// This test is same as above except the ipv4 listener is added first, then ipv4-mapped
-// ipv6 listener is added.
+// This test is same as above except the ipv4 listener is added first, then ipv6
+// listener is added.
 TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag2) {
   auto scoped_runtime = std::make_unique<TestScopedRuntime>();
 
@@ -1637,6 +1636,9 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag2) 
   EXPECT_CALL(*access_log_, log(_, _, _, _));
 }
 
+// This test the case of there is stopped "0.0.0.0" listener, then add
+// "::" listener with ipv4_compat. Ensure the ipv6 listener will take over the
+// ipv4 listener.
 TEST_F(ConnectionHandlerTest, AddIpv4MappedListenerAfterIpv4ListenerStopped) {
   auto scoped_runtime = std::make_unique<TestScopedRuntime>();
 
@@ -1712,7 +1714,8 @@ TEST_F(ConnectionHandlerTest, AddIpv4MappedListenerAfterIpv4ListenerStopped) {
   // The listener1 will balance the request to listener2.
   EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
   // The listener2 gets the connection
-  EXPECT_CALL(*ipv6_overridden_filter_chain_manager, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+  EXPECT_CALL(*ipv6_overridden_filter_chain_manager, findFilterChain(_))
+      .WillOnce(Return(filter_chain_.get()));
   // The listener3 won't get the connection since it is stopped.
   EXPECT_CALL(*ipv4_overridden_filter_chain_manager, findFilterChain(_)).Times(0);
 

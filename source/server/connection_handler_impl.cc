@@ -105,19 +105,22 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         !address->ip()->ipv6()->v6only()) {
       if (address->ip()->isAnyAddress()) {
         // Since both "::" with ipv4_compat and "0.0.0.0" can be supported.
-        // So use `emplace` here, if there already one and it isn't shutdown for compatible addr, then
-        // won't insert a new one.
-        auto ipv4_any_listener = tcp_listener_map_by_address_.find(Network::Address::Ipv4Instance(address->ip()->port()).asStringView());
-        if (ipv4_any_listener == tcp_listener_map_by_address_.end() || ipv4_any_listener->second->listener_->listener() == nullptr) {
+        // So use `emplace` here, if there already one and it isn't shutdown for compatible addr,
+        // then won't insert a new one.
+        auto ipv4_any_listener = tcp_listener_map_by_address_.find(
+            Network::Address::Ipv4Instance(address->ip()->port()).asStringView());
+        if (ipv4_any_listener == tcp_listener_map_by_address_.end() ||
+            ipv4_any_listener->second->listener_->listener() == nullptr) {
           tcp_listener_map_by_address_.insert_or_assign(
-            Network::Address::Ipv4Instance(address->ip()->port()).asStringView(), details);
+              Network::Address::Ipv4Instance(address->ip()->port()).asStringView(), details);
         }
       } else {
         auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
         // Remove this check when runtime flag
         // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
         if (v4_compatible_addr.ok()) {
-          tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr.value()->asStringView(), details);
+          tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr.value()->asStringView(),
+                                                        details);
         }
       }
     }
