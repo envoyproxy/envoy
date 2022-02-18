@@ -145,6 +145,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         Network::Connection& connection = *data.connection_;
         auto client = std::make_unique<ActiveClient>(*pool, data);
         if (connection.state() == Network::Connection::State::Closed) {
+          // TODO(danzh) remove this branch once
+          // "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop" is deprecated.
           ASSERT(dynamic_cast<CodecClientProd*>(client->codec_client_.get()) != nullptr);
           return nullptr;
         }
