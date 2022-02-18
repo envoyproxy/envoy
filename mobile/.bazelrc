@@ -25,6 +25,9 @@ build --features=-per_object_debug_info
 # Suppress deprecated declaration warnings due to extensive transitive noise from protobuf.
 build --copt -Wno-deprecated-declarations
 
+# Override PGV validation with NOP functions
+build --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=nop
+
 # Enable source map for debugging in IDEs
 build:dbg --copt="-fdebug-compilation-dir" --copt="/proc/self/cwd"
 
@@ -70,6 +73,12 @@ build:tsan-dev --test_env="TSAN_OPTIONS=report_atomic_races=0"
 # Exclude debug info from the release binary since it makes it too large to fit
 # into a zip file. This shouldn't affect crash reports.
 build:release-common --define=no_debug_info=1
+
+# Compile releases optimizing for size (eg -Os, etc).
+build:release-common --config=sizeopt
+
+# Set default symbols visibility to hidden to reduce .dynstr and the symbol table size
+build:release-common --copt=-fvisibility=hidden
 
 # Flags for release builds targeting iOS
 build:release-ios --apple_bitcode=embedded
