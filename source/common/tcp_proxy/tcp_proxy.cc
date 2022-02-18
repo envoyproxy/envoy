@@ -362,12 +362,11 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   }
 
   if (auto downstream_connection = downstreamConnection(); downstream_connection != nullptr) {
-    if (!read_callbacks_->connection()
-             .streamInfo()
+    if (!downstream_connection->streamInfo()
              .filterState()
-             ->hasData<Network::ProxyProtocolFilterState>(
+             .hasData<Network::ProxyProtocolFilterState>(
                  Network::ProxyProtocolFilterState::key())) {
-      read_callbacks_->connection().streamInfo().filterState()->setData(
+      getStreamInfo().filterState()->setData(
           Network::ProxyProtocolFilterState::key(),
           std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
               downstream_connection->connectionInfoProvider().remoteAddress(),
