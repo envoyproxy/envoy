@@ -111,7 +111,6 @@ message ApiConfigSource {
   // Skip the node identifier in subsequent discovery requests for streaming gRPC config types.
   bool set_node_on_first_message_only = 7;
 
-  // [#not-implemented-hide:]
   // A list of config validators that will be executed when a new update is
   // received from the ApiConfigSource. Note that each validator handles a
   // specific xDS service type, and only the validators corresponding to the
