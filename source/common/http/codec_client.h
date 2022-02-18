@@ -274,6 +274,8 @@ using CodecClientPtr = std::unique_ptr<CodecClient>;
 
 /**
  * Production implementation that installs a real codec without automatically connecting.
+ * TODO(danzh) deprecate this class and make CodecClientProd to have the option to defer connect
+ * once "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop" is deprecated.
  */
 class NoConnectCodecClientProd : public CodecClient {
 public:

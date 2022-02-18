@@ -1,22 +1,12 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#pragma GCC diagnostic ignored "-Wtype-limits"
-#endif
-
-#include "quiche/quic/test_tools/test_certificates.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
 #include <memory>
 
-#include "test/mocks/network/mocks.h"
 #include "source/common/quic/envoy_quic_proof_source_base.h"
+
+#include "test/mocks/network/mocks.h"
+
+#include "quiche/quic/test_tools/test_certificates.h"
 
 namespace Envoy {
 namespace Quic {

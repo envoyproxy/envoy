@@ -38,7 +38,7 @@ public:
 class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   Http3ConnPoolImplTest() {
-    EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _, _))
+    EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _))
         .WillRepeatedly(Return(ssl_context_));
     factory_.emplace(std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
                          new NiceMock<Ssl::MockClientContextConfig>),
@@ -147,14 +147,18 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
 
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
+
   auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks,
                                                               {/*can_send_early_data_=*/false,
                                                                /*can_use_http3_=*/true});
   EXPECT_NE(nullptr, cancellable);
   if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted")) {
+          "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
     async_connect_callback->invokeCallback();
+  } else {
+    EXPECT_FALSE(async_connect_callback->enabled());
+    delete async_connect_callback;
   }
 
   std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
@@ -168,7 +172,7 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
 
 TEST_F(Http3ConnPoolImplTest, NewAndCancelStreamBeforeConnect) {
   if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted")) {
+          "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
     return;
   }
 
@@ -199,7 +203,7 @@ TEST_F(Http3ConnPoolImplTest, NewAndCancelStreamBeforeConnect) {
 
 TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
   if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.postpone_h3_client_connect_till_enlisted")) {
+          "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
     return;
   }
   initialize();

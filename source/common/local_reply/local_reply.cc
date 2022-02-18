@@ -79,7 +79,8 @@ public:
                        StreamInfo::StreamInfo& stream_info, Http::Code& code, std::string& body,
                        BodyFormatter*& final_formatter) const {
     // If not matched, just bail out.
-    if (!filter_->evaluate(stream_info, request_headers, response_headers, response_trailers)) {
+    if (filter_ == nullptr ||
+        !filter_->evaluate(stream_info, request_headers, response_headers, response_trailers)) {
       return false;
     }
 

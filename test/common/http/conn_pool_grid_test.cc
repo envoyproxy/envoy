@@ -830,7 +830,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.postpone_h3_client_connect_till_enlisted", "false"}});
+      {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "false"}});
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
 
@@ -840,7 +840,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
-  EXPECT_CALL(factory_context.context_manager_, createSslClientContext(_, _, _))
+  EXPECT_CALL(factory_context.context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context));
   auto factory =
       std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context);
@@ -903,7 +903,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.postpone_h3_client_connect_till_enlisted", "true"}});
+      {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "true"}});
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
 
@@ -913,7 +913,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
-  EXPECT_CALL(factory_context.context_manager_, createSslClientContext(_, _, _))
+  EXPECT_CALL(factory_context.context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context));
   auto factory =
       std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context);

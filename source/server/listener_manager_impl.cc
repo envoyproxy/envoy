@@ -607,16 +607,19 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
   if (overridden_listener.has_value()) {
     ENVOY_LOG(debug, "replacing existing listener {}", overridden_listener.value());
   }
-  worker.addListener(overridden_listener, listener, [this, completion_callback]() -> void {
-    // The add listener completion runs on the worker thread. Post back to the main thread to
-    // avoid locking.
-    server_.dispatcher().post([this, completion_callback]() -> void {
-      stats_.listener_create_success_.inc();
-      if (completion_callback) {
-        completion_callback();
-      }
-    });
-  });
+  worker.addListener(
+      overridden_listener, listener,
+      [this, completion_callback]() -> void {
+        // The add listener completion runs on the worker thread. Post back to the main thread to
+        // avoid locking.
+        server_.dispatcher().post([this, completion_callback]() -> void {
+          stats_.listener_create_success_.inc();
+          if (completion_callback) {
+            completion_callback();
+          }
+        });
+      },
+      server_.runtime());
 }
 
 void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
