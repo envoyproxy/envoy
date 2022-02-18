@@ -147,6 +147,8 @@ To add an extension config to the API, the steps below should be followed:
    (`option (udpa.annotations.file_status).package_version_status = ACTIVE;`).
    This is required to automatically include the config proto in [api/versioning/BUILD](versioning/BUILD).
 1. Add a reference to the v3 extension config in (1) in [api/versioning/BUILD](versioning/BUILD) under `active_protos`.
+1. If you introduce a new extension category, you'll also need to add its name
+   under `EXTENSION_CATEGORIES` in: [tools/extensions/extensions_check.py](tools/extensions/extensions_check.py).
 1. Run `./tools/proto_format/proto_format.sh fix`. This should regenerate the `BUILD` file and
    reformat `foobar.proto` as needed.
 
