@@ -15,10 +15,6 @@ ubuntu_focal:
   image: ubuntu:20.04
   ext: focal.changes
 
-ubuntu_hirstute:
-  image: ubuntu:21.04
-  ext: hirstute.changes
-
 ubuntu_impish:
   image: ubuntu:21.10
   ext: impish.changes
