@@ -40,7 +40,7 @@ TEST_P(AdminInstanceTest, LogLevelSetting) {
   EXPECT_EQ(getFancyContext().getFancyLogEntry(__FILE__)->level(), spdlog::level::info);
 
   // Test multiple log levels at once
-  std::string file = "xxxx_test_logger_file_xxxx";
+  const std::string file = "xxxx_test_logger_file_xxxx";
   std::atomic<spdlog::logger*> logger;
   getFancyContext().initFancyLogger(file, logger);
   query = fmt::format("/logging?paths={}:trace,{}:trace", __FILE__, file);

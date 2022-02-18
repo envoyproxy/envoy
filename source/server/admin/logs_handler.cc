@@ -131,7 +131,7 @@ absl::Status LogsHandler::changeLogLevel(const Http::Utility::QueryParams& param
 
 void LogsHandler::changeAllLogLevels(spdlog::level::level_enum level) {
   if (!Logger::Context::useFancyLogger()) {
-    ENVOY_LOG(debug, "change all log levels: level='{}'", spdlog::level::level_string_views[level]);
+    ENVOY_LOG(info, "change all log levels: level='{}'", spdlog::level::level_string_views[level]);
     Logger::Registry::setLogLevel(level);
   } else {
     // Level setting with Fancy Logger.
@@ -162,7 +162,7 @@ absl::Status LogsHandler::changeLogLevels(
       Logger::Logger* logger = it.first;
       spdlog::level::level_enum level = it.second;
 
-      ENVOY_LOG(debug, "change log level: name='{}' level='{}'", logger->name(),
+      ENVOY_LOG(info, "change log level: name='{}' level='{}'", logger->name(),
                 spdlog::level::level_string_views[level]);
       logger->setLevel(level);
     }
