@@ -40,6 +40,11 @@ public:
                                               generator_, validation_visitor_, *api_));
   }
 
+  ~TestScopedRuntime() {
+    Runtime::RuntimeFeatures features;
+    features.restoreDefaults();
+  }
+
 protected:
   Event::MockDispatcher dispatcher_;
   testing::NiceMock<ThreadLocal::MockInstance> tls_;

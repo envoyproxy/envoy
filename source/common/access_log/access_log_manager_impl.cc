@@ -149,21 +149,22 @@ void AccessLogFileImpl::flushThreadFunc() {
       ASSERT(flush_buffer_.length() == 0);
     }
 
-    // if we failed to open file before, then simply ignore
-    if (file_->isOpen()) {
-      if (reopen_file_) {
-        reopen_file_ = false;
+    // if we failed to reopen before, do it next loop.
+    if (reopen_file_) {
+      if (file_->isOpen()) {
         const Api::IoCallBoolResult result = file_->close();
         ASSERT(result.return_value_, fmt::format("unable to close file '{}': {}", file_->path(),
                                                  result.err_->getErrorDetails()));
-        const Api::IoCallBoolResult open_result = open();
-        if (!open_result.return_value_) {
-          stats_.reopen_failed_.inc();
-          return;
-        }
       }
-      doWrite(about_to_write_buffer_);
+      const Api::IoCallBoolResult open_result = open();
+      if (!open_result.return_value_) {
+        stats_.reopen_failed_.inc();
+      } else {
+        reopen_file_ = false;
+      }
     }
+    // doWrite no matter file isOpen, if not, we can drain buffer
+    doWrite(about_to_write_buffer_);
   }
 }
 
