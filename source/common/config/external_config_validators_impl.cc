@@ -25,7 +25,7 @@ ExternalConfigValidatorsImpl::ExternalConfigValidatorsImpl(
 }
 
 void ExternalConfigValidatorsImpl::executeValidators(absl::string_view type_url,
-                                                 const std::vector<DecodedResourceRef>& resources) {
+                                                 const std::vector<DecodedResourcePtr>& resources) {
   auto validators_it = validators_map_.find(type_url);
   if (validators_it != validators_map_.end()) {
     auto& validators = validators_it->second;
@@ -40,7 +40,7 @@ void ExternalConfigValidatorsImpl::executeValidators(absl::string_view type_url,
 }
 
 void ExternalConfigValidatorsImpl::executeValidators(
-    absl::string_view type_url, const std::vector<DecodedResourceRef>& added_resources,
+    absl::string_view type_url, const std::vector<DecodedResourcePtr>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
   auto validators_it = validators_map_.find(type_url);
   if (validators_it != validators_map_.end()) {

@@ -21,10 +21,10 @@ public:
 
   // ConfigValidator
   virtual bool validate(Server::Instance& server,
-                        const std::vector<Envoy::Config::DecodedResourceRef>& resources) override;
+                        const std::vector<Envoy::Config::DecodedResourcePtr>& resources) override;
 
   virtual bool validate(Server::Instance& server,
-                        const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
+                        const std::vector<Envoy::Config::DecodedResourcePtr>& added_resources,
                         const Protobuf::RepeatedPtrField<std::string>& removed_resources) override;
 
 private:

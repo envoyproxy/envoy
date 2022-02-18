@@ -29,7 +29,7 @@ TEST_F(MinimumClustersValidatorTest, NoMinimumNoClusters) {
   Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{}, {}, {}};
   MinimumClustersValidator validator(config);
 
-  const std::vector<Envoy::Config::DecodedResourceRef> added_resources;
+  const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
 
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
@@ -43,7 +43,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1NoClusters) {
   Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{}, {}, {}};
   MinimumClustersValidator validator(config);
 
-  const std::vector<Envoy::Config::DecodedResourceRef> added_resources;
+  const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
   EXPECT_THROW_WITH_MESSAGE(validator.validate(server_, added_resources, removed_resources),
@@ -60,8 +60,8 @@ TEST_F(MinimumClustersValidatorTest, Minimum1SingleCluster) {
 
   auto cluster = std::make_unique<envoy::config::cluster::v3::Cluster>();
   cluster->set_name("cluster1");
-  Envoy::Config::DecodedResourceImpl cluster_resource(std::move(cluster), "name", {}, "ver");
-  const std::vector<Envoy::Config::DecodedResourceRef> added_resources{cluster_resource};
+  std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
+  added_resources.emplace_back(new Envoy::Config::DecodedResourceImpl(std::move(cluster), "name", {}, "ver"));
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
   EXPECT_TRUE(validator.validate(server_, added_resources, removed_resources));
@@ -75,7 +75,7 @@ TEST_F(MinimumClustersValidatorTest, NoMinimumSingleCluster) {
       {{"foo", foo_cluster}}, {}, {{"foo", foo_cluster}}};
   MinimumClustersValidator validator(config);
 
-  const std::vector<Envoy::Config::DecodedResourceRef> added_resources;
+  const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
   EXPECT_TRUE(validator.validate(server_, added_resources, removed_resources));
@@ -91,7 +91,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1Empty) {
       {{"foo", foo_cluster}}, {}, {{"foo", foo_cluster}}};
   MinimumClustersValidator validator(config);
 
-  const std::vector<Envoy::Config::DecodedResourceRef> added_resources;
+  const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
   EXPECT_TRUE(validator.validate(server_, added_resources, removed_resources));
@@ -109,7 +109,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters2Remove1) {
       {{"foo", foo_cluster}, {"bar", bar_cluster}}};
   MinimumClustersValidator validator(config);
 
-  const std::vector<Envoy::Config::DecodedResourceRef> added_resources;
+  const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   removed_resources.Add("foo");
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
@@ -126,7 +126,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1RemoveNonExistent) {
       {{"foo", foo_cluster}}, {}, {{"foo", foo_cluster}}};
   MinimumClustersValidator validator(config);
 
-  const std::vector<Envoy::Config::DecodedResourceRef> added_resources;
+  const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   removed_resources.Add("bar");
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
@@ -143,7 +143,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1Remove1) {
       {{"foo", foo_cluster}}, {}, {{"foo", foo_cluster}}};
   MinimumClustersValidator validator(config);
 
-  const std::vector<Envoy::Config::DecodedResourceRef> added_resources;
+  const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   removed_resources.Add("foo");
   // Only clusters that were added by API (CDS) can be removed.
@@ -164,7 +164,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1Remove1NonApi) {
       {{"foo", foo_cluster}}, {}, {{"foo", foo_cluster}}};
   MinimumClustersValidator validator(config);
 
-  const std::vector<Envoy::Config::DecodedResourceRef> added_resources;
+  const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   removed_resources.Add("foo");
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));

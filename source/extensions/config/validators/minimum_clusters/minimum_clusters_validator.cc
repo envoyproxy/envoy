@@ -10,11 +10,11 @@ namespace Config {
 namespace Validators {
 
 bool MinimumClustersValidator::validate(
-    Server::Instance&, const std::vector<Envoy::Config::DecodedResourceRef>& resources) {
+    Server::Instance&, const std::vector<Envoy::Config::DecodedResourcePtr>& resources) {
   absl::flat_hash_set<std::string> next_cluster_names(resources.size());
   for (const auto& resource : resources) {
     envoy::config::cluster::v3::Cluster cluster =
-        dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get().resource());
+        dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get()->resource());
 
     // If the cluster was already added in the current update, it won't be added twice.
     next_cluster_names.insert(cluster.name());
@@ -30,7 +30,7 @@ bool MinimumClustersValidator::validate(
 }
 
 bool MinimumClustersValidator::validate(
-    Server::Instance& server, const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
+    Server::Instance& server, const std::vector<Envoy::Config::DecodedResourcePtr>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
   const Upstream::ClusterManager& cm = server.clusterManager();
   // If the number of clusters after removing all of the clusters in the removed_resources list is
@@ -49,7 +49,7 @@ bool MinimumClustersValidator::validate(
   absl::flat_hash_set<std::string> added_cluster_names(added_resources.size());
   for (const auto& resource : added_resources) {
     envoy::config::cluster::v3::Cluster cluster =
-        dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get().resource());
+        dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get()->resource());
 
     // If the cluster was already added in the current update, skip this cluster.
     if (!added_cluster_names.insert(cluster.name()).second) {

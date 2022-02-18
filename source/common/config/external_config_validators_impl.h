@@ -24,7 +24,7 @@ public:
    * @throw EnvoyException if the config is rejected by one of the validators.
    */
   void executeValidators(absl::string_view type_url,
-                         const std::vector<DecodedResourceRef>& resources) override;
+                         const std::vector<DecodedResourcePtr>& resources) override;
 
   /**
    * Executes the validators that receive the Incremental (delta-xDS) resources.
@@ -36,7 +36,7 @@ public:
    * @throw EnvoyException if the config is rejected by one of the validators.
    */
   void executeValidators(absl::string_view type_url,
-                         const std::vector<DecodedResourceRef>& added_resources,
+                         const std::vector<DecodedResourcePtr>& added_resources,
                          const Protobuf::RepeatedPtrField<std::string>& removed_resources) override;
 
 private:

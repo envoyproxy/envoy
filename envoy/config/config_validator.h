@@ -34,7 +34,7 @@ public:
    * @return whether the config is valid or not.
    */
   virtual bool validate(Server::Instance& server,
-                        const std::vector<DecodedResourceRef>& resources) PURE;
+                        const std::vector<DecodedResourcePtr>& resources) PURE;
 
   /**
    * Validates a given set of resources matching an Incremental update.
@@ -45,7 +45,7 @@ public:
    * @return whether the config is valid or not.
    */
   virtual bool validate(Server::Instance& server,
-                        const std::vector<DecodedResourceRef>& added_resources,
+                        const std::vector<DecodedResourcePtr>& added_resources,
                         const Protobuf::RepeatedPtrField<std::string>& removed_resources) PURE;
 };
 
