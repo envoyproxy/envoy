@@ -156,8 +156,8 @@ private:
   const Envoy::Config::TypedMetadataImpl<Envoy::Network::ListenerTypedMetadataFactory>
       typed_metadata_;
   envoy::config::core::v3::TrafficDirection direction_;
-  Stats::ScopeSharedPtr global_scope_;
-  Stats::ScopeSharedPtr listener_scope_; // Stats with listener named scope.
+  Stats::ScopePtr global_scope_;
+  Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const Server::DrainManagerPtr drain_manager_;
   bool is_quic_;

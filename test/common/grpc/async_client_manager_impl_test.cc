@@ -178,7 +178,6 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcInvalid) {
 }
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
-  ;
   EXPECT_CALL(scope_, createScope_("grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");

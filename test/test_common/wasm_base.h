@@ -59,7 +59,7 @@ public:
 
   void setupBase(const std::string& runtime, const std::string& code, CreateContextFn create_root) {
     Api::ApiPtr api = Api::createApiForTest(stats_store_);
-    scope_ = stats_store_.createScope("wasm.");
+    scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("wasm."));
 
     envoy::extensions::wasm::v3::PluginConfig plugin_config;
     *plugin_config.mutable_root_id() = root_id_;
