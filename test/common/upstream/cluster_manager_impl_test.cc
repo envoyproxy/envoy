@@ -2016,7 +2016,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_EQ(cp2, TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("fake_cluster")
                                               ->tcpConnPool(ResourcePriority::Default, nullptr)));
 
-  Network::MockClientConnection* connection = new Network::MockClientConnection();
+  Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   ON_CALL(*cluster2->info_, features())
       .WillByDefault(Return(ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE));
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
