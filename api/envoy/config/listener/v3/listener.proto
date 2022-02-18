@@ -135,7 +135,8 @@ message Listener {
   // * otherwise, if the destination port is 443, then the filter chain "https" is selected;
   // * otherwise, the default filter chain is selected (or the connection is rejected without the default filter chain).
   //
-  // .. code-block:: yaml
+  // .. validated-code-block:: yaml
+  //   :type-name: envoy.config.listener.v3.Listener
   //
   //  filter_chain_matcher:
   //    matcher_tree:
@@ -179,7 +180,7 @@ message Listener {
   //  connections is initiated.
   //
   // [#not-implemented-hide:]
-  repeated xds.type.matcher.v3.Matcher filter_chain_matcher = 32;
+  xds.type.matcher.v3.Matcher filter_chain_matcher = 32;
 
   // If a connection is redirected using *iptables*, the port on which the proxy
   // receives it might be different from the original destination address. When this flag is set to
