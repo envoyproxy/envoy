@@ -1,5 +1,7 @@
 #include "source/extensions/access_loggers/grpc/grpc_access_log_impl.h"
 
+#include <google/protobuf/descriptor.h>
+
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/grpc/async_client_manager.h"
@@ -19,9 +21,12 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
     const Grpc::RawAsyncClientSharedPtr& client,
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
     Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
-    : GrpcAccessLogger(std::move(client), config, dispatcher, scope, GRPC_LOG_STATS_PREFIX,
-                       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                           "envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs")),
+    : GrpcCriticalAccessLogger(
+          std::move(client), config, dispatcher, scope, GRPC_LOG_STATS_PREFIX,
+          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+              "envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs"),
+          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+              "envoy.service.accesslog.v3.AccessLogService.CriticalAccessLogs")),
       log_name_(config.log_name()), local_info_(local_info) {}
 
 void GrpcAccessLoggerImpl::addEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
@@ -32,6 +37,14 @@ void GrpcAccessLoggerImpl::addEntry(envoy::data::accesslog::v3::TCPAccessLogEntr
   message_.mutable_tcp_logs()->mutable_log_entry()->Add(std::move(entry));
 }
 
+void GrpcAccessLoggerImpl::addCriticalEntry(
+    envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
+  critical_message_.mutable_message()->mutable_http_logs()->mutable_log_entry()->Add(
+      std::move(entry));
+}
+
+void GrpcAccessLoggerImpl::addCriticalEntry(envoy::data::accesslog::v3::TCPAccessLogEntry&&) {}
+
 bool GrpcAccessLoggerImpl::isEmpty() {
   return !message_.has_http_logs() && !message_.has_tcp_logs();
 }
@@ -41,6 +54,19 @@ void GrpcAccessLoggerImpl::initMessage() {
   *identifier->mutable_node() = local_info_.node();
   identifier->set_log_name(log_name_);
 }
+
+void GrpcAccessLoggerImpl::initCriticalMessage() {
+  auto* identifier = critical_message_.mutable_message()->mutable_identifier();
+  *identifier->mutable_node() = local_info_.node();
+  identifier->set_log_name(log_name_);
+}
+
+bool GrpcAccessLoggerImpl::isCriticalMessageEmpty() {
+  return !critical_message_.message().has_http_logs() &&
+         !critical_message_.message().has_tcp_logs();
+}
+
+void GrpcAccessLoggerImpl::clearCriticalMessage() { critical_message_.Clear(); }
 
 GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& async_client_manager,
                                                      Stats::Scope& scope,

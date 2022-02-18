@@ -12,6 +12,14 @@
 namespace Envoy {
 namespace Grpc {
 
+#define BUFFERED_ASYNC_GRPC_CLIENT_STATS(COUNTER, GAUGE)                                           \
+  COUNTER(message_timeout)                                                                         \
+  GAUGE(pending_messages, Accumulate)
+
+struct BufferedAsyncGrpcClientStats {
+  BUFFERED_ASYNC_GRPC_CLIENT_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
 enum class BufferState { Buffered, PendingFlush };
 
 // This class wraps bidirectional gRPC and provides message arrival guarantee.
@@ -23,11 +31,15 @@ public:
   BufferedAsyncClient(uint32_t max_buffer_bytes, const Protobuf::MethodDescriptor& service_method,
                       Grpc::AsyncStreamCallbacks<ResponseType>& callbacks,
                       const Grpc::AsyncClient<RequestType, ResponseType>& client,
-                      Event::Dispatcher& dispatcher, std::chrono::milliseconds message_timeout_msec)
+                      Event::Dispatcher& dispatcher, std::chrono::milliseconds message_timeout_msec,
+                      Stats::Scope& scope)
       : max_buffer_bytes_(max_buffer_bytes), service_method_(service_method), callbacks_(callbacks),
         client_(client),
         ttl_manager_(
-            dispatcher, [this](uint64_t id) { onError(id); }, message_timeout_msec) {}
+            dispatcher, [this](uint64_t id) { onError(id); }, message_timeout_msec),
+        stats_({BUFFERED_ASYNC_GRPC_CLIENT_STATS(
+            POOL_COUNTER_PREFIX(scope, "buffered_async_client."),
+            POOL_GAUGE_PREFIX(scope, "buffered_async_client."))}) {}
 
   ~BufferedAsyncClient() {
     if (active_stream_ != nullptr) {
@@ -72,6 +84,7 @@ public:
 
       state = BufferState::PendingFlush;
       inflight_message_ids.emplace(id);
+      stats_.pending_messages_.inc();
       active_stream_->sendMessage(message, false);
     }
 
@@ -89,6 +102,7 @@ public:
       return;
     }
 
+    stats_.message_timeout_.inc();
     message_buffer_.at(message_id).first = BufferState::Buffered;
   }
 
@@ -105,6 +119,7 @@ private:
     if (message_buffer_.find(message_id) == message_buffer_.end()) {
       return;
     }
+    stats_.pending_messages_.dec();
     auto& buffer = message_buffer_.at(message_id);
 
     // There may be cases where the buffer status is not PendingFlush when
@@ -129,6 +144,7 @@ private:
   uint32_t current_buffer_bytes_ = 0;
   uint64_t next_message_id_ = 0;
   BufferedMessageTtlManager ttl_manager_;
+  BufferedAsyncGrpcClientStats stats_;
 };
 
 template <class RequestType, class ResponseType>

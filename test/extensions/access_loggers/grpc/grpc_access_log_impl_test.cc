@@ -60,6 +60,20 @@ public:
         }));
   }
 
+  void expectStreamCriticalMessage(const std::string& expected_message_yaml) {
+    envoy::service::accesslog::v3::CriticalAccessLogsMessage expected_message;
+    TestUtility::loadFromYaml(expected_message_yaml, expected_message);
+    EXPECT_CALL(stream_, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
+    EXPECT_CALL(stream_, sendMessageRaw_(_, false))
+        .WillOnce(Invoke([expected_message](Buffer::InstancePtr& request, bool) {
+          envoy::service::accesslog::v3::CriticalAccessLogsMessage message;
+          Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
+          EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
+          message.set_id(0);
+          EXPECT_EQ(message.DebugString(), expected_message.DebugString());
+        }));
+  }
+
 private:
   MockAccessLogStream stream_;
   AccessLogCallbacks* callbacks_;
@@ -68,13 +82,42 @@ private:
 class GrpcAccessLoggerImplTest : public testing::Test {
 public:
   GrpcAccessLoggerImplTest()
-      : async_client_(new Grpc::MockAsyncClient), timer_(new Event::MockTimer(&dispatcher_)),
+      : async_client_(new Grpc::MockAsyncClient),
+        timer_buffer_flusher_(new Event::MockTimer(&dispatcher_)),
         grpc_access_logger_impl_test_helper_(local_info_, async_client_) {
-    EXPECT_CALL(*timer_, enableTimer(_, _));
+    // enableTimer in timer_ttl_manager_ is never called due to the empty critical message.
+    EXPECT_CALL(*timer_buffer_flusher_, enableTimer(_, _));
+
     *config_.mutable_log_name() = "test_log_name";
     config_.mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
     config_.mutable_buffer_flush_interval()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(FlushInterval).count());
+  }
+
+  void initialize(bool enable_critical) {
+    if (enable_critical) {
+      const std::string filter_yaml = R"EOF(
+status_code_filter:
+  comparison:
+    op: EQ
+    value:
+      default_value: 200
+      runtime_key: access_log.access_error.status
+    )EOF";
+
+      envoy::config::accesslog::v3::AccessLogFilter filter_config;
+      TestUtility::loadFromYaml(filter_yaml, filter_config);
+      *config_.mutable_critical_buffer_log_filter() = filter_config;
+
+      timer_ttl_manager_ = std::make_unique<Event::MockTimer>(&dispatcher_);
+      EXPECT_CALL(*timer_ttl_manager_, enableTimer(_, _));
+      EXPECT_CALL(*timer_ttl_manager_, enabled());
+      EXPECT_CALL(*timer_ttl_manager_, disableTimer());
+
+      timer_critical_flusher_ = std::make_unique<Event::MockTimer>(&dispatcher_);
+      EXPECT_CALL(*timer_critical_flusher_, enableTimer(_, _));
+    }
+
     logger_ = std::make_unique<GrpcAccessLoggerImpl>(
         Grpc::RawAsyncClientPtr{async_client_}, config_, dispatcher_, local_info_, stats_store_);
   }
@@ -83,13 +126,17 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   LocalInfo::MockLocalInfo local_info_;
   Event::MockDispatcher dispatcher_;
-  Event::MockTimer* timer_;
+  std::unique_ptr<Event::MockTimer> timer_ttl_manager_;
+  std::unique_ptr<Event::MockTimer> timer_critical_flusher_;
+  Event::MockTimer* timer_buffer_flusher_;
   std::unique_ptr<GrpcAccessLoggerImpl> logger_;
   GrpcAccessLoggerImplTestHelper grpc_access_logger_impl_test_helper_;
   envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig config_;
 };
 
 TEST_F(GrpcAccessLoggerImplTest, LogHttp) {
+  initialize(false);
+
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
 identifier:
   node:
@@ -109,6 +156,8 @@ http_logs:
 }
 
 TEST_F(GrpcAccessLoggerImplTest, LogTcp) {
+  initialize(false);
+
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
 identifier:
   node:
@@ -125,6 +174,28 @@ tcp_logs:
   envoy::data::accesslog::v3::TCPAccessLogEntry tcp_entry;
   tcp_entry.mutable_common_properties()->set_sample_rate(1);
   logger_->log(envoy::data::accesslog::v3::TCPAccessLogEntry(tcp_entry));
+}
+
+TEST_F(GrpcAccessLoggerImplTest, CriticalLogHttp) {
+  initialize(true);
+  grpc_access_logger_impl_test_helper_.expectStreamCriticalMessage(R"EOF(
+message:
+  identifier:
+    node:
+      id: node_name
+      cluster: cluster_name
+      locality:
+        zone: zone_name
+    log_name: test_log_name
+  http_logs:
+    log_entry:
+      request:
+        path: /test/path1
+id: 0
+)EOF");
+  envoy::data::accesslog::v3::HTTPAccessLogEntry entry;
+  entry.mutable_request()->set_path("/test/path1");
+  logger_->criticalLog(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry));
 }
 
 class GrpcAccessLoggerCacheImplTest : public testing::Test {

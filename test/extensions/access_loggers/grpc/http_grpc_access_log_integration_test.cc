@@ -346,5 +346,244 @@ TEST_P(AccessLogIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
   test_server_->waitForCounterEq("access_logs.grpc_access_log.logs_written", 4);
 }
 
+class CriticalAccessLogIntegrationTest : public AccessLogIntegrationTest {
+public:
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      accesslog_cluster->set_name("accesslog");
+      ConfigHelper::setHttp2(*accesslog_cluster);
+    });
+
+    config_helper_.addConfigModifier(
+        [this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          auto* access_log = hcm.add_access_log();
+          access_log->set_name("grpc_accesslog");
+
+          envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config;
+          auto* common_config = config.mutable_common_config();
+          common_config->set_log_name("foo");
+          common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+          setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
+                         fake_upstreams_.back()->localAddress());
+
+          const std::string filter_yaml = R"EOF(
+          status_code_filter:
+            comparison:
+              op: GE
+              value:
+                default_value: 400
+                runtime_key: access_log.access_error.status
+            )EOF";
+
+          envoy::config::accesslog::v3::AccessLogFilter filter_config;
+          TestUtility::loadFromYaml(filter_yaml, filter_config);
+          *common_config->mutable_critical_buffer_log_filter() = filter_config;
+
+          access_log->mutable_typed_config()->PackFrom(config);
+        });
+
+    HttpIntegrationTest::initialize();
+  }
+
+  ABSL_MUST_USE_RESULT
+  AssertionResult waitForCriticalAccessLogRequest(const std::string& expected_request_msg_yaml) {
+    envoy::service::accesslog::v3::CriticalAccessLogsMessage request_msg;
+    VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
+    EXPECT_EQ("POST", access_log_request_->headers().getMethodValue());
+    EXPECT_EQ("/envoy.service.accesslog.v3.AccessLogService/CriticalAccessLogs",
+              access_log_request_->headers().getPathValue());
+    EXPECT_EQ("application/grpc", access_log_request_->headers().getContentTypeValue());
+
+    envoy::service::accesslog::v3::CriticalAccessLogsMessage expected_request_msg;
+    TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
+
+    // Clear fields which are not deterministic.
+    auto* log_entry = request_msg.mutable_message()->mutable_http_logs()->mutable_log_entry(0);
+    log_entry->mutable_common_properties()->clear_downstream_remote_address();
+    log_entry->mutable_common_properties()->clear_downstream_direct_remote_address();
+    log_entry->mutable_common_properties()->clear_downstream_local_address();
+    log_entry->mutable_common_properties()->clear_start_time();
+    log_entry->mutable_common_properties()->clear_time_to_last_rx_byte();
+    log_entry->mutable_common_properties()->clear_time_to_first_downstream_tx_byte();
+    log_entry->mutable_common_properties()->clear_time_to_last_downstream_tx_byte();
+    log_entry->mutable_request()->clear_request_id();
+    if (request_msg.message().has_identifier()) {
+      auto* node = request_msg.mutable_message()->mutable_identifier()->mutable_node();
+      node->clear_extensions();
+      node->clear_user_agent_build_version();
+    }
+    EXPECT_GE(request_msg.id(), 0);
+    pending_message_id_ = request_msg.id();
+    request_msg.clear_id();
+    EXPECT_THAT(request_msg, ProtoEq(expected_request_msg));
+    return AssertionSuccess();
+  }
+
+  uint32_t pending_message_id_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, CriticalAccessLogIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
+
+TEST_P(CriticalAccessLogIntegrationTest, BasicAckFlow) {
+  testRouterNotFound();
+  ASSERT_TRUE(waitForAccessLogConnection());
+  ASSERT_TRUE(waitForAccessLogStream());
+
+  ASSERT_TRUE(waitForCriticalAccessLogRequest(fmt::format(R"EOF(
+message:
+  identifier:
+    node:
+      id: node_name
+      cluster: cluster_name
+      locality:
+        zone: zone_name
+      user_agent_name: "envoy"
+    log_name: foo
+  http_logs:
+    log_entry:
+      common_properties:
+        response_flags:
+          no_route_found: true
+      protocol_version: HTTP11
+      request:
+        scheme: http
+        authority: host
+        path: /notfound
+        request_headers_bytes: 118
+        request_method: GET
+      response:
+        response_code:
+          value: 404
+        response_code_details: "route_not_found"
+        response_headers_bytes: 131
+)EOF")));
+
+  access_log_request_->startGrpcStream();
+  test_server_->waitForGaugeEq("buffered_async_client.pending_messages", 1);
+  envoy::service::accesslog::v3::CriticalAccessLogsResponse response_msg;
+  response_msg.set_id(pending_message_id_);
+  pending_message_id_ = 0;
+  response_msg.set_status(envoy::service::accesslog::v3::CriticalAccessLogsResponse::ACK);
+  access_log_request_->sendGrpcMessage(response_msg);
+  access_log_request_->finishGrpcStream(Grpc::Status::Ok);
+  switch (clientType()) {
+  case Grpc::ClientType::EnvoyGrpc:
+    test_server_->waitForGaugeEq("cluster.accesslog.upstream_rq_active", 0);
+    break;
+  case Grpc::ClientType::GoogleGrpc:
+    test_server_->waitForCounterGe("grpc.accesslog.streams_closed_0", 1);
+    break;
+  default:
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+
+  test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_ack_received", 1);
+  test_server_->waitForGaugeEq("buffered_async_client.pending_messages", 0);
+  cleanup();
+}
+
+TEST_P(CriticalAccessLogIntegrationTest, BasicNackFlow) {
+  testRouterNotFound();
+  ASSERT_TRUE(waitForAccessLogConnection());
+  ASSERT_TRUE(waitForAccessLogStream());
+
+  ASSERT_TRUE(waitForCriticalAccessLogRequest(fmt::format(R"EOF(
+message:
+  identifier:
+    node:
+      id: node_name
+      cluster: cluster_name
+      locality:
+        zone: zone_name
+      user_agent_name: "envoy"
+    log_name: foo
+  http_logs:
+    log_entry:
+      common_properties:
+        response_flags:
+          no_route_found: true
+      protocol_version: HTTP11
+      request:
+        scheme: http
+        authority: host
+        path: /notfound
+        request_headers_bytes: 118
+        request_method: GET
+      response:
+        response_code:
+          value: 404
+        response_code_details: "route_not_found"
+        response_headers_bytes: 131
+)EOF")));
+
+  access_log_request_->startGrpcStream();
+  test_server_->waitForGaugeEq("buffered_async_client.pending_messages", 1);
+  envoy::service::accesslog::v3::CriticalAccessLogsResponse response_msg;
+  response_msg.set_id(pending_message_id_);
+  pending_message_id_ = 0;
+  response_msg.set_status(envoy::service::accesslog::v3::CriticalAccessLogsResponse::NACK);
+  access_log_request_->sendGrpcMessage(response_msg);
+  access_log_request_->finishGrpcStream(Grpc::Status::Ok);
+  switch (clientType()) {
+  case Grpc::ClientType::EnvoyGrpc:
+    test_server_->waitForGaugeEq("cluster.accesslog.upstream_rq_active", 0);
+    break;
+  case Grpc::ClientType::GoogleGrpc:
+    test_server_->waitForCounterGe("grpc.accesslog.streams_closed_0", 1);
+    break;
+  default:
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+
+  test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_nack_received", 1);
+  test_server_->waitForGaugeEq("buffered_async_client.pending_messages", 1);
+  cleanup();
+}
+
+TEST_P(CriticalAccessLogIntegrationTest, NoResponseFlow) {
+  testRouterNotFound();
+  ASSERT_TRUE(waitForAccessLogConnection());
+  ASSERT_TRUE(waitForAccessLogStream());
+
+  ASSERT_TRUE(waitForCriticalAccessLogRequest(fmt::format(R"EOF(
+message:
+  identifier:
+    node:
+      id: node_name
+      cluster: cluster_name
+      locality:
+        zone: zone_name
+      user_agent_name: "envoy"
+    log_name: foo
+  http_logs:
+    log_entry:
+      common_properties:
+        response_flags:
+          no_route_found: true
+      protocol_version: HTTP11
+      request:
+        scheme: http
+        authority: host
+        path: /notfound
+        request_headers_bytes: 118
+        request_method: GET
+      response:
+        response_code:
+          value: 404
+        response_code_details: "route_not_found"
+        response_headers_bytes: 131
+)EOF")));
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringEq(
+      "buffered_async_client.message_timeout", 1);
+  test_server_->waitForGaugeEq("buffered_async_client.pending_messages", 1);
+  cleanup();
+}
+
 } // namespace
 } // namespace Envoy

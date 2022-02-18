@@ -15,6 +15,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -49,6 +50,8 @@ public:
   // GrpcAccessLogger
   MOCK_METHOD(void, log, (LogRecord && entry));
   MOCK_METHOD(void, log, (ProtobufWkt::Empty && entry));
+  MOCK_METHOD(void, criticalLog, (LogRecord && entry));
+  MOCK_METHOD(void, criticalLog, (ProtobufWkt::Empty && entry));
 };
 
 class MockGrpcAccessLoggerCache : public GrpcAccessLoggerCache {

@@ -33,6 +33,7 @@ envoy_cc_library(
         "//envoy/grpc:async_client_manager_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/thread_local:thread_local_interface",
+        "//source/common/access_log:access_log_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/extensions/access_loggers/common:grpc_access_logger",

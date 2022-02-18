@@ -31,7 +31,8 @@ class HttpGrpcAccessLog : public Common::ImplBase {
 public:
   HttpGrpcAccessLog(AccessLog::FilterPtr&& filter, const HttpGrpcAccessLogConfig config,
                     ThreadLocal::SlotAllocator& tls,
-                    GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache);
+                    GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+                    Server::Configuration::CommonFactoryContext& context);
 
 private:
   /**
@@ -56,6 +57,7 @@ private:
   std::vector<Http::LowerCaseString> response_headers_to_log_;
   std::vector<Http::LowerCaseString> response_trailers_to_log_;
   std::vector<std::string> filter_states_to_log_;
+  AccessLog::FilterPtr critical_log_filter_;
 };
 
 using HttpGrpcAccessLogPtr = std::unique_ptr<HttpGrpcAccessLog>;

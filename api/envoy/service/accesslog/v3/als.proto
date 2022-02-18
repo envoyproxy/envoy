@@ -22,12 +22,56 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 service AccessLogService {
   // Envoy will connect and send StreamAccessLogsMessage messages forever. It does not expect any
   // response to be sent as nothing would be done in the case of failure. The server should
-  // disconnect if it expects Envoy to reconnect. In the future we may decide to add a different
-  // API for "critical" access logs in which Envoy will buffer access logs for some period of time
-  // until it gets an ACK so it could then retry. This API is designed for high throughput with the
-  // expectation that it might be lossy.
+  // disconnect if it expects Envoy to reconnect. This API is designed for high throughput with the
   rpc StreamAccessLogs(stream StreamAccessLogsMessage) returns (StreamAccessLogsResponse) {
   }
+
+  // This endpoint provides acknowledgment of logs marked as requiring acknowledgment.
+  // The requirement for an acknowledgment can be set in
+  // :ref:`critical_buffer_log_filter <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.critical_buffer_log_filter>`.
+  // Log messages that match this filter will be guaranteed delivery. In order to guarantee
+  // the arrival, this endpoint performs the following process.
+  //
+  // 1. A response message is returned for each log. The response message includes ACK/NACK status,
+  //    and in case of NACK, the target log is not flushed but buffered by Envoy.
+  // 2. Timeout for response message is set and if no message is returned within a certain time,
+  //    it will be considered as unreachable and buffered by Envoy without flushing the target log. This timeout is set by
+  //    :ref:`message_ack_timeout <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.message_ack_timeout>`.
+  //
+  // On the ALS receiver side, ACK is expected to be returned to indicate that the log was saved properly,
+  // and NACK is expected to be returned when the log could not be saved due to some error.
+  //
+  // .. attention::
+  //
+  // Buffers for guaranteed reachability can be extremely memory-intensive. Therefore, the following points
+  // should be considered when using this endpoint.
+  //
+  // 1. :ref:`critical_buffer_log_filter <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.critical_buffer_log_filter>`
+  //    should be set strictly. A loose filter may encourage rapid buffer overwhelm and leading to OOM.
+  // 2. :ref:`max_pending_buffer_size_bytes <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.max_pending_buffer_size_bytes>`
+  //    should be set appropriately to prevent OOM.
+  // 3. Make sure that ALS receiver is implemented properly. If it is not implemented, all messages will
+  //    be buffered, which may cause OOM soon.
+  rpc CriticalAccessLogs(stream CriticalAccessLogsMessage)
+      returns (stream CriticalAccessLogsResponse) {
+  }
+}
+
+// Response received to identify undelivered or delivered messages in CriticalAccessLogs.
+message CriticalAccessLogsResponse {
+  enum Status {
+    // Indicates that the message has been received.
+    ACK = 0;
+
+    // Indicates that the message has not been received.
+    NACK = 1;
+  }
+
+  // This field is used to indicate the arrival status.
+  Status status = 1;
+
+  // Message ID that identifies a message.
+  uint64 id = 2;
 }
 
 // Empty response for the StreamAccessLogs API. Will never be sent. See below.
@@ -85,4 +129,17 @@ message StreamAccessLogsMessage {
 
     TCPAccessLogEntries tcp_logs = 3;
   }
+}
+
+// Stream message for the CriticalAccessLogs API.
+// Envoy opens a stream to the server and streams the access log,
+// expecting a response. Each message sent is assigned an individual ID,
+// and the state of the message is tracked based on the ID.
+message CriticalAccessLogsMessage {
+  // The body of the log message sent to CriticalAccessLogs.
+  StreamAccessLogsMessage message = 1;
+
+  // This is an ID to identify the message, and should be added to the Critical Endpoint
+  // response message to uniquely identify the message being ACK/NACKed.
+  uint64 id = 4;
 }

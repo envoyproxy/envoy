@@ -5,6 +5,7 @@ Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
+* access log: added :ref:`critical log message <envoy_v3_api_field_service.accesslog.v3.CriticalAccessLogsMessage.message>` to AccessLogService to guarantee log arrival.
 * tls: set TLS v1.2 as the default minimal version for servers. Users can still explicitly opt-in to 1.0 and 1.1 using :ref:`tls_minimum_protocol_version <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.tls_minimum_protocol_version>`.
 
 Minor Behavior Changes

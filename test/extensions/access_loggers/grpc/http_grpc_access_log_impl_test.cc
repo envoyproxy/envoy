@@ -14,6 +14,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -40,6 +41,8 @@ public:
   // GrpcAccessLogger
   MOCK_METHOD(void, log, (HTTPAccessLogEntry && entry));
   MOCK_METHOD(void, log, (envoy::data::accesslog::v3::TCPAccessLogEntry && entry));
+  MOCK_METHOD(void, criticalLog, (HTTPAccessLogEntry && entry));
+  MOCK_METHOD(void, criticalLog, (envoy::data::accesslog::v3::TCPAccessLogEntry && entry));
 };
 
 class MockGrpcAccessLoggerCache : public GrpcCommon::GrpcAccessLoggerCache {
@@ -52,6 +55,7 @@ public:
 
 // Test for the issue described in https://github.com/envoyproxy/envoy/pull/18081
 TEST(HttpGrpcAccessLog, TlsLifetimeCheck) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   NiceMock<ThreadLocal::MockInstance> tls;
   Stats::IsolatedStoreImpl scope;
   std::shared_ptr<MockGrpcAccessLoggerCache> logger_cache{new MockGrpcAccessLoggerCache()};
@@ -71,8 +75,8 @@ TEST(HttpGrpcAccessLog, TlsLifetimeCheck) {
         });
     // Set tls callback in the HttpGrpcAccessLog constructor,
     // but it is not called yet since we have defer_data_ = true.
-    const auto access_log = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter},
-                                                                config, tls, logger_cache);
+    const auto access_log = std::make_unique<HttpGrpcAccessLog>(
+        AccessLog::FilterPtr{filter}, config, tls, logger_cache, factory_context);
     // Intentionally make access_log die earlier in this scope to simulate the situation where the
     // creator has been deleted yet the tls callback is not called yet.
   }
@@ -100,7 +104,7 @@ public:
               return logger_;
             });
     access_log_ = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, tls_,
-                                                      logger_cache_);
+                                                      logger_cache_, factory_context_);
   }
 
   void expectLog(const std::string& expected_log_entry_yaml) {
@@ -111,6 +115,20 @@ public:
     HTTPAccessLogEntry expected_log_entry;
     TestUtility::loadFromYaml(expected_log_entry_yaml, expected_log_entry);
     EXPECT_CALL(*logger_, log(An<HTTPAccessLogEntry&&>()))
+        .WillOnce(
+            Invoke([expected_log_entry](envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
+              EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
+            }));
+  }
+
+  void expectCriticalLog(const std::string& expected_log_entry_yaml) {
+    if (access_log_ == nullptr) {
+      init();
+    }
+
+    HTTPAccessLogEntry expected_log_entry;
+    TestUtility::loadFromYaml(expected_log_entry_yaml, expected_log_entry);
+    EXPECT_CALL(*logger_, criticalLog(An<HTTPAccessLogEntry&&>()))
         .WillOnce(
             Invoke([expected_log_entry](envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
               EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
@@ -162,6 +180,7 @@ response: {{}}
   std::shared_ptr<MockGrpcAccessLogger> logger_{new MockGrpcAccessLogger()};
   std::shared_ptr<MockGrpcAccessLoggerCache> logger_cache_{new MockGrpcAccessLoggerCache()};
   HttpGrpcAccessLogPtr access_log_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
 };
 
 class TestSerializedFilterState : public StreamInfo::FilterState::Object {
@@ -982,6 +1001,72 @@ request: {}
 response: {}
 )EOF");
   access_log_->log(nullptr, nullptr, nullptr, stream_info);
+}
+
+TEST_F(HttpGrpcAccessLogTest, BufferLogFilterTest) {
+  const std::string filter_yaml = R"EOF(
+status_code_filter:
+  comparison:
+    op: EQ
+    value:
+      default_value: 200
+      runtime_key: access_log.access_error.status
+    )EOF";
+
+  envoy::config::accesslog::v3::AccessLogFilter config;
+  TestUtility::loadFromYaml(filter_yaml, config);
+  *config_.mutable_common_config()->mutable_critical_buffer_log_filter() = config;
+
+  init();
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.start_time_ = SystemTime(1h);
+    stream_info.response_code_ = 200;
+
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":scheme", "scheme_value"},
+        {":authority", "authority_value"},
+        {":path", "path_value"},
+        {":method", "POST"},
+    };
+
+    expectCriticalLog(R"EOF(
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_direct_remote_address:
+    socket_address:
+      address: "127.0.0.3"
+      port_value: 63443
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  upstream_remote_address:
+    socket_address:
+      address: "10.0.0.1"
+      port_value: 443
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
+  start_time:
+    seconds: 3600
+  upstream_cluster: "fake_cluster"
+request:
+  scheme: "scheme_value"
+  authority: "authority_value"
+  path: "path_value"
+  request_method: "POST"
+  request_headers_bytes: 70
+response:
+  response_code: 200
+)EOF");
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+  }
 }
 
 } // namespace

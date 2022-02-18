@@ -17,11 +17,13 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace GrpcCommon {
 
-class GrpcAccessLoggerImpl
-    : public Common::GrpcAccessLogger<envoy::data::accesslog::v3::HTTPAccessLogEntry,
-                                      envoy::data::accesslog::v3::TCPAccessLogEntry,
-                                      envoy::service::accesslog::v3::StreamAccessLogsMessage,
-                                      envoy::service::accesslog::v3::StreamAccessLogsResponse> {
+class GrpcAccessLoggerImpl : public Common::GrpcCriticalAccessLogger<
+                                 envoy::data::accesslog::v3::HTTPAccessLogEntry,
+                                 envoy::data::accesslog::v3::TCPAccessLogEntry,
+                                 envoy::service::accesslog::v3::StreamAccessLogsMessage,
+                                 envoy::service::accesslog::v3::StreamAccessLogsResponse,
+                                 envoy::service::accesslog::v3::CriticalAccessLogsMessage,
+                                 envoy::service::accesslog::v3::CriticalAccessLogsResponse> {
 public:
   GrpcAccessLoggerImpl(
       const Grpc::RawAsyncClientSharedPtr& client,
@@ -32,8 +34,13 @@ private:
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
   void addEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) override;
   void addEntry(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) override;
+  void addCriticalEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) override;
+  void addCriticalEntry(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) override;
   bool isEmpty() override;
   void initMessage() override;
+  void initCriticalMessage() override;
+  bool isCriticalMessageEmpty() override;
+  void clearCriticalMessage() override;
 
   const std::string log_name_;
   const LocalInfo::LocalInfo& local_info_;
