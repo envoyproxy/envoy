@@ -1168,12 +1168,21 @@ bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) {
 
 bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates,
                                   std::string& error_details) {
+  const SSL_CTX* ssl_ctx = tls_contexts_[0].ssl_ctx_.get();
   bssl::UniquePtr<X509_STORE_CTX> ctx(X509_STORE_CTX_new());
   // It doesn't matter which SSL context is used, because they share the same
   // cert validation config.
   X509_STORE* store = SSL_CTX_get_cert_store(tls_contexts_[0].ssl_ctx_.get());
   if (!X509_STORE_CTX_init(ctx.get(), store, &leaf_cert, &intermediates)) {
     error_details = "Failed to verify certificate chain: X509_STORE_CTX_init";
+    return false;
+  }
+  // Currently this method is only used to verify server certs, so hard-code "ssl_server" for now.
+  if (!X509_STORE_CTX_set_default(ctx.get(), "ssl_server") ||
+      !X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(ctx.get()),
+                              SSL_CTX_get0_param(const_cast<SSL_CTX*>(ssl_ctx)))) {
+    error_details =
+        "Failed to verify certificate chain: fail to setup X509_STORE_CTX or its param.";
     return false;
   }
 
