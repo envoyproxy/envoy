@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -155,13 +154,13 @@ private:
    * @param expect_match negates the expectation if false.
    * @return bool if actual and expected match.
    */
-  template<typename U, typename V>
-  bool compareResults(const U& actual, const V& expected,
-                      const std::string& test_type, const bool expect_match = true);
+  template <typename U, typename V>
+  bool compareResults(const U& actual, const V& expected, const std::string& test_type,
+                      const bool expect_match = true);
 
-  template<typename U, typename V>
-  void reportFailure(const U& actual, const V& expected,
-                     const std::string& test_type, const bool expect_match = true);
+  template <typename U, typename V>
+  void reportFailure(const U& actual, const V& expected, const std::string& test_type,
+                     const bool expect_match = true);
 
   void printResults();
 

@@ -537,7 +537,7 @@ bool RouterCheckTool::matchHeaderField(const HeaderMap& header_map,
   return false;
 }
 
-template<typename U, typename V>
+template <typename U, typename V>
 bool RouterCheckTool::compareResults(const U& actual, const V& expected,
                                      const std::string& test_type, const bool expect_match) {
   if ((expected == actual) != expect_match) {
@@ -547,12 +547,12 @@ bool RouterCheckTool::compareResults(const U& actual, const V& expected,
   return true;
 }
 
-template<typename U, typename V>
+template <typename U, typename V>
 void RouterCheckTool::reportFailure(const U& actual, const V& expected,
                                     const std::string& test_type, const bool expect_match) {
   std::stringstream ss;
-  ss << "expected: [" << expected << "], actual: "
-     << (expect_match ? "" : "NOT ") << "[" << actual << "],"
+  ss << "expected: [" << expected << "], actual: " << (expect_match ? "" : "NOT ") << "[" << actual
+     << "],"
      << " test type: " << test_type;
   tests_.back().second.emplace_back(ss.str());
 }
