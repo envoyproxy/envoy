@@ -13,8 +13,8 @@ class ExternalConfigValidatorsImpl : public ExternalConfigValidators {
 public:
   ExternalConfigValidatorsImpl(
       ProtobufMessage::ValidationVisitor& validation_visitor, Server::Instance& server,
-      const Protobuf::RepeatedPtrField<
-          envoy::config::core::v3::TypedExtensionConfig>& validators_configs);
+      const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
+          validators_configs);
 
   /**
    * Executes the validators that receive the State-of-the-World resources.
