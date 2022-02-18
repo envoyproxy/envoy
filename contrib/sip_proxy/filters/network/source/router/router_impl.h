@@ -249,11 +249,6 @@ public:
     tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.erase(host);
   }
 
-  std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
-  localServices() {
-    return local_services_;
-  }
-
 private:
   const std::string cluster_name_;
   ThreadLocal::SlotPtr tls_;
@@ -357,8 +352,7 @@ public:
     return *this;
   }
   absl::string_view getLocalIp() override;
-  std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
-  localServices() override;
+  std::shared_ptr<SipSettings> settings() override;
 
 private:
   UpstreamRequest& parent_;
@@ -416,6 +410,8 @@ public:
   std::shared_ptr<TransactionInfo> transactionInfo() { return transaction_info_; }
   void setMetadata(MessageMetadataSharedPtr metadata) { metadata_ = metadata; }
   MessageMetadataSharedPtr metadata() { return metadata_; }
+
+  std::shared_ptr<SipSettings> settings() { return callbacks_->settings(); }
 
 private:
   Upstream::TcpPoolData& conn_pool_;

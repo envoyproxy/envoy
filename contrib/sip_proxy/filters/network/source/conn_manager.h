@@ -129,10 +129,7 @@ public:
         ->addressAsString();
   }
 
-  std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
-  localServices() override {
-    return config_.settings()->localServices();
-  }
+  std::shared_ptr<SipSettings> settings() override { return config_.settings(); }
 
   void continueHanding(const std::string& key);
   void continueHanding(MessageMetadataSharedPtr metadata,
@@ -185,10 +182,7 @@ private:
       return parent_.parent_.getLocalIp();
     }
 
-    std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
-    localServices() override {
-      return parent_.parent_.localServices();
-    }
+    std::shared_ptr<SipSettings> settings() override { return parent_.parent_.settings(); }
 
     std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() {
       return parent_.parent_.tra_handler_;
@@ -382,7 +376,6 @@ private:
 
   // This is used in Router, put here to pass to Router
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
-  std::shared_ptr<SipSettings> sip_settings_;
   PendingList pending_list_;
 };
 

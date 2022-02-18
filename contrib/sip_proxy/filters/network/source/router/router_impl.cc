@@ -665,10 +665,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
 
 absl::string_view ResponseDecoder::getLocalIp() { return parent_.localAddress(); }
 
-std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
-ResponseDecoder::localServices() {
-  return parent_.transactionInfo()->localServices();
-}
+std::shared_ptr<SipSettings> ResponseDecoder::settings() { return parent_.settings(); }
 
 } // namespace Router
 } // namespace SipProxy

@@ -253,7 +253,7 @@ Decoder::HeaderHandler::HeaderHandler(MessageHandler& parent)
 
 int Decoder::HeaderHandler::processPath(absl::string_view& header) {
   metadata()->deleteInstipOperation(rawOffset(), header);
-  metadata()->addEPOperation(rawOffset(), header, parent_.parent_.localServices());
+  metadata()->addEPOperation(rawOffset(), header, parent_.parent_.settings()->localServices());
   return 0;
 }
 
@@ -278,7 +278,7 @@ int Decoder::HeaderHandler::processRecordRoute(absl::string_view& header) {
 
   setFirstRecordRoute(false);
 
-  metadata()->addEPOperation(rawOffset(), header, parent_.parent_.localServices());
+  metadata()->addEPOperation(rawOffset(), header, parent_.parent_.settings()->localServices());
   return 0;
 }
 
@@ -335,7 +335,7 @@ int Decoder::OK200HeaderHandler::processCseq(absl::string_view& header) {
 
 int Decoder::HeaderHandler::processContact(absl::string_view& header) {
   metadata()->deleteInstipOperation(rawOffset(), header);
-  metadata()->addEPOperation(rawOffset(), header, parent_.parent_.localServices());
+  metadata()->addEPOperation(rawOffset(), header, parent_.parent_.settings()->localServices());
   return 0;
 }
 
@@ -345,7 +345,7 @@ int Decoder::HeaderHandler::processServiceRoute(absl::string_view& header) {
   }
   setFirstServiceRoute(false);
 
-  metadata()->addEPOperation(rawOffset(), header, parent_.parent_.localServices());
+  metadata()->addEPOperation(rawOffset(), header, parent_.parent_.settings()->localServices());
   return 0;
 }
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -91,8 +93,7 @@ public:
    */
   virtual DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) PURE;
   virtual absl::string_view getLocalIp() PURE;
-  virtual std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
-  localServices() PURE;
+  virtual std::shared_ptr<SipSettings> settings() PURE;
 };
 
 /**
@@ -113,10 +114,8 @@ public:
    * @throw EnvoyException on Sip protocol errors
    */
   FilterStatus onData(Buffer::Instance& data, bool continue_handling = false);
-  std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
-  localServices() {
-    return callbacks_.localServices();
-  };
+
+  std::shared_ptr<SipSettings> settings() { return callbacks_.settings(); };
 
   MessageMetadataSharedPtr metadata() { return metadata_; }
 
