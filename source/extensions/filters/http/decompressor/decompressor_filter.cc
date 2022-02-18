@@ -75,27 +75,9 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
       config_->requestDirectionConfig().advertiseAcceptEncoding()) {
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.append_to_accept_content_encoding_only_once")) {
-      // Append the content encoding only if it isn't already present in the
-      // accept_encoding header. If it is present with a q-value ("gzip;q=0.3"),
-      // remove the q-value to indicate that the content encoding setting that we
-      // add has max priority (i.e. q-value 1.0).
-      std::vector<absl::string_view> newContentEncodings;
-      std::vector<absl::string_view> contentEncodings =
-          Http::HeaderUtility::parseCommaDelimitedHeader(
-              headers.getInlineValue(accept_encoding_handle.handle()));
-      for (absl::string_view contentEncoding : contentEncodings) {
-        absl::string_view strippedEncoding =
-            Http::HeaderUtility::getSemicolonDelimitedAttribute(contentEncoding);
-        if (strippedEncoding != config_->contentEncoding()) {
-          // Add back all content encodings back except for the content encoding that we want to
-          // add. For example, if content encoding is "gzip", this filters out encodings "gzip" and
-          // "gzip;q=0.6".
-          newContentEncodings.push_back(contentEncoding);
-        }
-      }
-      // Finally add a single instance of our content encoding.
-      newContentEncodings.push_back(config_->contentEncoding());
-      headers.setInline(accept_encoding_handle.handle(), absl::StrJoin(newContentEncodings, ","));
+      absl::string_view newAcceptEncodingHeader = Http::HeaderUtility::addEncodingToAcceptEncoding(
+          headers.getInlineValue(accept_encoding_handle.handle()), config_->contentEncoding());
+      headers.setInline(accept_encoding_handle.handle(), newAcceptEncodingHeader);
     } else {
       headers.appendInline(accept_encoding_handle.handle(), config_->contentEncoding(), ",");
     }

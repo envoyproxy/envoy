@@ -985,5 +985,22 @@ TEST(ValidateHeaders, GetSemicolonDelimitedAttribute) {
   EXPECT_EQ(HeaderUtility::getSemicolonDelimitedAttribute(";foo;"), "");
 }
 
+TEST(ValidateHeaders, ModifyAcceptEncodingHeader) {
+  // Add a new encoding
+  EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("one,two", "three"), "one,two,three");
+
+  // Add an already existing encoding
+  EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("one,two", "one"), "two,one");
+
+  // Preserve q-values for other tokens than the added encoding
+  EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("one;q=0.3,two", "two"), "one;q=0.3,two");
+
+  // Remove q-values for the current encoding
+  EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("one;q=0.3,two", "one"), "two,one");
+
+  // Add encoding to an empty header
+  EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("", "one"), "one");
+}
+
 } // namespace Http
 } // namespace Envoy

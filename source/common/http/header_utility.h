@@ -283,6 +283,12 @@ public:
    * "foo;bar=1" would return "foo".
    */
   static absl::string_view getSemicolonDelimitedAttribute(absl::string_view value);
+
+  /**
+   * Return a new AcceptEncoding header string vector.
+   */
+  static std::string addEncodingToAcceptEncoding(absl::string_view accept_encoding_header,
+                                                 absl::string_view encoding);
 };
 
 } // namespace Http
