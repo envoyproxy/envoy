@@ -26,7 +26,6 @@ envoy_cc_library(
         "//envoy/grpc:async_client_manager_interface",
         "//envoy/http:async_client_interface",
         "//envoy/http:conn_pool_interface",
-        "//envoy/http:persistent_quic_info_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/secret:secret_manager_interface",

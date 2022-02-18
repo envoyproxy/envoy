@@ -418,21 +418,18 @@ void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
 
 void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                                          Network::ConnectionEvent event) {
-  if (event != Network::ConnectionEvent::ConnectedZeroRtt) {
-    if (client.state() == ActiveClient::State::CONNECTING) {
-      ASSERT(connecting_stream_capacity_ >= client.effectiveConcurrentStreamLimit());
-      connecting_stream_capacity_ -= client.effectiveConcurrentStreamLimit();
-    }
-
-    if (client.connect_timer_) {
-      client.connect_timer_->disableTimer();
-      client.connect_timer_.reset();
-    }
+  if (client.state() == ActiveClient::State::CONNECTING) {
+    ASSERT(connecting_stream_capacity_ >= client.effectiveConcurrentStreamLimit());
+    connecting_stream_capacity_ -= client.effectiveConcurrentStreamLimit();
   }
 
-  switch (event) {
-  case Network::ConnectionEvent::RemoteClose:
-  case Network::ConnectionEvent::LocalClose: {
+  if (client.connect_timer_) {
+    client.connect_timer_->disableTimer();
+    client.connect_timer_.reset();
+  }
+
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
     state_.decrConnectingAndConnectedStreamCapacity(client.currentUnusedCapacity());
     // Make sure that onStreamClosed won't double count.
     client.remaining_streams_ = 0;
@@ -449,7 +446,6 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
 
-      // Purge pending streams only if this is not a 0-RTT handshake failure.
       ConnectionPool::PoolFailureReason reason;
       if (client.timed_out_) {
         reason = ConnectionPool::PoolFailureReason::Timeout;
@@ -459,10 +455,10 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
         reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
       }
 
-      // Raw connect failures should never happen under normal circumstances. If we have an
-      // upstream that is behaving badly, streams can get stuck here in the pending state. If we
-      // see a connect failure, we purge all pending streams so that calling code can determine
-      // what to do with the stream.
+      // Raw connect failures should never happen under normal circumstances. If we have an upstream
+      // that is behaving badly, streams can get stuck here in the pending state. If we see a
+      // connect failure, we purge all pending streams so that calling code can determine what to
+      // do with the stream.
       // NOTE: We move the existing pending streams to a temporary list. This is done so that
       //       if retry logic submits a new stream to the pool, we don't fail it inline.
       purgePendingStreams(client.real_host_description_, failure_reason, reason);
@@ -498,9 +494,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     if (!pending_streams_.empty()) {
       tryCreateNewConnections();
     }
-    break;
-  }
-  case Network::ConnectionEvent::Connected: {
+  } else if (event == Network::ConnectionEvent::Connected) {
     client.conn_connect_ms_->complete();
     client.conn_connect_ms_.reset();
     ASSERT(client.state() == ActiveClient::State::CONNECTING);
@@ -524,14 +518,6 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       onUpstreamReady();
     }
     checkForIdleAndCloseIdleConnsIfDraining();
-    break;
-  }
-  case Network::ConnectionEvent::ConnectedZeroRtt: {
-    ASSERT(client.state() == ActiveClient::State::CONNECTING);
-    host()->cluster().stats().upstream_cx_connect_with_0_rtt_.inc();
-    client.allows_early_data_ = true;
-    break;
-  }
   }
 }
 

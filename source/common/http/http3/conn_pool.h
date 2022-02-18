@@ -1,9 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 #include "envoy/common/optref.h"
-#include "envoy/http/persistent_quic_info.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/http/codec_client.h"
@@ -130,8 +130,7 @@ public:
                     Random::RandomGenerator& random_generator,
                     Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
                     CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
-                    OptRef<PoolConnectResultCallback> connect_callback,
-                    Http::PersistentQuicInfo& quic_info);
+                    OptRef<PoolConnectResultCallback> connect_callback);
 
   ~Http3ConnPoolImpl() override;
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
@@ -157,7 +156,7 @@ private:
 
   // Store quic helpers which can be shared between connections and must live
   // beyond the lifetime of individual connections.
-  Quic::PersistentQuicInfoImpl& quic_info_;
+  std::unique_ptr<Quic::PersistentQuicInfoImpl> quic_info_;
   // server-id can change over the lifetime of Envoy but will be consistent for a
   // given connection pool.
   quic::QuicServerId server_id_;
@@ -177,8 +176,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, Quic::QuicStatNames& quic_stat_names,
                  OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope,
-                 OptRef<PoolConnectResultCallback> connect_callback,
-                 Http::PersistentQuicInfo& quic_info);
+                 OptRef<PoolConnectResultCallback> connect_callback);
 
 } // namespace Http3
 } // namespace Http

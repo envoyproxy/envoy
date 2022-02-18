@@ -17,7 +17,6 @@
 #include "envoy/config/subscription_factory.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/conn_pool.h"
-#include "envoy/http/persistent_quic_info.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
@@ -464,8 +463,7 @@ public:
                        alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                   TimeSource& time_source, ClusterConnectivityState& state,
-                   Http::PersistentQuicInfo& quic_info) PURE;
+                   TimeSource& time_source, ClusterConnectivityState& state) PURE;
 
   /**
    * Allocate a TCP connection pool for the host. Pools are separated by 'priority' and

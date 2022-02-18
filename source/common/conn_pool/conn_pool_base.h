@@ -123,7 +123,6 @@ public:
   Event::TimerPtr connection_duration_timer_;
   bool resources_released_{false};
   bool timed_out_{false};
-  bool allows_early_data_{false};
 
 private:
   State state_{State::CONNECTING};
