@@ -1245,7 +1245,7 @@ TEST_F(ConnectionHandlerTest, MatchIPv6WildcardListener) {
 }
 
 // This tests the ConnectionHandler's `getBalancedHandlerByAddress` will match
-// IPv4 request to the listener which is listening on IPv6 any-address with ipv4_compat flag.
+// Ipv4 request to the listener which is listening on "::" with ipv4_compat flag.
 // The `listener1` is the listener will balance the request to the `listener2`,
 // the listener2 is listening on IPv6 any-address. And suppose the `listener2`
 // will accept the ipv4 request since it has ipv4_compat flag.
@@ -1265,7 +1265,7 @@ TEST_F(ConnectionHandlerTest, MatchIPv6WildcardListenerWithAnyAddressAndIpv4Comp
   Network::TcpListenerCallbacks* ipv6_any_listener_callbacks;
   auto listener2 = new NiceMock<Network::MockListener>();
   TestListener* ipv6_any_listener =
-      addListener(3, false, false, "ipv6_any_test_listener", listener2,
+      addListener(2, false, false, "ipv6_any_test_listener", listener2,
                   &ipv6_any_listener_callbacks, nullptr, nullptr, Network::Socket::Type::Stream,
                   std::chrono::milliseconds(15000), false, ipv6_overridden_filter_chain_manager);
   // Set the ipv6only as false.
@@ -1314,9 +1314,9 @@ TEST_F(ConnectionHandlerTest, MatchIPv6WildcardListenerWithAnyAddressAndIpv4Comp
 }
 
 // This tests the ConnectionHandler's `getBalancedHandlerByAddress` will match
-// IPv4 request to the listener which is listening on IPv4-compatible IPv6 address with ipv4_compat
+// Ipv4 request to the listener which is listening on Ipv4-compatible Ipv6 address with ipv4_compat
 // flag. The `listener1` is the listener will balance the request to the `listener2`, the listener2
-// is listening on IPv4-compatible IPv6 address. And suppose the `listener2` will accept the ipv4
+// is listening on Ipv4-compatible Ipv6 address. And suppose the `listener2` will accept the ipv4
 // request since it has ipv4_compat flag.
 TEST_F(ConnectionHandlerTest, MatchhIpv4CompatiableIPv6ListenerWithIpv4CompatFlag) {
   Network::TcpListenerCallbacks* listener_callbacks1;
@@ -1334,7 +1334,7 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4CompatiableIPv6ListenerWithIpv4CompatFla
   Network::TcpListenerCallbacks* ipv6_listener_callbacks;
   auto listener2 = new NiceMock<Network::MockListener>();
   TestListener* ipv6_listener =
-      addListener(3, false, false, "ipv6_test_listener", listener2, &ipv6_listener_callbacks,
+      addListener(2, false, false, "ipv6_test_listener", listener2, &ipv6_listener_callbacks,
                   nullptr, nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000),
                   false, ipv6_overridden_filter_chain_manager);
   // Set the ipv6only as false.
@@ -1383,10 +1383,10 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4CompatiableIPv6ListenerWithIpv4CompatFla
 }
 
 // This tests the ConnectionHandler's `getBalancedHandlerByAddress` won't match
-// IPv4 request to the listener which is listening on IPv6 any-address without ipv4_compat flag.
+// Ipv4 request to the listener which is listening on Ipv6 any-address without ipv4_compat flag.
 // The `listener1` is the listener will balance the request to the `listener2`,
 // the listener2 is listening on IPv6 any-address. And suppose the `listener2`
-// will accept the ipv4 request since it has ipv4_compat flag.
+// will accept the Ipv4 request since it has ipv4_compat flag.
 TEST_F(ConnectionHandlerTest, NotMatchIPv6WildcardListenerWithoutIpv4CompatFlag) {
   Network::TcpListenerCallbacks* listener_callbacks1;
   auto listener1 = new NiceMock<Network::MockListener>();
@@ -1403,7 +1403,7 @@ TEST_F(ConnectionHandlerTest, NotMatchIPv6WildcardListenerWithoutIpv4CompatFlag)
   Network::TcpListenerCallbacks* ipv6_any_listener_callbacks;
   auto listener2 = new NiceMock<Network::MockListener>();
   TestListener* ipv6_any_listener =
-      addListener(3, false, false, "ipv6_any_test_listener", listener2,
+      addListener(2, false, false, "ipv6_any_test_listener", listener2,
                   &ipv6_any_listener_callbacks, nullptr, nullptr, Network::Socket::Type::Stream,
                   std::chrono::milliseconds(15000), false, ipv6_overridden_filter_chain_manager);
   // not set the ipv6only flag, the default value is true.
@@ -1536,7 +1536,7 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag) {
   EXPECT_CALL(*access_log_, log(_, _, _, _));
 }
 
-// This test is same as above except the ipv4 listener is added first, then ipv6
+// This test is same as above except the Ipv4 listener is added first, then Ipv6
 // listener is added.
 TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag2) {
   // Listener1 is response for redirect the connection.
@@ -1637,13 +1637,13 @@ TEST_F(ConnectionHandlerTest, AddIpv4MappedListenerAfterIpv4ListenerStopped) {
       .WillRepeatedly(ReturnRef(normal_address));
   handler_->addListener(absl::nullopt, *test_listener1, runtime_);
 
-  // Listener2 is listening on an ipv4 address.
+  // Listener2 is listening on an Ipv4 address.
   auto ipv4_overridden_filter_chain_manager =
       std::make_shared<NiceMock<Network::MockFilterChainManager>>();
   Network::TcpListenerCallbacks* ipv4_listener_callbacks;
-  auto listener3 = new NiceMock<Network::MockListener>();
+  auto listener2 = new NiceMock<Network::MockListener>();
   TestListener* ipv4_listener =
-      addListener(3, false, false, "ipv4_test_listener", listener3, &ipv4_listener_callbacks,
+      addListener(2, false, false, "ipv4_test_listener", listener2, &ipv4_listener_callbacks,
                   nullptr, nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000),
                   false, ipv4_overridden_filter_chain_manager);
   Network::Address::InstanceConstSharedPtr ipv4_address(
@@ -1652,17 +1652,17 @@ TEST_F(ConnectionHandlerTest, AddIpv4MappedListenerAfterIpv4ListenerStopped) {
       .WillRepeatedly(ReturnRef(ipv4_address));
   handler_->addListener(absl::nullopt, *ipv4_listener, runtime_);
 
-  EXPECT_CALL(*listener3, onDestroy());
+  EXPECT_CALL(*listener2, onDestroy());
   // Stop the ipv4 listener.
-  handler_->stopListeners(3);
+  handler_->stopListeners(2);
 
-  // Listener3 is listening on an ipv4-mapped ipv6 address.
+  // Listener3 is listening on an Ipv4-mapped Ipv6 address.
   auto ipv6_overridden_filter_chain_manager =
       std::make_shared<NiceMock<Network::MockFilterChainManager>>();
   Network::TcpListenerCallbacks* ipv6_any_listener_callbacks;
-  auto listener2 = new NiceMock<Network::MockListener>();
+  auto listener3 = new NiceMock<Network::MockListener>();
   TestListener* ipv6_listener =
-      addListener(2, false, false, "ipv6_test_listener", listener2, &ipv6_any_listener_callbacks,
+      addListener(3, false, false, "ipv6_test_listener", listener3, &ipv6_any_listener_callbacks,
                   nullptr, nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000),
                   false, ipv6_overridden_filter_chain_manager);
   // Set the ipv6only as false.
@@ -1697,11 +1697,11 @@ TEST_F(ConnectionHandlerTest, AddIpv4MappedListenerAfterIpv4ListenerStopped) {
 
   // The listener1 will balance the request to listener2.
   EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
-  // The listener2 gets the connection
+  // The listener2 won't get the connection since it is stopped.
+  EXPECT_CALL(*ipv4_overridden_filter_chain_manager, findFilterChain(_)).Times(0);
+  // The listener3 gets the connection.
   EXPECT_CALL(*ipv6_overridden_filter_chain_manager, findFilterChain(_))
       .WillOnce(Return(filter_chain_.get()));
-  // The listener3 won't get the connection since it is stopped.
-  EXPECT_CALL(*ipv4_overridden_filter_chain_manager, findFilterChain(_)).Times(0);
 
   auto* connection = new NiceMock<Network::MockServerConnection>();
   EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
@@ -1709,7 +1709,7 @@ TEST_F(ConnectionHandlerTest, AddIpv4MappedListenerAfterIpv4ListenerStopped) {
   listener_callbacks1->onAccept(Network::ConnectionSocketPtr{accepted_socket});
   EXPECT_EQ(1UL, handler_->numConnections());
 
-  EXPECT_CALL(*listener2, onDestroy());
+  EXPECT_CALL(*listener3, onDestroy());
   EXPECT_CALL(*listener1, onDestroy());
   EXPECT_CALL(*access_log_, log(_, _, _, _));
 }
@@ -2254,7 +2254,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveListener) {
   handler_->removeListeners(0);
 }
 
-TEST_F(ConnectionHandlerTest, TcpListenerRemoveListenerWithIpv4CompatIpv6AnyAddress) {
+TEST_F(ConnectionHandlerTest, TcpListenerRemoveIpv6AnyAddressWithIpv4CompatListener) {
   InSequence s;
 
   Network::TcpListenerCallbacks* listener_callbacks;
@@ -2278,14 +2278,14 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveListenerWithIpv4CompatIpv6AnyAddr
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   handler_->removeListeners(1);
 
-  // Ensure both the ipv6 and ipv4 address was removed.
+  // Ensure both the Ipv6 and Ipv4 address was removed.
   EXPECT_FALSE(handler_->getBalancedHandlerByAddress(*any_address_ipv6).has_value());
   Network::Address::InstanceConstSharedPtr any_address_ipv4(
       new Network::Address::Ipv4Instance("0.0.0.0", 80, nullptr));
   EXPECT_FALSE(handler_->getBalancedHandlerByAddress(*any_address_ipv4).has_value());
 }
 
-TEST_F(ConnectionHandlerTest, TcpListenerRemoveListenerWithIpv4CompatIpv6) {
+TEST_F(ConnectionHandlerTest, TcpListenerRemoveIpv4CompatAddressListener) {
   InSequence s;
 
   Network::TcpListenerCallbacks* listener_callbacks;
@@ -2316,61 +2316,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveListenerWithIpv4CompatIpv6) {
   EXPECT_FALSE(handler_->getBalancedHandlerByAddress(*address_ipv4).has_value());
 }
 
-TEST_F(ConnectionHandlerTest, TcpListenerRemoveWithBothIpv4AndIpv4CompatIpv6) {
-  InSequence s;
-
-  Network::TcpListenerCallbacks* listener_callbacks;
-  auto listener = new NiceMock<Network::MockListener>();
-  TestListener* test_listener =
-      addListener(1, true, false, "test_listener", listener, &listener_callbacks);
-  Network::Address::InstanceConstSharedPtr address_ipv6(
-      new Network::Address::Ipv6Instance("::", 80, nullptr, false));
-  EXPECT_CALL(test_listener->socket_factory_, localAddress())
-      .WillRepeatedly(ReturnRef(address_ipv6));
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
-
-  Network::TcpListenerCallbacks* listener_callbacks2;
-  auto listener2 = new NiceMock<Network::MockListener>();
-  TestListener* test_listener2 =
-      addListener(2, true, false, "test_listener2", listener2, &listener_callbacks2);
-  Network::Address::InstanceConstSharedPtr address_ipv4(
-      new Network::Address::Ipv4Instance("0.0.0.0", 80, nullptr));
-  EXPECT_CALL(test_listener2->socket_factory_, localAddress())
-      .WillRepeatedly(ReturnRef(address_ipv4));
-  handler_->addListener(absl::nullopt, *test_listener2, runtime_);
-
-  Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
-  EXPECT_CALL(*access_log_, log(_, _, _, _));
-  listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
-  EXPECT_EQ(0UL, handler_->numConnections());
-
-  Network::MockConnectionSocket* connection2 = new NiceMock<Network::MockConnectionSocket>();
-  EXPECT_CALL(*access_log_, log(_, _, _, _));
-  listener_callbacks2->onAccept(Network::ConnectionSocketPtr{connection2});
-  EXPECT_EQ(0UL, handler_->numConnections());
-
-  // Remove Listener1 first.
-  EXPECT_CALL(*listener, onDestroy());
-  handler_->stopListeners(1);
-
-  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
-  handler_->removeListeners(1);
-
-  // Ensure only ipv6 address was removed.
-  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(*address_ipv6).has_value());
-  EXPECT_TRUE(handler_->getBalancedHandlerByAddress(*address_ipv4).has_value());
-
-  // Now remove Listener2.
-  EXPECT_CALL(*listener2, onDestroy());
-  handler_->stopListeners(2);
-
-  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
-  handler_->removeListeners(2);
-  // Ensure the listener2 is gone.
-  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(*address_ipv4).has_value());
-}
-
-TEST_F(ConnectionHandlerTest, TcpListenerRemoveWithBothIpv4AnyAndIpv4CompatIpv6Any) {
+TEST_F(ConnectionHandlerTest, TcpListenerRemoveWithBothIpv4AnyAndIpv6Any) {
   InSequence s;
 
   Network::TcpListenerCallbacks* listener_callbacks;
