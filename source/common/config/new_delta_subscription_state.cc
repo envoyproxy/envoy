@@ -152,8 +152,7 @@ UpdateAck NewDeltaSubscriptionState::handleResponse(
 
 bool NewDeltaSubscriptionState::isHeartbeatResponse(
     const envoy::service::discovery::v3::Resource& resource) const {
-  if (!supports_heartbeats_ &&
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_heartbeats")) {
+  if (!supports_heartbeats_) {
     return false;
   }
   if (resource.has_resource()) {

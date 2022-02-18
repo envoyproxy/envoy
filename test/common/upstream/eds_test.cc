@@ -1520,7 +1520,7 @@ TEST_F(EdsTest, EndpointLocalityUpdated) {
 // Unlike EndpointLocalityUpdated, runtime feature flag is disabled this time and then it is
 // verified that locality update does not happen on eds cluster endpoints.
 TEST_F(EdsTest, EndpointLocalityNotUpdatedIfFixDisabled) {
-  Runtime::LoaderSingleton::initialize(&runtime_);
+  TestScopedRuntime runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints", "false"}});
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;

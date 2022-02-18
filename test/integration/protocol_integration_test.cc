@@ -291,6 +291,34 @@ TEST_P(ProtocolIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
   EXPECT_EQ(response->body(), "body");
 }
 
+TEST_P(ProtocolIntegrationTest, StopIterationHeadersInjectBodyFilter) {
+  config_helper_.prependFilter(R"EOF(
+  name: stop-iteration-headers-inject-body-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send a headers only request.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Make sure that the body was injected to the request.
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(upstream_request_->receivedData());
+  EXPECT_EQ(upstream_request_->body().toString(), "body");
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Make sure that the body was injected to the response.
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->body(), "body");
+}
+
 TEST_P(ProtocolIntegrationTest, AddEncodedTrailers) {
   config_helper_.prependFilter(R"EOF(
 name: add-trailers-filter

@@ -601,8 +601,6 @@ void ListenerImpl::createListenerFilterFactories(Network::Socket::Type socket_ty
       listener_filter_factories_ = parent_.factory_.createListenerFilterFactoryList(
           config_.listener_filters(), *listener_factory_context_);
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 }
