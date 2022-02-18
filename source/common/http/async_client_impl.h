@@ -46,8 +46,7 @@ namespace Envoy {
 namespace Http {
 namespace {
 // Limit the size of buffer for data used for retries.
-// The default is set to 64KB. Since the existence of a buffer for
-// retries is non-trivial to the user, this value is not varied.
+// The default is set to 64KB.
 constexpr uint64_t kBufferLimitForRetry = 1 << 16;
 } // namespace
 
