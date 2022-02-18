@@ -384,18 +384,3 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )
-
-envoy_extension_cc_test(
-    name = "rds_impl_test",
-    srcs = ["rds_impl_test.cc"],
-    extension_names = ["envoy.filters.network.thrift_proxy"],
-    deps = [
-        ":mocks",
-        "//source/extensions/filters/network/thrift_proxy:config",
-        "//source/extensions/filters/network/thrift_proxy/router:config",
-        "//test/mocks/matcher:matcher_mocks",
-        "//test/mocks/server:factory_context_mocks",
-        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-    ],
-)

@@ -141,9 +141,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "rds_lib",
-    srcs = [
-        "rds_impl.cc",
-    ],
     hdrs = [
         "rds_impl.h",
     ],

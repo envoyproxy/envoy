@@ -55,7 +55,7 @@ public:
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  RouteConfigProviderManagerImplPtr route_config_provider_manager_;
+  std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
   std::unique_ptr<ThriftProxy::ConfigImpl> config_;
   Network::Address::Ipv4Instance default_remote_address_{"10.0.0.1"};
   MessageMetadataSharedPtr metadata_;

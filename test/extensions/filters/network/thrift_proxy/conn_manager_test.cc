@@ -351,7 +351,7 @@ public:
   ThriftFilterStats stats_;
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config_;
 
-  Router::RouteConfigProviderManagerImplPtr route_config_provider_manager_;
+  std::unique_ptr<Router::RouteConfigProviderManagerImpl> route_config_provider_manager_;
   std::unique_ptr<TestConfigImpl> config_;
 
   Buffer::OwnedImpl buffer_;

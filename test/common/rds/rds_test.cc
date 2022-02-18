@@ -2,11 +2,17 @@
 #include <memory>
 #include <string>
 
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/admin/v3/config_dump.pb.validate.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route.pb.validate.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.validate.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/config/opaque_resource_decoder_impl.h"
+#include "source/common/rds/basic/route_config_provider_manager_impl.h"
 #include "source/common/rds/rds_route_config_provider_impl.h"
 #include "source/common/rds/rds_route_config_subscription.h"
 #include "source/common/rds/route_config_provider_manager.h"
@@ -61,34 +67,11 @@ private:
   envoy::config::route::v3::RouteConfiguration rc_;
 };
 
-class TestTraits : public ConfigTraits, public ProtoTraits {
-public:
-  TestTraits() {
-    resource_type_ = Envoy::Config::getResourceName<envoy::config::route::v3::RouteConfiguration>();
-  }
-
-  const std::string& resourceType() const override { return resource_type_; }
-  int resourceNameFieldNumber() const override { return resource_name_field_index_; }
-  ConfigConstSharedPtr createNullConfig() const override {
-    return std::make_shared<const TestConfig>();
-  }
-  ProtobufTypes::MessagePtr createEmptyProto() const override {
-    return std::make_unique<envoy::config::route::v3::RouteConfiguration>();
-  }
-  ConfigConstSharedPtr createConfig(const Protobuf::Message& rc) const override {
-    return std::make_shared<const TestConfig>(
-        dynamic_cast<const envoy::config::route::v3::RouteConfiguration&>(rc));
-  }
-
-  std::string resource_type_;
-  int resource_name_field_index_ = 1;
-};
-
 class RdsConfigUpdateReceiverTest : public RdsTestBase {
 public:
   void setup() {
-    config_update_ =
-        std::make_unique<RouteConfigUpdateReceiverImpl>(traits_, traits_, server_factory_context_);
+    config_update_ = std::make_unique<RouteConfigUpdateReceiverImpl>(config_traits_, proto_traits_,
+                                                                     server_factory_context_);
   }
 
   const std::string* route(const std::string& path) {
@@ -96,7 +79,9 @@ public:
         ->route(path);
   }
 
-  TestTraits traits_;
+  Basic::ProtoTraitsImpl<envoy::config::route::v3::RouteConfiguration, 1> proto_traits_;
+  Basic::ConfigTraitsImpl<envoy::config::route::v3::RouteConfiguration, TestConfig, TestConfig>
+      config_traits_;
   RouteConfigUpdatePtr config_update_;
 };
 
@@ -163,105 +148,135 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdate) {
 
 class RdsConfigProviderManagerTest : public RdsTestBase {
 public:
-  RdsConfigProviderManagerTest() : manager_(server_factory_context_.admin_, "test", traits_) {}
+  RdsConfigProviderManagerTest() : manager_(server_factory_context_.admin_) {}
 
   RouteConfigProviderSharedPtr createDynamic() {
-    envoy::config::core::v3::ConfigSource config_source;
-    config_source.set_path("test_path");
-    return manager_.addDynamicProvider(
-        config_source, "test_route", outer_init_manager_,
-        [&config_source, this](uint64_t manager_identifier) {
-          auto config_update = std::make_unique<RouteConfigUpdateReceiverImpl>(
-              traits_, traits_, server_factory_context_);
-          auto resource_decoder = std::make_unique<Envoy::Config::OpaqueResourceDecoderImpl<
-              envoy::config::route::v3::RouteConfiguration>>(
-              server_factory_context_.messageValidationContext().dynamicValidationVisitor(),
-              "name");
-          auto subscription = std::make_shared<RdsRouteConfigSubscription>(
-              std::move(config_update), std::move(resource_decoder), config_source,
-              route_config_name_, manager_identifier, server_factory_context_, "test_stat",
-              rds_type_, manager_);
-          auto provider = std::make_shared<RdsRouteConfigProviderImpl>(std::move(subscription),
-                                                                       server_factory_context_);
-          return std::make_pair(provider, &provider->subscription().initTarget());
-        });
+    envoy::extensions::filters::network::thrift_proxy::v3::Trds rds;
+    rds.mutable_config_source()->set_path("dummy");
+    rds.set_route_config_name("test_route");
+    return manager_.createRdsRouteConfigProvider(rds, server_factory_context_, "test_listener.",
+                                                 outer_init_manager_);
   }
 
   RouteConfigProviderSharedPtr createStatic() {
-    return manager_.addStaticProvider([this]() {
-      envoy::config::route::v3::RouteConfiguration route_config;
-      return std::make_unique<StaticRouteConfigProviderImpl>(route_config, traits_,
-                                                             server_factory_context_, manager_);
-    });
+    envoy::config::route::v3::RouteConfiguration route_config;
+    TestUtility::loadFromYaml(R"EOF(
+name: foo
+virtual_hosts: null
+)EOF",
+                              route_config);
+    return manager_.createStaticRouteConfigProvider(route_config, server_factory_context_);
   }
 
-  void setConfigToDynamicProvider() {
-    const std::string response_json = R"EOF(
-{
-  "version_info": "1",
-  "resources": [
-    {
-      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
-      "name": "test_route",
-      "virtual_hosts": null
-    }
-  ]
-}
-)EOF";
+  template <class RouteConfiguration = envoy::config::route::v3::RouteConfiguration>
+  void setConfigToDynamicProvider(const std::string& response_json) {
     auto response =
         TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_json);
-    const auto decoded_resources =
-        TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response);
+    const auto decoded_resources = TestUtility::decodeResources<RouteConfiguration>(response);
     server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
         decoded_resources.refvec_, response.version_info());
   }
 
   NiceMock<Init::MockManager> outer_init_manager_;
-  TestTraits traits_;
-  RouteConfigProviderManager manager_;
-  const std::string rds_type_ = "TestRDS";
-  const std::string route_config_name_ = "test_route";
+  Basic::RouteConfigProviderManagerImpl<envoy::extensions::filters::network::thrift_proxy::v3::Trds,
+                                        envoy::config::route::v3::RouteConfiguration, 1, TestConfig,
+                                        TestConfig>
+      manager_;
 };
 
-TEST_F(RdsConfigProviderManagerTest, ProviderErase) {
+TEST_F(RdsConfigProviderManagerTest, ProviderAddErase) {
   Matchers::UniversalStringMatcher universal_name_matcher;
+  auto config_tracker_callback =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["trds_routes"];
 
-  auto dump = manager_.dumpRouteConfigs(universal_name_matcher);
-  EXPECT_EQ(0, dump->dynamic_route_configs().size());
-  EXPECT_EQ(0, dump->static_route_configs().size());
+  timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
+
+  auto message_ptr = config_tracker_callback(universal_name_matcher);
+  const auto& dump1 =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
+  EXPECT_EQ(0, dump1.dynamic_route_configs().size());
+  EXPECT_EQ(0, dump1.static_route_configs().size());
 
   RouteConfigProviderSharedPtr static_provider = createStatic();
   RouteConfigProviderSharedPtr dynamic_provider = createDynamic();
-  setConfigToDynamicProvider();
+  setConfigToDynamicProvider<>(R"EOF(
+version_info: "1"
+resources:
+  - "@type": type.googleapis.com/envoy.config.route.v3.RouteConfiguration
+    name: test_route
+    virtual_hosts: null
+)EOF");
 
-  dump = manager_.dumpRouteConfigs(universal_name_matcher);
-  EXPECT_EQ(1, dump->dynamic_route_configs().size());
-  EXPECT_EQ(1, dump->static_route_configs().size());
+  message_ptr = config_tracker_callback(universal_name_matcher);
+  const auto& dump2 =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
+  EXPECT_EQ(1, dump2.dynamic_route_configs().size());
+  EXPECT_EQ(1, dump2.static_route_configs().size());
+
+  envoy::admin::v3::RoutesConfigDump expected_dump;
+  TestUtility::loadFromYaml(R"EOF(
+static_route_configs:
+  - route_config:
+      "@type": type.googleapis.com/envoy.config.route.v3.RouteConfiguration
+      name: foo
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_route_configs:
+  - version_info: "1"
+    route_config:
+      "@type": type.googleapis.com/envoy.config.route.v3.RouteConfiguration
+      name: test_route
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+)EOF",
+                            expected_dump);
+  EXPECT_EQ(expected_dump.DebugString(), dump2.DebugString());
+
+  EXPECT_EQ(1UL, scope_.counter("test_listener.trds.test_route.config_reload").value());
 
   static_provider.reset();
-  dump = manager_.dumpRouteConfigs(universal_name_matcher);
-  EXPECT_EQ(1, dump->dynamic_route_configs().size());
-  EXPECT_EQ(0, dump->static_route_configs().size());
+  message_ptr = config_tracker_callback(universal_name_matcher);
+  const auto& dump3 =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
+  EXPECT_EQ(1, dump3.dynamic_route_configs().size());
+  EXPECT_EQ(0, dump3.static_route_configs().size());
 
   dynamic_provider.reset();
-  dump = manager_.dumpRouteConfigs(universal_name_matcher);
-  EXPECT_EQ(0, dump->dynamic_route_configs().size());
-  EXPECT_EQ(0, dump->static_route_configs().size());
+  message_ptr = config_tracker_callback(universal_name_matcher);
+  const auto& dump4 =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
+  EXPECT_EQ(0, dump4.dynamic_route_configs().size());
+  EXPECT_EQ(0, dump4.static_route_configs().size());
 }
 
 TEST_F(RdsConfigProviderManagerTest, FailureInvalidResourceType) {
   RouteConfigProviderSharedPtr dynamic_provider = createDynamic();
 
-  traits_.resource_name_field_index_ = 0;
-  EXPECT_THROW_WITH_MESSAGE(setConfigToDynamicProvider(), EnvoyException,
-                            "Unexpected " + rds_type_ + " configuration (expecting " +
-                                route_config_name_ + "): ");
+  const std::string wrong_name = R"EOF(
+version_info: "1"
+resources:
+  - "@type": type.googleapis.com/envoy.config.route.v3.RouteConfiguration
+    name: not_test_route
+    virtual_hosts: null
+)EOF";
+  EXPECT_THROW_WITH_MESSAGE(setConfigToDynamicProvider<>(wrong_name), EnvoyException,
+                            "Unexpected TRDS configuration (expecting test_route): not_test_route");
 
-  traits_.resource_type_ = "EXPECTED_resource_type";
-  EXPECT_THROW_WITH_MESSAGE(setConfigToDynamicProvider(), EnvoyException,
-                            "Unexpected " + rds_type_ + " configuration type (expecting " +
-                                traits_.resource_type_ +
-                                "): envoy.config.route.v3.RouteConfiguration");
+  const std::string wrong_type = R"EOF(
+version_info: "1"
+resources:
+  - "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.RouteConfiguration
+    name: test_route
+    routes: null
+)EOF";
+  EXPECT_THROW_WITH_MESSAGE(
+      setConfigToDynamicProvider<
+          envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration>(wrong_type),
+      EnvoyException,
+      "Unexpected TRDS configuration type (expecting envoy.config.route.v3.RouteConfiguration): "
+      "envoy.extensions.filters.network.thrift_proxy.v3.RouteConfiguration");
 }
 
 } // namespace
