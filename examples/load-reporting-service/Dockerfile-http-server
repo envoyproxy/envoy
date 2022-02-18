@@ -1,6 +1,7 @@
 FROM envoyproxy/envoy-alpine-dev:latest
 
-RUN apk update && apk add py3-pip bash curl
+RUN apk update && apk add py3-pip
+RUN pip3 install -q Flask==2.0.3
 RUN mkdir /code
 ADD ./start_service.sh /usr/local/bin/start_service.sh
 COPY . ./code
