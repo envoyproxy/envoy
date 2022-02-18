@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/http/persist_quic_info.h"
+#include "envoy/http/persistent_quic_info.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/quic/envoy_quic_alarm_factory.h"

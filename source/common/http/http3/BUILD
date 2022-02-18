@@ -14,7 +14,7 @@ envoy_cc_library(
     hdrs = ["conn_pool.h"],
     deps = [
         "//envoy/event:dispatcher_interface",
-        "//envoy/http:persist_quic_info_interface",
+        "//envoy/http:persistent_quic_info_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/http:codec_client_lib",
         "//source/common/http:conn_pool_base_lib",

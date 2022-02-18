@@ -165,7 +165,7 @@ envoy_cc_library(
         ":envoy_quic_server_session_lib",
         ":envoy_quic_utils_lib",
         "//envoy/http:codec_interface",
-        "//envoy/http:persist_quic_info_interface",
+        "//envoy/http:persistent_quic_info_interface",
         "//envoy/registry",
         "//source/extensions/quic/crypto_stream:envoy_quic_crypto_client_stream_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
