@@ -180,8 +180,8 @@ RouteMatcher::RouteMatcher(
     case RouteMatch::MatchSpecifierCase::kServiceName:
       routes_.emplace_back(new ServiceNameRouteEntryImpl(route));
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case RouteMatch::MatchSpecifierCase::MATCH_SPECIFIER_NOT_SET:
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
   }
 }

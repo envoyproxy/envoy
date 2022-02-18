@@ -32,6 +32,7 @@ cbor
 CDN
 CDS
 CEL
+CWND
 DSR
 DSS
 EBADF
@@ -238,6 +239,8 @@ Nilsson
 Nonhashable
 Oauth
 OCSP
+OD
+ODCDS
 OID
 OK
 OOM
@@ -743,6 +746,7 @@ inflater
 inflight
 -ing
 init
+initialize
 initializer
 initializers
 inlined
@@ -756,6 +760,7 @@ interpretable
 intra
 ints
 invariance
+invoker
 iovec
 iovecs
 ips
@@ -853,6 +858,7 @@ multi
 multicast
 multikill
 multimap
+multiple
 multivalue
 mutator
 mutex
@@ -1007,6 +1013,7 @@ ratelimited
 ratelimiter
 rawseti
 rc
+rdsone
 readded
 readonly
 readv
@@ -1128,6 +1135,7 @@ spdlog
 splitter
 spoofable
 src
+srtt
 ssize
 stackdriver
 stacktrace

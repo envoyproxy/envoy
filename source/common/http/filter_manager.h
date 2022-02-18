@@ -577,11 +577,6 @@ public:
    * Returns the tracked scope to use for this stream.
    */
   virtual const ScopeTrackedObject& scope() PURE;
-
-  /**
-   * Returns whether internal redirects with request bodies is enabled.
-   */
-  virtual bool enableInternalRedirectsWithBody() const PURE;
 };
 
 /**
@@ -940,10 +935,6 @@ public:
   Buffer::BufferMemoryAccountSharedPtr account() const { return account_; }
 
   Buffer::InstancePtr& bufferedRequestData() { return buffered_request_data_; }
-
-  bool enableInternalRedirectsWithBody() const {
-    return filter_manager_callbacks_.enableInternalRedirectsWithBody();
-  }
 
   void contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack);
 

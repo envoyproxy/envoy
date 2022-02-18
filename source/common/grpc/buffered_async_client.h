@@ -1,7 +1,9 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 
+#include "source/common/grpc/buffered_message_ttl_manager.h"
 #include "source/common/grpc/typed_async_client.h"
 #include "source/common/protobuf/utility.h"
 
@@ -20,9 +22,12 @@ template <class RequestType, class ResponseType> class BufferedAsyncClient {
 public:
   BufferedAsyncClient(uint32_t max_buffer_bytes, const Protobuf::MethodDescriptor& service_method,
                       Grpc::AsyncStreamCallbacks<ResponseType>& callbacks,
-                      const Grpc::AsyncClient<RequestType, ResponseType>& client)
+                      const Grpc::AsyncClient<RequestType, ResponseType>& client,
+                      Event::Dispatcher& dispatcher, std::chrono::milliseconds message_timeout_msec)
       : max_buffer_bytes_(max_buffer_bytes), service_method_(service_method), callbacks_(callbacks),
-        client_(client) {}
+        client_(client),
+        ttl_manager_(
+            dispatcher, [this](uint64_t id) { onError(id); }, message_timeout_msec) {}
 
   ~BufferedAsyncClient() {
     if (active_stream_ != nullptr) {
@@ -70,13 +75,17 @@ public:
       active_stream_->sendMessage(message, false);
     }
 
+    ttl_manager_.addDeadlineEntry(inflight_message_ids);
     return inflight_message_ids;
   }
 
   void onSuccess(uint64_t message_id) { erasePendingMessage(message_id); }
 
   void onError(uint64_t message_id) {
-    if (message_buffer_.find(message_id) == message_buffer_.end()) {
+    const auto& message_it = message_buffer_.find(message_id);
+
+    if (message_it == message_buffer_.end() ||
+        message_it->second.first != Grpc::BufferState::PendingFlush) {
       return;
     }
 
@@ -119,6 +128,7 @@ private:
   absl::btree_map<uint64_t, std::pair<BufferState, RequestType>> message_buffer_;
   uint32_t current_buffer_bytes_ = 0;
   uint64_t next_message_id_ = 0;
+  BufferedMessageTtlManager ttl_manager_;
 };
 
 template <class RequestType, class ResponseType>

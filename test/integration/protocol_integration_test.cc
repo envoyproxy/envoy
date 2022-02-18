@@ -179,6 +179,45 @@ TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
   EXPECT_EQ("600", response->headers().getStatusValue());
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, AddInvalidDecodedData) {
+  EXPECT_ENVOY_BUG(
+      {
+        useAccessLog("%RESPONSE_CODE_DETAILS%");
+        config_helper_.prependFilter(R"EOF(
+  name: add-invalid-data-filter
+  )EOF");
+        initialize();
+        codec_client_ = makeHttpConnection(lookupPort("http"));
+        auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+        waitForNextUpstreamRequest();
+        upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+        ASSERT_TRUE(response->waitForEndStream());
+        EXPECT_EQ("502", response->headers().getStatusValue());
+        EXPECT_THAT(waitForAccessLog(access_log_name_),
+                    HasSubstr("filter_added_invalid_request_data"));
+      },
+      "Invalid request data");
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, AddInvalidEncodedData) {
+  EXPECT_ENVOY_BUG(
+      {
+        useAccessLog("%RESPONSE_CODE_DETAILS%");
+        config_helper_.prependFilter(R"EOF(
+  name: add-invalid-data-filter
+  )EOF");
+        initialize();
+        codec_client_ = makeHttpConnection(lookupPort("http"));
+        default_request_headers_.setCopy(Envoy::Http::LowerCaseString("invalid-encode"), "yes");
+        auto response = std::move((codec_client_->startRequest(default_request_headers_)).second);
+        ASSERT_TRUE(response->waitForEndStream());
+        EXPECT_EQ("502", response->headers().getStatusValue());
+        EXPECT_THAT(waitForAccessLog(access_log_name_),
+                    HasSubstr("filter_added_invalid_response_data"));
+      },
+      "Invalid response data");
+}
+
 // Verifies behavior for https://github.com/envoyproxy/envoy/pull/11248
 TEST_P(ProtocolIntegrationTest, AddBodyToRequestAndWaitForIt) {
   config_helper_.prependFilter(R"EOF(
@@ -227,6 +266,34 @@ TEST_P(ProtocolIntegrationTest, AddBodyToResponseAndWaitForIt) {
 TEST_P(ProtocolIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
   config_helper_.prependFilter(R"EOF(
   name: continue-headers-only-inject-body-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send a headers only request.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Make sure that the body was injected to the request.
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(upstream_request_->receivedData());
+  EXPECT_EQ(upstream_request_->body().toString(), "body");
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Make sure that the body was injected to the response.
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->body(), "body");
+}
+
+TEST_P(ProtocolIntegrationTest, StopIterationHeadersInjectBodyFilter) {
+  config_helper_.prependFilter(R"EOF(
+  name: stop-iteration-headers-inject-body-filter
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");

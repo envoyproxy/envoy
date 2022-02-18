@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.core.v3;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 
 import "google/protobuf/duration.proto";
@@ -143,13 +144,49 @@ message RateLimitSettings {
   google.protobuf.DoubleValue fill_rate = 2 [(validate.rules).double = {gt: 0.0}];
 }
 
+// Local filesystem path configuration source.
+message PathConfigSource {
+  // Path on the filesystem to source and watch for configuration updates.
+  // When sourcing configuration for a :ref:`secret <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.Secret>`,
+  // the certificate and key files are also watched for updates.
+  //
+  // .. note::
+  //
+  //  The path to the source must exist at config load time.
+  //
+  // .. note::
+  //
+  //   If `watched_directory` is *not* configured, Envoy will watch the file path for *moves.*
+  //   This is because in general only moves are atomic. The same method of swapping files as is
+  //   demonstrated in the :ref:`runtime documentation <config_runtime_symbolic_link_swap>` can be
+  //   used here also. If `watched_directory` is configured, no watch will be placed directly on
+  //   this path. Instead, the configured `watched_directory` will be used to trigger reloads of
+  //   this path. This is required in certain deployment scenarios. See below for more information.
+  string path = 1 [(validate.rules).string = {min_len: 1}];
+
+  // If configured, this directory will be watched for *moves.* When an entry in this directory is
+  // moved to, the `path` will be reloaded. This is required in certain deployment scenarios.
+  //
+  // Specifically, if trying to load an xDS resource using a
+  // `Kubernetes ConfigMap <https://kubernetes.io/docs/concepts/configuration/configmap/>`_, the
+  // following configuration might be used:
+  // 1. Store xds.yaml inside a ConfigMap.
+  // 2. Mount the ConfigMap to `/config_map/xds`
+  // 3. Configure path `/config_map/xds/xds.yaml`
+  // 4. Configure watched directory `/config_map/xds`
+  //
+  // The above configuration will ensure that Envoy watches the owning directory for moves which is
+  // required due to how Kubernetes manages ConfigMap symbolic links during atomic updates.
+  WatchedDirectory watched_directory = 2;
+}
+
 // Configuration for :ref:`listeners <config_listeners>`, :ref:`clusters
 // <config_cluster_manager>`, :ref:`routes
 // <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`, :ref:`endpoints
 // <arch_overview_service_discovery>` etc. may either be sourced from the
 // filesystem or from an xDS API source. Filesystem configs are watched with
 // inotify for updates.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message ConfigSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.ConfigSource";
 
@@ -162,20 +199,11 @@ message ConfigSource {
   oneof config_source_specifier {
     option (validate.required) = true;
 
-    // Path on the filesystem to source and watch for configuration updates.
-    // When sourcing configuration for :ref:`secret <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.Secret>`,
-    // the certificate and key files are also watched for updates.
-    //
-    // .. note::
-    //
-    //  The path to the source must exist at config load time.
-    //
-    // .. note::
-    //
-    //   Envoy will only watch the file path for *moves.* This is because in general only moves
-    //   are atomic. The same method of swapping files as is demonstrated in the
-    //   :ref:`runtime documentation <config_runtime_symbolic_link_swap>` can be used here also.
-    string path = 1;
+    // Deprecated in favor of `path_config_source`. Use that field instead.
+    string path = 1 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+    // Local filesystem path configuration source.
+    PathConfigSource path_config_source = 8;
 
     // API configuration source.
     ApiConfigSource api_config_source = 2;
