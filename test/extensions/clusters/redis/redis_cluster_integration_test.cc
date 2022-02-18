@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <sstream>
 #include <vector>
 
@@ -319,6 +320,22 @@ protected:
     return resp.str();
   }
 
+  std::string singleSlotPrimaryReplicaHostnames(const std::string primary_hostname,
+                                                const uint32_t primary_port,
+                                                const std::string replica_hostname,
+                                                const uint32_t replica_port) {
+    int64_t start_slot = 0;
+    int64_t end_slot = 16383;
+
+    std::stringstream resp;
+    resp << "*1\r\n"
+         << "*4\r\n"
+         << ":" << start_slot << "\r\n"
+         << ":" << end_slot << "\r\n"
+         << makeIp(primary_hostname, primary_port) << makeIp(replica_hostname, replica_port);
+    return resp.str();
+  }
+
   /**
    * Simple response for 2 slot redis cluster with 2 nodes.
    * @param slot1 the ip of the primary node of slot1.
@@ -424,6 +441,27 @@ TEST_P(RedisClusterIntegrationTest, SingleSlotPrimaryReplica) {
   simpleRequestAndResponse(0, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
 }
 
+// This test is the same as SingleSlotPrimaryReplica, the only
+// difference being that it has the primary and replica identified
+// by hostname instead of IP address.
+TEST_P(RedisClusterIntegrationTest, SingleSlotPrimaryReplicaHostnames) {
+  random_index_ = 0;
+
+  on_server_init_function_ = [this]() {
+    std::string cluster_slot_response = singleSlotPrimaryReplicaHostnames(
+        "localhost", fake_upstreams_[0]->localAddress()->ip()->port(), "localhost",
+        fake_upstreams_[1]->localAddress()->ip()->port());
+
+    expectCallClusterSlot(random_index_, cluster_slot_response);
+  };
+
+  initialize();
+
+  // foo hashes to slot 12182 which is in upstream 0
+  simpleRequestAndResponse(0, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+}
+
+// This test sends a simple "get foo" command from a fake
 // This test sends a simple "get foo" command from a fake
 // downstream client through the proxy to a fake upstream
 // Redis cluster with 2 slots. The fake server sends a valid response
