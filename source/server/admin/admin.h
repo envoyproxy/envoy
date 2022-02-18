@@ -220,6 +220,8 @@ public:
   static HandlerPtr makeStaticTextHandler(absl::string_view response_text, Http::Code code);
 
 private:
+  friend class AdminTestingPeer;
+
   /**
    * Individual admin handler including prefix, help text, and callback.
    */
@@ -288,8 +290,8 @@ private:
    * OverloadManager keeps the admin interface accessible even when the proxy is overloaded.
    */
   struct NullOverloadManager : public OverloadManager {
-    struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
-      NullThreadLocalOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+    struct OverloadState : public ThreadLocalOverloadState {
+      OverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
       bool tryAllocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
       bool tryDeallocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
@@ -303,12 +305,12 @@ private:
 
     void start() override {
       tls_->set([](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        return std::make_shared<NullThreadLocalOverloadState>(dispatcher);
+        return std::make_shared<OverloadState>(dispatcher);
       });
     }
 
     ThreadLocalOverloadState& getThreadLocalOverloadState() override {
-      return tls_->getTyped<NullThreadLocalOverloadState>();
+      return tls_->getTyped<OverloadState>();
     }
 
     Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override { return nullptr; }

@@ -220,9 +220,48 @@ TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0, 0));
 }
 
+class AdminTestingPeer {
+public:
+  AdminTestingPeer(AdminImpl& admin) : admin_(admin), server_(admin.server_) {}
+  AdminImpl::NullRouteConfigProvider& route_config_provider() { return route_config_provider_; }
+  AdminImpl::NullScopedRouteConfigProvider& scoped_route_config_provider() {
+    return scoped_route_config_provider_;
+  }
+  AdminImpl::NullOverloadManager& overload_manager() { return admin_.null_overload_manager_; }
+  AdminImpl::NullOverloadManager::OverloadState& overload_state() { return overload_state_; }
+
+private:
+  AdminImpl& admin_;
+  Server::Instance& server_;
+  AdminImpl::NullRouteConfigProvider route_config_provider_{server_.timeSource()};
+  AdminImpl::NullScopedRouteConfigProvider scoped_route_config_provider_{server_.timeSource()};
+  AdminImpl::NullOverloadManager::OverloadState overload_state_{server_.dispatcher()};
+};
+
 TEST_P(AdminInstanceTest, Overrides) {
   admin_.http1Settings();
   admin_.originalIpDetectionExtensions();
+
+  AdminTestingPeer peer(admin_);
+
+  peer.route_config_provider().config();
+  peer.route_config_provider().configInfo();
+  peer.route_config_provider().lastUpdated();
+  peer.route_config_provider().onConfigUpdate();
+
+  peer.scoped_route_config_provider().lastUpdated();
+  peer.scoped_route_config_provider().getConfigProto();
+  peer.scoped_route_config_provider().getConfigVersion();
+  peer.scoped_route_config_provider().getConfig();
+  peer.scoped_route_config_provider().apiType();
+  peer.scoped_route_config_provider().getConfigProtos();
+
+  auto overload_name = Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections;
+  peer.overload_state().tryAllocateResource(overload_name, 0);
+  peer.overload_state().tryDeallocateResource(overload_name, 0);
+  peer.overload_state().isResourceMonitorEnabled(overload_name);
+
+  peer.overload_manager().scaledTimerFactory();
 }
 
 } // namespace Server
