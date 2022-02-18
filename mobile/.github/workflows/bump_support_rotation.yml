@@ -16,23 +16,14 @@ jobs:
         uses: actions/checkout@v2
       - name: Bump Lyft Support Rotation
         run: ./tools/bump_lyft_support_rotation.sh
-      - name: Set Branch
-        id: branch
-        run: |
-          echo "::set-output name=BRANCH_NAME::support-bump-${GITHUB_RUN_ID}"
-      - name: Commit Changes
-        run: |
-          git checkout -b "${{ steps.branch.outputs.BRANCH_NAME }}"
-          git config --global user.email "${GITHUB_ACTOR}"
-          git config --global user.name "${GITHUB_ACTOR}@users.noreply.github.com"
-          git add .github/lyft_maintainers.yml
-          git commit -am "Bump Lyft Support Rotation"
-          git push
-      - name: Submit Pull Request
-        run: |
-          curl \
-            -X POST \
-            -H "Accept: application/vnd.github.v3+json" \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/octocat/hello-world/pulls \
-            -d '{"head":"${{ steps.branch.outputs.BRANCH_NAME }}","base":"main", "title": "Bump Lyft Support Rotation"}'
+      - name: Create PR
+        uses: peter-evans/create-pull-request@v3
+        with:
+          token: ${{ secrets.CREDENTIALS_GITHUB_PUSH_TOKEN }}
+          title: Bump Lyft Support Rotation
+          commit-message: Bump Lyft Support Rotation
+          committer: GitHub Action <noreply@github.com>
+          base: main
+          delete-branch: true
+          branch: support-bump
+          branch-suffix: short-commit-hash
