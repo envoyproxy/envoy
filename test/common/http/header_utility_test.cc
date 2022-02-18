@@ -13,6 +13,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::ElementsAre;
+
 namespace Envoy {
 namespace Http {
 
@@ -925,47 +927,38 @@ TEST(ValidateHeaders, ContentLength) {
 }
 
 TEST(ValidateHeaders, ParseCommaDelimitedHeader) {
-  std::vector<absl::string_view> tokens;
-  std::vector<absl::string_view> expected;
-
   // Basic case
-  expected = {"one", "two", "three"};
-  tokens = HeaderUtility::parseCommaDelimitedHeader("one,two,three");
-  EXPECT_EQ(tokens, expected);
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader("one,two,three"),
+              ElementsAre("one", "two", "three"));
 
   // Whitespace at the end or beginning of tokens
-  tokens = HeaderUtility::parseCommaDelimitedHeader("one  ,   two, three");
-  EXPECT_EQ(tokens, expected);
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader("one  ,two,three"),
+              ElementsAre("one", "two", "three"));
 
   // Empty tokens are removed (from beginning, middle, and end of the string)
-  tokens = HeaderUtility::parseCommaDelimitedHeader(", one,, two, three,,,");
-  EXPECT_EQ(tokens, expected);
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader(", one,, two, three,,,"),
+              ElementsAre("one", "two", "three"));
 
   // Whitespace is not removed from the middle of the tokens
-  expected = {"one", "two", "t  hree"};
-  tokens = HeaderUtility::parseCommaDelimitedHeader("one, two, t  hree");
-  EXPECT_EQ(tokens, expected);
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader("one, two, t  hree"),
+              ElementsAre("one", "two", "t  hree"));
 
   // Semicolons are kept as part of the tokens
-  expected = {"one", "two;foo", "three"};
-  tokens = HeaderUtility::parseCommaDelimitedHeader("one, two;foo, three");
-  EXPECT_EQ(tokens, expected);
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader("one, two;foo, three"),
+              ElementsAre("one", "two;foo", "three"));
 
   // Check that a single token is parsed regardless of commas
-  expected = {"foo"};
-  tokens = HeaderUtility::parseCommaDelimitedHeader("foo");
-  EXPECT_EQ(tokens, expected);
-  tokens = HeaderUtility::parseCommaDelimitedHeader("foo,");
-  EXPECT_EQ(tokens, expected);
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader("foo"), ElementsAre("foo"));
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader(",foo,"), ElementsAre("foo"));
 
   // Empty string is handled
-  expected = {};
-  tokens = HeaderUtility::parseCommaDelimitedHeader("");
-  EXPECT_EQ(tokens, expected);
+  EXPECT_TRUE(HeaderUtility::parseCommaDelimitedHeader("").empty());
 
   // Empty string is handled (whitespace)
-  tokens = HeaderUtility::parseCommaDelimitedHeader("   ");
-  EXPECT_EQ(tokens, expected);
+  EXPECT_TRUE(HeaderUtility::parseCommaDelimitedHeader("   ").empty());
+
+  // Empty string is handled (commas)
+  EXPECT_TRUE(HeaderUtility::parseCommaDelimitedHeader(",,,").empty());
 }
 
 TEST(ValidateHeaders, GetSemicolonDelimitedAttribute) {
