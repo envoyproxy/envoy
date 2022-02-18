@@ -315,8 +315,8 @@ ClusterManagerImpl::ClusterManagerImpl(
   auto is_primary_cluster = [](const envoy::config::cluster::v3::Cluster& cluster) -> bool {
     return cluster.type() != envoy::config::cluster::v3::Cluster::EDS ||
            (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
-            cluster.eds_cluster_config().eds_config().config_source_specifier_case() ==
-                envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath);
+            Config::SubscriptionFactory::isPathBasedConfigSource(
+                cluster.eds_cluster_config().eds_config().config_source_specifier_case()));
   };
   // Build book-keeping for which clusters are primary. This is useful when we
   // invoke loadCluster() below and it needs the complete set of primaries.
@@ -399,8 +399,8 @@ ClusterManagerImpl::ClusterManagerImpl(
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // Now load all the secondary clusters.
     if (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
-        cluster.eds_cluster_config().eds_config().config_source_specifier_case() !=
-            envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath) {
+        !Config::SubscriptionFactory::isPathBasedConfigSource(
+            cluster.eds_cluster_config().eds_config().config_source_specifier_case())) {
       loadCluster(cluster, MessageUtil::hash(cluster), "", false, active_clusters_);
     }
   }
@@ -1830,8 +1830,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
-        transport_socket_options, state, source, alternate_protocols_cache,
-        std::chrono::milliseconds(300), coptions, quic_stat_names_, stats_);
+        transport_socket_options, state, source, alternate_protocols_cache, coptions,
+        quic_stat_names_, stats_);
 #else
     // Should be blocked by configuration checking at an earlier point.
     PANIC("unexpected");
@@ -1853,7 +1853,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #ifdef ENVOY_ENABLE_QUIC
     return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
                                          priority, options, transport_socket_options, state, source,
-                                         quic_stat_names_, stats_, {});
+                                         quic_stat_names_, {}, stats_, {});
 #else
     UNREFERENCED_PARAMETER(source);
     // Should be blocked by configuration checking at an earlier point.

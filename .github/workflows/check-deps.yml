@@ -12,7 +12,7 @@ jobs:
     if: github.repository_owner == 'envoyproxy'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
         with:
           ref: ${{ github.head_ref }}
       - name: Set up Python ${{ matrix.python-version }}
@@ -23,5 +23,5 @@ jobs:
       - name: Run dependency checker
         run: |
           export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          bazel run //tools/dependency:check -- -c release_issues
+          bazel run //tools/dependency:check -- -c release_issues --fix
           bazel run //tools/dependency:check -- -c cves -w error

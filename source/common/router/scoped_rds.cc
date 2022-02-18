@@ -71,10 +71,11 @@ ConfigProviderPtr create(
         ScopedRoutesConfigProviderManagerOptArg(
             config.scoped_routes().name(), config.scoped_routes().rds_config_source(),
             config.scoped_routes().scope_key_builder(), optional_http_filters));
-  default:
-    // Proto validation enforces that is not reached.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
+      ConfigSpecifierCase::CONFIG_SPECIFIER_NOT_SET:
+    PANIC("not implemented");
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace ScopedRoutesConfigProviderUtil
@@ -103,7 +104,7 @@ makeScopedRouteInfos(ProtobufTypes::ConstMessagePtrVector&& config_protos,
             scoped_route_config.route_configuration(), optional_http_filters, factory_context,
             factory_context.messageValidationContext().staticValidationVisitor());
     scopes.push_back(std::make_shared<const ScopedRouteInfo>(scoped_route_config,
-                                                             route_config_provider->config()));
+                                                             route_config_provider->configCast()));
   }
 
   return scopes;
@@ -230,7 +231,7 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigPro
 
   rds_update_callback_handle_ = route_provider_->subscription().addUpdateCallback([this]() {
     // Subscribe to RDS update.
-    parent_.onRdsConfigUpdate(scope_name_, route_provider_->config());
+    parent_.onRdsConfigUpdate(scope_name_, route_provider_->configCast());
   });
   parent_.stats_.active_scopes_.inc();
 }
@@ -263,7 +264,7 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConf
     return;
   }
   // If RouteConfiguration has been initialized, apply update to all the threads.
-  parent_.onRdsConfigUpdate(scope_name_, route_provider_->config());
+  parent_.onRdsConfigUpdate(scope_name_, route_provider_->configCast());
 }
 
 bool ScopedRdsConfigSubscription::addOrUpdateScopes(
