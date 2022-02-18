@@ -25,6 +25,14 @@ index 1cc0121e60..dedc78fbb0 100644
  )
  
  # Default setting for v8_enable_pointer_compression.
+@@ -2309,6 +2309,7 @@ filegroup(
+         "//conditions:default": [],
+     }) + select({
+         "@v8//bazel/config:is_windows": [
++            "include/v8-wasm-trap-handler-win.h",
+             "src/trap-handler/handler-inside-win.cc",
+             "src/trap-handler/handler-outside-win.cc",
+             "src/trap-handler/handler-inside-win.h",
 diff --git a/bazel/defs.bzl b/bazel/defs.bzl
 index 0e9559a65f..fa0c460c48 100644
 --- a/bazel/defs.bzl
