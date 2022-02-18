@@ -42,6 +42,7 @@ message Action {
     uint32 get_raw_slices = 14;
     Search search = 15;
     string starts_with = 16;
+    uint32 copy_out_to_slices = 17;
   }
 }
 
