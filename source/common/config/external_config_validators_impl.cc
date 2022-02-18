@@ -9,7 +9,7 @@ namespace Config {
 ExternalConfigValidatorsImpl::ExternalConfigValidatorsImpl(
     ProtobufMessage::ValidationVisitor& validation_visitor, Server::Instance& server,
     const Protobuf::RepeatedPtrField<
-        envoy::config::core::v3::ApiConfigSource::ConfigSourceTypedConfig>& validators_configs)
+        envoy::config::core::v3::TypedExtensionConfig>& validators_configs)
     : server_(server) {
   for (const auto& validator_config : validators_configs) {
     auto& factory =
