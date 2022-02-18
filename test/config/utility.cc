@@ -44,7 +44,8 @@ admin:
 dynamic_resources:
   lds_config:
     resource_api_version: V3
-    path: {}
+    path_config_source:
+      path: {}
 static_resources:
   secrets:
   - name: "secret_static_0"
@@ -1330,7 +1331,8 @@ void ConfigHelper::setLds(absl::string_view version_info) {
     resource->PackFrom(listener);
   }
 
-  const std::string lds_filename = bootstrap().dynamic_resources().lds_config().path();
+  const std::string lds_filename =
+      bootstrap().dynamic_resources().lds_config().path_config_source().path();
   std::string file = TestEnvironment::writeStringToFileForTest(
       "new_lds_file", MessageUtil::getJsonStringFromMessageOrDie(lds));
   TestEnvironment::renameFile(file, lds_filename);
