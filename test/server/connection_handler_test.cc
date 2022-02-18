@@ -1487,10 +1487,10 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag) {
                   nullptr, nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000),
                   false, ipv6_overridden_filter_chain_manager);
   // Set the ipv6only as false.
-  Network::Address::InstanceConstSharedPtr ipv4_mapped_ipv6_address(
-      new Network::Address::Ipv6Instance("::FFFF:192.168.0.1", 80, nullptr, false));
+  Network::Address::InstanceConstSharedPtr ipv6_any_address(
+      new Network::Address::Ipv6Instance("::", 80, nullptr, false));
   EXPECT_CALL(ipv6_listener->socket_factory_, localAddress())
-      .WillRepeatedly(ReturnRef(ipv4_mapped_ipv6_address));
+      .WillRepeatedly(ReturnRef(ipv6_any_address));
   handler_->addListener(absl::nullopt, *ipv6_listener);
 
   // Listener3 is listening on an ipv4 address.
@@ -1503,7 +1503,7 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag) {
                   nullptr, nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000),
                   false, ipv4_overridden_filter_chain_manager);
   Network::Address::InstanceConstSharedPtr ipv4_address(
-      new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
+      new Network::Address::Ipv4Instance("0.0.0.0", 80, nullptr));
   EXPECT_CALL(ipv4_listener->socket_factory_, localAddress())
       .WillRepeatedly(ReturnRef(ipv4_address));
   handler_->addListener(absl::nullopt, *ipv4_listener);
@@ -1575,7 +1575,7 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag2) 
                   nullptr, nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000),
                   false, ipv4_overridden_filter_chain_manager);
   Network::Address::InstanceConstSharedPtr ipv4_address(
-      new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
+      new Network::Address::Ipv4Instance("0.0.0.0", 80, nullptr));
   EXPECT_CALL(ipv4_listener->socket_factory_, localAddress())
       .WillRepeatedly(ReturnRef(ipv4_address));
   handler_->addListener(absl::nullopt, *ipv4_listener);
@@ -1591,7 +1591,7 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag2) 
                   false, ipv6_overridden_filter_chain_manager);
   // Set the ipv6only as false.
   Network::Address::InstanceConstSharedPtr ipv4_mapped_ipv6_address(
-      new Network::Address::Ipv6Instance("::FFFF:192.168.0.1", 80, nullptr, false));
+      new Network::Address::Ipv6Instance("::", 80, nullptr, false));
   EXPECT_CALL(ipv6_listener->socket_factory_, localAddress())
       .WillRepeatedly(ReturnRef(ipv4_mapped_ipv6_address));
   handler_->addListener(absl::nullopt, *ipv6_listener);
@@ -1632,6 +1632,96 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag2) 
   EXPECT_EQ(1UL, handler_->numConnections());
 
   EXPECT_CALL(*listener3, onDestroy());
+  EXPECT_CALL(*listener2, onDestroy());
+  EXPECT_CALL(*listener1, onDestroy());
+  EXPECT_CALL(*access_log_, log(_, _, _, _));
+}
+
+TEST_F(ConnectionHandlerTest, AddIpv4MappedListenerAfterIpv4ListenerStopped) {
+  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
+
+  // Listener1 is response for redirect the connection.
+  Network::TcpListenerCallbacks* listener_callbacks1;
+  auto listener1 = new NiceMock<Network::MockListener>();
+  TestListener* test_listener1 =
+      addListener(1, true, true, "test_listener1", listener1, &listener_callbacks1);
+  Network::Address::InstanceConstSharedPtr normal_address(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+  EXPECT_CALL(test_listener1->socket_factory_, localAddress())
+      .WillRepeatedly(ReturnRef(normal_address));
+  handler_->addListener(absl::nullopt, *test_listener1);
+
+  // Listener2 is listening on an ipv4 address.
+  auto ipv4_overridden_filter_chain_manager =
+      std::make_shared<NiceMock<Network::MockFilterChainManager>>();
+  Network::TcpListenerCallbacks* ipv4_listener_callbacks;
+  auto listener3 = new NiceMock<Network::MockListener>();
+  TestListener* ipv4_listener =
+      addListener(3, false, false, "ipv4_test_listener", listener3, &ipv4_listener_callbacks,
+                  nullptr, nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000),
+                  false, ipv4_overridden_filter_chain_manager);
+  Network::Address::InstanceConstSharedPtr ipv4_address(
+      new Network::Address::Ipv4Instance("0.0.0.0", 80, nullptr));
+  EXPECT_CALL(ipv4_listener->socket_factory_, localAddress())
+      .WillRepeatedly(ReturnRef(ipv4_address));
+  handler_->addListener(absl::nullopt, *ipv4_listener);
+
+  EXPECT_CALL(*listener3, onDestroy());
+  // Stop the ipv4 listener.
+  handler_->stopListeners(3);
+
+  // Listener3 is listening on an ipv4-mapped ipv6 address.
+  auto ipv6_overridden_filter_chain_manager =
+      std::make_shared<NiceMock<Network::MockFilterChainManager>>();
+  Network::TcpListenerCallbacks* ipv6_any_listener_callbacks;
+  auto listener2 = new NiceMock<Network::MockListener>();
+  TestListener* ipv6_listener =
+      addListener(2, false, false, "ipv6_test_listener", listener2, &ipv6_any_listener_callbacks,
+                  nullptr, nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000),
+                  false, ipv6_overridden_filter_chain_manager);
+  // Set the ipv6only as false.
+  Network::Address::InstanceConstSharedPtr ipv4_mapped_ipv6_address(
+      new Network::Address::Ipv6Instance("::", 80, nullptr, false));
+  EXPECT_CALL(ipv6_listener->socket_factory_, localAddress())
+      .WillRepeatedly(ReturnRef(ipv4_mapped_ipv6_address));
+  handler_->addListener(absl::nullopt, *ipv6_listener);
+
+  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
+  EXPECT_CALL(*test_filter, destroy_());
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  bool redirected = false;
+  EXPECT_CALL(factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+        // Insert the Mock filter.
+        if (!redirected) {
+          manager.addAcceptFilter(listener_filter_matcher_,
+                                  Network::ListenerFilterPtr{test_filter});
+          redirected = true;
+        }
+        return true;
+      }));
+
+  Network::Address::InstanceConstSharedPtr alt_address(
+      new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
+  EXPECT_CALL(*test_filter, onAccept(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+        cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
+        return Network::FilterStatus::Continue;
+      }));
+
+  // The listener1 will balance the request to listener2.
+  EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
+  // The listener2 gets the connection
+  EXPECT_CALL(*ipv6_overridden_filter_chain_manager, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+  // The listener3 won't get the connection since it is stopped.
+  EXPECT_CALL(*ipv4_overridden_filter_chain_manager, findFilterChain(_)).Times(0);
+
+  auto* connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  listener_callbacks1->onAccept(Network::ConnectionSocketPtr{accepted_socket});
+  EXPECT_EQ(1UL, handler_->numConnections());
+
   EXPECT_CALL(*listener2, onDestroy());
   EXPECT_CALL(*listener1, onDestroy());
   EXPECT_CALL(*access_log_, log(_, _, _, _));
@@ -2247,7 +2337,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveWithBothIpv4AndIpv4CompatIpv6) {
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
   Network::Address::InstanceConstSharedPtr address_ipv6(
-      new Network::Address::Ipv6Instance("::FFFF:192.168.0.1", 80, nullptr, false));
+      new Network::Address::Ipv6Instance("::", 80, nullptr, false));
   EXPECT_CALL(test_listener->socket_factory_, localAddress())
       .WillRepeatedly(ReturnRef(address_ipv6));
   handler_->addListener(absl::nullopt, *test_listener);
@@ -2257,7 +2347,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveWithBothIpv4AndIpv4CompatIpv6) {
   TestListener* test_listener2 =
       addListener(2, true, false, "test_listener2", listener2, &listener_callbacks2);
   Network::Address::InstanceConstSharedPtr address_ipv4(
-      new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
+      new Network::Address::Ipv4Instance("0.0.0.0", 80, nullptr));
   EXPECT_CALL(test_listener2->socket_factory_, localAddress())
       .WillRepeatedly(ReturnRef(address_ipv4));
   handler_->addListener(absl::nullopt, *test_listener2);
