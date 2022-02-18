@@ -16,7 +16,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // gRPC-JSON transcoder :ref:`configuration overview <config_http_filters_grpc_json_transcoder>`.
 // [#extension: envoy.filters.http.grpc_json_transcoder]
 
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 // GrpcJsonTranscoder filter configuration.
 // The filter itself can be used per route / per virtual host or on the general level. The most
 // specific one is being used for a given route. If the list of services is empty - filter
@@ -103,6 +103,17 @@ message GrpcJsonTranscoder {
     bool reject_binding_body_field_collisions = 3;
   }
 
+  message ReflectionConfig {
+    // Supplies the cluster name of the gRPC cluster to use for reflection.
+    // This will typically be the same gRPC cluster that Envoy is forwarding
+    // gRPC traffic to, but it does not need to be.
+    string cluster_name = 1;
+
+    // The amount of time in ms that Envoy should wait for gRPC reflection
+    // requests to return.
+    uint64 request_timeout = 2;
+  }
+
   oneof descriptor_set {
     option (validate.required) = true;
 
@@ -115,6 +126,11 @@ message GrpcJsonTranscoder {
     // :ref:`the proto descriptor set <config_grpc_json_generate_proto_descriptor_set>` for the gRPC
     // services.
     bytes proto_descriptor_bin = 4;
+
+    // Supplies the grpc reflection configuration to fetching the content of
+    // :ref:`the proto descriptor set <config_grpc_json_generate_proto_descriptor_set>` for the gRPC
+    // services.
+    ReflectionConfig reflection_cluster_config = 14;
   }
 
   // A list of strings that

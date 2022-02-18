@@ -10,6 +10,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/grpc/codec.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/descriptor_pool_builder.h"
 #include "source/extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
 
 #include "google/api/http.pb.h"
@@ -63,7 +64,7 @@ public:
   JsonTranscoderConfig(
       const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
           proto_config,
-      Api::Api& api);
+      DescriptorPoolBuilderSharedPtr descriptor_pool_builder);
 
   /**
    * Create an instance of Transcoder interface based on incoming request.
@@ -97,12 +98,22 @@ public:
   bool matchIncomingRequestInfo() const;
 
   /**
+   * Transfer ownership of a Protobuf::DescriptorPool into this class and
+   * enable the filter. If this function is called twice, the second call will
+   * be ignored. This function is not thread-safe, so callers are expected to
+   * synchronize access.
+   */
+  void loadDescriptorPool(std::unique_ptr<Protobuf::DescriptorPool>&& descriptor_pool);
+
+  /**
    * If true, when trailer indicates a gRPC error and there was no HTTP body,
    * make google.rpc.Status out of gRPC status headers and use it as JSON body.
    */
   bool convertGrpcStatus() const;
 
   bool disabled() const { return disabled_; }
+  bool initialized() const { return initialized_; }
+  bool error() const { return error_; }
 
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       RequestValidationOptions request_validation_options_{};
@@ -115,8 +126,6 @@ private:
    */
   ProtobufUtil::Status methodToRequestInfo(const MethodInfoSharedPtr& method_info,
                                            google::grpc::transcoding::RequestInfo* info) const;
-
-  void addFileDescriptor(const Protobuf::FileDescriptorProto& file);
   ProtobufUtil::Status resolveField(const Protobuf::Descriptor* descriptor,
                                     const std::string& field_path_str,
                                     std::vector<const ProtobufWkt::Field*>* field_path,
@@ -125,7 +134,13 @@ private:
                                         const google::api::HttpRule& http_rule,
                                         MethodInfoSharedPtr& method_info);
 
-  Protobuf::DescriptorPool descriptor_pool_;
+  /**
+   * A copy of the original proto_config.
+   */
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config_;
+
+  std::unique_ptr<Protobuf::DescriptorPool> descriptor_pool_;
+
   google::grpc::transcoding::PathMatcherPtr<MethodInfoSharedPtr> path_matcher_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
   Protobuf::util::JsonPrintOptions print_options_;
@@ -134,7 +149,33 @@ private:
   bool ignore_unknown_query_parameters_{false};
   bool convert_grpc_status_{false};
 
+  /**
+   * True means that a filter using this config will pass through requests and
+   * responses without modification.
+   */
   bool disabled_;
+
+  /**
+   * This should be set if and only if the protobuf descriptor descriptor pool
+   * has been passed into this class.
+   * False means that a filter using this config will pass through requests and
+   * responses without modification.
+   */
+  bool initialized_;
+
+  /**
+   * True means that the filter encountered an initialization error when
+   * loading this config. This is useful for debugging and unit testing because
+   * we cannot throw exceptions in loadDescriptorPool, since it may be called
+   * from a context without exception capture.
+   */
+  bool error_;
+
+  /**
+   * Used for building the descriptor pool for this config instance. We need to keep this alive in
+   * case we are using gRPC reflection.
+   */
+  DescriptorPoolBuilderSharedPtr descriptor_pool_builder_;
 };
 
 using JsonTranscoderConfigSharedPtr = std::shared_ptr<JsonTranscoderConfig>;

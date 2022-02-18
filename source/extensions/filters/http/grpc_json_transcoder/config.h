@@ -10,6 +10,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
 
+// Forward declaration, to avoid needing to include the entire header.
+class JsonTranscoderConfig;
+using JsonTranscoderConfigSharedPtr = std::shared_ptr<JsonTranscoderConfig>;
+
 /**
  * Config registration for the gRPC JSON transcoder filter. @see NamedHttpFilterConfigFactory.
  */
@@ -29,6 +33,10 @@ private:
       const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&,
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;
+
+  JsonTranscoderConfigSharedPtr createConfig(
+      const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&,
+      Server::Configuration::CommonFactoryContext& context);
 };
 
 } // namespace GrpcJsonTranscoder

@@ -110,111 +110,19 @@ private:
 JsonTranscoderConfig::JsonTranscoderConfig(
     const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
-    Api::Api& api) {
-
+    DescriptorPoolBuilderSharedPtr descriptor_pool_builder)
+    : proto_config_(proto_config), initialized_(false), error_(false),
+      descriptor_pool_builder_(descriptor_pool_builder) {
   disabled_ = proto_config.services().empty();
   if (disabled_) {
     return;
   }
 
-  FileDescriptorSet descriptor_set;
-
-  switch (proto_config.descriptor_set_case()) {
-  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
-      DescriptorSetCase::kProtoDescriptor:
-    if (!descriptor_set.ParseFromString(
-            api.fileSystem().fileReadToEnd(proto_config.proto_descriptor()))) {
-      throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
-    }
-    break;
-  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
-      DescriptorSetCase::kProtoDescriptorBin:
-    if (!descriptor_set.ParseFromString(proto_config.proto_descriptor_bin())) {
-      throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
-    }
-    break;
-  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
-      DescriptorSetCase::DESCRIPTOR_SET_NOT_SET:
-    throw EnvoyException("transcoding_filter: descriptor not set");
-  }
-
-  for (const auto& file : descriptor_set.file()) {
-    addFileDescriptor(file);
-  }
-
+  descriptor_pool_builder_->requestDescriptorPool(
+      [this](std::unique_ptr<Protobuf::DescriptorPool>&& descriptor_pool) {
+        this->loadDescriptorPool(std::move(descriptor_pool));
+      });
   convert_grpc_status_ = proto_config.convert_grpc_status();
-  if (convert_grpc_status_) {
-    addBuiltinSymbolDescriptor("google.protobuf.Any");
-    addBuiltinSymbolDescriptor("google.rpc.Status");
-  }
-
-  type_helper_ = std::make_unique<google::grpc::transcoding::TypeHelper>(
-      Protobuf::util::NewTypeResolverForDescriptorPool(Grpc::Common::typeUrlPrefix(),
-                                                       &descriptor_pool_));
-
-  PathMatcherBuilder<MethodInfoSharedPtr> pmb;
-  // clang-format off
-  // We cannot convert this to a absl hash set as PathMatcherUtility::RegisterByHttpRule takes a
-  // std::unordered_set as an argument
-  std::unordered_set<std::string> ignored_query_parameters;
-  // clang-format on
-  for (const auto& query_param : proto_config.ignored_query_parameters()) {
-    ignored_query_parameters.insert(query_param);
-  }
-
-  for (const auto& service_name : proto_config.services()) {
-    auto service = descriptor_pool_.FindServiceByName(service_name);
-    if (service == nullptr) {
-      throw EnvoyException("transcoding_filter: Could not find '" + service_name +
-                           "' in the proto descriptor");
-    }
-    for (int i = 0; i < service->method_count(); ++i) {
-      auto method = service->method(i);
-
-      HttpRule http_rule;
-      if (method->options().HasExtension(google::api::http)) {
-        http_rule = method->options().GetExtension(google::api::http);
-      } else if (proto_config.auto_mapping()) {
-        auto post = "/" + service->full_name() + "/" + method->name();
-        http_rule.set_post(post);
-        http_rule.set_body("*");
-      }
-
-      MethodInfoSharedPtr method_info;
-      Status status = createMethodInfo(method, http_rule, method_info);
-      if (!status.ok()) {
-        throw EnvoyException("transcoding_filter: Cannot register '" + method->full_name() +
-                             "': " + status.message().ToString());
-      }
-
-      if (!PathMatcherUtility::RegisterByHttpRule(pmb, http_rule, ignored_query_parameters,
-                                                  method_info)) {
-        throw EnvoyException("transcoding_filter: Cannot register '" + method->full_name() +
-                             "' to path matcher");
-      }
-    }
-  }
-
-  switch (proto_config.url_unescape_spec()) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
-      ALL_CHARACTERS_EXCEPT_RESERVED:
-    pmb.SetUrlUnescapeSpec(
-        google::grpc::transcoding::UrlUnescapeSpec::kAllCharactersExceptReserved);
-    break;
-  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
-      ALL_CHARACTERS_EXCEPT_SLASH:
-    pmb.SetUrlUnescapeSpec(google::grpc::transcoding::UrlUnescapeSpec::kAllCharactersExceptSlash);
-    break;
-  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
-      ALL_CHARACTERS:
-    pmb.SetUrlUnescapeSpec(google::grpc::transcoding::UrlUnescapeSpec::kAllCharacters);
-    break;
-  }
-  pmb.SetQueryParamUnescapePlus(proto_config.query_param_unescape_plus());
-  pmb.SetMatchUnregisteredCustomVerb(proto_config.match_unregistered_custom_verb());
-
-  path_matcher_ = pmb.Build();
 
   const auto& print_config = proto_config.print_options();
   print_options_.add_whitespace = print_config.add_whitespace();
@@ -225,28 +133,6 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   match_incoming_request_route_ = proto_config.match_incoming_request_route();
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
   request_validation_options_ = proto_config.request_validation_options();
-}
-
-void JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
-  if (descriptor_pool_.BuildFile(file) == nullptr) {
-    throw EnvoyException("transcoding_filter: Unable to build proto descriptor pool");
-  }
-}
-
-void JsonTranscoderConfig::addBuiltinSymbolDescriptor(const std::string& symbol_name) {
-  if (descriptor_pool_.FindFileContainingSymbol(symbol_name) != nullptr) {
-    return;
-  }
-
-  auto* builtin_pool = Protobuf::DescriptorPool::generated_pool();
-  if (!builtin_pool) {
-    return;
-  }
-
-  Protobuf::DescriptorPoolDatabase pool_database(*builtin_pool);
-  Protobuf::FileDescriptorProto file_proto;
-  pool_database.FindFileContainingSymbol(symbol_name, &file_proto);
-  addFileDescriptor(file_proto);
 }
 
 Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor,
@@ -319,6 +205,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     std::unique_ptr<Transcoder>& transcoder, MethodInfoSharedPtr& method_info) const {
 
   ASSERT(!disabled_);
+  ASSERT(initialized_);
   const std::string method(headers.getMethodValue());
   std::string path(headers.getPathValue());
   std::string args;
@@ -415,6 +302,94 @@ JsonTranscoderConfig::translateProtoMessageToJson(const Protobuf::Message& messa
       message.SerializeAsString(), json_out, print_options_);
 }
 
+void JsonTranscoderConfig::loadDescriptorPool(
+    std::unique_ptr<Protobuf::DescriptorPool>&& descriptor_pool) {
+  if (initialized_ || error_) {
+    ENVOY_LOG(warn, "transcoding_filter: tried to set descriptor pool for an already "
+                    "initialized or errored filter. Ignoring second attempt without error.");
+    return;
+  }
+
+  descriptor_pool_ = std::move(descriptor_pool);
+
+  type_helper_ = std::make_unique<google::grpc::transcoding::TypeHelper>(
+      Protobuf::util::NewTypeResolverForDescriptorPool(Grpc::Common::typeUrlPrefix(),
+                                                       descriptor_pool_.get()));
+
+  // Do all the initialization that blocks on a descriptor pool being available.
+  PathMatcherBuilder<MethodInfoSharedPtr> pmb;
+  // clang-format off
+  // We cannot convert this to a absl hash set as PathMatcherUtility::RegisterByHttpRule takes a
+  // std::unordered_set as an argument
+  std::unordered_set<std::string> ignored_query_parameters;
+  // clang-format on
+  for (const auto& query_param : proto_config_.ignored_query_parameters()) {
+    ignored_query_parameters.insert(query_param);
+  }
+
+  for (const auto& service_name : proto_config_.services()) {
+    auto service = descriptor_pool_->FindServiceByName(service_name);
+    if (service == nullptr) {
+      ENVOY_LOG(error, "transcoding_filter: Could not find '" + service_name +
+                           "' in the proto descriptor");
+      error_ = true;
+      return;
+    }
+    for (int i = 0; i < service->method_count(); ++i) {
+      auto method = service->method(i);
+
+      HttpRule http_rule;
+      if (method->options().HasExtension(google::api::http)) {
+        http_rule = method->options().GetExtension(google::api::http);
+      } else if (proto_config_.auto_mapping()) {
+        auto post = "/" + service->full_name() + "/" + method->name();
+        http_rule.set_post(post);
+        http_rule.set_body("*");
+      }
+
+      MethodInfoSharedPtr method_info;
+      Status status = createMethodInfo(method, http_rule, method_info);
+      if (!status.ok()) {
+        ENVOY_LOG(error, "transcoding_filter: Cannot register '" + method->full_name() +
+                             "': " + status.message().ToString());
+        error_ = true;
+        return;
+      }
+
+      if (!PathMatcherUtility::RegisterByHttpRule(pmb, http_rule, ignored_query_parameters,
+                                                  method_info)) {
+        ENVOY_LOG(error, "transcoding_filter: Cannot register '" + method->full_name() +
+                             "' to path matcher");
+        error_ = true;
+        return;
+      }
+    }
+  }
+
+  switch (proto_config_.url_unescape_spec()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
+      ALL_CHARACTERS_EXCEPT_RESERVED:
+    pmb.SetUrlUnescapeSpec(
+        google::grpc::transcoding::UrlUnescapeSpec::kAllCharactersExceptReserved);
+    break;
+  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
+      ALL_CHARACTERS_EXCEPT_SLASH:
+    pmb.SetUrlUnescapeSpec(google::grpc::transcoding::UrlUnescapeSpec::kAllCharactersExceptSlash);
+    break;
+  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
+      ALL_CHARACTERS:
+    pmb.SetUrlUnescapeSpec(google::grpc::transcoding::UrlUnescapeSpec::kAllCharacters);
+    break;
+  }
+
+  pmb.SetQueryParamUnescapePlus(proto_config_.query_param_unescape_plus());
+  pmb.SetMatchUnregisteredCustomVerb(proto_config_.match_unregistered_custom_verb());
+
+  path_matcher_ = pmb.Build();
+  initialized_ = true;
+}
+
 JsonTranscoderFilter::JsonTranscoderFilter(const JsonTranscoderConfig& config) : config_(config) {}
 
 void JsonTranscoderFilter::initPerRouteConfig() {
@@ -427,7 +402,7 @@ void JsonTranscoderFilter::initPerRouteConfig() {
 Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool end_stream) {
   initPerRouteConfig();
-  if (per_route_config_->disabled()) {
+  if (per_route_config_->disabled() || per_route_config_->error()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -676,7 +651,8 @@ JsonTranscoderFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
 }
 
 void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_or_trailers) {
-  if (error_ || !transcoder_ || !per_route_config_ || per_route_config_->disabled()) {
+  if (error_ || !transcoder_ || !per_route_config_ || per_route_config_->disabled() ||
+      per_route_config_->error()) {
     return;
   }
 
