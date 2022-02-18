@@ -49,6 +49,11 @@ public:
   // Method to enable TLS.
   bool startSecureTransport() override;
 
+  void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                        std::chrono::microseconds rtt) override {
+    return active_socket_->configureInitialCongestionWindow(bandwidth_bits_per_sec, rtt);
+  }
+
 private:
   // Socket used in all transport socket operations.
   // initially it is set to use raw buffer socket but
