@@ -36,7 +36,7 @@ bool MinimumClustersValidator::validate(
   // If the number of clusters after removing all of the clusters in the removed_resources list is
   // above the threshold, then it is surely a valid config.
   const Upstream::ClusterManager::ClusterInfoMaps cur_clusters = cm.clusters();
-  const uint32_t cur_clusters_num = cur_clusters.added_via_api_clusters_.size();
+  const uint32_t cur_clusters_num = cur_clusters.added_via_api_clusters_num_;
   const uint32_t removed_resources_size = static_cast<uint32_t>(removed_resources.size());
   if ((cur_clusters_num >= removed_resources_size) &&
       (cur_clusters_num - removed_resources_size >= min_clusters_num_)) {

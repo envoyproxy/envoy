@@ -26,7 +26,7 @@ public:
 // Validates that an empty config accepts an update with no clusters.
 TEST_F(MinimumClustersValidatorTest, NoMinimumNoClusters) {
   envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;
-  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{}, {}, {}};
+  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{}, {}, 0};
   MinimumClustersValidator validator(config);
 
   const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
@@ -40,7 +40,7 @@ TEST_F(MinimumClustersValidatorTest, NoMinimumNoClusters) {
 TEST_F(MinimumClustersValidatorTest, Minimum1NoClusters) {
   envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;
   config.set_min_clusters_num(1);
-  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{}, {}, {}};
+  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{}, {}, 0};
   MinimumClustersValidator validator(config);
 
   const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
@@ -55,7 +55,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1NoClusters) {
 // is accepted.
 TEST_F(MinimumClustersValidatorTest, Minimum1SingleCluster) {
   envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;
-  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{}, {}, {}};
+  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{}, {}, 0};
   MinimumClustersValidator validator(config);
 
   auto cluster = std::make_unique<envoy::config::cluster::v3::Cluster>();
@@ -72,7 +72,7 @@ TEST_F(MinimumClustersValidatorTest, NoMinimumSingleCluster) {
   envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;
   NiceMock<Upstream::MockClusterMockPrioritySet> foo_cluster;
   Upstream::MockClusterManager::ClusterInfoMaps cluster_info{
-      {{"foo", foo_cluster}}, {}, {{"foo", foo_cluster}}};
+      {{"foo", foo_cluster}}, {}, 1};
   MinimumClustersValidator validator(config);
 
   const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
@@ -88,7 +88,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1Empty) {
   config.set_min_clusters_num(1);
   NiceMock<Upstream::MockClusterMockPrioritySet> foo_cluster;
   Upstream::MockClusterManager::ClusterInfoMaps cluster_info{
-      {{"foo", foo_cluster}}, {}, {{"foo", foo_cluster}}};
+      {{"foo", foo_cluster}}, {}, 1};
   MinimumClustersValidator validator(config);
 
   const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
@@ -105,8 +105,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters2Remove1) {
   NiceMock<Upstream::MockClusterMockPrioritySet> foo_cluster, bar_cluster;
   Upstream::MockClusterManager::ClusterInfoMaps cluster_info{
       {{"foo", foo_cluster}, {"bar", bar_cluster}},
-      {},
-      {{"foo", foo_cluster}, {"bar", bar_cluster}}};
+      {}, 2};
   MinimumClustersValidator validator(config);
 
   const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
@@ -123,7 +122,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1RemoveNonExistent) {
   config.set_min_clusters_num(1);
   NiceMock<Upstream::MockClusterMockPrioritySet> foo_cluster;
   Upstream::MockClusterManager::ClusterInfoMaps cluster_info{
-      {{"foo", foo_cluster}}, {}, {{"foo", foo_cluster}}};
+      {{"foo", foo_cluster}}, {}, 1};
   MinimumClustersValidator validator(config);
 
   const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
@@ -140,7 +139,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1Remove1) {
   config.set_min_clusters_num(1);
   NiceMock<Upstream::MockClusterMockPrioritySet> foo_cluster;
   Upstream::MockClusterManager::ClusterInfoMaps cluster_info{
-      {{"foo", foo_cluster}}, {}, {{"foo", foo_cluster}}};
+      {{"foo", foo_cluster}}, {}, 1};
   MinimumClustersValidator validator(config);
 
   const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
@@ -161,7 +160,7 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1Remove1NonApi) {
   config.set_min_clusters_num(1);
   NiceMock<Upstream::MockClusterMockPrioritySet> foo_cluster;
   Upstream::MockClusterManager::ClusterInfoMaps cluster_info{
-      {{"foo", foo_cluster}}, {}, {{"foo", foo_cluster}}};
+      {{"foo", foo_cluster}}, {}, 1};
   MinimumClustersValidator validator(config);
 
   const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;

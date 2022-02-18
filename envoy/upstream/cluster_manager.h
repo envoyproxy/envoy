@@ -269,9 +269,9 @@ public:
     ClusterInfoMap active_clusters_;
     ClusterInfoMap warming_clusters_;
 
-    // Clusters that were dynamically added via API (xDS). This map will be a
-    // subset of the `active_clusters_` and `warming_clusters_` maps.
-    ClusterInfoMap added_via_api_clusters_;
+    // Number of clusters that were dynamically added via API (xDS). This will be
+    // less than or equal to the number of `active_clusters_` and `warming_clusters_`.
+    uint32_t added_via_api_clusters_num_{0};
   };
 
   /**

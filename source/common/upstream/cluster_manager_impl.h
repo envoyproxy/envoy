@@ -268,13 +268,13 @@ public:
     for (const auto& cluster : active_clusters_) {
       clusters_maps.active_clusters_.emplace(cluster.first, *cluster.second->cluster_);
       if (cluster.second->cluster_->info()->addedViaApi()) {
-        clusters_maps.added_via_api_clusters_.emplace(cluster.first, *cluster.second->cluster_);
+        ++clusters_maps.added_via_api_clusters_num_;
       }
     }
     for (const auto& cluster : warming_clusters_) {
       clusters_maps.warming_clusters_.emplace(cluster.first, *cluster.second->cluster_);
       if (cluster.second->cluster_->info()->addedViaApi()) {
-        clusters_maps.added_via_api_clusters_.emplace(cluster.first, *cluster.second->cluster_);
+        ++clusters_maps.added_via_api_clusters_num_;
       }
     }
     return clusters_maps;

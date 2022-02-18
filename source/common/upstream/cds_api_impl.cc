@@ -40,7 +40,6 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& r
   for (const auto& resource : resources) {
     all_existing_clusters.active_clusters_.erase(resource.get().name());
     all_existing_clusters.warming_clusters_.erase(resource.get().name());
-    all_existing_clusters.added_via_api_clusters_.erase(resource.get().name());
   }
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
   for (const auto& [cluster_name, _] : all_existing_clusters.active_clusters_) {
