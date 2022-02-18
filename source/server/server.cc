@@ -530,7 +530,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
                                      : ReusePortDefault::False;
   } else {
     // This is needed so that we don't read the value until runtime is fully initialized.
-    enable_reuse_port_default_ = ReusePortDefault::Runtime;
+    enable_reuse_port_default_ = ReusePortDefault::True;
   }
   admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this,
                                        initial_config.admin().ignoreGlobalConnLimit());
@@ -1009,9 +1009,6 @@ bool InstanceImpl::enableReusePortDefault() {
     return true;
   case ReusePortDefault::False:
     return false;
-  case ReusePortDefault::Runtime:
-    return Runtime::runtimeFeatureEnabled(
-        "envoy.reloadable_features.listener_reuse_port_default_enabled");
   }
 
   return false; // for gcc
