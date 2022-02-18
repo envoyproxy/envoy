@@ -46,7 +46,7 @@ SanMatcherPtr createStringSanMatcher(
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SAN_TYPE_UNSPECIFIED:
     PANIC("unhandled value");
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  throw EnvoyException("unexpected san_type enum provided");
 }
 
 } // namespace Tls
