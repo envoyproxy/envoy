@@ -864,7 +864,17 @@ envoy_cluster_upstream_cx_active{cluster="c2"} 12
 
   CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::OK, code_response.first);
-  EXPECT_THAT(expected_response, code_response.second);
+  EXPECT_EQ(expected_response, code_response.second);
+}
+
+TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusInvalidRegex) {
+  std::string url = "/stats?format=prometheus&filter=(+invalid)";
+
+  createTestStats();
+
+  CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_THAT(code_response.second, HasSubstr("Invalid regex"));
 }
 
 class StatsHandlerPrometheusWithTextReadoutsTest
