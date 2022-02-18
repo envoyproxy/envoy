@@ -18,6 +18,7 @@ envoy_cc_library(
     hdrs = ["json_transcoder_filter.h"],
     external_deps = [
         "path_matcher",
+        "grpc",
         "grpc_transcoding",
         "http_api_protos",
         "api_httpbody_protos",
@@ -28,10 +29,12 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
+        "//source/common/grpc:async_client_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
         "//source/common/runtime:runtime_features_lib",
         "@com_google_googleapis//google/api:http_cc_proto",
+        "@com_github_grpc_grpc//:grpc++_reflection",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
     ],
 )

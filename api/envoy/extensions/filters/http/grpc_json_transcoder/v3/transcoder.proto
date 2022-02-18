@@ -101,6 +101,11 @@ message GrpcJsonTranscoder {
     // :ref:`the proto descriptor set <config_grpc_json_generate_proto_descriptor_set>` for the gRPC
     // services.
     bytes proto_descriptor_bin = 4;
+
+    // Supplies the cluster name of the gRPC cluster to use for reflection.
+    // :ref:`the proto descriptor set <config_grpc_json_generate_proto_descriptor_set>` for the gRPC
+    // services.
+    string proto_descriptor_cluster_name = 14;
   }
 
   // A list of strings that

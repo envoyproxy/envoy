@@ -1,16 +1,28 @@
 #pragma once
 
+#include <memory>
+#include <mutex>
+#include <grpcpp/grpcpp.h>
+#include <grpcpp/channel.h>
+#include <google/protobuf/descriptor.h>
+#include <google/protobuf/repeated_field.h>
+
 #include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
+#include "envoy/upstream/cluster_manager.h"
+#include "source/common/grpc/typed_async_client.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/grpc/codec.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/grpc/typed_async_client.h"
+#include "source/common/init/target_impl.h"
 #include "source/extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
+#include "src/proto/grpc/reflection/v1alpha/reflection.grpc.pb.h"
 
 #include "google/api/http.pb.h"
 #include "grpc_transcoding/path_matcher.h"
@@ -49,6 +61,190 @@ struct MethodInfo {
 };
 using MethodInfoSharedPtr = std::shared_ptr<MethodInfo>;
 
+// Forward declarations
+class DescriptorPoolBuilder;
+class JsonTranscoderConfig;
+
+/**
+ * This class contains the logic for starting gRPC reflection Rpcs and handling
+ * callbacks.
+ */
+class AsyncReflectionFetcher :
+    public Envoy::Grpc::AsyncStreamCallbacks<grpc::reflection::v1alpha::ServerReflectionResponse> {
+public:
+  /**
+   * Constructor. All arguments are used for needed for making non-blocking gRpc requests with the
+   * Envoy client.
+   */
+  AsyncReflectionFetcher(const std::string& cluster_name, const google::protobuf::RepeatedPtrField<std::string>& services,
+      TimeSource& time_source, Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager) :
+      cluster_name_(cluster_name),
+      time_source_(time_source),
+      cluster_manager_(cluster_manager),
+      init_manager_(init_manager),
+      services_(std::begin(services), std::end(services)),
+      async_clients_() {}
+
+  /**
+   * Ask this AsyncReflectionFetcher to call descriptor_pool_builder.
+   */
+  void requestFileDescriptors(DescriptorPoolBuilder* descriptor_pool_builder);
+
+  /**
+   * Kick off reflection Rpcs; invoked by initManager.
+   */
+  void startReflectionRpcs();
+
+  /**
+   * Callback for a successful Server Reflection response.
+   */
+  void onReceiveMessage(std::unique_ptr<grpc::reflection::v1alpha::ServerReflectionResponse>&& message);
+
+  /**
+   * See RawAsyncStreamCallbacks for documentation of these methods.
+   */
+  void onCreateInitialMetadata(Http::RequestHeaderMap&) {}
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) {};
+
+  /**
+   * These two are used for detecting unexpected errors.
+   */
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override;
+  void onRemoteClose(Envoy::Grpc::Status::GrpcStatus status, const std::string& message) override;
+
+private:
+  /**
+   * The name of the upstream Envoy cluster serving gRPC.
+   */
+  const std::string cluster_name_;
+
+  /**
+   * Time source from the factory context; used for making gRPC requests.
+   */
+  TimeSource& time_source_;
+
+  /**
+   * Reference to the upstream cluster managered, used for constructing a
+   * Envoy::Grpc::AsyncClientImpl to make non-blocking Reflection Rpcs with.
+   */
+  Upstream::ClusterManager& cluster_manager_;
+
+  /**
+   * Reference to the factory context's init manager, used for deferring
+   * completion of filter initialization until the reflection Rpcs complete.
+   */
+  Init::Manager& init_manager_;
+
+  /**
+   * A pointer to the DescriptorPoolBuilder that requested file descriptors from us.
+   */
+  DescriptorPoolBuilder* descriptor_pool_builder_;
+
+  /**
+   * The remaining services that we need protos for.
+   */
+  std::unordered_set<std::string> services_;
+
+  /**
+   * The async clients used to make each server reflection request. We are
+   * using multiple clients to send multiple streaming Rpcs in parallel, as
+   * recommended by qiwzhang.
+   */
+  std::vector<std::unique_ptr<Envoy::Grpc::AsyncClient<grpc::reflection::v1alpha::ServerReflectionRequest,
+      grpc::reflection::v1alpha::ServerReflectionResponse> >> async_clients_;
+
+
+  /**
+   * The target for the initManager, used to notify the init manager that the
+   * filter has finished initializing.
+   */
+  std::unique_ptr<Init::TargetImpl> init_target_;
+
+  /**
+   * The file descriptors we have received from reflection requests thus far.
+   */
+  Envoy::Protobuf::FileDescriptorSet file_descriptor_set_;
+
+  /**
+   * This mutex protects the data structures manipulated in the
+   * onReceiveMessage callback, since the same object is used for handling all
+   * the callbacks.
+   */
+  std::mutex receive_message_mutex_;
+};
+
+/**
+ * This class contains the logic for building a protobuf descriptor pool from a
+ * set of FileDescriptorProtos.
+ */
+class DescriptorPoolBuilder {
+public:
+  /**
+   * Constructor for the non-reflection usage.
+   */
+  DescriptorPoolBuilder(
+      const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
+          proto_config,
+      Api::Api& api) :
+    proto_config_(proto_config),
+    api_(&api) {}
+
+  /**
+   * Constructor. The async_reflection_fetcher is injected rather than
+   * constructed internally for easier unit testing.
+   */
+  DescriptorPoolBuilder(
+      const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
+          proto_config,
+      std::shared_ptr<AsyncReflectionFetcher> async_reflection_fetcher);
+
+  /**
+   * Ask this DescriptorPoolBuilder to call json_transcoder_config.setDescriptorPool at some point
+   * the future. If this DescriptorPoolBuilder is using reflection, the requested call will
+   * happen after the completion of reflection Rpcs. Otherwise, the requested call will happen
+   * before this call returns.
+   */
+  void requestDescriptorPool(JsonTranscoderConfig* json_transcoder_config);
+
+  /**
+   * Convert the given FileDescriptorSet into a descriptor pool and inject it
+   * into the json_transcoder_config passed to requestDescriptorPool.
+   */
+  void loadFileDescriptorProtos(const Envoy::Protobuf::FileDescriptorSet& file_descriptor_set);
+
+private:
+  /**
+   * A copy of the original proto_config.
+   */
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config_;
+
+  /**
+   * A pointer to our AsyncReflectionFetcher if we are using reflection. Set to nullptr if we are
+   * not using reflection.
+   */
+  std::shared_ptr<AsyncReflectionFetcher> async_reflection_fetcher_;
+
+  /**
+   * A pointer to the JsonTranscoderConfig that requested a descriptor pool.
+   * We inject our descriptor pool into this after we are done building it.
+   * This is only necessary for reflection, although we use it everywhere for
+   * consistency.
+   */
+  JsonTranscoderConfig* json_transcoder_config_;
+
+  /**
+   * API used for reading from the filesystem when loading protos from the filesystem.
+   */
+  Api::Api* api_;
+
+  /**
+   * The descriptor pool being built. This is mostly syntactic sugar to skip
+   * passing this variable into addFileDescriptor. This variable is fully
+   * consumed after being passed to json_transcoder_config_->setDescriptorPool.
+   */
+  Protobuf::DescriptorPool* descriptor_pool_;
+};
+
 /**
  * Global configuration for the gRPC JSON transcoder filter. Factory for the Transcoder interface.
  */
@@ -63,7 +259,7 @@ public:
   JsonTranscoderConfig(
       const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
           proto_config,
-      Api::Api& api);
+      std::shared_ptr<DescriptorPoolBuilder> descriptor_pool_builder);
 
   /**
    * Create an instance of Transcoder interface based on incoming request.
@@ -97,12 +293,20 @@ public:
   bool matchIncomingRequestInfo() const;
 
   /**
+   * Transfer ownership of a Protobuf::DescriptorPool and its fallback database
+   * into this class and enable the filter.
+   */
+  void loadDescriptorPoolAndDatabase(Protobuf::DescriptorPool* descriptor_pool,
+      Protobuf::DescriptorDatabase* descriptor_database);
+
+  /**
    * If true, when trailer indicates a gRPC error and there was no HTTP body,
    * make google.rpc.Status out of gRPC status headers and use it as JSON body.
    */
   bool convertGrpcStatus() const;
 
   bool disabled() const { return disabled_; }
+  bool initialized() const { return initialized_; }
 
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       RequestValidationOptions request_validation_options_{};
@@ -114,8 +318,6 @@ private:
   ProtobufUtil::Status methodToRequestInfo(const MethodInfoSharedPtr& method_info,
                                            google::grpc::transcoding::RequestInfo* info) const;
 
-  void addFileDescriptor(const Protobuf::FileDescriptorProto& file);
-  void addBuiltinSymbolDescriptor(const std::string& symbol_name);
   ProtobufUtil::Status resolveField(const Protobuf::Descriptor* descriptor,
                                     const std::string& field_path_str,
                                     std::vector<const ProtobufWkt::Field*>* field_path,
@@ -124,7 +326,18 @@ private:
                                         const google::api::HttpRule& http_rule,
                                         MethodInfoSharedPtr& method_info);
 
-  Protobuf::DescriptorPool descriptor_pool_;
+  /**
+   * A copy of the original proto_config.
+   */
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config_;
+
+  std::unique_ptr<Protobuf::DescriptorPool> descriptor_pool_;
+
+  /**
+   * This database is owned by the config because it is needed by
+   * descriptor_pool_ but the latter does not want to own this object.
+   */
+  std::unique_ptr<Protobuf::DescriptorDatabase> descriptor_database_;
   google::grpc::transcoding::PathMatcherPtr<MethodInfoSharedPtr> path_matcher_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
   Protobuf::util::JsonPrintOptions print_options_;
@@ -133,7 +346,25 @@ private:
   bool ignore_unknown_query_parameters_{false};
   bool convert_grpc_status_{false};
 
+  /**
+   * True means that a filter using this config will pass through requests and
+   * responses without modification.
+   */
   bool disabled_;
+
+  /**
+   * This should be set if and only if the protobuf descriptor descriptor pool
+   * has been passed into this class.
+   * False means that a filter using this config will pass through requests and
+   * responses without modification.
+   */
+  bool initialized_;
+
+  /**
+   * Used for building the descriptor pool for this config instance. We need to keep this alive in
+   * case we are using gRPC reflection.
+   */
+  std::shared_ptr<DescriptorPoolBuilder> descriptor_pool_builder_;
 };
 
 using JsonTranscoderConfigSharedPtr = std::shared_ptr<JsonTranscoderConfig>;
