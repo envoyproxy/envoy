@@ -80,8 +80,8 @@ function cp_binary_for_image_build() {
   fi
 
   # Tools for the tools image. Strip to save size.
-  cp -f bazel-bin/test/tools/schema_validator/schema_validator_tool "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
-  strip "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
+  strip bazel-bin/test/tools/schema_validator/schema_validator_tool \
+    -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
 
   # Copy the su-exec utility binary into the image
   cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
