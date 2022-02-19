@@ -82,7 +82,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog:83.3" # Death tests within extensions
 "source/extensions/watchdog/profile_action:83.3"
 "source/server:93.3" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
-"source/server/admin:99"
+"source/server/admin:97.6"
 "source/server/config_validation:74.8"
 )
 

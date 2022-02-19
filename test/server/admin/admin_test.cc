@@ -277,7 +277,6 @@ TEST_P(AdminInstanceTest, Overrides) {
   peer.listener().udpListenerConfig();
   peer.listener().direction();
   peer.listener().tcpBacklogSize();
-  peer.listener().initManager();
 }
 
 } // namespace Server
