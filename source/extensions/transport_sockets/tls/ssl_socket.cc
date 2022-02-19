@@ -164,7 +164,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 }
 
 void SslSocket::onPrivateKeyMethodComplete() {
-  ASSERT(isThreadSafe());
+  ASSERT(callbacks_ != nullptr && callbacks_->connection().dispatcher().isThreadSafe());
   ASSERT(info_->state() == Ssl::SocketState::HandshakeInProgress);
 
   // Resume handshake.
