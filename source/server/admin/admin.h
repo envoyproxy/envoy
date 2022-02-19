@@ -93,7 +93,7 @@ public:
                          const std::string& address_out_path,
                          Network::Address::InstanceConstSharedPtr address,
                          const Network::Socket::OptionsSharedPtr& socket_options,
-                         Stats::ScopeSharedPtr&& listener_scope) override;
+                         Stats::ScopePtr&& listener_scope) override;
   uint32_t concurrency() const override { return server_.options().concurrency(); }
 
   // Network::FilterChainManager
@@ -370,7 +370,7 @@ private:
 
   class AdminListener : public Network::ListenerConfig {
   public:
-    AdminListener(AdminImpl& parent, Stats::ScopeSharedPtr&& listener_scope)
+    AdminListener(AdminImpl& parent, Stats::ScopePtr&& listener_scope)
         : parent_(parent), name_("admin"), scope_(std::move(listener_scope)),
           stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)),
           init_manager_(nullptr), ignore_global_conn_limit_(parent.ignore_global_conn_limit_) {}
@@ -409,7 +409,7 @@ private:
 
     AdminImpl& parent_;
     const std::string name_;
-    Stats::ScopeSharedPtr scope_;
+    Stats::ScopePtr scope_;
     Http::ConnectionManagerListenerStats stats_;
     Network::NopConnectionBalancerImpl connection_balancer_;
     BasicResourceLimitImpl open_connections_;

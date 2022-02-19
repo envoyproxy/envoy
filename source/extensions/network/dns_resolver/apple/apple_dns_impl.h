@@ -136,7 +136,7 @@ private:
   Event::Dispatcher& dispatcher_;
   Event::TimerPtr initialize_failure_timer_;
   BackOffStrategyPtr backoff_strategy_;
-  Stats::ScopeSharedPtr scope_;
+  Stats::ScopePtr scope_;
   AppleDnsResolverStats stats_;
 };
 
