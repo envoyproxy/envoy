@@ -222,13 +222,16 @@ TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
 
 class AdminTestingPeer {
 public:
-  AdminTestingPeer(AdminImpl& admin) : admin_(admin), server_(admin.server_) {}
-  AdminImpl::NullRouteConfigProvider& route_config_provider() { return route_config_provider_; }
-  AdminImpl::NullScopedRouteConfigProvider& scoped_route_config_provider() {
+  AdminTestingPeer(AdminImpl& admin)
+      : admin_(admin), server_(admin.server_), listener_scope_(server_.stats().createScope("")) {}
+  AdminImpl::NullRouteConfigProvider& routeConfigProvider() { return route_config_provider_; }
+  AdminImpl::NullScopedRouteConfigProvider& scopedRouteConfigProvider() {
     return scoped_route_config_provider_;
   }
-  AdminImpl::NullOverloadManager& overload_manager() { return admin_.null_overload_manager_; }
-  AdminImpl::NullOverloadManager::OverloadState& overload_state() { return overload_state_; }
+  AdminImpl::NullOverloadManager& overloadManager() { return admin_.null_overload_manager_; }
+  AdminImpl::NullOverloadManager::OverloadState& overloadState() { return overload_state_; }
+  AdminImpl::AdminListenSocketFactory& socketFactory() { return socket_factory_; }
+  AdminImpl::AdminListener& listener() { return listener_; }
 
 private:
   AdminImpl& admin_;
@@ -236,6 +239,9 @@ private:
   AdminImpl::NullRouteConfigProvider route_config_provider_{server_.timeSource()};
   AdminImpl::NullScopedRouteConfigProvider scoped_route_config_provider_{server_.timeSource()};
   AdminImpl::NullOverloadManager::OverloadState overload_state_{server_.dispatcher()};
+  AdminImpl::AdminListenSocketFactory socket_factory_{nullptr};
+  Stats::ScopeSharedPtr listener_scope_;
+  AdminImpl::AdminListener listener_{admin_, std::move(listener_scope_)};
 };
 
 TEST_P(AdminInstanceTest, Overrides) {
@@ -244,24 +250,34 @@ TEST_P(AdminInstanceTest, Overrides) {
 
   AdminTestingPeer peer(admin_);
 
-  peer.route_config_provider().config();
-  peer.route_config_provider().configInfo();
-  peer.route_config_provider().lastUpdated();
-  peer.route_config_provider().onConfigUpdate();
+  peer.routeConfigProvider().config();
+  peer.routeConfigProvider().configInfo();
+  peer.routeConfigProvider().lastUpdated();
+  peer.routeConfigProvider().onConfigUpdate();
 
-  peer.scoped_route_config_provider().lastUpdated();
-  peer.scoped_route_config_provider().getConfigProto();
-  peer.scoped_route_config_provider().getConfigVersion();
-  peer.scoped_route_config_provider().getConfig();
-  peer.scoped_route_config_provider().apiType();
-  peer.scoped_route_config_provider().getConfigProtos();
+  peer.scopedRouteConfigProvider().lastUpdated();
+  peer.scopedRouteConfigProvider().getConfigProto();
+  peer.scopedRouteConfigProvider().getConfigVersion();
+  peer.scopedRouteConfigProvider().getConfig();
+  peer.scopedRouteConfigProvider().apiType();
+  peer.scopedRouteConfigProvider().getConfigProtos();
 
   auto overload_name = Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections;
-  peer.overload_state().tryAllocateResource(overload_name, 0);
-  peer.overload_state().tryDeallocateResource(overload_name, 0);
-  peer.overload_state().isResourceMonitorEnabled(overload_name);
+  peer.overloadState().tryAllocateResource(overload_name, 0);
+  peer.overloadState().tryDeallocateResource(overload_name, 0);
+  peer.overloadState().isResourceMonitorEnabled(overload_name);
 
-  peer.overload_manager().scaledTimerFactory();
+  peer.overloadManager().scaledTimerFactory();
+
+  peer.socketFactory().clone();
+  peer.socketFactory().closeAllSockets();
+  peer.socketFactory().doFinalPreWorkerInit();
+
+  peer.listener().name();
+  peer.listener().udpListenerConfig();
+  peer.listener().direction();
+  peer.listener().tcpBacklogSize();
+  peer.listener().initManager();
 }
 
 } // namespace Server
