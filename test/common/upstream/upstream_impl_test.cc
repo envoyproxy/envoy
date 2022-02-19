@@ -3393,9 +3393,13 @@ TEST_F(ClusterInfoImplTest, Http3) {
             validation_context:
               trusted_ca:
                 filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-              match_subject_alt_names:
-              - exact: localhost
-              - exact: 127.0.0.1
+              match_typed_subject_alt_names:
+              - matcher:
+                  exact: localhost
+                san_type: URI
+              - matcher:
+                  exact: 127.0.0.1
+                san_type: IP_ADDRESS
   )EOF",
                                                        Network::Address::IpVersion::v4);
   auto cluster1 = makeCluster(yaml);
@@ -3466,9 +3470,13 @@ TEST_F(ClusterInfoImplTest, Http3BadConfig) {
             validation_context:
               trusted_ca:
                 filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-              match_subject_alt_names:
-              - exact: localhost
-              - exact: 127.0.0.1
+              match_typed_subject_alt_names:
+              - matcher:
+                  exact: localhost
+                san_type: URI
+              - matcher:
+                  exact: 127.0.0.1
+                san_type: IP_ADDRESS
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -3511,9 +3519,13 @@ TEST_F(ClusterInfoImplTest, Http3Auto) {
             validation_context:
               trusted_ca:
                 filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-              match_subject_alt_names:
-              - exact: localhost
-              - exact: 127.0.0.1
+              match_typed_subject_alt_names:
+              - matcher:
+                  exact: localhost
+                san_type: URI
+              - matcher:
+                  exact: 127.0.0.1
+                san_type: IP_ADDRESS
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -3570,9 +3582,13 @@ TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocolWithoutDowngrade) {
             validation_context:
               trusted_ca:
                 filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-              match_subject_alt_names:
-              - exact: localhost
-              - exact: 127.0.0.1
+              match_typed_subject_alt_names:
+              - matcher:
+                  exact: localhost
+                san_type: URI
+              - matcher:
+                  exact: 127.0.0.1
+                san_type: IP_ADDRESS
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions

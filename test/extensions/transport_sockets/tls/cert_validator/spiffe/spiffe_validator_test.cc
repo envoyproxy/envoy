@@ -64,13 +64,34 @@ public:
   // Setter.
   void setAllowExpiredCertificate(bool val) { allow_expired_certificate_ = val; }
   void setSanMatchers(std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers) {
-    san_matchers_ = san_matchers;
+    san_matchers_.clear();
+    for (auto& matcher : san_matchers) {
+      san_matchers_.emplace_back();
+      san_matchers_.back().set_san_type(
+          envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
+      *san_matchers_.back().mutable_matcher() = matcher;
+
+      san_matchers_.emplace_back();
+      san_matchers_.back().set_san_type(
+          envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
+      *san_matchers_.back().mutable_matcher() = matcher;
+
+      san_matchers_.emplace_back();
+      san_matchers_.back().set_san_type(
+          envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL);
+      *san_matchers_.back().mutable_matcher() = matcher;
+
+      san_matchers_.emplace_back();
+      san_matchers_.back().set_san_type(
+          envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS);
+      *san_matchers_.back().mutable_matcher() = matcher;
+    }
   };
 
 private:
   bool allow_expired_certificate_{false};
   TestCertificateValidationContextConfigPtr config_;
-  std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers_{};
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers_{};
   Stats::TestUtil::TestStore store_;
   SslStats stats_;
   Event::TestRealTimeSystem time_system_;
@@ -193,7 +214,8 @@ TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
 
   // Non-SPIFFE SAN
   cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/non_spiffe_san_cert.pem"));
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/non_spiffe_san_cert.pem"));
   EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
 
   // SPIFFE SAN

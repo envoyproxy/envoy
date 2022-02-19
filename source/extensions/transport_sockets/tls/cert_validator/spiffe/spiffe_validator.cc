@@ -1,5 +1,6 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
 
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/registry/registry.h"
@@ -37,7 +38,14 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
 
   if (!config->subjectAltNameMatchers().empty()) {
     for (const auto& matcher : config->subjectAltNameMatchers()) {
-      subject_alt_name_matchers_.push_back(Matchers::StringMatcherImpl(matcher));
+      if (matcher.san_type() ==
+          envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI) {
+        // Only match against URI SAN since SPIFFE specification does not restrict values in other
+        // SAN types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
+        // TODO(pradeepcrao): Throw an exception when a non-URI matcher is encountered after the
+        // deprecated field match_subject_alt_names is removed
+        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher));
+      }
     }
   }
 
@@ -224,15 +232,10 @@ bool SPIFFEValidator::matchSubjectAltName(X509& leaf_cert) {
   ASSERT(san_names != nullptr,
          "san_names should have at least one name after SPIFFE cert validation");
 
-  // Only match against URI SAN since SPIFFE specification does not restrict values in other SAN
-  // types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
   for (const GENERAL_NAME* general_name : san_names.get()) {
-    if (general_name->type == GEN_URI) {
-      const std::string san = Utility::generalNameAsString(general_name);
-      for (const auto& config_san_matcher : subject_alt_name_matchers_) {
-        if (config_san_matcher.match(san)) {
-          return true;
-        }
+    for (const auto& config_san_matcher : subject_alt_name_matchers_) {
+      if (config_san_matcher->match(general_name)) {
+        return true;
       }
     }
   }

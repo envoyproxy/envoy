@@ -66,8 +66,23 @@ void initializeUpstreamTlsContextConfig(
     common_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http3);
   }
   if (!options.san_.empty()) {
-    common_context->mutable_validation_context()->add_match_subject_alt_names()->set_exact(
-        options.san_);
+    envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher* matcher =
+        common_context->mutable_validation_context()->add_match_typed_subject_alt_names();
+    matcher->mutable_matcher()->set_exact(options.san_);
+    matcher->set_san_type(
+        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
+    matcher = common_context->mutable_validation_context()->add_match_typed_subject_alt_names();
+    matcher->mutable_matcher()->set_exact(options.san_);
+    matcher->set_san_type(
+        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
+    matcher = common_context->mutable_validation_context()->add_match_typed_subject_alt_names();
+    matcher->mutable_matcher()->set_exact(options.san_);
+    matcher->set_san_type(
+        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL);
+    matcher = common_context->mutable_validation_context()->add_match_typed_subject_alt_names();
+    matcher->mutable_matcher()->set_exact(options.san_);
+    matcher->set_san_type(
+        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS);
   }
   for (const std::string& cipher_suite : options.cipher_suites_) {
     common_context->mutable_tls_params()->add_cipher_suites(cipher_suite);
