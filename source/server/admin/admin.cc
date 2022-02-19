@@ -199,11 +199,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerServerInfo), false, false),
           makeHandler("/ready", "print server state, return 200 if LIVE, otherwise return 503",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerReady), false, false),
-          {"/stats", "print server stats",
-           [this](absl::string_view path, AdminStream& admin_stream) -> Admin::HandlerPtr {
-             return stats_handler_.makeContext(path, admin_stream);
-           },
-           false, false},
+          makeChunkedHandler("/stats", "print server stats", stats_handler_, false, false),
           makeHandler("/stats/prometheus", "print server stats in prometheus format",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerPrometheusStats), false, false),
           makeHandler("/stats/recentlookups", "Show recent stat-name lookups",

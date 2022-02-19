@@ -228,11 +228,33 @@ private:
    * Creates a Handler instance given a request.
    */
   HandlerPtr findHandler(absl::string_view path_and_query, AdminStream& admin_stream);
+
   /**
    * Creates a UrlHandler structure from a non-chunked callback.
    */
   UrlHandler makeHandler(const std::string& prefix, const std::string& help_text,
                          HandlerCb callback, bool removable, bool mutates_state);
+
+  /**
+   * Creates a URL prefix bound to chunked handler. Then handler is expected to
+   * supply a method makeContext(absl::string_view, AdminStream&).
+   *
+   * @param prefix the prefix to register
+   * @param help_text a help text ot display in a table in the admin home page
+   * @param handler the Handler object for the admin subsystem, supplying makeContext().
+   * @param removeable indicates whether the handler can be removed after being added
+   * @param mutates_state indicates whether the handler will mutate state and therefore
+   *                      must be accessed via HTTP POST rather than GET.
+   * @return the UrlHandler.
+   */
+  template<class Handler>
+  UrlHandler makeChunkedHandler(const std::string& prefix, const std::string& help_text,
+                                Handler& handler, bool removable, bool mutates_state) {
+    return {prefix, help_text,
+      [&handler](absl::string_view path, AdminStream& admin_stream) -> Admin::HandlerPtr {
+        return handler.makeContext(path, admin_stream);
+      }, removable, mutates_state};
+  }
 
   /**
    * Implementation of RouteConfigProvider that returns a static null route config.

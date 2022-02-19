@@ -16,7 +16,9 @@
 #include "absl/container/btree_map.h"
 #include "absl/types/variant.h"
 
+namespace {
 constexpr uint64_t ChunkSize = 2 * 1000 * 1000;
+} // namespace
 
 namespace Envoy {
 namespace Server {
@@ -76,6 +78,8 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
   return Http::Code::OK;
 }
 
+// Abstract class for rendering stats. Every method is called "generate"
+// differing only by the data type, for simplifying call-sites.
 class StatsHandler::Render {
 public:
   virtual ~Render() = default;
@@ -88,6 +92,7 @@ public:
   virtual bool nextChunk(Buffer::Instance& response) PURE;
 };
 
+// Implements the Render interface for simple textual representation of stats.
 class StatsHandler::TextRender : public StatsHandler::Render {
 public:
   void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override {
@@ -108,6 +113,7 @@ public:
   bool nextChunk(Buffer::Instance& response) override { return response.length() > ChunkSize; }
 };
 
+// Implements the Render interface for json output.
 class StatsHandler::JsonRender : public StatsHandler::Render {
 public:
   JsonRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response) {
