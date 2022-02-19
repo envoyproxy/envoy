@@ -11,9 +11,9 @@ namespace Validators {
 
 class MinimumClustersValidatorFactory : public Envoy::Config::ConfigValidatorFactory {
 public:
-  MinimumClustersValidatorFactory() {}
+  MinimumClustersValidatorFactory() = default;
 
-  virtual Envoy::Config::ConfigValidatorPtr
+  Envoy::Config::ConfigValidatorPtr
   createConfigValidator(const ProtobufWkt::Any& config,
                         ProtobufMessage::ValidationVisitor& validation_visitor) override;
 

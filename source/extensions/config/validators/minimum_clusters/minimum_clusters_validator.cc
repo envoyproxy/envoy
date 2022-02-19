@@ -14,7 +14,7 @@ bool MinimumClustersValidator::validate(
   absl::flat_hash_set<std::string> next_cluster_names(resources.size());
   for (const auto& resource : resources) {
     envoy::config::cluster::v3::Cluster cluster =
-        dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get()->resource());
+        dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource->resource());
 
     // If the cluster was already added in the current update, it won't be added twice.
     next_cluster_names.insert(cluster.name());
@@ -49,7 +49,7 @@ bool MinimumClustersValidator::validate(
   absl::flat_hash_set<std::string> added_cluster_names(added_resources.size());
   for (const auto& resource : added_resources) {
     envoy::config::cluster::v3::Cluster cluster =
-        dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get()->resource());
+        dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource->resource());
 
     // If the cluster was already added in the current update, skip this cluster.
     if (!added_cluster_names.insert(cluster.name()).second) {
