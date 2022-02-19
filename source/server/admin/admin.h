@@ -247,13 +247,14 @@ private:
    *                      must be accessed via HTTP POST rather than GET.
    * @return the UrlHandler.
    */
-  template<class Handler>
+  template <class Handler>
   UrlHandler makeChunkedHandler(const std::string& prefix, const std::string& help_text,
                                 Handler& handler, bool removable, bool mutates_state) {
     return {prefix, help_text,
-      [&handler](absl::string_view path, AdminStream& admin_stream) -> Admin::HandlerPtr {
-        return handler.makeContext(path, admin_stream);
-      }, removable, mutates_state};
+            [&handler](absl::string_view path, AdminStream& admin_stream) -> Admin::HandlerPtr {
+              return handler.makeContext(path, admin_stream);
+            },
+            removable, mutates_state};
   }
 
   /**
