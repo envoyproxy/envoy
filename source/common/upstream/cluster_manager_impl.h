@@ -77,7 +77,8 @@ public:
                        alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                   TimeSource& time_source, ClusterConnectivityState& state) override;
+                   TimeSource& time_source, ClusterConnectivityState& state,
+                   Http::PersistentQuicInfo& quic_info) override;
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
@@ -517,6 +518,7 @@ private:
       LoadBalancerPtr lb_;
       ClusterInfoConstSharedPtr cluster_info_;
       Http::AsyncClientImpl http_async_client_;
+      std::unique_ptr<Http::PersistentQuicInfo> quic_info_;
     };
 
     using ClusterEntryPtr = std::unique_ptr<ClusterEntry>;

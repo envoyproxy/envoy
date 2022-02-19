@@ -15,8 +15,6 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
 
-#include "quiche/quic/core/crypto/quic_client_session_cache.h"
-
 using testing::Return;
 
 namespace Envoy {
@@ -51,7 +49,7 @@ protected:
         context_);
     crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
         std::make_unique<Quic::EnvoyQuicProofVerifier>(factory_->sslCtx()),
-        std::make_unique<quic::QuicClientSessionCache>());
+        quic_info_->getQuicSessionCacheDelegate());
   }
 
   uint32_t highWatermark(EnvoyQuicClientSession* session) {
@@ -96,15 +94,12 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
 
   Http::MockAlternateProtocolsCache rtt_cache;
   quic::QuicConfig config;
-  PersistentQuicInfoImpl info{dispatcher_, 45};
+  PersistentQuicInfoImpl info{dispatcher_, *factory_, simTime(), 30, config, 45};
 
   EXPECT_CALL(rtt_cache, getSrtt).WillOnce(Return(std::chrono::microseconds(5)));
 
-  const int port = 30;
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
-      info, crypto_config_,
-      quic::QuicServerId{factory_->clientContextConfig().serverNameIndication(), port, false},
-      dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_);
+      info, dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_);
 
   EXPECT_EQ(info.quic_config_.GetInitialRoundTripTimeUsToSend(), 5);
 

@@ -847,7 +847,6 @@ envoy_cc_test_library(
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:codec_client_lib",
-        "//source/common/http/http3:quic_client_connection_factory_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/quic:quic_stat_names_lib",

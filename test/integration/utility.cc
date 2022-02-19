@@ -25,7 +25,6 @@
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
-#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 #endif
 
 #include "test/common/upstream/utility.h"
@@ -230,7 +229,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       *persistent_info,
       std::make_shared<quic::QuicCryptoClientConfig>(
           std::make_unique<Quic::EnvoyQuicProofVerifier>(quic_transport_socket_factory.sslCtx()),
-          std::make_unique<quic::QuicClientSessionCache>()),
+          persistent_info->getQuicSessionCacheDelegate()),
       quic::QuicServerId(quic_transport_socket_factory.clientContextConfig().serverNameIndication(),
                          static_cast<uint16_t>(addr->ip()->port())),
       *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store);

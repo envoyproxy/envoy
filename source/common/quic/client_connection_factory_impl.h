@@ -1,6 +1,10 @@
 #pragma once
 
-#include "source/common/http/http3/quic_client_connection_factory.h"
+#include <memory>
+
+#include "envoy/http/persistent_quic_info.h"
+#include "envoy/upstream/upstream.h"
+
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
@@ -9,6 +13,7 @@
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_client_stream.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 #include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
 
@@ -18,6 +23,9 @@ namespace Quic {
 // Information which can be shared across connections, though not across threads.
 struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   PersistentQuicInfoImpl(Event::Dispatcher& dispatcher, uint32_t buffer_limit);
+
+  // Get a delegate to access the quic session cache.
+  std::unique_ptr<quic::SessionCache> getQuicSessionCacheDelegate();
 
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
@@ -29,6 +37,7 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   quic::QuicClientPushPromiseIndex push_promise_index_;
   // Hard code with the default crypto stream as there's no pluggable crypto for upstream Envoy.
   EnvoyQuicCryptoClientStreamFactoryImpl crypto_stream_factory_;
+  quic::QuicClientSessionCache session_cache_;
 };
 
 std::unique_ptr<PersistentQuicInfoImpl>
