@@ -149,7 +149,7 @@ Http::StreamResetReason quicRstErrorToEnvoyLocalResetReason(quic::QuicRstStreamE
 Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStreamErrorCode rst_err);
 
 // Called when underlying QUIC connection is closed locally.
-Http::StreamResetReason quicErrorCodeToEnvoyLocalResetReason(quic::QuicErrorCode error);
+Http::StreamResetReason quicErrorCodeToEnvoyLocalResetReason(quic::QuicErrorCode error, bool connected);
 
 // Called when underlying QUIC connection is closed by peer.
 Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCode error);

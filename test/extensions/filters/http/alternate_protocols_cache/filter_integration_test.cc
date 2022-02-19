@@ -190,6 +190,59 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 2);
 }
 
+TEST_P(FilterIntegrationTest, RetryAfterHttp3ZeroRttHandshakeFailed) {
+  const uint64_t response_size = 0;
+  const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  int port = fake_upstreams_[0]->localAddress()->ip()->port();
+  std::string alt_svc = absl::StrCat("h3=\":", port, "\"; ma=86400");
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"alt-svc", alt_svc}};
+
+  // First request should go out over HTTP/2. The response includes an Alt-Svc header.
+  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0,
+                                                /*upstream_index=*/0, timeout);
+  checkSimpleRequestSuccess(0, response_size, response.get());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 1);
+
+  // Close the connection so the HTTP/2 connection will not be used.
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  fake_upstream_connection_.reset();
+
+  // The 2nd request should go out over HTTP/3 because of the Alt-Svc information.
+  auto response2 = sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0,
+                                                /*upstream_index=*/1, timeout);
+  checkSimpleRequestSuccess(0, response_size, response.get());
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_cx_http3_total")->value());
+  // Close the h3 upstream connection so that the next request will create another connection.
+ ASSERT_TRUE(fake_upstream_connection_->close());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 2);
+
+  // Stop the HTTP/3 fake upstream.
+  fake_upstreams_[1]->cleanUp();
+  
+ // The 3rd request should be sent over HTTP/3 as early data because of the cached 0-RTT credentials.
+  auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  // Wait for the upstream to connect timeout and the failed early data request to be retried.
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+   EXPECT_EQ(3u, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+
+  // The retry should attempt both HTTP/3 and HTTP/2. And the TCP connection will win the race.
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(response_headers, true);
+  ASSERT_TRUE(response3->waitForEndStream());
+  checkSimpleRequestSuccess(0, response_size, response3.get());
+  EXPECT_EQ(2u, test_server_->counter("cluster.cluster_0.upstream_cx_http2_total")->value());
+
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 4);
+
+  EXPECT_EQ(3u, test_server_->counter("cluster.cluster_0.upstream_cx_http3_total")->value());
+}
+
 INSTANTIATE_TEST_SUITE_P(Protocols, FilterIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP2}, {Http::CodecType::HTTP3})),

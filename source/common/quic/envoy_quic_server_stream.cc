@@ -332,7 +332,7 @@ void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
   // callbacks.
   if (!local_end_stream_) {
     runResetCallbacks(source == quic::ConnectionCloseSource::FROM_SELF
-                          ? quicErrorCodeToEnvoyLocalResetReason(error)
+                          ? quicErrorCodeToEnvoyLocalResetReason(error, session()->OneRttKeysAvailable())
                           : quicErrorCodeToEnvoyRemoteResetReason(error));
   }
   quic::QuicSpdyServerStreamBase::OnConnectionClosed(error, source);

@@ -96,6 +96,12 @@ void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
     connect_callback_->onHandshakeComplete();
   }
 }
+void Http3ConnPoolImpl::onConnectFailed(Envoy::ConnectionPool::ActiveClient& client) {
+  if (connect_callback_ != absl::nullopt && static_cast<ActiveClient&>(client).hasCreatedStream()) {
+    ASSERT(client.numActiveStreams() == 0);
+    connect_callback_->onZeroRttHandshakeFailed();
+  }
+}
 
 // Make sure all connections are torn down before quic_info_ is deleted.
 Http3ConnPoolImpl::~Http3ConnPoolImpl() { destructAllConnections(); }

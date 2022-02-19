@@ -655,6 +655,23 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
   checkForIdleAndCloseIdleConnsIfDraining();
 }
 
+void ConnPoolImplBase::decrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client) {
+  state_.decrConnectingAndConnectedStreamCapacity(delta);
+  if (client.isConnecting()) {
+    // If connecting, this client must have been serving early data streams, update the local
+    // connecting capacity.
+    ASSERT(connecting_stream_capacity_ >= delta);
+    connecting_stream_capacity_ -= delta;
+  }
+}
+
+void ConnPoolImplBase::incrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client) {
+  state_.incrConnectingAndConnectedStreamCapacity(delta);
+  if (client.isConnecting()) {
+    connecting_stream_capacity_ += delta;
+  }
+}
+
 void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
   ASSERT(client.isConnecting() && client.readyForStream());
   // Check pending streams backward for safe request.
@@ -777,23 +794,6 @@ bool ActiveClient::readyForStream() const {
 }
 
 bool ActiveClient::isConnecting() const { return connect_timer_ != nullptr; }
-
-void ActiveClient::decrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client) {
-  state_.decrConnectingAndConnectedStreamCapacity(delta);
-  if (client.isConnecting()) {
-    // If connecting, this client must have been serving early data streams, update the local
-    // connecting capacity.
-    ASSERT(connecting_stream_capacity_ >= delta);
-    connecting_stream_capacity_ -= delta;
-  }
-}
-
-void ActiveClient::incrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client) {
-  state_.incrConnectingAndConnectedStreamCapacity(delta);
-  if (client.isConnecting()) {
-    connecting_stream_capacity_ += delta;
-  }
-}
 
 } // namespace ConnectionPool
 } // namespace Envoy

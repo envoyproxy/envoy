@@ -18,6 +18,10 @@ bool Http3StatusTracker::isHttp3Broken() const { return state_ == State::Broken;
 
 bool Http3StatusTracker::isHttp3Confirmed() const { return state_ == State::Confirmed; }
 
+bool Http3StatusTracker::hasHttp3FailedRecently() const {
+  return state_ == State::FailedRecently;
+}
+
 void Http3StatusTracker::markHttp3Broken() {
   state_ = State::Broken;
   if (!expiration_timer_->enabled()) {
@@ -37,12 +41,15 @@ void Http3StatusTracker::markHttp3Confirmed() {
   }
 }
 
+void Http3StatusTracker::markHttp3FailedRecently() {
+  state_ = State::FailedRecently;
+}
+
 void Http3StatusTracker::onExpirationTimeout() {
   if (state_ != State::Broken) {
     return;
   }
-
-  state_ = State::Pending;
+  state_ = State::FailedRecently;
 }
 
 } // namespace Http

@@ -177,7 +177,8 @@ public:
 
   // Http3::PoolConnectResultCallback
   void onHandshakeComplete() override;
-
+  void onZeroRttHandshakeFailed() override;
+  
 protected:
   // Set the required idle callback on the pool.
   void setupPool(ConnectionPool::Instance& pool);

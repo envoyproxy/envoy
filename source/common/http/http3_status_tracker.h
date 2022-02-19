@@ -16,14 +16,19 @@ public:
   bool isHttp3Broken() const;
   // Returns true if HTTP/3 is confirmed to be working.
   bool isHttp3Confirmed() const;
+  // Returns true if HTTP/3 has failed recently.
+  bool hasHttp3FailedRecently() const;
   // Marks HTTP/3 broken for a period of time, subject to backoff.
   void markHttp3Broken();
   // Marks HTTP/3 as confirmed to be working and resets the backoff timeout.
   void markHttp3Confirmed();
+  // Marks HTTP/3 as failed recently.
+  void markHttp3FailedRecently();
 
 private:
   enum class State {
     Pending,
+    FailedRecently,
     Broken,
     Confirmed,
   };

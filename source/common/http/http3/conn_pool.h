@@ -36,6 +36,7 @@ public:
 
   RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override {
     ASSERT(quiche_capacity_ != 0);
+    stream_attached_ = true;
     // Each time a quic stream is allocated the quic capacity needs to get
     // decremented. See comments by quiche_capacity_.
     updateCapacity(quiche_capacity_ - 1);
@@ -73,6 +74,10 @@ public:
     }
   }
 
+  bool hasCreatedStream() const {
+    return stream_attached_;
+  }
+  
 private:
   // Unlike HTTP/2 and HTTP/1, rather than having a cap on the number of active
   // streams, QUIC has a fixed number of streams available which is updated via
@@ -96,6 +101,8 @@ private:
   // necessary.
   uint64_t quiche_capacity_ = 100;
   Event::SchedulableCallbackPtr async_connect_callback_;
+  // True if newStream() is ever called.
+  bool stream_attached_{false};
 };
 
 // An interface to propagate H3 handshake result.
@@ -107,6 +114,7 @@ public:
   // Called when the mandatory handshake is complete. This is when a HTTP/3 connection is regarded
   // as connected and is able to send requests.
   virtual void onHandshakeComplete() PURE;
+  virtual void onZeroRttHandshakeFailed() PURE;
 };
 
 // Http3 subclass of FixedHttpConnPoolImpl which exists to store quic data.
@@ -137,6 +145,7 @@ public:
 
 protected:
   void onConnected(Envoy::ConnectionPool::ActiveClient&) override;
+  void onConnectFailed(Envoy::ConnectionPool::ActiveClient&) override;
 
 private:
   friend class Http3ConnPoolImplPeer;

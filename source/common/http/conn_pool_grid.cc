@@ -1,5 +1,6 @@
 #include "source/common/http/conn_pool_grid.h"
 
+#include "header_map_impl.h"
 #include "source/common/http/mixed_conn_pool.h"
 
 #include "quiche/quic/core/http/spdy_utils.h"
@@ -31,6 +32,7 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
     // HTTP/3 and the failure must be post-handshake. So disable HTTP/3 for this request.
     http3_attempt_failed_ = true;
   }
+  std::cerr << "======= WrapperCallbacks early data " << options.can_send_early_data_ << "\n";
 }
 
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemptCallbacks(
@@ -46,6 +48,7 @@ ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::~ConnectionAttem
 ConnectivityGrid::StreamCreationResult
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::newStream() {
   ASSERT(!parent_.grid_.isPoolHttp3(pool()) || parent_.stream_options_.can_use_http3_);
+  std::cerr << "============ AttemptCallbacks newStream early data " << parent_.stream_options_.can_send_early_data_ << "\0";
   auto* cancellable = pool().newStream(parent_.decoder_, *this, parent_.stream_options_);
   if (cancellable == nullptr) {
     return StreamCreationResult::ImmediateResult;
@@ -105,7 +108,7 @@ ConnectivityGrid::StreamCreationResult ConnectivityGrid::WrapperCallbacks::newSt
             describePool(**current_), grid_.host_->hostname());
   auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, current_);
   LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
-  if (!next_attempt_timer_->enabled()) {
+  if (next_attempt_timer_ != nullptr && !next_attempt_timer_->enabled()) {
     next_attempt_timer_->enableTimer(grid_.next_attempt_duration_);
   }
   // Note that in the case of immediate attempt/failure, newStream will delete this.
@@ -287,6 +290,7 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     createNextPool();
   }
   PoolIterator pool = pools_.begin();
+  bool use_h3_pool{true};
   if (!shouldAttemptHttp3() || !options.can_use_http3_) {
     ASSERT(options.can_use_http3_ ||
            Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3));
@@ -294,9 +298,11 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     // Before skipping to the next pool, make sure it has been created.
     createNextPool();
     ++pool;
+    use_h3_pool = false;
   }
+  const bool disable_early_data = http3_status_tracker_.hasHttp3FailedRecently() && options.can_send_early_data_ && use_h3_pool;
   auto wrapped_callback =
-      std::make_unique<WrapperCallbacks>(*this, decoder, pool, callbacks, options);
+      std::make_unique<WrapperCallbacks>(*this, decoder, pool, callbacks, (disable_early_data ? Instance::StreamOptions{false, options.can_use_http3_} : options));
   ConnectionPool::Cancellable* ret = wrapped_callback.get();
   LinkedList::moveIntoList(std::move(wrapped_callback), wrapped_callbacks_);
   if (wrapped_callbacks_.front()->newStream() == StreamCreationResult::ImmediateResult) {
@@ -304,6 +310,10 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     // callback and does not need a cancellable handle. At this point the
     // WrappedCallbacks object has also been deleted.
     return nullptr;
+  }
+  if (use_h3_pool && http3_status_tracker_.hasHttp3FailedRecently()) {
+    // Immediately start TCP attempt if HTTP/3 failed recently.
+    wrapped_callbacks_.front()->tryAnotherConnection();
   }
   return ret;
 }
@@ -430,6 +440,11 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
 void ConnectivityGrid::onHandshakeComplete() {
   ENVOY_LOG(trace, "Marking HTTP/3 confirmed for host '{}'.", host_->hostname());
   markHttp3Confirmed();
+}
+
+void ConnectivityGrid::onZeroRttHandshakeFailed() {
+  ENVOY_LOG(trace, "Marking HTTP/3 failed for host '{}'.", host_->hostname());
+  http3_status_tracker_.markHttp3FailedRecently();
 }
 
 } // namespace Http

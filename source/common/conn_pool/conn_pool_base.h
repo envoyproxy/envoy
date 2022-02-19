@@ -75,6 +75,7 @@ public:
   // Return true if it is ready to dispatch the next stream.
   bool readyForStream() const;
 
+  // Return true if it hasn't received Connected network event yet.
   bool isConnecting() const;
 
   // This function is called onStreamClosed to see if there was a negative delta
