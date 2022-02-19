@@ -244,6 +244,10 @@ private:
   AdminImpl::AdminListener listener_{admin_, std::move(listener_scope_)};
 };
 
+// Covers override methods for admin-specific implementations of classes in
+// admin.h, reducing a major source of reduced coverage-percent expectations in
+// source/server/admin. There remain a few uncovered lines that are somewhat
+// harder to construct tests for.
 TEST_P(AdminInstanceTest, Overrides) {
   admin_.http1Settings();
   admin_.originalIpDetectionExtensions();
