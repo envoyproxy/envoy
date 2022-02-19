@@ -324,7 +324,8 @@ void RedisCluster::RedisDiscoverySession::updateDnsStats(
  * @param address_resolution_required_cnt the number of hostnames that need DNS resolution
  */
 void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
-    ClusterSlotsSharedPtr&& slots, uint64_t& hostname_resolution_required_cnt) {
+    ClusterSlotsSharedPtr&& slots,
+    std::shared_ptr<std::uint64_t> hostname_resolution_required_cnt) {
   for (uint64_t slot_idx = 0; slot_idx < slots->size(); slot_idx++) {
     auto& slot = (*slots)[slot_idx];
     if (slot.primary() == nullptr) {
@@ -350,7 +351,7 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
             // Primary slot address resolved
             slot.setPrimary(Network::Utility::getAddressWithPort(
                 *response.front().addrInfo().address_, slot.primary_port_));
-            hostname_resolution_required_cnt--;
+            (*hostname_resolution_required_cnt)--;
             // Continue on to resolve replicas
             resolveReplicas(slots, slot_idx, hostname_resolution_required_cnt);
           });
@@ -369,10 +370,11 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
  * @param address_resolution_required_cnt the number of address that need to be resolved
  */
 void RedisCluster::RedisDiscoverySession::resolveReplicas(
-    ClusterSlotsSharedPtr slots, std::size_t index, uint64_t& hostname_resolution_required_cnt) {
+    ClusterSlotsSharedPtr slots, std::size_t index,
+    std::shared_ptr<std::uint64_t> hostname_resolution_required_cnt) {
   auto& slot = (*slots)[index];
   if (slot.replicas_to_resolve_.empty()) {
-    if (hostname_resolution_required_cnt == 0) {
+    if (*hostname_resolution_required_cnt == 0) {
       finishClusterHostnameResolution(slots);
     }
     return;
@@ -399,9 +401,9 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
             slot.addReplica(Network::Utility::getAddressWithPort(
                 *response.front().addrInfo().address_, replica.second));
           }
-          hostname_resolution_required_cnt--;
+          (*hostname_resolution_required_cnt)--;
           // finish resolution if all the addresses have been resolved.
-          if (hostname_resolution_required_cnt <= 0) {
+          if (*hostname_resolution_required_cnt <= 0) {
             finishClusterHostnameResolution(slots);
           }
         });
@@ -446,7 +448,7 @@ void RedisCluster::RedisDiscoverySession::onResponse(
   //       3) "821d8ca00d7ccf931ed3ffc7e3db0599d2271abf"
   //
   // Loop through the cluster slot response and error checks for each field.
-  uint64_t hostname_resolution_required_cnt = 0;
+  auto hostname_resolution_required_cnt = std::make_shared<std::uint64_t>(0);
   for (const NetworkFilters::Common::Redis::RespValue& part : value->asArray()) {
     if (part.type() != NetworkFilters::Common::Redis::RespType::Array) {
       onUnexpectedResponse(value);
@@ -482,7 +484,7 @@ void RedisCluster::RedisDiscoverySession::onResponse(
       const auto& array = slot_range[SlotPrimary].asArray();
       slot.primary_hostname_ = array[0].asString();
       slot.primary_port_ = array[1].asInteger();
-      hostname_resolution_required_cnt++;
+      (*hostname_resolution_required_cnt)++;
     }
 
     // Row 4-N: Replica(s) addresses
@@ -499,13 +501,13 @@ void RedisCluster::RedisDiscoverySession::onResponse(
         // Replica address is potentially a hostname, save it for async DNS resolution.
         const auto& array = replica->asArray();
         slot.addReplicaToResolve(array[0].asString(), array[1].asInteger());
-        hostname_resolution_required_cnt++;
+        (*hostname_resolution_required_cnt)++;
       }
     }
     cluster_slots->push_back(std::move(slot));
   }
 
-  if (hostname_resolution_required_cnt > 0) {
+  if (*hostname_resolution_required_cnt > 0) {
     // DNS resolution is required, defer finalizing the slot update until resolution is complete.
     resolveClusterHostnames(std::move(cluster_slots), hostname_resolution_required_cnt);
   } else {
