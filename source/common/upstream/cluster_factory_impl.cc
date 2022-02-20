@@ -133,7 +133,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
 
   new_cluster_pair.first->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
       *new_cluster_pair.first, cluster, context.mainThreadDispatcher(), context.runtime(),
-      context.outlierEventLogger()));
+      context.outlierEventLogger(), context.api().randomGenerator()));
 
   new_cluster_pair.first->setTransportFactoryContext(std::move(transport_factory_context));
   return new_cluster_pair;
