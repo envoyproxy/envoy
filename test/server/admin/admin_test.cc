@@ -81,7 +81,8 @@ TEST_P(AdminInstanceTest, AdminAddress) {
 }
 
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
-  const std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
+  const std::string bad_path =
+      TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
   AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_, false);
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
