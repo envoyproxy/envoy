@@ -10,6 +10,9 @@ namespace Envoy {
 namespace Rds {
 namespace Basic {
 
+/**
+ * Basic implementation of ProtoTraits interface. It can be used in all protocols.
+ */
 template <class RouteConfiguration, int NameFieldNumber>
 class ProtoTraitsImpl : public ProtoTraits {
 public:

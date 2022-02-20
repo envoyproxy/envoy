@@ -8,6 +8,10 @@ namespace Envoy {
 namespace Rds {
 namespace Basic {
 
+/**
+ * Basic implementation of ConfigTraits interface. It can be used in simple protocols where no
+ * other parameters are required.
+ */
 template <class RouteConfiguration, class ConfigImpl, class NullConfigImpl>
 class ConfigTraitsImpl : public ConfigTraits {
 public:

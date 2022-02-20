@@ -15,17 +15,28 @@
 #include "source/common/rds/route_config_update_receiver_impl.h"
 #include "source/common/rds/static_route_config_provider_impl.h"
 
+#include "absl/strings/ascii.h"
+
 namespace Envoy {
 namespace Rds {
 namespace Basic {
 
+/**
+ * Implementation of RouteConfigProviderManager interface.
+ * The keys for config tracker, stat, log and exception text will be derived
+ * from the name of the proto message class passed in the Rds template argument
+ * Since the config tracker key has to be unique across envoy, this name has to be also unique.
+ * The proto message has two mandatory fields:
+ * config_source (config.core.v3.ConfigSource)
+ * route_config_name (string)
+ */
 template <class Rds, class RouteConfiguration, int NameFieldNumber, class ConfigImpl,
           class NullConfigImpl>
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager<Rds, RouteConfiguration>,
                                        public Singleton::Instance {
 public:
   RouteConfigProviderManagerImpl(Server::Admin& admin)
-      : manager_(admin, downCase(getRdsName()) + "_routes", proto_traits_) {}
+      : manager_(admin, absl::AsciiStrToLower(getRdsName()) + "_routes", proto_traits_) {}
 
   // RouteConfigProviderManager
   RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
@@ -43,7 +54,8 @@ public:
           auto subscription = std::make_shared<RdsRouteConfigSubscription>(
               std::move(config_update), std::move(resource_decoder), rds.config_source(),
               rds.route_config_name(), manager_identifier, factory_context,
-              stat_prefix + downCase(getRdsName()) + ".", upCase(getRdsName()), manager_);
+              stat_prefix + absl::AsciiStrToLower(getRdsName()) + ".",
+              absl::AsciiStrToUpper(getRdsName()), manager_);
           auto provider = std::make_shared<RdsRouteConfigProviderImpl>(std::move(subscription),
                                                                        factory_context);
           return std::make_pair(provider, &provider->subscription().initTarget());
@@ -69,16 +81,6 @@ private:
   std::string getNameFieldName() {
     ASSERT(RouteConfiguration().GetDescriptor()->FindFieldByNumber(NameFieldNumber));
     return RouteConfiguration().GetDescriptor()->FindFieldByNumber(NameFieldNumber)->name();
-  }
-
-  std::string downCase(std::string s) {
-    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
-    return s;
-  }
-
-  std::string upCase(std::string s) {
-    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::toupper(c); });
-    return s;
   }
 };
 

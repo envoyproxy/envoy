@@ -12,8 +12,9 @@ namespace Basic {
 
 /**
  * The RouteConfigProviderManager exposes the ability to get a RouteConfigProvider. This interface
- * is exposed to the Server's FactoryContext in order to allow ThriftProxy to get
+ * is exposed to the Server's FactoryContext in order to allow the protocol to get
  * RouteConfigProviders.
+ * This basic interface can be used in simple protocols where no other parameters are required.
  */
 template <class Rds, class RouteConfiguration> class RouteConfigProviderManager {
 public:
@@ -21,11 +22,11 @@ public:
 
   /**
    * Get a RouteConfigProviderPtr for a route from RDS. Ownership of the RouteConfigProvider is the
-   * ThriftProxy who calls this function. The RouteConfigProviderManager holds raw
+   * caller of this function. The RouteConfigProviderManager holds raw
    * pointers to the RouteConfigProviders. Clean up of the pointers happen from the destructor of
    * the RouteConfigProvider. This method creates a RouteConfigProvider which may share the
    * underlying RDS subscription with the same (route_config_name, cluster).
-   * @param trds supplies the proto configuration of an RDS-configured RouteConfigProvider.
+   * @param rds supplies the proto configuration of an RDS-configured RouteConfigProvider.
    * @param factory_context is the context to use for the route config provider.
    * @param stat_prefix supplies the stat_prefix to use for the provider stats.
    * @param init_manager the Init::Manager used to coordinate initialization of a the underlying RDS
