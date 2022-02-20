@@ -226,8 +226,7 @@ void FilterChainManagerImpl::addFilterChains(
     }
 
     addFilterChainForConnectionMetadata(
-        connection_metadata_map_,
-        absl::AsciiStrToLower(filter_chain_match.connection_metadata()),
+        connection_metadata_map_, absl::AsciiStrToLower(filter_chain_match.connection_metadata()),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
         server_names, filter_chain_match.transport_protocol(),
         filter_chain_match.application_protocols(), direct_source_ips,
@@ -277,8 +276,8 @@ void FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
 }
 
 void FilterChainManagerImpl::addFilterChainForConnectionMetadata(
-    ConnectionMetadataMap& connection_metadata_map, const std::string& connection_metadata, uint16_t destination_port,
-    const std::vector<std::string>& destination_ips,
+    ConnectionMetadataMap& connection_metadata_map, const std::string& connection_metadata,
+    uint16_t destination_port, const std::vector<std::string>& destination_ips,
     const absl::Span<const std::string> server_names, const std::string& transport_protocol,
     const absl::Span<const std::string* const> application_protocols,
     const std::vector<std::string>& direct_source_ips,
@@ -289,10 +288,10 @@ void FilterChainManagerImpl::addFilterChainForConnectionMetadata(
   if (connection_metadata_map.find(connection_metadata) == connection_metadata_map.end()) {
     connection_metadata_map[connection_metadata] = DestinationPortsMap{};
   }
-  addFilterChainForDestinationPorts(connection_metadata_map[connection_metadata], destination_port, destination_ips,
-                                  server_names, transport_protocol, application_protocols,
-                                  direct_source_ips, source_type, source_ips, source_ports,
-                                  filter_chain);
+  addFilterChainForDestinationPorts(connection_metadata_map[connection_metadata], destination_port,
+                                    destination_ips, server_names, transport_protocol,
+                                    application_protocols, direct_source_ips, source_type,
+                                    source_ips, source_ports, filter_chain);
 }
 
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(
@@ -488,12 +487,14 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
 
 const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
-  const auto& connection_metadata = absl::AsciiStrToLower(socket.connectionInfoProvider().connectionMetadata());
+  const auto& connection_metadata =
+      absl::AsciiStrToLower(socket.connectionInfoProvider().connectionMetadata());
 
   const Network::FilterChain* best_match_filter_chain = nullptr;
   const auto connection_metadata_match = connection_metadata_map_.find(connection_metadata);
   if (connection_metadata_match != connection_metadata_map_.end()) {
-    best_match_filter_chain = findFilterChainForDestinationPort(connection_metadata_match->second, socket);
+    best_match_filter_chain =
+        findFilterChainForDestinationPort(connection_metadata_match->second, socket);
     if (best_match_filter_chain != nullptr) {
       return best_match_filter_chain;
     } else {
@@ -506,7 +507,8 @@ FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket)
   // Match on a filter chain without tenant ID requirements.
   const auto connection_metadata_catchall_match = connection_metadata_map_.find(EMPTY_STRING);
   if (connection_metadata_catchall_match != connection_metadata_map_.end()) {
-    best_match_filter_chain = findFilterChainForDestinationPort(connection_metadata_catchall_match->second, socket);
+    best_match_filter_chain =
+        findFilterChainForDestinationPort(connection_metadata_catchall_match->second, socket);
   }
 
   return best_match_filter_chain != nullptr
@@ -515,8 +517,9 @@ FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket)
              : default_filter_chain_.get();
 }
 
-const Network::FilterChain*
-FilterChainManagerImpl::findFilterChainForDestinationPort(const DestinationPortsMap& destination_ports_map, const Network::ConnectionSocket& socket) const {
+const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDestinationPort(
+    const DestinationPortsMap& destination_ports_map,
+    const Network::ConnectionSocket& socket) const {
   const auto& address = socket.connectionInfoProvider().localAddress();
 
   const Network::FilterChain* best_match_filter_chain = nullptr;

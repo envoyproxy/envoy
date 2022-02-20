@@ -280,8 +280,8 @@ private:
   using ConnectionMetadataMap = absl::flat_hash_map<std::string, DestinationPortsMap>;
 
   void addFilterChainForConnectionMetadata(
-      ConnectionMetadataMap& connection_metadata_map, const std::string& connection_metadata, uint16_t destination_port,
-      const std::vector<std::string>& destination_ips,
+      ConnectionMetadataMap& connection_metadata_map, const std::string& connection_metadata,
+      uint16_t destination_port, const std::vector<std::string>& destination_ips,
       const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
       const std::vector<std::string>& direct_source_ips,
@@ -388,8 +388,8 @@ private:
   // and application protocols, using structures defined above.
   // DestinationPortsMap destination_ports_map_;
 
-  // Mapping of FilterChain's configured Connection Metadata, destination ports, IPs, server names, transport protocols
-  // and application protocols, using structures defined above.
+  // Mapping of FilterChain's configured Connection Metadata, destination ports, IPs, server names,
+  // transport protocols and application protocols, using structures defined above.
   ConnectionMetadataMap connection_metadata_map_;
 
   const Network::Address::InstanceConstSharedPtr address_;

@@ -183,9 +183,9 @@ protected:
   }
 
   const Network::FilterChain*
-  findFilterChain(const std::string& connection_metadata,
-                  uint16_t destination_port, const std::string& destination_address,
-                  const std::string& server_name, const std::string& transport_protocol,
+  findFilterChain(const std::string& connection_metadata, uint16_t destination_port,
+                  const std::string& destination_address, const std::string& server_name,
+                  const std::string& transport_protocol,
                   const std::vector<std::string>& application_protocols,
                   const std::string& source_address, uint16_t source_port,
                   std::string direct_source_address = "") {

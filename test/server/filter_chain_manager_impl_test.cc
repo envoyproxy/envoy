@@ -66,9 +66,9 @@ public:
   }
 
   const Network::FilterChain*
-  findFilterChainHelper(const std::string& connection_metadata,
-                        uint16_t destination_port, const std::string& destination_address,
-                        const std::string& server_name, const std::string& transport_protocol,
+  findFilterChainHelper(const std::string& connection_metadata, uint16_t destination_port,
+                        const std::string& destination_address, const std::string& server_name,
+                        const std::string& transport_protocol,
                         const std::vector<std::string>& application_protocols,
                         const std::string& source_address, uint16_t source_port) {
     auto mock_socket = std::make_shared<NiceMock<Network::MockConnectionSocket>>();
@@ -157,8 +157,8 @@ TEST_F(FilterChainManagerImplTest, FilterChainMatchCaseInSensitive) {
   filter_chain_manager_.addFilterChains(
       std::vector<const envoy::config::listener::v3::FilterChain*>{&new_filter_chain}, nullptr,
       filter_chain_factory_builder_, filter_chain_manager_);
-  auto filter_chain =
-      findFilterChainHelper("some_METADATA", 10000, "127.0.0.1", "FOO.example.com", "tls", {}, "8.8.8.8", 111);
+  auto filter_chain = findFilterChainHelper("some_METADATA", 10000, "127.0.0.1", "FOO.example.com",
+                                            "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
 }
 
