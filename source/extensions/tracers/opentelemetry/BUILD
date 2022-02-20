@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
 )
@@ -9,6 +10,17 @@ licenses(["notice"])  # Apache 2
 # Trace driver for OpenTelemetry: https://opentelemetry.io/
 
 envoy_extension_package()
+
+envoy_cc_extension(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    deps = [
+        ":opentelemetry_tracer_lib",
+        "//source/extensions/tracers/common:factory_base_lib",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+    ],
+)
 
 envoy_cc_library(
     name = "grpc_trace_exporter",
