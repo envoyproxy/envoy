@@ -87,7 +87,7 @@ private:
 
   static RingHashLoadBalancerStats generateStats(Stats::Scope& scope);
 
-  Stats::ScopeSharedPtr scope_;
+  Stats::ScopePtr scope_;
   RingHashLoadBalancerStats stats_;
 
   static const uint64_t DefaultMinRingSize = 1024;

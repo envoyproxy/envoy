@@ -108,7 +108,7 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
 OriginalDstCluster::OriginalDstCluster(
     const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
+    Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api,
                       factory_context.mainThreadDispatcher().timeSource()),
       dispatcher_(factory_context.mainThreadDispatcher()),
@@ -182,7 +182,7 @@ std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 OriginalDstClusterFactory::createClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-    Stats::ScopeSharedPtr&& stats_scope) {
+    Stats::ScopePtr&& stats_scope) {
   if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     throw EnvoyException(
         fmt::format("cluster: LB policy {} is not valid for Cluster type {}. Only "
