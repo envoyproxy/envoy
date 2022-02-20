@@ -61,6 +61,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     // Try to split it into its component parts:
     std::vector<std::string> propagation_header_components =
         absl::StrSplit(header_value_string, '-', absl::SkipEmpty());
+    // TODO: handle tracestate
     if (propagation_header_components.size() == 4) {
       // TODO: should we try to parse these to ensure they're valid?
       std::string version = propagation_header_components[0];
