@@ -292,10 +292,11 @@ modify different aspects of the server:
 
 .. http:post:: /logging
 
-  Enable/disable different logging levels on a particular logger or all loggers.
+  Enable/disable logging levels for different loggers.
 
   - To change the logging level across all loggers, set the query parameter as level=<desired_level>.
   - To change a particular logger's level, set the query parameter like so, <logger_name>=<desired_level>.
+  - To change multiple logging levels at once, set the query parameter as paths=<logger_name1>=<desired_level1>,<logger_name2>=<desired_level2>.
   - To list the loggers, send a POST request to the /logging endpoint without a query parameter.
 
   .. note::
