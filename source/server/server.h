@@ -394,7 +394,7 @@ private:
   ListenerHooks& hooks_;
   Quic::QuicStatNames quic_stat_names_;
   ServerFactoryContextImpl server_contexts_;
-  absl::optional<ReusePortDefault> enable_reuse_port_default_;
+  bool enable_reuse_port_default_;
 
   bool stats_flush_in_progress_ : 1;
 
