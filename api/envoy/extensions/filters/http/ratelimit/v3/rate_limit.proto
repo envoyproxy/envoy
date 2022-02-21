@@ -29,10 +29,9 @@ message RateLimit {
       "envoy.config.filter.http.rate_limit.v2.RateLimit";
 
   // Defines the version of the standard to use for X-RateLimit headers.
-  // This field is deprecated in favor of :ref:`XRateLimitHeadersRFCVersion <envoy_v3_api_enum_extensions.common.ratelimit.v3.XRateLimitHeadersRFCVersion>`.
+  //
+  // [#next-major-version: unify with local ratelimit, should use common.ratelimit.v3.XRateLimitHeadersRFCVersion instead.]
   enum XRateLimitHeadersRFCVersion {
-    option deprecated = true;
-
     // X-RateLimit headers disabled.
     OFF = 0;
 
