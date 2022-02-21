@@ -98,16 +98,16 @@ stat_prefix: name
 failure_mode_deny: true
 )EOF";
 
-//   const std::string replace_ip_config = R"EOF(
-// domain: foo
-// descriptors:
-// - entries:
-//    - key: remote_address
-//      value: downstream_ip
-//    - key: hello
-//      value: world
-// stat_prefix: name
-// )EOF";
+  const std::string replace_ip_config = R"EOF(
+  domain: foo
+  descriptors:
+  - entries:
+    - key: remote_address
+      value: envoy.downstream_ip
+    - key: hello
+      value: world
+  stat_prefix: name
+  )EOF";
 
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -149,7 +149,7 @@ TEST_F(RateLimitFilterTest, OK) {
   EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.ok").value());
 }
 
-/*TEST_F(RateLimitFilterTest, ReplaceDownstreamIP) {
+TEST_F(RateLimitFilterTest, ReplaceDownstreamIP) {
   InSequence s;
   setUpTest(replace_ip_config);
   // filter_->injectDynamicDescriptorKeys(config_->descriptors() ,filter_callbacks_.connection_);
@@ -174,10 +174,11 @@ TEST_F(RateLimitFilterTest, OK) {
     }
   }
 
-  EXPECT_CALL(*client_, limit(_, "foo",
-                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                                  {{{"remote_address", "downstream_ip"}, {"hello", "world"}}}}),
-                              testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_,
+              limit(_, "foo",
+                    testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                        {{{"remote_address", "envoy.downstream_ip"}, {"hello", "world"}}}}),
+                    testing::A<Tracing::Span&>(), _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -199,7 +200,7 @@ TEST_F(RateLimitFilterTest, OK) {
 
   EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.total").value());
   EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.ok").value());
-}*/
+}
 
 TEST_F(RateLimitFilterTest, OverLimit) {
   InSequence s;

@@ -1,12 +1,14 @@
 #include "source/extensions/filters/network/ratelimit/ratelimit.h"
 
 #include <cstdint>
+#include <regex>
 #include <string>
 
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/fmt.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
@@ -26,7 +28,6 @@ Config::Config(const envoy::extensions::filters::network::ratelimit::v3::RateLim
     }
     descriptors_.push_back(new_descriptor);
   }
-
 }
 
 InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope) {

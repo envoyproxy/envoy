@@ -2,9 +2,11 @@
 
 #include <cstdint>
 #include <memory>
+#include <regex>
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -13,6 +15,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
 #include "source/extensions/filters/common/ratelimit/ratelimit.h"
 
 namespace Envoy {
@@ -54,7 +59,6 @@ public:
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
-
   std::string domain_;
   std::vector<RateLimit::Descriptor> descriptors_;
   const InstanceStats stats_;
@@ -83,35 +87,42 @@ public:
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     filter_callbacks_ = &callbacks;
     filter_callbacks_->connection().addConnectionCallbacks(*this);
-    //injectDynamicDescriptorKeys(config_->descriptors(), filter_callbacks_->connection());
+    applySubstitutionFormatter(filter_descriptors_, filter_callbacks_->connection().streamInfo());
   }
 
-  /*void injectDynamicDescriptorKeys(std::vector<RateLimit::Descriptor> original_descriptors,
-                                   const Network::Connection& connection) {
+  void applySubstitutionFormatter(std::vector<RateLimit::Descriptor> original_descriptors,
+                                  StreamInfo::StreamInfo& stream_info) {
+
     std::vector<RateLimit::Descriptor> dynamicDescriptors = std::vector<RateLimit::Descriptor>();
     for (const RateLimit::Descriptor& descriptor : original_descriptors) {
       RateLimit::Descriptor new_descriptor;
       for (const RateLimit::DescriptorEntry& descriptorEntry : descriptor.entries_) {
         std::string value = descriptorEntry.value_;
-
-        // TODO: do we care about case sensitivity?
-        if (strcasecmp(descriptorEntry.key_.c_str(), "remote_address") == 0 &&
-            strcasecmp(descriptorEntry.value_.c_str(), "downstream_ip") == 0) {
-          // TODO: do we want the port numbers? IPv6 support?
-          // TODO: safety checks on stream_info and its fields?
-          // TODO: what exactly should the token representing downstream_ip be?
-          // TODO: should we use remote address or direct remote address as the substitution?
-          if (connection.connectionInfoProvider().remoteAddress()->type() ==
-              Network::Address::Type::Ip) {
-            value = connection.connectionInfoProvider().remoteAddress()->ip()->addressAsString();
-          }
+        if (config_->runtime().snapshot().runtimeFeatureEnabled(
+                "envoy.reloadable_features.network_rate_limit.downstream_ip_formatter") &&
+            absl::StrContains(descriptorEntry.value_, "envoy.downstream_ip")) {
+          value = formatValue("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", stream_info);
         }
         new_descriptor.entries_.push_back({descriptorEntry.key_, value});
+
+        dynamicDescriptors.push_back(new_descriptor);
       }
-      dynamicDescriptors.push_back(new_descriptor);
+      filter_descriptors_ = dynamicDescriptors;
     }
-    filter_descriptors_ = dynamicDescriptors;
-  }*/
+  }
+
+  std::string formatValue(std::string format, StreamInfo::StreamInfo& stream_info) {
+    std::string body;
+    Http::RequestHeaderMapOptConstRef request_headers;
+    Http::ResponseHeaderMapOptConstRef response_headers;
+    Http::ResponseTrailerMapOptConstRef response_trailers;
+
+    Formatter::FormatterImpl formatter(format, false);
+
+    std::string value = formatter.format(request_headers.value(), response_headers.value(),
+                                         response_trailers.value(), stream_info, body);
+    return value;
+  }
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -129,7 +140,6 @@ public:
 
 private:
   enum class Status { NotStarted, Calling, Complete };
-
   ConfigSharedPtr config_;
   std::vector<RateLimit::Descriptor> filter_descriptors_;
   Filters::Common::RateLimit::ClientPtr client_;
