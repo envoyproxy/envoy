@@ -337,12 +337,12 @@ public:
         break;
       case 4: {
         auto histogram = absl::get<Stats::HistogramSharedPtr>(variant);
-        if (!skip(histogram, name)) {
+        //if (!skip(histogram, name)) {
           auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
           if (parent_histogram != nullptr) {
             render_->generate(response, name, *parent_histogram);
           }
-        }
+          //}
       }
       }
       stat_map_.erase(iter);
@@ -380,12 +380,6 @@ public:
     }
   }
 
-  // Determines whether the "usedonly" and "filter" status allows the stat to be
-  // displayed.
-  template <class StatType> bool shouldShowMetric(const StatType& stat) {
-    return StatsHandler::shouldShowMetric(stat, used_only_, regex_);
-  }
-
   // Iterates over scope_vec and populates the metric types associated with the
   // current phase.
   void populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
@@ -409,7 +403,14 @@ public:
   template <class StatType> void populateStatsFromScopes(const ScopeVec& scope_vec) {
     for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
       Stats::IterateFn<StatType> fn = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
-        stat_map_[stat->name()] = stat;
+        if (used_only_ && !stat->used()) {
+          return true;
+        }
+        std::string name = stat->name();
+        if (regex_.has_value() && !std::regex_search(name, regex_.value())) {
+          return true;
+        }
+        stat_map_[name] = stat;
         return true;
       };
       scope->iterate(fn);
@@ -421,22 +422,7 @@ public:
   template <class SharedStatType>
   void renderStat(const std::string& name, Buffer::Instance& response, StatOrScopes& variant) {
     auto stat = absl::get<SharedStatType>(variant);
-    if (skip(stat, name)) {
-      return;
-    }
     render_->generate(response, name, stat->value());
-  }
-
-  // Determines whether the specified stat should be skipped based on the
-  // "usedonly" and "filter" query-params.
-  template <class SharedStatType> bool skip(const SharedStatType& stat, const std::string& name) {
-    if (used_only_ && !stat->used()) {
-      return true;
-    }
-    if (regex_.has_value() && !std::regex_search(name, regex_.value())) {
-      return true;
-    }
-    return false;
   }
 
 private:
@@ -454,7 +440,7 @@ private:
   Buffer::OwnedImpl response_;
 };
 
-Admin::RequestPtr StatsHandler::makeHandler(absl::string_view path, AdminStream& /*admin_stream*/) {
+Admin::RequestPtr StatsHandler::makeRequest(absl::string_view path, AdminStream& /*admin_stream*/) {
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
@@ -483,10 +469,10 @@ Admin::RequestPtr StatsHandler::makeHandler(absl::string_view path, AdminStream&
     }
   }
 
-  return makeHandler(server_.stats(), used_only, json, regex);
+  return makeRequest(server_.stats(), used_only, json, regex);
 }
 
-Admin::RequestPtr StatsHandler::makeHandler(Stats::Store& stats, bool used_only, bool json,
+Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, bool used_only, bool json,
                                             const absl::optional<std::regex>& regex) {
   return std::make_unique<StreamingRequest>(stats, used_only, json, regex);
 }

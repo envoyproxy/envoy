@@ -45,8 +45,8 @@ public:
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
 
-  Admin::RequestPtr makeHandler(absl::string_view path, AdminStream& admin_stream);
-  static Admin::RequestPtr makeHandler(Stats::Store& stats, bool used_only, bool json,
+  Admin::RequestPtr makeRequest(absl::string_view path, AdminStream& admin_stream);
+  static Admin::RequestPtr makeRequest(Stats::Store& stats, bool used_only, bool json,
                                        const absl::optional<std::regex>& regex);
 
   class JsonRender;
@@ -55,13 +55,6 @@ public:
   class StreamingRequest;
 
 private:
-  template <class StatType>
-  static bool shouldShowMetric(const StatType& metric, const bool used_only,
-                               const absl::optional<std::regex>& regex) {
-    return ((!used_only || metric.used()) &&
-            (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
-  }
-
   friend class StatsHandlerTest;
 };
 

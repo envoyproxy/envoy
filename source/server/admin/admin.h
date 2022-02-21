@@ -238,7 +238,7 @@ private:
 
   /**
    * Creates a URL prefix bound to chunked handler. Handler is expected to
-   * supply a method makeHandler(absl::string_view, AdminStream&).
+   * supply a method makeRequest(absl::string_view, AdminStream&).
    *
    * @param prefix the prefix to register
    * @param help_text a help text ot display in a table in the admin home page
@@ -253,7 +253,7 @@ private:
                                 Handler& handler, bool removable, bool mutates_state) {
     return {prefix, help_text,
             [&handler](absl::string_view path, AdminStream& admin_stream) -> Admin::RequestPtr {
-              return handler.makeHandler(path, admin_stream);
+              return handler.makeRequest(path, admin_stream);
             },
             removable, mutates_state};
   }
