@@ -271,6 +271,31 @@ public:
     return Http::Code::OK;
   }
 
+  // nextChunkI() Streams out the next chunk of stats to the client, visiting
+  // only the scopes that can plausibly contribute the next set of named
+  // stats. This enables us to linearly traverse the entire set of stats without
+  // buffering all of them and sorting.
+  //
+  // Instead we keep the a set of candidate stats to emit in stat_map_ an
+  // alphabetically ordered btree, which heterogeneously stores stats of all
+  // types and scopes. Note that there can be multiple scopes with the same
+  // name, so we keep same-named scopes in a vector. However leaf metrics cannot
+  // have duplicates. It would also be feasible to use a multi-map for this.
+  //
+  // So in start() above, we initially populate all the scopes, as well as the
+  // metrics contained in all scopes with an empty name. So in nextChunk we can
+  // emit and remove the first element of stat_map_. When we encounter a vector
+  // of scopes then we add the contained metrics to the map and continue
+  // iterating.
+  //
+  // Whenever the desired chunk size is reached we end the current chunk so that
+  // the current buffer can be flushed to the network. In #19898 we will
+  // introduce flow-control so that we don't buffer the all the serialized stats
+  // while waiting for a slow client.
+  //
+  // Note that we do 3 passes through all the scopes_, so that we can emit
+  // text-readouts first, then the intermingled counters and gauges, and finally
+  // the histograms.
   bool nextChunk(Buffer::Instance& response) override {
     if (response_.length() > 0) {
       ASSERT(response.length() == 0);
@@ -361,6 +386,8 @@ public:
     return StatsHandler::shouldShowMetric(stat, used_only_, regex_);
   }
 
+  // Iterates over scope_vec and populates the metric types associated with the
+  // current phase.
   void populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
     switch (phase_) {
     case Phase::TextReadouts:
@@ -376,6 +403,9 @@ public:
     }
   }
 
+  // Populates all the metrics of the templatized type from scope_vec. Here we
+  // exploit that Scope::iterate is a generic templatized function to avoid code
+  // duplication.
   template <class StatType> void populateStatsFromScopes(const ScopeVec& scope_vec) {
     for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
       Stats::IterateFn<StatType> fn = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
@@ -386,6 +416,8 @@ public:
     }
   }
 
+  // Renders the templatized type, exploiting the fact that Render::generate is
+  // generic to avoid code duplication.
   template <class SharedStatType>
   void renderStat(const std::string& name, Buffer::Instance& response, StatOrScopes& variant) {
     auto stat = absl::get<SharedStatType>(variant);
@@ -395,6 +427,8 @@ public:
     render_->generate(response, name, stat->value());
   }
 
+  // Determines whether the specified stat should be skipped based on the
+  // "usedonly" and "filter" query-params.
   template <class SharedStatType> bool skip(const SharedStatType& stat, const std::string& name) {
     if (used_only_ && !stat->used()) {
       return true;
@@ -405,6 +439,7 @@ public:
     return false;
   }
 
+private:
   const bool used_only_;
   const bool json_;
   absl::optional<std::regex> regex_;
@@ -455,28 +490,6 @@ Admin::RequestPtr StatsHandler::makeHandler(Stats::Store& stats, bool used_only,
                                             const absl::optional<std::regex>& regex) {
   return std::make_unique<StreamingRequest>(stats, used_only, json, regex);
 }
-
-#if 0
-struct CompareStatsAndScopes {
-  CompareStatsAndScopes(Stats::SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
-  bool operator()(const StatOrScope& a, const StatOrScope& b) const {
-    return symbol_table_.lessThan(name(a), name(b));
-  }
-
-  Stats::StatName name(const StatOrScope& stat_or_scope) const {
-    switch (stat_or_scope.index()) {
-      case 0: return absl::get<Stats::ConstScopeSharedPtr>(stat_or_scope)->prefix();
-      case 1: return absl::get<Stats::TextReadoutSharedPtr>(stat_or_scope)->statName();
-      case 2: return absl::get<Stats::CounterSharedPtr>(stat_or_scope)->statName();
-      case 3: return absl::get<Stats::GaugeSharedPtr>(stat_or_scope)->statName();
-      case 4: return absl::get<Stats::ParentHistogramSharedPtr>(stat_or_scope)->statName();
-    }
-    return Stats::StatName();
-  }
-
-  Stats::SymbolTable& symbol_table_;
-};
-#endif
 
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
                                                 Http::ResponseHeaderMap&,
