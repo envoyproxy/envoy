@@ -24,7 +24,7 @@ public:
                                                                      nullptr)
                         : nullptr) {}
   bool addHandler(const std::string&, const std::string&, HandlerCb, bool, bool) override;
-  bool addStreamingHandler(const std::string&, const std::string&, GenHandlerCb, bool,
+  bool addStreamingHandler(const std::string&, const std::string&, GenRequestFn, bool,
                            bool) override;
   bool removeHandler(const std::string&) override;
   const Network::Socket& socket() override;
