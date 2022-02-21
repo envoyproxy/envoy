@@ -337,12 +337,10 @@ public:
         break;
       case 4: {
         auto histogram = absl::get<Stats::HistogramSharedPtr>(variant);
-        //if (!skip(histogram, name)) {
-          auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
-          if (parent_histogram != nullptr) {
-            render_->generate(response, name, *parent_histogram);
-          }
-          //}
+        auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
+        if (parent_histogram != nullptr) {
+          render_->generate(response, name, *parent_histogram);
+        }
       }
       }
       stat_map_.erase(iter);
