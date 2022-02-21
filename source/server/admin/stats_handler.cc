@@ -87,8 +87,8 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   // If the histogram_buckets query param does not exist histogram output should contain quantile
   // summary data. Using histogram_buckets will change output to show bucket data. The
   // histogram_buckets query param has two possible values: cumulative or disjoint.
-  Utility::HistogramBucketsValue histogram_buckets_value = Utility::HistogramBucketsValue::Null;
-  if (!Utility::histogramBucketsParam(params, response, histogram_buckets_value)) {
+  Utility::HistogramBucketsMode histogram_buckets_mode = Utility::HistogramBucketsMode::NoBuckets;
+  if (!Utility::histogramBucketsParam(params, response, histogram_buckets_mode)) {
     return Http::Code::BadRequest;
   }
 
@@ -126,7 +126,7 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
 
   if (!format_value.has_value()) {
     // Display plain stats if format query param is not there.
-    statsAsText(all_stats, text_readouts, histograms, used_only, histogram_buckets_value, regex,
+    statsAsText(all_stats, text_readouts, histograms, used_only, histogram_buckets_mode, regex,
                 response);
     return Http::Code::OK;
   }
@@ -134,7 +134,7 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   if (format_value.value() == "json") {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
     response.add(statsAsJson(all_stats, text_readouts, histograms, used_only,
-                             histogram_buckets_value, regex));
+                             histogram_buckets_mode, regex));
     return Http::Code::OK;
   }
 
@@ -189,7 +189,7 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
                                const std::map<std::string, std::string>& text_readouts,
                                const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
                                bool used_only,
-                               Utility::HistogramBucketsValue histogram_buckets_value,
+                               Utility::HistogramBucketsMode histogram_buckets_mode,
                                const absl::optional<std::regex>& regex,
                                Buffer::Instance& response) {
   // Display plain stats if format query param is not there.
@@ -206,16 +206,16 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
       bool emplace_success = false;
       // Display bucket data if histogram_buckets query parameter is used, otherwise output contains
       // quantile summary data.
-      switch (histogram_buckets_value) {
-      case Utility::HistogramBucketsValue::Null:
+      switch (histogram_buckets_mode) {
+      case Utility::HistogramBucketsMode::NoBuckets:
         emplace_success =
             all_histograms.emplace(histogram->name(), histogram->quantileSummary()).second;
         break;
-      case Utility::HistogramBucketsValue::Cumulative:
+      case Utility::HistogramBucketsMode::Cumulative:
         emplace_success =
             all_histograms.emplace(histogram->name(), histogram->bucketSummary()).second;
         break;
-      case Utility::HistogramBucketsValue::Disjoint:
+      case Utility::HistogramBucketsMode::Disjoint:
         emplace_success =
             all_histograms.emplace(histogram->name(), computeDisjointBucketSummary(histogram))
                 .second;
@@ -234,7 +234,7 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                           const std::map<std::string, std::string>& text_readouts,
                           const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
                           const bool used_only,
-                          Utility::HistogramBucketsValue histogram_buckets_value,
+                          Utility::HistogramBucketsMode histogram_buckets_mode,
                           const absl::optional<std::regex>& regex, const bool pretty_print) {
 
   ProtobufWkt::Struct document;
@@ -259,12 +259,12 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
 
   // Display bucket data if histogram_buckets query parameter is used, otherwise output contains
   // quantile summary data.
-  switch (histogram_buckets_value) {
-  case Utility::HistogramBucketsValue::Null:
+  switch (histogram_buckets_mode) {
+  case Utility::HistogramBucketsMode::NoBuckets:
     statsAsJsonQuantileSummaryHelper(*histograms_obj_container_fields, all_histograms, used_only,
                                      regex);
     break;
-  case Utility::HistogramBucketsValue::Cumulative:
+  case Utility::HistogramBucketsMode::Cumulative:
     statsAsJsonHistogramBucketsHelper(
         *histograms_obj_container_fields, all_histograms, used_only, regex,
         [](const Stats::ParentHistogramSharedPtr& histogram) {
@@ -274,7 +274,7 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
           return histogram->cumulativeStatistics().computedBuckets();
         });
     break;
-  case Utility::HistogramBucketsValue::Disjoint:
+  case Utility::HistogramBucketsMode::Disjoint:
     statsAsJsonHistogramBucketsHelper(
         *histograms_obj_container_fields, all_histograms, used_only, regex,
         [](const Stats::ParentHistogramSharedPtr& histogram) {
