@@ -117,7 +117,7 @@ public:
 
     // Hold a Scope for the lifetime of the configuration because connections in
     // the UpstreamDrainManager can live longer than the listener.
-    const Stats::ScopePtr stats_scope_;
+    const Stats::ScopeSharedPtr stats_scope_;
 
     const TcpProxyStats stats_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
