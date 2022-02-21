@@ -72,7 +72,7 @@ public:
     EXPECT_CALL(instance, api()).WillRepeatedly(ReturnRef(api_));
     EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
     StatsHandler handler(instance);
-    Admin::HandlerPtr context = handler.makeContext(url, admin_stream_);
+    Admin::RequestPtr context = handler.makeHandler(url, admin_stream_);
     Http::TestResponseHeaderMapImpl response_headers;
     Http::Code code = context->start(response_headers);
     Buffer::OwnedImpl data;
@@ -716,6 +716,21 @@ TEST_P(AdminStatsTest, SortedCountersAndGauges) {
     CodeResponse code_response = handlerStats(url);
     ASSERT_EQ(Http::Code::OK, code_response.first);
     checkOrder(code_response.second, {"s1", "s2", "s3", "s4"});
+  }
+}
+
+TEST_P(AdminStatsTest, SortedScopes) {
+  // Check counters and gauges are co-mingled in sorted order in the admin output.
+  Stats::ScopeSharedPtr scope = store_->createScope("scope");
+  scope->counterFromString("r");
+  scope->counterFromString("s");
+  scope->counterFromString("t");
+  Stats::ScopeSharedPtr subscope = scope->createScope("subscope");
+  subscope->counterFromString("x");
+  for (const std::string& url : {"/stats", "/stats?format=json"}) {
+    CodeResponse code_response = handlerStats(url);
+    ASSERT_EQ(Http::Code::OK, code_response.first);
+    checkOrder(code_response.second, {"scope.r", "scope.s", "scope.subscope.x", "scope.t"});
   }
 }
 

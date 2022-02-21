@@ -123,7 +123,7 @@ TEST_P(AdminInstanceTest, CustomHandler) {
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
 }
 
-class ChunkedHandler : public Admin::Handler {
+class ChunkedHandler : public Admin::Request {
 public:
   Http::Code start(Http::ResponseHeaderMap&) override { return Http::Code::OK; }
 
@@ -137,13 +137,14 @@ private:
 };
 
 TEST_P(AdminInstanceTest, CustomChunkedHandler) {
-  auto callback = [](absl::string_view, AdminStream&) -> Admin::HandlerPtr {
-    Admin::HandlerPtr handler = Admin::HandlerPtr(new ChunkedHandler);
+  auto callback = [](absl::string_view, AdminStream&) -> Admin::RequestPtr {
+    Admin::RequestPtr handler = Admin::RequestPtr(new ChunkedHandler);
     return handler;
   };
 
   // Test removable handler.
-  EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addChunkedHandler("/foo/bar", "hello", callback, true, false)));
+  EXPECT_NO_LOGS(
+      EXPECT_TRUE(admin_.addStreamingHandler("/foo/bar", "hello", callback, true, false)));
   Http::TestResponseHeaderMapImpl header_map;
   {
     Buffer::OwnedImpl response;
@@ -158,11 +159,11 @@ TEST_P(AdminInstanceTest, CustomChunkedHandler) {
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
 
   // Add non removable handler.
-  EXPECT_TRUE(admin_.addChunkedHandler("/foo/bar", "hello", callback, false, false));
+  EXPECT_TRUE(admin_.addStreamingHandler("/foo/bar", "hello", callback, false, false));
   EXPECT_EQ(Http::Code::OK, getCallback("/foo/bar", header_map, response));
 
   // Add again and make sure it is not there twice.
-  EXPECT_FALSE(admin_.addChunkedHandler("/foo/bar", "hello", callback, false, false));
+  EXPECT_FALSE(admin_.addStreamingHandler("/foo/bar", "hello", callback, false, false));
 
   // Try to remove non removable handler, and make sure it is not removed.
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));

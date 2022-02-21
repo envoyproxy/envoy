@@ -84,8 +84,9 @@ public:
   // The prefix must start with "/" and contain at least one additional character.
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
                   bool removable, bool mutates_server_state) override;
-  bool addChunkedHandler(const std::string& prefix, const std::string& help_text,
-                         GenHandlerCb callback, bool removable, bool mutates_server_state) override;
+  bool addStreamingHandler(const std::string& prefix, const std::string& help_text,
+                           GenRequestFn callback, bool removable,
+                           bool mutates_server_state) override;
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
@@ -202,9 +203,9 @@ public:
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
   Server::Instance& server() { return server_; }
 
-  GenHandlerCb createHandlerFunction() {
-    return [this](absl::string_view path_and_query, AdminStream& admin_stream) -> HandlerPtr {
-      return findHandler(path_and_query, admin_stream);
+  GenRequestFn createRequestFunction() {
+    return [this](absl::string_view path_and_query, AdminStream& admin_stream) -> RequestPtr {
+      return makeRequest(path_and_query, admin_stream);
     };
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
@@ -219,15 +220,15 @@ private:
   struct UrlHandler {
     const std::string prefix_;
     const std::string help_text_;
-    const GenHandlerCb handler_;
+    const GenRequestFn handler_;
     const bool removable_;
     const bool mutates_server_state_;
   };
 
   /**
-   * Creates a Handler instance given a request.
+   * Creates a Request from a url.
    */
-  HandlerPtr findHandler(absl::string_view path_and_query, AdminStream& admin_stream);
+  RequestPtr makeRequest(absl::string_view path_and_query, AdminStream& admin_stream);
 
   /**
    * Creates a UrlHandler structure from a non-chunked callback.
@@ -236,8 +237,8 @@ private:
                          HandlerCb callback, bool removable, bool mutates_state);
 
   /**
-   * Creates a URL prefix bound to chunked handler. Then handler is expected to
-   * supply a method makeContext(absl::string_view, AdminStream&).
+   * Creates a URL prefix bound to chunked handler. Handler is expected to
+   * supply a method makeHandler(absl::string_view, AdminStream&).
    *
    * @param prefix the prefix to register
    * @param help_text a help text ot display in a table in the admin home page
@@ -251,8 +252,8 @@ private:
   UrlHandler makeChunkedHandler(const std::string& prefix, const std::string& help_text,
                                 Handler& handler, bool removable, bool mutates_state) {
     return {prefix, help_text,
-            [&handler](absl::string_view path, AdminStream& admin_stream) -> Admin::HandlerPtr {
-              return handler.makeContext(path, admin_stream);
+            [&handler](absl::string_view path, AdminStream& admin_stream) -> Admin::RequestPtr {
+              return handler.makeHandler(path, admin_stream);
             },
             removable, mutates_state};
   }

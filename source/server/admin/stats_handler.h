@@ -45,14 +45,14 @@ public:
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
 
-  Admin::HandlerPtr makeContext(absl::string_view path, AdminStream& admin_stream);
-  static Admin::HandlerPtr makeContext(Stats::Store& stats, bool used_only, bool json,
+  Admin::RequestPtr makeHandler(absl::string_view path, AdminStream& admin_stream);
+  static Admin::RequestPtr makeHandler(Stats::Store& stats, bool used_only, bool json,
                                        const absl::optional<std::regex>& regex);
 
   class JsonRender;
   class Render;
   class TextRender;
-  class Context;
+  class StreamingRequest;
 
 private:
   template <class StatType>

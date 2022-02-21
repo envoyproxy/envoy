@@ -70,16 +70,33 @@ public:
   }
 
 /**
- * Global admin HTTP endpoint for the server.
+ * Global admin HTTP endpoint for the server, holding a map from URL prefixes to
+ * handlers. When an HTTP request arrives at the admin port, the URL is linearly
+ * prefixed-matched against an ordered list of handlers. When a match is found,
+ * the handler is used to generate a Request.
+ *
+ * Requests are capable of streaming out content to the client, however, most
+ * requests are delivered all at once. The implementation supplies adapters for
+ * simplifying the creation of streaming requests based on a simple callback
+ * that takes a URL and generates response headers and response body.
+ *
+ * A Taxonomy of the major types involved may help clarify:
+ *   Request     a class holding state for streaming admin content to clients.
+ *               These are re-created for each request.
+ *   Handler     a class that holds context for a family of admin requests,
+ *               supplying one-shot callbacks for non-streamed responses, and
+ *               for generating Request objects directly for streamed responses.
+ *               These have the same lifetime as Admin objects.
+ *   Admin       Holds the ordered list of handlers to be prefix-matched.
  */
 class Admin {
 public:
   virtual ~Admin() = default;
 
-  // Represents a handler for admin endpoints, allowing for chunked responses.
-  class Handler {
+  // Represents a request for admin endpoints, enabling streamed responses.
+  class Request {
   public:
-    virtual ~Handler() = default;
+    virtual ~Request() = default;
 
     /**
      * Initiates a handler. The URL can be supplied to the constructor if needed.
@@ -102,7 +119,7 @@ public:
      */
     virtual bool nextChunk(Buffer::Instance& response) PURE;
   };
-  using HandlerPtr = std::unique_ptr<Handler>;
+  using RequestPtr = std::unique_ptr<Request>;
 
   /**
    * Callback for admin URL handlers.
@@ -119,9 +136,9 @@ public:
       Buffer::Instance& response, AdminStream& admin_stream)>;
 
   /**
-   * Lambda to generate a Handler.
+   * Lambda to generate a Request.
    */
-  using GenHandlerCb = std::function<HandlerPtr(absl::string_view path, AdminStream&)>;
+  using GenRequestFn = std::function<RequestPtr(absl::string_view path, AdminStream&)>;
 
   /**
    * Add a legacy admin handler where the entire response is written in
@@ -142,14 +159,14 @@ public:
    *
    * @param prefix supplies the URL prefix to handle.
    * @param help_text supplies the help text for the handler.
-   * @param callback supplies the callback to generate a Handler.
+   * @param callback supplies the callback to generate a Request.
    * @param removable if true allows the handler to be removed via removeHandler.
    * @param mutates_server_state indicates whether callback will mutate server state.
    * @return bool true if the handler was added, false if it was not added.
    */
-  virtual bool addChunkedHandler(const std::string& prefix, const std::string& help_text,
-                                 GenHandlerCb callback, bool removable,
-                                 bool mutates_server_state) PURE;
+  virtual bool addStreamingHandler(const std::string& prefix, const std::string& help_text,
+                                   GenRequestFn gen_request, bool removable,
+                                   bool mutates_server_state) PURE;
 
   /**
    * Remove an admin handler if it is removable.
@@ -216,8 +233,8 @@ public:
    * @param code the Http::Code for the response
    * @return the handler
    */
-  static HandlerPtr makeStaticTextHandler(absl::string_view response_text, Http::Code code);
-  static HandlerPtr makeStaticTextHandler(Buffer::Instance& response_text, Http::Code code);
+  static RequestPtr makeStaticTextRequest(absl::string_view response_text, Http::Code code);
+  static RequestPtr makeStaticTextRequest(Buffer::Instance& response_text, Http::Code code);
 };
 
 } // namespace Server

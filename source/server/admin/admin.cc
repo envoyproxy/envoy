@@ -250,18 +250,18 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
 }
 
 void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
-  callbacks.addStreamFilter(std::make_shared<AdminFilter>(createHandlerFunction()));
+  callbacks.addStreamFilter(std::make_shared<AdminFilter>(createRequestFunction()));
 }
 
 namespace {
 
 // Implements a chunked handler for static text.
-class StaticTextHandler : public Admin::Handler {
+class StaticTextRequest : public Admin::Request {
 public:
-  StaticTextHandler(absl::string_view response_text, Http::Code code) : code_(code) {
+  StaticTextRequest(absl::string_view response_text, Http::Code code) : code_(code) {
     response_text_.add(response_text);
   }
-  StaticTextHandler(Buffer::Instance& response_text, Http::Code code) : code_(code) {
+  StaticTextRequest(Buffer::Instance& response_text, Http::Code code) : code_(code) {
     response_text_.move(response_text);
   }
 
@@ -276,19 +276,19 @@ private:
   const Http::Code code_;
 };
 
-// Implements a Chunked Handler implementation based on a non-chunked callback
-// that generates the entire admin output in one shot.
-class HandlerGasket : public Admin::Handler {
+// Implements a streaming Request based on a non-streaming callback that
+// generates the entire admin output in one shot.
+class RequestGasket : public Admin::Request {
 public:
-  HandlerGasket(Admin::HandlerCb handler_cb, absl::string_view path_and_query,
+  RequestGasket(Admin::HandlerCb handler_cb, absl::string_view path_and_query,
                 AdminStream& admin_stream)
       : path_and_query_(std::string(path_and_query)), handler_cb_(handler_cb),
         admin_stream_(admin_stream) {}
 
-  static Admin::GenHandlerCb makeGen(Admin::HandlerCb callback) {
+  static Admin::GenRequestFn makeGen(Admin::HandlerCb callback) {
     return [callback](absl::string_view path_and_query,
-                      AdminStream& admin_stream) -> Server::Admin::HandlerPtr {
-      return std::make_unique<HandlerGasket>(callback, path_and_query, admin_stream);
+                      AdminStream& admin_stream) -> Server::Admin::RequestPtr {
+      return std::make_unique<RequestGasket>(callback, path_and_query, admin_stream);
     };
   }
 
@@ -310,18 +310,18 @@ private:
 
 } // namespace
 
-Admin::HandlerPtr Admin::makeStaticTextHandler(absl::string_view response, Http::Code code) {
-  return std::make_unique<StaticTextHandler>(response, code);
+Admin::RequestPtr Admin::makeStaticTextRequest(absl::string_view response, Http::Code code) {
+  return std::make_unique<StaticTextRequest>(response, code);
 }
 
-Admin::HandlerPtr Admin::makeStaticTextHandler(Buffer::Instance& response, Http::Code code) {
-  return std::make_unique<StaticTextHandler>(response, code);
+Admin::RequestPtr Admin::makeStaticTextRequest(Buffer::Instance& response, Http::Code code) {
+  return std::make_unique<StaticTextRequest>(response, code);
 }
 
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream& admin_stream) {
-  HandlerPtr handler = findHandler(path_and_query, admin_stream);
+  RequestPtr handler = makeRequest(path_and_query, admin_stream);
   Http::Code code = handler->start(response_headers);
   bool more_data;
   do {
@@ -331,7 +331,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
   return code;
 }
 
-Admin::HandlerPtr AdminImpl::findHandler(absl::string_view path_and_query,
+Admin::RequestPtr AdminImpl::makeRequest(absl::string_view path_and_query,
                                          AdminStream& admin_stream) {
   std::string::size_type query_index = path_and_query.find('?');
   if (query_index == std::string::npos) {
@@ -345,7 +345,7 @@ Admin::HandlerPtr AdminImpl::findHandler(absl::string_view path_and_query,
         if (method != Http::Headers::get().MethodValues.Post) {
           ENVOY_LOG(error, "admin path \"{}\" mutates state, method={} rather than POST",
                     handler.prefix_, method);
-          return Admin::makeStaticTextHandler(
+          return Admin::makeStaticTextRequest(
               fmt::format("Method {} not allowed, POST required.", method),
               Http::Code::MethodNotAllowed);
         }
@@ -360,7 +360,7 @@ Admin::HandlerPtr AdminImpl::findHandler(absl::string_view path_and_query,
   Buffer::OwnedImpl error_response;
   error_response.add("invalid path. ");
   getHelp(error_response);
-  return Admin::makeStaticTextHandler(error_response, Http::Code::NotFound);
+  return Admin::makeStaticTextRequest(error_response, Http::Code::NotFound);
 }
 
 std::vector<const AdminImpl::UrlHandler*> AdminImpl::sortedHandlers() const {
@@ -443,11 +443,11 @@ const Network::Address::Instance& AdminImpl::localAddress() {
 AdminImpl::UrlHandler AdminImpl::makeHandler(const std::string& prefix,
                                              const std::string& help_text, HandlerCb callback,
                                              bool removable, bool mutates_state) {
-  return UrlHandler{prefix, help_text, HandlerGasket::makeGen(callback), removable, mutates_state};
+  return UrlHandler{prefix, help_text, RequestGasket::makeGen(callback), removable, mutates_state};
 }
 
-bool AdminImpl::addChunkedHandler(const std::string& prefix, const std::string& help_text,
-                                  GenHandlerCb callback, bool removable, bool mutates_state) {
+bool AdminImpl::addStreamingHandler(const std::string& prefix, const std::string& help_text,
+                                    GenRequestFn callback, bool removable, bool mutates_state) {
   ASSERT(prefix.size() > 1);
   ASSERT(prefix[0] == '/');
 
@@ -472,8 +472,8 @@ bool AdminImpl::addChunkedHandler(const std::string& prefix, const std::string& 
 
 bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
                            HandlerCb callback, bool removable, bool mutates_state) {
-  return addChunkedHandler(prefix, help_text, HandlerGasket::makeGen(callback), removable,
-                           mutates_state);
+  return addStreamingHandler(prefix, help_text, RequestGasket::makeGen(callback), removable,
+                             mutates_state);
 }
 
 bool AdminImpl::removeHandler(const std::string& prefix) {
@@ -488,7 +488,7 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
 
 Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_view method,
                               Http::ResponseHeaderMap& response_headers, std::string& body) {
-  AdminFilter filter(createHandlerFunction());
+  AdminFilter filter(createRequestFunction());
 
   auto request_headers = Http::RequestHeaderMapImpl::create();
   request_headers->setMethod(method);

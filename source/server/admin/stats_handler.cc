@@ -79,17 +79,30 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
 }
 
 // Abstract class for rendering stats. Every method is called "generate"
-// differing only by the data type, for simplifying call-sites.
+// differing only by the data type, to facilitate templatized call-sites.
+//
+// There are currently Json and Text implementations of this interface, and in
+// #19546 an HTML version will be added to provide a hierarchical view.
 class StatsHandler::Render {
 public:
   virtual ~Render() = default;
+
+  // Writes a fragment for a numeric value, for counters and gauges.
   virtual void generate(Buffer::Instance& response, const std::string& name, uint64_t value) PURE;
+
+  // Writes a json fragment for a textual value, for text readouts.
   virtual void generate(Buffer::Instance& response, const std::string& name,
                         const std::string& value) PURE;
+
+  // Writes a histogram value.
   virtual void generate(Buffer::Instance& response, const std::string& name,
                         const Stats::ParentHistogram& histogram) PURE;
+
+  // Completes rendering any buffered data.
   virtual void render(Buffer::Instance& response) PURE;
-  virtual bool nextChunk(Buffer::Instance& response) PURE;
+
+  // Determines whether the current chunk is full.
+  bool isChunkFull(Buffer::Instance& response) { return response.length() > ChunkSize; }
 };
 
 // Implements the Render interface for simple textual representation of stats.
@@ -110,7 +123,6 @@ public:
   }
 
   void render(Buffer::Instance&) override {}
-  bool nextChunk(Buffer::Instance& response) override { return response.length() > ChunkSize; }
 };
 
 // Implements the Render interface for json output.
@@ -118,16 +130,27 @@ class StatsHandler::JsonRender : public StatsHandler::Render {
 public:
   JsonRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response) {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+    // We don't create a JSON data model for the entire stats output, as that
+    // makes streaming difficult. Instead we emit the preamble in the
+    // constructor here, and create json models for each stats entry.
     response.add("{\"stats\":[");
   }
 
   void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override {
     add(response, name, ValueUtil::numberValue(value));
   }
+
   void generate(Buffer::Instance& response, const std::string& name,
                 const std::string& value) override {
     add(response, name, ValueUtil::stringValue(value));
   }
+
+  // In JSON we buffer all histograms and don't write them immediately, so we
+  // can, in one JSON structure, emit shared attributes of all histograms and
+  // each individual histogram.
+  //
+  // This is counter to the goals of streaming and chunked interfaces, but
+  // usually there are far fewer histograms than counters or gauges.
   void generate(Buffer::Instance&, const std::string& name,
                 const Stats::ParentHistogram& histogram) override {
     if (!found_used_histogram_) {
@@ -166,6 +189,8 @@ public:
     computed_quantile_array_.push_back(ValueUtil::structValue(computed_quantile));
   }
 
+  // Since histograms are buffered (see above), the render() method generates
+  // all of them.
   void render(Buffer::Instance& response) override {
     if (found_used_histogram_) {
       auto* histograms_obj_fields = histograms_obj_.mutable_fields();
@@ -179,8 +204,6 @@ public:
     }
     response.add("]}");
   }
-
-  bool nextChunk(Buffer::Instance& response) override { return response.length() > ChunkSize; }
 
 private:
   template <class Value>
@@ -212,7 +235,8 @@ private:
   bool first_{true};
 };
 
-class StatsHandler::Context : public Admin::Handler {
+// Captures context for a streaming request, implementing the AdminHandler interface.
+class StatsHandler::StreamingRequest : public Admin::Request {
   using ScopeVec = std::vector<Stats::ConstScopeSharedPtr>;
   using StatOrScopes = absl::variant<ScopeVec, Stats::TextReadoutSharedPtr, Stats::CounterSharedPtr,
                                      Stats::GaugeSharedPtr, Stats::HistogramSharedPtr>;
@@ -223,10 +247,10 @@ class StatsHandler::Context : public Admin::Handler {
   };
 
 public:
-  Context(Stats::Store& stats, bool used_only, bool json, absl::optional<std::regex> regex)
+  StreamingRequest(Stats::Store& stats, bool used_only, bool json, absl::optional<std::regex> regex)
       : used_only_(used_only), json_(json), regex_(regex), stats_(stats) {}
 
-  // Admin::Handler
+  // Admin::Request
   Http::Code start(Http::ResponseHeaderMap& response_headers) override {
     if (json_) {
       render_ = std::make_unique<JsonRender>(response_headers, response_);
@@ -253,7 +277,7 @@ public:
       response.move(response_);
       ASSERT(response_.length() == 0);
     }
-    while (!render_->nextChunk(response)) {
+    while (!render_->isChunkFull(response)) {
       while (stat_map_.empty()) {
         switch (phase_) {
         case Phase::TextReadouts:
@@ -300,6 +324,16 @@ public:
     }
     return true;
   }
+
+  // To duplicate prior behavior for this class, we do three passes over all the stats:
+  //   1. text readouts across all scopes
+  //   2. counters and gauges, co-mingled, across all scopes
+  //   3. histograms across all scopes.
+  // It would be little more efficient to co-mingle all the stats, but three
+  // passes over the scopes is OK. In the future we may decide to organize the
+  // result data differently, but in the process of changing from buffering
+  // the entire /stats response to streaming the data out in chunks, it's easier
+  // to reason about if the tests don't change their expectations.
   void startPhase() {
     ASSERT(stat_map_.empty());
     for (const Stats::ConstScopeSharedPtr& scope : scopes_) {
@@ -321,6 +355,8 @@ public:
     }
   }
 
+  // Determines whether the "usedonly" and "filter" status allows the stat to be
+  // displayed.
   template <class StatType> bool shouldShowMetric(const StatType& stat) {
     return StatsHandler::shouldShowMetric(stat, used_only_, regex_);
   }
@@ -384,7 +420,7 @@ public:
   Buffer::OwnedImpl response_;
 };
 
-Admin::HandlerPtr StatsHandler::makeContext(absl::string_view path, AdminStream& /*admin_stream*/) {
+Admin::RequestPtr StatsHandler::makeHandler(absl::string_view path, AdminStream& /*admin_stream*/) {
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
@@ -395,7 +431,7 @@ Admin::HandlerPtr StatsHandler::makeContext(absl::string_view path, AdminStream&
   absl::optional<std::regex> regex;
   Buffer::OwnedImpl response;
   if (!Utility::filterParam(params, response, regex)) {
-    return Admin::makeStaticTextHandler(response, Http::Code::BadRequest);
+    return Admin::makeStaticTextRequest(response, Http::Code::BadRequest);
   }
 
   const absl::optional<std::string> format_value = Utility::formatParam(params);
@@ -404,21 +440,21 @@ Admin::HandlerPtr StatsHandler::makeContext(absl::string_view path, AdminStream&
     if (format_value.value() == "prometheus") {
       Buffer::OwnedImpl response;
       Http::Code code = prometheusStats(path, response);
-      return Admin::makeStaticTextHandler(response, code);
+      return Admin::makeStaticTextRequest(response, code);
     } else if (format_value.value() == "json") {
       json = true;
     } else {
-      return Admin::makeStaticTextHandler(
+      return Admin::makeStaticTextRequest(
           "usage: /stats?format=json  or /stats?format=prometheus \n\n", Http::Code::BadRequest);
     }
   }
 
-  return makeContext(server_.stats(), used_only, json, regex);
+  return makeHandler(server_.stats(), used_only, json, regex);
 }
 
-Admin::HandlerPtr StatsHandler::makeContext(Stats::Store& stats, bool used_only, bool json,
+Admin::RequestPtr StatsHandler::makeHandler(Stats::Store& stats, bool used_only, bool json,
                                             const absl::optional<std::regex>& regex) {
-  return std::make_unique<Context>(stats, used_only, json, regex);
+  return std::make_unique<StreamingRequest>(stats, used_only, json, regex);
 }
 
 #if 0

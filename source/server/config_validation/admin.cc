@@ -4,8 +4,8 @@ namespace Envoy {
 namespace Server {
 
 // Pretend that handler was added successfully.
-bool ValidationAdmin::addChunkedHandler(const std::string&, const std::string&, GenHandlerCb, bool,
-                                        bool) {
+bool ValidationAdmin::addStreamingHandler(const std::string&, const std::string&, GenHandlerCb,
+                                          bool, bool) {
   return true;
 }
 bool ValidationAdmin::addHandler(const std::string&, const std::string&, HandlerCb, bool, bool) {
