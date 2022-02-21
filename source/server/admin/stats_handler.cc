@@ -18,6 +18,7 @@
 
 namespace {
 constexpr uint64_t ChunkSize = 2 * 1000 * 1000;
+constexpr uint64_t JsonStatsFlushCount = 64; // This value found by iterating in benchmark.
 } // namespace
 
 namespace Envoy {
@@ -192,6 +193,9 @@ public:
   // Since histograms are buffered (see above), the render() method generates
   // all of them.
   void render(Buffer::Instance& response) override {
+    if (!stats_array_.empty()) {
+      flushStats(response);
+    }
     if (found_used_histogram_) {
       auto* histograms_obj_fields = histograms_obj_.mutable_fields();
       (*histograms_obj_fields)["computed_quantiles"] =
@@ -212,11 +216,34 @@ private:
     auto* stat_obj_fields = stat_obj.mutable_fields();
     (*stat_obj_fields)["name"] = ValueUtil::stringValue(name);
     (*stat_obj_fields)["value"] = value;
-    auto str = MessageUtil::getJsonStringFromMessageOrDie(stat_obj, false /* pretty */, true);
-    addStatJson(response, str);
+    stats_array_.push_back(ValueUtil::structValue(stat_obj));
+
+    // We build up stats_array to a certain size so we can amortize the overhead
+    // of entering into the JSON serialization infrastructure. If we set the
+    // threshold too high we buffer too much memory, likely impacting processor
+    // cache. The optimum threshold found after a few experiments on a local
+    // host appears to be between 50 and 100.
+    if (stats_array_.size() == JsonStatsFlushCount) {
+      flushStats(response);
+    }
   }
 
-  void addStatJson(Buffer::Instance& response, const std::string& json) {
+  void flushStats(Buffer::Instance& response) {
+    std::string str = MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::listValue(stats_array_),
+                                                                 false /* pretty */, true);
+    stats_array_.clear();
+
+    // We are going to wind up with multiple flushes which have to serialize as
+    // a single array, rather than a concatenation of multiple arrays, so we add
+    // those in the constructor and render() method, strip off the "[" and "]"
+    // from each buffered serialization.
+    ASSERT(!str.empty());
+    ASSERT(str[0] == '[');
+    ASSERT(str[str.size() - 1] == ']');
+    addStatJson(response, absl::string_view(str).substr(1, str.size() - 2));
+  }
+
+  void addStatJson(Buffer::Instance& response, absl::string_view json) {
     if (first_) {
       response.add(json);
       first_ = false;
@@ -225,9 +252,7 @@ private:
     }
   }
 
-  ProtobufWkt::Struct document_;
   std::vector<ProtobufWkt::Value> stats_array_;
-  std::vector<ProtobufWkt::Value> scope_array_;
   ProtobufWkt::Struct histograms_obj_;
   ProtobufWkt::Struct histograms_obj_container_;
   std::vector<ProtobufWkt::Value> computed_quantile_array_;
