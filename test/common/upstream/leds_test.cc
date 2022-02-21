@@ -156,7 +156,7 @@ public:
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<MockClusterManager> cm_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  Envoy::Stats::ScopeSharedPtr cluster_scope_;
+  Envoy::Stats::ScopePtr cluster_scope_;
   LedsSubscriptionPtr leds_subscription_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;

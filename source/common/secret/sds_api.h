@@ -100,7 +100,7 @@ private:
   void onWatchUpdate();
   SdsApiStats generateStats(Stats::Scope& scope);
 
-  Stats::ScopeSharedPtr scope_;
+  Stats::ScopePtr scope_;
   SdsApiStats sds_api_stats_;
 
   const envoy::config::core::v3::ConfigSource sds_config_;
