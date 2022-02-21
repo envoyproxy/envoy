@@ -159,7 +159,7 @@ public:
    *
    * @param prefix supplies the URL prefix to handle.
    * @param help_text supplies the help text for the handler.
-   * @param callback supplies the callback to generate a Request.
+   * @param gen_request supplies the callback to generate a Request.
    * @param removable if true allows the handler to be removed via removeHandler.
    * @param mutates_server_state indicates whether callback will mutate server state.
    * @return bool true if the handler was added, false if it was not added.
@@ -229,7 +229,7 @@ public:
    * Makes a chunked handler for static text. The version that takes the
    * Buffer::Instance& transfers the content from the passed-in buffer.
    *
-   * @param resposne_text the text to populate response with
+   * @param response_text the text to populate response with
    * @param code the Http::Code for the response
    * @return the handler
    */

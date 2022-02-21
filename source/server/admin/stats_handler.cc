@@ -414,8 +414,7 @@ public:
 
   Stats::Store& stats_;
   ScopeVec scopes_;
-  using StatMap = absl::btree_map<std::string, StatOrScopes>;
-  StatMap stat_map_;
+  absl::btree_map<std::string, StatOrScopes> stat_map_;
   Phase phase_{Phase::TextReadouts};
   Buffer::OwnedImpl response_;
 };
