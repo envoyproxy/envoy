@@ -266,7 +266,7 @@ resources:
 
       auto sds_path =
           TestEnvironment::writeStringToFileForTest("server_cert_ecdsa.sds.yaml", sds_content);
-      config_source->set_path(sds_path);
+      config_source->mutable_path_config_source()->set_path(sds_path);
       config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
     }
   }
@@ -309,7 +309,7 @@ resources:
     }
     return Quic::createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_,
                                              Network::Utility::resolveUrl(url), local_address,
-                                             quic_stat_names_, stats_store_);
+                                             quic_stat_names_, {}, stats_store_);
 #else
     PANIC("reached unexpected code");
 #endif

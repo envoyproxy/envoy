@@ -36,7 +36,14 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath: {
     Utility::checkFilesystemSubscriptionBackingPath(config.path(), api_);
     return std::make_unique<Config::FilesystemSubscriptionImpl>(
-        dispatcher_, config.path(), callbacks, resource_decoder, stats, validation_visitor_, api_);
+        dispatcher_, makePathConfigSource(config.path()), callbacks, resource_decoder, stats,
+        validation_visitor_, api_);
+  }
+  case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPathConfigSource: {
+    Utility::checkFilesystemSubscriptionBackingPath(config.path_config_source().path(), api_);
+    return std::make_unique<Config::FilesystemSubscriptionImpl>(
+        dispatcher_, config.path_config_source(), callbacks, resource_decoder, stats,
+        validation_visitor_, api_);
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kApiConfigSource: {
     const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
@@ -44,6 +51,11 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                                                             api_config_source);
     Utility::checkTransportVersion(api_config_source);
     switch (api_config_source.api_type()) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC:
+      throw EnvoyException("Unsupported config source AGGREGATED_GRPC");
+    case envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC:
+      throw EnvoyException("Unsupported config source AGGREGATED_DELTA_GRPC");
     case envoy::config::core::v3::ApiConfigSource::DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE:
       throw EnvoyException(
           "REST_LEGACY no longer a supported ApiConfigSource. "
@@ -103,9 +115,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config), /*is_aggregated*/ false, options);
     }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    throw EnvoyException("Invalid API config source API type");
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
     return std::make_unique<GrpcSubscriptionImpl>(
@@ -130,7 +141,8 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     const std::string path = Http::Utility::localPathFromFilePath(collection_locator.id());
     Utility::checkFilesystemSubscriptionBackingPath(path, api_);
     return std::make_unique<Config::FilesystemCollectionSubscriptionImpl>(
-        dispatcher_, path, callbacks, resource_decoder, stats, validation_visitor_, api_);
+        dispatcher_, makePathConfigSource(path), callbacks, resource_decoder, stats,
+        validation_visitor_, api_);
   }
   case xds::core::v3::ResourceLocator::XDSTP: {
     if (resource_type != collection_locator.resource_type()) {

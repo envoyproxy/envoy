@@ -23,6 +23,7 @@
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
+#include "absl/flags/flag.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 
@@ -41,20 +42,27 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
   stats.deprecated_feature_seen_since_process_start_.inc();
 }
 
-// TODO(12923): Document the Quiche reloadable flag setup.
-#ifdef ENVOY_ENABLE_QUIC
-void refreshQuicheReloadableFlags(const Snapshot::EntryMap& flag_map) {
+void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
   absl::flat_hash_map<std::string, bool> quiche_flags_override;
   for (const auto& it : flag_map) {
+#ifdef ENVOY_ENABLE_QUIC
     if (absl::StartsWith(it.first, quiche::EnvoyQuicheReloadableFlagPrefix) &&
         it.second.bool_value_.has_value()) {
       quiche_flags_override[it.first.substr(quiche::EnvoyFeaturePrefix.length())] =
           it.second.bool_value_.value();
     }
-  }
-  quiche::FlagRegistry::getInstance().updateReloadableFlags(quiche_flags_override);
-}
 #endif
+    if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
+      maybeSetRuntimeGuard(it.first, it.second.bool_value_.value());
+    }
+    if (it.second.uint_value_.has_value()) {
+      maybeSetDeprecatedInts(it.first, it.second.uint_value_.value());
+    }
+  }
+#ifdef ENVOY_ENABLE_QUIC
+  quiche::FlagRegistry::getInstance().updateReloadableFlags(quiche_flags_override);
+#endif
+}
 
 } // namespace
 
@@ -83,8 +91,8 @@ bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_
 
 bool SnapshotImpl::runtimeFeatureEnabled(absl::string_view key) const {
   // If the value is not explicitly set as a runtime boolean, the default value is based on
-  // enabledByDefault.
-  return getBoolean(key, RuntimeFeaturesDefaults::get().enabledByDefault(key));
+  // the underlying value.
+  return getBoolean(key, Runtime::runtimeFeatureEnabled(key));
 }
 
 bool SnapshotImpl::featureEnabled(absl::string_view key, uint64_t default_value,
@@ -381,8 +389,6 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
     }
     break;
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -423,8 +429,8 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
           std::make_unique<RtdsSubscription>(*this, layer.rtds_layer(), store, validation_visitor));
       init_manager_.add(subscriptions_.back()->init_target_);
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::LAYER_SPECIFIER_NOT_SET:
+      throw EnvoyException("layer specifier not set");
     }
   }
 
@@ -533,9 +539,7 @@ void LoaderImpl::loadNewSnapshot() {
     return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(ptr);
   });
 
-#ifdef ENVOY_ENABLE_QUIC
-  refreshQuicheReloadableFlags(ptr->values());
-#endif
+  refreshReloadableFlags(ptr->values());
 
   {
     absl::MutexLock lock(&snapshot_mutex_);
@@ -619,8 +623,8 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
       layers.emplace_back(std::make_unique<const ProtoLayer>(layer.name(), subscription->proto_));
       break;
     }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::LAYER_SPECIFIER_NOT_SET:
+      PANIC_DUE_TO_PROTO_UNSET;
     }
   }
   stats_.num_layers_.set(layers.size());

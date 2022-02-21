@@ -147,6 +147,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, CdsIntegrationTest,
 // 7) We send Envoy a request, which we verify is properly proxied to and served by that cluster.
 TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
+  config_helper_.addConfigModifier(configureProxyStatus());
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
   test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
 
@@ -163,6 +164,8 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
       lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(response->headers().getProxyStatusValue(),
+            "envoy; error=destination_unavailable; details=\"cluster_not_found; NC\"");
 
   cleanupUpstreamAndDownstream();
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -180,6 +183,37 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
 
   cleanupUpstreamAndDownstream();
+}
+
+// Make sure that clusters won't create new connections on teardown.
+TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
+  initialize();
+  test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+  test_server_->waitForCounterExists("cluster.cluster_1.upstream_cx_total");
+  Stats::CounterSharedPtr cx_counter = test_server_->counter("cluster.cluster_1.upstream_cx_total");
+  // Confirm no upstream connection is attempted so far.
+  EXPECT_EQ(0, cx_counter->value());
+
+  // Make the upstreams stop working, to ensure the connection was not
+  // established.
+  fake_upstreams_[1]->dispatcher()->exit();
+  fake_upstreams_[2]->dispatcher()->exit();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/cluster1"}, {":scheme", "http"}, {":authority", "host"}});
+
+  // Tell Envoy that cluster_1 is gone.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                             {ClusterName1}, "42");
+  // We can continue the test once we're sure that Envoy's ClusterManager has made use of
+  // the DiscoveryResponse that says cluster_1 is gone.
+  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  codec_client_->sendReset(encoder_decoder.first);
+  cleanupUpstreamAndDownstream();
+
+  // Either 0 or 1 upstream connection is attempted but no more.
+  EXPECT_LE(cx_counter->value(), 1);
 }
 
 // Test the fast addition and removal of clusters when they use ThreadAwareLb.

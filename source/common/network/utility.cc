@@ -372,7 +372,7 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
   case Address::IpVersion::v6:
     return std::make_shared<Address::Ipv6Instance>(address.ip()->addressAsString(), port);
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("not handled");
 }
 
 Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
@@ -489,9 +489,12 @@ Utility::protobufAddressToAddress(const envoy::config::core::v3::Address& proto_
   case envoy::config::core::v3::Address::AddressCase::kPipe:
     return std::make_shared<Address::PipeInstance>(proto_address.pipe().path(),
                                                    proto_address.pipe().mode());
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
+    PANIC("internal address not supported"); // TODO(lambdai) fix.
+  case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
+    PANIC_DUE_TO_PROTO_UNSET;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void Utility::addressToProtobufAddress(const Address::Instance& address,
@@ -512,22 +515,23 @@ Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto
   case envoy::config::core::v3::Address::AddressCase::kSocketAddress: {
     const auto protocol = proto_address.socket_address().protocol();
     switch (protocol) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::config::core::v3::SocketAddress::TCP:
       return Socket::Type::Stream;
     case envoy::config::core::v3::SocketAddress::UDP:
       return Socket::Type::Datagram;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   case envoy::config::core::v3::Address::AddressCase::kPipe:
     return Socket::Type::Stream;
   case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
     // Currently internal address supports stream operation only.
     return Socket::Type::Stream;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
+    PANIC_DUE_TO_PROTO_UNSET;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::Instance& buffer,
@@ -711,8 +715,6 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
                                        : num_packets_to_read);
   // Make sure to read at least once.
   num_reads = std::max<size_t>(1, num_reads);
-  bool honor_read_limit =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit");
   do {
     const uint32_t old_packets_dropped = packets_dropped;
     const MonotonicTime receive_time = time_source.monotonicTime();
@@ -740,9 +742,7 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
           delta);
       udp_packet_processor.onDatagramsDropped(delta);
     }
-    if (honor_read_limit) {
-      --num_reads;
-    }
+    --num_reads;
     if (num_reads == 0) {
       return std::move(result.err_);
     }

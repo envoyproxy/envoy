@@ -46,12 +46,8 @@ public:
     const auto header = headers.get(header_name_);
     if (!header.empty()) {
       absl::InlinedVector<absl::string_view, 1> header_values;
-
-      size_t num_headers_to_hash = 1;
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hash_multiple_header_values")) {
-        num_headers_to_hash = header.size();
-        header_values.reserve(num_headers_to_hash);
-      }
+      size_t num_headers_to_hash = header.size();
+      header_values.reserve(num_headers_to_hash);
 
       for (size_t i = 0; i < num_headers_to_hash; i++) {
         header_values.push_back(header[i]->value().getStringView());
@@ -167,8 +163,8 @@ public:
   evaluate(const Network::Address::Instance*, const RequestHeaderMap&,
            const HashPolicy::AddCookieCallback,
            const StreamInfo::FilterStateSharedPtr filter_state) const override {
-    if (filter_state->hasData<Hashable>(key_)) {
-      return filter_state->getDataReadOnly<Hashable>(key_).hash();
+    if (auto typed_state = filter_state->getDataReadOnly<Hashable>(key_); typed_state != nullptr) {
+      return typed_state->hash();
     }
     return absl::nullopt;
   }

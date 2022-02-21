@@ -111,16 +111,21 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     }
   }
 
+  Stats::Store& stats = server_.stats();
+  std::vector<Stats::ParentHistogramSharedPtr> histograms = stats.histograms();
+  stats.symbolTable().sortByStatNames<Stats::ParentHistogramSharedPtr>(
+      histograms.begin(), histograms.end(),
+      [](const Stats::ParentHistogramSharedPtr& a) -> Stats::StatName { return a->statName(); });
+
   if (!format_value.has_value()) {
     // Display plain stats if format query param is not there.
-    statsAsText(all_stats, text_readouts, server_.stats().histograms(), used_only, regex, response);
+    statsAsText(all_stats, text_readouts, histograms, used_only, regex, response);
     return Http::Code::OK;
   }
 
   if (format_value.value() == "json") {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-    response.add(
-        statsAsJson(all_stats, text_readouts, server_.stats().histograms(), used_only, regex));
+    response.add(statsAsJson(all_stats, text_readouts, histograms, used_only, regex));
     return Http::Code::OK;
   }
 
@@ -178,11 +183,11 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
                                Buffer::Instance& response) {
   // Display plain stats if format query param is not there.
   for (const auto& text_readout : text_readouts) {
-    response.add(fmt::format("{}: \"{}\"\n", text_readout.first,
-                             Html::Utility::sanitize(text_readout.second)));
+    response.addFragments(
+        {text_readout.first, ": \"", Html::Utility::sanitize(text_readout.second), "\"\n"});
   }
   for (const auto& stat : all_stats) {
-    response.add(fmt::format("{}: {}\n", stat.first, stat.second));
+    response.addFragments({stat.first, ": ", absl::StrCat(stat.second), "\n"});
   }
   std::map<std::string, std::string> all_histograms;
   for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
@@ -192,7 +197,7 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
     }
   }
   for (const auto& histogram : all_histograms) {
-    response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
+    response.addFragments({histogram.first, ": ", histogram.second, "\n"});
   }
 }
 

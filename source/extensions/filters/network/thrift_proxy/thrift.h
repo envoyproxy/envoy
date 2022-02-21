@@ -45,9 +45,8 @@ public:
       return UNFRAMED;
     case TransportType::Auto:
       return AUTO;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 };
 
@@ -96,9 +95,8 @@ public:
       return TWITTER;
     case ProtocolType::Auto:
       return AUTO;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 };
 
