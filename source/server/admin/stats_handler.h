@@ -83,10 +83,7 @@ private:
       Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
       const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
       const absl::optional<std::regex>& regex,
-      std::function<std::vector<uint64_t>(const Stats::ParentHistogramSharedPtr&)>
-          interval_computed_buckets,
-      std::function<std::vector<uint64_t>(const Stats::ParentHistogramSharedPtr&)>
-          cumulative_computed_buckets);
+      std::function<std::vector<uint64_t>(const Stats::HistogramStatistics&)> computed_buckets);
 
   static ProtobufWkt::Value statsAsJsonHistogramBucketsCreateHistogramElementHelper(
       Stats::ConstSupportedBuckets& supported_buckets,

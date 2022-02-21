@@ -188,8 +188,7 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
 void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
                                const std::map<std::string, std::string>& text_readouts,
                                const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                               bool used_only,
-                               Utility::HistogramBucketsMode histogram_buckets_mode,
+                               bool used_only, Utility::HistogramBucketsMode histogram_buckets_mode,
                                const absl::optional<std::regex>& regex,
                                Buffer::Instance& response) {
   // Display plain stats if format query param is not there.
@@ -265,24 +264,18 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                      regex);
     break;
   case Utility::HistogramBucketsMode::Cumulative:
-    statsAsJsonHistogramBucketsHelper(
-        *histograms_obj_container_fields, all_histograms, used_only, regex,
-        [](const Stats::ParentHistogramSharedPtr& histogram) {
-          return histogram->intervalStatistics().computedBuckets();
-        },
-        [](const Stats::ParentHistogramSharedPtr& histogram) {
-          return histogram->cumulativeStatistics().computedBuckets();
-        });
+    statsAsJsonHistogramBucketsHelper(*histograms_obj_container_fields, all_histograms, used_only,
+                                      regex,
+                                      [](const Stats::HistogramStatistics& histogram_statistics) {
+                                        return histogram_statistics.computedBuckets();
+                                      });
     break;
   case Utility::HistogramBucketsMode::Disjoint:
-    statsAsJsonHistogramBucketsHelper(
-        *histograms_obj_container_fields, all_histograms, used_only, regex,
-        [](const Stats::ParentHistogramSharedPtr& histogram) {
-          return histogram->intervalStatistics().computeDisjointBuckets();
-        },
-        [](const Stats::ParentHistogramSharedPtr& histogram) {
-          return histogram->cumulativeStatistics().computeDisjointBuckets();
-        });
+    statsAsJsonHistogramBucketsHelper(*histograms_obj_container_fields, all_histograms, used_only,
+                                      regex,
+                                      [](const Stats::HistogramStatistics& histogram_statistics) {
+                                        return histogram_statistics.computeDisjointBuckets();
+                                      });
     break;
   }
 
@@ -376,16 +369,14 @@ void StatsHandler::statsAsJsonHistogramBucketsHelper(
     Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
     const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
     const absl::optional<std::regex>& regex,
-    std::function<std::vector<uint64_t>(const Stats::ParentHistogramSharedPtr&)>
-        interval_computed_buckets,
-    std::function<std::vector<uint64_t>(const Stats::ParentHistogramSharedPtr&)>
-        cumulative_computed_buckets) {
+    std::function<std::vector<uint64_t>(const Stats::HistogramStatistics&)> computed_buckets) {
   std::vector<ProtobufWkt::Value> histogram_obj_array;
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
     if (shouldShowMetric(*histogram, used_only, regex)) {
+      const Stats::HistogramStatistics& interval_statistics = histogram->intervalStatistics();
       histogram_obj_array.push_back(statsAsJsonHistogramBucketsCreateHistogramElementHelper(
-          histogram->intervalStatistics().supportedBuckets(), interval_computed_buckets(histogram),
-          cumulative_computed_buckets(histogram), histogram->name()));
+          interval_statistics.supportedBuckets(), computed_buckets(interval_statistics),
+          computed_buckets(histogram->cumulativeStatistics()), histogram->name()));
     }
   }
   if (!histogram_obj_array.empty()) { // If used histogram found.
