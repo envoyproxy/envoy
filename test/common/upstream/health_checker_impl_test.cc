@@ -4139,7 +4139,7 @@ public:
     addCompletionCallback();
   }
 
-  void setupHCWithAdditionalHeaders(const absl::flat_hash_map<std::string, std::string> headers_to_add) {
+  void setupHCWithHeaders(const absl::flat_hash_map<std::string, std::string> headers_to_add) {
     auto config = createGrpcHealthCheckConfig();
     config.mutable_grpc_health_check()->set_service_name("service");
     for (const auto& pair : headers_to_add) {
@@ -4458,7 +4458,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithAdditionalHeaders) {
   const std::string START_TIME_KEY = "x-start-time";
   const std::string UPSTREAM_METADATA_KEY = "x-upstream-metadata";
 
-  setupHCWithAdditionalHeaders(
+  setupHCWithHeaders(
       {{ENVOY_OK_KEY, ENVOY_OK_VAL},
        {ENVOY_COOL_KEY, ENVOY_COOL_VAL},
        {ENVOY_AWESOME_KEY, ENVOY_AWESOME_VAL},
