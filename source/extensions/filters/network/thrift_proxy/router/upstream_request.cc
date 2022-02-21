@@ -303,8 +303,6 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     // Error occurred after a partial response, propagate the reset to the downstream.
     parent_.resetDownstreamConnection();
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

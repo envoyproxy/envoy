@@ -68,6 +68,7 @@ public:
   void setBufferLimits(uint32_t limit) override;
   bool startSecureTransport() override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
+  void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
 
   // Simple getters which always delegate to the first connection in connections_.
   bool isHalfCloseEnabled() override;

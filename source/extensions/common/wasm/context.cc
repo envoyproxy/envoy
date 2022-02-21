@@ -447,19 +447,18 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   if (part_token == property_tokens.end()) {
     if (info) {
       std::string key = absl::StrCat(CelStateKeyPrefix, name);
-      const CelState* state;
-      if (info->filterState().hasData<CelState>(key)) {
-        state = &info->filterState().getDataReadOnly<CelState>(key);
-      } else if (info->upstreamInfo().has_value() &&
-                 info->upstreamInfo().value().get().upstreamFilterState() &&
-                 info->upstreamInfo().value().get().upstreamFilterState()->hasData<CelState>(key)) {
-        state =
-            &info->upstreamInfo().value().get().upstreamFilterState()->getDataReadOnly<CelState>(
-                key);
-      } else {
-        return {};
+      const CelState* state = info->filterState().getDataReadOnly<CelState>(key);
+      if (state == nullptr) {
+        if (info->upstreamInfo().has_value() &&
+            info->upstreamInfo().value().get().upstreamFilterState() != nullptr) {
+          state =
+              info->upstreamInfo().value().get().upstreamFilterState()->getDataReadOnly<CelState>(
+                  key);
+        }
       }
-      return state->exprValue(arena, last);
+      if (state != nullptr) {
+        return state->exprValue(arena, last);
+      }
     }
     return {};
   }
@@ -728,7 +727,8 @@ const Http::HeaderMap* Context::getConstMap(WasmHeaderMapType type) {
     return nullptr;
   }
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("unexpected");
+  return nullptr;
 }
 
 WasmResult Context::addHeaderMapValue(WasmHeaderMapType type, std::string_view key,
@@ -1128,10 +1128,8 @@ WasmResult Context::setProperty(std::string_view path, std::string_view value) {
   }
   std::string key;
   absl::StrAppend(&key, CelStateKeyPrefix, toAbslStringView(path));
-  CelState* state;
-  if (stream_info->filterState()->hasData<CelState>(key)) {
-    state = &stream_info->filterState()->getDataMutable<CelState>(key);
-  } else {
+  CelState* state = stream_info->filterState()->getDataMutable<CelState>(key);
+  if (state == nullptr) {
     const auto& it = rootContext()->state_prototypes_.find(toAbslStringView(path));
     const CelStatePrototype& prototype =
         it == rootContext()->state_prototypes_.end()
@@ -1180,9 +1178,12 @@ WasmResult Context::log(uint32_t level, std::string_view message) {
   case spdlog::level::critical:
     ENVOY_LOG(critical, "wasm log{}: {}", log_prefix(), message);
     return WasmResult::Ok;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case spdlog::level::off:
+    PANIC("not implemented");
+  case spdlog::level::n_levels:
+    PANIC("not implemented");
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 uint32_t Context::getLogLevel() {

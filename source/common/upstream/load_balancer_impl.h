@@ -351,24 +351,30 @@ private:
 
   HostSet& localHostSet() const { return *local_priority_set_->hostSetsPerPriority()[0]; }
 
-  static HostsSource::SourceType localitySourceType(HostAvailability host_availability) {
+  static absl::optional<HostsSource::SourceType>
+  localitySourceType(HostAvailability host_availability) {
     switch (host_availability) {
     case HostAvailability::Healthy:
-      return HostsSource::SourceType::LocalityHealthyHosts;
+      return absl::make_optional<HostsSource::SourceType>(
+          HostsSource::SourceType::LocalityHealthyHosts);
     case HostAvailability::Degraded:
-      return HostsSource::SourceType::LocalityDegradedHosts;
+      return absl::make_optional<HostsSource::SourceType>(
+          HostsSource::SourceType::LocalityDegradedHosts);
     }
-    PANIC_DUE_TO_CORRUPT_ENUM;
+    IS_ENVOY_BUG("unexpected locality source type enum");
+    return absl::nullopt;
   }
 
-  static HostsSource::SourceType sourceType(HostAvailability host_availability) {
+  static absl::optional<HostsSource::SourceType> sourceType(HostAvailability host_availability) {
     switch (host_availability) {
     case HostAvailability::Healthy:
-      return HostsSource::SourceType::HealthyHosts;
+      return absl::make_optional<HostsSource::SourceType>(HostsSource::SourceType::HealthyHosts);
     case HostAvailability::Degraded:
-      return HostsSource::SourceType::DegradedHosts;
+      return absl::make_optional<HostsSource::SourceType>(HostsSource::SourceType::DegradedHosts);
     }
-    PANIC_DUE_TO_CORRUPT_ENUM;
+
+    IS_ENVOY_BUG("unexpected source type enum");
+    return absl::nullopt;
   }
 
   // The set of local Envoy instances which are load balancing across priority_set_.
@@ -393,6 +399,8 @@ private:
   std::vector<PerPriorityStatePtr> per_priority_state_;
   Common::CallbackHandlePtr priority_update_cb_;
   Common::CallbackHandlePtr local_priority_set_member_update_cb_handle_;
+
+  friend class TestZoneAwareLoadBalancer;
 };
 
 /**

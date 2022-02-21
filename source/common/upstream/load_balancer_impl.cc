@@ -719,7 +719,11 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   }
 
   if (locality.has_value()) {
-    hosts_source.source_type_ = localitySourceType(host_availability);
+    auto source_type = localitySourceType(host_availability);
+    if (!source_type) {
+      return absl::nullopt;
+    }
+    hosts_source.source_type_ = source_type.value();
     hosts_source.locality_index_ = locality.value();
     return hosts_source;
   }
@@ -728,13 +732,21 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   // for the selected host set.
   if (per_priority_state_[host_set.priority()]->locality_routing_state_ ==
       LocalityRoutingState::NoLocalityRouting) {
-    hosts_source.source_type_ = sourceType(host_availability);
+    auto source_type = sourceType(host_availability);
+    if (!source_type) {
+      return absl::nullopt;
+    }
+    hosts_source.source_type_ = source_type.value();
     return hosts_source;
   }
 
   // Determine if the load balancer should do zone based routing for this pick.
   if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, routing_enabled_)) {
-    hosts_source.source_type_ = sourceType(host_availability);
+    auto source_type = sourceType(host_availability);
+    if (!source_type) {
+      return absl::nullopt;
+    }
+    hosts_source.source_type_ = source_type.value();
     return hosts_source;
   }
 
@@ -745,12 +757,20 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
     if (fail_traffic_on_panic_) {
       return absl::nullopt;
     } else {
-      hosts_source.source_type_ = sourceType(host_availability);
+      auto source_type = sourceType(host_availability);
+      if (!source_type) {
+        return absl::nullopt;
+      }
+      hosts_source.source_type_ = source_type.value();
       return hosts_source;
     }
   }
 
-  hosts_source.source_type_ = localitySourceType(host_availability);
+  auto source_type = localitySourceType(host_availability);
+  if (!source_type) {
+    return absl::nullopt;
+  }
+  hosts_source.source_type_ = source_type.value();
   hosts_source.locality_index_ = tryChooseLocalLocalityHosts(host_set);
   return hosts_source;
 }
