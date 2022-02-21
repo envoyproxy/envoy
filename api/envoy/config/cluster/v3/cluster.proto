@@ -596,12 +596,12 @@ message Cluster {
     // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
     ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
 
-    // Expected override host statuses. This configuration only makes sense if the L4/L7 extensions
-    // specify an :ref:`override host <arch_overview_load_balancing_override_host>`.
+    // This controls what hosts are considered valid when using
+    // :ref:`host overrides <arch_overview_load_balancing_override_host>`, which is used by some
+    // filters to modify the load balancing decision.
     //
-    // If this is set and and has no item then the override host will be ignored.
-    // If this is not set then healthy statuses (``UNKNOWN``, ``HEALTHY`` and ``DEGRADED`` for now)
-    // will be applied by default.
+    // If this is unset then [UNKNOWN, HEALTHY, DEGRADED] will be applied by default. If this is
+    // set with an empty set of statuses then host overrides will be ignored by the load balancing.
     core.v3.HealthStatusSet override_host_status = 8;
   }
 

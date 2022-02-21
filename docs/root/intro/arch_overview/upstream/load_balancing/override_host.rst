@@ -5,7 +5,7 @@ Override host
 
 Load balancing algorithms (round robin, random, etc.) are used to select upstream hosts by default.
 Also, Envoy supports overriding the results of the load balancing algorithms by specifying a valid
-override host address. If valid override host address is specified and the corresponding upstream
+override host address. If a valid override host address is specified and the corresponding upstream
 host has the
 :ref:`expected health status <envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.override_host_status>`,
 that upstream host will be selected preferentially.
