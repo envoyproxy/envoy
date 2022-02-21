@@ -216,7 +216,7 @@ public:
 
 private:
   Instance& server_;
-  Stats::ScopePtr server_scope_;
+  Stats::ScopeSharedPtr server_scope_;
 };
 
 /**
