@@ -3312,6 +3312,172 @@ TEST_P(Http2CodecImplTest, ShouldWaitForDeferredBodyToProcessBeforeProcessingTra
   }
 }
 
+TEST_P(Http2CodecImplTest, ShouldBufferDeferredBodyNoEndstream) {
+  // We must initialize before dtor, otherwise we'll touch uninitialized
+  // members in dtor.
+  initialize();
+
+  // Test only makes sense if we have defer processing enabled.
+  if (!defer_processing_backedup_streams_) {
+    return;
+  }
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  // Force the stream to buffer data at the receiving codec.
+  server_->getStream(1)->readDisable(true);
+  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  request_encoder_->encodeData(body, false);
+  driveToCompletion();
+
+  // Now re-enable the stream, we should just flush the buffered data without
+  // end stream to the upstream.
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+
+  server_->getStream(1)->readDisable(false);
+
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+  // Now invoke the deferred processing callback.
+  {
+    InSequence seq;
+    EXPECT_CALL(request_decoder_, decodeData(_, false));
+    process_buffered_data_callback->invokeCallback();
+  }
+}
+
+TEST_P(Http2CodecImplTest, ShouldBufferDeferredBodyWithEndStream) {
+  // We must initialize before dtor, otherwise we'll touch uninitialized
+  // members in dtor.
+  initialize();
+
+  // Test only makes sense if we have defer processing enabled.
+  if (!defer_processing_backedup_streams_) {
+    return;
+  }
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  // Force the stream to buffer data at the receiving codec.
+  server_->getStream(1)->readDisable(true);
+  Buffer::OwnedImpl first_part(std::string(1024, 'a'));
+  request_encoder_->encodeData(first_part, false);
+  driveToCompletion();
+
+  // Finish request in subsequent call.
+  Buffer::OwnedImpl final_part(std::string(1024, 'a'));
+  request_encoder_->encodeData(final_part, true);
+  driveToCompletion();
+
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+
+  server_->getStream(1)->readDisable(false);
+
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+  // Now invoke the deferred processing callback.
+  {
+    InSequence seq;
+    EXPECT_CALL(request_decoder_, decodeData(_, true));
+    process_buffered_data_callback->invokeCallback();
+  }
+}
+
+TEST_P(Http2CodecImplTest,
+       ShouldGracefullyHandleBufferedDataConsumedByNetworkEventInsteadOfCallback) {
+  // We must initialize before dtor, otherwise we'll touch uninitialized
+  // members in dtor.
+  initialize();
+
+  // Test only makes sense if we have defer processing enabled.
+  if (!defer_processing_backedup_streams_) {
+    return;
+  }
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  // Force the stream to buffer data at the receiving codec.
+  server_->getStream(1)->readDisable(true);
+  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  request_encoder_->encodeData(body, false);
+  driveToCompletion();
+
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+  server_->getStream(1)->readDisable(false);
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+  // Scoop the buffered data instead by this call to encodeData.
+  EXPECT_CALL(request_decoder_, decodeData(_, true));
+  request_encoder_->encodeData(body, true);
+  driveToCompletion();
+
+  // Deferred processing callback should have nothing to consume.
+  {
+    InSequence seq;
+    EXPECT_CALL(request_decoder_, decodeData(_, _)).Times(0);
+    EXPECT_CALL(request_decoder_, decodeTrailers_(_)).Times(0);
+    process_buffered_data_callback->invokeCallback();
+  }
+}
+
+TEST_P(Http2CodecImplTest, CanHandleMultipleBufferedDataProcessingOnAStream) {
+  // We must initialize before dtor, otherwise we'll touch uninitialized
+  // members in dtor.
+  initialize();
+
+  // Test only makes sense if we have defer processing enabled.
+  if (!defer_processing_backedup_streams_) {
+    return;
+  }
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
+  for (int i = 0; i < 10; ++i) {
+    // Repeatedly back up, clearing with the deferred processing callback.
+    const bool end_stream = i == 9;
+    server_->getStream(1)->readDisable(true);
+    Buffer::OwnedImpl body(std::string(1024, 'a'));
+    request_encoder_->encodeData(body, end_stream);
+    driveToCompletion();
+
+    EXPECT_FALSE(process_buffered_data_callback->enabled_);
+    server_->getStream(1)->readDisable(false);
+    EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+    {
+      InSequence seq;
+      EXPECT_CALL(request_decoder_, decodeData(_, end_stream));
+      process_buffered_data_callback->invokeCallback();
+      EXPECT_FALSE(process_buffered_data_callback->enabled_);
+    }
+  }
+}
+
 class TestNghttp2SessionFactory;
 
 // Test client for H/2 METADATA frame edge cases.
