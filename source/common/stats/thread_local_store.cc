@@ -909,7 +909,7 @@ const std::string ParentHistogramImpl::quantileSummary() const {
     const std::vector<double>& supported_quantiles_ref = interval_statistics_.supportedQuantiles();
     summary.reserve(supported_quantiles_ref.size());
     for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
-      summary.push_back(fmt::format("P{:g}({},{})", 100 * supported_quantiles_ref[i],
+      summary.push_back(fmt::format("P{:g}({:g},{:g})", 100 * supported_quantiles_ref[i],
                                     interval_statistics_.computedQuantiles()[i],
                                     cumulative_statistics_.computedQuantiles()[i]));
     }
