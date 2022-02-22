@@ -277,7 +277,7 @@ Http::FilterHeadersStatus PlatformBridgeFilter::FilterBase::onHeaders(Http::Head
     PANIC("invalid filter state: unsupported status for platform filters");
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("not reached");
 }
 
 Http::FilterDataStatus PlatformBridgeFilter::FilterBase::onData(Buffer::Instance& data,
@@ -373,7 +373,7 @@ Http::FilterDataStatus PlatformBridgeFilter::FilterBase::onData(Buffer::Instance
     PANIC("invalid filter state: unsupported status for platform filters");
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("not reached");
 }
 
 Http::FilterTrailersStatus PlatformBridgeFilter::FilterBase::onTrailers(Http::HeaderMap& trailers) {
@@ -438,7 +438,7 @@ Http::FilterTrailersStatus PlatformBridgeFilter::FilterBase::onTrailers(Http::He
     PANIC("invalid filter state: unsupported status for platform filters");
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("not reached");
 }
 
 Http::FilterHeadersStatus PlatformBridgeFilter::decodeHeaders(Http::RequestHeaderMap& headers,
