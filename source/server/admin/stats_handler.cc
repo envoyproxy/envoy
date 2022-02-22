@@ -266,14 +266,14 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   case Utility::HistogramBucketsMode::Cumulative:
     statsAsJsonHistogramBucketsHelper(*histograms_obj_container_fields, all_histograms, used_only,
                                       regex,
-                                      [](const Stats::HistogramStatistics& histogram_statistics) {
+                                      [](const Stats::HistogramStatistics& histogram_statistics) -> std::vector<uint64_t> {
                                         return histogram_statistics.computedBuckets();
                                       });
     break;
   case Utility::HistogramBucketsMode::Disjoint:
     statsAsJsonHistogramBucketsHelper(*histograms_obj_container_fields, all_histograms, used_only,
                                       regex,
-                                      [](const Stats::HistogramStatistics& histogram_statistics) {
+                                      [](const Stats::HistogramStatistics& histogram_statistics) -> std::vector<uint64_t> {
                                         return histogram_statistics.computeDisjointBuckets();
                                       });
     break;
