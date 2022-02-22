@@ -930,14 +930,16 @@ void Filter::onResponseTimeout() {
         request_vcluster_->stats().upstream_rq_timeout_.inc();
       }
 
+      if (upstream_request->upstreamHost()) {
+        upstream_request->upstreamHost()->stats().rq_timeout_.inc();
+      }
+    }
+
+    if (upstream_request->awaitingHeaders()) {
       if (cluster_->timeoutBudgetStats().has_value()) {
         // Cancel firing per-try timeout information, because the per-try timeout did not come into
         // play when the global timeout was hit.
         upstream_request->recordTimeoutBudget(false);
-      }
-
-      if (upstream_request->upstreamHost()) {
-        upstream_request->upstreamHost()->stats().rq_timeout_.inc();
       }
 
       // If this upstream request already hit a "soft" timeout, then it
