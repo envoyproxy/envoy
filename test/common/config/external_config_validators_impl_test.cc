@@ -24,6 +24,8 @@ public:
       return false;
     case FakeValidatorAction::ThrowException:
       throw EnvoyException("Emulating fake action throw exception");
+    default:
+      PANIC("reached unexpected code");
     }
   }
 
