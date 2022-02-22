@@ -224,7 +224,7 @@ std::list<DnsResponse>& AppleDnsResolverImpl::PendingResolution::finalAddressLis
 void AppleDnsResolverImpl::PendingResolution::finishResolve() {
   ENVOY_LOG_EVENT(debug, "apple_dns_resolution_complete",
                   "dns resolution for {} completed with status {}", dns_name_,
-                  pending_response_.status_);
+                  static_cast<int>(pending_response_.status_));
   callback_(pending_response_.status_, std::move(finalAddressList()));
 
   if (owned_) {
