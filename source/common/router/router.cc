@@ -916,8 +916,15 @@ void Filter::onResponseTimeout() {
     UpstreamRequestPtr upstream_request =
         upstream_requests_.back()->removeFromList(upstream_requests_);
 
-    // Don't do work for upstream requests we've already seen headers for.
-    if (upstream_request->awaitingHeaders()) {
+    // We want to record the upstream timeouts and increase the stats counters in all the cases.
+    // For example, we also want to record the stats in the case of BiDi streaming APIs where we
+    // might have already seen the headers.
+    // If desired, the old behavior to not do any work for those upstream requests we've already
+    // seen the headers for can be achieved by overloading the runtime guard
+    // `do_not_await_headers_on_upstream_timeout_to_emit_stats` to false.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats") ||
+        upstream_request->awaitingHeaders()) {
       cluster_->stats().upstream_rq_timeout_.inc();
       if (request_vcluster_) {
         request_vcluster_->stats().upstream_rq_timeout_.inc();
