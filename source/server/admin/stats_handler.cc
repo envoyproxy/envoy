@@ -88,7 +88,10 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   // summary data. Using histogram_buckets will change output to show bucket data. The
   // histogram_buckets query param has two possible values: cumulative or disjoint.
   Utility::HistogramBucketsMode histogram_buckets_mode = Utility::HistogramBucketsMode::NoBuckets;
-  if (!Utility::histogramBucketsParam(params, response, histogram_buckets_mode)) {
+  absl::Status histogram_buckets_status =
+      Utility::histogramBucketsParam(params, histogram_buckets_mode);
+  if (!histogram_buckets_status.ok()) {
+    response.add(histogram_buckets_status.message());
     return Http::Code::BadRequest;
   }
 
@@ -264,18 +267,18 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                      regex);
     break;
   case Utility::HistogramBucketsMode::Cumulative:
-    statsAsJsonHistogramBucketsHelper(*histograms_obj_container_fields, all_histograms, used_only,
-                                      regex,
-                                      [](const Stats::HistogramStatistics& histogram_statistics) -> std::vector<uint64_t> {
-                                        return histogram_statistics.computedBuckets();
-                                      });
+    statsAsJsonHistogramBucketsHelper(
+        *histograms_obj_container_fields, all_histograms, used_only, regex,
+        [](const Stats::HistogramStatistics& histogram_statistics) -> std::vector<uint64_t> {
+          return histogram_statistics.computedBuckets();
+        });
     break;
   case Utility::HistogramBucketsMode::Disjoint:
-    statsAsJsonHistogramBucketsHelper(*histograms_obj_container_fields, all_histograms, used_only,
-                                      regex,
-                                      [](const Stats::HistogramStatistics& histogram_statistics) -> std::vector<uint64_t> {
-                                        return histogram_statistics.computeDisjointBuckets();
-                                      });
+    statsAsJsonHistogramBucketsHelper(
+        *histograms_obj_container_fields, all_histograms, used_only, regex,
+        [](const Stats::HistogramStatistics& histogram_statistics) -> std::vector<uint64_t> {
+          return histogram_statistics.computeDisjointBuckets();
+        });
     break;
   }
 
@@ -297,8 +300,7 @@ StatsHandler::computeDisjointBucketSummary(const Stats::ParentHistogramSharedPtr
   }
   std::vector<std::string> bucket_summary;
   const Stats::HistogramStatistics& interval_statistics = histogram->intervalStatistics();
-  Stats::ConstSupportedBuckets& supported_buckets =
-      interval_statistics.supportedBuckets();
+  Stats::ConstSupportedBuckets& supported_buckets = interval_statistics.supportedBuckets();
   const std::vector<uint64_t> disjoint_interval_buckets =
       interval_statistics.computeDisjointBuckets();
   const std::vector<uint64_t> disjoint_cumulative_buckets =
