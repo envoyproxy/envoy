@@ -508,7 +508,7 @@ void UpstreamRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 }
 
 void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
-  ENVOY_LOG(info, "received upstream event {}", event);
+  ENVOY_LOG(info, "received upstream event {}", static_cast<int>(event));
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
     ENVOY_STREAM_LOG(debug, "upstream remote close", *callbacks_);
