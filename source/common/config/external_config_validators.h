@@ -5,8 +5,10 @@
 namespace Envoy {
 namespace Config {
 
-// Represents a collection of external config validators for all xDS
-// service type.
+// Represents a collection of config validators defined using Envoy extensions,
+// for all xDS service types. This is different than running Envoy in
+// "validation-mode", as these config validators will be executed whenever
+// Envoy receives a new update.
 class ExternalConfigValidators {
 public:
   virtual ~ExternalConfigValidators() = default;

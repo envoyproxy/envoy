@@ -277,6 +277,9 @@ public:
         ++clusters_maps.added_via_api_clusters_num_;
       }
     }
+    // The number of clusters that were added via API must be at most the number
+    // of active clusters + number of warming clusters.
+    ASSERT(clusters_maps.added_via_api_clusters_num_ <= clusters_maps.active_clusters_.size() + clusters_maps.warming_clusters_.size());
     return clusters_maps;
   }
 
