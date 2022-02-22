@@ -124,6 +124,8 @@
   [definitions appendFormat:@"- &dns_preresolve_hostnames %@\n", self.dnsPreresolveHostnames];
   [definitions appendFormat:@"- &dns_lookup_family %@\n",
                             self.enableHappyEyeballs ? @"ALL" : @"V4_PREFERRED"];
+  [definitions appendFormat:@"- &dns_multiple_addresses %@\n",
+                            self.enableHappyEyeballs ? @"true" : @"false"];
   [definitions appendFormat:@"- &dns_resolver_name envoy.network.dns_resolver.apple\n"];
   // No additional values are currently needed for Apple-based DNS resolver.
   [definitions

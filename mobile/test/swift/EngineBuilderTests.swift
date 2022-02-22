@@ -387,6 +387,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&dns_query_timeout 800s"))
     XCTAssertTrue(resolvedYAML.contains("&dns_preresolve_hostnames [test]"))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family ALL"))
+    XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses true"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding true"))
 
     XCTAssertTrue(resolvedYAML.contains("&h2_connection_keepalive_idle_interval 0.001s"))
@@ -446,6 +447,7 @@ final class EngineBuilderTests: XCTestCase {
     )
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family V4_PREFERRED"))
+    XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses false"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding false"))
   }
 
