@@ -180,7 +180,7 @@ public:
 
 private:
   bool hasCacheControlNoTransform(Http::ResponseHeaderMap& headers) const;
-  bool isAcceptEncodingAllowed(const Http::ResponseHeaderMap& headers) const;
+  bool isAcceptEncodingAllowed(bool should_stats, const Http::ResponseHeaderMap& headers) const;
   bool isEtagAllowed(Http::ResponseHeaderMap& headers) const;
   bool isTransferEncodingAllowed(Http::RequestOrResponseHeaderMap& headers) const;
 

@@ -227,6 +227,8 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
 Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                           bool end_stream) {
   const auto& config = config_->responseDirectionConfig();
+
+  // Calculate whether no_accept_header_ should be statistic here
   const bool isEnabledAndContentLengthBigEnough =
       config.compressionEnabled() && config.isMinimumContentLength(headers);
 
@@ -234,7 +236,7 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
       isEnabledAndContentLengthBigEnough && !Http::Utility::isUpgrade(headers) &&
       config.isContentTypeAllowed(headers) && !hasCacheControlNoTransform(headers) &&
       isEtagAllowed(headers) && !headers.getInline(response_content_encoding_handle.handle());
-  if (!end_stream && isEnabledAndContentLengthBigEnough && isAcceptEncodingAllowed(headers) &&
+  if (!end_stream && isAcceptEncodingAllowed(isEnabledAndContentLengthBigEnough, headers) &&
       isCompressible && isTransferEncodingAllowed(headers)) {
     sanitizeEtagHeader(headers);
     headers.removeContentLength();
@@ -454,7 +456,12 @@ bool CompressorFilter::shouldCompress(const CompressorFilter::EncodingDecision& 
   return should_compress;
 }
 
-bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& headers) const {
+bool CompressorFilter::isAcceptEncodingAllowed(bool should_stats,
+                                               const Http::ResponseHeaderMap& headers) const {
+  if (!should_stats) {
+    return false;
+  }
+
   if (accept_encoding_ == nullptr) {
     config_->responseDirectionConfig().responseStats().no_accept_header_.inc();
     return false;
