@@ -565,3 +565,13 @@ envoy_cc_test(
         "//test/mocks/filesystem:filesystem_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "external_config_validators_impl_test",
+    srcs = ["external_config_validators_impl_test.cc"],
+    deps = [
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/server:instance_mocks",
+        "//test/test_common:registry_lib",
+    ],
+)
