@@ -19,6 +19,7 @@ namespace Api {
 
 struct EnvoyTcpInfo {
   std::chrono::microseconds tcpi_rtt;
+  uint32_t tcpi_snd_cwnd; // Congestion window, in packets
 };
 
 // Small struct to avoid exposing ifaddrs -- which is not defined in all platforms -- to the

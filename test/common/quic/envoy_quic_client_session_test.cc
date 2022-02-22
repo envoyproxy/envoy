@@ -348,5 +348,9 @@ TEST_P(EnvoyQuicClientSessionTest, IncomingUnidirectionalReadStream) {
   envoy_quic_session_.OnStreamFrame(stream_frame2);
 }
 
+TEST_P(EnvoyQuicClientSessionTest, GetCongestionWindow) {
+  EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(), 1000);
+}
+
 } // namespace Quic
 } // namespace Envoy

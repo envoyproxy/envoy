@@ -231,5 +231,18 @@ void QuicFilterManagerConnectionImpl::configureInitialCongestionWindow(
   }
 }
 
+absl::optional<uint64_t> QuicFilterManagerConnectionImpl::congestionWindowInBytes() const {
+  if (quicConnection() == nullptr) {
+    return {};
+  }
+
+  uint64_t cwnd = quicConnection()->sent_packet_manager().GetCongestionWindowInBytes();
+  if (cwnd == 0) {
+    return {};
+  }
+
+  return cwnd;
+}
+
 } // namespace Quic
 } // namespace Envoy
