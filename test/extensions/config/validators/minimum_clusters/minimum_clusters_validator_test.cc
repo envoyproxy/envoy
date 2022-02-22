@@ -165,8 +165,27 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1Remove1NonApi) {
   EXPECT_TRUE(validator.validate(server_, added_resources, removed_resources));
 }
 
-// Add a test with high threshold, and small update (only additions), and make
-// sure it is rejected
+// Add a test with high threshold, and small update (only additions) below the
+// threshold, which will be rejected.
+TEST_F(MinimumClustersValidatorTest, Minimum5AddingOneCluster) {
+  envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;
+  config.set_min_clusters_num(5);
+  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{}, {}, 0};
+  MinimumClustersValidator validator(config);
+
+  auto cluster = std::make_unique<envoy::config::cluster::v3::Cluster>();
+  cluster->set_name("cluster1");
+  std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
+  added_resources.emplace_back(
+      new Envoy::Config::DecodedResourceImpl(std::move(cluster), "name", {}, "ver"));
+  const Protobuf::RepeatedPtrField<std::string> removed_resources;
+
+  EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
+  EXPECT_THROW_WITH_MESSAGE(validator.validate(server_, added_resources, removed_resources),
+                            EnvoyException,
+                            "CDS update attempts to reduce clusters below configured minimum.");
+}
+
 } // namespace
 } // namespace Validators
 } // namespace Config

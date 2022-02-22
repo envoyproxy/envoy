@@ -197,10 +197,6 @@ TEST_P(MinimumClustersValidatorIntegrationTest, RemoveAllClustersThreshold1) {
                               "CDS update attempts to reduce clusters below configured minimum."));
   EXPECT_EQ(3, test_server_->gauge("cluster_manager.active_clusters")->value());
 }
-//
-// TEST_P(MinimumClustersValidatorIntegrationTest, RemoveAllClustersNoValidator) {
-// }
-//
 
 } // namespace
 } // namespace Envoy
