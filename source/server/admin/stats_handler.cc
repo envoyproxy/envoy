@@ -210,6 +210,10 @@ public:
   }
 
 private:
+  // Collects a scalar metric (text-readout, counter, or gauge) into an array of
+  // stats, so they can all be serialized in one shot when a threshold is
+  // reached. Serializing each one individually results in much worse
+  // performance (see stats_handler_speed_test.cc).
   template <class Value>
   void add(Buffer::Instance& response, const std::string& name, const Value& value) {
     ProtobufWkt::Struct stat_obj;
@@ -228,21 +232,25 @@ private:
     }
   }
 
+  // Flushes all scalar stats that were buffered in add() above.
   void flushStats(Buffer::Instance& response) {
-    std::string str = MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::listValue(stats_array_),
-                                                                 false /* pretty */, true);
+    ASSERT(!stats_array_.empty());
+    const std::string json_array = MessageUtil::getJsonStringFromMessageOrDie(
+        ValueUtil::listValue(stats_array_), false /* pretty */, true);
     stats_array_.clear();
 
     // We are going to wind up with multiple flushes which have to serialize as
     // a single array, rather than a concatenation of multiple arrays, so we add
     // those in the constructor and render() method, strip off the "[" and "]"
     // from each buffered serialization.
-    ASSERT(!str.empty());
-    ASSERT(str[0] == '[');
-    ASSERT(str[str.size() - 1] == ']');
-    addStatJson(response, absl::string_view(str).substr(1, str.size() - 2));
+    ASSERT(json_array.size() >= 2);
+    ASSERT(json_array[0] == '[');
+    ASSERT(json_array[json_array.size() - 1] == ']');
+    addStatJson(response, absl::string_view(json_array).substr(1, json_array.size() - 2));
   }
 
+  // Adds a json fragment of scalar stats to the response buffer, including a
+  // "," delimiter if this is not the first fragment.
   void addStatJson(Buffer::Instance& response, absl::string_view json) {
     if (first_) {
       response.add(json);
@@ -296,10 +304,10 @@ public:
     return Http::Code::OK;
   }
 
-  // nextChunkI() Streams out the next chunk of stats to the client, visiting
-  // only the scopes that can plausibly contribute the next set of named
-  // stats. This enables us to linearly traverse the entire set of stats without
-  // buffering all of them and sorting.
+  // Streams out the next chunk of stats to the client, visiting only the scopes
+  // that can plausibly contribute the next set of named stats. This enables us
+  // to linearly traverse the entire set of stats without buffering all of them
+  // and sorting.
   //
   // Instead we keep the a set of candidate stats to emit in stat_map_ an
   // alphabetically ordered btree, which heterogeneously stores stats of all

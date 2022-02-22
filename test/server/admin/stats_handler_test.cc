@@ -821,17 +821,8 @@ TEST_P(AdminInstanceTest, RecentLookups) {
   EXPECT_THAT(body, HasSubstr("Lookup tracking is not enabled"));
   EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
 
-  EXPECT_EQ(Http::Code::OK,
-            admin_.request("/stats/recentlookups/enable", "POST", response_headers, body));
-  Stats::StatNamePool pool(server_.stats().symbolTable());
-  pool.add("alpha");
-  pool.add("beta");
-  pool.add("gamma");
-  pool.add("alpha");
-  pool.add("beta");
-  pool.add("alpha");
-  EXPECT_EQ(Http::Code::OK, admin_.request("/stats/recentlookups", "GET", response_headers, body));
-  EXPECT_THAT(body, HasSubstr("       1 gamma\n       2 beta\n       3 alpha\n"));
+  // We can't test RecentLookups in admin unit tests as it doesn't work with a
+  // fake symbol table. However we cover this solidly in integration tests.
 }
 
 class StatsHandlerPrometheusTest : public StatsHandlerTest {
