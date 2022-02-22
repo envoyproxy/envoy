@@ -266,14 +266,7 @@ TEST_P(AdminStatsTest, HandlerStatsJsonNoHistograms) {
 
   store_->mergeHistograms([]() -> void {});
 
-  const std::string expected_json = R"EOF({
-    "stats": [
-        {
-            "name":"c1",
-            "value":10,
-        }
-    ]
-})EOF";
+  const std::string expected_json = R"EOF({"stats": [{"name":"c1", "value":10}]})EOF";
 
   CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::OK, code_response.first);
