@@ -71,17 +71,9 @@ public:
   void onSuccess(SSL* ssl) override;
   void onFailure() override;
   Network::TransportSocketCallbacks* transportSocketCallbacks() override { return callbacks_; }
+  const Envoy::Ssl::ContextConfig& config() const { return config_; }
 
   SSL* rawSslForTest() const { return rawSsl(); }
-  static bool tlsKeyLogMatch(const Network::Address::InstanceConstSharedPtr local,
-                             const Network::Address::InstanceConstSharedPtr remote,
-                             const Ssl::ContextConfig& config);
-  void enableTlsKeyLog();
-  void disableTlsKeyLog();
-  static void keylogCallback(const SSL* ssl, const char* line);
-  static int ssl_ex_data_config_index_;
-  static int ssl_ex_data_callback_index_;
-  static int ssl_ex_data_file_index_;
 
 protected:
   SSL* rawSsl() const { return info_->ssl(); }
@@ -106,7 +98,6 @@ private:
 
   SslHandshakerImplSharedPtr info_;
   const Envoy::Ssl::ContextConfig& config_;
-  bool enable_tls_keylog_;
 };
 
 class ClientSslSocketFactory : public Network::CommonTransportSocketFactory,

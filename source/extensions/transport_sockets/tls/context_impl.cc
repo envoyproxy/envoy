@@ -336,6 +336,89 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   //
   // Note that if a negotiated version is outside of this set, we'll issue an ENVOY_BUG.
   stat_name_set_->rememberBuiltins({"TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"});
+
+  if (config.tlsKeyLogFile() != nullptr) {
+    ENVOY_LOG(debug, "Enable tls key log");
+    enableTlsKeyLog();
+  } else {
+    disableTlsKeyLog();
+  }
+}
+
+bool ContextImpl::tlsKeyLogMatch(const Network::Address::InstanceConstSharedPtr local,
+                                 const Network::Address::InstanceConstSharedPtr remote,
+                                 const Ssl::ContextConfig& config) {
+  const Network::Address::IpList& local_ip = config.tlsKeyLogLocal();
+  const Network::Address::IpList& remote_ip = config.tlsKeyLogRemote();
+  bool match = false;
+  bool match_local = false;
+  bool enable_local = false;
+  bool match_remote = false;
+  bool enable_remote = false;
+
+  if (local_ip.getIpListSize() > 0) {
+    enable_local = true;
+    if (local_ip.contains(*local)) {
+      match_local = true;
+    }
+  }
+  if (remote_ip.getIpListSize() > 0) {
+    enable_remote = true;
+    if (remote_ip.contains(*remote)) {
+      match_remote = true;
+    }
+  }
+  ENVOY_LOG(trace, "enable_local: {}, enable_remote:{}, match_local:{}, match_remote:{}",
+            enable_local, enable_remote, match_local, match_remote);
+  if (enable_local) {
+    if (enable_remote) {
+      match = match_local && match_remote;
+    } else {
+      match = match_local;
+    }
+  } else {
+    if (enable_remote) {
+      match = match_remote;
+    } else {
+      match = false;
+    }
+  }
+  ENVOY_LOG(trace, "tls key log match: {}", match);
+  return match;
+}
+int ContextImpl::ssl_ex_data_callback_index_ =
+    SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+int ContextImpl::ssl_ex_data_config_index_ =
+    SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+
+void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
+  ASSERT(ssl != nullptr);
+  auto* callback = static_cast<Network::TransportSocketCallbacks*>(
+      SSL_get_ex_data(ssl, ssl_ex_data_callback_index_));
+  auto config = static_cast<Ssl::ContextConfig*>(SSL_get_ex_data(ssl, ssl_ex_data_config_index_));
+  ASSERT(callback != nullptr);
+  ASSERT(config != nullptr);
+  auto match =
+      tlsKeyLogMatch(callback->connection().connectionInfoProvider().localAddress(),
+                     callback->connection().connectionInfoProvider().remoteAddress(), *config);
+  if (match) {
+    config->tlsKeyLogFile()->write(line);
+    config->tlsKeyLogFile()->write("\n");
+  }
+}
+
+void ContextImpl::disableTlsKeyLog(void) {
+  SSL_CTX* ctx = tls_contexts_[0].ssl_ctx_.get();
+  ASSERT(ctx != nullptr);
+  SSL_CTX_set_keylog_callback(ctx, nullptr);
+  enable_tls_keylog_ = false;
+}
+
+void ContextImpl::enableTlsKeyLog(void) {
+  SSL_CTX* ctx = tls_contexts_[0].ssl_ctx_.get();
+  ASSERT(ctx != nullptr);
+  SSL_CTX_set_keylog_callback(ctx, keylogCallback);
+  enable_tls_keylog_ = true;
 }
 
 int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned char* outlen,
