@@ -252,6 +252,8 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
     ProtobufWkt::Struct stat_obj;
     auto* stat_obj_fields = stat_obj.mutable_fields();
     (*stat_obj_fields)["name"] = ValueUtil::stringValue(stat.first);
+
+    // ValueUtil::numberValue does unnecessary conversions from uint64_t values to doubles.
     (*stat_obj_fields)["value"] = ValueUtil::numberValue(stat.second);
     stats_array.push_back(ValueUtil::structValue(stat_obj));
   }
@@ -406,6 +408,8 @@ ProtobufWkt::Value StatsHandler::statsAsJsonHistogramBucketsCreateHistogramEleme
     ProtobufWkt::Struct bucket;
     auto* bucket_fields = bucket.mutable_fields();
     (*bucket_fields)["upper_bound"] = ValueUtil::numberValue(supported_buckets[i]);
+
+    // ValueUtil::numberValue does unnecessary conversions from uint64_t values to doubles.
     (*bucket_fields)["interval"] = ValueUtil::numberValue(interval_buckets[i]);
     (*bucket_fields)["cumulative"] = ValueUtil::numberValue(cumulative_buckets[i]);
     bucket_array.push_back(ValueUtil::structValue(bucket));
