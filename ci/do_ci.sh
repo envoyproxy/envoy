@@ -290,7 +290,7 @@ elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
   if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
     echo "Building and testing envoy-filter-example tests..."
     pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-    bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c dbg --config=clang-tsan "${ENVOY_FILTER_EXAMPLE_TESTS[@]}"
+    bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c dbg --config=clang-tsan "${ENVOY_FILTER_EXAMPLE_TESTS[@]}" --test_arg="-l trace"
     popd
   fi
   exit 0

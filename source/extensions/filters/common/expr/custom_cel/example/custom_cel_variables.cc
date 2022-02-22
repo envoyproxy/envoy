@@ -10,7 +10,7 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace Custom_CEL {
+namespace CustomCel {
 namespace Example {
 
 absl::optional<CelValue> CustomWrapper::operator[](CelValue key) const {
@@ -88,7 +88,7 @@ absl::optional<CelValue> ExtendedRequestWrapper::getMapFromQueryStr(absl::string
 }
 
 } // namespace Example
-} // namespace Custom_CEL
+} // namespace CustomCel
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

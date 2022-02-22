@@ -145,6 +145,7 @@ typed_config:
                string_value: {}
 )EOF";
 
+
 using RBACIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, RBACIntegrationTest,
@@ -730,7 +731,7 @@ typed_config:
     custom_cel_vocabulary_config:
       name: envoy.expr.custom_cel_vocabulary.example
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.expr.custom_cel_vocabulary.example.v3.ExampleCustomCELVocabularyConfig
+        "@type": type.googleapis.com/envoy.extensions.expr.custom_cel_vocabulary.example.v3.ExampleCustomCelVocabularyConfig
         return_url_query_string_as_map: true
     policies:
       foo:
@@ -768,14 +769,14 @@ const std::string CUSTOM_CEL_FUNCTION_EXPR = R"EOF(
                 int64_value: {}
 )EOF";
 
-using RBACWithCustomCelVocabularyIntegrationTests = HttpProtocolIntegrationTest;
+using RbacWithCustomCelVocabularyIntegrationTests = HttpProtocolIntegrationTest;
 
-INSTANTIATE_TEST_SUITE_P(Protocols, RBACWithCustomCelVocabularyIntegrationTests,
+INSTANTIATE_TEST_SUITE_P(Protocols, RbacWithCustomCelVocabularyIntegrationTests,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Custom CEL Vocabulary - DENY if custom[team]==spirit
-TEST_P(RBACWithCustomCelVocabularyIntegrationTests, CustomCelVariableExprIfMatchDeny) {
+TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelVariableExprIfMatchDeny) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
                                            fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "spirit")));
@@ -794,7 +795,7 @@ TEST_P(RBACWithCustomCelVocabularyIntegrationTests, CustomCelVariableExprIfMatch
 }
 
 // Custom CEL Vocabulary - NO DENY if custom[team]!=spirit
-TEST_P(RBACWithCustomCelVocabularyIntegrationTests, CustomCelVariableExprIfNoMatchNoDeny) {
+TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelVariableExprIfNoMatchNoDeny) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(
       fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
@@ -812,8 +813,8 @@ TEST_P(RBACWithCustomCelVocabularyIntegrationTests, CustomCelVariableExprIfNoMat
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// Custom CEL Vocabulary - DENY if GetSquareOf(4)==16
-TEST_P(RBACWithCustomCelVocabularyIntegrationTests, CustomCelFunctionExprIfMatchDeny) {
+// Custom Cel Vocabulary - DENY if GetSquareOf(4)==16
+TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelFunctionExprIfMatchDeny) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
                                            fmt::format(CUSTOM_CEL_FUNCTION_EXPR, "16")));
@@ -831,8 +832,8 @@ TEST_P(RBACWithCustomCelVocabularyIntegrationTests, CustomCelFunctionExprIfMatch
               testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
 }
 
-// Custom CEL Vocabulary - NO DENY if GetSquareOf(4)==-1
-TEST_P(RBACWithCustomCelVocabularyIntegrationTests, CustomCelFunctionExprIfNoMatchNoDeny) {
+// Custom Cel Vocabulary - NO DENY if GetSquareOf(4)==-1
+TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelFunctionExprIfNoMatchNoDeny) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
                                            fmt::format(CUSTOM_CEL_FUNCTION_EXPR, "-1")));

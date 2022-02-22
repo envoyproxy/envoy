@@ -17,12 +17,12 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace Custom_CEL {
+namespace CustomCel {
 namespace Example {
 
-// Implementation of the CustomCELVocabulary interface.
+// Implementation of the CustomCelVocabulary interface.
 
-using envoy::extensions::expr::custom_cel_vocabulary::example::v3::ExampleCustomCELVocabularyConfig;
+using envoy::extensions::expr::custom_cel_vocabulary::example::v3::ExampleCustomCelVocabularyConfig;
 using google::api::expr::runtime::Activation;
 using google::api::expr::runtime::CelFunctionRegistry;
 
@@ -38,9 +38,9 @@ constexpr absl::string_view LazyFuncNameGetNextInt = "GetNextInt";
 constexpr absl::string_view StaticFuncNameGet99 = "Get99";
 constexpr absl::string_view StaticFuncNameGetSquareOf = "GetSquareOf";
 
-class ExampleCustomCELVocabulary : public CustomCELVocabulary {
+class ExampleCustomCelVocabulary : public CustomCelVocabulary {
 public:
-  ExampleCustomCELVocabulary(bool return_url_query_string_as_map)
+  ExampleCustomCelVocabulary(bool return_url_query_string_as_map)
       : return_url_query_string_as_map_(return_url_query_string_as_map) {}
 
   void fillActivation(Activation* activation, Protobuf::Arena& arena,
@@ -52,30 +52,30 @@ public:
   void registerFunctions(CelFunctionRegistry* registry) override;
 
   // return_url_query_string_as_map: url query string be returned as string or map.
-  // This is user provided and comes from the ExampleCustomCELVocabularyConfig proto.
+  // This is user provided and comes from the ExampleCustomCelVocabularyConfig proto.
   bool returnUrlQueryStringAsMap() { return return_url_query_string_as_map_; }
 
-  ~ExampleCustomCELVocabulary() override = default;
+  ~ExampleCustomCelVocabulary() override = default;
 
 private:
   bool return_url_query_string_as_map_;
 };
 
-class ExampleCustomCELVocabularyFactory : public CustomCELVocabularyFactory {
+class ExampleCustomCelVocabularyFactory : public CustomCelVocabularyFactory {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ExampleCustomCELVocabularyConfig>();
+    return std::make_unique<ExampleCustomCelVocabularyConfig>();
   }
 
-  CustomCELVocabularyPtr
-  createCustomCELVocabulary(const Protobuf::Message& config,
+  CustomCelVocabularyPtr
+  createCustomCelVocabulary(const Protobuf::Message& config,
                             ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
   std::string name() const override { return "envoy.expr.custom_cel_vocabulary.example"; }
 };
 
 } // namespace Example
-} // namespace Custom_CEL
+} // namespace CustomCel
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

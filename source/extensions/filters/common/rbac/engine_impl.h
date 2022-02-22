@@ -23,7 +23,7 @@ public:
 };
 
 using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
-using Expr::Custom_CEL::CustomCELVocabularyPtr;
+using Expr::CustomCel::CustomCelVocabularyPtr;
 
 enum class EnforcementMode { Enforced, Shadow };
 
@@ -54,7 +54,7 @@ private:
   Protobuf::Arena constant_arena_;
   Expr::BuilderPtr builder_;
 
-  CustomCELVocabularyPtr custom_cel_vocabulary_;
+  CustomCelVocabularyPtr custom_cel_vocabulary_;
 };
 
 } // namespace RBAC

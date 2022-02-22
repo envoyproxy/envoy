@@ -17,12 +17,12 @@ namespace Common {
 namespace Expr {
 namespace {
 
-using Custom_CEL::Example::ExampleCustomCELVocabulary;
+using CustomCel::Example::ExampleCustomCelVocabulary;
 using test::extensions::filters::common::expr::EvaluatorTestCase;
 
 void protoFuzzer(const EvaluatorTestCase& input, bool use_custom_cel_vocabulary) {
   // Create builder without constant folding.
-  ExampleCustomCELVocabulary custom_cel_vocabulary(true);
+  ExampleCustomCelVocabulary custom_cel_vocabulary(true);
   static Expr::BuilderPtr builder;
   if (use_custom_cel_vocabulary) {
     builder = Expr::createBuilder(nullptr, &custom_cel_vocabulary);

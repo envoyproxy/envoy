@@ -7,7 +7,7 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace Custom_CEL {
+namespace CustomCel {
 namespace Example {
 
 absl::Status GetProduct::Evaluate(absl::Span<const CelValue> args, CelValue* output,
@@ -34,7 +34,7 @@ CelValue getSquareOf(Protobuf::Arena*, int64_t i) { return CelValue::CreateInt64
 CelValue getNextInt(Protobuf::Arena*, int64_t i) { return CelValue::CreateInt64(i + 1); }
 
 } // namespace Example
-} // namespace Custom_CEL
+} // namespace CustomCel
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

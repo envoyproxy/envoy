@@ -11,14 +11,14 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace Custom_CEL {
+namespace CustomCel {
 namespace Example {
 
 using google::api::expr::runtime::CelValue;
 
 // tests for the custom CEL functions in the example implementation
 
-class CustomCELFunctionTests : public testing::Test {
+class CustomCelFunctionTests : public testing::Test {
 public:
   Protobuf::Arena arena;
   CelValue result;
@@ -30,7 +30,7 @@ void matchDescriptorsTest(CelFunctionDescriptor descriptor1, CelFunctionDescript
   EXPECT_EQ(descriptor1.types(), descriptor2.types());
 }
 
-TEST_F(CustomCELFunctionTests, GetProductTest) {
+TEST_F(CustomCelFunctionTests, GetProductTest) {
   GetProduct function("GetProduct");
   std::vector<CelValue> input_values = {CelValue::CreateInt64(2), CelValue::CreateInt64(3)};
   auto args = absl::Span<CelValue>(input_values);
@@ -40,7 +40,7 @@ TEST_F(CustomCELFunctionTests, GetProductTest) {
   matchDescriptorsTest(function.createDescriptor("GetProduct"), function.descriptor());
 }
 
-TEST_F(CustomCELFunctionTests, GetDoubleTest) {
+TEST_F(CustomCelFunctionTests, GetDoubleTest) {
   GetDouble function("GetDouble");
   std::vector<CelValue> input_values = {CelValue::CreateInt64(2)};
   auto args = absl::Span<CelValue>(input_values);
@@ -50,7 +50,7 @@ TEST_F(CustomCELFunctionTests, GetDoubleTest) {
   matchDescriptorsTest(function.createDescriptor("GetDouble"), function.descriptor());
 }
 
-TEST_F(CustomCELFunctionTests, Get99Test) {
+TEST_F(CustomCelFunctionTests, Get99Test) {
   Get99 function("Get99");
   std::vector<CelValue> input_values = {};
   auto args = absl::Span<CelValue>(input_values);
@@ -60,16 +60,16 @@ TEST_F(CustomCELFunctionTests, Get99Test) {
   matchDescriptorsTest(function.createDescriptor("Get99"), function.descriptor());
 }
 
-TEST_F(CustomCELFunctionTests, GetSquareOfTest) {
+TEST_F(CustomCelFunctionTests, GetSquareOfTest) {
   EXPECT_EQ(getSquareOf(&arena, 4).Int64OrDie(), 16);
 }
 
-TEST_F(CustomCELFunctionTests, GetNextIntTest) {
+TEST_F(CustomCelFunctionTests, GetNextIntTest) {
   EXPECT_EQ(getNextInt(&arena, 10).Int64OrDie(), 11);
 }
 
 } // namespace Example
-} // namespace Custom_CEL
+} // namespace CustomCel
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

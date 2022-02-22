@@ -44,7 +44,7 @@ static_resources:
                 custom_cel_vocabulary_config:
                   name: envoy.expr.custom_cel_vocabulary.example
                   typed_config:
-                    "@type": type.googleapis.com/envoy.extensions.expr.custom_cel_vocabulary.example.v3.ExampleCustomCELVocabularyConfig
+                    "@type": type.googleapis.com/envoy.extensions.expr.custom_cel_vocabulary.example.v3.ExampleCustomCelVocabularyConfig
                     return_url_query_string_as_map: true
                 policies:
 #                  "policy-rbac-deny-if-custom-team-is-spirit":

@@ -10,7 +10,7 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace Custom_CEL {
+namespace CustomCel {
 namespace Example {
 
 using google::api::expr::runtime::CelValue;
@@ -40,7 +40,7 @@ public:
 };
 
 } // namespace Example
-} // namespace Custom_CEL
+} // namespace CustomCel
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

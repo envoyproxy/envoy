@@ -37,7 +37,7 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace Custom_CEL {
+namespace CustomCel {
 namespace Example {
 
 using google::api::expr::runtime::FunctionAdapter;
@@ -133,7 +133,7 @@ void addStaticFunctionToRegistry(CelFunctionRegistry* registry,
   }
 }
 
-void ExampleCustomCELVocabulary::fillActivation(Activation* activation, Protobuf::Arena& arena,
+void ExampleCustomCelVocabulary::fillActivation(Activation* activation, Protobuf::Arena& arena,
                                                 const StreamInfo::StreamInfo& info,
                                                 const Http::RequestHeaderMap* request_headers,
                                                 const Http::ResponseHeaderMap* response_headers,
@@ -143,28 +143,28 @@ void ExampleCustomCELVocabulary::fillActivation(Activation* activation, Protobuf
   response_trailers_ = response_trailers;
 
   // variables
-  addValueProducerToActivation(activation, CustomVariablesName,
-                               std::make_unique<CustomWrapper>(arena, info));
+//  addValueProducerToActivation(activation, CustomVariablesName,
+//                               std::make_unique<CustomWrapper>(arena, info));
   addValueProducerToActivation(activation, SourceVariablesName,
                                std::make_unique<SourceWrapper>(arena, info));
   addValueProducerToActivation(activation, ExtendedRequestVariablesName,
                                std::make_unique<ExtendedRequestWrapper>(
                                    arena, request_headers, info, return_url_query_string_as_map_));
   // lazy functions only
-  addLazyFunctionToActivation(activation, std::make_unique<GetDouble>(LazyFuncNameGetDouble));
-  addLazyFunctionToActivation(activation, std::make_unique<GetProduct>(LazyFuncNameGetProduct));
-  addLazyFunctionToActivation(activation, LazyFuncNameGetNextInt, false,
-                              std::function<CelValue(Protobuf::Arena*, int64_t)>(getNextInt));
+//  addLazyFunctionToActivation(activation, std::make_unique<GetDouble>(LazyFuncNameGetDouble));
+//  addLazyFunctionToActivation(activation, std::make_unique<GetProduct>(LazyFuncNameGetProduct));
+//  addLazyFunctionToActivation(activation, LazyFuncNameGetNextInt, false,
+//                              std::function<CelValue(Protobuf::Arena*, int64_t)>(getNextInt));
 }
 
-void ExampleCustomCELVocabulary::registerFunctions(CelFunctionRegistry* registry) {
+void ExampleCustomCelVocabulary::registerFunctions(CelFunctionRegistry* registry) {
   absl::Status status;
 
   // lazy functions
-  addLazyFunctionToRegistry(registry, GetDouble::createDescriptor(LazyFuncNameGetDouble));
-  addLazyFunctionToRegistry(registry, GetProduct::createDescriptor(LazyFuncNameGetProduct));
-  addLazyFunctionToRegistry(registry, LazyFuncNameGetNextInt, false,
-                            std::function<CelValue(Protobuf::Arena*, int64_t)>(getNextInt));
+//  addLazyFunctionToRegistry(registry, GetDouble::createDescriptor(LazyFuncNameGetDouble));
+//  addLazyFunctionToRegistry(registry, GetProduct::createDescriptor(LazyFuncNameGetProduct));
+//  addLazyFunctionToRegistry(registry, LazyFuncNameGetNextInt, false,
+//                            std::function<CelValue(Protobuf::Arena*, int64_t)>(getNextInt));
 
   // static functions
   addStaticFunctionToRegistry(registry, std::make_unique<Get99>(StaticFuncNameGet99));
@@ -172,19 +172,19 @@ void ExampleCustomCELVocabulary::registerFunctions(CelFunctionRegistry* registry
                               std::function<CelValue(Protobuf::Arena*, int64_t)>(getSquareOf));
 }
 
-CustomCELVocabularyPtr ExampleCustomCELVocabularyFactory::createCustomCELVocabulary(
+CustomCelVocabularyPtr ExampleCustomCelVocabularyFactory::createCustomCelVocabulary(
     const Protobuf::Message& config, ProtobufMessage::ValidationVisitor& validation_visitor) {
-  ExampleCustomCELVocabularyConfig custom_cel_config =
-      MessageUtil::downcastAndValidate<const ExampleCustomCELVocabularyConfig&>(config,
+  ExampleCustomCelVocabularyConfig custom_cel_config =
+      MessageUtil::downcastAndValidate<const ExampleCustomCelVocabularyConfig&>(config,
                                                                                 validation_visitor);
-  return std::make_unique<ExampleCustomCELVocabulary>(
+  return std::make_unique<ExampleCustomCelVocabulary>(
       custom_cel_config.return_url_query_string_as_map());
 }
 
-REGISTER_FACTORY(ExampleCustomCELVocabularyFactory, CustomCELVocabularyFactory);
+REGISTER_FACTORY(ExampleCustomCelVocabularyFactory, CustomCelVocabularyFactory);
 
 } // namespace Example
-} // namespace Custom_CEL
+} // namespace CustomCel
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

@@ -24,7 +24,7 @@ using BuilderPtr = std::unique_ptr<Builder>;
 using Expression = google::api::expr::runtime::CelExpression;
 using ExpressionPtr = std::unique_ptr<Expression>;
 
-using Envoy::Extensions::Filters::Common::Expr::Custom_CEL::CustomCELVocabulary;
+using Envoy::Extensions::Filters::Common::Expr::CustomCel::CustomCelVocabulary;
 using google::api::expr::runtime::CelValue;
 
 // Creates an activation providing the common context attributes.
@@ -33,12 +33,12 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
                                const Http::RequestHeaderMap* request_headers,
                                const Http::ResponseHeaderMap* response_headers,
                                const Http::ResponseTrailerMap* response_trailers,
-                               CustomCELVocabulary* custom_cel_vocabulary);
+                               CustomCelVocabulary* custom_cel_vocabulary);
 
 // Creates an expression builder. The optional arena is used to enable constant folding
 // for intermediate evaluation results.
 // Throws an exception if fails to construct an expression builder.
-BuilderPtr createBuilder(Protobuf::Arena* arena, CustomCELVocabulary* custom_cel_vocabulary);
+BuilderPtr createBuilder(Protobuf::Arena* arena, CustomCelVocabulary* custom_cel_vocabulary);
 
 BuilderPtr createBuilder(Protobuf::Arena* arena);
 
@@ -60,7 +60,7 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
                                   const Http::RequestHeaderMap* request_headers,
                                   const Http::ResponseHeaderMap* response_headers,
                                   const Http::ResponseTrailerMap* response_trailers,
-                                  CustomCELVocabulary* custom_cel_vocabulary);
+                                  CustomCelVocabulary* custom_cel_vocabulary);
 
 // Evaluates an expression and returns true if the expression evaluates to "true".
 // Returns false if the expression fails to evaluate.
@@ -69,7 +69,7 @@ bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
 
 // Same as above. Takes a parameter for a custom_cel_vocabulary.
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
-             const Http::RequestHeaderMap& headers, CustomCELVocabulary* custom_cel_vocabulary);
+             const Http::RequestHeaderMap& headers, CustomCelVocabulary* custom_cel_vocabulary);
 
 // Returns a string for a CelValue.
 std::string print(CelValue value);

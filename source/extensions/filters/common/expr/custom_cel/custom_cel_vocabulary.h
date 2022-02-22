@@ -16,12 +16,12 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace Custom_CEL {
+namespace CustomCel {
 
 using google::api::expr::runtime::Activation;
 using google::api::expr::runtime::CelFunctionRegistry;
 
-// CustomCELVocabulary
+// CustomCelVocabulary
 //
 // Background Information:
 //
@@ -63,12 +63,12 @@ using google::api::expr::runtime::CelFunctionRegistry;
 // like Request, Response, Connection, etc.
 // These are added to the activation.
 //
-// and (3) the Custom CEL Vocabulary
+// and (3) the Custom Cel Vocabulary
 // These are custom definitions which a user can define.
 // Custom CEL stateless functions have to be added to the registry.
 // Custom CEL variables and stateful functions have to be added to the activation.
 //
-// This interface is intended to allow for the addition and use of a CustomCELVocabulary.
+// This interface is intended to allow for the addition and use of a CustomCelVocabulary.
 //
 // A note on function definitions: either standard functions or CelFunctions can be used.
 // The standard functions will be converted to CelFunctions when added to the
@@ -76,9 +76,9 @@ using google::api::expr::runtime::CelFunctionRegistry;
 // All standard functions will need a Protobuf Arena because CelFunction::Evaluate takes
 // Arena as a parameter.
 
-class CustomCELVocabulary {
+class CustomCelVocabulary {
 public:
-  CustomCELVocabulary() = default;
+  CustomCelVocabulary() = default;
 
   // fillActivation:
   //
@@ -132,7 +132,7 @@ public:
   // or overridden, as it can for an activation mapping.
   virtual void registerFunctions(CelFunctionRegistry* registry) PURE;
 
-  virtual ~CustomCELVocabulary() = default;
+  virtual ~CustomCelVocabulary() = default;
 
 protected:
   const Http::RequestHeaderMap* request_headers_;
@@ -140,22 +140,22 @@ protected:
   const Http::ResponseTrailerMap* response_trailers_;
 };
 
-using CustomCELVocabularyPtr = std::unique_ptr<CustomCELVocabulary>;
+using CustomCelVocabularyPtr = std::unique_ptr<CustomCelVocabulary>;
 
-// CustomCELVocabularyFactory
-// Creates a CustomCELVocabulary implementation instance.
-class CustomCELVocabularyFactory : public Envoy::Config::TypedFactory {
+// CustomCelVocabularyFactory
+// Creates a CustomCelVocabulary implementation instance.
+class CustomCelVocabularyFactory : public Envoy::Config::TypedFactory {
 public:
   std::string category() const override { return "envoy.expr.custom_cel_vocabulary_config"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override PURE;
 
-  virtual CustomCELVocabularyPtr
-  createCustomCELVocabulary(const Protobuf::Message& config,
+  virtual CustomCelVocabularyPtr
+  createCustomCelVocabulary(const Protobuf::Message& config,
                             ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 };
 
-} // namespace Custom_CEL
+} // namespace CustomCel
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

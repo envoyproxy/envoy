@@ -22,6 +22,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // Any fields which pertain to the custom CEL vocabulary can be added,
 // or it can be left empty (just an indicator that a custom vocabulary is being used).
 // [#extension: envoy.expr.custom_cel_vocabulary.example]
-message ExampleCustomCELVocabularyConfig {
+message ExampleCustomCelVocabularyConfig {
   bool return_url_query_string_as_map = 1;
 }

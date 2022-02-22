@@ -18,7 +18,7 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
                                const Http::RequestHeaderMap* request_headers,
                                const Http::ResponseHeaderMap* response_headers,
                                const Http::ResponseTrailerMap* response_trailers,
-                               CustomCELVocabulary* custom_cel_vocabulary) {
+                               CustomCelVocabulary* custom_cel_vocabulary) {
   auto activation = std::make_unique<Activation>();
 
   activation->InsertValueProducer(Request,
@@ -51,7 +51,7 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
 
 BuilderPtr createBuilder(Protobuf::Arena* arena) { return createBuilder(arena, nullptr); }
 
-BuilderPtr createBuilder(Protobuf::Arena* arena, CustomCELVocabulary* custom_cel_vocabulary) {
+BuilderPtr createBuilder(Protobuf::Arena* arena, CustomCelVocabulary* custom_cel_vocabulary) {
   google::api::expr::runtime::InterpreterOptions options;
 
   // Security-oriented defaults
@@ -115,7 +115,7 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
                                   const Http::RequestHeaderMap* request_headers,
                                   const Http::ResponseHeaderMap* response_headers,
                                   const Http::ResponseTrailerMap* response_trailers,
-                                  CustomCELVocabulary* custom_cel_vocabulary) {
+                                  CustomCelVocabulary* custom_cel_vocabulary) {
   auto activation = createActivation(arena, info, request_headers, response_headers,
                                      response_trailers, custom_cel_vocabulary);
   auto eval_status = expr.Evaluate(*activation, &arena);
@@ -136,7 +136,7 @@ bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
 }
 
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
-             const Http::RequestHeaderMap& headers, CustomCELVocabulary* custom_cel_vocabulary) {
+             const Http::RequestHeaderMap& headers, CustomCelVocabulary* custom_cel_vocabulary) {
   Protobuf::Arena arena;
   auto eval_status =
       Expr::evaluate(expr, arena, info, &headers, nullptr, nullptr, custom_cel_vocabulary);

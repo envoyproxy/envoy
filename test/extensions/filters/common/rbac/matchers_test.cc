@@ -483,8 +483,8 @@ TEST(PolicyMatcherWithCustomCelVocabulary, PolicyMatcherWithCustomCelVocabulary)
       fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "spirit")));
 
   using Envoy::Extensions::Filters::Common::Expr::BuilderPtr;
-  using Envoy::Extensions::Filters::Common::Expr::Custom_CEL::Example::ExampleCustomCELVocabulary;
-  ExampleCustomCELVocabulary custom_cel_vocabulary(true);
+  using Envoy::Extensions::Filters::Common::Expr::CustomCel::Example::ExampleCustomCelVocabulary;
+  ExampleCustomCelVocabulary custom_cel_vocabulary(true);
   BuilderPtr builder =
       Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr, &custom_cel_vocabulary);
   RBAC::PolicyMatcher matcher(policy, builder.get(), ProtobufMessage::getStrictValidationVisitor(),

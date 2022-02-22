@@ -17,7 +17,7 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace Custom_CEL {
+namespace CustomCel {
 namespace Example {
 
 // tests for the custom CEL variables in the example implementation
@@ -151,7 +151,7 @@ TEST_F(ExtendedRequestVariablesTests, QueryAsMapTest) {
 }
 
 } // namespace Example
-} // namespace Custom_CEL
+} // namespace CustomCel
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

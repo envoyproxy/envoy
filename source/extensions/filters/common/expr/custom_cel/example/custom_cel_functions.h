@@ -21,7 +21,7 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace Custom_CEL {
+namespace CustomCel {
 namespace Example {
 
 using google::api::expr::runtime::CelFunction;
@@ -74,7 +74,7 @@ CelValue getSquareOf(Protobuf::Arena* arena, int64_t i);
 CelValue getNextInt(Protobuf::Arena* arena, int64_t i);
 
 } // namespace Example
-} // namespace Custom_CEL
+} // namespace CustomCel
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

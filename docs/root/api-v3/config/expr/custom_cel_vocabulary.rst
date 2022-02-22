@@ -1,4 +1,4 @@
-Custom CEL Vocabulary
+Custom Cel Vocabulary
 =====================
 
 .. toctree::

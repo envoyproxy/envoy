@@ -19,10 +19,10 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace Custom_CEL {
+namespace CustomCel {
 namespace Example {
 
-using Envoy::Extensions::Filters::Common::Expr::Custom_CEL::Example::Utility;
+using Envoy::Extensions::Filters::Common::Expr::CustomCel::Example::Utility;
 using google::api::expr::runtime::CelList;
 using google::api::expr::runtime::ContainerBackedListImpl;
 
@@ -116,7 +116,7 @@ private:
 };
 
 } // namespace Example
-} // namespace Custom_CEL
+} // namespace CustomCel
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

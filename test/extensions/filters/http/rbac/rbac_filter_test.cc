@@ -609,12 +609,12 @@ const std::string CUSTOM_CEL_VARIABLE_EXPR = R"EOF(
                string_value: {}
 )EOF";
 
-class CustomCELVocabularyTests : public RoleBasedAccessControlFilterTest {
+class CustomCelVocabularyTests : public RoleBasedAccessControlFilterTest {
 public:
   void rbacFilterConfigSetup(const std::string& condition,
                              const envoy::config::rbac::v3::RBAC::Action& action) {
     using envoy::extensions::expr::custom_cel_vocabulary::example::v3::
-        ExampleCustomCELVocabularyConfig;
+        ExampleCustomCelVocabularyConfig;
     envoy::config::rbac::v3::Policy policy;
     policy.add_permissions()->set_any(true);
     policy.add_principals()->set_any(true);
@@ -626,7 +626,7 @@ public:
     (*rbac_filter_config.mutable_rules()->mutable_policies())["foo"] = policy;
     *rbac_filter_config.mutable_rules()->mutable_custom_cel_vocabulary_config()->mutable_name() =
         "envoy.expr.custom_cel_vocabulary.example";
-    ExampleCustomCELVocabularyConfig config;
+    ExampleCustomCelVocabularyConfig config;
     config.set_return_url_query_string_as_map(true);
     rbac_filter_config.mutable_rules()
         ->mutable_custom_cel_vocabulary_config()
@@ -640,7 +640,7 @@ public:
   }
 };
 
-TEST_F(CustomCELVocabularyTests, CustomCELVocabularyDeny) {
+TEST_F(CustomCelVocabularyTests, CustomCelVocabularyDeny) {
 
   // should deny
   rbacFilterConfigSetup(fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "spirit"),
@@ -653,7 +653,7 @@ TEST_F(CustomCELVocabularyTests, CustomCELVocabularyDeny) {
   EXPECT_EQ(1U, config_->stats().denied_.value());
 }
 
-TEST_F(CustomCELVocabularyTests, CustomCELVocabularyAllow) {
+TEST_F(CustomCelVocabularyTests, CustomCelVocabularyAllow) {
 
   // should NOT deny
   rbacFilterConfigSetup(fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "wrong"),
