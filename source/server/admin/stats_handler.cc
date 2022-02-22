@@ -296,10 +296,11 @@ StatsHandler::computeDisjointBucketSummary(const Stats::ParentHistogramSharedPtr
     return "No recorded values";
   }
   std::vector<std::string> bucket_summary;
+  const Stats::HistogramStatistics& interval_statistics = histogram->intervalStatistics();
   Stats::ConstSupportedBuckets& supported_buckets =
-      histogram->intervalStatistics().supportedBuckets();
+      interval_statistics.supportedBuckets();
   const std::vector<uint64_t> disjoint_interval_buckets =
-      histogram->intervalStatistics().computeDisjointBuckets();
+      interval_statistics.computeDisjointBuckets();
   const std::vector<uint64_t> disjoint_cumulative_buckets =
       histogram->cumulativeStatistics().computeDisjointBuckets();
   bucket_summary.reserve(supported_buckets.size());
@@ -327,11 +328,12 @@ void StatsHandler::statsAsJsonQuantileSummaryHelper(
       auto* computed_quantile_fields = computed_quantile.mutable_fields();
       (*computed_quantile_fields)["name"] = ValueUtil::stringValue(histogram->name());
 
+      const Stats::HistogramStatistics& interval_statistics = histogram->intervalStatistics();
       std::vector<ProtobufWkt::Value> computed_quantile_value_array;
-      for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
+      for (size_t i = 0; i < interval_statistics.supportedQuantiles().size(); ++i) {
         ProtobufWkt::Struct computed_quantile_value;
         auto* computed_quantile_value_fields = computed_quantile_value.mutable_fields();
-        const auto& interval = histogram->intervalStatistics().computedQuantiles()[i];
+        const auto& interval = interval_statistics.computedQuantiles()[i];
         const auto& cumulative = histogram->cumulativeStatistics().computedQuantiles()[i];
         (*computed_quantile_value_fields)["interval"] =
             std::isnan(interval) ? ValueUtil::nullValue() : ValueUtil::numberValue(interval);
