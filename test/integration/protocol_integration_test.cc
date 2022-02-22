@@ -3602,11 +3602,15 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
 
   // Make sure that the local interface name was populated due to runtime override.
   // TODO: h3 upstreams don't have local interface name
+#ifdef WIN32
+  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("local_interface_name")).empty());
+#else
   if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
     EXPECT_TRUE(response->headers().get(Http::LowerCaseString("local_interface_name")).empty());
   } else {
     EXPECT_FALSE(response->headers().get(Http::LowerCaseString("local_interface_name")).empty());
   }
+#endif
 }
 
 #ifdef NDEBUG
