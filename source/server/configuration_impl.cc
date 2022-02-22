@@ -94,9 +94,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   for (auto iter = certificate_providers.begin(); iter != certificate_providers.end(); iter++) {
     ENVOY_LOG(debug, "===========================================================");
     ENVOY_LOG(debug, "certificate provider: {}", iter->first);
-    envoy::config::core::v3::TypedExtensionConfig cert_provider_config;
-    cert_provider_config.MergeFrom(iter->second);
-    server.certificateProviderManager().addCertificateProvider(iter->first, cert_provider_config);
+    server.certificateProviderManager().addCertificateProvider(iter->first, iter->second);
   }
 
   ENVOY_LOG(info, "loading {} cluster(s)", bootstrap.static_resources().clusters().size());

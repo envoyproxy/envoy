@@ -1,6 +1,6 @@
-#include "source/extensions/certificate_providers/default_cert_provider/config.h"
+#include "source/extensions/certificate_providers/static_cert_provider/config.h"
 
-#include "envoy/extensions/certificate_providers/default_cert_provider/v3/config.pb.h"
+#include "envoy/extensions/certificate_providers/static_cert_provider/v3/config.pb.h"
 
 #include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
@@ -10,13 +10,11 @@ namespace Envoy {
 namespace Extensions {
 namespace CertificateProviders {
 
-using DefaultCertProviderConfig =
-    envoy::extensions::certificate_providers::default_cert_provider::v3::DefaultCertProviderConfig;
-
-DefaultCertificateProvider::DefaultCertificateProvider(
+StaticCertificateProvider::StaticCertificateProvider(
     const envoy::config::core::v3::TypedExtensionConfig& config, Api::Api& api) {
 
-  DefaultCertProviderConfig message;
+  envoy::extensions::certificate_providers::static_cert_provider::v3::
+      StaticCertificateProviderConfig message;
   Config::Utility::translateOpaqueConfig(config.typed_config(),
                                          ProtobufMessage::getStrictValidationVisitor(), message);
 

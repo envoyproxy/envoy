@@ -2,7 +2,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/extension.pb.h"
-#include "envoy/extensions/certificate_providers/default_cert_provider/v3/config.pb.h"
+#include "envoy/extensions/certificate_providers/static_cert_provider/v3/config.pb.h"
 
 #include "source/extensions/certificate_providers/certificate_provider.h"
 #include "source/extensions/certificate_providers/factory.h"
@@ -11,16 +11,20 @@ namespace Envoy {
 namespace Extensions {
 namespace CertificateProviders {
 
-class DefaultCertificateProvider : public CertificateProvider {
+class StaticCertificateProvider : public CertificateProvider {
 public:
-  DefaultCertificateProvider(const envoy::config::core::v3::TypedExtensionConfig& config,
-                             Api::Api& api);
+  StaticCertificateProvider(const envoy::config::core::v3::TypedExtensionConfig& config,
+                            Api::Api& api);
 
   Capabilites capabilities() const override { return capabilities_; };
 
-  const std::string& getCACertificate() const override { return ca_cert_; };
+  const std::string& getCACertificate(absl::string_view /* cert_name */) const override {
+    return ca_cert_;
+  };
 
-  std::list<Certpair> getTlsCertificates() override { return tls_certificates_; };
+  std::list<Certpair> getIdentityCertificates(absl::string_view /* cert_name */) override {
+    return tls_certificates_;
+  };
 
   Certpair* generateTlsCertificate(absl::string_view /* server_name */) override {
     return nullptr;
@@ -33,25 +37,26 @@ private:
   std::map<absl::string_view, Certpair> cached_tls_certificates_;
 };
 
-class DefaultCertificateProviderFactory : public CertificateProviderFactory {
+class StaticCertificateProviderFactory : public CertificateProviderFactory {
 public:
-  DefaultCertificateProviderFactory() = default;
+  StaticCertificateProviderFactory() = default;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::extensions::certificate_providers::
-                                         default_cert_provider::v3::DefaultCertProviderConfig()};
+    return ProtobufTypes::MessagePtr{
+        new envoy::extensions::certificate_providers::static_cert_provider::v3::
+            StaticCertificateProviderConfig()};
   }
 
   Envoy::Extensions::CertificateProviders::CertificateProviderSharedPtr
   createCertificateProviderInstance(const envoy::config::core::v3::TypedExtensionConfig& config,
                                     Api::Api& api) override {
-    return std::make_shared<DefaultCertificateProvider>(config, api);
+    return std::make_shared<StaticCertificateProvider>(config, api);
   }
 
-  std::string name() const override { return "envoy.certificate_providers.default_cert_provider"; }
+  std::string name() const override { return "envoy.certificate_providers.static_cert_provider"; }
 };
 
-REGISTER_FACTORY(DefaultCertificateProviderFactory, CertificateProviderFactory);
+REGISTER_FACTORY(StaticCertificateProviderFactory, CertificateProviderFactory);
 
 } // namespace CertificateProviders
 } // namespace Extensions

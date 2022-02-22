@@ -53,7 +53,7 @@ EXTENSION_CATEGORIES = (
     "envoy.transport_sockets.downstream", "envoy.transport_sockets.upstream",
     "envoy.tls.cert_validator", "envoy.upstreams", "envoy.wasm.runtime", "envoy.common.key_value",
     "envoy.network.dns_resolver", "envoy.rbac.matchers", "envoy.access_loggers.extension_filters",
-    "envoy.http.stateful_session")
+    "envoy.http.stateful_session", "envoy.cert_providers")
 
 EXTENSION_STATUS_VALUES = (
     # This extension is stable and is expected to be production usable.
