@@ -163,6 +163,8 @@ public class EnvoyConfiguration {
         .append(String.format("- &dns_preresolve_hostnames %s\n", dnsPreresolveHostnames))
         .append(String.format("- &dns_lookup_family %s\n",
                               enableHappyEyeballs ? "ALL" : "V4_PREFERRED"))
+        .append(
+            String.format("- &dns_multiple_addresses %s\n", enableHappyEyeballs ? "true" : "false"))
         .append("- &dns_resolver_name envoy.network.dns_resolver.cares\n")
         .append(String.format("- &dns_resolver_config %s\n", dnsResolverConfig))
         .append(String.format("- &enable_interface_binding %s\n",
