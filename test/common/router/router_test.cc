@@ -1201,10 +1201,6 @@ TEST_F(RouterTest, UpstreamTimeoutAllStatsEmissionWhenRuntimeGuardTrue) {
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
   response_decoder->decodeHeaders(std::move(response_headers), false);
-  EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _, _)).Times(0);
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _))
-      .Times(0);
   response_timeout_->invokeCallback();
 
   EXPECT_EQ(1U,
@@ -1213,7 +1209,6 @@ TEST_F(RouterTest, UpstreamTimeoutAllStatsEmissionWhenRuntimeGuardTrue) {
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
 TEST_F(RouterTest, UpstreamTimeout) {
