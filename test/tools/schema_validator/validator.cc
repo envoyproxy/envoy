@@ -39,6 +39,10 @@ Options::Options(int argc, char** argv) {
       "Type of schema to validate the configuration against. "
       "Supported schema is: 'route', 'discovery_response', 'bootstrap'.",
       true, "", "string", cmd);
+  TCLAP::SwitchArg fail_on_deprecated("", "fail-on-deprecated",
+                                      "Whether to fail if using deprecated fields.", cmd, false);
+  TCLAP::SwitchArg fail_on_wip("", "fail-on-wip",
+                               "Whether to fail if using work-in-progress fields.", cmd, false);
 
   try {
     cmd.parse(argc, argv);
@@ -59,27 +63,59 @@ Options::Options(int argc, char** argv) {
   }
 
   config_path_ = config_path.getValue();
+  fail_on_deprecated_ = fail_on_deprecated.getValue();
+  fail_on_wip_ = fail_on_wip.getValue();
 }
 
-void Validator::validate(const std::string& config_path, Schema::Type schema_type) {
+namespace {
+class Visitor : public ProtobufMessage::ValidationVisitor {
+public:
+  Visitor(const Options& options) : options_(options) {}
 
-  switch (schema_type) {
+  // ProtobufMessage::ValidationVisitor
+  void onUnknownField(absl::string_view description) override {
+    throw ProtobufMessage::UnknownProtoFieldException(
+        absl::StrCat("Protobuf message (", description, ") has unknown fields"));
+  }
+  bool skipValidation() override { return false; }
+  void onDeprecatedField(absl::string_view description, bool) override {
+    if (options_.failOnDeprecated()) {
+      throw ProtobufMessage::DeprecatedProtoFieldException(
+          absl::StrCat("Failing due to deprecated field: ", description));
+    }
+  }
+  void onWorkInProgress(absl::string_view description) override {
+    if (options_.failOnWip()) {
+      throw EnvoyException(absl::StrCat("Failing due to work-in-progress field: ", description));
+    }
+  }
+
+private:
+  const Options& options_;
+};
+} // namespace
+
+void Validator::validate(const Options& options) {
+  Visitor visitor(options);
+  std::cerr << "Validating: " << options.configPath() << "\n";
+
+  switch (options.schemaType()) {
   case Schema::Type::DiscoveryResponse: {
     envoy::service::discovery::v3::DiscoveryResponse discovery_response_config;
-    TestUtility::loadFromFile(config_path, discovery_response_config, *api_);
-    TestUtility::validate(discovery_response_config);
+    TestUtility::loadFromFile(options.configPath(), discovery_response_config, *api_);
+    MessageUtil::validate(discovery_response_config, visitor, true);
     break;
   }
   case Schema::Type::Route: {
     envoy::config::route::v3::RouteConfiguration route_config;
-    TestUtility::loadFromFile(config_path, route_config, *api_);
-    TestUtility::validate(route_config);
+    TestUtility::loadFromFile(options.configPath(), route_config, *api_);
+    MessageUtil::validate(route_config, visitor, true);
     break;
   }
   case Schema::Type::Bootstrap: {
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
-    TestUtility::loadFromFile(config_path, bootstrap, *api_);
-    TestUtility::validate(bootstrap);
+    TestUtility::loadFromFile(options.configPath(), bootstrap, *api_);
+    MessageUtil::validate(bootstrap, visitor, true);
     break;
   }
   }

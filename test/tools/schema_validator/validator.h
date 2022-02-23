@@ -50,9 +50,21 @@ public:
    */
   const std::string& configPath() const { return config_path_; }
 
+  /**
+   * @return whether to fail on deprecated fields.
+   */
+  bool failOnDeprecated() const { return fail_on_deprecated_; }
+
+  /**
+   * @return whether to fail on WiP fields.
+   */
+  bool failOnWip() const { return fail_on_wip_; }
+
 private:
   Schema::Type schema_type_;
   std::string config_path_;
+  bool fail_on_deprecated_;
+  bool fail_on_wip_;
 };
 
 /**
@@ -66,10 +78,10 @@ public:
    * An EnvoyException is thrown in several cases:
    *  - Cannot load the configuration from config_path(invalid path or malformed data).
    *  - A schema error from validating the configuration.
-   * @param config_path specifies the path to the configuration file.
-   * @param schema_type specifies the schema to validate the configuration against.
+   *  - Use of deprecated/WiP fields if configured to fail in those cases.
+   * @param options supplies the validation options.
    */
-  void validate(const std::string& config_path, Schema::Type schema_type);
+  void validate(const Options& options);
 
 private:
   Stats::IsolatedStoreImpl stats_;
