@@ -629,6 +629,7 @@ void ListenerImpl::buildFilterChains() {
   transport_factory_context_->setInitManager(*dynamic_init_manager_);
   ListenerFilterChainFactoryBuilder builder(*this, *transport_factory_context_);
   filter_chain_manager_.addFilterChains(
+      config_.has_filter_chain_matcher() ? &config_.filter_chain_matcher() : nullptr,
       config_.filter_chains(),
       config_.has_default_filter_chain() ? &config_.default_filter_chain() : nullptr, builder,
       filter_chain_manager_);

@@ -6,7 +6,9 @@
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/matcher/matcher.h"
 #include "envoy/network/drain_decision.h"
+#include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -217,6 +219,7 @@ public:
   // Add all filter chains into this manager. During the lifetime of FilterChainManagerImpl this
   // should be called at most once.
   void addFilterChains(
+      const xds::type::matcher::v3::Matcher* filter_chain_matcher,
       absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
       const envoy::config::listener::v3::FilterChain* default_filter_chain,
       FilterChainFactoryBuilder& filter_chain_factory_builder,
@@ -237,6 +240,8 @@ public:
 
 private:
   void convertIPsToTries();
+  const Network::FilterChain*
+  findFilterChainUsingMatcher(const Network::ConnectionSocket& socket) const;
 
   // Build default filter chain from filter chain message. Skip the build but copy from original
   // filter chain manager if the default filter chain message duplicates the message in origin
@@ -365,6 +370,9 @@ private:
   // detect the filter chains in the intersection of existing listener and new listener.
   FcContextMap fc_contexts_;
 
+  // Mapping from filter chain name to filter chain.
+  absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr> filter_chains_by_name_;
+
   absl::optional<envoy::config::listener::v3::FilterChain> default_filter_chain_message_;
   // The optional fallback filter chain if destination_ports_map_ does not find a matched filter
   // chain.
@@ -385,8 +393,11 @@ private:
 
   // For FilterChainFactoryContextCreator
   // init manager owned by the corresponding listener. The reference is valid when building the
-  // filter chain.
+  // filter chain.,,
   Init::Manager& init_manager_;
+
+  // Matcher selecting the filter chain name.
+  Matcher::MatchTreeSharedPtr<Network::MatchingData> matcher_;
 };
 } // namespace Server
 } // namespace Envoy
