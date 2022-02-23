@@ -88,6 +88,13 @@ TEST_F(PassthroughTest, FailOnStartSecureTransport) {
   EXPECT_FALSE(passthrough_socket_->startSecureTransport());
 }
 
+// Test configureInitialCongestionWindow method defers to inner socket
+TEST_F(PassthroughTest, ConfigureInitialCongestionWindowDefersToInnerSocket) {
+  EXPECT_CALL(*inner_socket_,
+              configureInitialCongestionWindow(100, std::chrono::microseconds(123)));
+  passthrough_socket_->configureInitialCongestionWindow(100, std::chrono::microseconds(123));
+}
+
 TEST(PassthroughFactoryTest, TestDelegation) {
   auto inner_factory_ptr = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
   Network::MockTransportSocketFactory* inner_factory = inner_factory_ptr.get();

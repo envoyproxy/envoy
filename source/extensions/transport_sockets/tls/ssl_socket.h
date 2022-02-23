@@ -62,6 +62,7 @@ public:
   void onConnected() override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   bool startSecureTransport() override { return false; }
+  void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
   // Ssl::HandshakeCallbacks
@@ -103,6 +104,8 @@ public:
   ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
                          Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope);
 
+  ~ClientSslSocketFactory() override;
+
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;
@@ -133,6 +136,8 @@ public:
   ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
                          Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope,
                          const std::vector<std::string>& server_names);
+
+  ~ServerSslSocketFactory() override;
 
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;

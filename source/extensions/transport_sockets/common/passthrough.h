@@ -43,6 +43,8 @@ public:
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   // startSecureTransport method should not be called for this transport socket.
   bool startSecureTransport() override { return false; }
+  void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                        std::chrono::microseconds rtt) override;
 
 protected:
   Network::TransportSocketPtr transport_socket_;

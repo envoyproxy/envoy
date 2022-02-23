@@ -248,7 +248,7 @@ public:
    * @param value target value.
    * @param time_system the time system to use for waiting.
    * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
-   * @return AssertionSuccess() if the counter was >= to the value within the timeout, else
+   * @return AssertionSuccess() if the counter was >= the value within the timeout, else
    * AssertionFailure().
    */
   static AssertionResult

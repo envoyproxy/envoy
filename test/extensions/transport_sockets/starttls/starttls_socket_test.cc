@@ -50,6 +50,10 @@ TEST(StartTlsTest, BasicSwitch) {
   EXPECT_CALL(*ssl_socket, canFlushClose()).Times(0);
   socket->canFlushClose();
 
+  EXPECT_CALL(*raw_socket, configureInitialCongestionWindow(100, std::chrono::microseconds(123)));
+  EXPECT_CALL(*ssl_socket, configureInitialCongestionWindow(_, _)).Times(0);
+  socket->configureInitialCongestionWindow(100, std::chrono::microseconds(123));
+
   EXPECT_CALL(*raw_socket, ssl());
   EXPECT_CALL(*ssl_socket, ssl()).Times(0);
   socket->ssl();
@@ -89,6 +93,9 @@ TEST(StartTlsTest, BasicSwitch) {
 
   EXPECT_CALL(*ssl_socket, canFlushClose());
   socket->canFlushClose();
+
+  EXPECT_CALL(*ssl_socket, configureInitialCongestionWindow(200, std::chrono::microseconds(223)));
+  socket->configureInitialCongestionWindow(200, std::chrono::microseconds(223));
 
   EXPECT_CALL(*ssl_socket, ssl());
   socket->ssl();

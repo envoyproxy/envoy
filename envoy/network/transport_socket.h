@@ -157,6 +157,17 @@ public:
    * @return boolean indicating if the transport socket was able to start secure transport.
    */
   virtual bool startSecureTransport() PURE;
+
+  /**
+   * Try to configure the connection's initial congestion window.
+   * The operation is advisory - the connection may not support it, even if it's supported, it may
+   * not do anything after the first few network round trips with the peer.
+   * @param bandwidth_bits_per_sec The estimated bandwidth between the two endpoints of the
+   * connection.
+   * @param rtt The estimated round trip time between the two endpoints of the connection.
+   */
+  virtual void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                                std::chrono::microseconds rtt) PURE;
 };
 
 using TransportSocketPtr = std::unique_ptr<TransportSocket>;

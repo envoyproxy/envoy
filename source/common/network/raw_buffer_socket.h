@@ -22,6 +22,7 @@ public:
   IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
   bool startSecureTransport() override { return false; }
+  void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
 
 private:
   TransportSocketCallbacks* callbacks_{};

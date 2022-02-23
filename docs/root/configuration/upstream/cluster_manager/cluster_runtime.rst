@@ -132,6 +132,11 @@ outlier_detection.max_ejection_time_ms
   <envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_time>`
   setting in outlier detection
 
+outlier_detection.max_ejection_time_jitter_ms
+  :ref:`base_ejection_time
+  <envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_time_jitter>`
+  setting in outlier detection
+
 Core
 ----
 
