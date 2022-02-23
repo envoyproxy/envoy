@@ -159,11 +159,10 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
   }
 
   if (buffered_body_ != nullptr) {
-    // TODO(shikugawa): Currently, it only put logs when the retry buffer overflows, and does not
-    // implement any action against buffer overflows. We need to implement buffer overflow handling
-    // in the future. If you want to retry a huge message, you can increase the size of the buffer.
-    // If you want to retry multiple messages like gRPC Client/Bidi Streaming, delete old messages
-    // in the retry buffer.
+    // TODO(shikugawa): Currently, data is dropped when the retry buffer overflows and there is no
+    // ability implement any error handling. We need to implement buffer overflow handling in the
+    // future. Options include configuring the max buffer size, or for use cases like gRPC
+    // streaming, deleting old data in the retry buffer.
     if (buffered_body_->length() + data.length() > kBufferLimitForRetry) {
       ENVOY_LOG_EVERY_POW_2(
           warn, "the buffer size limit (64KB) for async client retries has been exceeded.");
