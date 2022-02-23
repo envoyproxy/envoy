@@ -1169,9 +1169,6 @@ TEST_F(RouterTest, UpstreamTimeoutNoStatsEmissionWhenRuntimeGuardFalse) {
   // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
   response_decoder->decodeHeaders(std::move(response_headers), false);
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _, _)).Times(0);
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _))
-      .Times(0);
   response_timeout_->invokeCallback();
 
   EXPECT_EQ(0U,
