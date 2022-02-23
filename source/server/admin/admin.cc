@@ -120,7 +120,7 @@ void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>&
                                   const std::string& address_out_path,
                                   Network::Address::InstanceConstSharedPtr address,
                                   const Network::Socket::OptionsSharedPtr& socket_options,
-                                  Stats::ScopePtr&& listener_scope) {
+                                  Stats::ScopeSharedPtr&& listener_scope) {
   for (const auto& access_log : access_logs) {
     access_logs_.emplace_back(access_log);
   }
@@ -315,7 +315,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream& admin_stream) {
   HandlerPtr handler = findHandler(path_and_query, admin_stream);
-  Http::Code code = handler->start(/*path_and_query, */ response_headers);
+  Http::Code code = handler->start(response_headers);
   bool more_data;
   do {
     more_data = handler->nextChunk(response);
@@ -501,7 +501,7 @@ void AdminImpl::closeSocket() {
 
 void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   if (listener_) {
-    handler->addListener(absl::nullopt, *listener_);
+    handler->addListener(absl::nullopt, *listener_, server_.runtime());
   }
 }
 

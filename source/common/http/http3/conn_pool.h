@@ -26,7 +26,7 @@ public:
   ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                Upstream::Host::CreateConnectionData& data);
 
-  ~ActiveClient() {
+  ~ActiveClient() override {
     if (async_connect_callback_ != nullptr && async_connect_callback_->enabled()) {
       async_connect_callback_->cancel();
     }
@@ -74,10 +74,8 @@ public:
     }
   }
 
-  bool hasCreatedStream() const {
-    return stream_attached_;
-  }
-  
+  bool hasCreatedStream() const { return stream_attached_; }
+
 private:
   // Unlike HTTP/2 and HTTP/1, rather than having a cap on the number of active
   // streams, QUIC has a fixed number of streams available which is updated via
@@ -100,6 +98,9 @@ private:
   // deemed connected, at which point further connections will be established if
   // necessary.
   uint64_t quiche_capacity_ = 100;
+  // Used to schedule a deferred connect() call. Because HTTP/3 codec client can
+  // do 0-RTT during connect(), deferring it to avoid handling network events during CodecClient
+  // construction.
   Event::SchedulableCallbackPtr async_connect_callback_;
   // True if newStream() is ever called.
   bool stream_attached_{false};

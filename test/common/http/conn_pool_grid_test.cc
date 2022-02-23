@@ -50,9 +50,10 @@ public:
     setupPool(*instance);
     pools_.push_back(ConnectionPool::InstancePtr{instance});
     ON_CALL(*instance, newStream(_, _, _))
-        .WillByDefault(Invoke(
-            [&, &grid=*this](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
-                const ConnectionPool::Instance::StreamOptions& options) -> ConnectionPool::Cancellable* {
+        .WillByDefault(
+            Invoke([&, &grid = *this](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
+                                      const ConnectionPool::Instance::StreamOptions& options)
+                       -> ConnectionPool::Cancellable* {
               if (ConnectivityGridForTest::hasHttp3FailedRecently(grid)) {
                 EXPECT_FALSE(options.can_send_early_data_);
               }
@@ -792,7 +793,7 @@ TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenSucceeds) {
   EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
   EXPECT_EQ(grid_->first(), nullptr);
 
-// This timer will be returned and armed as the grid creates the wrapper's failover timer.
+  // This timer will be returned and armed as the grid creates the wrapper's failover timer.
   Event::MockTimer* failover_timer = new StrictMock<MockTimer>(&dispatcher_);
   EXPECT_CALL(*failover_timer, enabled()).WillOnce(Return(false)).WillOnce(Return(true));
   EXPECT_CALL(*failover_timer, enableTimer(_, _));
@@ -813,7 +814,7 @@ TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenSucceeds) {
   ASSERT_NE(grid_->callbacks(0), nullptr);
   ASSERT_NE(grid_->callbacks(1), nullptr);
   EXPECT_CALL(callbacks_.pool_ready_, ready());
-   EXPECT_CALL(grid_->cancel_, cancel(_));
+  EXPECT_CALL(grid_->cancel_, cancel(_));
   grid_->callbacks(0)->onPoolReady(encoder_, host_, info_, absl::nullopt);
   // Getting onPoolReady() from HTTP/3 pool doesn't change H3 status.
   EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
@@ -842,8 +843,8 @@ TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenFailsAgain) {
   // Getting onPoolReady() from TCP pool alone doesn't change H3 status.
   EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
   // Getting onPoolFailure() from Http3 pool later should mark H3 broken.
- grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
-                                        "reason", host_);
+  grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                     "reason", host_);
   EXPECT_TRUE(grid_->isHttp3Broken());
 }
 
@@ -900,7 +901,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.postpone_h3_client_connect_till_enlisted", "false"}});
+      {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "false"}});
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
 
@@ -910,7 +911,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
-  EXPECT_CALL(factory_context.context_manager_, createSslClientContext(_, _, _))
+  EXPECT_CALL(factory_context.context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context));
   auto factory =
       std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context);
@@ -973,7 +974,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.postpone_h3_client_connect_till_enlisted", "true"}});
+      {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "true"}});
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
 
@@ -983,7 +984,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
-  EXPECT_CALL(factory_context.context_manager_, createSslClientContext(_, _, _))
+  EXPECT_CALL(factory_context.context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context));
   auto factory =
       std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context);
@@ -995,10 +996,11 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(
-      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
-      simTime(), alternate_protocols_, options_, quic_stat_names_, store_, *quic_connection_persistent_info_);
+  ConnectivityGrid grid(dispatcher_, random_,
+                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+                        Upstream::ResourcePriority::Default, socket_options_,
+                        transport_socket_options_, state_, simTime(), alternate_protocols_,
+                        options_, quic_stat_names_, store_, *quic_connection_persistent_info_);
 
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
