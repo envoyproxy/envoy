@@ -8,6 +8,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -68,7 +69,7 @@ private:
   bool using_tls_{false};
 };
 
-class StartTlsSocketFactory : public Network::TransportSocketFactory,
+class StartTlsSocketFactory : public Network::CommonTransportSocketFactory,
                               Logger::Loggable<Logger::Id::config> {
 public:
   ~StartTlsSocketFactory() override = default;
@@ -81,8 +82,6 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override { return false; }
-  void hashKey(std::vector<uint8_t>& key,
-               Network::TransportSocketOptionsConstSharedPtr options) const override;
 
 private:
   Network::TransportSocketFactoryPtr raw_socket_factory_;

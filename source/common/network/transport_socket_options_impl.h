@@ -90,12 +90,15 @@ public:
    */
   static TransportSocketOptionsConstSharedPtr
   fromFilterState(const StreamInfo::FilterStateSharedPtr& stream_info);
+};
 
+class CommonTransportSocketFactory : public virtual TransportSocketFactory {
+public:
   /**
    * Compute the generic hash key from the transport socket options.
    */
-  static void commonHashKey(std::vector<std::uint8_t>& key,
-                            TransportSocketOptionsConstSharedPtr options);
+  void hashKey(std::vector<uint8_t>& key,
+               TransportSocketOptionsConstSharedPtr options) const override;
 };
 
 } // namespace Network

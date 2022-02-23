@@ -4,16 +4,10 @@
 #include "envoy/network/transport_socket.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
-
-void PassthroughFactory::hashKey(std::vector<uint8_t>& key,
-                                 Network::TransportSocketOptionsConstSharedPtr options) const {
-  return Network::TransportSocketOptionsUtility::commonHashKey(key, options);
-}
 
 PassthroughSocket::PassthroughSocket(Network::TransportSocketPtr&& transport_socket)
     : transport_socket_(std::move(transport_socket)) {}

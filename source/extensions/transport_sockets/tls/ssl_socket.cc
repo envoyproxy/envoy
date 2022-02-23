@@ -6,7 +6,6 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/hex.h"
 #include "source/common/http/headers.h"
-#include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/transport_sockets/tls/io_handle_bio.h"
 #include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
@@ -389,11 +388,6 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
 
 bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
-void ClientSslSocketFactory::hashKey(std::vector<uint8_t>& key,
-                                     Network::TransportSocketOptionsConstSharedPtr options) const {
-  return Network::TransportSocketOptionsUtility::commonHashKey(key, options);
-}
-
 void ClientSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
   auto ctx = manager_.createSslClientContext(stats_scope_, *config_);
@@ -443,11 +437,6 @@ ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsCon
 }
 
 bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
-
-void ServerSslSocketFactory::hashKey(std::vector<uint8_t>& key,
-                                     Network::TransportSocketOptionsConstSharedPtr options) const {
-  return Network::TransportSocketOptionsUtility::commonHashKey(key, options);
-}
 
 void ServerSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");

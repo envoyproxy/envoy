@@ -5,6 +5,7 @@
 #include "envoy/network/transport_socket.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -29,14 +30,12 @@ private:
   bool shutdown_{};
 };
 
-class RawBufferSocketFactory : public TransportSocketFactory {
+class RawBufferSocketFactory : public CommonTransportSocketFactory {
 public:
   // Network::TransportSocketFactory
   TransportSocketPtr
   createTransportSocket(TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;
-  void hashKey(std::vector<uint8_t>& key,
-               TransportSocketOptionsConstSharedPtr options) const override;
 };
 
 } // namespace Network

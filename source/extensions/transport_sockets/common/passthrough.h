@@ -4,12 +4,13 @@
 #include "envoy/network/transport_socket.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 
-class PassthroughFactory : public Network::TransportSocketFactory {
+class PassthroughFactory : public Network::CommonTransportSocketFactory {
 public:
   PassthroughFactory(Network::TransportSocketFactoryPtr&& transport_socket_factory)
       : transport_socket_factory_(std::move(transport_socket_factory)) {
@@ -20,8 +21,6 @@ public:
     return transport_socket_factory_->implementsSecureTransport();
   }
   bool supportsAlpn() const override { return transport_socket_factory_->supportsAlpn(); }
-  void hashKey(std::vector<uint8_t>& key,
-               Network::TransportSocketOptionsConstSharedPtr options) const override;
 
 protected:
   // The wrapped factory.

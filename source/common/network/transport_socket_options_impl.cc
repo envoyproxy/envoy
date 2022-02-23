@@ -16,8 +16,8 @@
 namespace Envoy {
 namespace Network {
 
-void TransportSocketOptionsUtility::commonHashKey(std::vector<std::uint8_t>& key,
-                                                  TransportSocketOptionsConstSharedPtr options) {
+void CommonTransportSocketFactory::hashKey(std::vector<uint8_t>& key,
+                                           TransportSocketOptionsConstSharedPtr options) const {
   if (!options) {
     return;
   }

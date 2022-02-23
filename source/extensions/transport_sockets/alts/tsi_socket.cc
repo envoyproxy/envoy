@@ -4,7 +4,6 @@
 #include "source/common/common/cleanup.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
-#include "source/common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -380,10 +379,6 @@ TsiSocketFactory::TsiSocketFactory(HandshakerFactory handshaker_factory,
       handshake_validator_(std::move(handshake_validator)) {}
 
 bool TsiSocketFactory::implementsSecureTransport() const { return true; }
-void TsiSocketFactory::hashKey(std::vector<uint8_t>& key,
-                               Network::TransportSocketOptionsConstSharedPtr options) const {
-  return Network::TransportSocketOptionsUtility::commonHashKey(key, options);
-}
 
 Network::TransportSocketPtr
 TsiSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr) const {
