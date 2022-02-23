@@ -152,7 +152,6 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_http_reject_path_with_fragment,
   &FLAGS_envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled,
   &FLAGS_envoy_reloadable_features_internal_address,
-  &FLAGS_envoy_reloadable_features_listener_reuse_port_default_enabled,
   &FLAGS_envoy_reloadable_features_listener_wildcard_match_ip_family,
   &FLAGS_envoy_reloadable_features_new_tcp_connection_pool,
   &FLAGS_envoy_reloadable_features_postpone_h3_client_connect_to_next_loop,
