@@ -1169,7 +1169,6 @@ TEST_F(RouterTest, UpstreamTimeoutNoStatsEmissionWhenRuntimeGuardFalse) {
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
   response_decoder->decodeHeaders(std::move(response_headers), false);
-  EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _, _)).Times(0);
   response_timeout_->invokeCallback();
 
   EXPECT_EQ(0U,
@@ -1178,7 +1177,6 @@ TEST_F(RouterTest, UpstreamTimeoutNoStatsEmissionWhenRuntimeGuardFalse) {
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
   EXPECT_EQ(0UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
 TEST_F(RouterTest, UpstreamTimeoutAllStatsEmissionWhenRuntimeGuardTrue) {
