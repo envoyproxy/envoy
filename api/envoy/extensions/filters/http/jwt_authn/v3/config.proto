@@ -53,7 +53,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
@@ -271,6 +271,14 @@ message JwtProvider {
   //   config validation.
   //
   string header_in_metadata = 14;
+
+  // If true, clear the route cache in order to allow this filter to impact routing decisions.
+  // When a JWT provider executes header or metadata operations, e.g. via
+  // :ref:`payload_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+  // the route should be re-resolved before forwarding to upstream.
+  // If not specified, default is false.
+  // [#not-implemented-hide:]
+  bool clear_route_cache = 15;
 
   // Specify the clock skew in seconds when verifying JWT time constraint,
   // such as `exp`, and `nbf`. If not specified, default is 60 seconds.
@@ -583,8 +591,7 @@ message FilterStateRule {
 
   // A map of string keys to requirements. The string key is the string value
   // in the FilterState with the name specified in the *name* field above.
-  map<string, JwtRequirement>
-  requires = 3;
+  map<string, JwtRequirement> requires = 3;
 }
 
 // This is the Envoy HTTP filter config for JWT authentication.
