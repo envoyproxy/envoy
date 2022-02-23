@@ -14,6 +14,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -100,6 +101,7 @@ public:
 };
 
 namespace {
+
 class ConnectivityGridTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   ConnectivityGridTest()
@@ -160,7 +162,6 @@ public:
 // Test the first pool successfully connecting.
 TEST_F(ConnectivityGridTest, Success) {
   initialize();
-
   addHttp3AlternateProtocol();
   EXPECT_EQ(grid_->first(), nullptr);
   EXPECT_NE(grid_->newStream(decoder_, callbacks_,
@@ -819,6 +820,81 @@ TEST_F(ConnectivityGridTest, RealGrid) {
 }
 
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "false"}});
+  initialize();
+  EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
+
+  testing::InSequence s;
+  dispatcher_.allow_null_callback_ = true;
+  // Set the cluster up to have a quic transport socket.
+  Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
+  EXPECT_CALL(factory_context.context_manager_, createSslClientContext(_, _))
+      .WillOnce(Return(ssl_context));
+  auto factory =
+      std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context);
+  factory->initialize();
+  ASSERT_FALSE(factory->usesProxyProtocolOptions());
+  auto& matcher =
+      static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
+  EXPECT_CALL(matcher, resolve(_))
+      .WillRepeatedly(
+          Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
+
+  ConnectivityGrid grid(
+      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
+      simTime(), alternate_protocols_, options_, quic_stat_names_, store_);
+
+  // Create the HTTP/3 pool.
+  auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
+  ASSERT_TRUE(optional_it1.has_value());
+  EXPECT_EQ("HTTP/3", (**optional_it1)->protocolDescription());
+
+  const bool supports_getifaddrs = Api::OsSysCallsSingleton::get().supportsGetifaddrs();
+  Api::InterfaceAddressVector interfaces{};
+  if (supports_getifaddrs) {
+    ASSERT_EQ(0, Api::OsSysCallsSingleton::get().getifaddrs(interfaces).return_value_);
+  }
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(supports_getifaddrs));
+  if (supports_getifaddrs) {
+    EXPECT_CALL(os_sys_calls, getifaddrs(_))
+        .WillOnce(
+            Invoke([&](Api::InterfaceAddressVector& interface_vector) -> Api::SysCallIntResult {
+              interface_vector.insert(interface_vector.begin(), interfaces.begin(),
+                                      interfaces.end());
+              return {0, 0};
+            }));
+  }
+  EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillOnce(Return(Api::SysCallSocketResult{1, 0}));
+#if defined(__APPLE__) || defined(WIN32)
+  EXPECT_CALL(os_sys_calls, setsocketblocking(1, false))
+      .WillOnce(Return(Api::SysCallIntResult{1, 0}));
+#endif
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _))
+      .Times(testing::AtLeast(0u))
+      .WillRepeatedly(Return(0));
+  EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{1, 0}));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 101}));
+  EXPECT_CALL(os_sys_calls, close(1)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+  ConnectionPool::Cancellable* cancel = (**optional_it1)
+                                            ->newStream(decoder_, callbacks_,
+                                                        {/*can_send_early_data_=*/false,
+                                                         /*can_use_http3_=*/true});
+  EXPECT_EQ(nullptr, cancel);
+}
+
+TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "true"}});
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
 
@@ -878,14 +954,17 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
       .WillRepeatedly(Return(0));
   EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{1, 0}));
   EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
-  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 101}));
+  auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
 
-  EXPECT_CALL(os_sys_calls, close(1)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   ConnectionPool::Cancellable* cancel = (**optional_it1)
                                             ->newStream(decoder_, callbacks_,
                                                         {/*can_send_early_data_=*/false,
                                                          /*can_use_http3_=*/true});
-  EXPECT_EQ(nullptr, cancel);
+  EXPECT_NE(nullptr, cancel);
+
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 101}));
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+  async_connect_callback->invokeCallback();
 }
 
 #endif
