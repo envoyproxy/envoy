@@ -92,7 +92,8 @@ resources:
   eds_cluster_config:
     eds_config:
       resource_api_version: V3
-      path: eds path
+      path_config_source:
+        path: eds path
 )EOF";
   auto response1 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
@@ -264,14 +265,16 @@ resources:
   eds_cluster_config:
     eds_config:
       resource_api_version: V3
-      path: eds path
+      path_config_source:
+        path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster2
   type: EDS
   eds_cluster_config:
     eds_config:
       resource_api_version: V3
-      path: eds path
+      path_config_source:
+        path: eds path
 )EOF";
   auto response1 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
@@ -295,14 +298,16 @@ resources:
   eds_cluster_config:
     eds_config:
       resource_api_version: V3
-      path: eds path
+      path_config_source:
+        path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster3
   type: EDS
   eds_cluster_config:
     eds_config:
       resource_api_version: V3
-      path: eds path
+      path_config_source:
+        path: eds path
 )EOF";
   auto response2 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_yaml);
@@ -333,14 +338,16 @@ resources:
   eds_cluster_config:
     eds_config:
       resource_api_version: V3
-      path: eds path
+      path_config_source:
+        path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
   type: EDS
   eds_cluster_config:
     eds_config:
       resource_api_version: V3
-      path: eds path
+      path_config_source:
+        path: eds path
 )EOF";
   auto response1 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);

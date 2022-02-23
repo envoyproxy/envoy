@@ -437,6 +437,15 @@ message WeightedCluster {
   // configuration file will be used as the default weight. See the :ref:`runtime documentation
   // <operations_runtime>` for how key names map to the underlying implementation.
   string runtime_key_prefix = 2;
+
+  oneof random_value_specifier {
+    // Specifies the header name that is used to look up the random value passed in the request header.
+    // This is used to ensure consistent cluster picking across multiple proxy levels for weighted traffic.
+    // If header is not present or invalid, Envoy will fall back to use the internally generated random value.
+    // This header is expected to be single-valued header as we only want to have one selected value throughout
+    // the process for the consistency. And the value is a unsigned number between 0 and UINT64_MAX.
+    string header_name = 4;
+  }
 }
 
 // [#next-free-field: 14]

@@ -57,7 +57,7 @@ public:
 class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   Http3ConnPoolImplTest() {
-    EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _, _))
+    EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _))
         .WillRepeatedly(Return(ssl_context_));
     factory_.emplace(std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
                          new NiceMock<Ssl::MockClientContextConfig>),
@@ -76,7 +76,7 @@ public:
     Network::TransportSocketOptionsConstSharedPtr transport_options;
     pool_ =
         allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
-                         transport_options, state_, simTime(), quic_stat_names_, store_,
+                         transport_options, state_, simTime(), quic_stat_names_, {}, store_,
                          makeOptRef<PoolConnectResultCallback>(connect_result_callback_));
   }
 
@@ -123,7 +123,7 @@ TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
   Network::TransportSocketOptionsConstSharedPtr transport_options;
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
-                       transport_options, state_, simTime(), quic_stat_names_, store_,
+                       transport_options, state_, simTime(), quic_stat_names_, {}, store_,
                        makeOptRef<PoolConnectResultCallback>(connect_result_callback_));
 
   EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
@@ -147,10 +147,16 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
   Network::TransportSocketOptionsConstSharedPtr transport_options;
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
-                       transport_options, state_, simTime(), quic_stat_names_, store_,
+                       transport_options, state_, simTime(), quic_stat_names_, {}, store_,
                        makeOptRef<PoolConnectResultCallback>(connect_result_callback_));
 
-  EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
+  MockResponseDecoder decoder;
+  ConnPoolCallbacks callbacks;
+  EXPECT_CALL(callbacks.pool_failure_, ready());
+  EXPECT_EQ(pool->newStream(decoder, callbacks,
+                            {/*can_send_early_data_=*/false,
+                             /*can_use_http3_=*/true}),
+            nullptr);
 }
 
 TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
@@ -160,8 +166,19 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
 
-  ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks);
+  auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks,
+                                                              {/*can_send_early_data_=*/false,
+                                                               /*can_use_http3_=*/true});
   EXPECT_NE(nullptr, cancellable);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
+    async_connect_callback->invokeCallback();
+  } else {
+    EXPECT_FALSE(async_connect_callback->enabled());
+    delete async_connect_callback;
+  }
+
   std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
       Http3ConnPoolImplPeer::connectingClients(*pool_);
   EXPECT_EQ(1u, clients.size());
@@ -169,6 +186,64 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
     cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   }));
   pool_->onConnectionEvent(*clients.front(), "", Network::ConnectionEvent::Connected);
+}
+
+TEST_F(Http3ConnPoolImplTest, NewAndCancelStreamBeforeConnect) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
+    return;
+  }
+
+  EXPECT_CALL(mockHost().cluster_, perConnectionBufferLimitBytes);
+  initialize();
+
+  MockResponseDecoder decoder;
+  ConnPoolCallbacks callbacks;
+  auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks,
+                                                              {/*can_send_early_data_=*/false,
+                                                               /*can_use_http3_=*/true});
+  EXPECT_NE(nullptr, cancellable);
+  std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
+      Http3ConnPoolImplPeer::connectingClients(*pool_);
+  EXPECT_EQ(1u, clients.size());
+  Envoy::ConnectionPool::ActiveClient& client_ref = *clients.front();
+
+  // Cancel the stream before async connect.
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  EXPECT_TRUE(clients.empty());
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::CLOSED, client_ref.state());
+  EXPECT_EQ(dispatcher_.to_delete_.front().get(), &client_ref);
+
+  EXPECT_CALL(*async_connect_callback, cancel());
+  dispatcher_.to_delete_.clear();
+}
+
+TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
+    return;
+  }
+  EXPECT_CALL(mockHost().cluster_, perConnectionBufferLimitBytes);
+  initialize();
+
+  MockResponseDecoder decoder;
+  ConnPoolCallbacks callbacks;
+  auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks,
+                                                              {/*can_send_early_data_=*/false,
+                                                               /*can_use_http3_=*/true});
+  EXPECT_NE(nullptr, cancellable);
+  std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
+      Http3ConnPoolImplPeer::connectingClients(*pool_);
+  EXPECT_EQ(1u, clients.size());
+
+  pool_->drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
+
+  // Triggering the async connect callback after the client starts draining shouldn't cause crash.
+  async_connect_callback->invokeCallback();
+  cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
 }
 
 TEST_F(Http3ConnPoolImplTest, CreationWithConfig) {
@@ -183,6 +258,7 @@ TEST_F(Http3ConnPoolImplTest, CreationWithConfig) {
             options->max_concurrent_streams().value());
   EXPECT_EQ(info.quic_config_.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend(),
             options->initial_stream_window_size().value());
+  EXPECT_EQ(3000, info.server_id_.port());
 }
 
 } // namespace Http3

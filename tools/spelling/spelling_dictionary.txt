@@ -32,6 +32,7 @@ cbor
 CDN
 CDS
 CEL
+CWND
 DSR
 DSS
 EBADF
@@ -745,6 +746,7 @@ inflater
 inflight
 -ing
 init
+initialize
 initializer
 initializers
 inlined
@@ -856,6 +858,7 @@ multi
 multicast
 multikill
 multimap
+multiple
 multivalue
 mutator
 mutex
@@ -1010,6 +1013,7 @@ ratelimited
 ratelimiter
 rawseti
 rc
+rdsone
 readded
 readonly
 readv
@@ -1131,6 +1135,7 @@ spdlog
 splitter
 spoofable
 src
+srtt
 ssize
 stackdriver
 stacktrace

@@ -2,7 +2,7 @@
 
 An original destination cluster forwards requests to the same destination
 the request was going to before being redirected to Envoy using an
-iptables REDIRECT rule. `proxy_config.json` contains an example Envoy
+iptables REDIRECT rule. `proxy_config.yaml` contains an example Envoy
 configuration demonstrating the use of an original destination
 cluster. `netns_setup.sh` and `netns_cleanup.sh` are provided as
 examples for setting up and cleaning up, respectively, a network
@@ -13,7 +13,7 @@ namespace and the required iptables rule to redirect traffic to Envoy.
 `netns_setup.sh` takes two arguments: the name of the new network
 namespace and the prefix that is to be redirected. Envoy listener port
 is set to 10000, which matches the configuration in
-`proxy_config.json`.
+`proxy_config.yaml`.
 
 This creates a network namespace `ns1` and redirects traffic from
 there to Envoy listening on port 10000 if the destination address of
@@ -35,7 +35,7 @@ bazel build //source/exe:envoy-static -c dbg
 Then you should run Envoy with the provided example configuration:
 
 ```
-bazel-out/local-dbg/bin/source/exe/envoy-static -c configs/original-dst-cluster/proxy_config.json -l debug
+bazel-out/local-dbg/bin/source/exe/envoy-static -c configs/original-dst-cluster/proxy_config.yaml -l debug
 ```
 
 When running you should see periodical messages like `Cleaning up
@@ -53,7 +53,7 @@ sudo ip netns exec ns1 curl -v 173.194.222.106:80
 Most likely you'll see `301 Moved` in the curl response. In the rare
 case of upstream connection timeout you'll see `503 Service
 Unavailable` instead. The connection timeout setting on the
-proxy_config.json is set to 6 seconds to make this less likely, but if
+proxy_config.yaml is set to 6 seconds to make this less likely, but if
 no host with the destination address exist then you will get this
 response no matter how long the timeout setting.
 

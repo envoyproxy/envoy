@@ -18,5 +18,6 @@ resources:
           route_config_name: route_config_0
           config_source:
             resource_api_version: V3
-            path: "{{ rds_json_path }}"
+            path_config_source:
+              path: "{{ rds_json_path }}"
         http_filters: [{name: envoy.filters.http.router}]

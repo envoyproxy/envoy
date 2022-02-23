@@ -134,7 +134,7 @@ To add an extension config to the API, the steps below should be followed:
    annotation of the form `// [#extension-category: your.extension.category]`
    in one of the proto files for the docs build to pass.
 1. Update
-   [source/extensions/extensions_build_config.bzl](source/extensions/extensions_build_config.bzl)
+   [source/extensions/extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl)
    to include the new extension.
 1. If the extension is not hidden, find or create a docs file with a toctree
    and to reference your proto to make sure users can navigate to it from the API docs
@@ -147,6 +147,8 @@ To add an extension config to the API, the steps below should be followed:
    (`option (udpa.annotations.file_status).package_version_status = ACTIVE;`).
    This is required to automatically include the config proto in [api/versioning/BUILD](versioning/BUILD).
 1. Add a reference to the v3 extension config in (1) in [api/versioning/BUILD](versioning/BUILD) under `active_protos`.
+1. If you introduce a new extension category, you'll also need to add its name
+   under `EXTENSION_CATEGORIES` in: [tools/extensions/extensions_check.py](../tools/extensions/extensions_check.py).
 1. Run `./tools/proto_format/proto_format.sh fix`. This should regenerate the `BUILD` file and
    reformat `foobar.proto` as needed.
 

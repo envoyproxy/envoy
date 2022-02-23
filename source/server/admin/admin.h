@@ -84,6 +84,8 @@ public:
   // The prefix must start with "/" and contain at least one additional character.
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
                   bool removable, bool mutates_server_state) override;
+  bool addChunkedHandler(const std::string& prefix, const std::string& help_text,
+                         GenHandlerCb callback, bool removable, bool mutates_server_state) override;
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
@@ -91,7 +93,7 @@ public:
                          const std::string& address_out_path,
                          Network::Address::InstanceConstSharedPtr address,
                          const Network::Socket::OptionsSharedPtr& socket_options,
-                         Stats::ScopePtr&& listener_scope) override;
+                         Stats::ScopeSharedPtr&& listener_scope) override;
   uint32_t concurrency() const override { return server_.options().concurrency(); }
 
   // Network::FilterChainManager
@@ -200,6 +202,11 @@ public:
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
   Server::Instance& server() { return server_; }
 
+  GenHandlerCb createHandlerFunction() {
+    return [this](absl::string_view path_and_query, AdminStream& admin_stream) -> HandlerPtr {
+      return findHandler(path_and_query, admin_stream);
+    };
+  }
   AdminFilter::AdminServerCallbackFunction createCallbackFunction() {
     return [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
                   Buffer::OwnedImpl& response, AdminFilter& filter) -> Http::Code {
@@ -211,6 +218,14 @@ public:
     return proxy_status_config_.get();
   }
 
+  /**
+   * Makes a chunked handler for static text.
+   * @param resposne_text the text to populate response with
+   * @param code the Http::Code for the response
+   * @return the handler
+   */
+  static HandlerPtr makeStaticTextHandler(absl::string_view response_text, Http::Code code);
+
 private:
   /**
    * Individual admin handler including prefix, help text, and callback.
@@ -218,10 +233,20 @@ private:
   struct UrlHandler {
     const std::string prefix_;
     const std::string help_text_;
-    const HandlerCb handler_;
+    const GenHandlerCb handler_;
     const bool removable_;
     const bool mutates_server_state_;
   };
+
+  /**
+   * Creates a Handler instance given a request.
+   */
+  HandlerPtr findHandler(absl::string_view path_and_query, AdminStream& admin_stream);
+  /**
+   * Creates a UrlHandler structure from a non-chunked callback.
+   */
+  UrlHandler makeHandler(const std::string& prefix, const std::string& help_text,
+                         HandlerCb callback, bool removable, bool mutates_state);
 
   /**
    * Implementation of RouteConfigProvider that returns a static null route config.
@@ -230,14 +255,16 @@ private:
     NullRouteConfigProvider(TimeSource& time_source);
 
     // Router::RouteConfigProvider
-    Router::ConfigConstSharedPtr config() override { return config_; }
-    absl::optional<ConfigInfo> configInfo() const override { return {}; }
+    Rds::ConfigConstSharedPtr config() const override { return config_; }
+    const absl::optional<ConfigInfo>& configInfo() const override { return config_info_; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
+    Router::ConfigConstSharedPtr configCast() const override { return config_; }
     void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
                                    std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {}
 
     Router::ConfigConstSharedPtr config_;
+    absl::optional<ConfigInfo> config_info_;
     TimeSource& time_source_;
   };
 
@@ -315,6 +342,7 @@ private:
   Http::Code handlerHelp(absl::string_view path_and_query,
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream&);
+  void getHelp(Buffer::Instance& response);
 
   class AdminListenSocketFactory : public Network::ListenSocketFactory {
   public:
@@ -342,7 +370,7 @@ private:
 
   class AdminListener : public Network::ListenerConfig {
   public:
-    AdminListener(AdminImpl& parent, Stats::ScopePtr&& listener_scope)
+    AdminListener(AdminImpl& parent, Stats::ScopeSharedPtr&& listener_scope)
         : parent_(parent), name_("admin"), scope_(std::move(listener_scope)),
           stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)),
           init_manager_(nullptr), ignore_global_conn_limit_(parent.ignore_global_conn_limit_) {}
@@ -381,7 +409,7 @@ private:
 
     AdminImpl& parent_;
     const std::string name_;
-    Stats::ScopePtr scope_;
+    Stats::ScopeSharedPtr scope_;
     Http::ConnectionManagerListenerStats stats_;
     Network::NopConnectionBalancerImpl connection_balancer_;
     BasicResourceLimitImpl open_connections_;

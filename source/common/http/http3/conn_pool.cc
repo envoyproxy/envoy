@@ -28,7 +28,19 @@ uint32_t getMaxStreams(const Upstream::ClusterInfo& cluster) {
 ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                            Upstream::Host::CreateConnectionData& data)
     : MultiplexedActiveClientBase(parent, getMaxStreams(parent.host()->cluster()),
-                                  parent.host()->cluster().stats().upstream_cx_http3_total_, data) {
+                                  parent.host()->cluster().stats().upstream_cx_http3_total_, data),
+      async_connect_callback_(parent_.dispatcher().createSchedulableCallback([this]() {
+        if (state() == Envoy::ConnectionPool::ActiveClient::State::CONNECTING) {
+          codec_client_->connect();
+        }
+      })) {
+  ASSERT(codec_client_);
+  if (dynamic_cast<CodecClientProd*>(codec_client_.get()) == nullptr) {
+    ASSERT(Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop"));
+    // Hasn't called connect() yet, schedule one for the next event loop.
+    async_connect_callback_->scheduleCallbackNextIteration();
+  }
 }
 
 void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
@@ -41,6 +53,14 @@ void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
     // With HTTP/3 this can only happen during a rejected 0-RTT handshake.
     parent_.transitionActiveClientState(*this, ActiveClient::State::BUSY);
   }
+}
+
+ConnectionPool::Cancellable* Http3ConnPoolImpl::newStream(Http::ResponseDecoder& response_decoder,
+                                                          ConnectionPool::Callbacks& callbacks,
+                                                          const Instance::StreamOptions& options) {
+  ENVOY_BUG(options.can_use_http3_,
+            "Trying to send request over h3 while alternate protocols is disabled.");
+  return FixedHttpConnPoolImpl::newStream(response_decoder, callbacks, options);
 }
 
 void Http3ConnPoolImpl::setQuicConfigFromClusterConfig(const Upstream::ClusterInfo& cluster,
@@ -61,16 +81,12 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
     : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
                             random_generator, state, client_fn, codec_fn, protocol),
       connect_callback_(connect_callback) {
-  auto source_address = host_->cluster().sourceAddress();
-  if (!source_address.get()) {
-    auto host_address = host->address();
-    source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
-  }
+  uint32_t remote_port = host->address()->ip()->port();
   Network::TransportSocketFactory& transport_socket_factory = host->transportSocketFactory();
   quic::QuicConfig quic_config;
   setQuicConfigFromClusterConfig(host_->cluster(), quic_config);
   quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      dispatcher, transport_socket_factory, time_source, source_address, quic_config,
+      dispatcher, transport_socket_factory, time_source, remote_port, quic_config,
       host->cluster().perConnectionBufferLimitBytes());
 }
 
@@ -89,11 +105,12 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-                 Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope,
+                 Quic::QuicStatNames& quic_stat_names,
+                 OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope,
                  OptRef<PoolConnectResultCallback> connect_callback) {
   return std::make_unique<Http3ConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
-      [&quic_stat_names,
+      [&quic_stat_names, rtt_cache,
        &scope](HttpConnPoolImplBase* pool) -> ::Envoy::ConnectionPool::ActiveClientPtr {
         ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool), debug,
                             "Creating Http/3 client");
@@ -117,7 +134,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         }
         data.connection_ =
             Quic::createQuicNetworkConnection(h3_pool->quicInfo(), pool->dispatcher(), host_address,
-                                              source_address, quic_stat_names, scope);
+                                              source_address, quic_stat_names, rtt_cache, scope);
         if (data.connection_ == nullptr) {
           ENVOY_LOG_EVERY_POW_2_TO_LOGGER(
               Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool), warn,
@@ -128,14 +145,26 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         Network::Connection& connection = *data.connection_;
         auto client = std::make_unique<ActiveClient>(*pool, data);
         if (connection.state() == Network::Connection::State::Closed) {
+          // TODO(danzh) remove this branch once
+          // "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop" is deprecated.
+          ASSERT(dynamic_cast<CodecClientProd*>(client->codec_client_.get()) != nullptr);
           return nullptr;
         }
         return client;
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
-        CodecClientPtr codec{new CodecClientProd(CodecType::HTTP3, std::move(data.connection_),
-                                                 data.host_description_, pool->dispatcher(),
-                                                 pool->randomGenerator())};
+        // Because HTTP/3 codec client connect() can close connection inline and can raise 0-RTT
+        // event inline, and both cases need to have network callbacks and http callbacks wired up
+        // to propagate the event, so do not call connect() during codec client construction.
+        CodecClientPtr codec =
+            Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")
+                ? std::make_unique<NoConnectCodecClientProd>(
+                      CodecType::HTTP3, std::move(data.connection_), data.host_description_,
+                      pool->dispatcher(), pool->randomGenerator())
+                : std::make_unique<CodecClientProd>(CodecType::HTTP3, std::move(data.connection_),
+                                                    data.host_description_, pool->dispatcher(),
+                                                    pool->randomGenerator());
         return codec;
       },
       std::vector<Protocol>{Protocol::Http3}, time_source, connect_callback);

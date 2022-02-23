@@ -121,7 +121,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
         Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
     return Network::FilterStatus::StopIteration;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void Filter::onALPN(const unsigned char* data, unsigned int len) {

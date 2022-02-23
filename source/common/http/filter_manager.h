@@ -317,7 +317,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
       : ActiveStreamFilterBase(parent, dual_filter, std::move(match_state)), handle_(filter) {}
 
   // ActiveStreamFilterBase
-  bool canContinue() override { return true; }
+  bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
@@ -577,11 +577,6 @@ public:
    * Returns the tracked scope to use for this stream.
    */
   virtual const ScopeTrackedObject& scope() PURE;
-
-  /**
-   * Returns whether internal redirects with request bodies is enabled.
-   */
-  virtual bool enableInternalRedirectsWithBody() const PURE;
 };
 
 /**
@@ -912,7 +907,7 @@ public:
   /**
    * Whether remote processing has been marked as complete.
    */
-  bool remoteComplete() const { return state_.remote_complete_; }
+  bool remoteDecodeComplete() const { return state_.remote_decode_complete_; }
 
   /**
    * Instructs the FilterManager to not create a filter chain. This makes it possible to issue
@@ -940,10 +935,6 @@ public:
   Buffer::BufferMemoryAccountSharedPtr account() const { return account_; }
 
   Buffer::InstancePtr& bufferedRequestData() { return buffered_request_data_; }
-
-  bool enableInternalRedirectsWithBody() const {
-    return filter_manager_callbacks_.enableInternalRedirectsWithBody();
-  }
 
   void contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack);
 
@@ -1067,15 +1058,15 @@ private:
 
   struct State {
     State()
-        : remote_complete_(false), local_complete_(false), has_1xx_headers_(false),
-          created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
-          non_100_response_headers_encoded_(false), under_on_local_reply_(false),
-          decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false),
-          saw_downstream_reset_(false) {}
-
+        : remote_encode_complete_(false), remote_decode_complete_(false), local_complete_(false),
+          has_1xx_headers_(false), created_filter_chain_(false), is_head_request_(false),
+          is_grpc_request_(false), non_100_response_headers_encoded_(false),
+          under_on_local_reply_(false), decoder_filter_chain_aborted_(false),
+          encoder_filter_chain_aborted_(false), saw_downstream_reset_(false) {}
     uint32_t filter_call_state_{0};
 
-    bool remote_complete_ : 1;
+    bool remote_encode_complete_ : 1;
+    bool remote_decode_complete_ : 1;
     bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
                               // A filter can still stop the stream from being complete as seen
                               // by the codec.
