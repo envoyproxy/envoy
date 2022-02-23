@@ -84,6 +84,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   if (verifier == nullptr) {
+    // Skip the route clear because the request is not updated.
     onComplete(Status::Ok);
   } else {
     original_uri_ = Http::Utility::buildOriginalUri(headers, MaximumUriLength);
@@ -133,9 +134,11 @@ void Filter::onComplete(const Status& status) {
   }
   stats_.allowed_.inc();
   state_ = Complete;
-  if (stopped_) {
-    decoder_callbacks_->continueDecoding();
-  }
+  // place holder: clear cache
+  if (config_->)
+    if (stopped_) {
+      decoder_callbacks_->continueDecoding();
+    }
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {

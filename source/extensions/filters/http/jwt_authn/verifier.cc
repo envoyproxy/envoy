@@ -32,14 +32,14 @@ struct CompletionState {
 class ContextImpl : public Verifier::Context {
 public:
   ContextImpl(Http::RequestHeaderMap& headers, Tracing::Span& parent_span,
-              Verifier::Callbacks* callback)
+              Verifier::Callbacks& callback)
       : headers_(headers), parent_span_(parent_span), callback_(callback) {}
 
   Http::RequestHeaderMap& headers() const override { return headers_; }
 
   Tracing::Span& parentSpan() const override { return parent_span_; }
 
-  Verifier::Callbacks* callback() const override { return callback_; }
+  Verifier::Callbacks* callback() const override { return &callback_; }
 
   void cancel() override {
     for (const auto& it : auths_) {
@@ -57,22 +57,22 @@ public:
 
   // Add a pair of (name, payload), called by Authenticator. It can be either JWT header or payload.
   void addExtractedData(const std::string& name, const ProtobufWkt::Struct& extracted_data) {
-    *(*extrated_data_.mutable_fields())[name].mutable_struct_value() = extracted_data;
+    *(*extracted_data_.mutable_fields())[name].mutable_struct_value() = extracted_data;
   }
 
   void setExtractedData() {
-    if (!extrated_data_.fields().empty()) {
-      callback_->setExtractedData(extrated_data_);
+    if (!extracted_data_.fields().empty()) {
+      callback_.setExtractedData(extracted_data_);
     }
   }
 
 private:
   Http::RequestHeaderMap& headers_;
   Tracing::Span& parent_span_;
-  Verifier::Callbacks* callback_;
+  Verifier::Callbacks& callback_;
   absl::node_hash_map<const Verifier*, CompletionState> completion_states_;
   std::vector<AuthenticatorPtr> auths_;
-  ProtobufWkt::Struct extrated_data_;
+  ProtobufWkt::Struct extracted_data_;
 };
 
 // base verifier for provider_name, provider_and_audiences, and allow_missing_or_failed.
@@ -127,9 +127,7 @@ public:
         [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
           ctximpl.addExtractedData(name, extracted_data);
         },
-        [this, context](const Status& status) {
-          onComplete(status, static_cast<ContextImpl&>(*context));
-        });
+        [this, &ctximpl](const Status& status) { onComplete(status, ctximpl); });
     if (!ctximpl.getCompletionState(this).is_completed_) {
       ctximpl.storeAuth(std::move(auth));
     } else {
@@ -178,9 +176,7 @@ public:
         [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
           ctximpl.addExtractedData(name, extracted_data);
         },
-        [this, context](const Status& status) {
-          onComplete(status, static_cast<ContextImpl&>(*context));
-        });
+        [this, &ctximpl](const Status& status) { onComplete(status, ctximpl); });
     if (!ctximpl.getCompletionState(this).is_completed_) {
       ctximpl.storeAuth(std::move(auth));
     } else {
@@ -190,7 +186,6 @@ public:
 
 private:
   const AuthFactory& auth_factory_;
-  // const Extractor& extractor_;
   const ExtractorConstPtr extractor_;
 };
 
@@ -213,9 +208,7 @@ public:
         [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
           ctximpl.addExtractedData(name, extracted_data);
         },
-        [this, context](const Status& status) {
-          onComplete(status, static_cast<ContextImpl&>(*context));
-        });
+        [this, &ctximpl](const Status& status) { onComplete(status, ctximpl); });
     if (!ctximpl.getCompletionState(this).is_completed_) {
       ctximpl.storeAuth(std::move(auth));
     } else {
