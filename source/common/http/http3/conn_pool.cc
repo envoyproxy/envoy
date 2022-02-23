@@ -28,7 +28,19 @@ uint32_t getMaxStreams(const Upstream::ClusterInfo& cluster) {
 ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                            Upstream::Host::CreateConnectionData& data)
     : MultiplexedActiveClientBase(parent, getMaxStreams(parent.host()->cluster()),
-                                  parent.host()->cluster().stats().upstream_cx_http3_total_, data) {
+                                  parent.host()->cluster().stats().upstream_cx_http3_total_, data),
+      async_connect_callback_(parent_.dispatcher().createSchedulableCallback([this]() {
+        if (state() == Envoy::ConnectionPool::ActiveClient::State::CONNECTING) {
+          codec_client_->connect();
+        }
+      })) {
+  ASSERT(codec_client_);
+  if (dynamic_cast<CodecClientProd*>(codec_client_.get()) == nullptr) {
+    ASSERT(Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop"));
+    // Hasn't called connect() yet, schedule one for the next event loop.
+    async_connect_callback_->scheduleCallbackNextIteration();
+  }
 }
 
 void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
@@ -133,14 +145,26 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         Network::Connection& connection = *data.connection_;
         auto client = std::make_unique<ActiveClient>(*pool, data);
         if (connection.state() == Network::Connection::State::Closed) {
+          // TODO(danzh) remove this branch once
+          // "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop" is deprecated.
+          ASSERT(dynamic_cast<CodecClientProd*>(client->codec_client_.get()) != nullptr);
           return nullptr;
         }
         return client;
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
-        CodecClientPtr codec{new CodecClientProd(CodecType::HTTP3, std::move(data.connection_),
-                                                 data.host_description_, pool->dispatcher(),
-                                                 pool->randomGenerator())};
+        // Because HTTP/3 codec client connect() can close connection inline and can raise 0-RTT
+        // event inline, and both cases need to have network callbacks and http callbacks wired up
+        // to propagate the event, so do not call connect() during codec client construction.
+        CodecClientPtr codec =
+            Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")
+                ? std::make_unique<NoConnectCodecClientProd>(
+                      CodecType::HTTP3, std::move(data.connection_), data.host_description_,
+                      pool->dispatcher(), pool->randomGenerator())
+                : std::make_unique<CodecClientProd>(CodecType::HTTP3, std::move(data.connection_),
+                                                    data.host_description_, pool->dispatcher(),
+                                                    pool->randomGenerator());
         return codec;
       },
       std::vector<Protocol>{Protocol::Http3}, time_source, connect_callback);
