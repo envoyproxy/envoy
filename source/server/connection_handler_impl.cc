@@ -107,8 +107,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         // Since both "::" with ipv4_compat and "0.0.0.0" can be supported.
         // If there already one and it isn't shutdown for compatible addr,
         // then won't insert a new one.
-        auto ipv4_any_address =
-            Network::Address::Ipv4Instance(address->ip()->port()).asString();
+        auto ipv4_any_address = Network::Address::Ipv4Instance(address->ip()->port()).asString();
         auto ipv4_any_listener = tcp_listener_map_by_address_.find(ipv4_any_address);
         if (ipv4_any_listener == tcp_listener_map_by_address_.end() ||
             ipv4_any_listener->second->listener_->listener() == nullptr) {
