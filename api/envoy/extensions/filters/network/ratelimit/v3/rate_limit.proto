@@ -53,9 +53,9 @@ message RateLimit {
   config.ratelimit.v3.RateLimitServiceConfig rate_limit_service = 6
       [(validate.rules).message = {required: true}];
 
-  // Runtime flags that control whether substitution formatting on rate limit descriptors is enabled or not
-  //Currently supports the following flags
-  //- envoy.reloadable_features.network_rate_limit.downstream_ip_formatter
-  //If not specified, defaults to disabled.
+  // Runtime flags that control whether runtime substitution on rate limit descriptors is enabled or not
+  // Currently supports the following flags
+  // - envoy.reloadable_features.network.rate_limit.dynamic_downstream_ip -> downstream_ip
+  // If not specified, defaults to disabled.
   repeated config.core.v3.RuntimeFeatureFlag substitution_formatter_flags = 7;
 }

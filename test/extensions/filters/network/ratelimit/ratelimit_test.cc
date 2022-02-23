@@ -55,7 +55,6 @@ public:
         new Network::Address::Ipv4Instance("8.8.8.8", 3000)};
     filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
         ->setRemoteAddress(downstream_direct_remote);
-
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
     // NOP currently.
@@ -149,13 +148,75 @@ TEST_F(RateLimitFilterTest, OK) {
   EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.ok").value());
 }
 
-TEST_F(RateLimitFilterTest, ReplaceDownstreamIP) {
+TEST_F(RateLimitFilterTest, ReplaceDownstreamIpEnabled) {
   InSequence s;
+  ON_CALL(
+      runtime_.snapshot_,
+      runtimeFeatureEnabled("envoy.reloadable_features.network.rate_limit.dynamic_downstream_ip"))
+      .WillByDefault(Return(true));
   setUpTest(replace_ip_config);
-  // filter_->injectDynamicDescriptorKeys(config_->descriptors() ,filter_callbacks_.connection_);
+
+  EXPECT_EQ("8.8.8.8",
+            filter_->substitutionFormattedString("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%",
+                                                 filter_callbacks_.connection_.streamInfo()));
 
   std::vector<RateLimit::Descriptor> expected_descriptors;
   expected_descriptors.push_back({{{"remote_address", "8.8.8.8"}, {"hello", "world"}}});
+
+  std::vector<RateLimit::Descriptor> actual_descriptors{filter_->descriptors().begin(),
+                                                        filter_->descriptors().end()};
+
+  for (auto it_expected = expected_descriptors.begin(), it_actual = actual_descriptors.begin();
+       it_expected != expected_descriptors.end() && it_actual != actual_descriptors.end();
+       ++it_expected, ++it_actual) {
+    std::vector<RateLimit::DescriptorEntry> de1 = it_expected->entries_;
+    std::vector<RateLimit::DescriptorEntry> de2 = it_actual->entries_;
+    for (auto de_expected = de1.begin(), de_actual = de2.begin();
+         de_expected != de1.end() && de_actual != de2.end(); ++de_expected, ++de_actual) {
+      auto actual_entry = de_actual.base();
+      auto expected_entry = de_expected.base();
+      EXPECT_EQ(actual_entry->key_, expected_entry->key_);
+      EXPECT_EQ(actual_entry->value_, expected_entry->value_);
+    }
+  }
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"remote_address", "8.8.8.8"}, {"hello", "world"}}}}),
+                              testing::A<Tracing::Span&>(), _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  EXPECT_CALL(filter_callbacks_, continueReading());
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  EXPECT_CALL(*client_, cancel()).Times(0);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
+
+  EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.total").value());
+  EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.ok").value());
+}
+
+TEST_F(RateLimitFilterTest, ReplaceDownstreamIpDisabled) {
+  InSequence s;
+  ON_CALL(
+      runtime_.snapshot_,
+      runtimeFeatureEnabled("envoy.reloadable_features.network.rate_limit.dynamic_downstream_ip"))
+      .WillByDefault(Return(false));
+  setUpTest(replace_ip_config);
+
+  std::vector<RateLimit::Descriptor> expected_descriptors;
+  expected_descriptors.push_back({{{"remote_address", "envoy.downstream_ip"}, {"hello", "world"}}});
 
   std::vector<RateLimit::Descriptor> actual_descriptors{filter_->descriptors().begin(),
                                                         filter_->descriptors().end()};

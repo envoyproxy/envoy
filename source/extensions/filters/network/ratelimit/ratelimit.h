@@ -87,7 +87,8 @@ public:
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     filter_callbacks_ = &callbacks;
     filter_callbacks_->connection().addConnectionCallbacks(*this);
-    applySubstitutionFormatter(filter_descriptors_, filter_callbacks_->connection().streamInfo());
+    applySubstitutionFormatter(config_->descriptors(),
+                               filter_callbacks_->connection().streamInfo());
   }
 
   void applySubstitutionFormatter(std::vector<RateLimit::Descriptor> original_descriptors,
@@ -99,29 +100,26 @@ public:
       for (const RateLimit::DescriptorEntry& descriptorEntry : descriptor.entries_) {
         std::string value = descriptorEntry.value_;
         if (config_->runtime().snapshot().runtimeFeatureEnabled(
-                "envoy.reloadable_features.network_rate_limit.downstream_ip_formatter") &&
-            absl::StrContains(descriptorEntry.value_, "envoy.downstream_ip")) {
-          value = formatValue("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", stream_info);
+                "envoy.reloadable_features.network.rate_limit.dynamic_downstream_ip") &&
+            absl::StrContains(value, "envoy.downstream_ip")) {
+          value =
+              substitutionFormattedString("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", stream_info);
         }
         new_descriptor.entries_.push_back({descriptorEntry.key_, value});
-
-        dynamicDescriptors.push_back(new_descriptor);
       }
-      filter_descriptors_ = dynamicDescriptors;
+      dynamicDescriptors.push_back(new_descriptor);
     }
+    filter_descriptors_ = dynamicDescriptors;
   }
 
-  std::string formatValue(std::string format, StreamInfo::StreamInfo& stream_info) {
+  std::string substitutionFormattedString(std::string format, StreamInfo::StreamInfo& stream_info) {
     std::string body;
-    Http::RequestHeaderMapOptConstRef request_headers;
-    Http::ResponseHeaderMapOptConstRef response_headers;
-    Http::ResponseTrailerMapOptConstRef response_trailers;
 
     Formatter::FormatterImpl formatter(format, false);
 
-    std::string value = formatter.format(request_headers.value(), response_headers.value(),
-                                         response_trailers.value(), stream_info, body);
-    return value;
+    return formatter.format(*Http::RequestHeaderMapImpl::create(),
+                            *Http::ResponseHeaderMapImpl::create(),
+                            *Http::ResponseTrailerMapImpl::create(), stream_info, body);
   }
 
   // Network::ConnectionCallbacks
