@@ -690,7 +690,7 @@ void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
     }
 
     if (stream.can_send_early_data_) {
-      ENVOY_CONN_LOG(debug, "create stream for early data.", client);
+      ENVOY_CONN_LOG(debug, "creating stream for early data.", client);
       attachStreamToClient(client, stream.context());
       state_.decrPendingStreams(1);
       stream.removeFromList(pending_streams_);

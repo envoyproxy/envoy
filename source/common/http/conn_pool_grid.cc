@@ -301,6 +301,7 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     use_h3_pool = false;
   }
   const bool disable_early_data = http3_status_tracker_.hasHttp3FailedRecently() && options.can_send_early_data_ && use_h3_pool;
+  std::cerr << "========= creating WrapperCallbacks disable_early_data " << disable_early_data << " h3 status " << http3_status_tracker_.hasHttp3FailedRecently() << "\n";
   auto wrapped_callback =
       std::make_unique<WrapperCallbacks>(*this, decoder, pool, callbacks, (disable_early_data ? Instance::StreamOptions{false, options.can_use_http3_} : options));
   ConnectionPool::Cancellable* ret = wrapped_callback.get();
