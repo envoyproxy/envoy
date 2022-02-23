@@ -56,7 +56,8 @@ enum HealthStatus {
 
 message HealthStatusSet {
   // An order-independent set of health status.
-  repeated HealthStatus statuses = 1;
+  repeated HealthStatus statuses = 1
+      [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 }
 
 // [#next-free-field: 25]

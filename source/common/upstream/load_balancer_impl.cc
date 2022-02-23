@@ -545,6 +545,8 @@ uint32_t LoadBalancerContextBase::createOverrideHostStatus(
       override_host_status |= singleHealthStatusToUint(Host::Health::Degraded);
       break;
     default:
+      ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::assert), warn,
+                          "Unknown health status: {} for override host", single_status);
       break;
     }
   }
