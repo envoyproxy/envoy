@@ -45,7 +45,9 @@ public:
 };
 
 TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButHasNoEntry) {
+  setupWithCDS();
   Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
   EXPECT_CALL(*decoder_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
 }

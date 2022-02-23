@@ -256,6 +256,7 @@ envoy_cc_test(
         ":fake_upstream_lib",
         ":http_integration_lib",
         "//source/common/common:macros",
+        "//source/extensions/filters/http/on_demand:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
