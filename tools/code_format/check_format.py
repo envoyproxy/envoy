@@ -659,7 +659,7 @@ class FormatChecker:
             if "RealTimeSource" in line or \
               ("RealTimeSystem" in line and not "TestRealTimeSystem" in line) or \
               "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
-              "std::this_thread::sleep_for" in line or" usleep(" in line or "::usleep(" in line:
+              "std::this_thread::sleep_for" in line or " usleep(" in line or "::usleep(" in line:
                 report_error(
                     "Don't reference real-world time sources; use TimeSystem::advanceTime(Wait|Async)"
                 )
@@ -667,8 +667,7 @@ class FormatChecker:
                 report_error(
                     "Don't use CondVar::waitFor(); use TimeSystem::waitFor() instead.  If this "
                     "already is TimeSystem::waitFor(), please name the TimeSystem variable "
-                    "time_system or time_system_ so the linter can understand."
-                )
+                    "time_system or time_system_ so the linter can understand.")
         duration_arg = DURATION_VALUE_REGEX.search(line)
         if duration_arg and duration_arg.group(1) != "0" and duration_arg.group(1) != "0.0":
             # Matching duration(int-const or float-const) other than zero
