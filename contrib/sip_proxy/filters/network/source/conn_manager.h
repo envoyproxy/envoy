@@ -5,6 +5,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/upstream.h"
 
@@ -113,23 +114,6 @@ public:
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) override;
 
-  absl::string_view getLocalIp() override {
-    // should return local address ip
-    // But after ORIGINAL_DEST, the local address update to upstream local address
-    // So here get downstream remote IP, which should in same pod car with envoy
-    ENVOY_LOG(debug, "Local ip: {}",
-              read_callbacks_->connection()
-                  .connectionInfoProvider()
-                  .localAddress()
-                  ->ip()
-                  ->addressAsString());
-    return read_callbacks_->connection()
-        .connectionInfoProvider()
-        .localAddress()
-        ->ip()
-        ->addressAsString();
-  }
-
   std::shared_ptr<SipSettings> settings() const override { return config_.settings(); }
 
   void continueHanding(const std::string& key);
@@ -174,13 +158,6 @@ private:
     DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) override {
       UNREFERENCED_PARAMETER(metadata);
       return *this;
-    }
-
-    absl::string_view getLocalIp() override {
-      // should return local address ip
-      // But after ORIGINAL_DEST, the local address update to upstream local address
-      // So here get downstream remote IP, which should in same pod car with envoy
-      return parent_.parent_.getLocalIp();
     }
 
     std::shared_ptr<SipSettings> settings() const override { return parent_.parent_.settings(); }
@@ -360,6 +337,12 @@ private:
   void sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
   void doDeferredTransDestroy(ActiveTrans& trans);
   void resetAllTrans(bool local_reset);
+  absl::string_view localAddress() {
+    auto& local_address =
+        context_.getTransportSocketFactoryContext().localInfo().address()->ip()->addressAsString();
+    ENVOY_LOG(debug, "localAddress {}", local_address);
+    return local_address;
+  }
 
   Config& config_;
   SipFilterStats& stats_;

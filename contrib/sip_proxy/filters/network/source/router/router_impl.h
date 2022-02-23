@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/router/router.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/tcp/conn_pool.h"
@@ -293,6 +294,13 @@ private:
   QueryStatus handleCustomizedAffinity(std::string type, std::string key,
                                        MessageMetadataSharedPtr metadata);
 
+  absl::string_view localAddress() {
+    auto& local_address =
+        context_.getTransportSocketFactoryContext().localInfo().address()->ip()->addressAsString();
+    ENVOY_LOG(debug, "localAddress {}", local_address);
+    return local_address;
+  }
+
   Upstream::ClusterManager& cluster_manager_;
   RouterStats stats_;
 
@@ -333,7 +341,6 @@ public:
     UNREFERENCED_PARAMETER(metadata);
     return *this;
   }
-  absl::string_view getLocalIp() override;
   std::shared_ptr<SipSettings> settings() const override;
 
 private:
@@ -379,14 +386,6 @@ public:
   void setConnectionState(ConnectionState state) { conn_state_ = state; }
   void write(Buffer::Instance& data, bool end_stream) {
     return conn_data_->connection().write(data, end_stream);
-  }
-
-  absl::string_view localAddress() {
-    return conn_data_->connection()
-        .connectionInfoProvider()
-        .localAddress()
-        ->ip()
-        ->addressAsString();
   }
 
   std::shared_ptr<TransactionInfo> transactionInfo() { return transaction_info_; }

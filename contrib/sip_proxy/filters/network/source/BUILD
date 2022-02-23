@@ -56,6 +56,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
+        "//envoy/server:transport_socket_config_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:timespan_interface",
         "//source/common/buffer:buffer_lib",
