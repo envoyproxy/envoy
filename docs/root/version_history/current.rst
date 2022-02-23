@@ -19,6 +19,7 @@ Minor Behavior Changes
 * http: now the max concurrent streams of http2 connection can not only be adjusted down according to the SETTINGS frame but also can be adjusted up, of course, it can not exceed the configured upper bounds. This fix is guarded by ``envoy.reloadable_features.http2_allow_capacity_increase_by_settings``.
 * http: when writing custom filters, `injectEncodedDataToFilterChain` and `injectDecodedDataToFilterChain` now trigger sending of headers if they were not yet sent due to `StopIteration`. Previously, calling one of the inject functions in that state would trigger an assertion. See issue #19891 for more details.
 * perf: ssl contexts are now tracked without scan based garbage collection and greatly improved the performance on secret update.
+* router: record upstream request timeouts for all the cases and not just for those requests which are awaiting headers. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` to false.
 
 Bug Fixes
 ---------
@@ -50,6 +51,7 @@ Removed Config or Runtime
 * http: removed ``envoy.reloadable_features.allow_response_for_timeout`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.http2_consume_stream_refused_errors`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.internal_redirects_with_body`` and legacy code paths.
+* listener: removed ``envoy.reloadable_features.listener_reuse_port_default_enabled`` and legacy code paths.
 * udp: removed ``envoy.reloadable_features.udp_per_event_loop_read_limit`` and legacy code paths.
 * upstream: removed ``envoy.reloadable_features.health_check.graceful_goaway_handling`` and legacy code paths.
 * xds: removed ``envoy.reloadable_features.vhds_heartbeats`` and legacy code paths.
@@ -71,6 +73,13 @@ New Features
 * http3: supports upstream HTTP/3 retries. Automatically retry `0-RTT safe requests <https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1>`_ if they are rejected because they are sent `too early <https://datatracker.ietf.org/doc/html/rfc8470#section-5.2>`_. And automatically retry 0-RTT safe requests if connect attempt fails later on and the cluster is configured with TCP fallback. And add retry on ``http3-post-connect-failure`` policy which allows retry of failed HTTP/3 requests with TCP fallback even after handshake if the cluster is configured with TCP fallback. This feature is guarded by ``envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_http3``.
 * matching: the matching API can now express a match tree that will always match by omitting a matcher at the top level.
 * outlier_detection: :ref:`max_ejection_time_jitter<envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>` configuration added to allow adding a random value to the ejection time to prevent 'thundering herd' scenarios. Defaults to 0 so as to not break or change the behavior of existing deployments.
+* schema_validator_tool: added ``bootstrap`` checking to the
+  :ref:`schema validator check tool <install_tools_schema_validator_check_tool>`. Also fixed linking
+  of all extensions into the tool so that all typed configurations can be properly verified.
+* tools: the project now ships a :ref:`tools docker image <install_tools>` which contains tools
+  useful in support systems such as CI, CD, etc. The
+  :ref:`schema validator check tool <install_tools_schema_validator_check_tool>` has been added
+  to the tools image.
 
 Deprecated
 ----------
