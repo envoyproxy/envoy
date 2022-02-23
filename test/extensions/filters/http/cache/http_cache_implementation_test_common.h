@@ -96,7 +96,7 @@ protected:
   VaryAllowList vary_allow_list_;
   LookupResult lookup_result_;
   Http::TestRequestHeaderMapImpl request_headers_;
-  Event::SimulatedTimeSystem time_source_;
+  Event::SimulatedTimeSystem time_system_;
   Event::MockDispatcher dispatcher_;
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
