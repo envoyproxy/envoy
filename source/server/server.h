@@ -304,8 +304,6 @@ public:
   registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
 
 private:
-  enum class ReusePortDefault { True, False };
-
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStatsInternal();
   void updateServerStats();

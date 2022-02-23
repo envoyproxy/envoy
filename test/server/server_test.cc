@@ -1024,6 +1024,32 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
 }
 
+// Validate server runtime is parsed from bootstrap and that we can read from
+// service cluster specified disk-based overrides.
+TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
+  options_.service_cluster_name_ = "some_service";
+  initialize("test/server/test_data/server/runtime_bootstrap.yaml");
+  EXPECT_EQ("bar", server_->runtime().snapshot().get("foo").value().get());
+  // This should access via the override/some_service overlay.
+  EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz").value().get());
+}
+
+// Validate that a runtime absent an admin layer will fail mutating operations
+// but still support inspection of runtime values.
+TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
+  options_.service_cluster_name_ = "some_service";
+  initialize("test/server/test_data/server/runtime_bootstrap.yaml");
+  Http::TestResponseHeaderMapImpl response_headers;
+  std::string response_body;
+  EXPECT_EQ(Http::Code::OK,
+            server_->admin().request("/runtime", "GET", response_headers, response_body));
+  EXPECT_THAT(response_body, HasSubstr("fozz"));
+  EXPECT_EQ(
+      Http::Code::ServiceUnavailable,
+      server_->admin().request("/runtime_modify?foo=bar", "POST", response_headers, response_body));
+  EXPECT_EQ("No admin layer specified", response_body);
+}
+
 // Verify that bootstrap fails if RTDS is configured through an EDS cluster
 TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughEdsFails) {
   options_.service_cluster_name_ = "some_service";
