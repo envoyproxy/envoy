@@ -145,7 +145,6 @@ typed_config:
                string_value: {}
 )EOF";
 
-
 using RBACIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, RBACIntegrationTest,

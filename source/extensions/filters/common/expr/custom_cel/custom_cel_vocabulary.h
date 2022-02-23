@@ -46,7 +46,7 @@ using google::api::expr::runtime::CelFunctionRegistry;
 // CelExpressionBuilder: A CelExpressionBuilder contains the registry of all allowable CEL
 // functions. The CelExpressionBuilder is used to create CelExpressions.
 // An activation is created for every CelExpression.
-
+//
 // Vocabulary: Variables and functions constitute the "vocabulary" used to
 // evaluate expressions.
 //

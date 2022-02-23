@@ -143,28 +143,28 @@ void ExampleCustomCelVocabulary::fillActivation(Activation* activation, Protobuf
   response_trailers_ = response_trailers;
 
   // variables
-//  addValueProducerToActivation(activation, CustomVariablesName,
-//                               std::make_unique<CustomWrapper>(arena, info));
+  //  addValueProducerToActivation(activation, CustomVariablesName,
+  //                               std::make_unique<CustomWrapper>(arena, info));
   addValueProducerToActivation(activation, SourceVariablesName,
                                std::make_unique<SourceWrapper>(arena, info));
   addValueProducerToActivation(activation, ExtendedRequestVariablesName,
                                std::make_unique<ExtendedRequestWrapper>(
                                    arena, request_headers, info, return_url_query_string_as_map_));
   // lazy functions only
-//  addLazyFunctionToActivation(activation, std::make_unique<GetDouble>(LazyFuncNameGetDouble));
-//  addLazyFunctionToActivation(activation, std::make_unique<GetProduct>(LazyFuncNameGetProduct));
-//  addLazyFunctionToActivation(activation, LazyFuncNameGetNextInt, false,
-//                              std::function<CelValue(Protobuf::Arena*, int64_t)>(getNextInt));
+  addLazyFunctionToActivation(activation, std::make_unique<GetDouble>(LazyFuncNameGetDouble));
+  addLazyFunctionToActivation(activation, std::make_unique<GetProduct>(LazyFuncNameGetProduct));
+  addLazyFunctionToActivation(activation, LazyFuncNameGetNextInt, false,
+                              std::function<CelValue(Protobuf::Arena*, int64_t)>(getNextInt));
 }
 
 void ExampleCustomCelVocabulary::registerFunctions(CelFunctionRegistry* registry) {
   absl::Status status;
 
   // lazy functions
-//  addLazyFunctionToRegistry(registry, GetDouble::createDescriptor(LazyFuncNameGetDouble));
-//  addLazyFunctionToRegistry(registry, GetProduct::createDescriptor(LazyFuncNameGetProduct));
-//  addLazyFunctionToRegistry(registry, LazyFuncNameGetNextInt, false,
-//                            std::function<CelValue(Protobuf::Arena*, int64_t)>(getNextInt));
+  addLazyFunctionToRegistry(registry, GetDouble::createDescriptor(LazyFuncNameGetDouble));
+  addLazyFunctionToRegistry(registry, GetProduct::createDescriptor(LazyFuncNameGetProduct));
+  addLazyFunctionToRegistry(registry, LazyFuncNameGetNextInt, false,
+                            std::function<CelValue(Protobuf::Arena*, int64_t)>(getNextInt));
 
   // static functions
   addStaticFunctionToRegistry(registry, std::make_unique<Get99>(StaticFuncNameGet99));
