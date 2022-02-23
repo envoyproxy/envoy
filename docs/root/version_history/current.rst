@@ -19,6 +19,7 @@ Minor Behavior Changes
 * http: now the max concurrent streams of http2 connection can not only be adjusted down according to the SETTINGS frame but also can be adjusted up, of course, it can not exceed the configured upper bounds. This fix is guarded by ``envoy.reloadable_features.http2_allow_capacity_increase_by_settings``.
 * http: when writing custom filters, `injectEncodedDataToFilterChain` and `injectDecodedDataToFilterChain` now trigger sending of headers if they were not yet sent due to `StopIteration`. Previously, calling one of the inject functions in that state would trigger an assertion. See issue #19891 for more details.
 * perf: ssl contexts are now tracked without scan based garbage collection and greatly improved the performance on secret update.
+* tracing: set tracing error tag for grpc non-ok response code only when it is a server side error.
 
 Bug Fixes
 ---------

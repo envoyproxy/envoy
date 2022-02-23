@@ -84,10 +84,21 @@ static void addGrpcRequestTags(Span& span, const Http::RequestHeaderMap& headers
 template <class T> static void addGrpcResponseTags(Span& span, const T& headers) {
   addTagIfNotNull(span, Tracing::Tags::get().GrpcStatusCode, headers.GrpcStatus());
   addTagIfNotNull(span, Tracing::Tags::get().GrpcMessage, headers.GrpcMessage());
-  // Set error tag when status is not OK.
+  // Set error tag when Grpc status code represents an error. See
+  // https://github.com/envoyproxy/envoy/issues/18877
   absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = Grpc::Common::getGrpcStatus(headers);
-  if (grpc_status_code && grpc_status_code.value() != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  if (grpc_status_code.has_value()) {
+    const auto& status = grpc_status_code.value();
+    if (status != Grpc::Status::WellKnownGrpcStatus::InvalidCode &&
+        (status == Grpc::Status::WellKnownGrpcStatus::Unknown ||
+         status == Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded ||
+         status == Grpc::Status::WellKnownGrpcStatus::Unimplemented ||
+         status == Grpc::Status::WellKnownGrpcStatus::Internal ||
+         status == Grpc::Status::WellKnownGrpcStatus::Unavailable ||
+         status == Grpc::Status::WellKnownGrpcStatus::DataLoss ||
+         status == Grpc::Status::WellKnownGrpcStatus::Unauthenticated)) {
+      span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    }
   }
 }
 
