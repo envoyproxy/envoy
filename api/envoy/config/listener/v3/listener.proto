@@ -121,6 +121,7 @@ message Listener {
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
 
+  // [#not-implemented-hide:]
   // Unified matcher resolving the filter chain name from the network properties. This matcher is used as a replacement
   // for the per-filter chain match condition
   // `filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChain.filter_chain_match>`.
@@ -138,38 +139,46 @@ message Listener {
   // .. validated-code-block:: yaml
   //   :type-name: envoy.config.listener.v3.Listener
   //
-  //  filter_chain_matcher:
-  //    matcher_tree:
-  //      input:
-  //        typed_config:
-  //          "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
-  //      exact_match_map:
-  //        map:
-  //          "80":
-  //            action:
-  //              name: http
-  //          "443":
-  //            matcher:
-  //              matcher_tree:
-  //                input:
-  //                  typed_config:
-  //                    "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
-  //                custom_match:
-  //                  typed_config:
-  //                    "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
-  //                    range_matchers:
-  //                    - ranges:
-  //                      - address_prefix: 192.0.0.0
-  //                        prefix_len: 2
-  //                      on_match:
-  //                        action:
-  //                          name: internal
-  //                    - ranges:
-  //                      - address_prefix: 0.0.0.0
-  //                      on_match:
-  //                        action:
-  //                          name: https
-  //
+  //   filter_chain_matcher:
+  //     matcher_tree:
+  //       input:
+  //         typed_config:
+  //           "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+  //       exact_match_map:
+  //         map:
+  //           "80":
+  //             action:
+  //               name: http
+  //               typed_config:
+  //                 "@type": type.googleapis.com/google.protobuf.StringValue
+  //                 value: http
+  //           "443":
+  //             matcher:
+  //               matcher_tree:
+  //                 input:
+  //                   typed_config:
+  //                     "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
+  //                 custom_match:
+  //                   typed_config:
+  //                     "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+  //                     range_matchers:
+  //                     - ranges:
+  //                       - address_prefix: 192.0.0.0
+  //                         prefix_len: 2
+  //                       on_match:
+  //                         action:
+  //                           name: internal
+  //                           typed_config:
+  //                             "@type": type.googleapis.com/google.protobuf.StringValue
+  //                             value: internal
+  //                     - ranges:
+  //                       - address_prefix: 0.0.0.0
+  //                       on_match:
+  //                         action:
+  //                           name: https
+  //                           typed_config:
+  //                             "@type": type.googleapis.com/google.protobuf.StringValue
+  //                             value: https
   //
   // .. note::
   //
@@ -178,8 +187,6 @@ message Listener {
   //  connections bound to the filter chain are not drained. If, however, the
   //  filter chain is removed or structurally modified, then the drain for its
   //  connections is initiated.
-  //
-  // [#not-implemented-hide:]
   xds.type.matcher.v3.Matcher filter_chain_matcher = 32;
 
   // If a connection is redirected using *iptables*, the port on which the proxy
