@@ -1,4 +1,4 @@
-1.18.7-dev (Pending)
+1.18.7 (Pending)
 ==========================
 
 Incompatible Behavior Changes
