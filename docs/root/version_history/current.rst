@@ -73,6 +73,13 @@ New Features
 * http3: supports upstream HTTP/3 retries. Automatically retry `0-RTT safe requests <https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1>`_ if they are rejected because they are sent `too early <https://datatracker.ietf.org/doc/html/rfc8470#section-5.2>`_. And automatically retry 0-RTT safe requests if connect attempt fails later on and the cluster is configured with TCP fallback. And add retry on ``http3-post-connect-failure`` policy which allows retry of failed HTTP/3 requests with TCP fallback even after handshake if the cluster is configured with TCP fallback. This feature is guarded by ``envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_http3``.
 * matching: the matching API can now express a match tree that will always match by omitting a matcher at the top level.
 * outlier_detection: :ref:`max_ejection_time_jitter<envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>` configuration added to allow adding a random value to the ejection time to prevent 'thundering herd' scenarios. Defaults to 0 so as to not break or change the behavior of existing deployments.
+* schema_validator_tool: added ``bootstrap`` checking to the
+  :ref:`schema validator check tool <install_tools_schema_validator_check_tool>`. Also fixed linking
+  of all extensions into the tool so that all typed configurations can be properly verified.
+* tools: the project now ships a :ref:`tools docker image <install_tools>` which contains tools
+  useful in support systems such as CI, CD, etc. The
+  :ref:`schema validator check tool <install_tools_schema_validator_check_tool>` has been added
+  to the tools image.
 
 Deprecated
 ----------
