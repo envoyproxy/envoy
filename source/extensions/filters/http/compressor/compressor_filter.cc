@@ -228,7 +228,7 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
                                                           bool end_stream) {
   const auto& config = config_->responseDirectionConfig();
 
-  // Calculate whether no_accept_header_ should be statistic here
+  // This is used to decide whether stats for accept-encoding header should be touched.
   const bool isEnabledAndContentLengthBigEnough =
       config.compressionEnabled() && config.isMinimumContentLength(headers);
 
@@ -456,9 +456,11 @@ bool CompressorFilter::shouldCompress(const CompressorFilter::EncodingDecision& 
   return should_compress;
 }
 
-bool CompressorFilter::isAcceptEncodingAllowed(bool should_stats,
+bool CompressorFilter::isAcceptEncodingAllowed(bool maybe_compress,
                                                const Http::ResponseHeaderMap& headers) const {
-  if (!should_stats) {
+  // Return false immediately if we are not going to compress irrespective of the content of
+  // accept-encoding. This way we neither need to update stats nor choose the right encoding.
+  if (!maybe_compress) {
     return false;
   }
 
