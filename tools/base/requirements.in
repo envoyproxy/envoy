@@ -42,7 +42,7 @@ sphinxext-rediraffe
 sphinx-rtd-theme
 sphinx-tabs
 thrift
-twitter.common.rpc==0.3.9
+twitter.common.rpc==0.3.11
 twitter.common.finagle-thrift
 verboselogs
 yapf
