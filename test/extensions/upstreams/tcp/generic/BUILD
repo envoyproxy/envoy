@@ -12,6 +12,7 @@ envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     deps = [
+        "//source/common/tcp_proxy",
         "//source/extensions/upstreams/tcp/generic:config",
         "//test/mocks/upstream:upstream_mocks",
     ],
