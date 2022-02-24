@@ -29,7 +29,7 @@ android_library(
         "TestUrlRequestCallback.java",
         "UrlUtils.java",
     ],
-    data = glob(["data/*"]),
+    data = glob(["data/*"]) + ["@envoy//test/config/integration/certs"],
     visibility = ["//test:__subpackages__"],
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
@@ -67,6 +67,25 @@ envoy_mobile_android_test(
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
         "//library/java/org/chromium/net/impl:cronvoy",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
+    ],
+)
+
+envoy_mobile_android_test(
+    name = "http2_test_server_test",
+    srcs = [
+        "Http2TestServerTest.java",
+    ],
+    exec_properties = {
+        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
+        "sandboxNetwork": "standard",
+    },
+    native_deps = [
+        "//library/common/jni:libndk_envoy_jni.so",
+        "//library/common/jni:libndk_envoy_jni.jnilib",
+    ],
+    deps = [
+        ":testing",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
     ],
 )

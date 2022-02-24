@@ -12,6 +12,17 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 
 /* Typed configuration that may be used for starting Envoy. */
 public class EnvoyConfiguration {
+  // Peer certificate verification mode.
+  // Must match the CertificateValidationContext.TrustChainVerification proto enum.
+  public enum TrustChainVerification {
+    // Perform default certificate verification (e.g., against CA / verification lists)
+    VERIFY_TRUST_CHAIN,
+    // Connections where the certificate fails verification will be permitted.
+    // For HTTP connections, the result of certificate verification can be used in route matching.
+    // Used for testing.
+    ACCEPT_UNTRUSTED;
+  }
+
   public final Boolean adminInterfaceEnabled;
   public final String grpcStatsDomain;
   public final Integer statsdPort;
@@ -33,6 +44,7 @@ public class EnvoyConfiguration {
   public final Integer perTryIdleTimeoutSeconds;
   public final String appVersion;
   public final String appId;
+  public final TrustChainVerification trustChainVerification;
   public final String virtualClusters;
   public final List<EnvoyNativeFilterConfig> nativeFilterChain;
   public final Map<String, EnvoyStringAccessor> stringAccessors;
@@ -63,25 +75,24 @@ public class EnvoyConfiguration {
    * @param perTryIdleTimeoutSeconds     per try idle timeout for HTTP streams.
    * @param appVersion                   the App Version of the App using this Envoy Client.
    * @param appId                        the App ID of the App using this Envoy Client.
+   * @param trustChainVerification       whether to mute TLS Cert verification - for tests.
    * @param virtualClusters              the JSON list of virtual cluster configs.
    * @param nativeFilterChain            the configuration for native filters.
    * @param httpPlatformFilterFactories  the configuration for platform filters.
    * @param stringAccessors              platform string accessors to register.
    */
-  public EnvoyConfiguration(Boolean adminInterfaceEnabled, String grpcStatsDomain,
-                            @Nullable Integer statsdPort, int connectTimeoutSeconds,
-                            int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase,
-                            int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds,
-                            String dnsPreresolveHostnames, List<String> dnsFallbackNameservers,
-                            Boolean dnsFilterUnroutableFamilies, boolean enableHappyEyeballs,
-                            boolean enableInterfaceBinding,
-                            int h2ConnectionKeepaliveIdleIntervalMilliseconds,
-                            int h2ConnectionKeepaliveTimeoutSeconds, int statsFlushSeconds,
-                            int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds,
-                            String appVersion, String appId, String virtualClusters,
-                            List<EnvoyNativeFilterConfig> nativeFilterChain,
-                            List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
-                            Map<String, EnvoyStringAccessor> stringAccessors) {
+  public EnvoyConfiguration(
+      Boolean adminInterfaceEnabled, String grpcStatsDomain, @Nullable Integer statsdPort,
+      int connectTimeoutSeconds, int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase,
+      int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds, String dnsPreresolveHostnames,
+      List<String> dnsFallbackNameservers, Boolean dnsFilterUnroutableFamilies,
+      boolean enableHappyEyeballs, boolean enableInterfaceBinding,
+      int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
+      int statsFlushSeconds, int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds,
+      String appVersion, String appId, TrustChainVerification trustChainVerification,
+      String virtualClusters, List<EnvoyNativeFilterConfig> nativeFilterChain,
+      List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
+      Map<String, EnvoyStringAccessor> stringAccessors) {
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
     this.statsdPort = statsdPort;
@@ -103,6 +114,7 @@ public class EnvoyConfiguration {
     this.perTryIdleTimeoutSeconds = perTryIdleTimeoutSeconds;
     this.appVersion = appVersion;
     this.appId = appId;
+    this.trustChainVerification = trustChainVerification;
     this.virtualClusters = virtualClusters;
     this.nativeFilterChain = nativeFilterChain;
     this.httpPlatformFilterFactories = httpPlatformFilterFactories;
@@ -177,6 +189,7 @@ public class EnvoyConfiguration {
         .append(String.format("- &per_try_idle_timeout %ss\n", perTryIdleTimeoutSeconds))
         .append(String.format("- &metadata { device_os: %s, app_version: %s, app_id: %s }\n",
                               "Android", appVersion, appId))
+        .append(String.format("- &trust_chain_verification %s\n", trustChainVerification.name()))
         .append("- &virtual_clusters ")
         .append(virtualClusters)
         .append("\n");

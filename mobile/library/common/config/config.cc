@@ -54,6 +54,7 @@ const std::string config_header = R"(
 - &statsd_port 8125
 - &stream_idle_timeout 15s
 - &per_try_idle_timeout 15s
+- &trust_chain_verification VERIFY_TRUST_CHAIN
 - &virtual_clusters []
 
 !ignore stats_defs:
@@ -105,17 +106,6 @@ R"(
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
     common_tls_context:
-      tls_params:
-        tls_maximum_protocol_version: TLSv1_3
-      validation_context:
-        trusted_ca:
-          inline_string: *tls_root_certs
-- &base_tls_h2_socket
-  name: envoy.transport_sockets.tls
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-    common_tls_context:
-      alpn_protocols: [h2]
       tls_params:
         tls_maximum_protocol_version: TLSv1_3
       validation_context:
@@ -345,7 +335,18 @@ R"(
     connect_timeout: *connect_timeout
     lb_policy: CLUSTER_PROVIDED
     cluster_type: *base_cluster_type
-    transport_socket: *base_tls_h2_socket
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          alpn_protocols: [h2]
+          tls_params:
+            tls_maximum_protocol_version: TLSv1_3
+          validation_context:
+            trusted_ca:
+              inline_string: *tls_root_certs
+            trust_chain_verification: *trust_chain_verification
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
     typed_extension_protocol_options: *base_protocol_options
