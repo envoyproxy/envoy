@@ -37,11 +37,9 @@ convertTypedStruct(const Protobuf::Message& message) {
   return {std::move(inner_message), target_type_url};
 }
 
-} // namespace
-
-void traverseMessage(ConstProtoVisitor& visitor, const Protobuf::Message& message,
-                     bool recurse_into_any) {
-  visitor.onMessage(message);
+void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& message,
+                           bool was_any_or_top_level, bool recurse_into_any) {
+  visitor.onMessage(message, was_any_or_top_level);
 
   // If told to recurse into Any messages, do that here and skip the rest of the function.
   if (recurse_into_any) {
@@ -64,7 +62,7 @@ void traverseMessage(ConstProtoVisitor& visitor, const Protobuf::Message& messag
     }
 
     if (inner_message != nullptr) {
-      traverseMessage(visitor, *inner_message, recurse_into_any);
+      traverseMessageWorker(visitor, *inner_message, true, recurse_into_any);
       return;
     } else if (!target_type_url.empty()) {
       throw EnvoyException(fmt::format("Invalid type_url '{}' during traversal", target_type_url));
@@ -81,14 +79,22 @@ void traverseMessage(ConstProtoVisitor& visitor, const Protobuf::Message& messag
       if (field->is_repeated()) {
         const int size = reflection->FieldSize(message, field);
         for (int j = 0; j < size; ++j) {
-          traverseMessage(visitor, reflection->GetRepeatedMessage(message, field, j),
-                          recurse_into_any);
+          traverseMessageWorker(visitor, reflection->GetRepeatedMessage(message, field, j), false,
+                                recurse_into_any);
         }
       } else if (reflection->HasField(message, field)) {
-        traverseMessage(visitor, reflection->GetMessage(message, field), recurse_into_any);
+        traverseMessageWorker(visitor, reflection->GetMessage(message, field), false,
+                              recurse_into_any);
       }
     }
   }
+}
+
+} // namespace
+
+void traverseMessage(ConstProtoVisitor& visitor, const Protobuf::Message& message,
+                     bool recurse_into_any) {
+  traverseMessageWorker(visitor, message, true, recurse_into_any);
 }
 
 } // namespace ProtobufMessage
