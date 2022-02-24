@@ -281,6 +281,11 @@ public:
                                        bool recurse_into_any = false);
 
   /**
+   * Perform a PGV check on the entire message tree, recursing into Any messages as needed.
+   */
+  static void recursivePgvCheck(const Protobuf::Message& message);
+
+  /**
    * Validate protoc-gen-validate constraints on a given protobuf as well as performing
    * unexpected field validation.
    * Note the corresponding `.pb.validate.h` for the message has to be included in the source file
@@ -299,11 +304,18 @@ public:
       checkForUnexpectedFields(message, validation_visitor, recurse_into_any);
     }
 
-    // TODO(mattklein123): When recurse_into_any is true, we should traverse the message stack and
-    // attempt to run validation on all sub-messages. This will require changes to PGV to access
-    // the validator registry so we don't need include files for all messages. Ultimately, this
-    // will allow us to remove bottom up validation from the entire codebase and only validate
-    // at top level ingestion (bootstrap, discovery response).
+    // TODO(mattklein123): This will recurse the message twice, once above and once for PGV. When
+    // we move to always recursing, satisfying the TODO below, we should merge into a single
+    // recursion for performance reasons.
+    if (recurse_into_any) {
+      return recursivePgvCheck(message);
+    }
+
+    // TODO(mattklein123): Now that PGV is capable of doing recursive message checks on abstract
+    // types, we can remove bottom up validation from the entire codebase and only validate
+    // at top level ingestion (bootstrap, discovery response). This is a large change and will be
+    // done as a separate PR. This change will also allow removing templating from most/all of
+    // related functions.
     std::string err;
     if (!Validate(message, &err)) {
       ProtoExceptionUtil::throwProtoValidationException(err, message);

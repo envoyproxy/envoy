@@ -15,7 +15,10 @@ public:
   virtual void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) PURE;
 
   // Invoked when a message is visited, with the message.
-  virtual void onMessage(const Protobuf::Message&) PURE;
+  // @param was_any_or_top_level supplies whether the message was either the top level message or an
+  //                             Any before being unpacked for further recursion. The latter can
+  //                             only be achieved by using recurse_into_any.
+  virtual void onMessage(const Protobuf::Message&, bool was_any_or_top_level) PURE;
 };
 
 void traverseMessage(ConstProtoVisitor& visitor, const Protobuf::Message& message,
