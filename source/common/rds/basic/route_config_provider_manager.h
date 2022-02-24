@@ -39,7 +39,7 @@ public:
 
   /**
    * Get a RouteConfigSharedPtr for a statically defined route. Ownership is as described for
-   * createRdsRouteConfigProvider above. This method always create a new RouteConfigProvider.
+   * createRdsRouteConfigProvider above. This method always creates a new RouteConfigProvider.
    * @param route_config supplies the RouteConfiguration for this route
    * @param factory_context is the context to use for the route config provider.
    */

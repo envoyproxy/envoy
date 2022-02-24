@@ -24,9 +24,10 @@ namespace Basic {
 /**
  * Implementation of RouteConfigProviderManager interface.
  * The keys for config tracker, stat, log and exception text will be derived
- * from the name of the proto message class passed in the Rds template argument
+ * from the name of the proto message class passed in the Rds template argument.
  * Since the config tracker key has to be unique across envoy, this name has to be also unique.
- * The proto message has two mandatory fields:
+ * The following two fields must be declared in the proto message since the template will call
+ * their generated member functions:
  * config_source (config.core.v3.ConfigSource)
  * route_config_name (string)
  */

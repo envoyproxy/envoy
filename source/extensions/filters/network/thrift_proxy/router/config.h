@@ -28,7 +28,7 @@ class ConfigImpl : public Config, Logger::Loggable<Logger::Id::config> {
 public:
   ConfigImpl(
       const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config)
-      : route_matcher_(new RouteMatcher(config)) {}
+      : route_matcher_(std::make_unique<RouteMatcher>(config)) {}
 
   // Config
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const override {

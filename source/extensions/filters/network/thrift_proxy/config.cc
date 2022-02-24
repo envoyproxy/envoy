@@ -111,6 +111,8 @@ Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFrom
   std::shared_ptr<Config> filter_config(
       new ConfigImpl(proto_config, context, *route_config_provider_manager));
 
+  // We capture route_config_provider_manager here only to copy the shared_ptr and keep the
+  // reference passed to ConfigImpl valid even after the local variable goes out of scope.
   return [route_config_provider_manager, filter_config,
           &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(

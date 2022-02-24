@@ -67,6 +67,7 @@ message Trds {
 
   // The name of the route configuration. This allows to use different route
   // configurations. Tells which route configuration should be fetched from the configuration source.
+  // Leave unspecified is also valid and means the unnamed route configuration.
   string route_config_name = 2;
 }
 
@@ -91,6 +92,9 @@ message ThriftProxy {
   RouteConfiguration route_config = 4
       [(udpa.annotations.field_migrate).oneof_promotion = "route_specifier"];
 
+  // Use xDS to fetch the route configuration. It is invalid to define both route_config and trds.
+  Trds trds = 8 [(udpa.annotations.field_migrate).oneof_promotion = "route_specifier"];
+
   // A list of individual Thrift filters that make up the filter chain for requests made to the
   // Thrift proxy. Order matters as the filters are processed sequentially. For backwards
   // compatibility, if no thrift_filters are specified, a default Thrift router filter
@@ -106,9 +110,6 @@ message ThriftProxy {
 
   // Optional maximum requests for a single downstream connection. If not specified, there is no limit.
   google.protobuf.UInt32Value max_requests_per_connection = 7;
-
-  // Use xDS to fetch the route configuration. It is invalid to define both route_config and trds.
-  Trds trds = 8 [(udpa.annotations.field_migrate).oneof_promotion = "route_specifier"];
 }
 
 // ThriftFilter configures a Thrift filter.
