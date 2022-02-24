@@ -51,9 +51,7 @@ public:
 
 protected:
   HttpCacheImplementationTest();
-
-  void SetUp() override;
-  void TearDown() override;
+  ~HttpCacheImplementationTest();
 
   HttpCache& cache() const { return delegate_->cache(); }
   bool validationEnabled() const { return delegate_->validationEnabled(); }

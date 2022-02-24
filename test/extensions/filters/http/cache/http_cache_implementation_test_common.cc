@@ -41,9 +41,7 @@ MATCHER(IsOk, "") { return arg.ok(); }
 } // namespace
 
 HttpCacheImplementationTest::HttpCacheImplementationTest()
-    : delegate_(GetParam()()), vary_allow_list_(getConfig().allowed_vary_headers()) {}
-
-void HttpCacheImplementationTest::SetUp() {
+    : delegate_(GetParam()()), vary_allow_list_(getConfig().allowed_vary_headers()) {
   request_headers_.setMethod("GET");
   request_headers_.setHost("example.com");
   request_headers_.setScheme("https");
@@ -55,7 +53,7 @@ void HttpCacheImplementationTest::SetUp() {
   delegate_->setUp(dispatcher_);
 }
 
-void HttpCacheImplementationTest::TearDown() {
+HttpCacheImplementationTest::~HttpCacheImplementationTest() {
   Assert::resetEnvoyBugCountersForTest();
 
   delegate_->tearDown();
