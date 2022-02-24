@@ -56,10 +56,8 @@ void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
 
 const Envoy::Ssl::ClientContextConfig&
 getConfig(Network::TransportSocketFactory& transport_socket_factory) {
-  auto* quic_socket_factory =
-      dynamic_cast<Quic::QuicClientTransportSocketFactory*>(&transport_socket_factory);
-  ASSERT(quic_socket_factory != nullptr);
-  return quic_socket_factory->clientContextConfig();
+  return dynamic_cast<Quic::QuicClientTransportSocketFactory&>(transport_socket_factory)
+      .clientContextConfig();
 }
 
 ConnectionPool::Cancellable* Http3ConnPoolImpl::newStream(Http::ResponseDecoder& response_decoder,
@@ -94,10 +92,9 @@ void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
 Http3ConnPoolImpl::~Http3ConnPoolImpl() { destructAllConnections(); }
 
 std::shared_ptr<quic::QuicCryptoClientConfig> Http3ConnPoolImpl::cryptoConfig() {
-  auto* quic_socket_factory =
-      dynamic_cast<Quic::QuicClientTransportSocketFactory*>(&host_->transportSocketFactory());
-  ASSERT(quic_socket_factory != nullptr);
-  auto context = quic_socket_factory->sslCtx();
+  Envoy::Ssl::ClientContextSharedPtr context =
+      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(host_->transportSocketFactory())
+          .sslCtx();
   // If the secrets haven't been loaded, there is no crypto config.
   if (context == nullptr) {
     return nullptr;

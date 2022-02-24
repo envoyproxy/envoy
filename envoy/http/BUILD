@@ -185,6 +185,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "header_evaluator",
+    hdrs = ["header_evaluator.h"],
+    deps = [
+        "//envoy/http:header_map_interface",
+        "//envoy/stream_info:stream_info_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "stateful_session_interface",
     hdrs = ["stateful_session.h"],
     deps = [
