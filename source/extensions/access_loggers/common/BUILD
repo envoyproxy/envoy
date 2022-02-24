@@ -39,6 +39,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":access_log_base",
+        "//source/extensions/filters/udp/udp_proxy:udp_proxy_filter_lib",
     ],
 )
 

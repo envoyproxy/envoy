@@ -2,6 +2,7 @@
 
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/extensions/access_loggers/common/access_log_base.h"
+#include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,6 +24,23 @@ private:
                const Http::ResponseHeaderMap& response_headers,
                const Http::ResponseTrailerMap& response_trailers,
                const StreamInfo::StreamInfo& stream_info) override;
+
+  AccessLog::AccessLogFileSharedPtr log_file_;
+  Formatter::FormatterPtr formatter_;
+};
+
+using Extensions::UdpFilters::UdpProxy::UdpProxyFilter;
+/**
+ * Access log Instance of UDP proxy that writes logs to a file.
+ */
+class UdpFileAccessLog{
+public:
+  UdpFileAccessLog(const Filesystem::FilePathAndType& access_log_file_info,
+                AccessLog::FilterPtr&& filter, Formatter::FormatterPtr&& formatter,
+                AccessLog::AccessLogManager& log_manager);
+
+private:
+  void emitLog(const UdpProxyFilter& udp_filter);
 
   AccessLog::AccessLogFileSharedPtr log_file_;
   Formatter::FormatterPtr formatter_;

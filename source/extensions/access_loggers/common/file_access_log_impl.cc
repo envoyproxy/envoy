@@ -20,6 +20,13 @@ void FileAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
                                       stream_info, absl::string_view()));
 }
 
+/* UdpFileAccessLog::UdpFileAccessLog(UdpProxy::UdpProxyFilter& filter,const Filesystem::FilePathAndType& access_log_file_info,
+                             AccessLog::FilterPtr&& filter, Formatter::FormatterPtr&& formatter,
+                             AccessLog::AccessLogManager& log_manager)
+    : ImplBase(std::move(filter)), formatter_(std::move(formatter)) {
+  log_file_ = log_manager.createAccessLog(access_log_file_info);
+} */
+
 } // namespace File
 } // namespace AccessLoggers
 } // namespace Extensions

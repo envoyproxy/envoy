@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.udp.udp_proxy.v3;
 
+import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/udp_socket_config.proto";
 
 import "google/protobuf/duration.proto";
@@ -88,4 +89,8 @@ message UdpProxyConfig {
   // The default if not specified is false, that means each data chunk is forwarded
   // to upstream host selected on first chunk receival for that "session" (identified by source IP/port and local IP/port).
   bool use_per_packet_load_balancing = 7;
+
+  // Configuration for :ref:`access logs <arch_overview_access_logs>`
+  // emitted by the this udp_proxy.
+  repeated config.accesslog.v3.AccessLog access_log = 8;
 }
