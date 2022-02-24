@@ -143,8 +143,8 @@ void ExampleCustomCelVocabulary::fillActivation(Activation* activation, Protobuf
   response_trailers_ = response_trailers;
 
   // variables
-  //  addValueProducerToActivation(activation, CustomVariablesName,
-  //                               std::make_unique<CustomWrapper>(arena, info));
+  addValueProducerToActivation(activation, CustomVariablesName,
+                               std::make_unique<CustomWrapper>(arena, info));
   addValueProducerToActivation(activation, SourceVariablesName,
                                std::make_unique<SourceWrapper>(arena, info));
   addValueProducerToActivation(activation, ExtendedRequestVariablesName,
