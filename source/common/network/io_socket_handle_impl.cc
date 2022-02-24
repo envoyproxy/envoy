@@ -582,8 +582,7 @@ absl::optional<uint64_t> IoSocketHandleImpl::congestionWindowInBytes() const {
   if (!result.return_value_) {
     return {};
   }
-  constexpr uint64_t kTcpMss = 1460;
-  return info.tcpi_snd_cwnd * kTcpMss;
+  return info.tcpi_snd_cwnd;
 }
 
 absl::optional<std::string> IoSocketHandleImpl::interfaceName() {

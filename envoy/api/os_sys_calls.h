@@ -19,7 +19,9 @@ namespace Api {
 
 struct EnvoyTcpInfo {
   std::chrono::microseconds tcpi_rtt;
-  uint32_t tcpi_snd_cwnd; // Congestion window, in packets
+  // Congestion window, in bytes. Note that posix's TCP_INFO socket option returns cwnd in packets,
+  // we multiply it by 1460(the default TCP MSS) to get bytes.
+  uint32_t tcpi_snd_cwnd = 0;
 };
 
 // Small struct to avoid exposing ifaddrs -- which is not defined in all platforms -- to the

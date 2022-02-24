@@ -64,7 +64,7 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   ASSERT(session != nullptr);
   EXPECT_EQ(highWatermark(session), 45);
   EXPECT_EQ(absl::nullopt, session->unixSocketPeerCredentials());
-  EXPECT_EQ(absl::nullopt, session->lastRoundTripTime());
+  EXPECT_NE(absl::nullopt, session->lastRoundTripTime());
   client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
