@@ -1101,6 +1101,39 @@ public:
   bool supportsPathlessHeaders() const override { return true; }
 };
 
+/**
+ * Route entry implementation for path separated prefix match routing.
+ */
+class PathSeparatedPrefixRouteEntryImpl : public RouteEntryImplBase {
+public:
+  PathSeparatedPrefixRouteEntryImpl(const VirtualHostImpl& vhost,
+                                    const envoy::config::route::v3::Route& route,
+                                    const OptionalHttpFilters& optional_http_filters,
+                                    Server::Configuration::ServerFactoryContext& factory_context,
+                                    ProtobufMessage::ValidationVisitor& validator);
+
+  // Router::PathMatchCriterion
+  const std::string& matcher() const override { return prefix_; }
+  PathMatchType matchType() const override { return PathMatchType::None; }
+
+  // Router::Matchable
+  RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
+                              const StreamInfo::StreamInfo& stream_info,
+                              uint64_t random_value) const override;
+
+  // Router::DirectResponseEntry
+  void rewritePathHeader(Http::RequestHeaderMap& headers,
+                         bool insert_envoy_original_path) const override;
+
+  // Router::RouteEntry
+  absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+
+private:
+  const std::string prefix_;
+  const Matchers::PathMatcherConstSharedPtr path_matcher_;
+};
+
 // Contextual information used to construct the route actions for a match tree.
 struct RouteActionContext {
   const VirtualHostImpl& vhost;

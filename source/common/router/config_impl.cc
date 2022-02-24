@@ -92,6 +92,11 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
     route = std::make_shared<ConnectRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                     factory_context, validator);
     break;
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix: {
+    route = std::make_shared<PathSeparatedPrefixRouteEntryImpl>(
+        vhost, route_config, optional_http_filters, factory_context, validator);
+    break;
+  }
   case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
     break; // throw the error below.
   }
@@ -1389,6 +1394,43 @@ RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap&
                                                    uint64_t random_value) const {
   if (Http::HeaderUtility::isConnect(headers) &&
       RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
+    return clusterEntry(headers, random_value);
+  }
+  return nullptr;
+}
+
+PathSeparatedPrefixRouteEntryImpl::PathSeparatedPrefixRouteEntryImpl(
+    const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
+    const OptionalHttpFilters& optional_http_filters,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator)
+    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
+      prefix_(route.match().path_separated_prefix()),
+      path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
+
+void PathSeparatedPrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
+                                                          bool insert_envoy_original_path) const {
+  finalizePathHeader(headers, prefix_, insert_envoy_original_path);
+}
+
+absl::optional<std::string> PathSeparatedPrefixRouteEntryImpl::currentUrlPathAfterRewrite(
+    const Http::RequestHeaderMap& headers) const {
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, prefix_);
+}
+
+RouteConstSharedPtr
+PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                           const StreamInfo::StreamInfo& stream_info,
+                                           uint64_t random_value) const {
+  if (!RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
+    return nullptr;
+  }
+  const absl::string_view pathValue = headers.getPathValue();
+  return nullptr;
+  if (pathValue.size() > prefix_.size() && path_matcher_->match(pathValue) &&
+      pathValue[prefix_.size()] == '/') {
+    return clusterEntry(headers, random_value);
+  } else if (case_sensitive_ ? pathValue == prefix_ : absl::EqualsIgnoreCase(pathValue, prefix_)) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;

@@ -151,6 +151,35 @@ public:
     return false;
   }
 };
+
+class PathSeparatedPrefixMatcherImpl : public BaseMatcherImpl {
+public:
+  PathSeparatedPrefixMatcherImpl(const RequirementRule& rule)
+      : BaseMatcherImpl(rule), prefix_(rule.match().path_separated_prefix()),
+        path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
+
+  bool matches(const Http::RequestHeaderMap& headers) const override {
+    if (!BaseMatcherImpl::matchRoute(headers)) {
+      return false;
+    }
+    const absl::string_view pathValue = headers.getPathValue();
+    if (pathValue.size() > prefix_.size() && path_matcher_->match(pathValue) &&
+        pathValue[prefix_.size()] == '/') {
+      ENVOY_LOG(debug, "Path-separated prefix requirement '{}' matched.", prefix_);
+      return true;
+    } else if (case_sensitive_ ? pathValue == prefix_
+                               : absl::EqualsIgnoreCase(pathValue, prefix_)) {
+      ENVOY_LOG(debug, "Path-separated prefix requirement '{}' matched.", prefix_);
+      return true;
+    }
+    return false;
+  }
+
+private:
+  // prefix string
+  const std::string prefix_;
+  const Matchers::PathMatcherConstSharedPtr path_matcher_;
+};
 } // namespace
 
 MatcherConstPtr Matcher::create(const RequirementRule& rule) {
@@ -163,6 +192,8 @@ MatcherConstPtr Matcher::create(const RequirementRule& rule) {
     return std::make_unique<RegexMatcherImpl>(rule);
   case RouteMatch::PathSpecifierCase::kConnectMatcher:
     return std::make_unique<ConnectMatcherImpl>(rule);
+  case RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
+    return std::make_unique<PathSeparatedPrefixMatcherImpl>(rule);
   case RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
     break; // Fall through to PANIC.
   }

@@ -448,7 +448,7 @@ message WeightedCluster {
   }
 }
 
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
 
@@ -513,6 +513,8 @@ message RouteMatch {
     // Note that CONNECT support is currently considered alpha in Envoy.
     // [#comment: TODO(htuch): Replace the above comment with an alpha tag.]
     ConnectMatcher connect_matcher = 12;
+
+    string path_separated_prefix = 14;
   }
 
   // Indicates that prefix/path matching should be case sensitive. The default
