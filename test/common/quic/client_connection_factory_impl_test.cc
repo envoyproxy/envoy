@@ -94,16 +94,18 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
 
   Http::MockAlternateProtocolsCache rtt_cache;
   quic::QuicConfig config;
-  PersistentQuicInfoImpl info{dispatcher_, *factory_, simTime(), 30, config, 45};
+  PersistentQuicInfoImpl info{dispatcher_, 45};
 
   EXPECT_CALL(rtt_cache, getSrtt).WillOnce(Return(std::chrono::microseconds(5)));
 
+  const int port = 30;
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
-      info, dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_);
-
-  EXPECT_EQ(info.quic_config_.GetInitialRoundTripTimeUsToSend(), 5);
-
+      info, crypto_config_,
+      quic::QuicServerId{factory_->clientContextConfig().serverNameIndication(), port, false},
+      dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+
+  EXPECT_EQ(session->config()->GetInitialRoundTripTimeUsToSend(), 5);
   session->Initialize();
   client_connection->connect();
   EXPECT_TRUE(client_connection->connecting());
