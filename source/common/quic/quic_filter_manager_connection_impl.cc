@@ -217,6 +217,20 @@ void QuicFilterManagerConnectionImpl::onSendBufferLowWatermark() {
   }
 }
 
+absl::optional<std::chrono::milliseconds>
+QuicFilterManagerConnectionImpl::lastRoundTripTime() const {
+  if (quicConnection() == nullptr) {
+    return {};
+  }
+
+  const auto* rtt_stats = quicConnection()->sent_packet_manager().GetRttStats();
+  if (!rtt_stats->latest_rtt().IsZero()) {
+    return std::chrono::milliseconds(rtt_stats->latest_rtt().ToMilliseconds());
+  }
+
+  return std::chrono::milliseconds(rtt_stats->initial_rtt().ToMilliseconds());
+}
+
 void QuicFilterManagerConnectionImpl::configureInitialCongestionWindow(
     uint64_t bandwidth_bits_per_sec, std::chrono::microseconds rtt) {
   if (quicConnection() != nullptr) {

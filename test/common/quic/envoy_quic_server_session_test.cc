@@ -1033,8 +1033,9 @@ TEST_F(EnvoyQuicServerSessionTest, IncomingUnidirectionalReadStream) {
   envoy_quic_session_.OnStreamFrame(stream_frame);
 }
 
-TEST_F(EnvoyQuicServerSessionTest, GetCongestionWindow) {
+TEST_F(EnvoyQuicServerSessionTest, GetRttAndCwnd) {
   installReadFilter();
+  EXPECT_GT(envoy_quic_session_.lastRoundTripTime().value(), std::chrono::microseconds(0));
   EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(), 1000);
 }
 

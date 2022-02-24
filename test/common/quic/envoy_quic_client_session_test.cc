@@ -348,7 +348,8 @@ TEST_P(EnvoyQuicClientSessionTest, IncomingUnidirectionalReadStream) {
   envoy_quic_session_.OnStreamFrame(stream_frame2);
 }
 
-TEST_P(EnvoyQuicClientSessionTest, GetCongestionWindow) {
+TEST_P(EnvoyQuicClientSessionTest, GetRttAndCwnd) {
+  EXPECT_GT(envoy_quic_session_.lastRoundTripTime().value(), std::chrono::microseconds(0));
   EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(), 1000);
 }
 
