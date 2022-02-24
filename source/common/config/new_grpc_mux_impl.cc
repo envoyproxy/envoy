@@ -40,7 +40,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                Random::RandomGenerator& random, Stats::Scope& scope,
                                const RateLimitSettings& rate_limit_settings,
                                const LocalInfo::LocalInfo& local_info,
-                               ExternalConfigValidatorsPtr&& config_validators)
+                               CustomConfigValidatorsPtr&& config_validators)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), config_validators_(std::move(config_validators)),

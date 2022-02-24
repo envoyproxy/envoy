@@ -14,7 +14,7 @@
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
 
 #include "test/common/config/subscription_test_harness.h"
-#include "test/mocks/config/external_config_validators.h"
+#include "test/mocks/config/custom_config_validators.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -44,7 +44,7 @@ public:
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new NiceMock<Grpc::MockAsyncClient>()),
-        config_validators_(std::make_unique<NiceMock<MockExternalConfigValidators>>()),
+        config_validators_(std::make_unique<NiceMock<MockCustomConfigValidators>>()),
         should_use_unified_(legacy_or_unified == Envoy::Config::LegacyOrUnified::Unified) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
@@ -224,7 +224,7 @@ public:
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder_{"cluster_name"};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  ExternalConfigValidatorsPtr config_validators_;
+  CustomConfigValidatorsPtr config_validators_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   GrpcMuxSharedPtr mux_;
   GrpcSubscriptionImplPtr subscription_;

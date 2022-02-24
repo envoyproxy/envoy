@@ -19,7 +19,7 @@
 
 #include "test/benchmark/main.h"
 #include "test/common/upstream/utility.h"
-#include "test/mocks/config/external_config_validators.h"
+#include "test/mocks/config/custom_config_validators.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -46,7 +46,7 @@ public:
         type_url_("type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"),
         subscription_stats_(Config::Utility::generateStats(stats_)),
         api_(Api::createApiForTest(stats_)), async_client_(new Grpc::MockAsyncClient()),
-        config_validators_(std::make_unique<NiceMock<Config::MockExternalConfigValidators>>()) {
+        config_validators_(std::make_unique<NiceMock<Config::MockCustomConfigValidators>>()) {
     if (use_unified_mux_) {
       grpc_mux_.reset(new Config::XdsMux::GrpcMuxSotw(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
@@ -178,7 +178,7 @@ public:
   Api::ApiPtr api_;
   Server::MockOptions options_;
   Grpc::MockAsyncClient* async_client_;
-  Config::ExternalConfigValidatorsPtr config_validators_;
+  Config::CustomConfigValidatorsPtr config_validators_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   Config::GrpcMuxSharedPtr grpc_mux_;
   Config::GrpcSubscriptionImplPtr subscription_;

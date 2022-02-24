@@ -17,7 +17,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
-#include "source/common/config/external_config_validators.h"
+#include "source/common/config/custom_config_validators.h"
 #include "source/common/config/grpc_stream.h"
 #include "source/common/config/ttl.h"
 #include "source/common/config/utility.h"
@@ -37,7 +37,7 @@ public:
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
-              ExternalConfigValidatorsPtr&& config_validators);
+              CustomConfigValidatorsPtr&& config_validators);
 
   ~GrpcMuxImpl() override;
 
@@ -170,7 +170,7 @@ private:
       grpc_stream_;
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
-  ExternalConfigValidatorsPtr config_validators_;
+  CustomConfigValidatorsPtr config_validators_;
   bool first_stream_request_;
 
   // Helper function for looking up and potentially allocating a new ApiState.

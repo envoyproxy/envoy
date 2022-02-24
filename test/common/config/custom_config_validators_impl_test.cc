@@ -1,4 +1,4 @@
-#include "source/common/config/external_config_validators_impl.h"
+#include "source/common/config/custom_config_validators_impl.h"
 
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/instance.h"
@@ -67,9 +67,9 @@ public:
   FakeValidatorAction action_;
 };
 
-class ExternalConfigValidatorsImplTest : public testing::Test {
+class CustomConfigValidatorsImplTest : public testing::Test {
 public:
-  ExternalConfigValidatorsImplTest()
+  CustomConfigValidatorsImplTest()
       : factory_true_(FakeValidatorAction::ReturnTrue),
         factory_false_(FakeValidatorAction::ReturnFalse),
         factory_throw_(FakeValidatorAction::ThrowException), register_factory_true_(factory_true_),
@@ -100,9 +100,9 @@ public:
 };
 
 // Validates that empty config that has no validators always returns true.
-TEST_F(ExternalConfigValidatorsImplTest, EmptyConfigValidator) {
+TEST_F(CustomConfigValidatorsImplTest, EmptyConfigValidator) {
   const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> empty_list;
-  ExternalConfigValidatorsImpl validators(validation_visitor_, server_, empty_list);
+  CustomConfigValidatorsImpl validators(validation_visitor_, server_, empty_list);
   {
     const std::vector<DecodedResourcePtr> resources;
     validators.executeValidators(type_url_, resources);
@@ -115,11 +115,11 @@ TEST_F(ExternalConfigValidatorsImplTest, EmptyConfigValidator) {
 }
 
 // Validates that a config that creates a validator that returns true does so.
-TEST_F(ExternalConfigValidatorsImplTest, ReturnTrueConfigValidator) {
+TEST_F(CustomConfigValidatorsImplTest, ReturnTrueConfigValidator) {
   Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> configs_list;
   auto* entry = configs_list.Add();
   *entry = parseConfig(returnTrueValidatorConfig);
-  ExternalConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
+  CustomConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
   {
     const std::vector<DecodedResourcePtr> resources;
     validators.executeValidators(type_url_, resources);
@@ -133,32 +133,32 @@ TEST_F(ExternalConfigValidatorsImplTest, ReturnTrueConfigValidator) {
 
 // Validates that a config that creates a validator that returns false throws an
 // exception.
-TEST_F(ExternalConfigValidatorsImplTest, ReturnFalseConfigValidator) {
+TEST_F(CustomConfigValidatorsImplTest, ReturnFalseConfigValidator) {
   Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> configs_list;
   auto* entry = configs_list.Add();
   *entry = parseConfig(returnFalseValidatorConfig);
-  ExternalConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
+  CustomConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
   {
     const std::vector<DecodedResourcePtr> resources;
     EXPECT_THROW_WITH_MESSAGE(validators.executeValidators(type_url_, resources), EnvoyException,
-                              "External validator rejected the config.");
+                              "Custom validator rejected the config.");
   }
   {
     const std::vector<DecodedResourcePtr> added_resources;
     const Protobuf::RepeatedPtrField<std::string> removed_resources;
     EXPECT_THROW_WITH_MESSAGE(
         validators.executeValidators(type_url_, added_resources, removed_resources), EnvoyException,
-        "External validator rejected the config.");
+        "Custom validator rejected the config.");
   }
 }
 
 // Validates that a config that creates a validator that throws an
 // exception, passes that exception out.
-TEST_F(ExternalConfigValidatorsImplTest, ThrowExceptionConfigValidator) {
+TEST_F(CustomConfigValidatorsImplTest, ThrowExceptionConfigValidator) {
   Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> configs_list;
   auto* entry = configs_list.Add();
   *entry = parseConfig(throwExceptionValidatorConfig);
-  ExternalConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
+  CustomConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
   {
     const std::vector<DecodedResourcePtr> resources;
     EXPECT_THROW_WITH_MESSAGE(validators.executeValidators(type_url_, resources), EnvoyException,
@@ -175,36 +175,36 @@ TEST_F(ExternalConfigValidatorsImplTest, ThrowExceptionConfigValidator) {
 
 // Validates that a config that contains a validator that returns true, followed
 // by a validator that returns false, throws an exception.
-TEST_F(ExternalConfigValidatorsImplTest, ReturnTrueThenFalseConfigValidator) {
+TEST_F(CustomConfigValidatorsImplTest, ReturnTrueThenFalseConfigValidator) {
   Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> configs_list;
   auto* entry1 = configs_list.Add();
   *entry1 = parseConfig(returnTrueValidatorConfig);
   auto* entry2 = configs_list.Add();
   *entry2 = parseConfig(returnFalseValidatorConfig);
-  ExternalConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
+  CustomConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
   {
     const std::vector<DecodedResourcePtr> resources;
     EXPECT_THROW_WITH_MESSAGE(validators.executeValidators(type_url_, resources), EnvoyException,
-                              "External validator rejected the config.");
+                              "Custom validator rejected the config.");
   }
   {
     const std::vector<DecodedResourcePtr> added_resources;
     const Protobuf::RepeatedPtrField<std::string> removed_resources;
     EXPECT_THROW_WITH_MESSAGE(
         validators.executeValidators(type_url_, added_resources, removed_resources), EnvoyException,
-        "External validator rejected the config.");
+        "Custom validator rejected the config.");
   }
 }
 
 // Validates that a config that creates a validator that returns false on
 // different type_url isn't rejected.
-TEST_F(ExternalConfigValidatorsImplTest, ReturnFalseDifferentTypeConfigValidator) {
+TEST_F(CustomConfigValidatorsImplTest, ReturnFalseDifferentTypeConfigValidator) {
   const std::string type_url{
       Envoy::Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>()};
   Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> configs_list;
   auto* entry = configs_list.Add();
   *entry = parseConfig(returnFalseValidatorConfig);
-  ExternalConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
+  CustomConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
   {
     const std::vector<DecodedResourcePtr> resources;
     validators.executeValidators(type_url, resources);

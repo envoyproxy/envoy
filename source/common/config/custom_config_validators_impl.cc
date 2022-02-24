@@ -1,4 +1,4 @@
-#include "source/common/config/external_config_validators_impl.h"
+#include "source/common/config/custom_config_validators_impl.h"
 
 #include "source/common/config/opaque_resource_decoder_impl.h"
 #include "source/common/config/utility.h"
@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Config {
 
-ExternalConfigValidatorsImpl::ExternalConfigValidatorsImpl(
+CustomConfigValidatorsImpl::CustomConfigValidatorsImpl(
     ProtobufMessage::ValidationVisitor& validation_visitor, Server::Instance& server,
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
         validators_configs)
@@ -24,7 +24,7 @@ ExternalConfigValidatorsImpl::ExternalConfigValidatorsImpl(
   }
 }
 
-void ExternalConfigValidatorsImpl::executeValidators(
+void CustomConfigValidatorsImpl::executeValidators(
     absl::string_view type_url, const std::vector<DecodedResourcePtr>& resources) {
   auto validators_it = validators_map_.find(type_url);
   if (validators_it != validators_map_.end()) {
@@ -33,13 +33,13 @@ void ExternalConfigValidatorsImpl::executeValidators(
       // A validator can either return false, or throw an EnvoyException.
       // Both will result in this method throwing an EnvoyException.
       if (!validator->validate(server_, resources)) {
-        throw EnvoyException("External validator rejected the config.");
+        throw EnvoyException("Custom validator rejected the config.");
       }
     }
   }
 }
 
-void ExternalConfigValidatorsImpl::executeValidators(
+void CustomConfigValidatorsImpl::executeValidators(
     absl::string_view type_url, const std::vector<DecodedResourcePtr>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
   auto validators_it = validators_map_.find(type_url);
@@ -49,7 +49,7 @@ void ExternalConfigValidatorsImpl::executeValidators(
       // A validator can either return false, or throw an EnvoyException.
       // Both will result in this method throwing an EnvoyException.
       if (!validator->validate(server_, added_resources, removed_resources)) {
-        throw EnvoyException("External validator rejected the config.");
+        throw EnvoyException("Custom validator rejected the config.");
       }
     }
   }

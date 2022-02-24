@@ -2,16 +2,14 @@
 
 #include "envoy/server/instance.h"
 
-#include "source/common/config/external_config_validators.h"
+#include "source/common/config/custom_config_validators.h"
 
 namespace Envoy {
 namespace Config {
 
-// Represents a collection of external config validators for all xDS
-// service type.
-class ExternalConfigValidatorsImpl : public ExternalConfigValidators {
+class CustomConfigValidatorsImpl : public CustomConfigValidators {
 public:
-  ExternalConfigValidatorsImpl(
+  CustomConfigValidatorsImpl(
       ProtobufMessage::ValidationVisitor& validation_visitor, Server::Instance& server,
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
           validators_configs);

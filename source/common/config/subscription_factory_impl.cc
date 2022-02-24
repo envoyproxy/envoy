@@ -2,7 +2,7 @@
 
 #include "envoy/config/core/v3/config_source.pb.h"
 
-#include "source/common/config/external_config_validators_impl.h"
+#include "source/common/config/custom_config_validators_impl.h"
 #include "source/common/config/filesystem_subscription_impl.h"
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/grpc_subscription_impl.h"
@@ -71,8 +71,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           validation_visitor_);
     case envoy::config::core::v3::ApiConfigSource::GRPC: {
       GrpcMuxSharedPtr mux;
-      ExternalConfigValidatorsPtr external_config_validators =
-          std::make_unique<ExternalConfigValidatorsImpl>(
+      CustomConfigValidatorsPtr custom_config_validators =
+          std::make_unique<CustomConfigValidatorsImpl>(
               validation_visitor_, server_, api_config_source.config_validators_typed_configs());
 
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
@@ -83,7 +83,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
             api_config_source.set_node_on_first_message_only(),
-            std::move(external_config_validators));
+            std::move(custom_config_validators));
       } else {
         mux = std::make_shared<Config::GrpcMuxImpl>(
             local_info_,
@@ -93,7 +93,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source),
             api_config_source.set_node_on_first_message_only(),
-            std::move(external_config_validators));
+            std::move(custom_config_validators));
       }
       return std::make_unique<GrpcSubscriptionImpl>(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
@@ -102,8 +102,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     }
     case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
       GrpcMuxSharedPtr mux;
-      ExternalConfigValidatorsPtr external_config_validators =
-          std::make_unique<ExternalConfigValidatorsImpl>(
+      CustomConfigValidatorsPtr custom_config_validators =
+          std::make_unique<CustomConfigValidatorsImpl>(
               validation_visitor_, server_, api_config_source.config_validators_typed_configs());
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
@@ -113,7 +113,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
             api_config_source.set_node_on_first_message_only(),
-            std::move(external_config_validators));
+            std::move(custom_config_validators));
       } else {
         mux = std::make_shared<Config::NewGrpcMuxImpl>(
             Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
@@ -121,7 +121,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                 ->createUncachedRawAsyncClient(),
             dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
-            std::move(external_config_validators));
+            std::move(custom_config_validators));
       }
       return std::make_unique<GrpcSubscriptionImpl>(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
@@ -168,8 +168,8 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
           config.api_config_source();
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
                                                               api_config_source);
-      ExternalConfigValidatorsPtr external_config_validators =
-          std::make_unique<ExternalConfigValidatorsImpl>(
+      CustomConfigValidatorsPtr custom_config_validators =
+          std::make_unique<CustomConfigValidatorsImpl>(
               validation_visitor_, server_, api_config_source.config_validators_typed_configs());
 
       SubscriptionOptions options;
@@ -187,7 +187,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
                     ->createUncachedRawAsyncClient(),
                 dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
                 Utility::parseRateLimitSettings(api_config_source), local_info_,
-                std::move(external_config_validators)),
+                std::move(custom_config_validators)),
             callbacks, resource_decoder, stats, dispatcher_,
             Utility::configSourceInitialFetchTimeout(config), false, options);
       }

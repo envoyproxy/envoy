@@ -14,7 +14,7 @@
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/common.h"
-#include "test/mocks/config/external_config_validators.h"
+#include "test/mocks/config/custom_config_validators.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -49,12 +49,12 @@ public:
       xds_context_ = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
           random_, stats_store_, rate_limit_settings_, local_info_, false,
-          std::make_unique<NiceMock<MockExternalConfigValidators>>());
+          std::make_unique<NiceMock<MockCustomConfigValidators>>());
     } else {
       xds_context_ = std::make_shared<NewGrpcMuxImpl>(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
           random_, stats_store_, rate_limit_settings_, local_info_,
-          std::make_unique<NiceMock<MockExternalConfigValidators>>());
+          std::make_unique<NiceMock<MockCustomConfigValidators>>());
     }
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         xds_context_, callbacks_, resource_decoder_, stats_,

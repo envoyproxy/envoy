@@ -9,7 +9,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
-#include "source/common/config/external_config_validators.h"
+#include "source/common/config/custom_config_validators.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -62,7 +62,7 @@ struct Watch {
 class WatchMap : public UntypedConfigUpdateCallbacks, public Logger::Loggable<Logger::Id::config> {
 public:
   WatchMap(const bool use_namespace_matching, const std::string& type_url,
-           ExternalConfigValidators& config_validators)
+           CustomConfigValidators& config_validators)
       : use_namespace_matching_(use_namespace_matching), type_url_(type_url),
         config_validators_(config_validators) {}
 
@@ -132,7 +132,7 @@ private:
 
   const bool use_namespace_matching_;
   const std::string type_url_;
-  ExternalConfigValidators& config_validators_;
+  CustomConfigValidators& config_validators_;
 };
 
 } // namespace Config

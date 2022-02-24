@@ -14,7 +14,7 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"
-#include "test/mocks/config/external_config_validators.h"
+#include "test/mocks/config/custom_config_validators.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -48,7 +48,7 @@ class GrpcMuxImplTestBase : public testing::Test {
 public:
   GrpcMuxImplTestBase()
       : async_client_(new Grpc::MockAsyncClient()),
-        config_validators_(std::make_unique<NiceMock<MockExternalConfigValidators>>()),
+        config_validators_(std::make_unique<NiceMock<MockCustomConfigValidators>>()),
         control_plane_connected_state_(
             stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)),
         control_plane_pending_requests_(
@@ -102,7 +102,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncStream async_stream_;
-  ExternalConfigValidatorsPtr config_validators_;
+  CustomConfigValidatorsPtr config_validators_;
   GrpcMuxImplPtr grpc_mux_;
   NiceMock<MockSubscriptionCallbacks> callbacks_;
   NiceMock<MockOpaqueResourceDecoder> resource_decoder_;
@@ -885,7 +885,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
           random_, stats_, rate_limit_settings_, true,
-          std::make_unique<NiceMock<MockExternalConfigValidators>>()),
+          std::make_unique<NiceMock<MockCustomConfigValidators>>()),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
@@ -899,7 +899,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
           random_, stats_, rate_limit_settings_, true,
-          std::make_unique<NiceMock<MockExternalConfigValidators>>()),
+          std::make_unique<NiceMock<MockCustomConfigValidators>>()),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");

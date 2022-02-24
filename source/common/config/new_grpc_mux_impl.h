@@ -34,7 +34,7 @@ public:
                  const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
                  Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info,
-                 ExternalConfigValidatorsPtr&& config_validators);
+                 CustomConfigValidatorsPtr&& config_validators);
 
   ~NewGrpcMuxImpl() override;
 
@@ -83,7 +83,7 @@ public:
   struct SubscriptionStuff {
     SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
                       const bool use_namespace_matching, Event::Dispatcher& dispatcher,
-                      ExternalConfigValidators& config_validators)
+                      CustomConfigValidators& config_validators)
         : watch_map_(use_namespace_matching, type_url, config_validators),
           sub_state_(type_url, watch_map_, local_info, dispatcher) {}
 
@@ -175,7 +175,7 @@ private:
       grpc_stream_;
 
   const LocalInfo::LocalInfo& local_info_;
-  ExternalConfigValidatorsPtr config_validators_;
+  CustomConfigValidatorsPtr config_validators_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
   Event::Dispatcher& dispatcher_;
 

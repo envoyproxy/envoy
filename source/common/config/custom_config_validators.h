@@ -9,9 +9,9 @@ namespace Config {
 // for all xDS service types. This is different than running Envoy in
 // "validation-mode", as these config validators will be executed whenever
 // Envoy receives a new update.
-class ExternalConfigValidators {
+class CustomConfigValidators {
 public:
-  virtual ~ExternalConfigValidators() = default;
+  virtual ~CustomConfigValidators() = default;
 
   /**
    * Executes the validators that receive the State-of-the-World resources.
@@ -40,7 +40,7 @@ public:
                     const Protobuf::RepeatedPtrField<std::string>& removed_resources) PURE;
 };
 
-using ExternalConfigValidatorsPtr = std::unique_ptr<ExternalConfigValidators>;
+using CustomConfigValidatorsPtr = std::unique_ptr<CustomConfigValidators>;
 
 } // namespace Config
 } // namespace Envoy

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/common/config/external_config_validators.h"
+#include "source/common/config/custom_config_validators.h"
 
 #include "gmock/gmock.h"
 
@@ -20,10 +20,10 @@ public:
                const Protobuf::RepeatedPtrField<std::string>& removed_resources));
 };
 
-class MockExternalConfigValidators : public ExternalConfigValidators {
+class MockCustomConfigValidators : public CustomConfigValidators {
 public:
-  MockExternalConfigValidators();
-  ~MockExternalConfigValidators() override;
+  MockCustomConfigValidators();
+  ~MockCustomConfigValidators() override;
 
   MOCK_METHOD(void, executeValidators,
               (absl::string_view type_url, const std::vector<DecodedResourcePtr>& resources));

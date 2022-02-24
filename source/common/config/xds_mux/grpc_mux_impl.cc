@@ -41,7 +41,7 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(
     const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr&& async_client,
     Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
     Random::RandomGenerator& random, Stats::Scope& scope,
-    const RateLimitSettings& rate_limit_settings, ExternalConfigValidatorsPtr&& config_validators)
+    const RateLimitSettings& rate_limit_settings, CustomConfigValidatorsPtr&& config_validators)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       subscription_state_factory_(std::move(subscription_state_factory)),
@@ -361,7 +361,7 @@ GrpcMuxDelta::GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispat
                            Random::RandomGenerator& random, Stats::Scope& scope,
                            const RateLimitSettings& rate_limit_settings,
                            const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
-                           ExternalConfigValidatorsPtr&& config_validators)
+                           CustomConfigValidatorsPtr&& config_validators)
     : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
                   local_info, std::move(async_client), dispatcher, service_method, random, scope,
                   rate_limit_settings, std::move(config_validators)) {}
@@ -382,7 +382,7 @@ GrpcMuxSotw::GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatch
                          Random::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings,
                          const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
-                         ExternalConfigValidatorsPtr&& config_validators)
+                         CustomConfigValidatorsPtr&& config_validators)
     : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
                   local_info, std::move(async_client), dispatcher, service_method, random, scope,
                   rate_limit_settings, std::move(config_validators)) {}

@@ -158,8 +158,8 @@ envoy_cc_library(
     hdrs = ["grpc_mux_impl.h"],
     deps = [
         ":api_version_lib",
+        ":custom_config_validators_interface",
         ":decoded_resource_lib",
-        ":external_config_validators_interface",
         ":grpc_stream_lib",
         ":ttl_lib",
         ":utility_lib",
@@ -194,8 +194,8 @@ envoy_cc_library(
     srcs = ["new_grpc_mux_impl.cc"],
     hdrs = ["new_grpc_mux_impl.h"],
     deps = [
+        ":custom_config_validators_interface",
         ":delta_subscription_state_lib",
-        ":external_config_validators_interface",
         ":grpc_stream_lib",
         ":pausable_ack_queue_lib",
         ":watch_map_lib",
@@ -317,7 +317,7 @@ envoy_cc_library(
     srcs = ["subscription_factory_impl.cc"],
     hdrs = ["subscription_factory_impl.h"],
     deps = [
-        ":external_config_validators_lib",
+        ":custom_config_validators_lib",
         ":filesystem_subscription_lib",
         ":grpc_subscription_lib",
         ":http_subscription_lib",
@@ -415,8 +415,8 @@ envoy_cc_library(
     srcs = ["watch_map.cc"],
     hdrs = ["watch_map.h"],
     deps = [
+        ":custom_config_validators_interface",
         ":decoded_resource_lib",
-        ":external_config_validators_interface",
         ":utility_lib",
         ":xds_resource_lib",
         "//envoy/config:subscription_interface",
@@ -440,19 +440,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "external_config_validators_interface",
-    hdrs = ["external_config_validators.h"],
+    name = "custom_config_validators_interface",
+    hdrs = ["custom_config_validators.h"],
     deps = [
         "//envoy/config:config_validator_interface",
     ],
 )
 
 envoy_cc_library(
-    name = "external_config_validators_lib",
-    srcs = ["external_config_validators_impl.cc"],
-    hdrs = ["external_config_validators_impl.h"],
+    name = "custom_config_validators_lib",
+    srcs = ["custom_config_validators_impl.cc"],
+    hdrs = ["custom_config_validators_impl.h"],
     deps = [
-        ":external_config_validators_interface",
+        ":custom_config_validators_interface",
         ":opaque_resource_decoder_lib",
         ":resource_name_lib",
         "//source/common/config:utility_lib",

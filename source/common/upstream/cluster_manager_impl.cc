@@ -21,7 +21,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/external_config_validators_impl.h"
+#include "source/common/config/custom_config_validators_impl.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
@@ -339,8 +339,8 @@ ClusterManagerImpl::ClusterManagerImpl(
   // After here, we just have a GrpcMux interface held in ads_mux_, which hides
   // whether the backing implementation is delta or SotW.
   if (dyn_resources.has_ads_config()) {
-    Config::ExternalConfigValidatorsPtr external_config_validators =
-        std::make_unique<Config::ExternalConfigValidatorsImpl>(
+    Config::CustomConfigValidatorsPtr custom_config_validators =
+        std::make_unique<Config::CustomConfigValidatorsImpl>(
             validation_context.dynamicValidationVisitor(), server,
             dyn_resources.ads_config().config_validators_typed_configs());
 
@@ -359,7 +359,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             dyn_resources.ads_config().set_node_on_first_message_only(),
-            std::move(external_config_validators));
+            std::move(custom_config_validators));
       } else {
         ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
             Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
@@ -370,7 +370,7 @@ ClusterManagerImpl::ClusterManagerImpl(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
-            std::move(external_config_validators));
+            std::move(custom_config_validators));
       }
     } else {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
@@ -386,7 +386,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-            std::move(external_config_validators));
+            std::move(custom_config_validators));
       } else {
         ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
             local_info,
@@ -399,7 +399,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-            std::move(external_config_validators));
+            std::move(custom_config_validators));
       }
     }
   } else {

@@ -28,10 +28,10 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
-    name = "external_config_validators_mocks",
-    srcs = ["external_config_validators.cc"],
-    hdrs = ["external_config_validators.h"],
+    name = "custom_config_validators_mocks",
+    srcs = ["custom_config_validators.cc"],
+    hdrs = ["custom_config_validators.h"],
     deps = [
-        "//source/common/config:external_config_validators_interface",
+        "//source/common/config:custom_config_validators_interface",
     ],
 )
