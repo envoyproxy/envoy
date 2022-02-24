@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.gcp_authn.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/http_uri.proto";
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.gcp_authn.v3";
+option java_outer_classname = "GcpAuthnProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/gcp_authn/v3;gcp_authnv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#not-implemented-hide:]
+message GcpAuthnFilterConfig {
+  // The HTTP URI to to fetch JWT token from Instance Metadata Server.
+  config.core.v3.HttpUri http_uri = 1;
+
+  // Retry policy for fetching JWT tokens.
+  config.core.v3.RetryPolicy retry_policy = 2;
+
+  // JWT filter Cache configuration
+  CacheConfig cache_config = 3;
+}
+
+message GcpAuthnFilterPerRouteConfig {
+  repeated string audience = 1;
+}
+
+// JWT Cache configuration.
+message CacheConfig {
+  enum ExpirationMode {
+    FIXED = 0;
+    TOKEN = 1;
+  }
+
+  // The unit is the number of JWT tokens.
+  uint32 cache_size = 1;
+
+  // Duration after which the cached JWT token should be expired.
+  google.protobuf.Duration cache_duration = 2;
+
+  ExpirationMode exp_mode = 3;
+}

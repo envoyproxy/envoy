@@ -203,6 +203,9 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # DNS Resolver
 /*/extensions/network/dns_resolver/cares @junr03 @yanavlasov
 /*/extensions/network/dns_resolver/apple @junr03 @yanavlasov
+# Google Cloud Platform Authentication HTTP filter
+# TODO(tyxia) I gueess need non-googler owner?
+/*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan

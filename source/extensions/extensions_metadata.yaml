@@ -173,6 +173,11 @@ envoy.filters.http.fault:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.filters.http.gcp_authn:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
 envoy.filters.http.grpc_http1_bridge:
   categories:
   - envoy.filters.http
