@@ -141,6 +141,7 @@ message Listener {
   //   filter_chain_matcher:
   //     matcher_tree:
   //       input:
+  //         name: port
   //         typed_config:
   //           "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
   //       exact_match_map:
