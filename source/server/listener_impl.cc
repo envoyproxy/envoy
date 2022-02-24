@@ -949,6 +949,8 @@ bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v
       envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName("filter_chains"));
   differencer.IgnoreField(envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName(
       "default_filter_chain"));
+  differencer.IgnoreField(envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName(
+      "filter_chain_matcher"));
   return differencer.Compare(lhs, rhs);
 }
 

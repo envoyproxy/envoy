@@ -259,9 +259,8 @@ message FilterChain {
   // establishment, the connection is summarily closed.
   google.protobuf.Duration transport_socket_connect_timeout = 9;
 
-  // [#not-implemented-hide:] The unique name (or empty) by which this filter chain is known. If no
-  // name is provided, Envoy will allocate an internal UUID for the filter chain. If the filter
-  // chain is to be dynamically updated or removed via FCDS a unique name must be provided.
+  // The unique name (or empty) by which this filter chain is known. If no
+  // name is provided, Envoy will allocate an internal UUID for the filter chain.
   // Note: :ref:`filter_chain_matcher
   // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
   // requires that filter chains are uniquely named.

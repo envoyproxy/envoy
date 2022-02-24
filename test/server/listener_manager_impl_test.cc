@@ -3733,6 +3733,71 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappi
                             "overlapping matching rules are defined");
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, MatcherFilterChainWithoutName) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.tls_inspector"
+    filter_chain_matcher:
+      matcher_tree:
+        input:
+          name: port
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+        exact_match_map:
+          map:
+            "10000":
+              action:
+                name: foo
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: foo
+    filter_chains:
+    - filters: []
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException,
+                            "error adding listener '127.0.0.1:1234': \"name\" field is required "
+                            "when using a listener matcher");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, MatcherFilterChainWithDuplicateName) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.tls_inspector"
+    filter_chain_matcher:
+      matcher_tree:
+        input:
+          name: port
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+        exact_match_map:
+          map:
+            "10000":
+              action:
+                name: foo
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: foo
+    filter_chains:
+    - name: foo
+      filters: []
+    - name: foo
+      filters: []
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException,
+                            "error adding listener '127.0.0.1:1234': \"name\" field is duplicated "
+                            "with value 'foo'");
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInline) {
   const std::string cert = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem"));
@@ -5661,6 +5726,27 @@ TEST(ListenerMessageUtilTest, ListenerDefaultFilterChainChangeIsAlwaysFilterChai
   {
     *listener1.mutable_default_filter_chain() = default_filter_chain_1;
     *listener2.mutable_default_filter_chain() = default_filter_chain_2;
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
+  }
+  {
+    listener1.clear_default_filter_chain();
+    listener2.clear_default_filter_chain();
+    const std::string filter_chain_matcher = R"EOF(
+       matcher_tree:
+         input:
+           name: port
+           typed_config:
+             "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+         exact_match_map:
+           map:
+             "10000":
+               action:
+                 name: foo
+                 typed_config:
+                   "@type": type.googleapis.com/google.protobuf.StringValue
+                   value: foo
+    )EOF";
+    TestUtility::loadFromYaml(filter_chain_matcher, *listener2.mutable_filter_chain_matcher());
     EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
   }
 }

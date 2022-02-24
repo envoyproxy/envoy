@@ -132,6 +132,7 @@ public:
   const std::string filter_chain_matcher = R"EOF(
      matcher_tree:
        input:
+         name: port
          typed_config:
            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
        exact_match_map:

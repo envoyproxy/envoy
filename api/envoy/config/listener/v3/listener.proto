@@ -121,7 +121,6 @@ message Listener {
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
 
-  // [#not-implemented-hide:]
   // Unified matcher resolving the filter chain name from the network properties. This matcher is used as a replacement
   // for the per-filter chain match condition
   // `filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChain.filter_chain_match>`.

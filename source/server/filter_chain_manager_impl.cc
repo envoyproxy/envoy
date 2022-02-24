@@ -248,7 +248,13 @@ void FilterChainManagerImpl::addFilterChains(
             "error adding listener '{}': \"name\" field is required when using a listener matcher",
             address_->asString()));
       }
-      filter_chains_by_name_.try_emplace(filter_chain->name(), filter_chain_impl);
+      auto [_, inserted] =
+          filter_chains_by_name_.try_emplace(filter_chain->name(), filter_chain_impl);
+      if (!inserted) {
+        throw EnvoyException(
+            fmt::format("error adding listener '{}': \"name\" field is duplicated with value '{}'",
+                        address_->asString(), filter_chain->name()));
+      }
     } else {
       auto createAddressVector = [](const auto& prefix_ranges) -> std::vector<std::string> {
         std::vector<std::string> ips;
