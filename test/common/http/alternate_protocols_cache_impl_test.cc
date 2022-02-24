@@ -2,6 +2,7 @@
 
 #include "test/mocks/common.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/mocks/event/mocks.h"
 
 #include "gtest/gtest.h"
 
@@ -12,17 +13,18 @@ namespace Envoy {
 namespace Http {
 
 namespace {
-class AlternateProtocolsCacheImplTest : public testing::Test, public Event::TestUsingSimulatedTime {
+class AlternateProtocolsCacheImplTest : public testing::Test {
 public:
   AlternateProtocolsCacheImplTest() : store_(new NiceMock<MockKeyValueStore>()) {}
 
   void initialize() {
     protocols_ = std::make_unique<AlternateProtocolsCacheImpl>(
-        simTime(), std::unique_ptr<KeyValueStore>(store_), max_entries_);
+        dispatcher_, std::unique_ptr<KeyValueStore>(store_), max_entries_);
   }
 
   const size_t max_entries_ = 10;
 
+  Event::MockDispatcher dispatcher_;
   MockKeyValueStore* store_;
   std::unique_ptr<AlternateProtocolsCacheImpl> protocols_;
 
@@ -36,8 +38,8 @@ public:
   const std::string alpn1_ = "alpn1";
   const std::string alpn2_ = "alpn2";
 
-  const MonotonicTime expiration1_ = simTime().monotonicTime() + Seconds(5);
-  const MonotonicTime expiration2_ = simTime().monotonicTime() + Seconds(10);
+  const MonotonicTime expiration1_ = dispatcher_.timeSource().monotonicTime() + Seconds(5);
+  const MonotonicTime expiration2_ = dispatcher_.timeSource().monotonicTime() + Seconds(10);
 
   const AlternateProtocolsCacheImpl::Origin origin1_ = {https_, hostname1_, port1_};
   const AlternateProtocolsCacheImpl::Origin origin2_ = {https_, hostname2_, port2_};
@@ -110,7 +112,7 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterExpiration) {
   initialize();
   EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0"));
   protocols_->setAlternatives(origin1_, protocols1_);
-  simTime().setMonotonicTime(expiration1_ + Seconds(1));
+  dispatcher_.globalTimeSystem().advanceTimeWait(Seconds(6));
   EXPECT_CALL(*store_, remove("https://hostname1:1"));
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
@@ -124,7 +126,7 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterPartialExpiration) 
                                    "alpn1=\"hostname1:1\"; ma=5,alpn2=\"hostname2:2\"; ma=10|0"));
   std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> both = {protocol1_, protocol2_};
   protocols_->setAlternatives(origin1_, both);
-  simTime().setMonotonicTime(expiration1_ + Seconds(1));
+  dispatcher_.globalTimeSystem().advanceTimeWait(Seconds(6));
   EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn2=\"hostname2:2\"; ma=10|0"));
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
@@ -206,7 +208,7 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
   auto testAltSvc = [&](const std::string& original_alt_svc,
                         const std::string& expected_alt_svc) -> void {
     absl::optional<AlternateProtocolsCacheImpl::OriginData> origin_data =
-        AlternateProtocolsCacheImpl::originDataFromString(original_alt_svc, simTime(), true);
+        AlternateProtocolsCacheImpl::originDataFromString(original_alt_svc, dispatcher_.timeSource(), true);
     ASSERT(origin_data.has_value());
     std::vector<AlternateProtocolsCache::AlternateProtocol>& protocols =
         origin_data.value().protocols;
@@ -217,7 +219,7 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
     EXPECT_EQ("", protocol.hostname_);
     EXPECT_EQ(443, protocol.port_);
     auto duration = std::chrono::duration_cast<std::chrono::seconds>(protocol.expiration_ -
-                                                                     simTime().monotonicTime());
+                                                                     dispatcher_.timeSource().monotonicTime());
     EXPECT_EQ(86400, duration.count());
 
     if (protocols.size() == 2) {
@@ -226,7 +228,7 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
       EXPECT_EQ("", protocol2.hostname_);
       EXPECT_EQ(443, protocol2.port_);
       duration = std::chrono::duration_cast<std::chrono::seconds>(protocol2.expiration_ -
-                                                                  simTime().monotonicTime());
+                                                                  dispatcher_.timeSource().monotonicTime());
       EXPECT_EQ(60, duration.count());
     }
 
@@ -242,7 +244,7 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
   // Test once more to make sure we handle time advancing correctly.
   // the absolute expiration time in testAltSvc is expected to be 86400 so add
   // 60s to the default max age.
-  simTime().setMonotonicTime(simTime().monotonicTime() + std::chrono::seconds(60));
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(60));
   testAltSvc("h3-29=\":443\"; ma=86460|2000", "h3-29=\":443\"; ma=86460|2000");
 }
 
@@ -250,20 +252,20 @@ TEST_F(AlternateProtocolsCacheImplTest, InvalidString) {
   initialize();
   // Too many numbers
   EXPECT_FALSE(AlternateProtocolsCacheImpl::originDataFromString(
-                   "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1|2|3", simTime(), true)
+                   "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1|2|3", dispatcher_.timeSource(), true)
                    .has_value());
   // Non-numeric rtt
   EXPECT_FALSE(AlternateProtocolsCacheImpl::originDataFromString(
-                   "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|a", simTime(), true)
+                   "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|a", dispatcher_.timeSource(), true)
                    .has_value());
 
   // Standard entry with rtt.
   EXPECT_TRUE(AlternateProtocolsCacheImpl::originDataFromString(
-                  "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1", simTime(), true)
+                  "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1", dispatcher_.timeSource(), true)
                   .has_value());
   // Standard entry without rtt.
   EXPECT_TRUE(AlternateProtocolsCacheImpl::originDataFromString(
-                  "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60", simTime(), true)
+                  "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60", dispatcher_.timeSource(), true)
                   .has_value());
 }
 TEST_F(AlternateProtocolsCacheImplTest, CacheLoad) {

@@ -670,7 +670,8 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
   checkForIdleAndCloseIdleConnsIfDraining();
 }
 
-void ConnPoolImplBase::decrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client) {
+void ConnPoolImplBase::decrConnectingAndConnectedStreamCapacity(uint32_t delta,
+                                                                ActiveClient& client) {
   state_.decrConnectingAndConnectedStreamCapacity(delta);
   if (client.isConnecting()) {
     // If connecting, this client must have been serving early data streams, update the local
@@ -680,7 +681,8 @@ void ConnPoolImplBase::decrConnectingAndConnectedStreamCapacity(uint32_t delta, 
   }
 }
 
-void ConnPoolImplBase::incrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client) {
+void ConnPoolImplBase::incrConnectingAndConnectedStreamCapacity(uint32_t delta,
+                                                                ActiveClient& client) {
   state_.incrConnectingAndConnectedStreamCapacity(delta);
   if (client.isConnecting()) {
     connecting_stream_capacity_ += delta;

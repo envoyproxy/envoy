@@ -213,23 +213,26 @@ TEST_P(FilterIntegrationTest, RetryAfterHttp3ZeroRttHandshakeFailed) {
   fake_upstream_connection_.reset();
 
   // The 2nd request should go out over HTTP/3 because of the Alt-Svc information.
-  auto response2 = sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0,
-                                                /*upstream_index=*/1, timeout);
-  checkSimpleRequestSuccess(0, response_size, response.get());
+  auto response2 = sendRequestAndWaitForResponse(default_request_headers_, 0,
+                                                 default_response_headers_, response_size,
+                                                 /*upstream_index=*/1, timeout);
+  checkSimpleRequestSuccess(0, response_size, response2.get());
   EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_cx_http3_total")->value());
   // Close the h3 upstream connection so that the next request will create another connection.
- ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->close());
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 2);
+  fake_upstream_connection_.reset();
 
   // Stop the HTTP/3 fake upstream.
   fake_upstreams_[1]->cleanUp();
-  
- // The 3rd request should be sent over HTTP/3 as early data because of the cached 0-RTT credentials.
+
+  // The 3rd request should be sent over HTTP/3 as early data because of the cached 0-RTT
+  // credentials.
   auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   // Wait for the upstream to connect timeout and the failed early data request to be retried.
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
   EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
-   EXPECT_EQ(3u, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  EXPECT_EQ(3u, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
 
   // The retry should attempt both HTTP/3 and HTTP/2. And the TCP connection will win the race.
   waitForNextUpstreamRequest(0);
@@ -238,7 +241,17 @@ TEST_P(FilterIntegrationTest, RetryAfterHttp3ZeroRttHandshakeFailed) {
   checkSimpleRequestSuccess(0, response_size, response3.get());
   EXPECT_EQ(2u, test_server_->counter("cluster.cluster_0.upstream_cx_http2_total")->value());
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 4);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_connect_fail", 2);
+  EXPECT_EQ(3u, test_server_->counter("cluster.cluster_0.upstream_cx_http3_total")->value());
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_http3_broken")->value());
+
+  upstream_request_.reset();
+  // As HTTP/3 is marked broken, the following request shouldn't cause the grid to attempt HTTP/3 to
+  // upstream at all.
+  auto response4 = sendRequestAndWaitForResponse(default_request_headers_, 0,
+                                                 default_response_headers_, response_size,
+                                                 /*upstream_index=*/0, timeout);
+  checkSimpleRequestSuccess(0, response_size, response4.get());
 
   EXPECT_EQ(3u, test_server_->counter("cluster.cluster_0.upstream_cx_http3_total")->value());
 }

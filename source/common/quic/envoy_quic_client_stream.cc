@@ -312,9 +312,10 @@ void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {
 void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
                                                quic::ConnectionCloseSource source) {
   if (!end_stream_decoded_) {
-    runResetCallbacks(source == quic::ConnectionCloseSource::FROM_SELF
-                          ? quicErrorCodeToEnvoyLocalResetReason(error, session()->OneRttKeysAvailable())
-                          : quicErrorCodeToEnvoyRemoteResetReason(error));
+    runResetCallbacks(
+        source == quic::ConnectionCloseSource::FROM_SELF
+            ? quicErrorCodeToEnvoyLocalResetReason(error, session()->OneRttKeysAvailable())
+            : quicErrorCodeToEnvoyRemoteResetReason(error));
   }
   quic::QuicSpdyClientStream::OnConnectionClosed(error, source);
 }

@@ -104,14 +104,16 @@ Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStream
   }
 }
 
-Http::StreamResetReason quicErrorCodeToEnvoyLocalResetReason(quic::QuicErrorCode error, bool connected) {
+Http::StreamResetReason quicErrorCodeToEnvoyLocalResetReason(quic::QuicErrorCode error,
+                                                             bool connected) {
   switch (error) {
   case quic::QUIC_HANDSHAKE_FAILED:
   case quic::QUIC_HANDSHAKE_TIMEOUT:
     return Http::StreamResetReason::ConnectionFailure;
   case quic::QUIC_PACKET_WRITE_ERROR:
   case quic::QUIC_NETWORK_IDLE_TIMEOUT:
-    return connected ? Http::StreamResetReason::ConnectionTermination : Http::StreamResetReason::ConnectionFailure;
+    return connected ? Http::StreamResetReason::ConnectionTermination
+                     : Http::StreamResetReason::ConnectionFailure;
   case quic::QUIC_HTTP_FRAME_ERROR:
     return Http::StreamResetReason::ProtocolError;
   default:

@@ -3,7 +3,7 @@
 #include "source/common/http/alternate_protocols_cache_impl.h"
 #include "source/common/http/conn_pool_base.h"
 #include "source/common/http/http3/conn_pool.h"
-#include "source/common/http/http3_status_tracker.h"
+#include "source/common/http/http3_status_tracker_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -178,7 +178,7 @@ public:
   // Http3::PoolConnectResultCallback
   void onHandshakeComplete() override;
   void onZeroRttHandshakeFailed() override;
-  
+
 protected:
   // Set the required idle callback on the pool.
   void setupPool(ConnectionPool::Instance& pool);
@@ -208,7 +208,7 @@ private:
   Upstream::ClusterConnectivityState& state_;
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
-  Http3StatusTracker http3_status_tracker_;
+  std::unique_ptr<AlternateProtocolsCache::Http3StatusTracker> http3_status_tracker_;
   AlternateProtocolsCacheSharedPtr alternate_protocols_;
 
   // True iff this pool is draining. No new streams or connections should be created

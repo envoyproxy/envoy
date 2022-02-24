@@ -103,12 +103,14 @@ AlternateProtocolsCacheImpl::originDataFromString(absl::string_view origin_data_
 }
 
 AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
-    TimeSource& time_source, std::unique_ptr<KeyValueStore>&& key_value_store, size_t max_entries)
-    : time_source_(time_source), key_value_store_(std::move(key_value_store)),
+    Event::Dispatcher& dispatcher, std::unique_ptr<KeyValueStore>&& key_value_store,
+    size_t max_entries)
+    : dispatcher_(dispatcher), key_value_store_(std::move(key_value_store)),
       max_entries_(max_entries > 0 ? max_entries : 1024) {
   if (key_value_store_) {
     KeyValueStore::ConstIterateCb load = [this](const std::string& key, const std::string& value) {
-      absl::optional<OriginData> origin_data = originDataFromString(value, time_source_, true);
+      absl::optional<OriginData> origin_data =
+          originDataFromString(value, dispatcher_.timeSource(), true);
       absl::optional<Origin> origin = stringToOrigin(key);
       if (origin_data.has_value() && origin.has_value()) {
         setAlternativesImpl(origin.value(), origin_data.value().protocols);
@@ -167,7 +169,7 @@ void AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
     key_value_store_->remove(originToString(iter->first));
     protocols_.erase(iter);
   }
-  protocols_[origin] = OriginData{protocols, std::chrono::microseconds(0)};
+  protocols_[origin] = OriginData{protocols, std::chrono::microseconds(0), nullptr};
 }
 
 OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>>
@@ -179,7 +181,7 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
   std::vector<AlternateProtocol>& protocols = entry_it->second.protocols;
 
   auto original_size = protocols.size();
-  const MonotonicTime now = time_source_.monotonicTime();
+  const MonotonicTime now = dispatcher_.timeSource().monotonicTime();
   protocols.erase(std::remove_if(protocols.begin(), protocols.end(),
                                  [now](const AlternateProtocol& protocol) {
                                    return (now > protocol.expiration_);
@@ -202,6 +204,25 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
 }
 
 size_t AlternateProtocolsCacheImpl::size() const { return protocols_.size(); }
+
+std::unique_ptr<AlternateProtocolsCache::Http3StatusTracker>
+AlternateProtocolsCacheImpl::acquireHttp3StatusTracker(const Origin& origin) {
+  auto entry_it = protocols_.find(origin);
+  if (entry_it == protocols_.end()) {
+    return nullptr;
+  }
+  return std::move(entry_it->second.h3_status_tracker);
+}
+
+void AlternateProtocolsCacheImpl::storeHttp3StatusTracker(
+    const Origin& origin,
+    std::unique_ptr<AlternateProtocolsCache::Http3StatusTracker> h3_status_tracker) {
+  auto entry_it = protocols_.find(origin);
+  if (entry_it == protocols_.end()) {
+    return;
+  }
+  entry_it->second.h3_status_tracker = std::move(h3_status_tracker);
+}
 
 } // namespace Http
 } // namespace Envoy

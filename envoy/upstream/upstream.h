@@ -589,6 +589,7 @@ public:
   COUNTER(upstream_rq_timeout)                                                                     \
   COUNTER(upstream_rq_total)                                                                       \
   COUNTER(upstream_rq_tx_reset)                                                                    \
+  COUNTER(upstream_http3_broken)                                                                   \
   GAUGE(lb_subsets_active, Accumulate)                                                             \
   GAUGE(max_host_weight, NeverImport)                                                              \
   GAUGE(membership_degraded, NeverImport)                                                          \
