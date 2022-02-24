@@ -1,6 +1,7 @@
 package io.envoyproxy.envoymobile
 
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
+import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.EnvoyEngineImpl
 import io.envoyproxy.envoymobile.engine.EnvoyNativeFilterConfig
@@ -46,6 +47,7 @@ open class EngineBuilder(
   private var perTryIdleTimeoutSeconds = 15
   private var appVersion = "unspecified"
   private var appId = "unspecified"
+  private var trustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN
   private var virtualClusters = "[]"
   private var platformFilterChain = mutableListOf<EnvoyHTTPFilterFactory>()
   private var nativeFilterChain = mutableListOf<EnvoyNativeFilterConfig>()
@@ -378,6 +380,18 @@ open class EngineBuilder(
   }
 
   /**
+   * Set how the TrustChainVerification must be handled.
+   *
+   * @param trustChainVerification whether to mute TLS Cert verification - intended for testing
+   *
+   * @return this builder.
+   */
+  fun setTrustChainVerification(trustChainVerification: TrustChainVerification): EngineBuilder {
+    this.trustChainVerification = trustChainVerification
+    return this
+  }
+
+  /**
    * Add virtual cluster configuration.
    *
    * @param virtualClusters the JSON configuration string for virtual clusters.
@@ -433,6 +447,7 @@ open class EngineBuilder(
             perTryIdleTimeoutSeconds,
             appVersion,
             appId,
+            trustChainVerification,
             virtualClusters,
             nativeFilterChain,
             platformFilterChain,
@@ -466,6 +481,7 @@ open class EngineBuilder(
             perTryIdleTimeoutSeconds,
             appVersion,
             appId,
+            trustChainVerification,
             virtualClusters,
             nativeFilterChain,
             platformFilterChain,

@@ -16,7 +16,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
@@ -25,9 +24,8 @@ import io.netty.handler.ssl.ApplicationProtocolConfig.SelectedListenerFailureBeh
 import io.netty.handler.ssl.ApplicationProtocolConfig.SelectorFailureBehavior;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
-import io.netty.handler.ssl.OpenSslServerContext;
+import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 
 /**
  * Wrapper class to start a HTTP/2 test server.
@@ -157,9 +155,9 @@ public final class Http2TestServer {
       // exist. Just avoid a KeyManagerFactory as it's unnecessary for our testing.
       System.setProperty("io.netty.handler.ssl.openssl.useKeyManagerFactory", "false");
 
-      mSslCtx = new OpenSslServerContext(certFile, keyFile, null, null, Http2SecurityUtil.CIPHERS,
-                                         SupportedCipherSuiteFilter.INSTANCE,
-                                         applicationProtocolConfig, 0, 0);
+      mSslCtx = SslContextBuilder.forServer(certFile, keyFile)
+                    .applicationProtocolConfig(applicationProtocolConfig)
+                    .build();
 
       mHangingUrlLatch = hangingUrlLatch;
     }

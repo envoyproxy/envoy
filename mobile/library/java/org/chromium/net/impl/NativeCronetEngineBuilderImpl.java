@@ -1,10 +1,13 @@
 package org.chromium.net.impl;
 
+import static io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
+
 import android.content.Context;
 import io.envoyproxy.envoymobile.engine.AndroidEngineImpl;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitor;
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration;
+import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification;
 import io.envoyproxy.envoymobile.engine.EnvoyEngine;
 import io.envoyproxy.envoymobile.engine.EnvoyNativeFilterConfig;
 import io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker;
@@ -45,6 +48,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private int mPerTryIdleTimeoutSeconds = 15;
   private String mAppVersion = "unspecified";
   private String mAppId = "unspecified";
+  private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private String mVirtualClusters = "[]";
   private List<EnvoyHTTPFilterFactory> mPlatformFilterChain = Collections.emptyList();
   private List<EnvoyNativeFilterConfig> mNativeFilterChain = Collections.emptyList();
@@ -82,6 +86,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
         mEnableDnsFilterUnroutableFamilies, mEnableHappyEyeballs, mEnableInterfaceBinding,
         mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
         mStatsFlushSeconds, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion,
-        mAppId, mVirtualClusters, mNativeFilterChain, mPlatformFilterChain, mStringAccessors);
+        mAppId, mTrustChainVerification, mVirtualClusters, mNativeFilterChain, mPlatformFilterChain,
+        mStringAccessors);
   }
 }
