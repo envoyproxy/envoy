@@ -130,14 +130,14 @@ public:
   void addValidator(uint32_t threshold) {
     config_helper_.addConfigModifier([threshold](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* config_validator_typed_config = bootstrap.mutable_dynamic_resources()
-                                                ->mutable_cds_config()
-                                                ->mutable_api_config_source()
-                                                ->add_config_validators_typed_configs();
+      auto* config_validator_config = bootstrap.mutable_dynamic_resources()
+                                          ->mutable_cds_config()
+                                          ->mutable_api_config_source()
+                                          ->add_config_validators();
       envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;
       config.set_min_clusters_num(threshold);
-      config_validator_typed_config->mutable_typed_config()->PackFrom(config);
-      config_validator_typed_config->set_name("minimum_cluster_validator");
+      config_validator_config->mutable_typed_config()->PackFrom(config);
+      config_validator_config->set_name("minimum_cluster_validator");
     });
   }
 

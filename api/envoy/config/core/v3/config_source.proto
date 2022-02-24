@@ -119,7 +119,7 @@ message ApiConfigSource {
   // If the validator returns false or throws an exception, the config will be rejected by
   // the client, and a NACK will be sent.
   // [#extension-category: envoy.config.validators]
-  repeated TypedExtensionConfig config_validators_typed_configs = 9;
+  repeated TypedExtensionConfig config_validators = 9;
 }
 
 // Aggregated Discovery Service (ADS) options. This is currently empty, but when

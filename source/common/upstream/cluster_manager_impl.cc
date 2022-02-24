@@ -342,7 +342,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     Config::CustomConfigValidatorsPtr custom_config_validators =
         std::make_unique<Config::CustomConfigValidatorsImpl>(
             validation_context.dynamicValidationVisitor(), server,
-            dyn_resources.ads_config().config_validators_typed_configs());
+            dyn_resources.ads_config().config_validators());
 
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {

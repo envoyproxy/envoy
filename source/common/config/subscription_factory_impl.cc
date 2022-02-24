@@ -72,8 +72,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     case envoy::config::core::v3::ApiConfigSource::GRPC: {
       GrpcMuxSharedPtr mux;
       CustomConfigValidatorsPtr custom_config_validators =
-          std::make_unique<CustomConfigValidatorsImpl>(
-              validation_visitor_, server_, api_config_source.config_validators_typed_configs());
+          std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
+                                                       api_config_source.config_validators());
 
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
@@ -103,8 +103,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
       GrpcMuxSharedPtr mux;
       CustomConfigValidatorsPtr custom_config_validators =
-          std::make_unique<CustomConfigValidatorsImpl>(
-              validation_visitor_, server_, api_config_source.config_validators_typed_configs());
+          std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
+                                                       api_config_source.config_validators());
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
             Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
@@ -169,8 +169,8 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
                                                               api_config_source);
       CustomConfigValidatorsPtr custom_config_validators =
-          std::make_unique<CustomConfigValidatorsImpl>(
-              validation_visitor_, server_, api_config_source.config_validators_typed_configs());
+          std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
+                                                       api_config_source.config_validators());
 
       SubscriptionOptions options;
       // All Envoy collections currently are xDS resource graph roots and require node context
