@@ -15,6 +15,8 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
 
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
+
 using testing::Return;
 
 namespace Envoy {
@@ -103,6 +105,7 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
       info, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig().serverNameIndication(), port, false},
       dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_);
+
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
 
   EXPECT_EQ(session->config()->GetInitialRoundTripTimeUsToSend(), 5);

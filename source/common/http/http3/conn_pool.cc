@@ -12,6 +12,8 @@
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
+
 namespace Envoy {
 namespace Http {
 namespace Http3 {

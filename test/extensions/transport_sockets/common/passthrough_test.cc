@@ -110,8 +110,9 @@ TEST(PassthroughFactoryTest, TestDelegation) {
     factory->supportsAlpn();
   }
   {
-    EXPECT_CALL(*inner_factory, usesProxyProtocolOptions());
-    factory->usesProxyProtocolOptions();
+    std::vector<uint8_t> key;
+    EXPECT_CALL(*inner_factory, hashKey(_, _));
+    factory->hashKey(key, nullptr);
   }
 }
 

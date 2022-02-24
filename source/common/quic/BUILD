@@ -410,6 +410,7 @@ envoy_cc_library(
         "//envoy/server:transport_socket_config_interface",
         "//envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",

@@ -1659,7 +1659,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
 
   bool have_transport_socket_options = false;
   if (context && context->upstreamTransportSocketOptions()) {
-    context->upstreamTransportSocketOptions()->hashKey(hash_key, host->transportSocketFactory());
+    host->transportSocketFactory().hashKey(hash_key, context->upstreamTransportSocketOptions());
     have_transport_socket_options = true;
   }
 
@@ -1760,7 +1760,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl
   bool have_transport_socket_options = false;
   if (context != nullptr && context->upstreamTransportSocketOptions() != nullptr) {
     have_transport_socket_options = true;
-    context->upstreamTransportSocketOptions()->hashKey(hash_key, host->transportSocketFactory());
+    host->transportSocketFactory().hashKey(hash_key, context->upstreamTransportSocketOptions());
   }
 
   TcpConnPoolsContainer& container = parent_.host_tcp_conn_pool_map_[host];

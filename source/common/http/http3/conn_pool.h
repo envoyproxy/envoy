@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 #include "envoy/common/optref.h"
 #include "envoy/http/persistent_quic_info.h"
