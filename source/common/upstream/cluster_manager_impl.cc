@@ -1852,7 +1852,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
 #ifdef ENVOY_ENABLE_QUIC
     return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
-                                         priority, options, transport_socket_options, state, source,
+                                         priority, options, transport_socket_options, state,
                                          quic_stat_names_, {}, stats_, {});
 #else
     UNREFERENCED_PARAMETER(source);
