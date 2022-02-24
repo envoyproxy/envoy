@@ -93,7 +93,7 @@ public:
    */
   virtual DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) PURE;
   virtual absl::string_view getLocalIp() PURE;
-  virtual std::shared_ptr<SipSettings> settings() PURE;
+  virtual std::shared_ptr<SipSettings> settings() const PURE;
 };
 
 /**

@@ -90,14 +90,8 @@ void Decoder::complete() {
 
 FilterStatus Decoder::onData(Buffer::Instance& data, bool continue_handling) {
   if (continue_handling) {
-    /**
-     * means previous handling suspended, continue handling last request
-     */
-    State rv = state_machine_->run();
-
-    if (rv == State::Done) {
-      // complete();
-    }
+    // means previous handling suspended, continue handling last request
+    state_machine_->run();
     complete();
   } else {
     reassemble(data);
@@ -117,10 +111,8 @@ int Decoder::reassemble(Buffer::Instance& data) {
   while (remaining_data.length() != 0) {
     ssize_t content_pos = remaining_data.search("\n\r\n", strlen("\n\r\n"), 0);
     if (content_pos != -1) {
-      /**
-       * Get the Content-Length header value so that we can find
-       * out the full message length.
-       */
+      // Get the Content-Length header value so that we can find
+      // out the full message length.
       content_pos += strlen("\n\r\n"); // move to the line after the CRLF line.
 
       ssize_t content_length_start =
@@ -132,12 +124,10 @@ int Decoder::reassemble(Buffer::Instance& data) {
       ssize_t content_length_end = remaining_data.search(
           "\r\n", strlen("\r\n"), content_length_start + strlen("Content-Length:"), content_pos);
 
-      /**
-       * The "\n\r\n" is always included in remaining_data, so could not return -1
-       * if (content_length_end == -1) {
-       *   break;
-       * }
-       */
+      // The "\n\r\n" is always included in remaining_data, so could not return -1
+      // if (content_length_end == -1) {
+      //   break;
+      // }
 
       char len[10]{}; // temporary storage
       remaining_data.copyOut(content_length_start + strlen("Content-Length:"),
@@ -146,25 +136,19 @@ int Decoder::reassemble(Buffer::Instance& data) {
 
       clen = std::atoi(len);
 
-      /**
-       * atoi return value >= 0, could not < 0
-       * if (clen < static_cast<size_t>(0)) {
-       *   break;
-       * }
-       */
+      // atoi return value >= 0, could not < 0
+      // if (clen < static_cast<size_t>(0)) {
+      //   break;
+      // }
 
       full_msg_len = content_pos + clen;
     }
 
-    /**
-     * Check for partial message received.
-     */
+    // Check for partial message received.
     if ((full_msg_len == 0) || (full_msg_len > remaining_data.length())) {
       break;
     } else {
-      /**
-       * We have a full SIP message; put it on the dispatch queue.
-       */
+      // We have a full SIP message; put it on the dispatch queue.
       Buffer::OwnedImpl message{};
       message.move(remaining_data, full_msg_len);
       onDataReady(message);
@@ -566,12 +550,10 @@ int Decoder::decode() {
 
   while (!msg.empty()) {
     std::string::size_type crlf = msg.find("\r\n");
-    /**
-     * After message reassemble, this condition could not be true
-     * if (crlf == absl::string_view::npos) {
-     *   break;
-     * }
-     */
+    // After message reassemble, this condition could not be true
+    // if (crlf == absl::string_view::npos) {
+    //   break;
+    // }
 
     if (current_header_ == HeaderType::TopLine) {
       // Sip Request Line

@@ -82,7 +82,6 @@ RouteConstSharedPtr GeneralRouteEntryImpl::matches(MessageMetadata& metadata) co
     }
   }
   auto domain = metadata.getDomainFromHeaderParameter(header, parameter_);
-  // if (domain_ == metadata.getDomainFromHeaderParameter(header, parameter_)) {
   if (domain_ == domain) {
     ENVOY_LOG(trace, "Route matched with header: {}, parameter: {} and domain: {}", header_,
               parameter_, domain_);
@@ -236,7 +235,6 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
     ENVOY_STREAM_LOG(debug, "no route matched", *callbacks_);
     stats_.route_missing_.inc();
     throw AppException(AppExceptionType::UnknownMethod, "envoy no match route found");
-    return FilterStatus::StopIteration;
   }
 
   route_entry_ = route_->routeEntry();
@@ -249,7 +247,6 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
     stats_.unknown_cluster_.inc();
     throw AppException(AppExceptionType::InternalError,
                        fmt::format("unknown cluster '{}'", cluster_name));
-    return FilterStatus::StopIteration;
   }
 
   cluster_ = cluster->info();
@@ -259,7 +256,6 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
     stats_.upstream_rq_maintenance_mode_.inc();
     throw AppException(AppExceptionType::InternalError,
                        fmt::format("maintenance mode for cluster '{}'", cluster_name));
-    return FilterStatus::StopIteration;
   }
 
   handleAffinity();
@@ -665,7 +661,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
 
 absl::string_view ResponseDecoder::getLocalIp() { return parent_.localAddress(); }
 
-std::shared_ptr<SipSettings> ResponseDecoder::settings() { return parent_.settings(); }
+std::shared_ptr<SipSettings> ResponseDecoder::settings() const { return parent_.settings(); }
 
 } // namespace Router
 } // namespace SipProxy

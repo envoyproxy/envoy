@@ -55,10 +55,9 @@ public:
   // SipProxy::DecoderCallbacks
   MOCK_METHOD(DecoderEventHandler&, newDecoderEventHandler, (MessageMetadataSharedPtr));
   MOCK_METHOD(absl::string_view, getLocalIp, ());
-  MOCK_METHOD(std::string, getOwnDomain, ());
   MOCK_METHOD(std::string, getDomainMatchParamName, ());
   MOCK_METHOD(void, setMetadata, (MessageMetadataSharedPtr metadata));
-  MOCK_METHOD(std::shared_ptr<SipSettings>, settings, ());
+  MOCK_METHOD(std::shared_ptr<SipSettings>, settings, (), (const));
 
   std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>
       local_services_;
@@ -116,7 +115,7 @@ public:
   MOCK_METHOD(void, resetDownstreamConnection, ());
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(std::shared_ptr<Router::TransactionInfos>, transactionInfos, ());
-  MOCK_METHOD(std::shared_ptr<SipProxy::SipSettings>, settings, ());
+  MOCK_METHOD(std::shared_ptr<SipProxy::SipSettings>, settings, (), (const));
   MOCK_METHOD(std::shared_ptr<SipProxy::TrafficRoutingAssistantHandler>, traHandler, ());
   MOCK_METHOD(void, onReset, ());
   MOCK_METHOD(void, pushIntoPendingList,

@@ -74,8 +74,9 @@ public:
   void subscribeTrafficRoutingAssistant(const std::string& type);
   void complete(const TrafficRoutingAssistant::ResponseType& type, const std::string& message_type,
                 const absl::any& resp) override;
-  void doSubscribe(const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity
-                       customized_affinity);
+  void
+  doSubscribe(const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity&
+                  customized_affinity);
 
 private:
   ConnectionManager& parent_;
@@ -129,7 +130,7 @@ public:
         ->addressAsString();
   }
 
-  std::shared_ptr<SipSettings> settings() override { return config_.settings(); }
+  std::shared_ptr<SipSettings> settings() const override { return config_.settings(); }
 
   void continueHanding(const std::string& key);
   void continueHanding(MessageMetadataSharedPtr metadata,
@@ -182,7 +183,7 @@ private:
       return parent_.parent_.getLocalIp();
     }
 
-    std::shared_ptr<SipSettings> settings() override { return parent_.parent_.settings(); }
+    std::shared_ptr<SipSettings> settings() const override { return parent_.parent_.settings(); }
 
     std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() {
       return parent_.parent_.tra_handler_;
@@ -217,7 +218,7 @@ private:
     std::shared_ptr<Router::TransactionInfos> transactionInfos() override {
       return parent_.transactionInfos();
     }
-    std::shared_ptr<SipSettings> settings() override { return parent_.settings(); }
+    std::shared_ptr<SipSettings> settings() const override { return parent_.settings(); }
     std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
       return parent_.traHandler();
     }
@@ -313,7 +314,7 @@ private:
     std::shared_ptr<Router::TransactionInfos> transactionInfos() override {
       return parent_.transaction_infos_;
     }
-    std::shared_ptr<SipSettings> settings() override { return parent_.config_.settings(); }
+    std::shared_ptr<SipSettings> settings() const override { return parent_.config_.settings(); }
     void onReset() override;
     std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
       return parent_.tra_handler_;

@@ -52,7 +52,7 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
   }
 
   if (activetrans.metadata()->queryMap()[type]) {
-    this->parent_.pushIntoPendingList(type, key, activetrans, [&]() {
+    parent_.pushIntoPendingList(type, key, activetrans, [&]() {
       if (tra_client_) {
         tra_client_->retrieveTrafficRoutingAssistant(type, key, Tracing::NullSpan::instance(),
                                                      stream_info_);
@@ -142,7 +142,7 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
 }
 
 void TrafficRoutingAssistantHandler::doSubscribe(
-    const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity
+    const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity&
         customized_affinity) {
   for (const auto& aff : customized_affinity.entries()) {
     if (aff.subscribe() == true &&

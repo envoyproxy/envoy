@@ -87,7 +87,7 @@ public:
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
 
   virtual std::shared_ptr<Router::TransactionInfos> transactionInfos() PURE;
-  virtual std::shared_ptr<SipProxy::SipSettings> settings() PURE;
+  virtual std::shared_ptr<SipProxy::SipSettings> settings() const PURE;
   virtual std::shared_ptr<SipProxy::TrafficRoutingAssistantHandler> traHandler() PURE;
   virtual void onReset() PURE;
   virtual void continueHanding(const std::string& key) PURE;

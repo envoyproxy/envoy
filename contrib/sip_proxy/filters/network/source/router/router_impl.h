@@ -334,7 +334,7 @@ public:
     return *this;
   }
   absl::string_view getLocalIp() override;
-  std::shared_ptr<SipSettings> settings() override;
+  std::shared_ptr<SipSettings> settings() const override;
 
 private:
   UpstreamRequest& parent_;

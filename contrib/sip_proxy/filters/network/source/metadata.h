@@ -198,7 +198,6 @@ public:
       t = value.substr(0, value.find_first_of(": "));
       v = value.substr(value.find_first_of(": ") + strlen(": "),
                        value.length() - t.length() - strlen(": "));
-      // ENVOY_LOG(error, "t:{}, v:{}", t, v);
       try {
         auto headerIter = absl::get<VectorPairHeader>(msg_header_list_[type]).begin();
         while (headerIter != absl::get<VectorPairHeader>(msg_header_list_[type]).end()) {
