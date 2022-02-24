@@ -22,7 +22,7 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
   quic::QuicConfig quic_config_;
-  // The cluster buffer limits.
+  // The connection send buffer limits from cluster config.
   const uint32_t buffer_limit_;
   // This arguably should not be shared across connections but as Envoy doesn't
   // support push promise it's really moot point.
