@@ -142,9 +142,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "ssl_socket_interface",
     hdrs = [
-          "ssl_socket.h",
-          "ssl_handshaker.h",
-          "connection_info_impl_base.h"
+         "connection_info_impl_base.h"
+         "ssl_handshaker.h",
+         "ssl_socket.h",
 ],
 )
 
@@ -166,9 +166,9 @@ envoy_cc_library(
     # TLS is core functionality.
     visibility = ["//visibility:public"],
     deps = [
+        ":ssl_socket_interface",
         ":stats_lib",
         ":utility_lib",
-        ":ssl_socket_interface",
         "//envoy/ssl:context_config_interface",
         "//envoy/ssl:context_interface",
         "//envoy/ssl:context_manager_interface",
