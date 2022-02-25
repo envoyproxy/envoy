@@ -11,8 +11,9 @@
 namespace Envoy {
 namespace Server {
 
+namespace {
 // Build the level string to level enum map.
-static absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> buildLevelMap() {
+absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> buildLevelMap() {
   absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> levels;
 
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
@@ -23,6 +24,7 @@ static absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> buildLe
 
   return levels;
 }
+} // namespace
 
 LogsHandler::LogsHandler(Server::Instance& server)
     : HandlerContextBase(server), log_levels_(buildLevelMap()) {}

@@ -158,11 +158,17 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
     return;
   }
 
-  // TODO(mattklein123): We trust callers currently to not do anything insane here if they set up
-  // buffering on an async client call. We should potentially think about limiting the size of
-  // buffering that we allow here.
   if (buffered_body_ != nullptr) {
-    buffered_body_->add(data);
+    // TODO(shikugawa): Currently, data is dropped when the retry buffer overflows and there is no
+    // ability implement any error handling. We need to implement buffer overflow handling in the
+    // future. Options include configuring the max buffer size, or for use cases like gRPC
+    // streaming, deleting old data in the retry buffer.
+    if (buffered_body_->length() + data.length() > kBufferLimitForRetry) {
+      ENVOY_LOG_EVERY_POW_2(
+          warn, "the buffer size limit (64KB) for async client retries has been exceeded.");
+    } else {
+      buffered_body_->add(data);
+    }
   }
 
   router_.decodeData(data, end_stream);
