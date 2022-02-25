@@ -2,12 +2,14 @@
 
 #include <functional>
 #include <memory>
+#include <sstream>
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "source/common/common/enum_to_int.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/network/socket_impl.h"
@@ -263,6 +265,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
         [this](auto&... params) -> bool { return this->compareRewritePath(params...); },
         [this](auto&... params) -> bool { return this->compareRewriteHost(params...); },
         [this](auto&... params) -> bool { return this->compareRedirectPath(params...); },
+        [this](auto&... params) -> bool { return this->compareRedirectCode(params...); },
         [this](auto&... params) -> bool { return this->compareRequestHeaderFields(params...); },
         [this](auto&... params) -> bool { return this->compareResponseHeaderFields(params...); },
     };
@@ -423,6 +426,29 @@ bool RouterCheckTool::compareRedirectPath(
   return compareRedirectPath(tool_config, expected.path_redirect().value());
 }
 
+bool RouterCheckTool::compareRedirectCode(ToolConfig& tool_config, uint32_t expected) {
+  uint32_t actual = 0;
+  if (tool_config.route_->directResponseEntry() != nullptr) {
+    actual = Envoy::enumToInt(tool_config.route_->directResponseEntry()->responseCode());
+  }
+  const bool matches = compareResults(actual, expected, "code_redirect");
+  if (matches && tool_config.route_->directResponseEntry() != nullptr) {
+    coverage_.markRedirectCodeCovered(*tool_config.route_);
+  }
+  return matches;
+}
+
+bool RouterCheckTool::compareRedirectCode(
+    ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
+  if (!expected.has_code_redirect()) {
+    return true;
+  }
+  if (tool_config.route_ == nullptr) {
+    return compareResults(0u, expected.code_redirect().value(), "code_redirect");
+  }
+  return compareRedirectCode(tool_config, expected.code_redirect().value());
+}
+
 bool RouterCheckTool::compareRequestHeaderFields(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
@@ -511,7 +537,8 @@ bool RouterCheckTool::matchHeaderField(const HeaderMap& header_map,
   return false;
 }
 
-bool RouterCheckTool::compareResults(const std::string& actual, const std::string& expected,
+template <typename U, typename V>
+bool RouterCheckTool::compareResults(const U& actual, const V& expected,
                                      const std::string& test_type, const bool expect_match) {
   if ((expected == actual) != expect_match) {
     reportFailure(actual, expected, test_type, expect_match);
@@ -520,11 +547,14 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
   return true;
 }
 
-void RouterCheckTool::reportFailure(const std::string& actual, const std::string& expected,
+template <typename U, typename V>
+void RouterCheckTool::reportFailure(const U& actual, const V& expected,
                                     const std::string& test_type, const bool expect_match) {
-  tests_.back().second.emplace_back("expected: [" + expected + "], " +
-                                    "actual: " + (expect_match ? "" : "NOT ") + "[" + actual +
-                                    "]," + " test type: " + test_type);
+  std::stringstream ss;
+  ss << "expected: [" << expected << "], actual: " << (expect_match ? "" : "NOT ") << "[" << actual
+     << "],"
+     << " test type: " << test_type;
+  tests_.back().second.emplace_back(ss.str());
 }
 
 void RouterCheckTool::printResults() {
