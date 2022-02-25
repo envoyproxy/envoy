@@ -320,6 +320,11 @@ void RedisCluster::RedisDiscoverySession::updateDnsStats(
  * We use the count of hostnames that require resolution to decide when the resolution process is
  * completed, and then call the post-resolution hooks.
  *
+ * If resolving any one of the primary replicas fails, we stop the resolution process and reset
+ * the timers to retry the resolution. Failure to resolve a replica, on the other hand does not
+ * stop the process. If we replica resolution fails, we simply log a warning, and move to resolving
+ * the rest.
+ *
  * @param slots the list of slots which may need DNS resolution
  * @param address_resolution_required_cnt the number of hostnames that need DNS resolution
  */
@@ -364,6 +369,8 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
 /**
  * Resolve the replicas in a cluster entry. If there are no replicas, simply return.
  * If all the hostnames have been resolved, call post-resolution methods.
+ * Failure to resolve a replica does not stop the overall resolution process. We log a
+ * warning, and move to the next one.
  *
  * @param slots the list of slots which may need DNS resolution
  * @param index the specific index into `slots` whose replicas need to be resolved
