@@ -88,8 +88,6 @@ public:
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
   bool verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates, std::string& error_details);
-  static int getSslExDataCBIdx() { return ssl_ex_data_callback_index_; };
-  static int getSslExDataCfgIdx() { return ssl_ex_data_config_index_; };
 
 protected:
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
@@ -139,9 +137,6 @@ protected:
   void enableTlsKeyLog();
   void disableTlsKeyLog();
   static void keylogCallback(const SSL* ssl, const char* line);
-  static int ssl_ex_data_callback_index_;
-  static int ssl_ex_data_config_index_;
-  bool enable_tls_keylog_;
 };
 
 using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;

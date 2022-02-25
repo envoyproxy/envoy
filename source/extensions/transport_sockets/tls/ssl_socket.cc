@@ -65,6 +65,20 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
   }
 }
 
+int SslSocket::sslSocketIndex() {
+  CONSTRUCT_ON_FIRST_USE(int, []() -> int {
+    int ssl_socket_index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+    RELEASE_ASSERT(ssl_socket_index >= 0, "");
+    return ssl_socket_index;
+  }());
+}
+
+SslSocket& SslSocket::get(const SSL* ssl) {
+  auto ssl_socket = static_cast<SslSocket*>(SSL_get_ex_data(ssl, sslSocketIndex()));
+  ASSERT(ssl_socket);
+  return *ssl_socket;
+}
+
 void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
@@ -78,9 +92,7 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   // Use custom BIO that reads from/writes to IoHandle
   BIO* bio = BIO_new_io_handle(&callbacks_->ioHandle());
   SSL_set_bio(rawSsl(), bio, bio);
-  SSL_set_ex_data(rawSsl(), ctx_->getSslExDataCBIdx(), static_cast<void*>(callbacks_));
-  SSL_set_ex_data(rawSsl(), ctx_->getSslExDataCfgIdx(),
-                  static_cast<void*>(const_cast<Ssl::ContextConfig*>(&config_)));
+  SSL_set_ex_data(rawSsl(), sslSocketIndex(), static_cast<void*>(this));
 }
 
 SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {

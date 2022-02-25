@@ -87,8 +87,9 @@ public:
       return *this;
     }
 
-    ServerSslOptions& setTlsKeyLogFilter(int mode) {
-      tls_keylog_filter_mode_ = mode;
+    ServerSslOptions& setTlsKeyLogFilter(bool local, bool remote) {
+      keylog_local_filter_ = local;
+      keylog_remote_filter_ = remote;
       return *this;
     }
 
@@ -101,7 +102,8 @@ public:
     bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
     bool expect_client_ecdsa_cert_{false};
-    int tls_keylog_filter_mode_{0};
+    bool keylog_local_filter_{false};
+    bool keylog_remote_filter_{false};
     std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
         san_matchers_{};
   };
@@ -120,7 +122,7 @@ public:
 
   static void initializeTlsKeyLog(
       envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
-      int mode);
+      bool keylog_local_filter, bool keylog_remote_filter);
   using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v3::Bootstrap&)>;
   using HttpModifierFunction = std::function<void(HttpConnectionManager&)>;
 

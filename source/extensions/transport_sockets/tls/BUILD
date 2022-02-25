@@ -140,6 +140,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ssl_socket_interface",
+    hdrs = [
+          "ssl_socket.h",
+          "ssl_handshaker.h",
+          "connection_info_impl_base.h"
+],
+)
+
+envoy_cc_library(
     name = "context_lib",
     srcs = [
         "context_impl.cc",
@@ -159,6 +168,7 @@ envoy_cc_library(
     deps = [
         ":stats_lib",
         ":utility_lib",
+        ":ssl_socket_interface",
         "//envoy/ssl:context_config_interface",
         "//envoy/ssl:context_interface",
         "//envoy/ssl:context_manager_interface",

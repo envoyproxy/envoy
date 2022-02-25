@@ -190,7 +190,8 @@ ContextConfigImpl::ContextConfigImpl(
   if (config.has_tls_keylog()) {
     if (config.tls_keylog().local_address_range_size() == 0 &&
         config.tls_keylog().remote_address_range_size() == 0) {
-      throw EnvoyException(fmt::format("At least one of src or dst should be set for TLS key log"));
+      throw EnvoyException(
+          fmt::format("At least one of local or remote should be set for TLS key log"));
     }
     access_log_ = factory_context.accessLogManager().createAccessLog(
         Filesystem::FilePathAndType{Filesystem::DestinationType::File, tls_keylog_path_});

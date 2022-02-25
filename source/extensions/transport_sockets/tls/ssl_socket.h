@@ -74,6 +74,8 @@ public:
   const Envoy::Ssl::ContextConfig& config() const { return config_; }
 
   SSL* rawSslForTest() const { return rawSsl(); }
+  static int sslSocketIndex();
+  static SslSocket& get(const SSL* ssl);
 
 protected:
   SSL* rawSsl() const { return info_->ssl(); }

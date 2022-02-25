@@ -1213,23 +1213,24 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
 }
 
 void ConfigHelper::initializeTlsKeyLog(
-    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& tls_context, int mode) {
-  if (mode == 0) {
+    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& tls_context,
+    bool keylog_local_filter, bool keylog_remote_filter) {
+  if (!keylog_local_filter && !keylog_local_filter) {
     return;
   }
   auto tls_keylog_path = tls_context.mutable_tls_keylog()->mutable_logfile_path();
 #ifdef _MSC_VER
-  *tls_keylog_path = std::string("nul");
+  *tls_keylog_path = std::string("%temp%\\keylog");
 #else
-  *tls_keylog_path = std::string("/dev/null");
+  *tls_keylog_path = std::string("/tmp/keylog");
 #endif
-  if (mode & 0x1) {
+  if (keylog_local_filter) {
     auto tls_keylog_local = tls_context.mutable_tls_keylog()->mutable_local_address_range();
     auto new_element_local = tls_keylog_local->Add();
     new_element_local->set_address_prefix("127.0.0.1");
     new_element_local->mutable_prefix_len()->set_value(32);
   }
-  if (mode & 0x10) {
+  if (keylog_remote_filter) {
     auto tls_keylog_remote = tls_context.mutable_tls_keylog()->mutable_remote_address_range();
     auto new_element_remote = tls_keylog_remote->Add();
     new_element_remote->set_address_prefix("127.0.0.1");
@@ -1285,7 +1286,8 @@ void ConfigHelper::initializeTls(
     *validation_context->mutable_match_typed_subject_alt_names() = {options.san_matchers_.begin(),
                                                                     options.san_matchers_.end()};
   }
-  initializeTlsKeyLog(common_tls_context, options.tls_keylog_filter_mode_);
+  initializeTlsKeyLog(common_tls_context, options.keylog_local_filter_,
+                      options.keylog_remote_filter_);
 }
 
 void ConfigHelper::renameListener(const std::string& name) {
