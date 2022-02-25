@@ -89,6 +89,11 @@ public:
    * @return whether to validate certificate chain with all CRL or not.
    */
   virtual bool onlyVerifyLeafCertificateCrl() const PURE;
+
+  /**
+   * @return the max depth used when verifying the certificate-chain
+   */
+  virtual const absl::optional<uint32_t> maxVerifyDepth() const PURE;
 };
 
 using CertificateValidationContextConfigPtr = std::unique_ptr<CertificateValidationContextConfig>;

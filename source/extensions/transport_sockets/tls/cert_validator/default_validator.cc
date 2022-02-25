@@ -455,6 +455,10 @@ void DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx, bool require
   if (require_client_cert) {
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
+  // Set the verify_depth
+  if (config_->maxVerifyDepth() != absl::nullopt) {
+    SSL_CTX_set_verify_depth(ctx, config_->maxVerifyDepth().value());
+  }
 }
 
 Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() const {

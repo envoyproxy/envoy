@@ -98,6 +98,30 @@ generate_selfsigned_x509_cert() {
     generate_info_header "$output_prefix"
 }
 
+# $1=<CA name>
+# Generates a chain of 3 intermediate certs in test_long_cert_chain
+# and a cert signed by this in test_random_cert.pem
+generate_cert_chain() {
+    local certname
+    local ca_name="${1}"
+    rm test_long_cert_chain.pem
+    touch test_long_cert_chain.pem
+    for x in {1..4}; do
+        certname="i$x"
+        if [[ $x -gt 1 ]]
+        then
+            ca_name="i$((x - 1))"
+        fi    
+        echo $x: $certname $ca_name
+        generate_ca $certname $ca_name
+    done
+    for x in {1..3}; do
+        cat "i${x}_cert.pem" >> test_long_cert_chain.pem
+    done
+    mv i4_cert.pem test_random_cert.pem
+}
+    
+
 # Generate ca_cert.pem.
 generate_ca ca
 
@@ -106,6 +130,9 @@ generate_ca intermediate_ca ca
 
 # Concatenate intermediate_ca_cert.pem and ca_cert.pem to create valid certificate chain.
 cat intermediate_ca_cert.pem ca_cert.pem > intermediate_ca_cert_chain.pem
+
+# Generate a cert-chain with 4 intermediate certs
+generate_cert_chain ca
 
 # Generate fake_ca_cert.pem.
 generate_ca fake_ca
