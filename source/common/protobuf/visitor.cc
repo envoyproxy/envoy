@@ -16,10 +16,10 @@ void traverseMessage(ConstProtoVisitor& visitor, const Protobuf::Message& messag
         TypeUtil::typeUrlToDescriptorFullName(any_message->type_url());
     const Protobuf::Descriptor* inner_descriptor =
         Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(
-            static_cast<std::string>(inner_type_name));
+            std::string(inner_type_name));
     auto* inner_message_prototype =
         Protobuf::MessageFactory::generated_factory()->GetPrototype(inner_descriptor);
-    auto* inner_message = inner_message_prototype->New();
+    std::unique_ptr<Protobuf::Message> inner_message(inner_message_prototype->New());
     MessageUtil::unpackTo(*any_message, *inner_message);
     traverseMessage(visitor, *inner_message, recurse_into_any);
     return;
