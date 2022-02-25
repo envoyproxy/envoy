@@ -598,8 +598,9 @@ public:
       Envoy::Extensions::Upstreams::Http::ProtocolOptionsConfigImpl;
   ClusterInfoImpl(const envoy::config::cluster::v3::Cluster& config,
                   const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
-                  TransportSocketMatcherPtr&& socket_matcher, const Stats::ScopeSharedPtr& stats_scope,
-                  bool added_via_api, Server::Configuration::TransportSocketFactoryContext&);
+                  TransportSocketMatcherPtr&& socket_matcher,
+                  const Stats::ScopeSharedPtr& stats_scope, bool added_via_api,
+                  Server::Configuration::TransportSocketFactoryContext&);
 
   static ClusterStats generateStats(Stats::Scope& scope,
                                     const ClusterStatNames& cluster_stat_names);
@@ -905,7 +906,8 @@ public:
 protected:
   ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                   Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                  const Stats::ScopeSharedPtr& stats_scope, bool added_via_api, TimeSource& time_source);
+                  const Stats::ScopeSharedPtr& stats_scope, bool added_via_api,
+                  TimeSource& time_source);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
