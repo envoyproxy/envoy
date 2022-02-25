@@ -211,21 +211,6 @@ class Filter : public WriteFilter, public ReadFilter {};
 using FilterSharedPtr = std::shared_ptr<Filter>;
 
 /**
- * Matching data providing network specific data to the match tree.
- */
-class NetworkMatchingData {
-public:
-  static absl::string_view name() { return "network"; }
-
-  virtual ~NetworkMatchingData() = default;
-
-  /**
-   * @return the source IP of the matching data.
-   */
-  virtual OptRef<const Address::Ip> sourceIp() const PURE;
-};
-
-/**
  * Interface for adding individual network filters to a manager.
  */
 class FilterManager {
