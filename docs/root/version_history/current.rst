@@ -21,6 +21,7 @@ Minor Behavior Changes
 * http: when writing custom filters, `injectEncodedDataToFilterChain` and `injectDecodedDataToFilterChain` now trigger sending of headers if they were not yet sent due to `StopIteration`. Previously, calling one of the inject functions in that state would trigger an assertion. See issue #19891 for more details.
 * perf: ssl contexts are now tracked without scan based garbage collection and greatly improved the performance on secret update.
 * sip-proxy: add customized affinity support by adding :ref:`tra_service_config <envoy_v3_api_msg_extensions.filters.network.sip_proxy.tra.v3alpha.TraServiceConfig>` and :ref:`customized_affinity <envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinity>`.
+* sip-proxy: add customized affinity support by adding ``tra_service_config`` and ``customized_affinity``.
 * sip-proxy: add ``503`` support, when there are something wrong occured, ``503 Service Unavailable`` send back to downstream.
 
 Bug Fixes
