@@ -62,6 +62,31 @@ struct UdpProxyUpstreamStats {
   ALL_UDP_PROXY_UPSTREAM_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+/**
+ * Struct definition for UDP Session access logging.
+ */
+struct UdpSessionStats {
+  SystemTime start_time;
+  uint64_t downstream_sess_rx_bytes;
+  uint64_t downstream_sess_rx_errors;
+  uint64_t downstream_sess_rx_datagrams;
+  uint64_t downstream_sess_tx_bytes;
+  uint64_t downstream_sess_tx_errors;
+  uint64_t downstream_sess_tx_datagrams;
+  uint64_t downstream_sess_total;
+  uint64_t idle_timeout;
+
+  uint64_t upstream_sess_rx_bytes;
+  uint64_t upstream_sess_rx_errors;
+  uint64_t upstream_sess_rx_datagrams;
+  uint64_t upstream_sess_tx_bytes;
+  uint64_t upstream_sess_tx_errors;
+  uint64_t upstream_sess_tx_datagrams;
+  uint64_t upstream_overflow;
+  uint64_t upstream_none_healthy;
+  uint64_t upstream_datagrams_dropped;
+};
+
 class UdpProxyFilterConfig {
 public:
   UdpProxyFilterConfig(Upstream::ClusterManager& cluster_manager, TimeSource& time_source,

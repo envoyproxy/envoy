@@ -29,18 +29,17 @@ private:
   Formatter::FormatterPtr formatter_;
 };
 
-using Extensions::UdpFilters::UdpProxy::UdpProxyFilter;
+using Extensions::UdpFilters::UdpProxy::UdpSessionStats;
 /**
  * Access log Instance of UDP proxy that writes logs to a file.
  */
-class UdpFileAccessLog{
+class UdpFileAccessLog {
 public:
   UdpFileAccessLog(const Filesystem::FilePathAndType& access_log_file_info,
-                AccessLog::FilterPtr&& filter, Formatter::FormatterPtr&& formatter,
-                AccessLog::AccessLogManager& log_manager);
+                   Formatter::FormatterPtr&& formatter, AccessLog::AccessLogManager& log_manager);
 
 private:
-  void emitLog(const UdpProxyFilter& udp_filter);
+  void emitLog(const UdpSessionStats& udp_stats);
 
   AccessLog::AccessLogFileSharedPtr log_file_;
   Formatter::FormatterPtr formatter_;
