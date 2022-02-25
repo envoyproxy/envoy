@@ -32,7 +32,7 @@ class EdsClusterImpl
 public:
   EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                  Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                 const Stats::ScopeSharedPtr& stats_scope, bool added_via_api);
+                 Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return initialize_phase_; }
@@ -115,7 +115,7 @@ private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
       const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      const Stats::ScopeSharedPtr& stats_scope) override;
+      Stats::ScopePtr&& stats_scope) override;
 };
 
 } // namespace Upstream

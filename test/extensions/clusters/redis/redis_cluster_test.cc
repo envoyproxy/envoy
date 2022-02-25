@@ -99,7 +99,7 @@ protected:
     expectRedisSessionCreated();
     NiceMock<Upstream::MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
-    Envoy::Stats::ScopeSharedPtr scope = stats_store_.createScope(fmt::format(
+    Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -128,7 +128,7 @@ protected:
   void setupFactoryFromV3Yaml(const std::string& yaml) {
     NiceMock<Upstream::MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
-    Envoy::Stats::ScopeSharedPtr scope = stats_store_.createScope(fmt::format(
+    Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(

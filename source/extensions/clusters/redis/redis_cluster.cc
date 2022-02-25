@@ -22,7 +22,7 @@ RedisCluster::RedisCluster(
     Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
     Network::DnsResolverSharedPtr dns_resolver,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    const Stats::ScopeSharedPtr& stats_scope, bool added_via_api,
+    Stats::ScopePtr&& stats_scope, bool added_via_api,
     ClusterSlotUpdateCallBackSharedPtr lb_factory)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                                        added_via_api,
@@ -401,7 +401,7 @@ RedisClusterFactory::createClusterWithConfig(
     const envoy::extensions::clusters::redis::v3::RedisClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-    Envoy::const Stats::ScopeSharedPtr& stats_scope) {
+    Envoy::Stats::ScopePtr&& stats_scope) {
   if (!cluster.has_cluster_type() || cluster.cluster_type().name() != "envoy.clusters.redis") {
     throw EnvoyException("Redis cluster can only created with redis cluster type.");
   }

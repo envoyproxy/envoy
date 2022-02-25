@@ -63,7 +63,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
-    Stats::ScopeSharedPtr stats_scope =
+    Stats::ScopePtr stats_scope =
         context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
     auto conn_pool_ptr = std::make_shared<ConnPool::InstanceImpl>(
         cluster, context.clusterManager(), Common::Redis::Client::ClientFactoryImpl::instance_,
