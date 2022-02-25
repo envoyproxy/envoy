@@ -44,7 +44,7 @@ public:
           Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
           Random::RandomGenerator& random,
           Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-          Stats::ScopeSharedPtr&& stats_scope, bool added_via_api);
+          const Stats::ScopeSharedPtr& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   Upstream::Cluster::InitializePhase initializePhase() const override {
@@ -174,7 +174,7 @@ private:
       const envoy::extensions::clusters::aggregate::v3::ClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopeSharedPtr&& stats_scope) override;
+      const Stats::ScopeSharedPtr& stats_scope) override;
 };
 
 DECLARE_FACTORY(ClusterFactory);

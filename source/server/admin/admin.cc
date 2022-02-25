@@ -120,7 +120,7 @@ void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>&
                                   const std::string& address_out_path,
                                   Network::Address::InstanceConstSharedPtr address,
                                   const Network::Socket::OptionsSharedPtr& socket_options,
-                                  Stats::ScopeSharedPtr&& listener_scope) {
+                                  const Stats::ScopeSharedPtr& listener_scope) {
   for (const auto& access_log : access_logs) {
     access_logs_.emplace_back(access_log);
   }

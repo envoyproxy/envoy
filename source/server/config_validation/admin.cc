@@ -22,7 +22,7 @@ void ValidationAdmin::startHttpListener(const std::list<AccessLog::InstanceShare
                                         const std::string&,
                                         Network::Address::InstanceConstSharedPtr,
                                         const Network::Socket::OptionsSharedPtr&,
-                                        Stats::ScopeSharedPtr&&) {}
+                                        const Stats::ScopeSharedPtr&) {}
 
 Http::Code ValidationAdmin::request(absl::string_view, absl::string_view, Http::ResponseHeaderMap&,
                                     std::string&) {
