@@ -35,6 +35,7 @@ envoy_cc_library(
         ":connection_balancer_interface",
         ":listen_socket_interface",
         ":listener_interface",
+        "//envoy/runtime:runtime_interface",
         "//envoy/ssl:context_interface",
         "//source/common/common:interval_value",
     ],

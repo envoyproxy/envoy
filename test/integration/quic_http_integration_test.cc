@@ -7,40 +7,30 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
+#include "source/common/quic/active_quic_listener.h"
+#include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_client_session.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
+#include "source/common/quic/envoy_quic_proof_verifier.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+
+#include "test/common/quic/test_utils.h"
 #include "test/common/upstream/utility.h"
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
 #include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
-#include "quiche/quic/test_tools/quic_test_utils.h"
-#include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_sent_packet_manager_peer.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/common/quic/active_quic_listener.h"
-#include "source/common/quic/client_connection_factory_impl.h"
-#include "source/common/quic/envoy_quic_client_session.h"
-#include "source/common/quic/envoy_quic_proof_verifier.h"
-#include "source/common/quic/envoy_quic_connection_helper.h"
-#include "source/common/quic/envoy_quic_alarm_factory.h"
-#include "source/common/quic/envoy_quic_packet_writer.h"
-#include "source/common/quic/envoy_quic_utils.h"
-#include "source/common/quic/quic_transport_socket_factory.h"
-#include "test/common/quic/test_utils.h"
-#include "test/config/integration/certs/clientcert_hash.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
+#include "quiche/quic/test_tools/quic_test_utils.h"
 
 #if defined(ENVOY_CONFIG_COVERAGE)
 #define DISABLE_UNDER_COVERAGE return

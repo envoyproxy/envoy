@@ -44,7 +44,8 @@ admin:
 dynamic_resources:
   lds_config:
     resource_api_version: V3
-    path: {}
+    path_config_source:
+      path: {}
 static_resources:
   secrets:
   - name: "secret_static_0"
@@ -844,6 +845,23 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
 
   applyConfigModifiers();
 
+  setPorts(ports);
+
+  if (!connect_timeout_set_) {
+#ifdef __APPLE__
+    // Set a high default connect timeout. Under heavy load (and in particular in CI), macOS
+    // connections can take inordinately long to complete.
+    setConnectTimeout(std::chrono::seconds(30));
+#else
+    // Set a default connect timeout.
+    setConnectTimeout(std::chrono::seconds(5));
+#endif
+  }
+
+  finalized_ = true;
+}
+
+void ConfigHelper::setPorts(const std::vector<uint32_t>& ports, bool override_port_zero) {
   uint32_t port_idx = 0;
   bool eds_hosts = false;
   bool custom_cluster = false;
@@ -864,7 +882,8 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
         for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
           auto lb_endpoint = locality_lb->mutable_lb_endpoints(k);
           if (lb_endpoint->endpoint().address().has_socket_address()) {
-            if (lb_endpoint->endpoint().address().socket_address().port_value() == 0) {
+            if (lb_endpoint->endpoint().address().socket_address().port_value() == 0 ||
+                override_port_zero) {
               RELEASE_ASSERT(ports.size() > port_idx, "");
               lb_endpoint->mutable_endpoint()
                   ->mutable_address()
@@ -881,19 +900,6 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   }
   ASSERT(skip_port_usage_validation_ || port_idx == ports.size() || eds_hosts ||
          original_dst_cluster || custom_cluster || bootstrap_.dynamic_resources().has_cds_config());
-
-  if (!connect_timeout_set_) {
-#ifdef __APPLE__
-    // Set a high default connect timeout. Under heavy load (and in particular in CI), macOS
-    // connections can take inordinately long to complete.
-    setConnectTimeout(std::chrono::seconds(30));
-#else
-    // Set a default connect timeout.
-    setConnectTimeout(std::chrono::seconds(5));
-#endif
-  }
-
-  finalized_ = true;
 }
 
 void ConfigHelper::setSourceAddress(const std::string& address_string) {
@@ -1325,7 +1331,8 @@ void ConfigHelper::setLds(absl::string_view version_info) {
     resource->PackFrom(listener);
   }
 
-  const std::string lds_filename = bootstrap().dynamic_resources().lds_config().path();
+  const std::string lds_filename =
+      bootstrap().dynamic_resources().lds_config().path_config_source().path();
   std::string file = TestEnvironment::writeStringToFileForTest(
       "new_lds_file", MessageUtil::getJsonStringFromMessageOrDie(lds));
   TestEnvironment::renameFile(file, lds_filename);

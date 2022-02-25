@@ -32,8 +32,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:92.6"
 "source/extensions/common:95.8"
-"source/extensions/common/tap:94.2"
-"source/extensions/common/wasm:95.1" # flaky: be careful adjusting
+"source/extensions/common/tap:92.9"
+"source/extensions/common/wasm:95.0" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
 "source/extensions/filters/common:96.1"
 "source/extensions/filters/common/expr:96.2"
@@ -67,8 +67,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/io_socket/user_space:96.2"
 "source/extensions/stat_sinks/common:96.4"
 "source/extensions/stat_sinks/common/statsd:96.4"
-"source/extensions/stat_sinks/graphite_statsd:88.5"
-"source/extensions/stat_sinks/statsd:88.0"
+"source/extensions/stat_sinks/graphite_statsd:75.0"
+"source/extensions/stat_sinks/statsd:76.9"
 "source/extensions/tracers/opencensus:94.8"
 "source/extensions/tracers/xray:96.2"
 "source/extensions/tracers/zipkin:95.9"

@@ -21,9 +21,10 @@ envoy_cc_library(
     srcs = ["inputs.cc"],
     hdrs = ["inputs.h"],
     deps = [
-        ":data_impl_lib",
         "//envoy/matcher:matcher_interface",
-        "//envoy/server:factory_context_interface",
-        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+        "//envoy/network:filter_interface",
+        "//envoy/registry",
+        "//source/common/network:utility_lib",
+        "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
     ],
 )

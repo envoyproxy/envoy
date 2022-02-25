@@ -5,21 +5,20 @@
 namespace Envoy {
 namespace Network {
 namespace Matching {
+
 /**
- * Implementation of NetworkMatchingData, providing network specific data to
+ * Implementation of Network::MatchingData, providing connection-level data to
  * the match tree.
  */
-class NetworkMatchingDataImpl : public NetworkMatchingData {
+class MatchingDataImpl : public MatchingData {
 public:
-  static absl::string_view name() { return "network"; }
-
-  NetworkMatchingDataImpl(const Address::Ip* source) : source_(source) {}
-
-  OptRef<const Address::Ip> sourceIp() const override { return makeOptRefFromPtr(source_); }
+  explicit MatchingDataImpl(const ConnectionSocket& socket) : socket_(socket) {}
+  const ConnectionSocket& socket() const override { return socket_; }
 
 private:
-  const Address::Ip* const source_{};
+  const ConnectionSocket& socket_;
 };
+
 } // namespace Matching
 } // namespace Network
 } // namespace Envoy
