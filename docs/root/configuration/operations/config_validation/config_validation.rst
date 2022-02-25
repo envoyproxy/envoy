@@ -19,5 +19,5 @@ Custom config validators are defined using Envoy's :ref:`extension <extending>` 
 Envoy's builtin config validators are listed :ref:`here <v3_config_config_validators>`.
 
 To use a config validation extension, it needs to be added to the
-:ref:`config_validators_typed_configs list <envoy_v3_api_field_config.core.v3.ApiConfigSource.config_validators_typed_configs>`
+:ref:`config_validators list <envoy_v3_api_field_config.core.v3.ApiConfigSource.config_validators>`
 field of the API configuration source that will be validated.
