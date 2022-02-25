@@ -1,7 +1,5 @@
 #pragma once
 
-#include <string>
-
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"

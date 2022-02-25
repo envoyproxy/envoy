@@ -30,7 +30,7 @@ Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
 REGISTER_FACTORY(RouteMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 
 absl::Status RouteActionValidationVisitor::performDataInputValidation(
-    const Matcher::DataInputFactory<Network::NetworkMatchingData>&, absl::string_view type_url) {
+    const Matcher::DataInputFactory<Network::MatchingData>&, absl::string_view type_url) {
   static std::string source_ip_input_name = TypeUtil::descriptorFullNameToTypeUrl(
       envoy::type::matcher::v3::SourceIpMatchInput::descriptor()->full_name());
   if (type_url == source_ip_input_name) {
@@ -49,7 +49,7 @@ RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::Udp
   } else {
     RouteActionContext context{};
     RouteActionValidationVisitor validation_visitor;
-    Matcher::MatchTreeFactory<Network::NetworkMatchingData, RouteActionContext> factory(
+    Matcher::MatchTreeFactory<Network::MatchingData, RouteActionContext> factory(
         context, factory_context, validation_visitor);
     matcher_ = factory.create(config.matcher())();
 
@@ -71,7 +71,7 @@ const std::string RouterImpl::route(Network::Address::InstanceConstSharedPtr sou
   }
 
   if (source_address->ip()) {
-    Network::Matching::NetworkMatchingDataImpl data(source_address->ip());
+    Network::Matching::MatchingDataImpl data(source_address->ip());
 
     auto result = matcher_->match(data);
     if (result.match_state_ == Matcher::MatchState::MatchComplete) {
