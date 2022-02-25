@@ -233,6 +233,102 @@ TEST(MatchingData, ApplicationProtocolInput) {
   }
 }
 
+TEST(UdpMatchingData, DestinationIPInput) {
+  DestinationIPInput input;
+  Address::InstanceConstSharedPtr ip =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
+  Address::InstanceConstSharedPtr pipe =
+      std::make_shared<Network::Address::PipeInstance>("/pipe/path");
+
+  {
+    UdpMatchingDataImpl data(ip, ip);
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, "127.0.0.1");
+  }
+
+  {
+    UdpMatchingDataImpl data(pipe, ip);
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
+}
+
+TEST(UdpMatchingData, DestinationPortInput) {
+  DestinationPortInput input;
+  Address::InstanceConstSharedPtr ip =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
+  Address::InstanceConstSharedPtr pipe =
+      std::make_shared<Network::Address::PipeInstance>("/pipe/path");
+
+  {
+    UdpMatchingDataImpl data(ip, ip);
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, "8080");
+  }
+
+  {
+    UdpMatchingDataImpl data(pipe, ip);
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
+}
+
+TEST(UdpMatchingData, SourceIPInput) {
+  SourceIPInput input;
+  Address::InstanceConstSharedPtr ip =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
+  Address::InstanceConstSharedPtr pipe =
+      std::make_shared<Network::Address::PipeInstance>("/pipe/path");
+
+  {
+    UdpMatchingDataImpl data(ip, ip);
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, "127.0.0.1");
+  }
+
+  {
+    UdpMatchingDataImpl data(ip, pipe);
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
+}
+
+TEST(UdpMatchingData, SourcePortInput) {
+  SourcePortInput input;
+  Address::InstanceConstSharedPtr ip =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
+  Address::InstanceConstSharedPtr pipe =
+      std::make_shared<Network::Address::PipeInstance>("/pipe/path");
+
+  {
+    UdpMatchingDataImpl data(ip, ip);
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, "8080");
+  }
+
+  {
+    UdpMatchingDataImpl data(ip, pipe);
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
+}
+
 } // namespace Matching
 } // namespace Network
 } // namespace Envoy

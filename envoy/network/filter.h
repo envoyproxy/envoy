@@ -520,16 +520,30 @@ public:
 };
 
 /**
- * Network filter matching context data for unified matchers.
+ * Filter matching context data for unified matchers.
  */
-class MatchingData {
+class MatchingDataBase {
 public:
   static absl::string_view name() { return "network"; }
 
-  virtual ~MatchingData() = default;
+  virtual ~MatchingDataBase() = default;
 
+  virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
+  virtual const Address::InstanceConstSharedPtr& remoteAddress() const PURE;
+};
+
+/**
+ * Network filter matching context data for unified matchers.
+ */
+class MatchingData : public MatchingDataBase {
+public:
   virtual const ConnectionSocket& socket() const PURE;
 };
+
+/**
+ * UDP listener filter matching context data for unified matchers.
+ */
+class UdpMatchingData : public MatchingDataBase {};
 
 } // namespace Network
 } // namespace Envoy

@@ -10,8 +10,8 @@ namespace Envoy {
 namespace Network {
 namespace Matching {
 
-Matcher::DataInputGetResult DestinationIPInput::get(const MatchingData& data) const {
-  const auto& address = data.socket().connectionInfoProvider().localAddress();
+Matcher::DataInputGetResult DestinationIPInput::get(const MatchingDataBase& data) const {
+  const auto& address = data.localAddress();
   if (address->type() != Network::Address::Type::Ip) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
@@ -19,8 +19,8 @@ Matcher::DataInputGetResult DestinationIPInput::get(const MatchingData& data) co
           address->ip()->addressAsString()};
 }
 
-Matcher::DataInputGetResult DestinationPortInput::get(const MatchingData& data) const {
-  const auto& address = data.socket().connectionInfoProvider().localAddress();
+Matcher::DataInputGetResult DestinationPortInput::get(const MatchingDataBase& data) const {
+  const auto& address = data.localAddress();
   if (address->type() != Network::Address::Type::Ip) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
@@ -28,8 +28,8 @@ Matcher::DataInputGetResult DestinationPortInput::get(const MatchingData& data) 
           absl::StrCat(address->ip()->port())};
 }
 
-Matcher::DataInputGetResult SourceIPInput::get(const MatchingData& data) const {
-  const auto& address = data.socket().connectionInfoProvider().remoteAddress();
+Matcher::DataInputGetResult SourceIPInput::get(const MatchingDataBase& data) const {
+  const auto& address = data.remoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
@@ -37,8 +37,8 @@ Matcher::DataInputGetResult SourceIPInput::get(const MatchingData& data) const {
           address->ip()->addressAsString()};
 }
 
-Matcher::DataInputGetResult SourcePortInput::get(const MatchingData& data) const {
-  const auto& address = data.socket().connectionInfoProvider().remoteAddress();
+Matcher::DataInputGetResult SourcePortInput::get(const MatchingDataBase& data) const {
+  const auto& address = data.remoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
@@ -90,10 +90,10 @@ Matcher::DataInputGetResult ApplicationProtocolInput::get(const MatchingData& da
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
-REGISTER_FACTORY(DestinationIPInputFactory, Matcher::DataInputFactory<MatchingData>);
-REGISTER_FACTORY(DestinationPortInputFactory, Matcher::DataInputFactory<MatchingData>);
-REGISTER_FACTORY(SourceIPInputFactory, Matcher::DataInputFactory<MatchingData>);
-REGISTER_FACTORY(SourcePortInputFactory, Matcher::DataInputFactory<MatchingData>);
+REGISTER_FACTORY(DestinationIPInputFactory, Matcher::DataInputFactory<MatchingDataBase>);
+REGISTER_FACTORY(DestinationPortInputFactory, Matcher::DataInputFactory<MatchingDataBase>);
+REGISTER_FACTORY(SourceIPInputFactory, Matcher::DataInputFactory<MatchingDataBase>);
+REGISTER_FACTORY(SourcePortInputFactory, Matcher::DataInputFactory<MatchingDataBase>);
 REGISTER_FACTORY(DirectSourceIPInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(SourceTypeInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(ServerNameInputFactory, Matcher::DataInputFactory<MatchingData>);
