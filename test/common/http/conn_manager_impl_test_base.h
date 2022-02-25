@@ -29,19 +29,6 @@ namespace Http {
 
 class HttpConnectionManagerImplTest : public testing::Test, public ConnectionManagerConfig {
 public:
-  struct RouteConfigProvider : public Router::RouteConfigProvider {
-    RouteConfigProvider(TimeSource& time_source) : time_source_(time_source) {}
-
-    // Router::RouteConfigProvider
-    Router::ConfigConstSharedPtr config() override { return route_config_; }
-    absl::optional<ConfigInfo> configInfo() const override { return {}; }
-    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
-    void onConfigUpdate() override {}
-
-    TimeSource& time_source_;
-    std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
-  };
-
   HttpConnectionManagerImplTest();
   ~HttpConnectionManagerImplTest() override;
   Tracing::CustomTagConstSharedPtr requestHeaderCustomTag(const std::string& header);
@@ -59,7 +46,10 @@ public:
 
   Event::MockTimer* setUpTimer();
   void sendRequestHeadersAndData();
-  ResponseHeaderMap* sendResponseHeaders(ResponseHeaderMapPtr&& response_headers);
+  ResponseHeaderMap*
+  sendResponseHeaders(ResponseHeaderMapPtr&& response_headers,
+                      absl::optional<StreamInfo::ResponseFlag> response_flag = absl::nullopt,
+                      std::string response_code_details = "details");
   void expectOnDestroy(bool deferred = true);
   void doRemoteClose(bool deferred = true);
   void testPathNormalization(const RequestHeaderMap& request_headers,
@@ -155,6 +145,9 @@ public:
     return ip_detection_extensions_;
   }
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
+    return proxy_status_config_.get();
+  }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -236,6 +229,7 @@ public:
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
               KEEP_UNCHANGED};
   bool strip_trailing_host_dot_ = false;
+  std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
 };
 
 } // namespace Http

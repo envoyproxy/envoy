@@ -37,9 +37,9 @@ ExtensionConfigBase::ExtensionConfigBase(
     ENVOY_LOG(debug, "initializing tap extension with static config");
     break;
   }
-  default: {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  case envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::
+      CONFIG_TYPE_NOT_SET:
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 }
 

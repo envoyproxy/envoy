@@ -1158,12 +1158,9 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
 
   switch (error_code) {
   case NGHTTP2_ERR_REFUSED_STREAM:
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http2_consume_stream_refused_errors")) {
-      stats_.stream_refused_errors_.inc();
-      return 0;
-    }
-    break;
+
+    stats_.stream_refused_errors_.inc();
+    return 0;
 
   case NGHTTP2_ERR_HTTP_HEADER:
   case NGHTTP2_ERR_HTTP_MESSAGING:

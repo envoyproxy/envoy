@@ -25,6 +25,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -152,7 +153,7 @@ protected:
     }
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
-    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->connectionInfoProvider().localAddress(), source_address_,
         Network::Test::createRawBufferSocket(), socket_options_);
@@ -276,6 +277,7 @@ protected:
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<Network::TcpListenSocket> socket_{nullptr};
   Network::MockTcpListenerCallbacks listener_callbacks_;
+  NiceMock<Runtime::MockLoader> runtime_;
   Network::ListenerPtr listener_;
   Network::ClientConnectionPtr client_connection_;
   StrictMock<MockConnectionCallbacks> client_callbacks_;
@@ -1371,7 +1373,7 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   dispatcher_ = api_->allocateDispatcher("test_thread");
   socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()));
-  listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
+  listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
 
   client_connection_ = dispatcher_->createClientConnection(
       socket_->connectionInfoProvider().localAddress(), source_address_,
@@ -2644,7 +2646,7 @@ TEST_F(MockTransportConnectionImplTest, WriteReadyOnConnected) {
 }
 
 // Test the interface used by external consumers.
-TEST_F(MockTransportConnectionImplTest, FlushWriteBuffer) {
+TEST_F(MockTransportConnectionImplTest, FlushWriteBufferAndRtt) {
   InSequence s;
 
   // Queue up some data in write buffer.
@@ -2654,6 +2656,9 @@ TEST_F(MockTransportConnectionImplTest, FlushWriteBuffer) {
   EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
   connection_->write(buffer, false);
+
+  // Make sure calling the rtt function doesn't cause problems.
+  connection_->lastRoundTripTime();
 
   // A read event triggers underlying socket to ask for more data.
   EXPECT_CALL(*transport_socket_, doRead(_)).WillOnce(InvokeWithoutArgs([this] {
@@ -2842,7 +2847,7 @@ public:
     dispatcher_ = api_->allocateDispatcher("test_thread");
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
-    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
 
     client_connection_ =
         dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),

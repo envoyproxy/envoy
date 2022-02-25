@@ -16,27 +16,14 @@ import shutil
 import paths
 
 EXCLUDED_PREFIXES = (
-    "./generated/",
-    "./thirdparty/",
-    "./build",
-    "./.git/",
-    "./bazel-",
-    "./.cache",
-    "./source/extensions/extensions_build_config.bzl",
-    "./contrib/contrib_build_config.bzl",
-    "./bazel/toolchains/configs/",
-    "./tools/testdata/check_format/",
-    "./tools/pyformat/",
-    "./third_party/",
-    "./test/extensions/filters/http/wasm/test_data",
+    "./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
+    "./source/extensions/extensions_build_config.bzl", "./contrib/contrib_build_config.bzl",
+    "./bazel/toolchains/configs/", "./tools/testdata/check_format/", "./tools/pyformat/",
+    "./third_party/", "./test/extensions/filters/http/wasm/test_data",
     "./test/extensions/filters/network/wasm/test_data",
-    "./test/extensions/stats_sinks/wasm/test_data",
-    "./test/extensions/bootstrap/wasm/test_data",
-    "./test/extensions/common/wasm/test_data",
-    "./test/extensions/access_loggers/wasm/test_data",
-    "./source/extensions/common/wasm/ext",
-    "./examples/wasm-cc",
-)
+    "./test/extensions/stats_sinks/wasm/test_data", "./test/extensions/bootstrap/wasm/test_data",
+    "./test/extensions/common/wasm/test_data", "./test/extensions/access_loggers/wasm/test_data",
+    "./source/extensions/common/wasm/ext", "./examples/wasm-cc", "./bazel/external/http_parser/")
 SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".mm", ".proto")
 PROTO_SUFFIX = (".proto")
 
@@ -183,7 +170,7 @@ FOR_EACH_N_REGEX = re.compile("for_each_n\(")
 # Check for punctuation in a terminal ref clause, e.g.
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
 DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
-FLAG_REGEX = re.compile("    \"(.*)\",")
+FLAG_REGEX = re.compile("RUNTIME_GUARD\((.*)\);")
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -516,30 +503,21 @@ class FormatChecker:
         subdir = path[0:slash]
         return subdir in SUBDIR_SET
 
-    # simple check that all flags between "Begin alphabetically sorted section."
-    # and the end of the struct are in order (except the ones that already aren't)
+    # simple check that all flags are sorted.
     def check_runtime_flags(self, file_path, error_messages):
-        in_flag_block = False
         previous_flag = ""
         for line_number, line in enumerate(self.read_lines(file_path)):
-            if "Begin alphabetically" in line:
-                in_flag_block = True
-                continue
-            if not in_flag_block:
-                continue
-            if "}" in line:
-                break
-            if "//" in line:
-                continue
-            match = FLAG_REGEX.match(line)
-            if not match:
-                error_messages.append("%s does not look like a reloadable flag" % line)
-                break
+            if line.startswith("RUNTIME_GUARD"):
+                match = FLAG_REGEX.match(line)
+                if not match:
+                    error_messages.append("%s does not look like a reloadable flag" % line)
+                    break
 
-            if previous_flag:
-                if line < previous_flag and match.groups()[0] not in UNSORTED_FLAGS:
-                    error_messages.append("%s and %s are out of order\n" % (line, previous_flag))
-            previous_flag = line
+                if previous_flag:
+                    if line < previous_flag and match.groups()[0] not in UNSORTED_FLAGS:
+                        error_messages.append(
+                            "%s and %s are out of order\n" % (line, previous_flag))
+                previous_flag = line
 
     def check_file_contents(self, file_path, checker):
         error_messages = []
@@ -1186,7 +1164,6 @@ if __name__ == "__main__":
             '@ggreenway',
             '@phlax',
             '@wrowe',
-            '@davinci26',
             '@rojkov',
             '@RyanTheOptimist',
             '@adisuissa',

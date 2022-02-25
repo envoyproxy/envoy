@@ -75,11 +75,18 @@ function cp_binary_for_image_build() {
   echo "Copying binary for image build..."
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   cp -f "${FINAL_DELIVERY_DIR}"/envoy "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
-  # Copy the su-exec utility binary into the image
-  cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
     cp -f "${FINAL_DELIVERY_DIR}"/envoy.dwp "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   fi
+
+  # Tools for the tools image. Strip to save size.
+  strip bazel-bin/test/tools/schema_validator/schema_validator_tool \
+    -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
+
+  # Copy the su-exec utility binary into the image
+  cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
+
+  # Stripped binaries for the debug image.
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
   strip "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
 
@@ -115,6 +122,7 @@ function bazel_binary_build() {
 
   echo "Building (type=${BINARY_TYPE} target=${BUILD_TARGET} debug=${BUILD_DEBUG_INFORMATION} name=${EXE_NAME})..."
   ENVOY_BIN=$(echo "${BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
+  echo "ENVOY_BIN=${ENVOY_BIN}"
 
   # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
   [[ -n "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
@@ -134,8 +142,12 @@ function bazel_binary_build() {
     cp -f bazel-bin/"${ENVOY_BIN}".dwp "${FINAL_DELIVERY_DIR}"/envoy.dwp
   fi
 
+  # Validation tools for the tools image.
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" \
+    //test/tools/schema_validator:schema_validator_tool ${CONFIG_ARGS}
+
   # Build su-exec utility
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" external:su-exec
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" external:su-exec
   cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
 }
 
@@ -158,18 +170,19 @@ function run_process_test_result() {
 
 function run_ci_verify () {
   echo "verify examples..."
-  docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
-  _images=$(docker image list --format "{{.Repository}}")
-  while read -r line; do images+=("$line"); done \
-      <<< "$_images"
-  _tags=$(docker image list --format "{{.Tag}}")
-  while read -r line; do tags+=("$line"); done \
-      <<< "$_tags"
-  for i in "${!images[@]}"; do
-      if [[ "${images[i]}" =~ "envoy" ]]; then
-          docker tag "${images[$i]}:${tags[$i]}" "${images[$i]}:latest"
-      fi
+  OCI_TEMP_DIR="${ENVOY_DOCKER_BUILD_DIR}/image"
+  mkdir -p "${OCI_TEMP_DIR}"
+
+  IMAGES=("envoy" "envoy-contrib" "envoy-google-vrp")
+
+  for IMAGE in "${IMAGES[@]}"; do
+    tar xvf "${ENVOY_DOCKER_BUILD_DIR}/docker/${IMAGE}.tar" -C "${OCI_TEMP_DIR}"
+    skopeo copy "oci:${OCI_TEMP_DIR}" "docker-daemon:envoyproxy/${IMAGE}-dev:latest"
+    rm -rf "${OCI_TEMP_DIR:?}/*"
   done
+
+  rm -rf "${OCI_TEMP_DIR:?}"
+
   docker images
   sudo apt-get update -y
   sudo apt-get install -y -qq --no-install-recommends expect redis-tools
@@ -449,20 +462,19 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
 
   echo "verifying dependencies..."
   # Validate dependency relationships between core/extensions and external deps.
-  "${ENVOY_SRCDIR}"/tools/dependency/validate.py
+  time bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:validate
 
   # Validate repository metadata.
   echo "check repositories..."
   "${ENVOY_SRCDIR}"/tools/check_repositories.sh
-  "${ENVOY_SRCDIR}"/ci/check_repository_locations.sh
+
+  echo "check dependencies..."
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check
 
   # Run pip requirements tests
+  echo "check pip..."
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check
 
-  exit 0
-elif [[ "$CI_TARGET" == "cve_scan" ]]; then
-  echo "scanning for CVEs in dependencies..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan
   exit 0
 elif [[ "$CI_TARGET" == "tooling" ]]; then
   setup_clang_toolchain
@@ -479,7 +491,7 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
   "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
 
   echo "dependency validate_test..."
-  "${ENVOY_SRCDIR}"/tools/dependency/validate_test.py
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:validate_test
 
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then

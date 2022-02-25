@@ -4,47 +4,38 @@
 #include "envoy/config/listener/v3/quic_config.pb.validate.h"
 #include "envoy/network/exception.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
-#include "quiche/quic/core/crypto/crypto_protocol.h"
-#include "quiche/quic/test_tools/crypto_test_utils.h"
-#include "quiche/quic/test_tools/quic_dispatcher_peer.h"
-#include "quiche/quic/test_tools/quic_test_utils.h"
-#include "quiche/quic/test_tools/quic_crypto_server_config_peer.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/server/configuration_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/http/utility.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
-#include "source/common/runtime/runtime_impl.h"
 #include "source/common/quic/active_quic_listener.h"
-#include "source/common/http/utility.h"
-#include "test/common/quic/test_utils.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/platform/envoy_quic_clock.h"
+#include "source/common/quic/udp_gso_batch_writer.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
+#include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
+#include "source/server/configuration_impl.h"
+
 #include "test/common/quic/test_proof_source.h"
-#include "test/test_common/simulated_time_system.h"
-#include "test/test_common/environment.h"
+#include "test/common/quic/test_utils.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/instance.h"
-#include "test/test_common/utility.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
+
 #include "absl/time/time.h"
-#include "gtest/gtest.h"
 #include "gmock/gmock.h"
-#include "source/common/quic/platform/envoy_quic_clock.h"
-#include "source/common/quic/envoy_quic_utils.h"
-#include "source/common/quic/udp_gso_batch_writer.h"
-#include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
-#include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
+#include "gtest/gtest.h"
+#include "quiche/quic/core/crypto/crypto_protocol.h"
+#include "quiche/quic/test_tools/crypto_test_utils.h"
+#include "quiche/quic/test_tools/quic_crypto_server_config_peer.h"
+#include "quiche/quic/test_tools/quic_dispatcher_peer.h"
+#include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -129,7 +120,8 @@ protected:
         .WillRepeatedly(ReturnRef(filter_chain_manager_));
     quic_listener_ =
         staticUniquePointerCast<ActiveQuicListener>(listener_factory_->createActiveUdpListener(
-            0, connection_handler_, *dispatcher_, listener_config_));
+            Runtime::LoaderSingleton::get(), 0, connection_handler_, *dispatcher_,
+            listener_config_));
     quic_dispatcher_ = ActiveQuicListenerPeer::quicDispatcher(*quic_listener_);
     quic::QuicCryptoServerConfig& crypto_config =
         ActiveQuicListenerPeer::cryptoConfig(*quic_listener_);
@@ -342,10 +334,7 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
-    EXPECT_EQ(50 * quic_dispatcher_->NumSessions(),
-              quic_listener_->numPacketsExpectedPerEventLoop());
-  }
+  EXPECT_EQ(50 * quic_dispatcher_->NumSessions(), quic_listener_->numPacketsExpectedPerEventLoop());
   const quic::QuicSession* session =
       quic::test::QuicDispatcherPeer::FindSession(quic_dispatcher_, connection_id);
   ASSERT(session != nullptr);
@@ -379,10 +368,7 @@ TEST_P(ActiveQuicListenerTest, NormalizeTimeouts) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
-    EXPECT_EQ(50 * quic_dispatcher_->NumSessions(),
-              quic_listener_->numPacketsExpectedPerEventLoop());
-  }
+  EXPECT_EQ(50 * quic_dispatcher_->NumSessions(), quic_listener_->numPacketsExpectedPerEventLoop());
   const quic::QuicSession* session =
       quic::test::QuicDispatcherPeer::FindSession(quic_dispatcher_, connection_id);
   ASSERT(session != nullptr);
@@ -428,15 +414,11 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   const uint32_t count = (ActiveQuicListener::kNumSessionsToCreatePerLoop * 2) + 1;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
-    maybeConfigureMocks(count + 1);
-    // Create 1 session to increase number of packet to read in the next read event.
-    sendCHLO(quic::test::TestConnectionId());
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-    EXPECT_NE(0u, quic_dispatcher_->NumSessions());
-  } else {
-    maybeConfigureMocks(count);
-  }
+  maybeConfigureMocks(count + 1);
+  // Create 1 session to increase number of packet to read in the next read event.
+  sendCHLO(quic::test::TestConnectionId());
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_NE(0u, quic_dispatcher_->NumSessions());
 
   // Generate one more CHLO than can be processed immediately.
   for (size_t i = 1; i <= count; ++i) {
@@ -454,10 +436,7 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   }
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
-    EXPECT_EQ(50 * quic_dispatcher_->NumSessions(),
-              quic_listener_->numPacketsExpectedPerEventLoop());
-  }
+  EXPECT_EQ(50 * quic_dispatcher_->NumSessions(), quic_listener_->numPacketsExpectedPerEventLoop());
 
   readFromClientSockets();
 }
