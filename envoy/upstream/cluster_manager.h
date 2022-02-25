@@ -17,7 +17,7 @@
 #include "envoy/config/subscription_factory.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/conn_pool.h"
-#include "envoy/http/persist_quic_info.h"
+#include "envoy/http/persistent_quic_info.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"

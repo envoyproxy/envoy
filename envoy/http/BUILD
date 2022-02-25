@@ -205,6 +205,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "persist_quic_info_interface",
-    hdrs = ["persist_quic_info.h"],
+    name = "persistent_quic_info_interface",
+    hdrs = ["persistent_quic_info.h"],
 )

@@ -1,9 +1,10 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 #include "envoy/common/optref.h"
-#include "envoy/http/persist_quic_info.h"
+#include "envoy/http/persistent_quic_info.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/http/codec_client.h"
