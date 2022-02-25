@@ -1,8 +1,8 @@
 #include "source/common/http/alternate_protocols_cache_impl.h"
 
 #include "test/mocks/common.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/mocks/event/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
 
@@ -15,7 +15,19 @@ namespace Http {
 namespace {
 class AlternateProtocolsCacheImplTest : public testing::Test {
 public:
-  AlternateProtocolsCacheImplTest() : store_(new NiceMock<MockKeyValueStore>()) {}
+  AlternateProtocolsCacheImplTest()
+      : dispatcher_([]() {
+          Envoy::Test::Global<Event::SingletonTimeSystemHelper> time_system;
+          time_system.get().timeSystem(
+              []() { return std::make_unique<Event::SimulatedTimeSystemHelper>(); });
+          return Event::MockDispatcher();
+        }()),
+        store_(new NiceMock<MockKeyValueStore>()),
+        expiration1_(dispatcher_.timeSource().monotonicTime() + Seconds(5)),
+        expiration2_(dispatcher_.timeSource().monotonicTime() + Seconds(10)),
+        protocol1_(alpn1_, hostname1_, port1_, expiration1_),
+        protocol2_(alpn2_, hostname2_, port2_, expiration2_), protocols1_({protocol1_}),
+        protocols2_({protocol2_}) {}
 
   void initialize() {
     protocols_ = std::make_unique<AlternateProtocolsCacheImpl>(
@@ -38,19 +50,17 @@ public:
   const std::string alpn1_ = "alpn1";
   const std::string alpn2_ = "alpn2";
 
-  const MonotonicTime expiration1_ = dispatcher_.timeSource().monotonicTime() + Seconds(5);
-  const MonotonicTime expiration2_ = dispatcher_.timeSource().monotonicTime() + Seconds(10);
+  const MonotonicTime expiration1_;
+  const MonotonicTime expiration2_;
 
   const AlternateProtocolsCacheImpl::Origin origin1_ = {https_, hostname1_, port1_};
   const AlternateProtocolsCacheImpl::Origin origin2_ = {https_, hostname2_, port2_};
 
-  AlternateProtocolsCacheImpl::AlternateProtocol protocol1_ = {alpn1_, hostname1_, port1_,
-                                                               expiration1_};
-  AlternateProtocolsCacheImpl::AlternateProtocol protocol2_ = {alpn2_, hostname2_, port2_,
-                                                               expiration2_};
+  AlternateProtocolsCacheImpl::AlternateProtocol protocol1_;
+  AlternateProtocolsCacheImpl::AlternateProtocol protocol2_;
 
-  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols1_ = {protocol1_};
-  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols2_ = {protocol2_};
+  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols1_;
+  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols2_;
 };
 
 TEST_F(AlternateProtocolsCacheImplTest, Init) {
@@ -208,7 +218,8 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
   auto testAltSvc = [&](const std::string& original_alt_svc,
                         const std::string& expected_alt_svc) -> void {
     absl::optional<AlternateProtocolsCacheImpl::OriginData> origin_data =
-        AlternateProtocolsCacheImpl::originDataFromString(original_alt_svc, dispatcher_.timeSource(), true);
+        AlternateProtocolsCacheImpl::originDataFromString(original_alt_svc,
+                                                          dispatcher_.timeSource(), true);
     ASSERT(origin_data.has_value());
     std::vector<AlternateProtocolsCache::AlternateProtocol>& protocols =
         origin_data.value().protocols;
@@ -218,8 +229,8 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
     EXPECT_EQ("h3-29", protocol.alpn_);
     EXPECT_EQ("", protocol.hostname_);
     EXPECT_EQ(443, protocol.port_);
-    auto duration = std::chrono::duration_cast<std::chrono::seconds>(protocol.expiration_ -
-                                                                     dispatcher_.timeSource().monotonicTime());
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(
+        protocol.expiration_ - dispatcher_.timeSource().monotonicTime());
     EXPECT_EQ(86400, duration.count());
 
     if (protocols.size() == 2) {
@@ -227,8 +238,8 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
       EXPECT_EQ("h3", protocol2.alpn_);
       EXPECT_EQ("", protocol2.hostname_);
       EXPECT_EQ(443, protocol2.port_);
-      duration = std::chrono::duration_cast<std::chrono::seconds>(protocol2.expiration_ -
-                                                                  dispatcher_.timeSource().monotonicTime());
+      duration = std::chrono::duration_cast<std::chrono::seconds>(
+          protocol2.expiration_ - dispatcher_.timeSource().monotonicTime());
       EXPECT_EQ(60, duration.count());
     }
 
@@ -251,9 +262,10 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
 TEST_F(AlternateProtocolsCacheImplTest, InvalidString) {
   initialize();
   // Too many numbers
-  EXPECT_FALSE(AlternateProtocolsCacheImpl::originDataFromString(
-                   "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1|2|3", dispatcher_.timeSource(), true)
-                   .has_value());
+  EXPECT_FALSE(
+      AlternateProtocolsCacheImpl::originDataFromString(
+          "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1|2|3", dispatcher_.timeSource(), true)
+          .has_value());
   // Non-numeric rtt
   EXPECT_FALSE(AlternateProtocolsCacheImpl::originDataFromString(
                    "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|a", dispatcher_.timeSource(), true)
