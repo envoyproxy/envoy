@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/network/address.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/stream_info/stream_info.h"
