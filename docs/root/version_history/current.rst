@@ -23,7 +23,7 @@ Minor Behavior Changes
 * perf: ssl contexts are now tracked without scan based garbage collection and greatly improved the performance on secret update.
 * router: record upstream request timeouts for all the cases and not just for those requests which are awaiting headers. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` to false.
 * sip-proxy: add customized affinity support by adding :ref:`tra_service_config <envoy_v3_api_msg_extensions.filters.network.sip_proxy.tra.v3alpha.TraServiceConfig>` and :ref:`customized_affinity <envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinity>`.
-* sip-proxy: add ``503`` support, when there are something wrong occured, ``503 Service Unavailable`` send back to downstream.
+* sip-proxy: add support for the ``503`` response code. When there is something wrong occurred, send ``503 Service Unavailable`` back to downstream.
 
 Bug Fixes
 ---------
