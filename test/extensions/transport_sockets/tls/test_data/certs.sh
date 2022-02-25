@@ -111,7 +111,7 @@ generate_cert_chain() {
         if [[ $x -gt 1 ]]
         then
             ca_name="i$((x - 1))"
-        fi    
+        fi
         echo $x: $certname $ca_name
         generate_ca $certname $ca_name
     done
@@ -120,7 +120,6 @@ generate_cert_chain() {
     done
     mv i4_cert.pem test_random_cert.pem
 }
-    
 
 # Generate ca_cert.pem.
 generate_ca ca
