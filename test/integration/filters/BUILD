@@ -127,6 +127,21 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "stop_iteration_headers_inject_body",
+    srcs = [
+        "stop_iteration_headers_inject_body_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "wait_for_whole_request_and_response_config_lib",
     srcs = [
         "wait_for_whole_request_and_response.cc",
@@ -520,6 +535,20 @@ envoy_cc_test_library(
     name = "encoder_decoder_buffer_filter_lib",
     srcs = [
         "encoder_decoder_buffer_filter.cc",
+    ],
+    deps = [
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "buffer_continue_filter_lib",
+    srcs = [
+        "buffer_continue_filter.cc",
     ],
     deps = [
         "//envoy/http:filter_interface",

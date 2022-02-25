@@ -220,7 +220,7 @@ public:
 
 private:
   Instance& server_;
-  Stats::ScopePtr server_scope_;
+  Stats::ScopeSharedPtr server_scope_;
 };
 
 /**
@@ -311,8 +311,6 @@ public:
   registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
 
 private:
-  enum class ReusePortDefault { True, False, Runtime };
-
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStatsInternal();
   void updateServerStats();
@@ -402,7 +400,7 @@ private:
   ListenerHooks& hooks_;
   Quic::QuicStatNames quic_stat_names_;
   ServerFactoryContextImpl server_contexts_;
-  absl::optional<ReusePortDefault> enable_reuse_port_default_;
+  bool enable_reuse_port_default_;
 
   bool stats_flush_in_progress_ : 1;
 

@@ -1,46 +1,38 @@
 #include <openssl/x509_vfy.h>
 
 #include <cstddef>
+#include <memory>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
+#include "source/common/quic/active_quic_listener.h"
+#include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_client_session.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
+#include "source/common/quic/envoy_quic_proof_verifier.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+
+#include "test/common/quic/test_utils.h"
 #include "test/common/upstream/utility.h"
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 #include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
-#include "quiche/quic/test_tools/quic_test_utils.h"
-#include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_sent_packet_manager_peer.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/common/quic/active_quic_listener.h"
-#include "source/common/quic/client_connection_factory_impl.h"
-#include "source/common/quic/envoy_quic_client_session.h"
-#include "source/common/quic/envoy_quic_proof_verifier.h"
-#include "source/common/quic/envoy_quic_connection_helper.h"
-#include "source/common/quic/envoy_quic_alarm_factory.h"
-#include "source/common/quic/envoy_quic_packet_writer.h"
-#include "source/common/quic/envoy_quic_utils.h"
-#include "source/common/quic/quic_transport_socket_factory.h"
-#include "test/common/quic/test_utils.h"
-#include "test/config/integration/certs/clientcert_hash.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
+#include "quiche/quic/test_tools/quic_test_utils.h"
 
 #if defined(ENVOY_CONFIG_COVERAGE)
 #define DISABLE_UNDER_COVERAGE return
@@ -193,9 +185,11 @@ public:
     OptRef<Http::AlternateProtocolsCache> cache;
     auto session = std::make_unique<EnvoyQuicClientSession>(
         persistent_info.quic_config_, supported_versions_, std::move(connection),
-        (host.empty() ? persistent_info.server_id_
-                      : quic::QuicServerId{host, static_cast<uint16_t>(port), false}),
-        persistent_info.cryptoConfig(), &push_promise_index_, *dispatcher_,
+        quic::QuicServerId{
+            (host.empty() ? transport_socket_factory_->clientContextConfig().serverNameIndication()
+                          : host),
+            static_cast<uint16_t>(port), false},
+        crypto_config_, &push_promise_index_, *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
@@ -267,6 +261,9 @@ public:
     // Latch quic_transport_socket_factory_ which is instantiated in initialize().
     transport_socket_factory_ =
         static_cast<QuicClientTransportSocketFactory*>(quic_transport_socket_factory_.get());
+    crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
+        std::make_unique<Quic::EnvoyQuicProofVerifier>(transport_socket_factory_->sslCtx()),
+        std::make_unique<quic::QuicClientSessionCache>());
     registerTestServerPorts({"http"});
 
     ASSERT(&transport_socket_factory_->clientContextConfig());
@@ -360,6 +357,7 @@ protected:
   TestEnvoyQuicClientConnection* quic_connection_{nullptr};
   std::list<quic::QuicConnectionId> designated_connection_ids_;
   Quic::QuicClientTransportSocketFactory* transport_socket_factory_{nullptr};
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   bool validation_failure_on_path_response_{false};
 };
 

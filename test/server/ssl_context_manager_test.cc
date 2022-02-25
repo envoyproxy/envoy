@@ -23,11 +23,10 @@ TEST(SslContextManager, createStub) {
   // Check we've created a stub, not real manager.
   EXPECT_EQ(manager->daysUntilFirstCertExpires(), std::numeric_limits<int>::max());
   EXPECT_EQ(manager->secondsUntilFirstOcspResponseExpires(), absl::nullopt);
-  EXPECT_THROW_WITH_MESSAGE(manager->createSslClientContext(scope, client_config, nullptr),
+  EXPECT_THROW_WITH_MESSAGE(manager->createSslClientContext(scope, client_config), EnvoyException,
+                            "SSL is not supported in this configuration");
+  EXPECT_THROW_WITH_MESSAGE(manager->createSslServerContext(scope, server_config, server_names),
                             EnvoyException, "SSL is not supported in this configuration");
-  EXPECT_THROW_WITH_MESSAGE(
-      manager->createSslServerContext(scope, server_config, server_names, nullptr), EnvoyException,
-      "SSL is not supported in this configuration");
   EXPECT_NO_THROW(manager->iterateContexts([](const Envoy::Ssl::Context&) -> void {}));
 }
 
