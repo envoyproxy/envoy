@@ -20,7 +20,7 @@ namespace Api {
 struct EnvoyTcpInfo {
   std::chrono::microseconds tcpi_rtt;
   // Congestion window, in bytes. Note that posix's TCP_INFO socket option returns cwnd in packets,
-  // we multiply it by 1460(the default TCP MSS) to get bytes.
+  // we multiply it by MSS to get bytes.
   uint32_t tcpi_snd_cwnd = 0;
 };
 

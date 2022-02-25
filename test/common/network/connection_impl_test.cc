@@ -307,9 +307,11 @@ TEST_P(ConnectionImplTest, GetCongestionWindow) {
   setUpBasicConnection();
   connect();
 
+// Congestion window is available on Posix(guarded by TCP_INFO) and Windows(guarded by
+// SIO_TCP_INFO).
 #if defined(TCP_INFO) || defined(SIO_TCP_INFO)
-  EXPECT_GT(client_connection_->congestionWindowInBytes().value(), 1000);
-  EXPECT_GT(server_connection_->congestionWindowInBytes().value(), 1000);
+  EXPECT_GT(client_connection_->congestionWindowInBytes().value(), 500);
+  EXPECT_GT(server_connection_->congestionWindowInBytes().value(), 500);
 #else
   EXPECT_FALSE(client_connection_->congestionWindowInBytes().has_value());
   EXPECT_FALSE(server_connection_->congestionWindowInBytes().has_value());

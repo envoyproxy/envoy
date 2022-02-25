@@ -1036,7 +1036,7 @@ TEST_F(EnvoyQuicServerSessionTest, IncomingUnidirectionalReadStream) {
 TEST_F(EnvoyQuicServerSessionTest, GetRttAndCwnd) {
   installReadFilter();
   EXPECT_GT(envoy_quic_session_.lastRoundTripTime().value(), std::chrono::microseconds(0));
-  EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(), 1000);
+  EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(), 500);
 }
 
 } // namespace Quic
