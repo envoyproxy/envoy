@@ -24,6 +24,8 @@ envoy_cc_library(
     name = "trie_matcher_lib",
     srcs = ["trie_matcher.cc"],
     hdrs = ["trie_matcher.h"],
+    # IP matching is core functionality.
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/matcher:matcher_interface",
         "//envoy/network:filter_interface",

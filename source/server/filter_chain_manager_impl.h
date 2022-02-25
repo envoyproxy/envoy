@@ -393,7 +393,7 @@ private:
 
   // For FilterChainFactoryContextCreator
   // init manager owned by the corresponding listener. The reference is valid when building the
-  // filter chain.,,
+  // filter chain.
   Init::Manager& init_manager_;
 
   // Matcher selecting the filter chain name.

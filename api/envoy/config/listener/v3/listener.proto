@@ -156,9 +156,11 @@ message Listener {
   //             matcher:
   //               matcher_tree:
   //                 input:
+  //                   name: ip
   //                   typed_config:
   //                     "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
   //                 custom_match:
+  //                   name: ip-matcher
   //                   typed_config:
   //                     "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
   //                     range_matchers:

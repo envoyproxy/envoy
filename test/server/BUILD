@@ -284,6 +284,7 @@ envoy_cc_test_library(
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
         "//source/common/init:manager_lib",
+        "//source/extensions/common/matcher:trie_matcher_lib",
         "//source/server:listener_manager_lib",
         "//test/mocks/init:init_mocks",
         "//test/mocks/matcher:matcher_mocks",
