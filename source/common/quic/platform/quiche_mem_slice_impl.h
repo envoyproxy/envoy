@@ -17,8 +17,8 @@
 namespace quiche {
 
 // Implements the interface required by
-// https://quiche.googlesource.com/quiche/+/refs/heads/master/quic/platform/api/quic_mem_slice.h
-class QuicheMemSliceImpl {
+// https://github.com/google/quiche/blob/main/common/platform/api/quiche_mem_slice.h
+  class QuicheMemSliceImpl {
 public:
   // Constructs an empty QuicheMemSliceImpl.
   QuicheMemSliceImpl() = default;
