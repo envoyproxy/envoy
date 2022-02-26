@@ -93,7 +93,7 @@ InstanceImpl::InstanceImpl(
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      stats_flush_in_progress_(false) {
+      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
   TRY_ASSERT_MAIN_THREAD {
     if (!options.logPath().empty()) {
       TRY_ASSERT_MAIN_THREAD {
@@ -180,34 +180,38 @@ void InstanceImpl::failHealthcheck(bool fail) {
 
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source) {
   store.forEachSinkedCounter(
-      [this](std::size_t size) mutable {
+      [this](std::size_t size) {
         snapped_counters_.reserve(size);
         counters_.reserve(size);
       },
-      [this](Stats::Counter& counter) mutable {
+      [this](Stats::Counter& counter) {
         snapped_counters_.push_back(Stats::CounterSharedPtr(&counter));
         counters_.push_back({counter.latch(), counter});
       });
 
   store.forEachSinkedGauge(
-      [this](std::size_t size) mutable {
+      [this](std::size_t size) {
         snapped_gauges_.reserve(size);
         gauges_.reserve(size);
       },
-      [this](Stats::Gauge& gauge) mutable {
+      [this](Stats::Gauge& gauge) {
         ASSERT(gauge.importMode() != Stats::Gauge::ImportMode::Uninitialized);
         snapped_gauges_.push_back(Stats::GaugeSharedPtr(&gauge));
         gauges_.push_back(gauge);
       });
 
-  snapped_histograms_ = store.histograms();
-  histograms_.reserve(snapped_histograms_.size());
-  for (const auto& histogram : snapped_histograms_) {
-    histograms_.push_back(*histogram);
-  }
+  store.forEachHistogram(
+      [this](std::size_t size) {
+        snapped_histograms_.reserve(size);
+        histograms_.reserve(size);
+      },
+      [this](Stats::ParentHistogram& histogram) {
+        snapped_histograms_.push_back(Stats::ParentHistogramSharedPtr(&histogram));
+        histograms_.push_back(histogram);
+      });
 
   store.forEachSinkedTextReadout(
-      [this](std::size_t size) mutable {
+      [this](std::size_t size) {
         snapped_text_readouts_.reserve(size);
         text_readouts_.reserve(size);
       },
@@ -521,12 +525,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
   if (parent_admin_shutdown_response.has_value()) {
     original_start_time_ = parent_admin_shutdown_response.value().original_start_time_;
-    enable_reuse_port_default_ = parent_admin_shutdown_response.value().enable_reuse_port_default_
-                                     ? ReusePortDefault::True
-                                     : ReusePortDefault::False;
-  } else {
-    // This is needed so that we don't read the value until runtime is fully initialized.
-    enable_reuse_port_default_ = ReusePortDefault::Runtime;
+    enable_reuse_port_default_ =
+        parent_admin_shutdown_response.value().enable_reuse_port_default_ ? true : false;
   }
   admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this,
                                        initial_config.admin().ignoreGlobalConnLimit());
@@ -998,20 +998,7 @@ ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
   return config_dump;
 }
 
-bool InstanceImpl::enableReusePortDefault() {
-  ASSERT(enable_reuse_port_default_.has_value());
-  switch (enable_reuse_port_default_.value()) {
-  case ReusePortDefault::True:
-    return true;
-  case ReusePortDefault::False:
-    return false;
-  case ReusePortDefault::Runtime:
-    return Runtime::runtimeFeatureEnabled(
-        "envoy.reloadable_features.listener_reuse_port_default_enabled");
-  }
-
-  return false; // for gcc
-}
+bool InstanceImpl::enableReusePortDefault() { return enable_reuse_port_default_; }
 
 } // namespace Server
 } // namespace Envoy

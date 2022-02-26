@@ -91,7 +91,16 @@ TEST(ServerInstanceUtil, flushHelper) {
   NiceMock<Stats::MockStore> mock_store;
   Stats::ParentHistogramSharedPtr parent_histogram(new Stats::MockParentHistogram());
   std::vector<Stats::ParentHistogramSharedPtr> parent_histograms = {parent_histogram};
-  ON_CALL(mock_store, histograms).WillByDefault(Return(parent_histograms));
+  ON_CALL(mock_store, forEachHistogram)
+      .WillByDefault([&](std::function<void(std::size_t)> f_size,
+                         std::function<void(Stats::ParentHistogram&)> f_stat) {
+        if (f_size != nullptr) {
+          f_size(parent_histograms.size());
+        }
+        for (auto& histogram : parent_histograms) {
+          f_stat(*histogram);
+        }
+      });
   EXPECT_CALL(*sink, flush(_)).WillOnce(Invoke([](Stats::MetricSnapshot& snapshot) {
     EXPECT_TRUE(snapshot.counters().empty());
     EXPECT_TRUE(snapshot.gauges().empty());
@@ -1020,7 +1029,6 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
 TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   options_.service_cluster_name_ = "some_service";
   initialize("test/server/test_data/server/runtime_bootstrap.yaml");
-  EXPECT_FALSE(server_->enableReusePortDefault());
   EXPECT_EQ("bar", server_->runtime().snapshot().get("foo").value().get());
   // This should access via the override/some_service overlay.
   EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz").value().get());

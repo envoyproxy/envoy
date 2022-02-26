@@ -19,7 +19,7 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsConstSharedPtr transpo
     // selected protocol.
     switch (protocol) {
     case Http::Protocol::Http10:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("not imlemented");
     case Http::Protocol::Http11:
       fallbacks.push_back(Http::Utility::AlpnNames::get().Http11);
       break;
@@ -58,9 +58,10 @@ HttpConnPoolImplBase::~HttpConnPoolImplBase() { destructAllConnections(); }
 
 ConnectionPool::Cancellable*
 HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
-                                Http::ConnectionPool::Callbacks& callbacks) {
+                                Http::ConnectionPool::Callbacks& callbacks,
+                                const Instance::StreamOptions& options) {
   HttpAttachContext context({&response_decoder, &callbacks});
-  return newStreamImpl(context);
+  return newStreamImpl(context, options.can_send_early_data_);
 }
 
 bool HttpConnPoolImplBase::hasActiveConnections() const {
@@ -68,12 +69,13 @@ bool HttpConnPoolImplBase::hasActiveConnections() const {
 }
 
 ConnectionPool::Cancellable*
-HttpConnPoolImplBase::newPendingStream(Envoy::ConnectionPool::AttachContext& context) {
+HttpConnPoolImplBase::newPendingStream(Envoy::ConnectionPool::AttachContext& context,
+                                       bool can_send_early_data) {
   Http::ResponseDecoder& decoder = *typedContext<HttpAttachContext>(context).decoder_;
   Http::ConnectionPool::Callbacks& callbacks = *typedContext<HttpAttachContext>(context).callbacks_;
   ENVOY_LOG(debug, "queueing stream due to no available connections");
   Envoy::ConnectionPool::PendingStreamPtr pending_stream(
-      new HttpPendingStream(*this, decoder, callbacks));
+      new HttpPendingStream(*this, decoder, callbacks, can_send_early_data));
   return addPendingStream(std::move(pending_stream));
 }
 

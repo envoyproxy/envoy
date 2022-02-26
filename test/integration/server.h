@@ -70,17 +70,17 @@ namespace Stats {
  */
 class TestScopeWrapper : public Scope {
 public:
-  TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopePtr wrapped_scope)
+  TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopeSharedPtr wrapped_scope)
       : lock_(lock), wrapped_scope_(std::move(wrapped_scope)) {}
 
-  ScopePtr createScope(const std::string& name) override {
+  ScopeSharedPtr createScope(const std::string& name) override {
     Thread::LockGuard lock(lock_);
-    return ScopePtr{new TestScopeWrapper(lock_, wrapped_scope_->createScope(name))};
+    return ScopeSharedPtr{new TestScopeWrapper(lock_, wrapped_scope_->createScope(name))};
   }
 
-  ScopePtr scopeFromStatName(StatName name) override {
+  ScopeSharedPtr scopeFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return ScopePtr{new TestScopeWrapper(lock_, wrapped_scope_->scopeFromStatName(name))};
+    return ScopeSharedPtr{new TestScopeWrapper(lock_, wrapped_scope_->scopeFromStatName(name))};
   }
 
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
@@ -163,10 +163,11 @@ public:
   bool iterate(const IterateFn<TextReadout>& fn) const override {
     return wrapped_scope_->iterate(fn);
   }
+  StatName prefix() const override { return wrapped_scope_->prefix(); }
 
 private:
   Thread::MutexBasicLockable& lock_;
-  ScopePtr wrapped_scope_;
+  ScopeSharedPtr wrapped_scope_;
 };
 
 // A counter which signals on a condition variable when it is incremented.
@@ -295,6 +296,15 @@ public:
     Thread::LockGuard lock(lock_);
     store_.forEachTextReadout(f_size, f_stat);
   }
+  void forEachHistogram(Stats::SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachHistogram(f_size, f_stat);
+  }
+  void forEachScope(std::function<void(std::size_t)> f_size,
+                    StatFn<const Scope> f_scope) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachScope(f_size, f_scope);
+  }
   void forEachSinkedCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachSinkedCounter(f_size, f_stat);
@@ -314,13 +324,13 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.counterFromString(name);
   }
-  ScopePtr createScope(const std::string& name) override {
+  ScopeSharedPtr createScope(const std::string& name) override {
     Thread::LockGuard lock(lock_);
-    return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
+    return ScopeSharedPtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
-  ScopePtr scopeFromStatName(StatName name) override {
+  ScopeSharedPtr scopeFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return ScopePtr{new TestScopeWrapper(lock_, store_.scopeFromStatName(name))};
+    return ScopeSharedPtr{new TestScopeWrapper(lock_, store_.scopeFromStatName(name))};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
@@ -387,6 +397,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.textReadouts();
   }
+  StatName prefix() const override { return store_.prefix(); }
 
   bool iterate(const IterateFn<Counter>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return store_.iterate(fn); }

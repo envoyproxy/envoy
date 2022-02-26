@@ -25,6 +25,8 @@ public:
                         : nullptr) {}
   bool addHandler(const std::string&, const std::string&, HandlerCb, bool, bool,
                   const ParamDescriptorVec& = {}) override;
+  bool addChunkedHandler(const std::string&, const std::string&, GenHandlerCb, bool, bool,
+                         const ParamDescriptorVec& = {}) override;
   bool removeHandler(const std::string&) override;
   const Network::Socket& socket() override;
   ConfigTracker& getConfigTracker() override;
@@ -32,7 +34,7 @@ public:
                          const std::string& address_out_path,
                          Network::Address::InstanceConstSharedPtr address,
                          const Network::Socket::OptionsSharedPtr&,
-                         Stats::ScopePtr&& listener_scope) override;
+                         Stats::ScopeSharedPtr&& listener_scope) override;
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
   void addListenerToHandler(Network::ConnectionHandler* handler) override;

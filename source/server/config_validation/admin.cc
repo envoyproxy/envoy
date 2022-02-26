@@ -8,6 +8,10 @@ bool ValidationAdmin::addHandler(const std::string&, const std::string&, Handler
                                  const ParamDescriptorVec&) {
   return true;
 }
+bool ValidationAdmin::addChunkedHandler(const std::string&, const std::string&, GenHandlerCb, bool,
+                                        bool, const ParamDescriptorVec&) {
+  return true;
+}
 
 bool ValidationAdmin::removeHandler(const std::string&) { return true; }
 
@@ -19,7 +23,7 @@ void ValidationAdmin::startHttpListener(const std::list<AccessLog::InstanceShare
                                         const std::string&,
                                         Network::Address::InstanceConstSharedPtr,
                                         const Network::Socket::OptionsSharedPtr&,
-                                        Stats::ScopePtr&&) {}
+                                        Stats::ScopeSharedPtr&&) {}
 
 Http::Code ValidationAdmin::request(absl::string_view, absl::string_view, Http::ResponseHeaderMap&,
                                     std::string&) {

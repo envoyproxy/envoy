@@ -39,7 +39,7 @@ Then run protoc to generate the descriptor set. For example using the test
 
 .. code-block:: console
 
-  $ protoc -I$(GOOGLEAPIS_DIR) -I. --include_imports --include_source_info \
+  $ protoc -I${GOOGLEAPIS_DIR} -I. --include_imports --include_source_info \
       --descriptor_set_out=proto.pb test/proto/bookstore.proto
 
 If you have more than one proto source files, you can pass all of them in one command.

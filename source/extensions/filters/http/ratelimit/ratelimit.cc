@@ -64,8 +64,6 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
                                    headers);
     }
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (!descriptors.empty()) {

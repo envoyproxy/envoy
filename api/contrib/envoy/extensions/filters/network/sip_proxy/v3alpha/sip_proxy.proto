@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.sip_proxy.v3alpha;
 
+import "contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha/tra.proto";
 import "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/route.proto";
 
 import "google/protobuf/any.proto";
@@ -60,11 +61,15 @@ message SipProxy {
     // +---------+-------------------------+----------+------------------------------------------------------------------------------+
     google.protobuf.Duration transaction_timeout = 1;
 
-    // own domain name
-    string own_domain = 2;
+    // The service to match for ep insert
+    repeated LocalService local_services = 2;
 
-    // points to domain match with own_domain
-    string domain_match_parameter_name = 3;
+    tra.v3alpha.TraServiceConfig tra_service_config = 3;
+
+    // Whether via header is operated, including add via for request and pop via for response
+    // False: sip service proxy
+    // True:  sip load balancer
+    bool operate_via = 4;
   }
 
   // The human readable prefix to use when emitting statistics.
@@ -106,4 +111,47 @@ message SipProtocolOptions {
 
   // The Register with Authorization header should go to the same endpoint which send out the 401 Unauthorized.
   bool registration_affinity = 2;
+
+  // Customized affinity
+  CustomizedAffinity customized_affinity = 3;
+}
+
+// For affinity
+message CustomizedAffinity {
+  // Affinity rules to conclude the upstream endpoint
+  repeated CustomizedAffinityEntry entries = 1;
+
+  // Configures whether load balance should be stopped or continued after affinity handling.
+  bool stop_load_balance = 2;
+}
+
+message CustomizedAffinityEntry {
+  // Affinity key for TRA query/subscribe
+  string key_name = 1;
+
+  // Whether subscribe to TRA is required
+  bool subscribe = 2;
+
+  // Whether query to TRA is required
+  bool query = 3;
+
+  // Local cache
+  Cache cache = 4;
+}
+
+message Cache {
+  // Affinity local cache item max number
+  int32 max_cache_item = 1;
+
+  // Whether query result can be added to local cache
+  bool add_query_to_cache = 2;
+}
+
+// Local Service
+message LocalService {
+  //The domain need to matched
+  string domain = 1;
+
+  //The parameter to get domain
+  string parameter = 2;
 }

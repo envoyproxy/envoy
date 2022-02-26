@@ -1,6 +1,7 @@
 #include "source/common/conn_pool/conn_pool_base.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/debug_recursion_checker.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
@@ -106,6 +107,7 @@ float ConnPoolImplBase::perUpstreamPreconnectRatio() const {
 }
 
 ConnPoolImplBase::ConnectionResult ConnPoolImplBase::tryCreateNewConnections() {
+  ASSERT(!is_draining_for_deletion_);
   ConnPoolImplBase::ConnectionResult result;
   // Somewhat arbitrarily cap the number of connections preconnected due to new
   // incoming connections. The preconnect ratio is capped at 3, so in steady
@@ -239,7 +241,8 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   }
 }
 
-ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& context) {
+ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& context,
+                                                             bool can_send_early_data) {
   ASSERT(!is_draining_for_deletion_);
   ASSERT(!deferred_deleting_);
 
@@ -262,7 +265,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
     return nullptr;
   }
 
-  ConnectionPool::Cancellable* pending = newPendingStream(context);
+  ConnectionPool::Cancellable* pending = newPendingStream(context, can_send_early_data);
   ENVOY_LOG(debug, "trying to create new connection");
   ENVOY_LOG(trace, fmt::format("{}", *this));
 
@@ -281,11 +284,10 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
     // This currently only happens for HTTP/3 if secrets aren't yet loaded.
     // Trigger connection failure.
     pending->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
-    onPoolFailure(nullptr, absl::string_view(), ConnectionPool::PoolFailureReason::Overflow,
-                  context);
+    onPoolFailure(nullptr, absl::string_view(),
+                  ConnectionPool::PoolFailureReason::LocalConnectionFailure, context);
     return nullptr;
   }
-
   return pending;
 }
 
@@ -323,9 +325,9 @@ std::list<ActiveClientPtr>& ConnPoolImplBase::owningList(ActiveClient::State sta
   case ActiveClient::State::DRAINING:
     return busy_clients_;
   case ActiveClient::State::CLOSED:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    break; // Fall through to PANIC.
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("unexpected");
 }
 
 void ConnPoolImplBase::transitionActiveClientState(ActiveClient& client,
@@ -347,6 +349,8 @@ void ConnPoolImplBase::transitionActiveClientState(ActiveClient& client,
 void ConnPoolImplBase::addIdleCallbackImpl(Instance::IdleCb cb) { idle_callbacks_.push_back(cb); }
 
 void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
+  Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
+
   // Create a separate list of elements to close to avoid mutate-while-iterating problems.
   std::list<ActiveClient*> to_close;
 
@@ -401,11 +405,7 @@ bool ConnPoolImplBase::isIdleImpl() const {
          connecting_clients_.empty();
 }
 
-void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
-  if (is_draining_for_deletion_) {
-    closeIdleConnectionsForDrainingPool();
-  }
-
+void ConnPoolImplBase::checkForIdleAndNotify() {
   if (isIdleImpl()) {
     ENVOY_LOG(debug, "invoking idle callbacks - is_draining_for_deletion_={}",
               is_draining_for_deletion_);
@@ -413,6 +413,14 @@ void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
       cb();
     }
   }
+}
+
+void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
+  if (is_draining_for_deletion_) {
+    closeIdleConnectionsForDrainingPool();
+  }
+
+  checkForIdleAndNotify();
 }
 
 void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
@@ -462,7 +470,9 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       //       if retry logic submits a new stream to the pool, we don't fail it inline.
       purgePendingStreams(client.real_host_description_, failure_reason, reason);
       // See if we should preconnect based on active connections.
-      tryCreateNewConnections();
+      if (!is_draining_for_deletion_) {
+        tryCreateNewConnections();
+      }
     }
 
     // We need to release our resourceManager() resources before checking below for
@@ -483,7 +493,15 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
 
     dispatcher_.deferredDelete(client.removeFromList(owningList(client.state())));
 
-    checkForIdleAndCloseIdleConnsIfDraining();
+    // Check if the pool transitioned to idle state after removing closed client
+    // from one of the client tracking lists.
+    // There is no need to check if other connections are idle in a draining pool
+    // because the pool will close all idle connection when it is starting to
+    // drain.
+    // Trying to close other connections here can lead to deep recursion when
+    // a large number idle connections are closed at the start of pool drain.
+    // See CdsIntegrationTest.CdsClusterDownWithLotsOfIdleConnections for an example.
+    checkForIdleAndNotify();
 
     client.setState(ActiveClient::State::CLOSED);
 
@@ -518,7 +536,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
   }
 }
 
-PendingStream::PendingStream(ConnPoolImplBase& parent) : parent_(parent) {
+PendingStream::PendingStream(ConnPoolImplBase& parent, bool can_send_early_data)
+    : parent_(parent), can_send_early_data_(can_send_early_data) {
   parent_.host()->cluster().stats().upstream_rq_pending_total_.inc();
   parent_.host()->cluster().stats().upstream_rq_pending_active_.inc();
   parent_.host()->cluster().resourceManager(parent_.priority()).pendingRequests().inc();

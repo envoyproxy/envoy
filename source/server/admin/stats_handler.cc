@@ -137,7 +137,7 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
     if (format_value.value() == "prometheus") {
       format_ = Format::Prometheus;
     } else if (format_value.value() == "json") {
-      format_ = Format::Json;
+     *co format_ = Format::Json;
     } else if (format_value.value() == "text") {
       format_ = Format::Text;
     } else if (format_value.value() == "html") {
@@ -159,21 +159,28 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   if (code != Http::Code::OK) {
     return code;
   }
+
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
-  Stats::Store& store = server_.stats();
+
+  Stats::Store& stats = server_.stats();
+  std::vector<Stats::ParentHistogramSharedPtr> histograms = stats.histograms();
+  stats.symbolTable().sortByStatNames<Stats::ParentHistogramSharedPtr>(
+      histograms.begin(), histograms.end(),
+      [](const Stats::ParentHistogramSharedPtr& a) -> Stats::StatName { return a->statName(); });
+
   if (params.format_ == Format::Prometheus) {
     const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
-        params.prometheus_text_readouts_ ? store.textReadouts()
+        params.prometheus_text_readouts_ ? stats.textReadouts()
                                          : std::vector<Stats::TextReadoutSharedPtr>();
     PrometheusStatsFormatter::statsAsPrometheus(
-        store.counters(), store.gauges(), store.histograms(), text_readouts_vec, response,
+        stats.counters(), stats.gauges(), stats.histograms(), text_readouts_vec, response,
         params.used_only_, params.filter_, server_.api().customStatNamespaces());
     return Http::Code::OK;
   }
 
-  return stats(params, server_.stats(), response_headers, response);
+  return stats(params, stats, response_headers, response);
 }
 
 class StatsHandler::Render {
@@ -245,6 +252,8 @@ public:
              const Params& params)
       : response_(response), params_(params) {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+    response.add(statsAsJson(all_stats, text_readouts, histograms, used_only, regex));
+    return Http::Code::OK;
   }
 
   void generate(const std::string& name, uint64_t value) override {

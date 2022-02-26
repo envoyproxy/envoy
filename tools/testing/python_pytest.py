@@ -16,10 +16,13 @@ import sys
 
 import pytest
 
-from envoy.base import runner, utils
+from aio.run import runner
+
+from envoy.base import utils
 
 
 class PytestRunner(runner.Runner):
+    _use_uvloop = False
 
     @property
     def cov_collect(self) -> str:
@@ -34,7 +37,7 @@ class PytestRunner(runner.Runner):
     def pytest_args(self, coveragerc: str) -> list:
         return self.extra_args + [f"--cov-config={coveragerc}"]
 
-    def run(self) -> int:
+    async def run(self) -> int:
         if not self.cov_collect:
             return pytest.main(self.extra_args)
 
@@ -43,7 +46,7 @@ class PytestRunner(runner.Runner):
 
 
 def main(*args) -> int:
-    return PytestRunner(*args).run()
+    return PytestRunner(*args)()
 
 
 if __name__ == "__main__":
