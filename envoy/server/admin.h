@@ -112,6 +112,24 @@ public:
   using HandlerPtr = std::unique_ptr<Handler>;
 
   /**
+   * Add an admin handler.
+   * Lambda to generate a Handler.
+   */
+  using GenHandlerCb = std::function<HandlerPtr(absl::string_view path, AdminStream&)>;
+
+  /**
+   * Individual admin handler including prefix, help text, and callback.
+   */
+  struct UrlHandler {
+    const std::string prefix_;
+    const std::string help_text_;
+    const GenHandlerCb handler_;
+    const bool removable_;
+    const bool mutates_server_state_;
+    const ParamDescriptorVec params_{};
+  };
+
+  /**
    * Callback for admin URL handlers.
    * @param path_and_query supplies the path and query of the request URL.
    * @param response_headers enables setting of http headers (e.g., content-type, cache-control) in
@@ -126,12 +144,6 @@ public:
       Buffer::Instance& response, AdminStream& admin_stream)>;
 
   virtual ~Admin() = default;
-
-  /**
-   * Add an admin handler.
-   * Lambda to generate a Handler.
-   */
-  using GenHandlerCb = std::function<HandlerPtr(absl::string_view path, AdminStream&)>;
 
   /**
    * Add a legacy admin handler where the entire response is written in
@@ -159,8 +171,8 @@ public:
    * @return bool true if the handler was added, false if it was not added.
    */
   virtual bool addChunkedHandler(const std::string& prefix, const std::string& help_text,
-                                 GenHandlerCb callback, bool removable,
-                                 bool mutates_server_state) PURE;
+                                 GenHandlerCb callback, bool removable, bool mutates_server_state,
+                                 const ParamDescriptorVec& params = {}) PURE;
 
   /**
    * Remove an admin handler if it is removable.
@@ -218,6 +230,21 @@ public:
    * @return the number of worker threads to run in the server.
    */
   virtual uint32_t concurrency() const PURE;
+
+  /**
+   * Makes a chunked handler for static text.
+   * @param resposne_text the text to populate response with
+   * @param code the Http::Code for the response
+   * @return the handler
+   */
+  static HandlerPtr makeStaticTextHandler(absl::string_view response_text, Http::Code code);
+
+  /**
+   * Creates a UrlHandler structure from a non-chunked callback.
+   */
+  static UrlHandler makeHandler(const std::string& prefix, const std::string& help_text,
+                                HandlerCb callback, bool removable, bool mutates_state,
+                                const ParamDescriptorVec& params = {});
 };
 
 } // namespace Server

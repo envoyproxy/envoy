@@ -100,19 +100,20 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerCerts), false, false),
           makeHandler("/clusters", "upstream cluster status",
                       MAKE_ADMIN_HANDLER(clusters_handler_.handlerClusters), false, false),
-          makeHandler("/config_dump", "dump current Envoy configs (experimental)",
-                      MAKE_ADMIN_HANDLER(config_dump_handler_.handlerConfigDump), false, false
-           {{Admin::ParamDescriptor::Type::String, "resource", "The resource to dump"},
-            {Admin::ParamDescriptor::Type::String, "mask",
-             "The mask to apply. When both resource and mask are specified, "
-             "the mask is applied to every element in the desired repeated field so that only a "
-             "subset of fields are returned. The mask is parsed as a ProtobufWkt::FieldMask"}}},
+          makeHandler(
+              "/config_dump", "dump current Envoy configs (experimental)",
+              MAKE_ADMIN_HANDLER(config_dump_handler_.handlerConfigDump), false, false,
+              {{Admin::ParamDescriptor::Type::String, "resource", "The resource to dump"},
+               {Admin::ParamDescriptor::Type::String, "mask",
+                "The mask to apply. When both resource and mask are specified, "
+                "the mask is applied to every element in the desired repeated field so that only a "
+                "subset of fields are returned. The mask is parsed as a ProtobufWkt::FieldMask"}}),
           makeHandler("/init_dump", "dump current Envoy init manager information (experimental)",
                       MAKE_ADMIN_HANDLER(init_dump_handler_.handlerInitDump), false, false,
-           {{Admin::ParamDescriptor::Type::String, "mask",
-             "The desired component to dump unready targets. The mask is parsed as "
-             "a ProtobufWkt::FieldMask. For example, get the unready targets of "
-                   "all listeners with /init_dump?mask=listener`"}});
+                      {{Admin::ParamDescriptor::Type::String, "mask",
+                        "The desired component to dump unready targets. The mask is parsed as "
+                        "a ProtobufWkt::FieldMask. For example, get the unready targets of "
+                        "all listeners with /init_dump?mask=listener`"}}),
           makeHandler("/contention", "dump current Envoy mutex contention stats (if enabled)",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerContention), false, false),
           makeHandler("/cpuprofiler", "enable/disable the CPU profiler",
@@ -136,16 +137,17 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerQuitQuitQuit), false, true),
           makeHandler("/reset_counters", "reset all counters to zero",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true),
-          makeHandler("/drain_listeners", "drain listeners",
-                      MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true,
-           {{ParamDescriptor::Type::Boolean, "graceful",
-             "When draining listeners, enter a graceful drain period prior to closing "
-             "listeners. This behaviour and duration is configurable via server options "
-             "or CLI"},
-            {ParamDescriptor::Type::Boolean, "inboundonly",
-             "Drains all inbound listeners. traffic_direction field in "
-             "envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a "
-             "listener is inbound or outbound."}}),
+          makeHandler(
+              "/drain_listeners", "drain listeners",
+              MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true,
+              {{ParamDescriptor::Type::Boolean, "graceful",
+                "When draining listeners, enter a graceful drain period prior to closing "
+                "listeners. This behaviour and duration is configurable via server options "
+                "or CLI"},
+               {ParamDescriptor::Type::Boolean, "inboundonly",
+                "Drains all inbound listeners. traffic_direction field in "
+                "envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a "
+                "listener is inbound or outbound."}}),
           makeHandler("/server_info", "print server version/status information",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerServerInfo), false, false),
           makeHandler("/ready", "print server state, return 200 if LIVE, otherwise return 503",
@@ -154,12 +156,13 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerStats), false, false),
           makeHandler("/stats/prometheus", "print server stats in prometheus format",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerPrometheusStats), false, false,
-           {{ParamDescriptor::Type::Boolean, "usedonly",
-             "Only include stats that have been written by system since restart"},
-            {ParamDescriptor::Type::Boolean, "text_readouts",
-             "Render text_readouts as new gaugues with value 0 (increases Prometheus data size)"},
-            {ParamDescriptor::Type::String, "filter",
-             "Regular expression (ecmascript) for filtering stats"}});
+                      {{ParamDescriptor::Type::Boolean, "usedonly",
+                        "Only include stats that have been written by system since restart"},
+                       {ParamDescriptor::Type::Boolean, "text_readouts",
+                        "Render text_readouts as new gaugues with value 0 (increases Prometheus "
+                        "data size)"},
+                       {ParamDescriptor::Type::String, "filter",
+                        "Regular expression (ecmascript) for filtering stats"}}),
           makeHandler("/stats/recentlookups", "Show recent stat-name lookups",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookups), false, false),
           makeHandler("/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
@@ -173,10 +176,10 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
               MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsEnable), false, true),
           makeHandler("/listeners", "print listener info",
                       MAKE_ADMIN_HANDLER(listeners_handler_.handlerListenerInfo), false, false,
-           {{Admin::ParamDescriptor::Type::Enum,
-             "format",
-             "File format to use",
-             {"text", "json"}}}),
+                      {{Admin::ParamDescriptor::Type::Enum,
+                        "format",
+                        "File format to use",
+                        {"text", "json"}}}),
           makeHandler("/runtime", "print runtime values",
                       MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntime), false, false),
           makeHandler("/runtime_modify",
@@ -273,7 +276,7 @@ private:
 
 } // namespace
 
-Admin::HandlerPtr AdminImpl::makeStaticTextHandler(absl::string_view response, Http::Code code) {
+Admin::HandlerPtr Admin::makeStaticTextHandler(absl::string_view response, Http::Code code) {
   return std::make_unique<StaticTextHandler>(response, code);
 }
 
@@ -370,12 +373,11 @@ const Network::Address::Instance& AdminImpl::localAddress() {
   return *server_.localInfo().address();
 }
 
-AdminImpl::UrlHandler AdminImpl::addHandler(
-    const std::string& prefix, const std::string& help_text,
-    HandlerCb callback, bool removable, bool mutates_state,
-    const ParamDescriptorVec& params) {
-  return UrlHandler{prefix, help_text, HandlerGasket::makeGen(callback), removable, mutates_state,
-    params};
+Admin::UrlHandler Admin::makeHandler(const std::string& prefix, const std::string& help_text,
+                                     HandlerCb callback, bool removable, bool mutates_state,
+                                     const ParamDescriptorVec& params) {
+  return UrlHandler{prefix,    help_text,     HandlerGasket::makeGen(callback),
+                    removable, mutates_state, params};
 }
 
 bool AdminImpl::addChunkedHandler(const std::string& prefix, const std::string& help_text,
@@ -404,9 +406,10 @@ bool AdminImpl::addChunkedHandler(const std::string& prefix, const std::string& 
 }
 
 bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
-                           HandlerCb callback, bool removable, bool mutates_state) {
+                           HandlerCb callback, bool removable, bool mutates_state,
+                           const ParamDescriptorVec& params) {
   return addChunkedHandler(prefix, help_text, HandlerGasket::makeGen(callback), removable,
-                           mutates_state);
+                           mutates_state, params);
 }
 
 bool AdminImpl::removeHandler(const std::string& prefix) {

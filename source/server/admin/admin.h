@@ -85,10 +85,9 @@ public:
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
                   bool removable, bool mutates_server_state,
                   const ParamDescriptorVec& params = {}) override;
-                  bool removable, bool mutates_server_state) override;
   bool addChunkedHandler(const std::string& prefix, const std::string& help_text,
                          GenHandlerCb callback, bool removable, bool mutates_server_state,
-                         const ParamDescriptorVec& params) override;
+                         const ParamDescriptorVec& params = {}) override;
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
@@ -220,36 +219,11 @@ public:
     return proxy_status_config_.get();
   }
 
-  /**
-   * Makes a chunked handler for static text.
-   * @param resposne_text the text to populate response with
-   * @param code the Http::Code for the response
-   * @return the handler
-   */
-  static HandlerPtr makeStaticTextHandler(absl::string_view response_text, Http::Code code);
-
 private:
-  /**
-   * Individual admin handler including prefix, help text, and callback.
-   */
-  struct UrlHandler {
-    const std::string prefix_;
-    const std::string help_text_;
-    const GenHandlerCb handler_;
-    const bool removable_;
-    const bool mutates_server_state_;
-    const ParamDescriptorVec params_{};
-  };
-
   /**
    * Creates a Handler instance given a request.
    */
   HandlerPtr findHandler(absl::string_view path_and_query, AdminStream& admin_stream);
-  /**
-   * Creates a UrlHandler structure from a non-chunked callback.
-   */
-  UrlHandler makeHandler(const std::string& prefix, const std::string& help_text,
-                         HandlerCb callback, bool removable, bool mutates_state);
 
   /**
    * Implementation of RouteConfigProvider that returns a static null route config.

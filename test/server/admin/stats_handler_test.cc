@@ -42,26 +42,6 @@ public:
     return instance;
   }
 
-  Http::Code handlerStats(absl::string_view url, Buffer::Instance& response) {
-    Http::TestResponseHeaderMapImpl response_headers;
-    StatsHandler::Params params;
-    Http::Code code = params.parse(url, response);
-    if (code != Http::Code::OK) {
-      return code;
-    }
-    std::shared_ptr<MockInstance> instance = setupMockedInstance();
-    StatsHandler handler(*instance);
-    return handler.stats(params, *store_, response_headers, response);
-  }
-
-  Http::Code statsAsJsonHandler(std::string& data, absl::string_view params = "") {
-    std::string url = absl::StrCat("/stats?format=json&pretty", params);
-    Buffer::OwnedImpl response;
-    Http::Code code = handlerStats(url, response);
-    data = response.toString();
-    return code;
-  }
-
   Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
   Stats::CustomStatNamespaces& customNamespaces() { return custom_namespaces_; }
 
@@ -133,8 +113,6 @@ public:
     }
   }
 
-  Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
-
   Stats::SymbolTableImpl symbol_table_;
   Stats::StatNamePool pool_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
@@ -144,7 +122,6 @@ public:
   Stats::ThreadLocalStoreImplPtr store_;
   Stats::CustomStatNamespacesImpl custom_namespaces_;
   MockAdminStream admin_stream_;
-  Configuration::MockStatsConfig stats_config_;
 };
 
 TEST(StatsHandlerTest, TypeToString) {
@@ -195,10 +172,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
-  Buffer::OwnedImpl data;
-  Http::Code code = handlerStats("/stats?format=blergh", data);
-  EXPECT_EQ(Http::Code::BadRequest, code);
-  EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", data.toString());
+  CodeResponse code_response = handlerStats("//stats?format=garbage");
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", code_response.second);
 }
 
 TEST_P(AdminStatsTest, HandlerStatsPlainText) {
@@ -257,14 +233,14 @@ TEST_P(AdminStatsTest, HandlerStatsHtml) {
 
   auto test = [this](absl::string_view params, const std::vector<std::string>& expected,
                      const std::vector<std::string>& not_expected) {
-    Buffer::OwnedImpl data;
     std::string url = absl::StrCat("/stats?format=html", params);
-    EXPECT_EQ(Http::Code::OK, handlerStats(url, data));
+    CodeResponse code_response = handlerStats(url);
+    EXPECT_EQ(Http::Code::OK, code_response.first);
     for (const std::string& expect : expected) {
-      EXPECT_THAT(data.toString(), HasSubstr(expect)) << "params=" << params;
+      EXPECT_THAT(code_response.second, HasSubstr(expect)) << "params=" << params;
     }
     for (const std::string& not_expect : not_expected) {
-      EXPECT_THAT(data.toString(), Not(HasSubstr(not_expect))) << "params=" << params;
+      EXPECT_THAT(code_response.second, Not(HasSubstr(not_expect))) << "params=" << params;
     }
   };
   test("",
@@ -275,15 +251,6 @@ TEST_P(AdminStatsTest, HandlerStatsHtml) {
        {"No Histograms found", "scope.g2: 2"});      // not expected
   test("&usedonly", {"foo.c0: 0", "foo.c1: 1"},      // expected
        {"scope1.scope2.unset"});                     // not expected
-  shutdownThreading();
-}
-
-TEST_P(AdminStatsTest, HandlerStatsJson) {
-  InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
-  code_response = handlerStats(url + "?usedonly");
-  EXPECT_EQ(Http::Code::OK, code_response.first);
-  EXPECT_EQ(expected, code_response.second);
 }
 
 TEST_P(AdminStatsTest, HandlerStatsJson) {

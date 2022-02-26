@@ -49,6 +49,7 @@ envoy_cc_test(
     srcs = ["admin_html_generator_test.cc"],
     deps = [
         "//source/server/admin:admin_html_generator_lib",
+        "//source/server/admin:admin_lib",
     ],
 )
 

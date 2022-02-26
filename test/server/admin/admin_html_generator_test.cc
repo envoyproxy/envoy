@@ -1,3 +1,4 @@
+#include "source/server/admin/admin.h"
 #include "source/server/admin/admin_html_generator.h"
 
 #include "gmock/gmock.h"
@@ -20,9 +21,8 @@ protected:
                                false,
                                {{Admin::ParamDescriptor::Type::Boolean, "param", "param help"}}} {}
 
-  static Http::Code handlerCallback(absl::string_view, Http::ResponseHeaderMap&, Buffer::Instance&,
-                                    AdminStream&) {
-    return Http::Code::OK;
+  static Admin::HandlerPtr handlerCallback(absl::string_view, AdminStream&) {
+    return Admin::makeStaticTextHandler("", Http::Code::OK);
   }
 
   Buffer::OwnedImpl data_;

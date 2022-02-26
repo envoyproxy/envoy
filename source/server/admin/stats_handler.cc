@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/admin/v3/mutex_stats.pb.h"
+#include "envoy/server/admin.h"
 
 #include "source/common/common/empty_string.h"
 #include "source/common/html/utility.h"
@@ -137,7 +138,7 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
     if (format_value.value() == "prometheus") {
       format_ = Format::Prometheus;
     } else if (format_value.value() == "json") {
-     *co format_ = Format::Json;
+      format_ = Format::Json;
     } else if (format_value.value() == "text") {
       format_ = Format::Text;
     } else if (format_value.value() == "html") {
@@ -164,23 +165,23 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     server_.flushStats();
   }
 
-  Stats::Store& stats = server_.stats();
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = stats.histograms();
-  stats.symbolTable().sortByStatNames<Stats::ParentHistogramSharedPtr>(
+  Stats::Store& store = server_.stats();
+  std::vector<Stats::ParentHistogramSharedPtr> histograms = store.histograms();
+  store.symbolTable().sortByStatNames<Stats::ParentHistogramSharedPtr>(
       histograms.begin(), histograms.end(),
       [](const Stats::ParentHistogramSharedPtr& a) -> Stats::StatName { return a->statName(); });
 
   if (params.format_ == Format::Prometheus) {
     const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
-        params.prometheus_text_readouts_ ? stats.textReadouts()
+        params.prometheus_text_readouts_ ? store.textReadouts()
                                          : std::vector<Stats::TextReadoutSharedPtr>();
     PrometheusStatsFormatter::statsAsPrometheus(
-        stats.counters(), stats.gauges(), stats.histograms(), text_readouts_vec, response,
+        store.counters(), store.gauges(), store.histograms(), text_readouts_vec, response,
         params.used_only_, params.filter_, server_.api().customStatNamespaces());
     return Http::Code::OK;
   }
 
-  return stats(params, stats, response_headers, response);
+  return stats(params, store, response_headers, response);
 }
 
 class StatsHandler::Render {
@@ -252,8 +253,8 @@ public:
              const Params& params)
       : response_(response), params_(params) {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-    response.add(statsAsJson(all_stats, text_readouts, histograms, used_only, regex));
-    return Http::Code::OK;
+    // response.add(statsAsJson(all_stats, text_readouts, histograms, used_only, regex));
+    // return Http::Code::OK;
   }
 
   void generate(const std::string& name, uint64_t value) override {
@@ -547,23 +548,20 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
 }
 
 Admin::UrlHandler StatsHandler::statsHandler() {
-  return {"/stats",
-          "Print server stats.",
-          MAKE_ADMIN_HANDLER(handlerStats),
-          false,
-          false,
-          {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
-            "Only include stats that have been written by system since restart"},
-           {Admin::ParamDescriptor::Type::String, "filter",
-            "Regular expression (ecmascript) for filtering stats"},
-           {Admin::ParamDescriptor::Type::Enum,
-            "format",
-            "File format to use.",
-            {"html", "text", "json"}},
-           {Admin::ParamDescriptor::Type::Enum,
-            "type",
-            "Stat types to include.",
-            {AllLabel, CountersLabel, HistogramsLabel, GaugesLabel, TextReadoutsLabel}}}};
+  return Admin::makeHandler(
+      "/stats", "Print server stats.", MAKE_ADMIN_HANDLER(handlerStats), false, false,
+      {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
+        "Only include stats that have been written by system since restart"},
+       {Admin::ParamDescriptor::Type::String, "filter",
+        "Regular expression (ecmascript) for filtering stats"},
+       {Admin::ParamDescriptor::Type::Enum,
+        "format",
+        "File format to use.",
+        {"html", "text", "json"}},
+       {Admin::ParamDescriptor::Type::Enum,
+        "type",
+        "Stat types to include.",
+        {AllLabel, CountersLabel, HistogramsLabel, GaugesLabel, TextReadoutsLabel}}});
 }
 
 absl::string_view StatsHandler::typeToString(StatsHandler::Type type) {
