@@ -74,6 +74,8 @@ public:
  */
 class Admin {
 public:
+  virtual ~Admin() = default;
+
   struct ParamDescriptor {
     enum class Type { Boolean, String, Enum, Hidden };
     const Type type_;
@@ -142,8 +144,6 @@ public:
   using HandlerCb = std::function<Http::Code(
       absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
       Buffer::Instance& response, AdminStream& admin_stream)>;
-
-  virtual ~Admin() = default;
 
   /**
    * Add a legacy admin handler where the entire response is written in

@@ -365,7 +365,6 @@ Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMa
 
   html.renderTableEnd();
 
-  // gen.renderTail();
   return Http::Code::OK;
 }
 

@@ -27,7 +27,6 @@ constexpr absl::string_view CountersLabel = "Counters";
 constexpr absl::string_view GaugesLabel = "Gauges";
 constexpr absl::string_view HistogramsLabel = "Histograms";
 constexpr absl::string_view TextReadoutsLabel = "TextReadouts";
-
 } // namespace
 
 const uint64_t RecentLookupsCapacity = 100;
@@ -565,28 +564,22 @@ Admin::UrlHandler StatsHandler::statsHandler() {
 }
 
 absl::string_view StatsHandler::typeToString(StatsHandler::Type type) {
-  static constexpr absl::string_view TextReadouts = "TextReadouts";
-  static constexpr absl::string_view Counters = "Counters";
-  static constexpr absl::string_view Gauges = "Gauges";
-  static constexpr absl::string_view Histograms = "Histograms";
-  static constexpr absl::string_view All = "All";
-
   absl::string_view ret;
   switch (type) {
   case Type::TextReadouts:
-    ret = TextReadouts;
+    ret = TextReadoutsLabel;
     break;
   case Type::Counters:
-    ret = Counters;
+    ret = CountersLabel;
     break;
   case Type::Gauges:
-    ret = Gauges;
+    ret = GaugesLabel;
     break;
   case Type::Histograms:
-    ret = Histograms;
+    ret = HistogramsLabel;
     break;
   case Type::All:
-    ret = All;
+    ret = AllLabel;
     break;
   }
   return ret;

@@ -283,7 +283,6 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.counterFromStatNameWithTags(name, tags);
   }
-
   void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachCounter(f_size, f_stat);
@@ -320,6 +319,7 @@ public:
   void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override {
     UNREFERENCED_PARAMETER(sink_predicates);
   }
+
   Counter& counterFromString(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.counterFromString(name);
