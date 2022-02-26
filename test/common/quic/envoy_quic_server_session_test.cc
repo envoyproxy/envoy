@@ -1037,6 +1037,10 @@ TEST_F(EnvoyQuicServerSessionTest, GetRttAndCwnd) {
   installReadFilter();
   EXPECT_GT(envoy_quic_session_.lastRoundTripTime().value(), std::chrono::microseconds(0));
   EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(), 500);
+
+  envoy_quic_session_.configureInitialCongestionWindow(8000000, std::chrono::microseconds(1000000));
+  EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(),
+            quic::kInitialCongestionWindow * quic::kDefaultTCPMSS);
 }
 
 } // namespace Quic
