@@ -142,7 +142,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "ssl_socket_interface",
     hdrs = [
-         "connection_info_impl_base.h"
+         "connection_info_impl_base.h",
          "ssl_handshaker.h",
          "ssl_socket.h",
 ],
