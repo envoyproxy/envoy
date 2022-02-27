@@ -271,6 +271,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
   // 2021/08/15  17290                40349   add all host map to priority set for fast host
   //                                          searching
   // 2021/08/18  13176    40577       40700   Support slow start mode
+  // 2022/02/25  19862    42589       42700   http3: monitor 0-RTT enabled connections
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -291,7 +292,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
     // https://github.com/envoyproxy/envoy/issues/12209
     // EXPECT_MEMORY_EQ(m_per_cluster, 37061);
   }
-  EXPECT_MEMORY_LE(m_per_cluster, 40700); // Round up to allow platform variations.
+  EXPECT_MEMORY_LE(m_per_cluster, 42700); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
