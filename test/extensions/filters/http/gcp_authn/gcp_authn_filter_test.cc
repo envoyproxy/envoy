@@ -46,26 +46,6 @@ private:
   Envoy::Http::AsyncClient::Callbacks* callback_;
   Envoy::Http::RequestMessagePtr message_;
 };
-// TEST_F(TokenSubscriberTest, VerifyRemoteRequest) {
-//   // Setup fake remote request.
-//   Envoy::Http::RequestHeaderMapPtr headers(
-//       new Envoy::Http::TestRequestHeaderMapImpl(
-//           {{":method", "POST"}, {":authority", "TestValue"}}));
-//   EXPECT_CALL(*info_, prepareRequest(token_url_))
-//       .Times(1)
-//       .WillRepeatedly(
-//           Return(ByMove(std::make_unique<Envoy::Http::RequestMessageImpl>(
-//               std::move(headers)))));
-
-//   // Start class under test.
-//   setUp(TokenType::IdentityToken,
-//         DependencyErrorBehavior::BLOCK_INIT_ON_ANY_ERROR);
-
-//   // Assert remote call matches.
-//   ASSERT_EQ(call_count_, 1);
-//   EXPECT_EQ(message_->headers().Method()->value().getStringView(), "POST");
-//   EXPECT_EQ(message_->headers().Host()->value().getStringView(), "TestValue");
-// }
 
 } // namespace
 } // namespace GcpAuthentication
