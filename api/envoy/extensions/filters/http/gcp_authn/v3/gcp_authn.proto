@@ -17,16 +17,17 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#not-implemented-hide:]
 message GcpAuthnFilterConfig {
-  // The HTTP URI to to fetch JWT token from Instance Metadata Server.
+  // The HTTP URI to to fetch token from Instance Metadata Server.
   config.core.v3.HttpUri http_uri = 1;
 
-  // Retry policy for fetching JWT tokens.
+  // Retry policy for fetching tokens.
   config.core.v3.RetryPolicy retry_policy = 2;
 
   // JWT filter Cache configuration
   CacheConfig cache_config = 3;
 }
 
+// TODO(tyxia) This sits in cluster config
 message GcpAuthnFilterPerRouteConfig {
   repeated string audience = 1;
 }

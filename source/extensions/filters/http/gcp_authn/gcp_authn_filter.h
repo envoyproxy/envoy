@@ -40,42 +40,18 @@ public:
 
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
-  void sendRequest(const std::string& method) {
-    if (active_request_) {
-      active_request_->cancel();
-      active_request_ = nullptr;
-    }
-
-    const std::chrono::milliseconds fetch_timeout(1000);
-    Http::RequestMessagePtr request_message = buildRequest(method);
-    const struct Envoy::Http::AsyncClient::RequestOptions options =
-        Envoy::Http::AsyncClient::RequestOptions()
-            .setTimeout(fetch_timeout)
-            // Metadata server rejects X-Forwarded-For requests.
-            // https://cloud.google.com/compute/docs/storing-retrieving-metadata#x-forwarded-for_header
-            .setSendXff(false);
-    const auto thread_local_cluster =
-        context_.clusterManager().getThreadLocalCluster(config_.http_uri().cluster());
-
-    if (thread_local_cluster) {
-      active_request_ =
-          thread_local_cluster->httpAsyncClient().send(std::move(request_message), *this, options);
-    }
-  }
+  void sendRequest();
 
 private:
   // Http::AsyncClient::Callbacks implemented by this class.
-  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override {}
-
-  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override {
-    if (active_request_) {
-      active_request_->cancel();
-    }
-  }
+  void onSuccess(const Http::AsyncClient::Request& request,
+                 Http::ResponseMessagePtr&& response) override;
+  void onFailure(const Http::AsyncClient::Request& request,
+                 Http::AsyncClient::FailureReason reason) override;
 
   Http::RequestMessagePtr buildRequest(const std::string& method);
+  void ProcessResponse(Http::ResponseMessagePtr&& response);
 
-  // Http::RequestMessagePtr buildRequest(const std::string& method);
   envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig config_;
   Server::Configuration::FactoryContext& context_;
   Http::AsyncClient::Request* active_request_{};

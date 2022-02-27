@@ -22,7 +22,7 @@ public:
       const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
       const std::string&, FactoryContext& context) override;
 
-  // TODO(tyxia) No need for perRouteConfig at this monment
+  // TODO(tyxia) No need for perRouteConfig at this monment.
   // Router::RouteSpecificFilterConfigConstSharedPtr
   // createRouteSpecificFilterConfigTyped(const GcpAuthnFilterPerRouteConfig& config,
   //                                      Server::Configuration::ServerFactoryContext&,

@@ -13,6 +13,9 @@ envoy_cc_library(
     name = "gcp_authn_lib",
     srcs = ["gcp_authn_filter.cc"],
     hdrs = ["gcp_authn_filter.h"],
+    external_deps = [
+        "jwt_verify_lib",
+    ],
     deps = [
         # ":filter_config",
         "//source/extensions/filters/http/common:pass_through_filter_lib",

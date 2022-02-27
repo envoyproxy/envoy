@@ -29,9 +29,8 @@ Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the filter. @see RegisterFactory.
  */
-// TODO(tyxia) {"envoy.gcp_authn"};
 REGISTER_FACTORY(GcpAuthnFilterFactory,
-                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.gcp_authn"};
+                 Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace GcpAuthentication
 } // namespace HttpFilters
