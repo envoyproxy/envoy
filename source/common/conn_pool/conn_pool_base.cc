@@ -606,6 +606,7 @@ void ConnPoolImplBase::decrConnectingAndConnectedStreamCapacity(uint32_t delta,
                                                                 ActiveClient& client) {
   state_.decrConnectingAndConnectedStreamCapacity(delta);
   if (client.isConnecting()) {
+    // If connecting, update the local connecting capacity as well.
     ASSERT(connecting_stream_capacity_ >= delta);
     connecting_stream_capacity_ -= delta;
   }
