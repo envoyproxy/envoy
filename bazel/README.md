@@ -124,7 +124,7 @@ for how to update or override dependencies.
     ```
     xcrun --show-sdk-version
     ```
-    If the sdk version is lower than the one in the error message, upgrade your Command Line Tools:
+    If the sdk version is lower than the one in the error message, upgrade your Command Line Tools using following commands:
     ```
     sudo rm -rf /Library/Developer/CommandLineTools
     softwareupdate --all --install --force
