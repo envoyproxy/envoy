@@ -112,6 +112,28 @@ for how to update or override dependencies.
     The full version of Xcode (not just Command Line Tools) is also required to build Envoy on macOS.
     Envoy compiles and passes tests with the version of clang installed by Xcode 11.1:
     Apple clang version 11.0.0 (clang-1100.0.33.8).
+    
+    #### trouble shooting
+    If you see some error messages like the following
+    ```
+    xcrun: error: SDK "macosx12.1" cannot be located
+    xcrun: error: SDK "macosx12.1" cannot be located
+    xcrun: error: unable to lookup item 'Path' in SDK 'macosx12.1'
+    ```
+    please check the installed sdk version.
+    ```
+    xcrun --show-sdk-version
+    ```
+    If the sdk version is lower than the one in the error message, upgrade your Command Line Tools:
+    ```
+    sudo rm -rf /Library/Developer/CommandLineTools
+    softwareupdate --all --install --force
+    sudo xcode-select --install
+    ```
+    If the following error occurs during the compilation process, please execute following command and retry.
+    ```
+    sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+    ```
 
     Having the binutils keg installed in Brew is known to cause issues due to putting an incompatible
     version of `ar` on the PATH, so if you run into issues building third party code like luajit
