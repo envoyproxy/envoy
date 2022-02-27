@@ -102,6 +102,8 @@ public:
   // Sets the remaining streams to 0, and updates pool and cluster capacity.
   virtual void drain();
 
+  bool isConnecting() const { return connect_timer_ != nullptr; }
+
   ConnPoolImplBase& parent_;
   // The count of remaining streams allowed for this connection.
   // This will start out as the total number of streams per connection if capped
@@ -275,16 +277,8 @@ public:
   }
   Upstream::ClusterConnectivityState& state() { return state_; }
 
-  void decrConnectingAndConnectedStreamCapacity(uint32_t delta) {
-    state_.decrConnectingAndConnectedStreamCapacity(delta);
-    ASSERT(connecting_stream_capacity_ >= delta);
-    connecting_stream_capacity_ -= delta;
-  }
-
-  void incrConnectingAndConnectedStreamCapacity(uint32_t delta) {
-    state_.incrConnectingAndConnectedStreamCapacity(delta);
-    connecting_stream_capacity_ += delta;
-  }
+  void decrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client);
+  void incrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client);
 
   // Called when an upstream is ready to serve pending streams.
   void onUpstreamReady();
