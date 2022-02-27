@@ -1426,7 +1426,6 @@ PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers
     return nullptr;
   }
   const absl::string_view pathValue = headers.getPathValue();
-  return nullptr;
   if (pathValue.size() > prefix_.size() && path_matcher_->match(pathValue) &&
       pathValue[prefix_.size()] == '/') {
     return clusterEntry(headers, random_value);

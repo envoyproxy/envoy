@@ -514,6 +514,9 @@ message RouteMatch {
     // [#comment: TODO(htuch): Replace the above comment with an alpha tag.]
     ConnectMatcher connect_matcher = 12;
 
+    // If specified, the route is a path - separated prefix rule meaning that the
+    // *:path* header must either exactly match the path_separated_prefix or have it
+    // as a prefix, follwed by '/'
     string path_separated_prefix = 14;
   }
 

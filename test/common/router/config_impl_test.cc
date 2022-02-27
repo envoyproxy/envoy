@@ -7585,6 +7585,33 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, PathSeparatedPrefixMatch) {
+
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_prefix
+    domains: ["*"]
+    routes:
+      - match:
+          path_separated_prefix: "/rest/api"
+        route: { cluster: some-cluster}
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  EXPECT_EQ("some-cluster", config.route(genHeaders("path.prefix.com", "/rest/api", "GET"), 0)
+                                ->routeEntry()
+                                ->clusterName());
+  EXPECT_EQ("some-cluster", config.route(genHeaders("path.prefix.com", "/rest/api/", "GET"), 0)
+                                ->routeEntry()
+                                ->clusterName());
+  EXPECT_EQ("some-cluster",
+            config.route(genHeaders("path.prefix.com", "/rest/api/thing", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+}
+
 TEST_F(RouteConfigurationV2, RegexPrefixWithNoRewriteWorksWhenPathChanged) {
 
   // Setup regex route entry. the regex is trivial, that's ok as we only want to test that
