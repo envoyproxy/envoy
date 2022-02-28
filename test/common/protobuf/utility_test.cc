@@ -1688,7 +1688,6 @@ class DeprecatedFieldsTest : public testing::Test, protected RuntimeStatsHelper 
 protected:
   void checkForDeprecation(const Protobuf::Message& message, bool recurse_into_any = false) {
     MessageUtil::checkForUnexpectedFields(message, ProtobufMessage::getStrictValidationVisitor(),
-                                          Runtime::LoaderSingleton::getExisting(),
                                           recurse_into_any);
   }
 };

@@ -89,6 +89,7 @@ public:
       throw EnvoyException(absl::StrCat("Failing due to work-in-progress field: ", description));
     }
   }
+  OptRef<Runtime::Loader> runtime() override { return OptRef<Runtime::Loader>(); }
 
 private:
   const Options& options_;

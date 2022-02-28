@@ -276,10 +276,9 @@ public:
    * @throw ProtoValidationException if deprecated fields are used and listed
    *    in disallowed_features in runtime_features.h
    */
-  static void
-  checkForUnexpectedFields(const Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor,
-                           bool recurse_into_any = false);
+  static void checkForUnexpectedFields(const Protobuf::Message& message,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                                       bool recurse_into_any = false);
 
   /**
    * Validate protoc-gen-validate constraints on a given protobuf as well as performing
@@ -297,8 +296,7 @@ public:
                        bool recurse_into_any = false) {
     // Log warnings or throw errors if deprecated fields or unknown fields are in use.
     if (!validation_visitor.skipValidation()) {
-      checkForUnexpectedFields(message, validation_visitor, Runtime::LoaderSingleton::getExisting(),
-                               recurse_into_any);
+      checkForUnexpectedFields(message, validation_visitor, recurse_into_any);
     }
 
     // TODO(mattklein123): When recurse_into_any is true, we should traverse the message stack and
