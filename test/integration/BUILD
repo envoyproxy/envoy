@@ -110,10 +110,12 @@ envoy_proto_library(
 
 envoy_cc_test(
     name = "cds_integration_test",
+    size = "large",
     srcs = ["cds_integration_test.cc"],
     data = [
         "//test/config/integration/certs",
     ],
+    shard_count = 4,
     deps = [
         ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
@@ -515,6 +517,7 @@ envoy_cc_test_library(
         "//source/extensions/filters/http/buffer:config",
         "//test/common/http/http2:http2_frame",
         "//test/integration/filters:add_invalid_data_filter_lib",
+        "//test/integration/filters:buffer_continue_filter_lib",
         "//test/integration/filters:continue_after_local_reply_filter_lib",
         "//test/integration/filters:continue_headers_only_inject_body",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
@@ -524,6 +527,7 @@ envoy_cc_test_library(
         "//test/integration/filters:local_reply_with_metadata_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
         "//test/integration/filters:remove_response_headers_lib",
+        "//test/integration/filters:stop_iteration_headers_inject_body",
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
@@ -719,6 +723,7 @@ envoy_cc_test_library(
         "fake_upstream.h",
     ],
     deps = [
+        "//test/mocks/runtime:runtime_mocks",
         "//source/server:listener_manager_lib",
         "//envoy/api:api_interface",
         "//envoy/grpc:status",
@@ -860,7 +865,6 @@ envoy_cc_test_library(
         "//source/server:options_lib",
         "//source/server:process_context_lib",
         "//source/server:server_lib",
-        "//test/common/runtime:utility_lib",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
         "//test/mocks:common_lib",
@@ -943,7 +947,6 @@ envoy_cc_test_library(
         "//source/server:process_context_lib",
         "//source/server:server_lib",
         "//test/common/grpc:grpc_client_integration_lib",
-        "//test/common/runtime:utility_lib",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
         "//test/mocks/buffer:buffer_mocks",

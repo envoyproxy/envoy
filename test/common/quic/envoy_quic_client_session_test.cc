@@ -1,38 +1,28 @@
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "envoy/stats/stats_macros.h"
 
-#include "quiche/quic/core/crypto/null_encrypter.h"
-#include "quiche/quic/test_tools/crypto_test_utils.h"
-#include "quiche/quic/test_tools/quic_session_peer.h"
-#include "quiche/quic/test_tools/quic_test_utils.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/common/quic/envoy_quic_client_session.h"
-#include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/codec_impl.h"
-#include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_client_session.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_client_stream.h"
 
 #include "test/common/quic/test_utils.h"
-
-#include "envoy/stats/stats_macros.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/quic/core/crypto/null_encrypter.h"
+#include "quiche/quic/test_tools/crypto_test_utils.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
+#include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::_;
 using testing::Invoke;

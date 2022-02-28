@@ -315,8 +315,8 @@ ClusterManagerImpl::ClusterManagerImpl(
   auto is_primary_cluster = [](const envoy::config::cluster::v3::Cluster& cluster) -> bool {
     return cluster.type() != envoy::config::cluster::v3::Cluster::EDS ||
            (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
-            cluster.eds_cluster_config().eds_config().config_source_specifier_case() ==
-                envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath);
+            Config::SubscriptionFactory::isPathBasedConfigSource(
+                cluster.eds_cluster_config().eds_config().config_source_specifier_case()));
   };
   // Build book-keeping for which clusters are primary. This is useful when we
   // invoke loadCluster() below and it needs the complete set of primaries.
@@ -399,8 +399,8 @@ ClusterManagerImpl::ClusterManagerImpl(
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // Now load all the secondary clusters.
     if (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
-        cluster.eds_cluster_config().eds_config().config_source_specifier_case() !=
-            envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath) {
+        !Config::SubscriptionFactory::isPathBasedConfigSource(
+            cluster.eds_cluster_config().eds_config().config_source_specifier_case())) {
       loadCluster(cluster, MessageUtil::hash(cluster), "", false, active_clusters_);
     }
   }
@@ -1651,7 +1651,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
 
   bool have_transport_socket_options = false;
   if (context && context->upstreamTransportSocketOptions()) {
-    context->upstreamTransportSocketOptions()->hashKey(hash_key, host->transportSocketFactory());
+    host->transportSocketFactory().hashKey(hash_key, context->upstreamTransportSocketOptions());
     have_transport_socket_options = true;
   }
 
@@ -1752,7 +1752,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl
   bool have_transport_socket_options = false;
   if (context != nullptr && context->upstreamTransportSocketOptions() != nullptr) {
     have_transport_socket_options = true;
-    context->upstreamTransportSocketOptions()->hashKey(hash_key, host->transportSocketFactory());
+    host->transportSocketFactory().hashKey(hash_key, context->upstreamTransportSocketOptions());
   }
 
   TcpConnPoolsContainer& container = parent_.host_tcp_conn_pool_map_[host];
@@ -1852,7 +1852,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
 #ifdef ENVOY_ENABLE_QUIC
     return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
-                                         priority, options, transport_socket_options, state, source,
+                                         priority, options, transport_socket_options, state,
                                          quic_stat_names_, {}, stats_, {});
 #else
     UNREFERENCED_PARAMETER(source);
