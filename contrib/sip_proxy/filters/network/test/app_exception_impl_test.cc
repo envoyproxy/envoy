@@ -1,7 +1,6 @@
 #include "source/common/buffer/buffer_impl.h"
 
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
-#include "contrib/sip_proxy/filters/network/test/mocks.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

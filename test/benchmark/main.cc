@@ -64,7 +64,14 @@ int main(int argc, char** argv) {
     cmd.parse(argc, argv);
   } catch (const TCLAP::ExitException& e) {
     // parse() throws an ExitException with status 0 after printing the output
-    // for --help and --version.
+    // for --help and --version. But first pass the args to
+    // benchmark::Initialize to give it a chance to print the benchmark library
+    // help.
+
+    if (contains_help_flag) {
+      ::benchmark::Initialize(&argc, argv);
+    }
+
     return 0;
   }
 
