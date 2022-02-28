@@ -1664,8 +1664,9 @@ TEST_F(ProtobufUtilityTest, MessageWip) {
 
 class DeprecatedFieldsTest : public testing::Test, protected TestScopedRuntime {
 protected:
-  void checkForDeprecation(const Protobuf::Message& message) {
-    MessageUtil::checkForUnexpectedFields(message, ProtobufMessage::getStrictValidationVisitor());
+  void checkForDeprecation(const Protobuf::Message& message, bool recurse_into_any = false) {
+    MessageUtil::checkForUnexpectedFields(message, ProtobufMessage::getStrictValidationVisitor(),
+                                          nullptr, recurse_into_any);
   }
 };
 
@@ -1692,6 +1693,17 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecatedEm
   EXPECT_LOG_CONTAINS("warning",
                       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
                       checkForDeprecation(base));
+}
+
+TEST_F(DeprecatedFieldsTest, RecurseIntoAny) {
+  envoy::service::discovery::v3::DiscoveryResponse discovery_response_config;
+  TestUtility::loadFromFile(
+      TestEnvironment::runfilesPath("test/tools/schema_validator/test/config/lds_deprecated.yaml"),
+      discovery_response_config, *api_);
+  EXPECT_THROW_WITH_REGEX(
+      checkForDeprecation(discovery_response_config, true),
+      Envoy::ProtobufMessage::DeprecatedProtoFieldException,
+      "Using deprecated option 'envoy.config.listener.v3.FilterChain.use_proxy_proto'");
 }
 
 TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecatedEmitsCrash) {
