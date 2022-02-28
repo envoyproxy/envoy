@@ -916,6 +916,10 @@ void FilterManager::sendLocalReply(
 
   stream_info_.setResponseCodeDetails(details);
 
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.override_response_code_408") &&
+      remoteDecodeComplete()) {
+    code = Http::Code::GatewayTimeout;
+  }
   StreamFilterBase::LocalReplyData data{code, details, false};
   FilterManager::onLocalReply(data);
   if (data.reset_imminent_) {
