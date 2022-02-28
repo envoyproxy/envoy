@@ -1841,6 +1841,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
         transport_socket_options, state, source, alternate_protocols_cache, coptions,
         quic_stat_names_, stats_, quic_info);
 #else
+    (void)quic_info;
     // Should be blocked by configuration checking at an earlier point.
     PANIC("unexpected");
 #endif
