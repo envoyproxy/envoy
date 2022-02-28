@@ -786,7 +786,7 @@ void ConnectionManagerImpl::ActiveStream::onRequestHeaderTimeout() {
 void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
-  if (!state_.downstream_request_read_complete_) {
+  if (!filter_manager_.remoteDecodeComplete()) {
     sendLocalReply(Http::Code::RequestTimeout,
                    "downstream duration timeout before the request is fully read", nullptr,
                    Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
@@ -1178,7 +1178,6 @@ void ConnectionManagerImpl::ActiveStream::decodeMetadata(MetadataMapPtr&& metada
 }
 
 void ConnectionManagerImpl::ActiveStream::disarmRequestTimeout() {
-  state_.downstream_request_read_complete_ = true;
   if (request_timer_) {
     request_timer_->disableTimer();
   }
