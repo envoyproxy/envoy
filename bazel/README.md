@@ -112,7 +112,7 @@ for how to update or override dependencies.
     The full version of Xcode (not just Command Line Tools) is also required to build Envoy on macOS.
     Envoy compiles and passes tests with the version of clang installed by Xcode 11.1:
     Apple clang version 11.0.0 (clang-1100.0.33.8).
-    
+
     #### Troubleshooting
     If you see some error messages like the following:
     ```console
@@ -131,7 +131,7 @@ for how to update or override dependencies.
     softwareupdate --all --install --force
     sudo xcode-select --install
     ```
-    
+
     If the following error occurs during the compilation process, please execute the following command and retry:
     ```console
     sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
