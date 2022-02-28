@@ -40,6 +40,9 @@ public:
 
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
+  Http::RequestMessagePtr buildRequest(const std::string& method,
+                                       const std::string& server_url) const;
+
   void sendRequest();
 
 private:
@@ -49,9 +52,8 @@ private:
   void onFailure(const Http::AsyncClient::Request& request,
                  Http::AsyncClient::FailureReason reason) override;
 
-  Http::RequestMessagePtr buildRequest(const std::string& method);
-  void ProcessResponse(Http::ResponseMessagePtr&& response);
-
+  // TODO(tyxia) Any missing const??
+  void handleFailure();
   envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig config_;
   Server::Configuration::FactoryContext& context_;
   Http::AsyncClient::Request* active_request_{};
@@ -65,8 +67,9 @@ public:
       : filter_config_(
             std::make_shared<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>(
                 config)),
-        context_(context) {}
+        context_(context), client_(std::make_unique<GcpAuthnClient>(*filter_config_, context_)) {}
 
+  // TODO(tyxia) Which the overridden functions are needed?
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
 
@@ -81,6 +84,7 @@ private:
   }
   FilterConfigProtoSharedPtr filter_config_;
   Server::Configuration::FactoryContext& context_;
+  std::unique_ptr<GcpAuthnClient> client_;
 };
 
 } // namespace GcpAuthentication

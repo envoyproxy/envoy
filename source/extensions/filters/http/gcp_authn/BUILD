@@ -22,8 +22,8 @@ envoy_cc_library(
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
         "//source/common/http:headers_lib",
+        "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
     ],
 )
 

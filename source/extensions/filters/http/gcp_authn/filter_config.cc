@@ -29,8 +29,7 @@ Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(GcpAuthnFilterFactory,
-                 Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(GcpAuthnFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace GcpAuthentication
 } // namespace HttpFilters

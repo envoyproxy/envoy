@@ -1,5 +1,6 @@
-#include "gtest/gtest.h"
 #include "test/integration/http_protocol_integration.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {

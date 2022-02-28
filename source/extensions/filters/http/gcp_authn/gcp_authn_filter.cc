@@ -12,9 +12,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthentication {
 
-// TODO(tyxia) Using is outside or inside
-using Http::FilterHeadersStatus;
 using ::google::jwt_verify::Status;
+using Http::FilterHeadersStatus;
 
 constexpr char kMetadataFlavorKey[] = "Metadata-Flavor";
 constexpr char kMetadataFlavor[] = "Google";
@@ -22,15 +21,15 @@ constexpr char kMetadataFlavor[] = "Google";
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   // TODO(tyxia) This is on the worker thread
   // Think about where to call this function.
-  auto client = CreateGcpAuthnClient();
-  client->sendRequest();
+  client_->sendRequest();
   return FilterHeadersStatus::Continue;
 }
 
-Http::RequestMessagePtr GcpAuthnClient::buildRequest(const std::string& method) {
+// TODO(tyxia) Add `audience` into this
+Http::RequestMessagePtr GcpAuthnClient::buildRequest(const std::string& method,
+                                                     const std::string& server_url) const {
   absl::string_view host;
   absl::string_view path;
-  absl::string_view server_url = config_.http_uri().uri();
   Envoy::Http::Utility::extractHostPathFromUri(server_url, host, path);
   Http::RequestHeaderMapPtr headers =
       Envoy::Http::createHeaderMap<Envoy::Http::RequestHeaderMapImpl>(
@@ -42,6 +41,7 @@ Http::RequestMessagePtr GcpAuthnClient::buildRequest(const std::string& method) 
   return std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
 }
 
+// TODO(tyxia) Pass the return of buildRequest to the sendRequest??
 void GcpAuthnClient::sendRequest() {
   if (active_request_) {
     active_request_->cancel();
@@ -56,8 +56,8 @@ void GcpAuthnClient::sendRequest() {
     ENVOY_LOG(error, "{}: send request [uri = {}] failed: [cluster = {}] is not configured",
               __func__, config_.http_uri().uri(), config_.http_uri().cluster());
     // TODO(tyxia)
-    // Something like onFailure()
-    // Or common function in the called from onFailure
+    // handleFailure here
+    handleFailure();
     return;
   }
 
@@ -77,33 +77,15 @@ void GcpAuthnClient::sendRequest() {
     options.setBufferBodyForRetry(true);
   }
 
-  Http::RequestMessagePtr request = buildRequest("GET");
+  Http::RequestMessagePtr request = buildRequest("GET", config_.http_uri().uri());
   active_request_ =
       thread_local_cluster->httpAsyncClient().send(std::move(request), *this, options);
 }
 
-void GcpAuthnClient::onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) {
-  ProcessResponse(std::move(response));
-}
-
-void GcpAuthnClient::onFailure(const Http::AsyncClient::Request&,
-                               Http::AsyncClient::FailureReason reason) {
-
-  if (reason == Http::AsyncClient::FailureReason::Reset) {
-    ENVOY_LOG(debug, "{}: fetch token [uri = {}] failed: the stream has been reset}", __func__,
-              config_.http_uri().uri());
-  } else {
-    ENVOY_LOG(debug, "{}: fetch token [uri = {}]: failed network error {}", __func__,
-              config_.http_uri().uri(), enumToInt(reason));
-  }
-
-  // HandleFailedResponse and retry ??
-}
-
-void GcpAuthnClient::ProcessResponse(Http::ResponseMessagePtr&& response) {
+void GcpAuthnClient::onSuccess(const Http::AsyncClient::Request&,
+                               Http::ResponseMessagePtr&& response) {
   try {
-    const uint64_t status_code =
-        Envoy::Http::Utility::getResponseStatus(response->headers());
+    const uint64_t status_code = Envoy::Http::Utility::getResponseStatus(response->headers());
 
     if (status_code == Envoy::enumToInt(Envoy::Http::Code::OK)) {
       // Decode JWT Token
@@ -117,12 +99,32 @@ void GcpAuthnClient::ProcessResponse(Http::ResponseMessagePtr&& response) {
 
     } else {
       ENVOY_LOG(error, "{}: failed: {}", status_code);
-      // handleFailResponse();
+      handleFailure();
     }
   } catch (const Envoy::EnvoyException& e) {
-    // This occurs if the reponse headers are invalid.
-    ENVOY_LOG(error, "Failed to get the response: {}" , e.what());
+    // This occurs if the response headers are invalid.
+    ENVOY_LOG(error, "Failed to get the response: {}", e.what());
+    handleFailure();
   }
+}
+
+void GcpAuthnClient::onFailure(const Http::AsyncClient::Request&,
+                               Http::AsyncClient::FailureReason reason) {
+
+  if (reason == Http::AsyncClient::FailureReason::Reset) {
+    ENVOY_LOG(debug, "{}: fetch token [uri = {}] failed: the stream has been reset}", __func__,
+              config_.http_uri().uri());
+  } else {
+    ENVOY_LOG(debug, "{}: fetch token [uri = {}]: failed network error {}", __func__,
+              config_.http_uri().uri(), enumToInt(reason));
+  }
+
+  handleFailure();
+}
+
+void GcpAuthnClient::handleFailure() {
+  // TODO(tyxia) Add logs or other monitor stats
+  active_request_ = nullptr;
 }
 
 } // namespace GcpAuthentication

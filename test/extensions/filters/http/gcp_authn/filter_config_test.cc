@@ -18,6 +18,7 @@ namespace {
 using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
 // TODO(tyxia)
 // Update to use test fixture later
+// Add negative test
 // Add static yaml configuration
 TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithEmptyProto) {
   GcpAuthnFilterConfig filter_config;
