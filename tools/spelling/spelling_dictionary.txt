@@ -25,6 +25,7 @@ BBR
 BSON
 BPF
 Repick
+TRA
 btree
 CAS
 CB
@@ -1332,3 +1333,4 @@ transid
 routable
 vhosts
 infos
+ElastiCache

@@ -377,7 +377,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
           StreamInfo::FilterState::LifeSpan::Connection);
     }
     transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-        downstream_connection->streamInfo().filterState());
+        read_callbacks_->connection().streamInfo().filterState());
 
     if (auto typed_state = downstream_connection->streamInfo()
                                .filterState()
