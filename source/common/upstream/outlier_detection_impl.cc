@@ -361,7 +361,6 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
     // to the non-triggering counter being close to its trigger value.
     host_monitors_[host]->resetConsecutive5xx();
     host_monitors_[host]->resetConsecutiveGatewayFailure();
-    host_monitors_[host]->resetConsecutiveLocalOriginFailure();
     monitor->uneject(now);
     runCallbacks(host);
 
