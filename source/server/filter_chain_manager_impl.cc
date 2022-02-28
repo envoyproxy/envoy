@@ -31,18 +31,27 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 }
 
 struct FilterChainNameAction : public Matcher::ActionBase<ProtobufWkt::StringValue> {
-  explicit FilterChainNameAction(const std::string& name) : name_(name) {}
-  const std::string name_;
+  explicit FilterChainNameAction(Network::DrainableFilterChainSharedPtr chain) : chain_(chain) {}
+  const Network::DrainableFilterChainSharedPtr chain_;
 };
 
-class FilterChainNameActionFactory : public Matcher::ActionFactory<Configuration::FactoryContext> {
+using FilterChainActionFactoryContext =
+    absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
+
+class FilterChainNameActionFactory
+    : public Matcher::ActionFactory<FilterChainActionFactoryContext> {
 public:
   std::string name() const override { return "filter-chain-name"; }
   Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config,
-                                                 Configuration::FactoryContext&,
+                                                 FilterChainActionFactoryContext& filter_chains,
                                                  ProtobufMessage::ValidationVisitor&) override {
+    Network::DrainableFilterChainSharedPtr chain = nullptr;
     const auto& name = dynamic_cast<const ProtobufWkt::StringValue&>(config);
-    return [name]() { return std::make_unique<FilterChainNameAction>(name.value()); };
+    const auto chain_match = filter_chains.find(name.value());
+    if (chain_match != filter_chains.end()) {
+      chain = chain_match->second;
+    }
+    return [chain]() { return std::make_unique<FilterChainNameAction>(chain); };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::StringValue>();
@@ -50,7 +59,7 @@ public:
 };
 
 REGISTER_FACTORY(FilterChainNameActionFactory,
-                 Matcher::ActionFactory<Configuration::FactoryContext>);
+                 Matcher::ActionFactory<FilterChainActionFactoryContext>);
 
 class FilterChainNameActionValidationVisitor
     : public Matcher::MatchTreeValidationVisitor<Network::MatchingData> {
@@ -204,14 +213,7 @@ void FilterChainManagerImpl::addFilterChains(
                       MessageUtil>
       filter_chains;
   uint32_t new_filter_chain_size = 0;
-
-  // Construct matcher if it is present in the listener configuration.
-  if (filter_chain_matcher) {
-    FilterChainNameActionValidationVisitor validation_visitor;
-    Matcher::MatchTreeFactory<Network::MatchingData, Configuration::FactoryContext> factory(
-        parent_context_, parent_context_.getServerFactoryContext(), validation_visitor);
-    matcher_ = factory.create(*filter_chain_matcher)();
-  }
+  absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr> filter_chains_by_name;
 
   for (const auto& filter_chain : filter_chain_span) {
     const auto& filter_chain_match = filter_chain->filter_chain_match();
@@ -220,7 +222,7 @@ void FilterChainManagerImpl::addFilterChains(
                                        "unimplemented fields",
                                        address_->asString(), filter_chain->name()));
     }
-    if (!matcher_) {
+    if (!filter_chain_matcher) {
       const auto& matching_iter = filter_chains.find(filter_chain_match);
       if (matching_iter != filter_chains.end()) {
         throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' has "
@@ -242,14 +244,14 @@ void FilterChainManagerImpl::addFilterChains(
     }
 
     // If using the matcher, require usage of "name" field and skip building the index.
-    if (matcher_) {
+    if (filter_chain_matcher) {
       if (filter_chain->name().empty()) {
         throw EnvoyException(fmt::format(
             "error adding listener '{}': \"name\" field is required when using a listener matcher",
             address_->asString()));
       }
       auto [_, inserted] =
-          filter_chains_by_name_.try_emplace(filter_chain->name(), filter_chain_impl);
+          filter_chains_by_name.try_emplace(filter_chain->name(), filter_chain_impl);
       if (!inserted) {
         throw EnvoyException(
             fmt::format("error adding listener '{}': \"name\" field is duplicated with value '{}'",
@@ -300,6 +302,13 @@ void FilterChainManagerImpl::addFilterChains(
   convertIPsToTries();
   copyOrRebuildDefaultFilterChain(default_filter_chain, filter_chain_factory_builder,
                                   context_creator);
+  // Construct matcher if it is present in the listener configuration.
+  if (filter_chain_matcher) {
+    FilterChainNameActionValidationVisitor validation_visitor;
+    Matcher::MatchTreeFactory<Network::MatchingData, FilterChainActionFactoryContext> factory(
+        filter_chains_by_name, parent_context_.getServerFactoryContext(), validation_visitor);
+    matcher_ = factory.create(*filter_chain_matcher)();
+  }
   ENVOY_LOG(debug, "new fc_contexts has {} filter chains, including {} newly built",
             fc_contexts_.size(), new_filter_chain_size);
 }
@@ -565,16 +574,12 @@ FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket)
 const Network::FilterChain*
 FilterChainManagerImpl::findFilterChainUsingMatcher(const Network::ConnectionSocket& socket) const {
   Network::Matching::MatchingDataImpl data(socket);
-  const auto match_result = Matcher::evaluateMatch<Network::MatchingData>(*matcher_, data);
+  const auto& match_result = Matcher::evaluateMatch<Network::MatchingData>(*matcher_, data);
   ASSERT(match_result.match_state_ == Matcher::MatchState::MatchComplete,
          "Matching must complete for network streams.");
   if (match_result.result_) {
     const auto result = match_result.result_();
-    const auto chain_match =
-        filter_chains_by_name_.find(result->getTyped<FilterChainNameAction>().name_);
-    if (chain_match != filter_chains_by_name_.end()) {
-      return chain_match->second.get();
-    }
+    return result->getTyped<FilterChainNameAction>().chain_.get();
   }
   return default_filter_chain_.get();
 }

@@ -370,9 +370,6 @@ private:
   // detect the filter chains in the intersection of existing listener and new listener.
   FcContextMap fc_contexts_;
 
-  // Mapping from filter chain name to filter chain.
-  absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr> filter_chains_by_name_;
-
   absl::optional<envoy::config::listener::v3::FilterChain> default_filter_chain_message_;
   // The optional fallback filter chain if destination_ports_map_ does not find a matched filter
   // chain.
@@ -397,7 +394,7 @@ private:
   Init::Manager& init_manager_;
 
   // Matcher selecting the filter chain name.
-  Matcher::MatchTreeSharedPtr<Network::MatchingData> matcher_;
+  Matcher::MatchTreePtr<Network::MatchingData> matcher_;
 };
 } // namespace Server
 } // namespace Envoy
