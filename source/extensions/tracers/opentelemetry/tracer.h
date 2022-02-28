@@ -68,8 +68,18 @@ public:
   // TODO(alexellis): implement this
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
-  // TODO(alexellis): implement this
-  void setSampled(bool /*sampled*/) override{};
+
+  /**
+   * Set the span's sampled flag.
+   */
+  void setSampled(bool sampled) override { sampled_ = sampled; };
+
+  /**
+   * @return whether or not the sampled attribute is set
+   */
+
+  bool sampled() const { return sampled_; }
+
   // TODO(alexellis): implement this
   std::string getBaggage(absl::string_view /*key*/) override { return EMPTY_STRING; };
   // TODO(alexellis): implement this
@@ -108,6 +118,7 @@ private:
   ::opentelemetry::proto::trace::v1::Span span_;
   Tracer& parent_tracer_;
   Envoy::TimeSource& time_source_;
+  bool sampled_;
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;

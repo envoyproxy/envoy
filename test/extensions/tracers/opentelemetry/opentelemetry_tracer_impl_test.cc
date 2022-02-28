@@ -93,7 +93,7 @@ TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
   const std::string trace_id_hex =
       absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id_low));
   const uint64_t parent_span_id = 2;
-  const std::string trace_flags = "00"; //
+  const std::string trace_flags = "01";
   const std::vector<std::string> v = {version, trace_id_hex, Hex::uint64ToHex(parent_span_id),
                                       trace_flags};
   const std::string parent_trace_header = absl::StrJoin(v, "-");
@@ -155,9 +155,10 @@ TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {
 
   auto sampled_entry = request_headers.get(OpenTelemetryConstants::get().TRACE_PARENT);
 
+  // Ends in 01 because span should be sampled. See https://w3c.github.io/trace-context/#trace-flags.
   EXPECT_EQ(sampled_entry.size(), 1);
   EXPECT_EQ(sampled_entry[0]->value().getStringView(),
-            "00-00000000000000010000000000000002-0000000000000003-00");
+            "00-00000000000000010000000000000002-0000000000000003-01");
 }
 
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpan) {

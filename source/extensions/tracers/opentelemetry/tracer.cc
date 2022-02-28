@@ -46,7 +46,7 @@ void Span::injectContext(Tracing::TraceContext& trace_context) {
   std::string trace_id_hex = absl::BytesToHexString(span_.trace_id());
   std::string span_id_hex = absl::BytesToHexString(span_.span_id());
   // Add flag for sampled; maybe for now just nothing?
-  std::vector<uint8_t> trace_flags_vec{0};
+  std::vector<uint8_t> trace_flags_vec{sampled()};
   std::string trace_flags_hex = Hex::encode(trace_flags_vec);
   std::string traceparent_header_value =
       absl::StrCat("00-", trace_id_hex, "-", span_id_hex, "-", trace_flags_hex);
@@ -108,6 +108,8 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   // Generate a new identifier for the span id.
   uint64_t span_id = random_.random();
   new_span.setId(Hex::uint64ToHex(span_id));
+  // Respect the previous span's sampled flag.
+  new_span.setSampled(previous_span_context.sampled());
   return std::make_unique<Span>(new_span);
 }
 
