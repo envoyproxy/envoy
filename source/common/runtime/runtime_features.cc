@@ -64,6 +64,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 // TODO(birenroy) reset to true after bug fixes
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
+// TODO(alyssar) flip false once issue complete.
+FALSE_RUNTIME_GUARD(envoy_restart_features_no_runtime_singleton);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
 ABSL_FLAG(uint64_t, envoy_buffer_overflow_multiplier, 0, "");                        // NOLINT
@@ -170,6 +172,7 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_validate_connect,
   &FLAGS_envoy_restart_features_explicit_wildcard_resource,
   &FLAGS_envoy_restart_features_use_apple_api_for_dns_lookups,
+  &FLAGS_envoy_restart_features_no_runtime_singleton,
 };
 // clang-format on
 
