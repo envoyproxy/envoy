@@ -132,7 +132,11 @@ for how to update or override dependencies.
     sudo xcode-select --install
     ```
 
-    If the following error occurs during the compilation process, please execute the following command and retry:
+    If the following error occurs during the compilation process:
+    ```console
+    xcode-select: error: tool 'xcodebuild' requires Xcode, but active developer directory '/Library/Developer/CommandLineTools' is a command line tools instance
+    ```
+    please execute the following command and retry:
     ```console
     sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
     ```
