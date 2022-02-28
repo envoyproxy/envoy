@@ -679,7 +679,6 @@ void testUtilV2(const TestUtilOptionsV2& options) {
 
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, server_names);
-  EXPECT_FALSE(server_ssl_socket_factory.usesProxyProtocolOptions());
 
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
