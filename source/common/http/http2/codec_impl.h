@@ -312,6 +312,9 @@ protected:
     void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
 
     bool buffersOverrun() const { return read_disable_count_ > 0; }
+    bool shouldAllowPeerAdditionalStreamWindow() const {
+      return !buffersOverrun() && !pending_recv_data_->highWatermarkTriggered();
+    }
 
     void encodeDataHelper(Buffer::Instance& data, bool end_stream,
                           bool skip_encoding_empty_trailers);
@@ -396,6 +399,10 @@ protected:
 
     // Schedules a callback to process buffered data.
     void scheduleProcessingOfBufferedData();
+
+    // Marks data consumed by the stream, granting the peer additional stream
+    // window.
+    void grantPeerAdditionalStreamWindow();
   };
 
   using StreamImplPtr = std::unique_ptr<StreamImpl>;

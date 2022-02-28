@@ -379,6 +379,19 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
   }
 }
 
+void ConnectionImpl::StreamImpl::grantPeerAdditionalStreamWindow() {
+  if (parent_.use_new_codec_wrapper_) {
+    parent_.adapter_->MarkDataConsumedForStream(stream_id_, unconsumed_bytes_);
+  } else {
+    nghttp2_session_consume(parent_.session_, stream_id_, unconsumed_bytes_);
+  }
+  unconsumed_bytes_ = 0;
+  if (parent_.sendPendingFramesAndHandleError()) {
+    // Intended to check through coverage that this error case is tested
+    return;
+  }
+}
+
 void ConnectionImpl::StreamImpl::readDisable(bool disable) {
   ENVOY_CONN_LOG(debug, "Stream {} {}, unconsumed_bytes {} read_disable_count {}",
                  parent_.connection_, stream_id_, (disable ? "disabled" : "enabled"),
@@ -390,17 +403,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
     --read_disable_count_;
     if (!buffersOverrun()) {
       scheduleProcessingOfBufferedData();
-
-      if (parent_.use_new_codec_wrapper_) {
-        parent_.adapter_->MarkDataConsumedForStream(stream_id_, unconsumed_bytes_);
-      } else {
-        nghttp2_session_consume(parent_.session_, stream_id_, unconsumed_bytes_);
-      }
-      unconsumed_bytes_ = 0;
-      if (parent_.sendPendingFramesAndHandleError()) {
-        // Intended to check through coverage that this error case is tested
-        return;
-      }
+      grantPeerAdditionalStreamWindow();
     }
   }
 }
@@ -432,7 +435,14 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferHighWatermark() {
 void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
   // If `defer_processing_backedup_streams_`, we don't read disable on
   // high watermark, so we shouldn't read disable here.
-  if (!defer_processing_backedup_streams_) {
+  if (defer_processing_backedup_streams_) {
+    if (shouldAllowPeerAdditionalStreamWindow()) {
+      // We should grant additional stream window here, in case the
+      // `pending_recv_buffer_` was blocking flow control updates
+      // from going to the peer.
+      grantPeerAdditionalStreamWindow();
+    }
+  } else {
     ENVOY_CONN_LOG(debug, "recv buffer under limit ", parent_.connection_);
     ASSERT(pending_receive_buffer_high_watermark_called_);
     pending_receive_buffer_high_watermark_called_ = false;
@@ -1011,7 +1021,7 @@ int ConnectionImpl::onData(int32_t stream_id, const uint8_t* data, size_t len) {
   stream->pending_recv_data_->add(data, len);
   // Update the window to the peer unless some consumer of this stream's data has hit a flow control
   // limit and disabled reads on this stream
-  if (!stream->buffersOverrun()) {
+  if (stream->shouldAllowPeerAdditionalStreamWindow()) {
     if (use_new_codec_wrapper_) {
       adapter_->MarkDataConsumedForStream(stream_id, len);
     } else {
