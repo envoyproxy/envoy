@@ -162,13 +162,15 @@ public:
     if (!BaseMatcherImpl::matchRoute(headers)) {
       return false;
     }
-    const absl::string_view pathValue = headers.getPathValue();
-    if (pathValue.size() > prefix_.size() && path_matcher_->match(pathValue) &&
-        pathValue[prefix_.size()] == '/') {
+    absl::string_view path = headers.getPathValue();
+    const size_t path_end = path.find('?');
+    if (path_end != absl::string_view::npos) {
+      path = path.substr(0, path_end);
+    }
+    if (path.size() > prefix_.size() && path_matcher_->match(path) && path[prefix_.size()] == '/') {
       ENVOY_LOG(debug, "Path-separated prefix requirement '{}' matched.", prefix_);
       return true;
-    } else if (case_sensitive_ ? pathValue == prefix_
-                               : absl::EqualsIgnoreCase(pathValue, prefix_)) {
+    } else if (case_sensitive_ ? path == prefix_ : absl::EqualsIgnoreCase(path, prefix_)) {
       ENVOY_LOG(debug, "Path-separated prefix requirement '{}' matched.", prefix_);
       return true;
     }
