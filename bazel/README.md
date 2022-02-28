@@ -115,23 +115,25 @@ for how to update or override dependencies.
     
     #### Troubleshooting
     If you see some error messages like the following:
-    ```
+    ```console
     xcrun: error: SDK "macosx12.1" cannot be located
     xcrun: error: SDK "macosx12.1" cannot be located
     xcrun: error: unable to lookup item 'Path' in SDK 'macosx12.1'
     ```
     please check the installed sdk version.
-    ```
+    ```console
     xcrun --show-sdk-version
     ```
+
     If the sdk version is lower than the one in the error message, upgrade your Command Line Tools using the following commands:
-    ```
+    ```console
     sudo rm -rf /Library/Developer/CommandLineTools
     softwareupdate --all --install --force
     sudo xcode-select --install
     ```
+    
     If the following error occurs during the compilation process, please execute the following command and retry:
-    ```
+    ```console
     sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
     ```
 
