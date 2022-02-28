@@ -658,8 +658,9 @@ TEST_F(OutlierDetectorImplTest, LargeNumberOfTimeouts) {
   });
 
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
-      cluster_, outlier_detection_split_, dispatcher_, runtime_, time_system_, event_logger_));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection_split_,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_));
   ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveLocalOriginFailureRuntime, 100))
       .WillByDefault(Return(true));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
