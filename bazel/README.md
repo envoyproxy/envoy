@@ -113,8 +113,8 @@ for how to update or override dependencies.
     Envoy compiles and passes tests with the version of clang installed by Xcode 11.1:
     Apple clang version 11.0.0 (clang-1100.0.33.8).
     
-    #### trouble shooting
-    If you see some error messages like the following
+    #### Troubleshooting
+    If you see some error messages like the following:
     ```
     xcrun: error: SDK "macosx12.1" cannot be located
     xcrun: error: SDK "macosx12.1" cannot be located
@@ -124,13 +124,13 @@ for how to update or override dependencies.
     ```
     xcrun --show-sdk-version
     ```
-    If the sdk version is lower than the one in the error message, upgrade your Command Line Tools using following commands:
+    If the sdk version is lower than the one in the error message, upgrade your Command Line Tools using the following commands:
     ```
     sudo rm -rf /Library/Developer/CommandLineTools
     softwareupdate --all --install --force
     sudo xcode-select --install
     ```
-    If the following error occurs during the compilation process, please execute following command and retry.
+    If the following error occurs during the compilation process, please execute the following command and retry:
     ```
     sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
     ```
