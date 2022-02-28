@@ -29,6 +29,8 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 #endif
 
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
@@ -242,8 +244,18 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
       fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
-  return Quic::createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_,
-                                           server_addr, local_addr, quic_stat_names_, stats_store_);
+  auto& quic_transport_socket_factory_ref =
+      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*quic_transport_socket_factory_);
+  return Quic::createQuicNetworkConnection(
+      *quic_connection_persistent_info_,
+      std::make_shared<quic::QuicCryptoClientConfig>(
+          std::make_unique<Quic::EnvoyQuicProofVerifier>(
+              quic_transport_socket_factory_ref.sslCtx()),
+          std::make_unique<quic::QuicClientSessionCache>()),
+      quic::QuicServerId(
+          quic_transport_socket_factory_ref.clientContextConfig().serverNameIndication(),
+          static_cast<uint16_t>(port)),
+      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, stats_store_);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;
@@ -347,12 +359,9 @@ void HttpIntegrationTest::initialize() {
   BaseIntegrationTest::initialize();
   registerTestServerPorts({"http"});
 
-  Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(fmt::format(
-      "udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
   // Needs to outlive all QUIC connections.
-  quic::QuicConfig config;
-  auto quic_connection_persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher_, *quic_transport_socket_factory_, timeSystem(), server_addr, config, 0);
+  auto quic_connection_persistent_info =
+      std::make_unique<Quic::PersistentQuicInfoImpl>(*dispatcher_, 0);
   // Config IETF QUIC flow control window.
   quic_connection_persistent_info->quic_config_
       .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(

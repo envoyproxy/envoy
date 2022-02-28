@@ -21,6 +21,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -46,6 +47,21 @@ public:
   static double slowStartMinWeightPercent(EdfLoadBalancerBase& edf_lb) {
     return edf_lb.slow_start_min_weight_percent_;
   }
+};
+
+class TestZoneAwareLoadBalancer : public ZoneAwareLoadBalancerBase {
+public:
+  TestZoneAwareLoadBalancer(
+      const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+      Random::RandomGenerator& random,
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
+      : ZoneAwareLoadBalancerBase(priority_set, nullptr, stats, runtime, random, common_config) {}
+  void runInvalidLocalitySourceType() {
+    localitySourceType(static_cast<LoadBalancerBase::HostAvailability>(123));
+  }
+  void runInvalidSourceType() { sourceType(static_cast<LoadBalancerBase::HostAvailability>(123)); }
+  HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override { PANIC("not implemented"); }
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { PANIC("not implemented"); }
 };
 
 namespace {
@@ -589,7 +605,15 @@ class ZoneAwareLoadBalancerBaseTest : public LoadBalancerTestBase {
 public:
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   TestZoneAwareLb lb_{priority_set_, stats_, runtime_, random_, common_config_};
+  TestZoneAwareLoadBalancer lbx_{priority_set_, stats_, runtime_, random_, common_config_};
 };
+
+// Tests the source type static methods in zone aware load balancer.
+TEST_F(ZoneAwareLoadBalancerBaseTest, SourceTypeMethods) {
+  { EXPECT_ENVOY_BUG(lbx_.runInvalidLocalitySourceType(), "unexpected locality source type enum"); }
+
+  { EXPECT_ENVOY_BUG(lbx_.runInvalidSourceType(), "unexpected source type enum"); }
+}
 
 TEST_F(ZoneAwareLoadBalancerBaseTest, BaseMethods) {
   EXPECT_FALSE(lb_.lifetimeCallbacks().has_value());

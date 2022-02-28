@@ -57,7 +57,6 @@ build_args() {
 use_builder() {
   # BuildKit is not available for Windows images, skip this
   if ! is_windows; then
-    TYPE=$1
     docker buildx use multi-builder
   fi
 }
@@ -117,7 +116,7 @@ if is_windows; then
   BUILD_COMMAND=("build")
 else
   # "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
-  BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-alpine" "-distroless" "-google-vrp")
+  BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-distroless" "-google-vrp" "-tools")
 
   # Configure docker-buildx tools
   BUILD_COMMAND=("buildx" "build")
@@ -146,14 +145,14 @@ for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
 
   # Only push latest on main builds.
   if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
-    docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:latest"
+    is_windows && docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:latest"
     push_images "${BUILD_TYPE}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:latest"
   fi
 
   # Push vX.Y-latest to tag the latest image in a release line
   if [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
     RELEASE_LINE=$(echo "$IMAGE_NAME" | sed -E 's/(v[0-9]+\.[0-9]+)\.[0-9]+/\1-latest/')
-    docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${RELEASE_LINE}"
+    is_windows && docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${RELEASE_LINE}"
     push_images "${BUILD_TYPE}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${RELEASE_LINE}"
   fi
 done

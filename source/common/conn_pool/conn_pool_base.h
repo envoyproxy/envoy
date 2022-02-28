@@ -6,6 +6,7 @@
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/common/debug_recursion_checker.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/linked_object.h"
 
@@ -17,7 +18,7 @@ namespace ConnectionPool {
 class ConnPoolImplBase;
 
 // A placeholder struct for whatever data a given connection pool needs to
-// successfully attach and upstream connection to a downstream connection.
+// successfully attach an upstream connection to a downstream connection.
 struct AttachContext {
   // Add a virtual destructor to allow for the dynamic_cast ASSERT in typedContext.
   virtual ~AttachContext() = default;
@@ -132,7 +133,7 @@ private:
 // yet established.
 class PendingStream : public LinkedObject<PendingStream>, public ConnectionPool::Cancellable {
 public:
-  PendingStream(ConnPoolImplBase& parent);
+  PendingStream(ConnPoolImplBase& parent, bool can_send_early_data);
   ~PendingStream() override;
 
   // ConnectionPool::Cancellable
@@ -143,6 +144,8 @@ public:
   virtual AttachContext& context() PURE;
 
   ConnPoolImplBase& parent_;
+  // The request can be sent as early data.
+  bool can_send_early_data_;
 };
 
 using PendingStreamPtr = std::unique_ptr<PendingStream>;
@@ -220,13 +223,17 @@ public:
   void onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                          Network::ConnectionEvent event);
 
+  // Check if the pool has gone idle and invoke idle notification callbacks.
+  void checkForIdleAndNotify();
+
   // See if the pool has gone idle. If we're draining, this will also close idle connections.
   void checkForIdleAndCloseIdleConnsIfDraining();
 
   void scheduleOnUpstreamReady();
-  ConnectionPool::Cancellable* newStreamImpl(AttachContext& context);
+  ConnectionPool::Cancellable* newStreamImpl(AttachContext& context, bool can_send_early_data);
 
-  virtual ConnectionPool::Cancellable* newPendingStream(AttachContext& context) PURE;
+  virtual ConnectionPool::Cancellable* newPendingStream(AttachContext& context,
+                                                        bool can_send_early_data) PURE;
 
   virtual void attachStreamToClient(Envoy::ConnectionPool::ActiveClient& client,
                                     AttachContext& context);
@@ -368,6 +375,7 @@ private:
   bool deferred_deleting_{false};
 
   Event::SchedulableCallbackPtr upstream_ready_cb_;
+  Common::DebugRecursionChecker recursion_checker_;
 };
 
 } // namespace ConnectionPool

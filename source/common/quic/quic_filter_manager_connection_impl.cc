@@ -217,5 +217,19 @@ void QuicFilterManagerConnectionImpl::onSendBufferLowWatermark() {
   }
 }
 
+void QuicFilterManagerConnectionImpl::configureInitialCongestionWindow(
+    uint64_t bandwidth_bits_per_sec, std::chrono::microseconds rtt) {
+  if (quicConnection() != nullptr) {
+    quic::SendAlgorithmInterface::NetworkParams params(
+        quic::QuicBandwidth::FromBitsPerSecond(bandwidth_bits_per_sec),
+        quic::QuicTime::Delta::FromMicroseconds(rtt.count()),
+        /*allow_cwnd_to_decrease=*/false);
+    // NOTE: Different QUIC congestion controllers implement this method differently, for example,
+    // the cubic implementation does not respect |params.allow_cwnd_to_decrease|. Check the
+    // implementations for the exact behavior.
+    quicConnection()->AdjustNetworkParameters(params);
+  }
+}
+
 } // namespace Quic
 } // namespace Envoy

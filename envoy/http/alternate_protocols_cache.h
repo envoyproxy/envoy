@@ -100,6 +100,20 @@ public:
                                std::vector<AlternateProtocol>& protocols) PURE;
 
   /**
+   * Sets the srtt estimate for an origin, assuming the origin exists in the cache.
+   * Otherwise this is a no-op.
+   * @param origin The origin to set network characteristics for.
+   * @param srtt The smothed round trip time for the origin.
+   */
+  virtual void setSrtt(const Origin& origin, std::chrono::microseconds srtt) PURE;
+
+  /**
+   * Returns the srtt estimate for an origin, or zero, if no srtt is cached.
+   * @param origin The origin to get network characteristics for.
+   */
+  virtual std::chrono::microseconds getSrtt(const Origin& origin) const PURE;
+
+  /**
    * Returns the possible alternative protocols which can be used to connect to the
    * specified origin, or nullptr if not alternatives are found. The returned reference
    * is owned by the AlternateProtocolsCache and is valid until the next operation on the

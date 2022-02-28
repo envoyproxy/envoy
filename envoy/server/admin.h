@@ -76,6 +76,34 @@ class Admin {
 public:
   virtual ~Admin() = default;
 
+  // Represents a handler for admin endpoints, allowing for chunked responses.
+  class Handler {
+  public:
+    virtual ~Handler() = default;
+
+    /**
+     * Initiates a handler. The URL can be supplied to the constructor if needed.
+     *
+     * @param response_headers successful text responses don't need to modify this,
+     *        but if we want to respond with (e.g.) JSON or HTML we can can set
+     *        those here.
+     * @return the HTTP status of the response.
+     */
+    virtual Http::Code start(Http::ResponseHeaderMap& response_headers) PURE;
+
+    /**
+     * Adds the next chunk of data to the response. Note that nextChunk can
+     * return 'true' but not add any data to the response, in which case a chunk
+     * is not sent, and a subsequent call to nextChunk can be made later,
+     * possibly after a post() or low-watermark callback on the http filter.
+     *
+     * @param response a buffer in which to write the chunk
+     * @return whether or not any chunks follow this one.
+     */
+    virtual bool nextChunk(Buffer::Instance& response) PURE;
+  };
+  using HandlerPtr = std::unique_ptr<Handler>;
+
   /**
    * Callback for admin URL handlers.
    * @param path_and_query supplies the path and query of the request URL.
@@ -91,7 +119,14 @@ public:
       Buffer::Instance& response, AdminStream& admin_stream)>;
 
   /**
-   * Add an admin handler.
+   * Lambda to generate a Handler.
+   */
+  using GenHandlerCb = std::function<HandlerPtr(absl::string_view path, AdminStream&)>;
+
+  /**
+   * Add a legacy admin handler where the entire response is written in
+   * one chunk.
+   *
    * @param prefix supplies the URL prefix to handle.
    * @param help_text supplies the help text for the handler.
    * @param callback supplies the callback to invoke when the prefix matches.
@@ -101,6 +136,20 @@ public:
    */
   virtual bool addHandler(const std::string& prefix, const std::string& help_text,
                           HandlerCb callback, bool removable, bool mutates_server_state) PURE;
+
+  /**
+   * Adds a an chunked admin handler.
+   *
+   * @param prefix supplies the URL prefix to handle.
+   * @param help_text supplies the help text for the handler.
+   * @param callback supplies the callback to generate a Handler.
+   * @param removable if true allows the handler to be removed via removeHandler.
+   * @param mutates_server_state indicates whether callback will mutate server state.
+   * @return bool true if the handler was added, false if it was not added.
+   */
+  virtual bool addChunkedHandler(const std::string& prefix, const std::string& help_text,
+                                 GenHandlerCb callback, bool removable,
+                                 bool mutates_server_state) PURE;
 
   /**
    * Remove an admin handler if it is removable.

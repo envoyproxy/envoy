@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 #include "envoy/common/optref.h"
 #include "envoy/upstream/upstream.h"
@@ -25,6 +26,11 @@ public:
   ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                Upstream::Host::CreateConnectionData& data);
 
+  ~ActiveClient() override {
+    if (async_connect_callback_ != nullptr && async_connect_callback_->enabled()) {
+      async_connect_callback_->cancel();
+    }
+  }
   // Http::ConnectionCallbacks
   void onMaxStreamsChanged(uint32_t num_streams) override;
 
@@ -75,6 +81,7 @@ public:
     }
   }
 
+private:
   // Unlike HTTP/2 and HTTP/1, rather than having a cap on the number of active
   // streams, QUIC has a fixed number of streams available which is updated via
   // the MAX_STREAMS frame.
@@ -96,6 +103,10 @@ public:
   // deemed connected, at which point further connections will be established if
   // necessary.
   uint64_t quiche_capacity_ = 100;
+  // Used to schedule a deferred connect() call. Because HTTP/3 codec client can
+  // do 0-RTT during connect(), deferring it to avoid handling network events during CodecClient
+  // construction.
+  Event::SchedulableCallbackPtr async_connect_callback_;
 };
 
 // An interface to propagate H3 handshake result.
@@ -119,19 +130,20 @@ public:
                     Random::RandomGenerator& random_generator,
                     Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
                     CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
-                    TimeSource& time_source, OptRef<PoolConnectResultCallback> connect_callback);
+                    OptRef<PoolConnectResultCallback> connect_callback);
 
   ~Http3ConnPoolImpl() override;
+  ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
+                                         ConnectionPool::Callbacks& callbacks,
+                                         const Instance::StreamOptions& options) override;
 
-  // Set relevant fields in quic_config based on the cluster configuration
-  // supplied in cluster.
-  static void setQuicConfigFromClusterConfig(const Upstream::ClusterInfo& cluster,
-                                             quic::QuicConfig& quic_config);
-
-  Quic::PersistentQuicInfoImpl& quicInfo() { return *quic_info_; }
   // For HTTP/3 the base connection pool does not track stream capacity, rather
   // the HTTP3 active client does.
   bool trackStreamCapacity() override { return false; }
+
+  std::unique_ptr<Network::ClientConnection>
+  createClientConnection(Quic::QuicStatNames& quic_stat_names,
+                         OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope);
 
 protected:
   void onConnected(Envoy::ConnectionPool::ActiveClient&) override;
@@ -139,9 +151,20 @@ protected:
 private:
   friend class Http3ConnPoolImplPeer;
 
+  // Returns the most recent crypto config from host_;
+  std::shared_ptr<quic::QuicCryptoClientConfig> cryptoConfig();
+
   // Store quic helpers which can be shared between connections and must live
   // beyond the lifetime of individual connections.
   std::unique_ptr<Quic::PersistentQuicInfoImpl> quic_info_;
+  // server-id can change over the lifetime of Envoy but will be consistent for a
+  // given connection pool.
+  quic::QuicServerId server_id_;
+  // Latch the latest crypto config, to determine if it has updated since last
+  // checked.
+  Envoy::Ssl::ClientContextSharedPtr client_context_;
+  // If client_context_ changes, client config will be updated as well.
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   // If not nullopt, called when the handshake state changes.
   OptRef<PoolConnectResultCallback> connect_callback_;
 };
@@ -151,8 +174,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                 Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-                 Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope,
+                 Upstream::ClusterConnectivityState& state, Quic::QuicStatNames& quic_stat_names,
+                 OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope,
                  OptRef<PoolConnectResultCallback> connect_callback);
 
 } // namespace Http3
