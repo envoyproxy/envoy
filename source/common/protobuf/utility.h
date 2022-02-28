@@ -272,7 +272,6 @@ public:
    * Checks for use of deprecated fields in message and all sub-messages.
    * @param message message to validate.
    * @param validation_visitor the validation visitor to use.
-   * @param loader optional a pointer to the runtime loader for live deprecation status.
    * @param recurse_into_any whether to recurse into Any messages during unexpected checking.
    * @throw ProtoValidationException if deprecated fields are used and listed
    *    in disallowed_features in runtime_features.h
@@ -280,7 +279,6 @@ public:
   static void
   checkForUnexpectedFields(const Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor,
-                           Runtime::Loader* loader = Runtime::LoaderSingleton::getExisting(),
                            bool recurse_into_any = false);
 
   /**
