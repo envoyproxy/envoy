@@ -62,7 +62,7 @@ namespace CustomCel {
 // like Request, Response, Connection, etc.
 // These are added to the activation.
 //
-// and (3) the Custom Cel Vocabulary
+// and (3) the Custom CEL Vocabulary
 // These are custom definitions which a user can define.
 // Custom CEL stateless functions have to be added to the registry.
 // Custom CEL value producers and lazy/stateful functions have to be added to the activation.

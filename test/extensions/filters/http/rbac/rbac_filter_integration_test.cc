@@ -865,7 +865,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelAttributeExprIfNoMa
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// Custom Cel Vocabulary - DENY if cookie(fruit)==apple
+// Custom CEL Vocabulary - DENY if cookie(fruit)==apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfMatchDeny) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
@@ -893,7 +893,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfMatchDeny) {
               testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
 }
 
-// Custom Cel Vocabulary - ALLOW if cookie(fruit)!=apple
+// Custom CEL Vocabulary - ALLOW if cookie(fruit)!=apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfNoMatchAllow) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
@@ -921,7 +921,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfNoMatchAllow) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// Custom Cel Vocabulary - DENY if cookieValue(fruit)==apple
+// Custom CEL Vocabulary - DENY if cookieValue(fruit)==apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfMatchDeny) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
@@ -949,7 +949,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfMatchDeny) {
               testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
 }
 
-// Custom Cel Vocabulary - ALLOW if cookieValue(fruit)!=apple
+// Custom CEL Vocabulary - ALLOW if cookieValue(fruit)!=apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfNoMatchAllow) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
@@ -977,7 +977,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfNoMatchAllow) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// Custom Cel Vocabulary - ALLOW if request.url() contains(correct_path)
+// Custom CEL Vocabulary - ALLOW if request.url() contains(correct_path)
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfMatchDeny) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
@@ -1004,7 +1004,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfMatchDeny) {
               testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
 }
 
-// Custom Cel Vocabulary - ALLOW if request.url() !contains(correct_path)
+// Custom CEL Vocabulary - ALLOW if request.url() !contains(correct_path)
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfNoMatchAllow) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,

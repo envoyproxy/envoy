@@ -1,5 +1,5 @@
-Extended Request CEL Vocabulary
-=============================
+Extended Request CEL Vocabulary Config
+======================================
 
 .. toctree::
   :glob:
