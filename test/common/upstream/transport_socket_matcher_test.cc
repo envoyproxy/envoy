@@ -109,7 +109,7 @@ protected:
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_context_;
   Network::TransportSocketFactoryPtr mock_default_factory_;
   Stats::IsolatedStoreImpl stats_store_;
-  Stats::ScopePtr stats_scope_;
+  Stats::ScopeSharedPtr stats_scope_;
 };
 
 TEST_F(TransportSocketMatcherTest, ReturnDefaultSocketFactoryWhenNoMatch) {
