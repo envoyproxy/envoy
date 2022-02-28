@@ -219,6 +219,13 @@ Runtime code is held to the same standard as regular Envoy code, so both the old
 path and the new should have 100% coverage both with the feature defaulting true
 and false.
 
+Please note that if adding a runtime guarded feature, your [release notes](docs/root/version_history/current.rst) should include both the functional change, and how to revert it, for example
+
+```
+* http: changed the ``:scheme`` header to ``:schema``. This behavioral change can be
+temporarily reverted by setting ``envoy.reloadable_features.schema_is_better_than_scheme`` to false.
+```
+
 # PR review policy for maintainers
 
 * Typically we try to turn around reviews within one business day.
