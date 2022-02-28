@@ -90,6 +90,42 @@ Matcher::DataInputGetResult ApplicationProtocolInput::get(const MatchingData& da
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
+Matcher::DataInputGetResult UdpDestinationIPInput::get(const UdpMatchingData& data) const {
+  const auto& address = data.localAddress();
+  if (address->type() != Network::Address::Type::Ip) {
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+  }
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+          address->ip()->addressAsString()};
+}
+
+Matcher::DataInputGetResult UdpDestinationPortInput::get(const UdpMatchingData& data) const {
+  const auto& address = data.localAddress();
+  if (address->type() != Network::Address::Type::Ip) {
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+  }
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+          absl::StrCat(address->ip()->port())};
+}
+
+Matcher::DataInputGetResult UdpSourceIPInput::get(const UdpMatchingData& data) const {
+  const auto& address = data.remoteAddress();
+  if (address->type() != Network::Address::Type::Ip) {
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+  }
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+          address->ip()->addressAsString()};
+}
+
+Matcher::DataInputGetResult UdpSourcePortInput::get(const UdpMatchingData& data) const {
+  const auto& address = data.remoteAddress();
+  if (address->type() != Network::Address::Type::Ip) {
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+  }
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+          absl::StrCat(address->ip()->port())};
+}
+
 REGISTER_FACTORY(DestinationIPInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(DestinationPortInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(SourceIPInputFactory, Matcher::DataInputFactory<MatchingData>);
@@ -99,6 +135,10 @@ REGISTER_FACTORY(SourceTypeInputFactory, Matcher::DataInputFactory<MatchingData>
 REGISTER_FACTORY(ServerNameInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(TransportProtocolInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(ApplicationProtocolInputFactory, Matcher::DataInputFactory<MatchingData>);
+REGISTER_FACTORY(UdpDestinationIPInputFactory, Matcher::DataInputFactory<UdpMatchingData>);
+REGISTER_FACTORY(UdpDestinationPortInputFactory, Matcher::DataInputFactory<UdpMatchingData>);
+REGISTER_FACTORY(UdpSourceIPInputFactory, Matcher::DataInputFactory<UdpMatchingData>);
+REGISTER_FACTORY(UdpSourcePortInputFactory, Matcher::DataInputFactory<UdpMatchingData>);
 
 } // namespace Matching
 } // namespace Network

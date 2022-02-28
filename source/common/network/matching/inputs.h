@@ -142,6 +142,78 @@ public:
   ApplicationProtocolInputFactory() : BaseFactory("application-protocol") {}
 };
 
+template <class InputType, class ProtoType>
+class UdpBaseFactory : public Matcher::DataInputFactory<UdpMatchingData> {
+protected:
+  explicit UdpBaseFactory(const std::string& name) : name_(name) {}
+
+public:
+  std::string name() const override { return name_; }
+
+  Matcher::DataInputFactoryCb<UdpMatchingData>
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+    return []() { return std::make_unique<InputType>(); };
+  };
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtoType>();
+  }
+
+private:
+  const std::string name_;
+};
+
+class UdpDestinationIPInput : public Matcher::DataInput<UdpMatchingData> {
+public:
+  Matcher::DataInputGetResult get(const UdpMatchingData& data) const override;
+};
+
+class UdpDestinationIPInputFactory
+    : public UdpBaseFactory<
+          UdpDestinationIPInput,
+          envoy::extensions::matching::common_inputs::network::v3::DestinationIPInput> {
+public:
+  UdpDestinationIPInputFactory() : UdpBaseFactory("destination-ip") {}
+};
+
+class UdpDestinationPortInput : public Matcher::DataInput<UdpMatchingData> {
+public:
+  Matcher::DataInputGetResult get(const UdpMatchingData& data) const override;
+};
+
+class UdpDestinationPortInputFactory
+    : public UdpBaseFactory<
+          UdpDestinationPortInput,
+          envoy::extensions::matching::common_inputs::network::v3::DestinationPortInput> {
+public:
+  UdpDestinationPortInputFactory() : UdpBaseFactory("destination-port") {}
+};
+
+class UdpSourceIPInput : public Matcher::DataInput<UdpMatchingData> {
+public:
+  Matcher::DataInputGetResult get(const UdpMatchingData& data) const override;
+};
+
+class UdpSourceIPInputFactory
+    : public UdpBaseFactory<
+          UdpSourceIPInput,
+          envoy::extensions::matching::common_inputs::network::v3::SourceIPInput> {
+public:
+  UdpSourceIPInputFactory() : UdpBaseFactory("source-ip") {}
+};
+
+class UdpSourcePortInput : public Matcher::DataInput<UdpMatchingData> {
+public:
+  Matcher::DataInputGetResult get(const UdpMatchingData& data) const override;
+};
+
+class UdpSourcePortInputFactory
+    : public UdpBaseFactory<
+          UdpSourcePortInput,
+          envoy::extensions::matching::common_inputs::network::v3::SourcePortInput> {
+public:
+  UdpSourcePortInputFactory() : UdpBaseFactory("source-port") {}
+};
+
 } // namespace Matching
 } // namespace Network
 } // namespace Envoy
