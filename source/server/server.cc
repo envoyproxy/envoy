@@ -935,7 +935,7 @@ void InstanceImpl::terminate() {
 }
 
 Runtime::Loader& InstanceImpl::runtime() {
-  if (runtime_singleton_.get()) {
+  if (runtime_singleton_) {
     return runtime_singleton_->instance();
   }
   return *runtime_;
