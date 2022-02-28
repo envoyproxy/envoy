@@ -223,7 +223,7 @@ Please note that if adding a runtime guarded feature, your [release notes](docs/
 
 ```
 * http: changed the ``:scheme`` header to ``:schema``. This behavioral change can be
-temporarily reverted by setting ``envoy.reloadable_features.schema_is_better_than_scheme`` to false.
+temporarily reverted by setting runtime guard ``envoy.reloadable_features.schema_is_better_than_scheme`` to false.
 ```
 
 # PR review policy for maintainers
