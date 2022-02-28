@@ -221,7 +221,7 @@ and false.
 
 Please note that if adding a runtime guarded feature, your [release notes](docs/root/version_history/current.rst) should include both the functional change, and how to revert it, for example
 
-```
+```rst
 * http: changed the ``:scheme`` header to ``:schema``. This behavioral change can be
 temporarily reverted by setting runtime guard ``envoy.reloadable_features.schema_is_better_than_scheme`` to false.
 ```
