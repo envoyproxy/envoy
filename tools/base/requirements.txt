@@ -38,9 +38,9 @@ aio-api-nist==0.0.1 \
     # via
     #   -r requirements.in
     #   envoy-dependency-check
-aio-core==0.5.8 \
-    --hash=sha256:3e027710040ce43548f5704a8cd45fbb9c2a0a609a3d65735db0da3f79fa8d3f \
-    --hash=sha256:a5f09e74b726accba91abf3bd32d2072d9add833bd5d092a6d9545e5efe26e7c
+aio-core==0.7.1 \
+    --hash=sha256:7d4997afc0bb8a93386ea88598dad1165e5ea8042eb700bff0703c5a3d77ada3 \
+    --hash=sha256:c4c55a26b941c66231a3524c18466648d4e589a673751b57f0db08917676da84
     # via
     #   -r requirements.in
     #   aio-api-github
@@ -427,10 +427,6 @@ imagesize==1.2.0 \
     --hash=sha256:6965f19a6a2039c7d48bca7dba2473069ff854c36ae6f19d2cde309d998228a1 \
     --hash=sha256:b1f6b5a4eab1f73479a50fb79fcf729514a900c341d8503d62a62dbc4127a2b1
     # via sphinx
-importlib-metadata==4.11.1 \
-    --hash=sha256:175f4ee440a0317f6e8d81b7f8d4869f93316170a65ad2b007d2929186c8052c \
-    --hash=sha256:e0bc84ff355328a4adfc5240c4f211e0ab386f80aa640d1b11f0618a1d282094
-    # via sphinx
 iniconfig==1.1.1 \
     --hash=sha256:011e24c64b7f47f6ebd835bb12a743f2fbe9a26d4cecaa7f53bc4f35ee9da8b3 \
     --hash=sha256:bc3af051d7d14b2ee5ef9969666def0cd1a000e121eaea580d4a313df4b37f32
@@ -641,7 +637,9 @@ psutil==5.9.0 \
     --hash=sha256:ea42d747c5f71b5ccaa6897b216a7dadb9f52c72a0fe2b872ef7d3e1eacf3ba3 \
     --hash=sha256:ef216cc9feb60634bda2f341a9559ac594e2eeaadd0ba187a4c2eb5b5d40b91c \
     --hash=sha256:ff0d41f8b3e9ebb6b6110057e40019a432e96aae2008951121ba4e56040b84f3
-    # via envoy-dependency-check
+    # via
+    #   aio-core
+    #   envoy-dependency-check
 py==1.10.0 \
     --hash=sha256:21b81bda15b66ef5e1a777a21c4dcd9c20ad3efd0b3f817e7a809035269e1bd3 \
     --hash=sha256:3b80836aa6d1feeaa108e046da6423ab8f6ceda6468545ae8d02d9d58d18818a
@@ -896,7 +894,9 @@ types-orjson==3.6.2 \
 types-psutil==5.8.20 \
     --hash=sha256:35e16c5d58c21cd638b7a74a8b451b3c099e0f8140121f1d084174c60625a5c8 \
     --hash=sha256:b9c5d6c1f8bd6154f845a79dfbe46e7628f8d58978c6cadde0afa4abe6400294
-    # via envoy-dependency-check
+    # via
+    #   aio-core
+    #   envoy-dependency-check
 typing-extensions==3.10.0.2 \
     --hash=sha256:49f75d16ff11f1cd258e1b988ccff82a3ca5570217d7ad8c5f48205dd99a677e \
     --hash=sha256:d8226d10bc02a29bcc81df19a26e56a9647f8b0a6d4a83924139f4a8b01f17b7 \
@@ -990,10 +990,6 @@ yarl==1.6.3 \
     --hash=sha256:f0b059678fd549c66b89bed03efcabb009075bd131c248ecdf087bdb6faba24a \
     --hash=sha256:fcbb48a93e8699eae920f8d92f7160c03567b421bc17362a9ffbbd706a816f71
     # via aiohttp
-zipp==3.7.0 \
-    --hash=sha256:9f50f446828eb9d45b267433fd3e9da8d801f614129124863f9c51ebceafb87d \
-    --hash=sha256:b47250dd24f92b7dd6a0a8fc5244da14608f3ca90a5efcd37a3b1642fac9a375
-    # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
 setuptools==60.9.3 \
