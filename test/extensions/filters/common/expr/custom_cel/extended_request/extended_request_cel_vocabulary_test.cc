@@ -1,10 +1,10 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
-#include "envoy/extensions/expr/custom_cel_vocabulary/example/v3/config.pb.h"
+#include "envoy/extensions/expr/custom_cel_vocabulary/extended_request/v3/config.pb.h"
 #include "envoy/protobuf/message_validator.h"
 
 #include "source/extensions/filters/common/expr/custom_cel/custom_cel_vocabulary.h"
-#include "source/extensions/filters/common/expr/custom_cel/example/custom_cel_variables.h"
-#include "source/extensions/filters/common/expr/custom_cel/example/example_custom_cel_vocabulary.h"
+#include "source/extensions/filters/common/expr/custom_cel/extended_request/custom_cel_attributes.h"
+#include "source/extensions/filters/common/expr/custom_cel/extended_request/extended_request_cel_vocabulary.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "test/mocks/stream_info/mocks.h"
@@ -39,75 +39,94 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 namespace CustomCel {
-namespace Example {
+namespace ExtendedRequest {
 
+using envoy::extensions::expr::custom_cel_vocabulary::extended_request::v3::
+    ExtendedRequestCelVocabularyConfig;
 using google::api::expr::runtime::CelFunctionDescriptor;
 using google::api::expr::runtime::CelFunctionRegistry;
 
-// tests example custom CEL vocabulary implementation and factory
+// tests Extended Request CEL Vocabulary implementation and factory
 
-TEST(ExampleCustomCelVocabularyFactoryTests, CreateCustomCelVocabularyFromProtoTest) {
-  ExampleCustomCelVocabularyConfig config;
+TEST(ExtendedRequestCelVocabularyFactoryTests, CreateCustomCelVocabularyFromProtoTest) {
+  ExtendedRequestCelVocabularyConfig config;
   config.set_return_url_query_string_as_map(true);
-  ExampleCustomCelVocabularyFactory factory;
+  ExtendedRequestCelVocabularyFactory factory;
   CustomCelVocabularyPtr custom_cel_vocabulary;
   // the object should be created from the config without an exception being thrown by
   // validation visitor
   EXPECT_NO_THROW(custom_cel_vocabulary = factory.createCustomCelVocabulary(
                       config, ProtobufMessage::getStrictValidationVisitor()));
   ASSERT_TRUE(custom_cel_vocabulary);
-  ExampleCustomCelVocabulary* example_custom_cel_vocabulary =
-      dynamic_cast<ExampleCustomCelVocabulary*>(custom_cel_vocabulary.get());
-  ASSERT_TRUE(example_custom_cel_vocabulary->returnUrlQueryStringAsMap());
+  ExtendedRequestCelVocabulary* extended_request_cel_vocabulary =
+      dynamic_cast<ExtendedRequestCelVocabulary*>(custom_cel_vocabulary.get());
+  ASSERT_TRUE(extended_request_cel_vocabulary->returnUrlQueryStringAsMap());
 }
 
-TEST(ExampleCustomCelVocabularyFactoryTests, CreateEmptyConfigProtoTest) {
-  ExampleCustomCelVocabularyFactory factory;
+TEST(ExtendedRequestCelVocabularyFactoryTests, CreateEmptyConfigProtoTest) {
+  ExtendedRequestCelVocabularyFactory factory;
   ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
   ASSERT_TRUE(message);
-  ExampleCustomCelVocabularyConfig* example_custom_cel_vocab_config =
-      dynamic_cast<ExampleCustomCelVocabularyConfig*>(message.get());
-  ASSERT_TRUE(example_custom_cel_vocab_config);
+  ExtendedRequestCelVocabularyConfig* extended_request_cel_vocab_config =
+      dynamic_cast<ExtendedRequestCelVocabularyConfig*>(message.get());
+  ASSERT_TRUE(extended_request_cel_vocab_config);
 }
 
-TEST(ExampleCustomCelVocabularyFactoryTests, FactoryCategoryTest) {
-  ExampleCustomCelVocabularyFactory factory;
+TEST(ExtendedRequestCelVocabularyFactoryTests, FactoryCategoryTest) {
+  ExtendedRequestCelVocabularyFactory factory;
   auto category = factory.category();
   EXPECT_EQ(category, "envoy.expr.custom_cel_vocabulary_config");
 }
 
-TEST(ExampleCustomCelVocabularyFactoryTests, FactoryNameTest) {
-  ExampleCustomCelVocabularyFactory factory;
+TEST(ExtendedRequestCelVocabularyFactoryTests, FactoryNameTest) {
+  ExtendedRequestCelVocabularyFactory factory;
   auto name = factory.name();
-  EXPECT_EQ(name, "envoy.expr.custom_cel_vocabulary.example");
+  EXPECT_EQ(name, "envoy.expr.custom_cel_vocabulary.extended_request");
 }
 
-class ExampleCustomCelVocabularyTests : public testing::Test {
+class ExtendedRequestCelVocabularyTests : public testing::Test {
 public:
-  std::array<absl::string_view, 3> variable_set_names = {CustomVariablesName, SourceVariablesName,
-                                                         ExtendedRequestVariablesName};
-  std::array<absl::string_view, 3> lazy_function_names = {
-      LazyFuncNameGetDouble, LazyFuncNameGetProduct, LazyFuncNameGetNextInt};
-  std::array<absl::string_view, 2> static_function_names = {StaticFuncNameGet99,
-                                                            StaticFuncNameGetSquareOf};
+  std::array<absl::string_view, 1> attribute_set_names = {ExtendedRequest};
+  std::array<absl::string_view, 2> lazy_function_names = {LazyFuncNameCookie,
+                                                          LazyFuncNameCookieValue};
+  std::array<absl::string_view, 1> static_function_names = {StaticFuncNameUrl};
 };
 
-TEST_F(ExampleCustomCelVocabularyTests, FillActivationTest) {
-  ExampleCustomCelVocabulary custom_cel_vocabulary(false);
+TEST_F(ExtendedRequestCelVocabularyTests, FillActivationTest) {
+  ExtendedRequestCelVocabulary custom_cel_vocabulary(false);
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  Protobuf::Arena arena;
+  Activation activation;
+  Http::TestRequestHeaderMapImpl request_headers;
+
+  custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
+                                       nullptr, nullptr);
+
+  // verify that the variable sets are in the activation
+  for (int i = 0; static_cast<size_t>(i) < attribute_set_names.size(); ++i) {
+    ASSERT_TRUE(activation.FindValue(attribute_set_names[i], &arena).has_value());
+  }
+  // verify that the functions are in the activation
+  for (int i = 0; static_cast<size_t>(i) < lazy_function_names.size(); ++i) {
+    EXPECT_EQ(activation.FindFunctionOverloads(lazy_function_names[i]).size(), 1);
+  }
+}
+
+TEST_F(ExtendedRequestCelVocabularyTests, FillActivationWithNullRequestHeadersTest) {
+  ExtendedRequestCelVocabulary custom_cel_vocabulary(false);
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   Protobuf::Arena arena;
   Activation activation;
 
   custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, nullptr, nullptr,
                                        nullptr);
-
-  // verify that the variable sets are in the activation
-  for (int i = 0; static_cast<size_t>(i) < variable_set_names.size(); ++i) {
-    ASSERT_TRUE(activation.FindValue(variable_set_names[i], &arena).has_value());
+  // verify that value producers have not been added
+  for (int i = 0; static_cast<size_t>(i) < attribute_set_names.size(); ++i) {
+    ASSERT_FALSE(activation.FindValue(attribute_set_names[i], &arena).has_value());
   }
-  // verify that the functions are in the activation
+  // verify that the functions are NOT in the activation
   for (int i = 0; static_cast<size_t>(i) < lazy_function_names.size(); ++i) {
-    EXPECT_EQ(activation.FindFunctionOverloads(lazy_function_names[i]).size(), 1);
+    EXPECT_EQ(activation.FindFunctionOverloads(lazy_function_names[i]).size(), 0);
   }
 }
 
@@ -125,20 +144,6 @@ const std::string REQUEST_HAS_QUERY_EXPR = R"EOF(
                bool_value: true
 )EOF";
 
-const std::string SOURCE_HAS_DESCRIPTION_EXPR = R"EOF(
-          call_expr:
-            function: _==_
-            args:
-            - select_expr:
-                test_only: true
-                operand:
-                  ident_expr:
-                    name: source
-                field: description
-            - const_expr:
-               bool_value: true
-)EOF";
-
 // evaluateExpressionWithCustomCelVocabulary:
 // Given an activation with mappings for vocabulary,
 // create a RBAC policy with a condition derived from the given yaml,
@@ -146,22 +151,24 @@ const std::string SOURCE_HAS_DESCRIPTION_EXPR = R"EOF(
 absl::StatusOr<CelValue>
 evaluateExpressionWithCustomCelVocabulary(Activation& activation, Protobuf::Arena& arena,
                                           const std::string& expr_yaml,
-                                          ExampleCustomCelVocabulary& custom_cel_vocabulary) {
+                                          ExtendedRequestCelVocabulary& custom_cel_vocabulary) {
   envoy::config::rbac::v3::Policy policy;
   policy.mutable_condition()->MergeFrom(
       TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(expr_yaml));
 
   using Envoy::Extensions::Filters::Common::Expr::BuilderPtr;
   using Envoy::Extensions::Filters::Common::Expr::ExpressionPtr;
-  using Envoy::Extensions::Filters::Common::Expr::CustomCel::Example::ExampleCustomCelVocabulary;
+  using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::
+      ExtendedRequestCelVocabulary;
   BuilderPtr builder =
       Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr, &custom_cel_vocabulary);
   ExpressionPtr expr = Expr::createExpression(*builder, policy.condition());
   return expr->Evaluate(activation, &arena);
 }
 
-TEST_F(ExampleCustomCelVocabularyTests, ReplaceDefaultMappingsWithCustomMappingsInActivationTest) {
-  ExampleCustomCelVocabulary custom_cel_vocabulary(true);
+TEST_F(ExtendedRequestCelVocabularyTests,
+       ReplaceDefaultMappingsWithCustomMappingsInActivationTest) {
+  ExtendedRequestCelVocabulary custom_cel_vocabulary(true);
   Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/query?a=apple&a=apricot&b=banana&=&c=cranberry"}};
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
@@ -175,10 +182,6 @@ TEST_F(ExampleCustomCelVocabularyTests, ReplaceDefaultMappingsWithCustomMappings
   // The activation does not contain the mappings for the custom CEL vocabulary yet.
   // The check for custom CEL fields should evaluate to false.
   auto has_custom_field_status = evaluateExpressionWithCustomCelVocabulary(
-      activation, arena, SOURCE_HAS_DESCRIPTION_EXPR, custom_cel_vocabulary);
-  ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() &&
-              !has_custom_field_status.value().BoolOrDie());
-  has_custom_field_status = evaluateExpressionWithCustomCelVocabulary(
       activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
   ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() &&
               !has_custom_field_status.value().BoolOrDie());
@@ -189,17 +192,13 @@ TEST_F(ExampleCustomCelVocabularyTests, ReplaceDefaultMappingsWithCustomMappings
   // The activation now contains the mappings for the custom CEL vocabulary.
   // The check for custom CEL fields should evaluate to true.
   has_custom_field_status = evaluateExpressionWithCustomCelVocabulary(
-      activation, arena, SOURCE_HAS_DESCRIPTION_EXPR, custom_cel_vocabulary);
-  ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() &&
-              has_custom_field_status.value().BoolOrDie());
-  has_custom_field_status = evaluateExpressionWithCustomCelVocabulary(
       activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
   ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() &&
               has_custom_field_status.value().BoolOrDie());
 }
 
-TEST_F(ExampleCustomCelVocabularyTests, AddCustomMappingsToActivationTwiceTest) {
-  ExampleCustomCelVocabulary custom_cel_vocabulary(true);
+TEST_F(ExtendedRequestCelVocabularyTests, AddCustomMappingsToActivationTwiceTest) {
+  ExtendedRequestCelVocabulary custom_cel_vocabulary(true);
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   Protobuf::Arena arena;
   absl::Status status;
@@ -207,30 +206,35 @@ TEST_F(ExampleCustomCelVocabularyTests, AddCustomMappingsToActivationTwiceTest) 
 
   using google::api::expr::runtime::FunctionAdapter;
 
-  activation.InsertValueProducer(CustomVariablesName,
-                                 std::make_unique<CustomWrapper>(arena, mock_stream_info));
-  activation.InsertValueProducer(SourceVariablesName,
-                                 std::make_unique<SourceWrapper>(arena, mock_stream_info));
-  activation.InsertValueProducer(
-      ExtendedRequestVariablesName,
-      std::make_unique<ExtendedRequestWrapper>(arena, nullptr, mock_stream_info, false));
+  activation.InsertValueProducer(ExtendedRequest, std::make_unique<ExtendedRequestWrapper>(
+                                                      arena, nullptr, mock_stream_info, false));
 
-  status = activation.InsertFunction(std::make_unique<GetDouble>(LazyFuncNameGetDouble));
-  status = activation.InsertFunction(std::make_unique<GetProduct>(LazyFuncNameGetProduct));
-
-  auto result_or =
-      FunctionAdapter<CelValue, int64_t>::Create(LazyFuncNameGetNextInt, false, getNextInt);
+  Http::TestRequestHeaderMapImpl request_headers;
+  auto result_or = FunctionAdapter<CelValue>::Create(
+      LazyFuncNameCookie, false,
+      std::function<CelValue(Protobuf::Arena*)>(
+          [request_headers](Protobuf::Arena* arena) { return cookie(arena, request_headers); }));
+  if (result_or.ok()) {
+    auto cel_function = std::move(result_or.value());
+    status = activation.InsertFunction(std::move(cel_function));
+  }
+  result_or = FunctionAdapter<CelValue, CelValue>::Create(
+      LazyFuncNameCookieValue, false,
+      std::function<CelValue(Protobuf::Arena*, CelValue)>(
+          [request_headers](Protobuf::Arena* arena, CelValue key) {
+            return cookieValue(arena, request_headers, key);
+          }));
   if (result_or.ok()) {
     auto cel_function = std::move(result_or.value());
     status = activation.InsertFunction(std::move(cel_function));
   }
 
-  custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, nullptr, nullptr,
-                                       nullptr);
+  custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
+                                       nullptr, nullptr);
 
-  // verify that the variable sets are in the activation
-  for (int i = 0; static_cast<size_t>(i) < variable_set_names.size(); ++i) {
-    ASSERT_TRUE(activation.FindValue(variable_set_names[i], &arena).has_value());
+  // verify that the attribute sets are in the activation
+  for (int i = 0; static_cast<size_t>(i) < attribute_set_names.size(); ++i) {
+    ASSERT_TRUE(activation.FindValue(attribute_set_names[i], &arena).has_value());
   }
   // verify that the functions are in the activation
   for (int i = 0; static_cast<size_t>(i) < lazy_function_names.size(); ++i) {
@@ -238,9 +242,9 @@ TEST_F(ExampleCustomCelVocabularyTests, AddCustomMappingsToActivationTwiceTest) 
   }
 }
 
-TEST_F(ExampleCustomCelVocabularyTests, RegisterFunctionsTest) {
+TEST_F(ExtendedRequestCelVocabularyTests, RegisterFunctionsTest) {
   google::api::expr::runtime::CelFunctionRegistry registry;
-  ExampleCustomCelVocabulary custom_cel_vocabulary(true);
+  ExtendedRequestCelVocabulary custom_cel_vocabulary(true);
   const CelFunctionDescriptor* function_descriptor;
 
   custom_cel_vocabulary.registerFunctions(&registry);
@@ -268,26 +272,15 @@ TEST_F(ExampleCustomCelVocabularyTests, RegisterFunctionsTest) {
   }
 }
 
-TEST_F(ExampleCustomCelVocabularyTests, AddRegistrationsToRegistryTwiceTest) {
-  ExampleCustomCelVocabulary custom_cel_vocabulary(true);
+TEST_F(ExtendedRequestCelVocabularyTests, AddRegistrationsToRegistryTwiceTest) {
+  ExtendedRequestCelVocabulary custom_cel_vocabulary(true);
   google::api::expr::runtime::CelFunctionRegistry registry;
   const CelFunctionDescriptor* function_descriptor;
   absl::Status status;
 
   using google::api::expr::runtime::FunctionAdapter;
 
-  status = registry.RegisterLazyFunction(GetDouble::createDescriptor(LazyFuncNameGetDouble));
-  status = registry.RegisterLazyFunction(GetProduct::createDescriptor(LazyFuncNameGetProduct));
-  auto result_or =
-      FunctionAdapter<CelValue, int64_t>::Create(LazyFuncNameGetNextInt, false, getNextInt);
-  if (result_or.ok()) {
-    auto cel_function = std::move(result_or.value());
-    status = registry.RegisterLazyFunction(cel_function->descriptor());
-  }
-
-  status = registry.Register(std::make_unique<Get99>(StaticFuncNameGet99));
-  status = FunctionAdapter<CelValue, int64_t>::CreateAndRegister(StaticFuncNameGetSquareOf, true,
-                                                                 getSquareOf, &registry);
+  status = registry.Register(std::make_unique<UrlFunction>(StaticFuncNameUrl));
 
   custom_cel_vocabulary.registerFunctions(&registry);
   auto functions = registry.ListFunctions();
@@ -314,7 +307,7 @@ TEST_F(ExampleCustomCelVocabularyTests, AddRegistrationsToRegistryTwiceTest) {
   }
 }
 
-} // namespace Example
+} // namespace ExtendedRequest
 } // namespace CustomCel
 } // namespace Expr
 } // namespace Common

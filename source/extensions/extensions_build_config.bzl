@@ -294,7 +294,7 @@ EXTENSIONS = {
     #
     # custom CEL vocabulary
     #
-    "envoy.expr.custom_cel_vocabulary.example": "//source/extensions/filters/common/expr/custom_cel/example:example_custom_cel_vocabulary_lib",
+    "envoy.expr.custom_cel_vocabulary.extended_request": "//source/extensions/filters/common/expr/custom_cel/extended_request:extended_request_cel_vocabulary_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

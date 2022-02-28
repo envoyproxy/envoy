@@ -6,7 +6,7 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
-#include "source/extensions/filters/common/expr/custom_cel/example/example_custom_cel_vocabulary.h"
+#include "source/extensions/filters/common/expr/custom_cel/extended_request/extended_request_cel_vocabulary.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/common/rbac/matchers.h"
 
@@ -458,33 +458,37 @@ TEST(PolicyMatcher, PolicyMatcher) {
   checkMatcher(matcher, false, conn, headers, info);
 }
 
-const std::string CUSTOM_CEL_VARIABLE_EXPR = R"EOF(
-          call_expr:
-            function: _==_
-            args:
-            - select_expr:
-                operand:
-                  ident_expr:
-                    name: custom
-                field: team
-            - const_expr:
-               string_value: {}
+const std::string CUSTOM_CEL_ATTRIBUTE_EXPR = R"EOF(
+           call_expr:
+             function: contains
+             args:
+             - select_expr:
+                 operand:
+                   select_expr:
+                     operand:
+                       ident_expr:
+                         name: request
+                     field: query
+                 field: key1
+             - const_expr:
+                 string_value: {}
 )EOF";
 
 TEST(PolicyMatcherWithCustomCelVocabulary, PolicyMatcherWithCustomCelVocabulary) {
   Envoy::Network::MockConnection conn;
-  Envoy::Http::TestRequestHeaderMapImpl headers;
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/query?key1=correct_value"}};
   NiceMock<StreamInfo::MockStreamInfo> info;
 
   envoy::config::rbac::v3::Policy policy;
   policy.add_permissions()->set_any(true);
   policy.add_principals()->set_any(true);
   policy.mutable_condition()->MergeFrom(TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(
-      fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "spirit")));
+      fmt::format(CUSTOM_CEL_ATTRIBUTE_EXPR, "correct_value")));
 
   using Envoy::Extensions::Filters::Common::Expr::BuilderPtr;
-  using Envoy::Extensions::Filters::Common::Expr::CustomCel::Example::ExampleCustomCelVocabulary;
-  ExampleCustomCelVocabulary custom_cel_vocabulary(true);
+  using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::
+      ExtendedRequestCelVocabulary;
+  ExtendedRequestCelVocabulary custom_cel_vocabulary(true);
   BuilderPtr builder =
       Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr, &custom_cel_vocabulary);
   RBAC::PolicyMatcher matcher(policy, builder.get(), ProtobufMessage::getStrictValidationVisitor(),
@@ -495,7 +499,7 @@ TEST(PolicyMatcherWithCustomCelVocabulary, PolicyMatcherWithCustomCelVocabulary)
 
   policy.mutable_condition()->Clear();
   policy.mutable_condition()->MergeFrom(TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(
-      fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "wrong")));
+      fmt::format(CUSTOM_CEL_ATTRIBUTE_EXPR, "something_wrong")));
   RBAC::PolicyMatcher matcher2(policy, builder.get(), ProtobufMessage::getStrictValidationVisitor(),
                                &custom_cel_vocabulary);
   // the policy condition should evaluate to false and checkMatcher should return false

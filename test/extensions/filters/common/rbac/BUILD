@@ -19,7 +19,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/common/expr/custom_cel:custom_cel_vocabulary_lib",
-        "//source/extensions/filters/common/expr/custom_cel/example:example_custom_cel_vocabulary_lib",
+        "//source/extensions/filters/common/expr/custom_cel/extended_request:extended_request_cel_vocabulary_lib",
         "//source/extensions/filters/common/rbac:matchers_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",
@@ -43,7 +43,7 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/expr/custom_cel_vocabulary/example/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/expr/custom_cel_vocabulary/extended_request/v3:pkg_cc_proto",
     ],
 )
 

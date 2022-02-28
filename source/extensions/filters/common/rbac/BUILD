@@ -64,7 +64,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
         "//source/extensions/filters/common/expr/custom_cel:custom_cel_vocabulary_lib",
-        "//source/extensions/filters/common/expr/custom_cel/example:example_custom_cel_vocabulary_lib",
+        "//source/extensions/filters/common/expr/custom_cel/extended_request:extended_request_cel_vocabulary_lib",
         "//source/extensions/filters/common/rbac:engine_interface",
         "//source/extensions/filters/common/rbac:matchers_lib",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",

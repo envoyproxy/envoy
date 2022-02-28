@@ -1,5 +1,5 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
-#include "envoy/extensions/expr/custom_cel_vocabulary/example/v3/config.pb.h"
+#include "envoy/extensions/expr/custom_cel_vocabulary/extended_request/v3/config.pb.h"
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/rbac/matchers/upstream_ip_port/v3/upstream_ip_port_matcher.pb.h"
 
@@ -596,25 +596,28 @@ TEST_F(UpstreamIpPortMatcherTests, EmptyUpstreamConfigPolicyDeny) {
       "and/or `upstream_port_range`");
 }
 
-const std::string CUSTOM_CEL_VARIABLE_EXPR = R"EOF(
-          call_expr:
-            function: _==_
-            args:
-            - select_expr:
-                operand:
-                  ident_expr:
-                    name: custom
-                field: team
-            - const_expr:
-               string_value: {}
+const std::string CUSTOM_CEL_ATTRIBUTE_EXPR = R"EOF(
+           call_expr:
+             function: contains
+             args:
+             - select_expr:
+                 operand:
+                   select_expr:
+                     operand:
+                       ident_expr:
+                         name: request
+                     field: query
+                 field: key1
+             - const_expr:
+                 string_value: {}
 )EOF";
 
 class CustomCelVocabularyTests : public RoleBasedAccessControlFilterTest {
 public:
   void rbacFilterConfigSetup(const std::string& condition,
                              const envoy::config::rbac::v3::RBAC::Action& action) {
-    using envoy::extensions::expr::custom_cel_vocabulary::example::v3::
-        ExampleCustomCelVocabularyConfig;
+    using envoy::extensions::expr::custom_cel_vocabulary::extended_request::v3::
+        ExtendedRequestCelVocabularyConfig;
     envoy::config::rbac::v3::Policy policy;
     policy.add_permissions()->set_any(true);
     policy.add_principals()->set_any(true);
@@ -625,8 +628,8 @@ public:
     rbac_filter_config.mutable_rules()->set_action(action);
     (*rbac_filter_config.mutable_rules()->mutable_policies())["foo"] = policy;
     *rbac_filter_config.mutable_rules()->mutable_custom_cel_vocabulary_config()->mutable_name() =
-        "envoy.expr.custom_cel_vocabulary.example";
-    ExampleCustomCelVocabularyConfig config;
+        "envoy.expr.custom_cel_vocabulary.extended_request";
+    ExtendedRequestCelVocabularyConfig config;
     config.set_return_url_query_string_as_map(true);
     rbac_filter_config.mutable_rules()
         ->mutable_custom_cel_vocabulary_config()
@@ -641,26 +644,27 @@ public:
 };
 
 TEST_F(CustomCelVocabularyTests, CustomCelVocabularyDeny) {
-
   // should deny
-  rbacFilterConfigSetup(fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "spirit"),
+  rbacFilterConfigSetup(fmt::format(CUSTOM_CEL_ATTRIBUTE_EXPR, "correct_value"),
                         envoy::config::rbac::v3::RBAC::DENY);
 
   // Filter iteration should stop since the policy is DENY.
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers_, false));
+  Http::TestRequestHeaderMapImpl headers{{":path", "/query?key1=correct_value"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
   // Expect `denied` stats to be incremented.
   EXPECT_EQ(1U, config_->stats().denied_.value());
 }
 
 TEST_F(CustomCelVocabularyTests, CustomCelVocabularyAllow) {
-
   // should NOT deny
-  rbacFilterConfigSetup(fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "wrong"),
+
+  rbacFilterConfigSetup(fmt::format(CUSTOM_CEL_ATTRIBUTE_EXPR, "something_wrong"),
                         envoy::config::rbac::v3::RBAC::DENY);
 
   // Filter iteration should continue since it should NOT deny.
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+  Http::TestRequestHeaderMapImpl headers{{":path", "/query?key1=correct_value"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
 
   // Expect `allowed` stats to be incremented.
   EXPECT_EQ(1U, config_->stats().allowed_.value());

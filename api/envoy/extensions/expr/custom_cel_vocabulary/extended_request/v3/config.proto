@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package envoy.extensions.expr.custom_cel_vocabulary.extended_request.v3;
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.expr.custom_cel_vocabulary.extended_request.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/expr/custom_cel_vocabulary/extended_request/v3;extended_requestv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Extended Request CEL Vocabulary Config]
+
+// This is an reference implementation of the extension category envoy.expr.custom_cel_vocabulary.
+// There exists a default envoy native CEL vocabulary for evaluating CEL expressions.
+// This config is used to indicate to the CEL expression evaluator that a custom CEL vocabulary
+// should also be used to evaluate CEL expressions.
+// Any fields which pertain to the custom CEL vocabulary can be added,
+// or it can be left empty (as an indicator that a custom vocabulary is being used).
+// [#extension: envoy.expr.custom_cel_vocabulary.extended_request]
+message ExtendedRequestCelVocabularyConfig {
+  bool return_url_query_string_as_map = 1;
+}

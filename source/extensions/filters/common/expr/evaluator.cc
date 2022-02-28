@@ -14,6 +14,9 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 
+using Envoy::Extensions::Filters::Common::Expr::CustomCel::CustomCelVocabulary;
+using google::api::expr::runtime::CelValue;
+
 ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info,
                                const Http::RequestHeaderMap* request_headers,
                                const Http::ResponseHeaderMap* response_headers,
@@ -72,7 +75,7 @@ BuilderPtr createBuilder(Protobuf::Arena* arena, CustomCelVocabulary* custom_cel
   auto register_status =
       google::api::expr::runtime::RegisterBuiltinFunctions(builder->GetRegistry(), options);
   if (!register_status.ok()) {
-    throw CELException(
+    throw CelException(
         absl::StrCat("failed to register built-in functions: ", register_status.message()));
   }
 
@@ -96,7 +99,7 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
   google::api::expr::v1alpha1::SourceInfo source_info;
   auto cel_expression_status = builder.CreateExpression(&expr, &source_info);
   if (!cel_expression_status.ok()) {
-    throw CELException(
+    throw CelException(
         absl::StrCat("failed to create an expression: ", cel_expression_status.status().message()));
   }
   return std::move(cel_expression_status.value());

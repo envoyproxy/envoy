@@ -1,4 +1,4 @@
-#include "source/extensions/filters/common/expr/custom_cel/example/custom_cel_variables.h"
+#include "source/extensions/filters/common/expr/custom_cel/extended_request/custom_cel_attributes.h"
 
 #include "source/common/http/utility.h"
 #include "source/extensions/filters/common/expr/context.h"
@@ -11,37 +11,12 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 namespace CustomCel {
-namespace Example {
+namespace ExtendedRequest {
 
-absl::optional<CelValue> CustomWrapper::operator[](CelValue key) const {
-  if (!key.IsString()) {
-    return {};
-  }
-  auto value = key.StringOrDie().value();
-  if (value == Team) {
-    return CelValue::CreateStringView("spirit");
-  } else if (value == Protocol) {
-    if (info_.protocol().has_value()) {
-      return CelValue::CreateString(Protobuf::Arena::Create<std::string>(
-          &arena_, Http::Utility::getProtocolString(info_.protocol().value())));
-    }
-  }
-  return {};
-}
-
-// SourceWrapper extends PeerWrapper
-// If SourceWrapper[key] is not found, then the base PeerWrapper[key] is returned.
-absl::optional<CelValue> SourceWrapper::operator[](CelValue key) const {
-  if (!key.IsString()) {
-    return {};
-  }
-  auto value = key.StringOrDie().value();
-  if (value == Description) {
-    return CelValue::CreateString(
-        Protobuf::Arena::Create<std::string>(&arena_, "description: has address, port values"));
-  }
-  return PeerWrapper::operator[](key);
-}
+using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::Utility::appendList;
+using google::api::expr::runtime::CelList;
+using google::api::expr::runtime::ContainerBackedListImpl;
+using google::api::expr::runtime::CreateErrorValue;
 
 // ExtendedRequestWrapper extends RequestWrapper
 // If ExtendedRequestWrapper[key] is not found, then the base RequestWrapper[key] is returned.
@@ -52,6 +27,9 @@ absl::optional<CelValue> ExtendedRequestWrapper::operator[](CelValue key) const 
   auto value = key.StringOrDie().value();
   if (value == Query) {
     absl::string_view path = request_header_map_->getPathValue();
+    if (path == nullptr) {
+      return CreateErrorValue(&arena_, "request.query path missing", absl::StatusCode::kNotFound);
+    }
     size_t query_offset = path.find('?');
     if (query_offset == absl::string_view::npos) {
       return {};
@@ -77,17 +55,10 @@ absl::optional<CelValue> ExtendedRequestWrapper::getMapFromQueryStr(absl::string
         CelValue::CreateString(Protobuf::Arena::Create<std::string>(&arena_, value)));
     key_value_pairs.push_back(key_value_pair);
   }
-  // create ContainerBackedMapImpl from vector of key value pairs
-  std::unique_ptr<CelMap> params_unique_ptr =
-      CreateContainerBackedMap(absl::Span<std::pair<CelValue, CelValue>>(key_value_pairs)).value();
-
-  // transfer ownership of map from unique_ptr to arena
-  CelMap* params_raw_ptr = params_unique_ptr.release();
-  arena_.Own(params_raw_ptr);
-  return CelValue::CreateMap(params_raw_ptr);
+  return Utility::createCelMap(arena_, key_value_pairs);
 }
 
-} // namespace Example
+} // namespace ExtendedRequest
 } // namespace CustomCel
 } // namespace Expr
 } // namespace Common

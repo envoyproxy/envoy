@@ -1,17 +1,16 @@
 expression {
   call_expr {
-    function: "_==_"
+    function: "contains"
     args {
-      select_expr {
-        operand {
+      call_expr {
+        target {
           ident_expr {
-            name: "custom"
+            name: request
           }
         }
-        field: "team"
-      }
+        function : "url"
       const_expr {
-        string_value: "spirit"
+        string_value: "/path"
       }
     }
   }
@@ -19,7 +18,7 @@ expression {
 
 request_headers {
   headers{key: ":method" value : "GET"}
-  headers{key: ":path" value : "/"}
+  headers{key: ":path" value : "/path"}
   headers{key: ":scheme" value : "http"}
   headers{key: ":authority" value : "foo.com"}
   headers {}

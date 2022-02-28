@@ -745,7 +745,7 @@ envoy.http.stateful_session.cookie:
   - envoy.http.stateful_session
   security_posture: unknown
   status: alpha
-envoy.expr.custom_cel_vocabulary.example:
+envoy.expr.custom_cel_vocabulary.extended_request:
   categories:
   - envoy.expr.custom_cel_vocabulary
   security_posture: unknown

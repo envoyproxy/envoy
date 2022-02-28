@@ -16,19 +16,22 @@ envoy_cc_library(
     ],
     hdrs = ["custom_cel_functions.h"],
     deps = [
+        "//source/common/http:utility_lib",
         "//source/common/protobuf",
+        "//source/extensions/filters/common/expr:context_lib",
         "//source/extensions/filters/common/expr/custom_cel:custom_cel_vocabulary_lib",
+        "//source/extensions/filters/common/expr/custom_cel/extended_request/utility:utility_lib",
         "@com_google_cel_cpp//eval/public:cel_function",
         "@com_google_cel_cpp//eval/public:cel_value",
+        "@com_google_cel_cpp//eval/public/containers:container_backed_map_impl",
     ],
 )
 
 envoy_cc_library(
-    name = "custom_cel_variables_lib",
-    srcs = ["custom_cel_variables.cc"],
-    hdrs = ["custom_cel_variables.h"],
+    name = "custom_cel_attributes_lib",
+    srcs = ["custom_cel_attributes.cc"],
+    hdrs = ["custom_cel_attributes.h"],
     deps = [
-        ":util_lib",
         "//source/common/common:logger_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",
@@ -36,31 +39,22 @@ envoy_cc_library(
         "//source/common/stream_info:utility_lib",
         "//source/extensions/filters/common/expr:context_lib",
         "//source/extensions/filters/common/expr/custom_cel:custom_cel_vocabulary_lib",
+        "//source/extensions/filters/common/expr/custom_cel/extended_request/utility:utility_lib",
         "@com_google_cel_cpp//eval/public:cel_value",
         "@com_google_cel_cpp//eval/public/containers:container_backed_list_impl",
         "@com_google_cel_cpp//eval/public/containers:container_backed_map_impl",
     ],
 )
 
-envoy_cc_library(
-    name = "util_lib",
-    hdrs = ["util.h"],
-    deps = [
-        "//source/common/protobuf:utility_lib",
-        "@com_google_cel_cpp//eval/public:cel_value",
-        "@com_google_cel_cpp//eval/public/containers:container_backed_list_impl",
-    ],
-)
-
 envoy_cc_extension(
-    name = "example_custom_cel_vocabulary_lib",
-    srcs = ["example_custom_cel_vocabulary.cc"],
+    name = "extended_request_cel_vocabulary_lib",
+    srcs = ["extended_request_cel_vocabulary.cc"],
     hdrs = [
-        "example_custom_cel_vocabulary.h",
+        "extended_request_cel_vocabulary.h",
     ],
     deps = [
+        ":custom_cel_attributes_lib",
         ":custom_cel_functions_lib",
-        ":custom_cel_variables_lib",
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/expr:context_lib",
@@ -70,6 +64,6 @@ envoy_cc_extension(
         "@com_google_cel_cpp//eval/public:cel_function_adapter",
         "@com_google_cel_cpp//eval/public:cel_function_registry",
         "@com_google_cel_cpp//eval/public:cel_value",
-        "@envoy_api//envoy/extensions/expr/custom_cel_vocabulary/example/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/expr/custom_cel_vocabulary/extended_request/v3:pkg_cc_proto",
     ],
 )

@@ -1,5 +1,5 @@
 #include "source/common/network/utility.h"
-#include "source/extensions/filters/common/expr/custom_cel/example/example_custom_cel_vocabulary.h"
+#include "source/extensions/filters/common/expr/custom_cel/extended_request/extended_request_cel_vocabulary.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "test/common/stream_info/test_util.h"
@@ -17,12 +17,12 @@ namespace Common {
 namespace Expr {
 namespace {
 
-using CustomCel::Example::ExampleCustomCelVocabulary;
+using CustomCel::ExtendedRequest::ExtendedRequestCelVocabulary;
 using test::extensions::filters::common::expr::EvaluatorTestCase;
 
 void protoFuzzer(const EvaluatorTestCase& input, bool use_custom_cel_vocabulary) {
   // Create builder without constant folding.
-  ExampleCustomCelVocabulary custom_cel_vocabulary(true);
+  ExtendedRequestCelVocabulary custom_cel_vocabulary(true);
   static Expr::BuilderPtr builder;
   if (use_custom_cel_vocabulary) {
     builder = Expr::createBuilder(nullptr, &custom_cel_vocabulary);
@@ -60,7 +60,7 @@ void protoFuzzer(const EvaluatorTestCase& input, bool use_custom_cel_vocabulary)
       Expr::evaluate(*expr, arena, *stream_info, &request_headers, &response_headers,
                      &response_trailers);
     }
-  } catch (const CELException& e) {
+  } catch (const CelException& e) {
     ENVOY_LOG_MISC(debug, "CelException: {}", e.what());
   }
 }

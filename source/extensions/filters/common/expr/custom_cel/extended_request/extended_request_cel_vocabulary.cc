@@ -1,12 +1,12 @@
-#include "source/extensions/filters/common/expr/custom_cel/example/example_custom_cel_vocabulary.h"
+#include "source/extensions/filters/common/expr/custom_cel/extended_request/extended_request_cel_vocabulary.h"
 
-#include "envoy/extensions/expr/custom_cel_vocabulary/example/v3/config.pb.h"
-#include "envoy/extensions/expr/custom_cel_vocabulary/example/v3/config.pb.validate.h"
+#include "envoy/extensions/expr/custom_cel_vocabulary/extended_request/v3/config.pb.h"
+#include "envoy/extensions/expr/custom_cel_vocabulary/extended_request/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/filters/common/expr/custom_cel/custom_cel_vocabulary.h"
-#include "source/extensions/filters/common/expr/custom_cel/example/custom_cel_functions.h"
-#include "source/extensions/filters/common/expr/custom_cel/example/custom_cel_variables.h"
+#include "source/extensions/filters/common/expr/custom_cel/extended_request/custom_cel_attributes.h"
+#include "source/extensions/filters/common/expr/custom_cel/extended_request/custom_cel_functions.h"
 
 #include "eval/public/activation.h"
 #include "eval/public/cel_function.h"
@@ -38,8 +38,14 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 namespace CustomCel {
-namespace Example {
+namespace ExtendedRequest {
 
+using envoy::extensions::expr::custom_cel_vocabulary::extended_request::v3::
+    ExtendedRequestCelVocabularyConfig;
+using google::api::expr::runtime::Activation;
+using google::api::expr::runtime::CelFunction;
+using google::api::expr::runtime::CelFunctionDescriptor;
+using google::api::expr::runtime::CelFunctionRegistry;
 using google::api::expr::runtime::FunctionAdapter;
 
 // Below are several helper functions for adding a function mapping to an activation
@@ -50,6 +56,8 @@ using google::api::expr::runtime::FunctionAdapter;
 //
 // CelFunction::Evaluate takes Arena as a parameter.
 // All standard functions will need to take Arena as a parameter.
+// Any declared parameters must be of type CelValue.
+// Non-CelValue parameters can be added via lambda captures.
 //
 // Activation: When adding a mapping to an activation for a variable/value producer or function,
 // any previously added mappings with the same name are removed first.
@@ -58,9 +66,6 @@ using google::api::expr::runtime::FunctionAdapter;
 // previous registrations with the same function descriptor cannot be removed or overridden.
 // A message will be printed to the log.
 
-// addValueProducerToActivation:
-// Removes any envoy native value producer mapping of the same name from the activation.
-// Replaces it with custom version.
 template <typename T>
 void addValueProducerToActivation(Activation* activation,
                                   const absl::string_view value_producer_name,
@@ -95,34 +100,6 @@ void addLazyFunctionToRegistry(CelFunctionRegistry* registry, CelFunctionDescrip
   }
 }
 
-template <typename ReturnType, typename... Arguments>
-void addLazyFunctionToRegistry(CelFunctionRegistry* registry, absl::string_view function_name,
-                               bool receiver_type,
-                               std::function<ReturnType(Protobuf::Arena*, Arguments...)> function) {
-  auto result_or =
-      FunctionAdapter<ReturnType, Arguments...>::Create(function_name, receiver_type, function);
-  if (result_or.ok()) {
-    auto cel_function = std::move(result_or.value());
-    absl::Status status = registry->RegisterLazyFunction(cel_function->descriptor());
-    if (!status.ok()) {
-      ENVOY_LOG_MISC(debug, "Failed to register static function {}  in CEL function registry: {}",
-                     function_name, status.message());
-    }
-  }
-}
-
-template <typename ReturnType, typename... Arguments>
-void addStaticFunctionToRegistry(
-    CelFunctionRegistry* registry, absl::string_view function_name, bool receiver_type,
-    std::function<ReturnType(Protobuf::Arena*, Arguments...)> function) {
-  absl::Status status = FunctionAdapter<ReturnType, Arguments...>::CreateAndRegister(
-      function_name, receiver_type, function, registry);
-  if (!status.ok()) {
-    ENVOY_LOG_MISC(debug, "Failed to register static function {}  in CEL function registry: {}",
-                   function_name, status.message());
-  }
-}
-
 void addStaticFunctionToRegistry(CelFunctionRegistry* registry,
                                  std::unique_ptr<CelFunction> function) {
   auto function_name = function->descriptor().name();
@@ -133,57 +110,59 @@ void addStaticFunctionToRegistry(CelFunctionRegistry* registry,
   }
 }
 
-void ExampleCustomCelVocabulary::fillActivation(Activation* activation, Protobuf::Arena& arena,
-                                                const StreamInfo::StreamInfo& info,
-                                                const Http::RequestHeaderMap* request_headers,
-                                                const Http::ResponseHeaderMap* response_headers,
-                                                const Http::ResponseTrailerMap* response_trailers) {
+void ExtendedRequestCelVocabulary::fillActivation(
+    Activation* activation, Protobuf::Arena& arena, const StreamInfo::StreamInfo& info,
+    const Http::RequestHeaderMap* request_headers, const Http::ResponseHeaderMap* response_headers,
+    const Http::ResponseTrailerMap* response_trailers) {
   request_headers_ = request_headers;
   response_headers_ = response_headers;
   response_trailers_ = response_trailers;
 
-  // variables
-  addValueProducerToActivation(activation, CustomVariablesName,
-                               std::make_unique<CustomWrapper>(arena, info));
-  addValueProducerToActivation(activation, SourceVariablesName,
-                               std::make_unique<SourceWrapper>(arena, info));
-  addValueProducerToActivation(activation, ExtendedRequestVariablesName,
-                               std::make_unique<ExtendedRequestWrapper>(
-                                   arena, request_headers, info, return_url_query_string_as_map_));
-  // lazy functions only
-  addLazyFunctionToActivation(activation, std::make_unique<GetDouble>(LazyFuncNameGetDouble));
-  addLazyFunctionToActivation(activation, std::make_unique<GetProduct>(LazyFuncNameGetProduct));
-  addLazyFunctionToActivation(activation, LazyFuncNameGetNextInt, false,
-                              std::function<CelValue(Protobuf::Arena*, int64_t)>(getNextInt));
+  // all of the following require request_headers
+  if (request_headers) {
+    // attributes
+    addValueProducerToActivation(
+        activation, ExtendedRequest,
+        std::make_unique<ExtendedRequestWrapper>(arena, request_headers, info,
+                                                 return_url_query_string_as_map_));
+
+    // lazy functions only
+    addLazyFunctionToActivation(
+        activation, LazyFuncNameCookie, false,
+        std::function<CelValue(Protobuf::Arena*)>(
+            [request_headers](Protobuf::Arena* arena) { return cookie(arena, *request_headers); }));
+    addLazyFunctionToActivation(activation, LazyFuncNameCookieValue, false,
+                                std::function<CelValue(Protobuf::Arena*, CelValue)>(
+                                    [request_headers](Protobuf::Arena* arena, CelValue key) {
+                                      return cookieValue(arena, *request_headers, key);
+                                    }));
+  }
 }
 
-void ExampleCustomCelVocabulary::registerFunctions(CelFunctionRegistry* registry) {
+void ExtendedRequestCelVocabulary::registerFunctions(CelFunctionRegistry* registry) {
   absl::Status status;
 
   // lazy functions
-  addLazyFunctionToRegistry(registry, GetDouble::createDescriptor(LazyFuncNameGetDouble));
-  addLazyFunctionToRegistry(registry, GetProduct::createDescriptor(LazyFuncNameGetProduct));
-  addLazyFunctionToRegistry(registry, LazyFuncNameGetNextInt, false,
-                            std::function<CelValue(Protobuf::Arena*, int64_t)>(getNextInt));
+  addLazyFunctionToRegistry(registry, CelFunctionDescriptor(LazyFuncNameCookie, false, {}));
+  addLazyFunctionToRegistry(
+      registry, CelFunctionDescriptor(LazyFuncNameCookieValue, false, {CelValue::Type::kString}));
 
   // static functions
-  addStaticFunctionToRegistry(registry, std::make_unique<Get99>(StaticFuncNameGet99));
-  addStaticFunctionToRegistry(registry, StaticFuncNameGetSquareOf, true,
-                              std::function<CelValue(Protobuf::Arena*, int64_t)>(getSquareOf));
+  addStaticFunctionToRegistry(registry, std::make_unique<UrlFunction>(StaticFuncNameUrl));
 }
 
-CustomCelVocabularyPtr ExampleCustomCelVocabularyFactory::createCustomCelVocabulary(
+CustomCelVocabularyPtr ExtendedRequestCelVocabularyFactory::createCustomCelVocabulary(
     const Protobuf::Message& config, ProtobufMessage::ValidationVisitor& validation_visitor) {
-  ExampleCustomCelVocabularyConfig custom_cel_config =
-      MessageUtil::downcastAndValidate<const ExampleCustomCelVocabularyConfig&>(config,
-                                                                                validation_visitor);
-  return std::make_unique<ExampleCustomCelVocabulary>(
+  ExtendedRequestCelVocabularyConfig custom_cel_config =
+      MessageUtil::downcastAndValidate<const ExtendedRequestCelVocabularyConfig&>(
+          config, validation_visitor);
+  return std::make_unique<ExtendedRequestCelVocabulary>(
       custom_cel_config.return_url_query_string_as_map());
 }
 
-REGISTER_FACTORY(ExampleCustomCelVocabularyFactory, CustomCelVocabularyFactory);
+REGISTER_FACTORY(ExtendedRequestCelVocabularyFactory, CustomCelVocabularyFactory);
 
-} // namespace Example
+} // namespace ExtendedRequest
 } // namespace CustomCel
 } // namespace Expr
 } // namespace Common

@@ -18,16 +18,15 @@ namespace Common {
 namespace Expr {
 namespace CustomCel {
 
-using google::api::expr::runtime::Activation;
-using google::api::expr::runtime::CelFunctionRegistry;
-
 // CustomCelVocabulary
 //
 // Background Information:
 //
-// CelExpression: CelExpressions can contain values, variables and functions.
-// The variables and functions can be either (1) stateless or (2) stateful.
+// CelExpression: CelExpressions can contain values, value producers and functions.
 // In CEL, stateless functions are called "static" and stateful functions are "lazy".
+// Static/stateless functions do not rely on any information outside the function, function
+// parameters. Lazy/stateful functions do. In this case, lazy or static does not refer to when the
+// function is evaluated.
 //
 // CelExpressions are evaluated with the aid of certain data structures
 // which contain references to variables and functions implementations.
@@ -41,7 +40,7 @@ using google::api::expr::runtime::CelFunctionRegistry;
 // reference implementations.
 // A new activation is created for every CelExpression and is used for the
 // evaluation of the CelExpression.
-// An activation contains variables and stateful, but not stateless functions.
+// An activation contains value producers and stateful, but not stateless functions.
 //
 // CelExpressionBuilder: A CelExpressionBuilder contains the registry of all allowable CEL
 // functions. The CelExpressionBuilder is used to create CelExpressions.
@@ -55,7 +54,7 @@ using google::api::expr::runtime::CelFunctionRegistry;
 // (1) the Built-in CEL Vocabulary
 // https://github.com/google/cel-spec/blob/master/doc/langdef.md#list-of-standard-definitions
 // Built-in CEL Functions include "+", "-", "*".
-// These are stateless and are registered with the CEL function registry.
+// These are static/stateless and are registered with the CEL function registry.
 //
 // (2) the Envoy defined Vocabulary,
 // https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes
@@ -66,7 +65,7 @@ using google::api::expr::runtime::CelFunctionRegistry;
 // and (3) the Custom Cel Vocabulary
 // These are custom definitions which a user can define.
 // Custom CEL stateless functions have to be added to the registry.
-// Custom CEL variables and stateful functions have to be added to the activation.
+// Custom CEL value producers and lazy/stateful functions have to be added to the activation.
 //
 // This interface is intended to allow for the addition and use of a CustomCelVocabulary.
 //
@@ -74,7 +73,8 @@ using google::api::expr::runtime::CelFunctionRegistry;
 // The standard functions will be converted to CelFunctions when added to the
 // registry and activation.
 // All standard functions will need a Protobuf Arena because CelFunction::Evaluate takes
-// Arena as a parameter.
+// Arena as a parameter. Any other parameters must be of type CelValue.
+// Non-CelValue parameters can be added via lambda captures.
 
 class CustomCelVocabulary {
 public:
@@ -106,8 +106,8 @@ public:
   //
   // It is possible to remove entries from an activation.
   // It is not possible to remove entries from the CEL function registry.
-  virtual void fillActivation(Activation* activation, Protobuf::Arena& arena,
-                              const StreamInfo::StreamInfo& info,
+  virtual void fillActivation(google::api::expr::runtime::Activation* activation,
+                              Protobuf::Arena& arena, const StreamInfo::StreamInfo& info,
                               const Http::RequestHeaderMap* request_headers,
                               const Http::ResponseHeaderMap* response_headers,
                               const Http::ResponseTrailerMap* response_trailers) PURE;
@@ -130,7 +130,7 @@ public:
   // stateful/lazy function descriptor in the registry.
   // Once registered, the function registration cannot be removed from the registry
   // or overridden, as it can for an activation mapping.
-  virtual void registerFunctions(CelFunctionRegistry* registry) PURE;
+  virtual void registerFunctions(google::api::expr::runtime::CelFunctionRegistry* registry) PURE;
 
   virtual ~CustomCelVocabulary() = default;
 

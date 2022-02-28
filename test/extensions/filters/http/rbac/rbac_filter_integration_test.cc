@@ -1,4 +1,4 @@
-#include "envoy/extensions/expr/custom_cel_vocabulary/example/v3/config.pb.h"
+#include "envoy/extensions/expr/custom_cel_vocabulary/extended_request/v3/config.pb.h"
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
@@ -728,9 +728,9 @@ typed_config:
   rules:
     action: DENY
     custom_cel_vocabulary_config:
-      name: envoy.expr.custom_cel_vocabulary.example
+      name: envoy.expr.custom_cel_vocabulary.extended_request
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.expr.custom_cel_vocabulary.example.v3.ExampleCustomCelVocabularyConfig
+        "@type": type.googleapis.com/envoy.extensions.expr.custom_cel_vocabulary.extended_request.v3.ExtendedRequestCelVocabularyConfig
         return_url_query_string_as_map: true
     policies:
       foo:
@@ -740,32 +740,64 @@ typed_config:
           - any: true
         condition:
           {}
+
 )EOF";
 
-const std::string CUSTOM_CEL_VARIABLE_EXPR = R"EOF(
-          call_expr:
-            function: _==_
-            args:
-            - select_expr:
-                operand:
-                  ident_expr:
-                    name: custom
-                field: team
-            - const_expr:
-               string_value: {}
+const std::string CUSTOM_CEL_ATTRIBUTE_EXPR = R"EOF(
+           call_expr:
+             function: contains
+             args:
+             - select_expr:
+                 operand:
+                   select_expr:
+                     operand:
+                       ident_expr:
+                         name: request
+                     field: query
+                 field: key1
+             - const_expr:
+                 string_value: {}
 )EOF";
 
-const std::string CUSTOM_CEL_FUNCTION_EXPR = R"EOF(
-          call_expr:
-            function: _==_
-            args:
-            - call_expr:
-                target:
-                  const_expr:
-                    int64_value: 4
-                function: GetSquareOf
-            - const_expr:
-                int64_value: {}
+const std::string COOKIE_EXPR = R"EOF(
+            call_expr:
+              function: contains
+              args:
+              - call_expr:
+                  function: _[_]
+                  args:
+                  - call_expr:
+                      function: cookie
+                  - const_expr:
+                      string_value: fruit
+              - const_expr:
+                  string_value: {}
+)EOF";
+
+const std::string COOKIE_VALUE_EXPR = R"EOF(
+             call_expr:
+               function: contains
+               args:
+               - call_expr:
+                   function: cookieValue
+                   args:
+                   - const_expr:
+                       string_value: fruit
+               - const_expr:
+                   string_value: {}
+)EOF";
+
+const std::string URL_EXPR = R"EOF(
+             call_expr:
+               function: contains
+               args:
+               - call_expr:
+                   target:
+                     ident_expr:
+                       name: request
+                   function: url
+               - const_expr:
+                   string_value: {}
 )EOF";
 
 using RbacWithCustomCelVocabularyIntegrationTests = HttpProtocolIntegrationTest;
@@ -774,16 +806,25 @@ INSTANTIATE_TEST_SUITE_P(Protocols, RbacWithCustomCelVocabularyIntegrationTests,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-// Custom CEL Vocabulary - DENY if custom[team]==spirit
-TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelVariableExprIfMatchDeny) {
+// Custom CEL Vocabulary - DENY if request[query][key1]==correct_value
+TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelAttributeExprIfMatchDeny) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
-                                           fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "spirit")));
+  config_helper_.prependFilter(
+      fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
+                  fmt::format(CUSTOM_CEL_ATTRIBUTE_EXPR, "correct_value")));
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/query?key1=correct_value"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
@@ -793,17 +834,26 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelVariableExprIfMatch
               testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
 }
 
-// Custom CEL Vocabulary - NO DENY if custom[team]!=spirit
-TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelVariableExprIfNoMatchNoDeny) {
+// Custom CEL Vocabulary - ALLOW if request[query][key1]!=correct_value
+TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelAttributeExprIfNoMatchAllow) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(
       fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
-                  fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "something_wrong")));
+                  fmt::format(CUSTOM_CEL_ATTRIBUTE_EXPR, "something_wrong")));
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/query?key1=correct_value"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
@@ -812,16 +862,25 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelVariableExprIfNoMat
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// Custom Cel Vocabulary - DENY if GetSquareOf(4)==16
-TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelFunctionExprIfMatchDeny) {
+// Custom Cel Vocabulary - DENY if cookie(fruit)==apple
+TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfMatchDeny) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
-                                           fmt::format(CUSTOM_CEL_FUNCTION_EXPR, "16")));
+                                           fmt::format(COOKIE_EXPR, "apple")));
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/path"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"x-forwarded-for", "10.0.0.1"},
+          {"cookie", "fruit=apple"},
+      },
+      1024);
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
@@ -831,16 +890,136 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelFunctionExprIfMatch
               testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
 }
 
-// Custom Cel Vocabulary - NO DENY if GetSquareOf(4)==-1
-TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelFunctionExprIfNoMatchNoDeny) {
+// Custom Cel Vocabulary - ALLOW if cookie(fruit)!=apple
+TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfNoMatchAllow) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
-                                           fmt::format(CUSTOM_CEL_FUNCTION_EXPR, "-1")));
+                                           fmt::format(COOKIE_EXPR, "veg")));
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/path"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"x-forwarded-for", "10.0.0.1"},
+          {"cookie", "fruit=apple"},
+      },
+      1024);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Custom Cel Vocabulary - DENY if cookieValue(fruit)==apple
+TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfMatchDeny) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
+                                           fmt::format(COOKIE_VALUE_EXPR, "apple")));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/path"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"x-forwarded-for", "10.0.0.1"},
+          {"cookie", "fruit=apple"},
+      },
+      1024);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+  // Note the whitespace in the policy id is replaced by '_'.
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
+}
+
+// Custom Cel Vocabulary - ALLOW if cookieValue(fruit)!=apple
+TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfNoMatchAllow) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
+                                           fmt::format(COOKIE_VALUE_EXPR, "veg")));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/path"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"x-forwarded-for", "10.0.0.1"},
+          {"cookie", "fruit=apple"},
+      },
+      1024);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Custom Cel Vocabulary - ALLOW if request.url() contains(correct_path)
+TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfMatchDeny) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
+                                           fmt::format(URL_EXPR, "correct_path")));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/correct_path"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"cookie", "fruit=apple"},
+                                     {"host", "abc.com:1234"}},
+      1024);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+  // Note the whitespace in the policy id is replaced by '_'.
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
+}
+
+// Custom Cel Vocabulary - ALLOW if request.url() !contains(correct_path)
+TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfNoMatchAllow) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
+                                           fmt::format(URL_EXPR, "wrong_path")));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/correct_path"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"cookie", "fruit=apple"},
+                                     {"host", "abc.com:1234"}},
+      1024);
+
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 

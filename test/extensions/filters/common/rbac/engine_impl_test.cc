@@ -2,7 +2,7 @@
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/config/rbac/v3/rbac.pb.validate.h"
-#include "envoy/extensions/expr/custom_cel_vocabulary/example/v3/config.pb.h"
+#include "envoy/extensions/expr/custom_cel_vocabulary/extended_request/v3/config.pb.h"
 
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/common/rbac/engine_impl.h"
@@ -469,28 +469,34 @@ TEST(RoleBasedAccessControlEngineImpl, LogIfMatched) {
   checkEngine(engine, true, RBAC::LogResult::No, info, conn, headers);
 }
 
-const std::string CUSTOM_CEL_VARIABLE_EXPR = R"EOF(
-        call_expr:
-          function: _==_
-          args:
-          - select_expr:
-              operand:
-                ident_expr:
-                  name: custom
-              field: team
-          - const_expr:
-             string_value: {}
+const std::string CUSTOM_CEL_ATTRIBUTE_EXPR = R"EOF(
+           call_expr:
+             function: contains
+             args:
+             - select_expr:
+                 operand:
+                   select_expr:
+                     operand:
+                       ident_expr:
+                         name: request
+                     field: query
+                 field: key1
+             - const_expr:
+                 string_value: {}
 )EOF";
 
 TEST(RoleBasedAccessControlEngineImpl, CustomCelVocabularyTest) {
-  using envoy::extensions::expr::custom_cel_vocabulary::example::v3::
-      ExampleCustomCelVocabularyConfig;
+  using envoy::extensions::expr::custom_cel_vocabulary::extended_request::v3::
+      ExtendedRequestCelVocabularyConfig;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/query?key1=correct_value"}};
 
   envoy::config::rbac::v3::RBAC rbac;
   rbac.set_action(envoy::config::rbac::v3::RBAC::DENY);
   *rbac.mutable_custom_cel_vocabulary_config()->mutable_name() =
-      "envoy.expr.custom_cel_vocabulary.example";
-  ExampleCustomCelVocabularyConfig config;
+      "envoy.expr.custom_cel_vocabulary.extended_request";
+  ExtendedRequestCelVocabularyConfig config;
   config.set_return_url_query_string_as_map(true);
   rbac.mutable_custom_cel_vocabulary_config()->mutable_typed_config()->PackFrom(config);
   envoy::config::rbac::v3::Policy policy;
@@ -499,20 +505,21 @@ TEST(RoleBasedAccessControlEngineImpl, CustomCelVocabularyTest) {
 
   // test 1: should deny
   policy.mutable_condition()->MergeFrom(TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(
-      fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "spirit")));
+      fmt::format(CUSTOM_CEL_ATTRIBUTE_EXPR, "correct_value")));
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac,
                                                 ProtobufMessage::getStrictValidationVisitor());
+
   // checkEngine:
   // if the action is ALLOW, handleAction will return the result of the evaluated expr
   // if the action is DENY, handleAction will return the opposite
   // the above expr with "spirit" is "true", so we expect to get "false" from checkEngine
-  checkEngine(engine, false, LogResult::Undecided);
+  checkEngine(engine, false, LogResult::Undecided, info, conn, headers);
 
   // test 2: should NOT deny
   policy.mutable_condition()->Clear();
   policy.mutable_condition()->MergeFrom(TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(
-      fmt::format(CUSTOM_CEL_VARIABLE_EXPR, "wrong")));
+      fmt::format(CUSTOM_CEL_ATTRIBUTE_EXPR, "something_wrong")));
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine2(rbac,
                                                  ProtobufMessage::getStrictValidationVisitor());
@@ -520,7 +527,7 @@ TEST(RoleBasedAccessControlEngineImpl, CustomCelVocabularyTest) {
   // if the action is ALLOW, handleAction will return the result of the evaluated expr
   // if the action is DENY, handleAction will return the opposite
   // the above expr with "wrong" is "false", so we expect to get "true" from checkEngine
-  checkEngine(engine2, true, LogResult::Undecided);
+  checkEngine(engine2, true, LogResult::Undecided, info, conn, headers);
 }
 
 } // namespace

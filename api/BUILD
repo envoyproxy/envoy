@@ -131,7 +131,7 @@ proto_library(
         "//envoy/extensions/compression/brotli/decompressor/v3:pkg",
         "//envoy/extensions/compression/gzip/compressor/v3:pkg",
         "//envoy/extensions/compression/gzip/decompressor/v3:pkg",
-        "//envoy/extensions/expr/custom_cel_vocabulary/example/v3:pkg",
+        "//envoy/extensions/expr/custom_cel_vocabulary/extended_request/v3:pkg",
         "//envoy/extensions/filters/common/dependency/v3:pkg",
         "//envoy/extensions/filters/common/fault/v3:pkg",
         "//envoy/extensions/filters/common/matcher/action/v3:pkg",
