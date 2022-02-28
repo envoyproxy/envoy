@@ -202,8 +202,8 @@ An example of a streaming admin tap configuration that uses the :ref:`JSON_BODY_
 Buffering Data
 --------------
 
-Buffering data in tap requests can be done at two levels of granularity - buffering individual traces (downstream request & upstream response bodies) or buffering a set of traces. 
-Both levels of granularity have separate controls to limit the amount of data buffered. 
+Buffering data in tap requests can be done at two levels of granularity - buffering individual traces (downstream request & upstream response bodies) or buffering a set of traces.
+Both levels of granularity have separate controls to limit the amount of data buffered.
 
 When buffering individual traces, Envoy will limit the amount of body data that is tapped to avoid OOM situations.
 The default limit is 1KiB for both received (request) and transmitted (response) data. This is
@@ -214,11 +214,11 @@ configurable via the :ref:`max_buffered_rx_bytes
 
 .. _config_http_filters_tap_streaming:
 
-Envoy also supports buffering multiple traces internally via the ``buffered_admin`` sink type. 
-This form of buffering is particularly useful for taps specifying a match configuration that is satisfied frequently. 
-The post body using a buffered admin sink should specify ``max_traces`` which is the number of traces to buffer, 
-and can optionally specify a ``timeout`` in seconds (Protobuf Duration), which is the maximum time the server 
-should wait to accumulate ``max_traces`` before flushing the traces buffered so far to the client. Each individual 
+Envoy also supports buffering multiple traces internally via the ``buffered_admin`` sink type.
+This form of buffering is particularly useful for taps specifying a match configuration that is satisfied frequently.
+The post body using a buffered admin sink should specify ``max_traces`` which is the number of traces to buffer,
+and can optionally specify a ``timeout`` in seconds (Protobuf Duration), which is the maximum time the server
+should wait to accumulate ``max_traces`` before flushing the traces buffered so far to the client. Each individual
 buffered trace also adheres to the single trace buffer limits from above.
 An example of a buffered admin tap configuration:
 
@@ -230,7 +230,7 @@ An example of a buffered admin tap configuration:
       any_match: true
     output_config:
       sinks:
-        - buffered_admin: 
+        - buffered_admin:
             max_traces: 3
             timeout: 0.2s
 
