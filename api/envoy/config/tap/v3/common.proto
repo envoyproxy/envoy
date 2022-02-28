@@ -278,7 +278,7 @@ message BufferedAdminSink {
   uint64 max_traces = 1 [(validate.rules).uint64 = {gt: 0}];
 
   // Acts as a fallback to prevent the client from waiting for long periods of time.
-  // After timout has occurred, a buffer flush will be triggered, returning the traces buffered so far.
+  // After timeout has occurred, a buffer flush will be triggered, returning the traces buffered so far.
   // Specifying 0 for the timeout value (or not specifying a value at all) indicates an infinite timeout.
   google.protobuf.Duration timeout = 2;
 }

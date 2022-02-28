@@ -115,7 +115,7 @@ AdminHandler::createPerTapSinkHandle(uint64_t,
   using ProtoOutputSinkType = envoy::config::tap::v3::OutputSink::OutputSinkTypeCase;
 
   /**
-   * FIXME: Demuxing the sink type here again after doing so in TapConfigBaseImpl constructor
+   * Switching on the sink type here again after doing so in TapConfigBaseImpl constructor
    * seems a bit strange. A possible refactor in the future could involve moving all Sinks
    * to live where the FilePerTapSink lives, and passing in the sink to use into the AdminHandler.
    */

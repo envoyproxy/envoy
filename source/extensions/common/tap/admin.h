@@ -104,7 +104,7 @@ private:
     // Return true if the buffer has already been flushed, false otherwise.
     bool flushed() const { return !buffer_; }
 
-    // Take ownership of the internally managed tracelist
+    // Take ownership of the internally managed trace list
     std::vector<TraceWrapper> flush() {
       std::vector<TraceWrapper> buffer = std::move(*buffer_);
       buffer_.reset(); // set optional to empty
