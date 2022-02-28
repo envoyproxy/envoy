@@ -25,6 +25,7 @@ BBR
 BSON
 BPF
 Repick
+TRA
 btree
 CAS
 CB
@@ -32,6 +33,7 @@ cbor
 CDN
 CDS
 CEL
+CWND
 DSR
 DSS
 EBADF
@@ -1331,3 +1333,4 @@ transid
 routable
 vhosts
 infos
+ElastiCache
