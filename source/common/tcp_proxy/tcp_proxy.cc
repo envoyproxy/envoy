@@ -73,7 +73,8 @@ Config::SharedConfig::SharedConfig(
     idle_timeout_ = std::chrono::hours(1);
   }
   if (config.has_tunneling_config()) {
-    tunneling_config_ = config.tunneling_config();
+    tunneling_config_helper_ =
+        std::make_unique<TunnelingConfigHelperImpl>(config.tunneling_config());
   }
   if (config.has_max_downstream_connection_duration()) {
     const uint64_t connection_duration =
@@ -376,7 +377,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
           StreamInfo::FilterState::LifeSpan::Connection);
     }
     transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-        downstream_connection->streamInfo().filterState());
+        read_callbacks_->connection().streamInfo().filterState());
 
     if (auto typed_state = downstream_connection->streamInfo()
                                .filterState()
@@ -413,8 +414,8 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
     return false;
   }
 
-  generic_conn_pool_ = factory->createGenericConnPool(cluster, config_->tunnelingConfig(), this,
-                                                      *upstream_callbacks_);
+  generic_conn_pool_ = factory->createGenericConnPool(cluster, config_->tunnelingConfigHelper(),
+                                                      this, *upstream_callbacks_);
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
@@ -519,8 +520,14 @@ Network::FilterStatus Filter::onNewConnection() {
 }
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
+    downstream_closed_ = true;
+  }
+
   ENVOY_CONN_LOG(trace, "on downstream event {}, has upstream = {}", read_callbacks_->connection(),
                  static_cast<int>(event), upstream_ == nullptr);
+
   if (upstream_) {
     Tcp::ConnectionPool::ConnectionDataPtr conn_data(upstream_->onDownstreamEvent(event));
     if (conn_data != nullptr &&
@@ -569,7 +576,9 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
             Upstream::Outlier::Result::LocalOriginConnectFailed);
       }
 
-      initializeUpstreamConnection();
+      if (!downstream_closed_) {
+        initializeUpstreamConnection();
+      }
     } else {
       if (read_callbacks_->connection().state() == Network::Connection::State::Open) {
         read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);

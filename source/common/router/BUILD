@@ -360,6 +360,7 @@ envoy_cc_library(
     hdrs = ["header_parser.h"],
     deps = [
         ":header_formatter_lib",
+        "//envoy/http:header_evaluator",
         "//envoy/http:header_map_interface",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
