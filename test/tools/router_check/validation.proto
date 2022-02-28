@@ -111,4 +111,7 @@ message ValidationAssert {
   // applicable.
   repeated envoy.config.route.v3.HeaderMatcher request_header_matches = 11;
   repeated envoy.config.route.v3.HeaderMatcher response_header_matches = 12;
+
+  // Match the redirect response code
+  google.protobuf.UInt32Value code_redirect = 13;
 }

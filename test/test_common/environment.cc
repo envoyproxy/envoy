@@ -42,7 +42,14 @@ namespace {
 
 std::string makeTempDir(std::string basename_template) {
 #ifdef WIN32
-  std::string name_template = TestEnvironment::temporaryDirectory() + "/" + basename_template;
+  std::string name_template{};
+  if (std::getenv("TMP")) {
+    name_template = TestEnvironment::getCheckedEnvVar("TMP") + "\\" + basename_template;
+  } else if (std::getenv("WINDIR")) {
+    name_template = TestEnvironment::getCheckedEnvVar("WINDIR") + "\\TEMP\\" + basename_template;
+  } else {
+    name_template = basename_template;
+  }
   char* dirname = ::_mktemp(&name_template[0]);
   RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
                                                  name_template, errorDetails(errno)));
