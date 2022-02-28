@@ -34,6 +34,14 @@ public:
     auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
     auto mock_client = std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
     mock_stream_ptr_ = std::make_unique<NiceMock<Grpc::MockAsyncStream>>();
+    ON_CALL(*mock_client, startRaw(_, _, _, _)).WillByDefault(Return(mock_stream_ptr_.get()));
+    ON_CALL(*mock_client_factory, createUncachedRawAsyncClient())
+        .WillByDefault(Return(ByMove(std::move(mock_client))));
+    auto& factory_context = context_.server_factory_context_;
+    ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
+    ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+        .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
+
     driver_ = std::make_unique<Driver>(opentelemetry_config, context_);
   }
 
@@ -60,6 +68,7 @@ protected:
   envoy::config::trace::v3::OpenTelemetryConfig config_;
   std::string test_string = "ABCDEFGHIJKLMN";
   Tracing::DriverPtr driver_;
+  NiceMock<Runtime::MockLoader> runtime_;
 };
 
 TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfig) {
@@ -88,7 +97,6 @@ TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
   const std::vector<std::string> v = {version, trace_id_hex, Hex::uint64ToHex(parent_span_id),
                                       trace_flags};
   const std::string parent_trace_header = absl::StrJoin(v, "-");
-  std::cout << "parent_trace_header: " << parent_trace_header << std::endl;
 
   request_headers.addReferenceKey(OpenTelemetryConstants::get().TRACE_PARENT, parent_trace_header);
 
@@ -132,12 +140,9 @@ TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {
   {
     InSequence s;
 
-    EXPECT_CALL(mock_random_generator_, random())
-        .WillOnce(Return(trace_id_high));
-    EXPECT_CALL(mock_random_generator_, random())
-        .WillOnce(Return(trace_id_low));
-    EXPECT_CALL(mock_random_generator_, random())
-        .WillOnce(Return(new_span_id));
+    EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(trace_id_high));
+    EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(trace_id_low));
+    EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(new_span_id));
   }
 
   Tracing::SpanPtr span =
@@ -153,6 +158,26 @@ TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {
   EXPECT_EQ(sampled_entry.size(), 1);
   EXPECT_EQ(sampled_entry[0]->value().getStringView(),
             "00-00000000000000010000000000000002-0000000000000003-00");
+}
+
+TEST_F(OpenTelemetryDriverTest, ExportOTLPSpan) {
+  // Set up driver
+  setupValidDriver();
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
+                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  // Flush after a single span.
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.open_telemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  // We should see a call to sendMessage to export that single span.
+  EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
+  span->finishSpan();
 }
 
 } // namespace OpenTelemetry
