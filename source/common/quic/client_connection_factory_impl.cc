@@ -31,7 +31,6 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     Network::Address::InstanceConstSharedPtr server_addr,
     Network::Address::InstanceConstSharedPtr local_addr, QuicStatNames& quic_stat_names,
     OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope) {
-  ASSERT(GetQuicReloadableFlag(quic_single_ack_in_packet2));
   ASSERT(crypto_config != nullptr);
   PersistentQuicInfoImpl* info_impl = reinterpret_cast<PersistentQuicInfoImpl*>(&info);
   quic::ParsedQuicVersionVector quic_versions = quic::CurrentSupportedHttp3Versions();
