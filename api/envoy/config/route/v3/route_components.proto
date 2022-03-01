@@ -517,8 +517,8 @@ message RouteMatch {
     // If specified, the route is a path - separated prefix rule meaning that the
     // *:path* header (without the query string) must either exactly match the
     // path_separated_prefix or have it as a prefix, followed by '/'
-    // Expect the value to not contain '?' and not to end in '/'
-    string path_separated_prefix = 14 [(validate.rules).string = {pattern: "^[^?]+[^?/]$"}];
+    // Expect the value to not contain '?' or '#' and not to end in '/'
+    string path_separated_prefix = 14 [(validate.rules).string = {pattern: "^[^?#]+[^?#/]$"}];
   }
 
   // Indicates that prefix/path matching should be case sensitive. The default

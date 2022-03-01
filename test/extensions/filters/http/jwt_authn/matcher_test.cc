@@ -176,6 +176,65 @@ TEST_F(MatcherTest, TestMatchConnectQuery) {
   EXPECT_FALSE(matcher->matches(headers));
 }
 
+TEST_F(MatcherTest, TestMatchPathSeparatedPrefix) {
+  const char config[] = R"(match:
+  path_separated_prefix: "/api")";
+  RequirementRule rule;
+  TestUtility::loadFromYaml(config, rule);
+  MatcherConstPtr matcher = Matcher::create(rule);
+  auto headers = TestRequestHeaderMapImpl{{":path", "/api"}};
+  EXPECT_TRUE(matcher->matches(headers));
+  headers = TestRequestHeaderMapImpl{{":path", "/ApI"}};
+  EXPECT_FALSE(matcher->matches(headers));
+  headers = TestRequestHeaderMapImpl{{":path", "/api?foo=bar"}};
+  EXPECT_TRUE(matcher->matches(headers));
+  headers = TestRequestHeaderMapImpl{{":path", "/api#foobar"}};
+  EXPECT_TRUE(matcher->matches(headers));
+  headers = TestRequestHeaderMapImpl{{":path", "/api/"}};
+  EXPECT_TRUE(matcher->matches(headers));
+  headers = TestRequestHeaderMapImpl{{":path", "/api/new"}};
+  EXPECT_TRUE(matcher->matches(headers));
+  headers = TestRequestHeaderMapImpl{{":path", "/apinew"}};
+  EXPECT_FALSE(matcher->matches(headers));
+}
+
+TEST_F(MatcherTest, TestMatchPathSeparatedPrefixCaseSensitive) {
+  const char config[] = R"(match:
+  path_separated_prefix: "/api"
+  case_sensitive: false)";
+  RequirementRule rule;
+  TestUtility::loadFromYaml(config, rule);
+  MatcherConstPtr matcher = Matcher::create(rule);
+  auto headers = TestRequestHeaderMapImpl{{":path", "/Api"}};
+  EXPECT_TRUE(matcher->matches(headers));
+  headers = TestRequestHeaderMapImpl{{":path", "/Api/"}};
+  EXPECT_TRUE(matcher->matches(headers));
+  headers = TestRequestHeaderMapImpl{{":path", "/Api/new"}};
+  EXPECT_TRUE(matcher->matches(headers));
+  headers = TestRequestHeaderMapImpl{{":path", "/Apinew"}};
+  EXPECT_FALSE(matcher->matches(headers));
+}
+
+TEST_F(MatcherTest, TestMatchPathSeparatedPrefixQueryHeader) {
+  const char config[] = R"(match:
+  path_separated_prefix: "/api"
+  query_parameters:
+  - name: foo
+    string_match:
+      exact: bar
+  headers:
+  - name: cookies)";
+  RequirementRule rule;
+  TestUtility::loadFromYaml(config, rule);
+  MatcherConstPtr matcher = Matcher::create(rule);
+  auto headers = TestRequestHeaderMapImpl{{":path", "/api?foo=bar"}, {"cookies", ""}};
+  EXPECT_TRUE(matcher->matches(headers));
+  headers = TestRequestHeaderMapImpl{{":path", "/api?foo=bar"}, {"pizza", ""}};
+  EXPECT_FALSE(matcher->matches(headers));
+  headers = TestRequestHeaderMapImpl{{":path", "/api"}, {"cookies", ""}};
+  EXPECT_FALSE(matcher->matches(headers));
+}
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters

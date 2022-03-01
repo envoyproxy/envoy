@@ -6,6 +6,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/regex.h"
+#include "source/common/http/path_utility.h"
 #include "source/common/router/config_impl.h"
 
 #include "absl/strings/match.h"
@@ -162,11 +163,7 @@ public:
     if (!BaseMatcherImpl::matchRoute(headers)) {
       return false;
     }
-    absl::string_view path = headers.getPathValue();
-    const size_t path_end = path.find('?');
-    if (path_end != absl::string_view::npos) {
-      path = path.substr(0, path_end);
-    }
+    absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
     if (path.size() > prefix_.size() && path_matcher_->match(path) && path[prefix_.size()] == '/') {
       ENVOY_LOG(debug, "Path-separated prefix requirement '{}' matched.", prefix_);
       return true;

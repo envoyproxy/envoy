@@ -7623,11 +7623,20 @@ virtual_hosts:
                 ->routeEntry()
                 ->clusterName());
   EXPECT_EQ("path-separated-cluster",
+            config.route(genHeaders("path.prefix.com", "/rest/api#fragment", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+
+  EXPECT_EQ("path-separated-cluster",
             config.route(genHeaders("path.prefix.com", "/rest/api/", "GET"), 0)
                 ->routeEntry()
                 ->clusterName());
   EXPECT_EQ("path-separated-cluster",
             config.route(genHeaders("path.prefix.com", "/rest/api/thing?param=true", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("path-separated-cluster",
+            config.route(genHeaders("path.prefix.com", "/rest/api/thing#fragment", "GET"), 0)
                 ->routeEntry()
                 ->clusterName());
 
@@ -7657,15 +7666,27 @@ virtual_hosts:
                 ->routeEntry()
                 ->clusterName());
 
-  { // Prefix rewrite
+  { // Prefix rewrite exact match
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
     Http::TestRequestHeaderMapImpl headers =
-        genHeaders("path.prefix.com", "/rewrite?param=true", "GET");
+        genHeaders("path.prefix.com", "/rewrite?param=true#fragment", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    EXPECT_EQ("/new/api?param=true", route->currentUrlPathAfterRewrite(headers));
+    EXPECT_EQ("/new/api?param=true#fragment", route->currentUrlPathAfterRewrite(headers));
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("rewrite-cluster", route->clusterName());
-    EXPECT_EQ("/new/api?param=true", headers.get_(Http::Headers::get().Path));
+    EXPECT_EQ("/new/api?param=true#fragment", headers.get_(Http::Headers::get().Path));
+    EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+  }
+
+  { // Prefix rewrite long match
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("path.prefix.com", "/rewrite/this?param=true#fragment", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("/new/api/this?param=true#fragment", route->currentUrlPathAfterRewrite(headers));
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("rewrite-cluster", route->clusterName());
+    EXPECT_EQ("/new/api/this?param=true#fragment", headers.get_(Http::Headers::get().Path));
     EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
   }
 }
@@ -7696,6 +7717,23 @@ virtual_hosts:
     routes:
       - match:
           path_separated_prefix: "/rest/api?query=1"
+        route: { cluster: some-cluster }
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
+}
+
+TEST_F(RouteMatcherTest, PathSeparatedPrefixMatchFragment) {
+
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_prefix
+    domains: ["*"]
+    routes:
+      - match:
+          path_separated_prefix: "/rest/api#fragment"
         route: { cluster: some-cluster }
   )EOF";
 
