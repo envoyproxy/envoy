@@ -220,8 +220,8 @@ AdminHandler::AttachedRequestBuffered::AttachedRequestBuffered(
     : AttachedRequest(admin_handler, tap_request, admin_stream) {
   auto sink = tap_request.tap_config().output_config().sinks()[0];
 
-  uint max_buffered_traces = sink.buffered_admin().max_traces();
-  uint timeout = PROTOBUF_GET_MS_OR_DEFAULT(sink.buffered_admin(), timeout, 0);
+  uint64_t max_buffered_traces = sink.buffered_admin().max_traces();
+  uint64_t timeout = PROTOBUF_GET_MS_OR_DEFAULT(sink.buffered_admin(), timeout, 0);
   trace_buffer_ = std::make_unique<TraceBuffer>(max_buffered_traces);
   // Start the countdown if provided an actual timeout
   if (timeout > 0) {

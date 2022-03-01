@@ -82,7 +82,7 @@ private:
     absl::optional<std::vector<TraceWrapper>> buffer_;
 
   public:
-    TraceBuffer(uint max_buf_size)
+    TraceBuffer(uint64_t max_buf_size)
         : max_buf_size_(max_buf_size), buffer_(std::vector<TraceWrapper>()) {
       buffer_->reserve(max_buf_size);
     }
