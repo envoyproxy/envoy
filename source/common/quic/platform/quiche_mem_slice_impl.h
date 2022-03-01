@@ -26,7 +26,7 @@ public:
   ~QuicheMemSliceImpl();
 
   // Constructs a QuicheMemSliceImpl by taking ownership of the memory in |buffer|.
-  QuicheMemSliceImpl(quic::QuicUniqueBufferPtr buffer, size_t length);
+  QuicheMemSliceImpl(quic::QuicBuffer buffer);
   QuicheMemSliceImpl(std::unique_ptr<char[]> buffer, size_t length);
 
   // Constructs a QuicheMemSliceImpl from a Buffer::Instance with first |length| bytes in it.
