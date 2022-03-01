@@ -20,7 +20,6 @@ void TestListener::OnTestEnd(const ::testing::TestInfo& test_info) {
                    absl::StrCat("MainThreadLeak: [", test_info.test_suite_name(), ".",
                                 test_info.name(), "] test exited before main thread shut down"));
   }
-  Runtime::RuntimeFeaturesDefaults::get().restoreDefaults();
 }
 
 } // namespace Envoy

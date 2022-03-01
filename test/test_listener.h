@@ -1,5 +1,6 @@
 #pragma once
 
+#include "absl/flags/reflection.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -25,6 +26,8 @@ public:
   void OnTestEnd(const ::testing::TestInfo& test_info) override;
 
 private:
+  // Make sure runtime guards are restored to defaults on test completion.
+  absl::FlagSaver saver_;
   bool validate_singletons_;
 };
 

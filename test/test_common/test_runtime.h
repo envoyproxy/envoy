@@ -31,6 +31,7 @@ namespace Envoy {
 class TestScopedRuntime {
 public:
   TestScopedRuntime() : api_(Api::createApiForTest()) {
+    std::cerr << "Creating\n";
     envoy::config::bootstrap::v3::LayeredRuntime config;
     // The existence of an admin layer is required for mergeValues() to work.
     config.add_layers()->mutable_admin_layer();
@@ -42,12 +43,8 @@ public:
 
   Runtime::Loader& loader() { return *Runtime::LoaderSingleton::getExisting(); }
 
-  ~TestScopedRuntime() {
-    Runtime::RuntimeFeatures features;
-    features.restoreDefaults();
-  }
-
 protected:
+  absl::FlagSaver saver_;
   Event::MockDispatcher dispatcher_;
   testing::NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::TestUtil::TestStore store_;

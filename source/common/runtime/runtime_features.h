@@ -8,6 +8,7 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/flags/flag.h"
+#include "absl/flags/reflection.h"
 
 namespace Envoy {
 namespace Runtime {
@@ -26,22 +27,11 @@ class RuntimeFeatures {
 public:
   RuntimeFeatures();
 
-  absl::Flag<bool>* getFlag(absl::string_view feature) const {
-    auto it = all_features_.find(feature);
-    if (it == all_features_.end()) {
-      return nullptr;
-    }
-    return it->second;
-  }
-
   void restoreDefaults() const;
 
 private:
   friend class RuntimeFeaturesPeer;
-
-  absl::flat_hash_map<std::string, absl::Flag<bool>*> enabled_features_;
-  absl::flat_hash_map<std::string, absl::Flag<bool>*> disabled_features_;
-  absl::flat_hash_map<std::string, absl::Flag<bool>*> all_features_;
+  mutable std::unique_ptr<absl::FlagSaver> saver_;
 };
 
 using RuntimeFeaturesDefaults = ConstSingleton<RuntimeFeatures>;
