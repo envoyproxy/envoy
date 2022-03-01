@@ -72,7 +72,7 @@ An example POST body:
 
   config_id: test_config_id
   tap_config:
-    match_config:
+    match:
       and_match:
         rules:
           - http_request_headers_match:
@@ -99,7 +99,7 @@ Another example POST body:
 
   config_id: test_config_id
   tap_config:
-    match_config:
+    match:
       or_match:
         rules:
           - http_request_headers_match:
@@ -126,7 +126,7 @@ Another example POST body:
 
   config_id: test_config_id
   tap_config:
-    match_config:
+    match:
       any_match: true
     output_config:
       sinks:
@@ -141,7 +141,7 @@ Another example POST body:
 
   config_id: test_config_id
   tap_config:
-    match_config:
+    match:
       and_match:
         rules:
           - http_request_headers_match:
@@ -192,7 +192,7 @@ An example of a streaming admin tap configuration that uses the :ref:`JSON_BODY_
 
   config_id: test_config_id
   tap_config:
-    match_config:
+    match:
       any_match: true
     output_config:
       sinks:
@@ -243,7 +243,7 @@ An static filter configuration to enable streaming output looks like:
     "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
     common_config:
       static_config:
-        match_config:
+        match:
           http_response_headers_match:
             headers:
               - name: bar
