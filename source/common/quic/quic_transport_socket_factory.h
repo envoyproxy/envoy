@@ -61,8 +61,10 @@ protected:
 // differentiate server and client side context config.
 class QuicServerTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
-  QuicServerTransportSocketFactory(Stats::Scope& store, Ssl::ServerContextConfigPtr config)
-      : QuicTransportSocketFactoryBase(store, "server"), config_(std::move(config)) {}
+  QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
+                                   Ssl::ServerContextConfigPtr config)
+      : QuicTransportSocketFactoryBase(store, "server"), config_(std::move(config)),
+        enable_early_data_(enable_early_data) {}
 
   void initialize() override {
     config_->setSecretUpdateCallback([this]() {
@@ -82,11 +84,14 @@ public:
     return config_->tlsCertificates();
   }
 
+  bool earlyDataEnabled() const { return enable_early_data_; }
+
 protected:
   void onSecretUpdated() override { stats_.context_config_update_by_sds_.inc(); }
 
 private:
   Ssl::ServerContextConfigPtr config_;
+  bool enable_early_data_;
 };
 
 class QuicClientTransportSocketFactory : public QuicTransportSocketFactoryBase {

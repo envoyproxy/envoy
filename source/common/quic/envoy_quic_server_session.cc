@@ -180,5 +180,15 @@ void EnvoyQuicServerSession::storeConnectionMapPosition(FilterChainToConnectionM
   position_.emplace(connection_map, filter_chain, position);
 }
 
+quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() {
+  quic::QuicSSLConfig config = quic::QuicServerSessionBase::GetSSLConfig();
+  config.early_data_enabled = position_.has_value()
+                                  ? static_cast<QuicServerTransportSocketFactory&>(
+                                        position_->filter_chain_.transportSocketFactory())
+                                        .earlyDataEnabled()
+                                  : true;
+  return config;
+}
+
 } // namespace Quic
 } // namespace Envoy
