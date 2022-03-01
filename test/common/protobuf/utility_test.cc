@@ -56,7 +56,29 @@ bool checkProtoEquality(const ProtobufWkt::Value& proto1, std::string text_proto
   return Envoy::Protobuf::util::MessageDifferencer::Equals(proto1, proto2);
 }
 
-class ProtobufUtilityTest : public testing::Test, public TestScopedRuntime {};
+class RuntimeStatsHelper : public TestScopedRuntime {
+public:
+  explicit RuntimeStatsHelper()
+      : runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")),
+        deprecated_feature_seen_since_process_start_(
+            store_.gauge("runtime.deprecated_feature_seen_since_process_start",
+                         Stats::Gauge::ImportMode::NeverImport)) {
+
+    auto visitor = static_cast<ProtobufMessage::StrictValidationVisitorImpl*>(
+        &ProtobufMessage::getStrictValidationVisitor());
+    visitor->setRuntime(loader());
+  }
+  ~RuntimeStatsHelper() {
+    auto visitor = static_cast<ProtobufMessage::StrictValidationVisitorImpl*>(
+        &ProtobufMessage::getStrictValidationVisitor());
+    visitor->clearRuntime();
+  }
+
+  Stats::Counter& runtime_deprecated_feature_use_;
+  Stats::Gauge& deprecated_feature_seen_since_process_start_;
+};
+
+class ProtobufUtilityTest : public testing::Test, protected RuntimeStatsHelper {};
 
 TEST_F(ProtobufUtilityTest, ConvertPercentNaNDouble) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
@@ -1662,7 +1684,7 @@ TEST_F(ProtobufUtilityTest, MessageWip) {
   EXPECT_EQ(2, wip_counter.value());
 }
 
-class DeprecatedFieldsTest : public testing::Test, protected TestScopedRuntime {
+class DeprecatedFieldsTest : public testing::Test, protected RuntimeStatsHelper {
 protected:
   void checkForDeprecation(const Protobuf::Message& message) {
     MessageUtil::checkForUnexpectedFields(message, ProtobufMessage::getStrictValidationVisitor());
@@ -1683,6 +1705,8 @@ TEST_F(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
   base.set_not_deprecated("foo");
   // Fatal checks for a non-deprecated field should cause no problem.
   checkForDeprecation(base);
+  EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(0, deprecated_feature_seen_since_process_start_.value());
 }
 
 TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecatedEmitsError)) {
@@ -1692,6 +1716,8 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecatedEm
   EXPECT_LOG_CONTAINS("warning",
                       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
                       checkForDeprecation(base));
+  EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
 }
 
 TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecatedEmitsCrash) {
@@ -1705,6 +1731,8 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecatedEmitsCrash) {
   EXPECT_THROW_WITH_REGEX(
       checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'");
+  EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(0, deprecated_feature_seen_since_process_start_.value());
 }
 
 // Use of a deprecated and disallowed field should result in an exception.
