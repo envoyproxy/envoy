@@ -298,7 +298,10 @@ void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
       {"grpc-status", std::to_string(static_cast<uint32_t>(status))}});
 }
 
-class TestHttp1ServerConnectionImpl : public Http::Http1::ServerConnectionImpl {};
+class TestHttp1ServerConnectionImpl : public Http::Http1::ServerConnectionImpl {
+public:
+  using Http::Http1::ServerConnectionImpl::ServerConnectionImpl;
+};
 
 class TestHttp2ServerConnectionImpl : public Http::Http2::ServerConnectionImpl {
 public:
