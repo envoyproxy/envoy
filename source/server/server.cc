@@ -93,7 +93,7 @@ InstanceImpl::InstanceImpl(
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      stats_flush_in_progress_(false) {
+      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
   TRY_ASSERT_MAIN_THREAD {
     if (!options.logPath().empty()) {
       TRY_ASSERT_MAIN_THREAD {
@@ -525,12 +525,11 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
   if (parent_admin_shutdown_response.has_value()) {
     original_start_time_ = parent_admin_shutdown_response.value().original_start_time_;
-    enable_reuse_port_default_ = parent_admin_shutdown_response.value().enable_reuse_port_default_
-                                     ? ReusePortDefault::True
-                                     : ReusePortDefault::False;
-  } else {
-    // This is needed so that we don't read the value until runtime is fully initialized.
-    enable_reuse_port_default_ = ReusePortDefault::Runtime;
+    // TODO(soulxu): This is added for switching the reuse port default value as true (#17259).
+    // It ensures the same default value during the hot restart. This can be removed when
+    // everyone switches to the new default value.
+    enable_reuse_port_default_ =
+        parent_admin_shutdown_response.value().enable_reuse_port_default_ ? true : false;
   }
   admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this,
                                        initial_config.admin().ignoreGlobalConnLimit());
@@ -623,6 +622,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
   initial_config.initAdminAccessLog(bootstrap_, *this);
+  validation_context_.setRuntime(runtime());
 
   if (initial_config.admin().address()) {
     admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
@@ -1002,20 +1002,7 @@ ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
   return config_dump;
 }
 
-bool InstanceImpl::enableReusePortDefault() {
-  ASSERT(enable_reuse_port_default_.has_value());
-  switch (enable_reuse_port_default_.value()) {
-  case ReusePortDefault::True:
-    return true;
-  case ReusePortDefault::False:
-    return false;
-  case ReusePortDefault::Runtime:
-    return Runtime::runtimeFeatureEnabled(
-        "envoy.reloadable_features.listener_reuse_port_default_enabled");
-  }
-
-  return false; // for gcc
-}
+bool InstanceImpl::enableReusePortDefault() { return enable_reuse_port_default_; }
 
 } // namespace Server
 } // namespace Envoy

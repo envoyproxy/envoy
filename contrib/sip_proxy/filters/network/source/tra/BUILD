@@ -43,11 +43,3 @@ envoy_cc_library(
         "//source/common/stats:symbol_table_lib",
     ],
 )
-
-envoy_cc_library(
-    name = "stat_names_lib",
-    hdrs = ["stat_names.h"],
-    deps = [
-        "//source/common/stats:symbol_table_lib",
-    ],
-)

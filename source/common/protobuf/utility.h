@@ -271,14 +271,11 @@ public:
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
    * @param message message to validate.
-   * @param loader optional a pointer to the runtime loader for live deprecation status.
    * @throw ProtoValidationException if deprecated fields are used and listed
    *    in disallowed_features in runtime_features.h
    */
-  static void
-  checkForUnexpectedFields(const Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor,
-                           Runtime::Loader* loader = Runtime::LoaderSingleton::getExisting());
+  static void checkForUnexpectedFields(const Protobuf::Message& message,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor);
 
   /**
    * Validate protoc-gen-validate constraints on a given protobuf.
