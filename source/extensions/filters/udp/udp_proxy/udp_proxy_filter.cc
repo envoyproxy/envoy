@@ -89,6 +89,11 @@ UdpProxyFilter::ClusterInfo::~ClusterInfo() {
     removeSession(sessions_.begin()->get());
   }
   ASSERT(host_to_sessions_.empty());
+
+  auto stats = std::make_shared<UdpSessionStats>();
+  for (const auto& access_log : filter_.config_->accessLogs()) {
+    access_log->log(stats);
+  }
 }
 
 void UdpProxyFilter::ClusterInfo::removeSession(const ActiveSession* session) {

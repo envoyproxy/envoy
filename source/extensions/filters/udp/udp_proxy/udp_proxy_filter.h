@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
@@ -62,41 +63,15 @@ struct UdpProxyUpstreamStats {
   ALL_UDP_PROXY_UPSTREAM_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-/**
- * Struct definition for UDP Session access logging.
- */
-struct UdpSessionStats {
-  SystemTime start_time;
-  uint64_t downstream_sess_rx_bytes;
-  uint64_t downstream_sess_rx_errors;
-  uint64_t downstream_sess_rx_datagrams;
-  uint64_t downstream_sess_tx_bytes;
-  uint64_t downstream_sess_tx_errors;
-  uint64_t downstream_sess_tx_datagrams;
-  uint64_t downstream_sess_total;
-  uint64_t idle_timeout;
-
-  uint64_t upstream_sess_rx_bytes;
-  uint64_t upstream_sess_rx_errors;
-  uint64_t upstream_sess_rx_datagrams;
-  uint64_t upstream_sess_tx_bytes;
-  uint64_t upstream_sess_tx_errors;
-  uint64_t upstream_sess_tx_datagrams;
-  uint64_t upstream_overflow;
-  uint64_t upstream_none_healthy;
-  uint64_t upstream_datagrams_dropped;
-};
-
 class UdpProxyFilterConfig {
 public:
-  UdpProxyFilterConfig(Upstream::ClusterManager& cluster_manager, TimeSource& time_source,
-                       Stats::Scope& root_scope,
+  UdpProxyFilterConfig(Server::Configuration::ListenerFactoryContext& context,
                        const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config)
-      : cluster_manager_(cluster_manager), time_source_(time_source), cluster_(config.cluster()),
+      : cluster_manager_(context.clusterManager()), time_source_(context.timeSource()), cluster_(config.cluster()),
         session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
         use_original_src_ip_(config.use_original_src_ip()),
         use_per_packet_load_balancing_(config.use_per_packet_load_balancing()),
-        stats_(generateStats(config.stat_prefix(), root_scope)),
+        stats_(generateStats(config.stat_prefix(), context.scope())),
         // Default prefer_gro to true for upstream client traffic.
         upstream_socket_config_(config.upstream_socket_config(), true) {
     if (use_original_src_ip_ && !Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
@@ -104,6 +79,11 @@ public:
           "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
           "is not running with the CAP_NET_ADMIN capability.");
     }
+
+    for (const envoy::config::accesslog::v3::AccessLog& log_config : config.access_log()) {
+      access_logs_.emplace_back(createUdpAccessLogInstance(log_config, context));
+    }
+
     if (!config.hash_policies().empty()) {
       hash_policy_ = std::make_unique<HashPolicyImpl>(config.hash_policies());
     }
@@ -120,6 +100,7 @@ public:
   const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const {
     return upstream_socket_config_;
   }
+  const std::vector<UdpInstanceSharedPtr>& accessLogs() { return access_logs_; }
 
 private:
   static UdpProxyDownstreamStats generateStats(const std::string& stat_prefix,
@@ -138,6 +119,7 @@ private:
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   mutable UdpProxyDownstreamStats stats_;
   const Network::ResolvedUdpSocketConfig upstream_socket_config_;
+  std::vector<UdpInstanceSharedPtr> access_logs_;
 };
 
 using UdpProxyFilterConfigSharedPtr = std::shared_ptr<const UdpProxyFilterConfig>;

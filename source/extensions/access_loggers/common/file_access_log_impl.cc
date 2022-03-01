@@ -20,15 +20,6 @@ void FileAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
                                       stream_info, absl::string_view()));
 }
 
-UdpFileAccessLog::UdpFileAccessLog(const Filesystem::FilePathAndType& access_log_file_info,
-                                   Formatter::FormatterPtr&& formatter,
-                                   AccessLog::AccessLogManager& log_manager)
-    : formatter_(std::move(formatter)) {
-  log_file_ = log_manager.createAccessLog(access_log_file_info);
-}
-
-void UdpFileAccessLog::emitLog(const UdpSessionStats& udp_stats) { (void)udp_stats; }
-
 } // namespace File
 } // namespace AccessLoggers
 } // namespace Extensions
