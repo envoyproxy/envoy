@@ -544,7 +544,6 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
   case Network::ConnectionEvent::ConnectedZeroRtt: {
     ASSERT(client.state() == ActiveClient::State::CONNECTING);
     host()->cluster().stats().upstream_cx_connect_with_0_rtt_.inc();
-    client.allows_early_data_ = true;
     break;
   }
   }
