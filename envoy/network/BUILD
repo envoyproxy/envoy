@@ -11,9 +11,6 @@ envoy_package()
 envoy_cc_library(
     name = "address_interface",
     hdrs = ["address.h"],
-    deps = [
-        "//source/common/common:statusor_lib",
-    ],
 )
 
 envoy_cc_library(

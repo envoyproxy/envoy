@@ -237,13 +237,15 @@ std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress() const {
   ASSERT(str == ptr);
   return ptr;
 }
-StatusOr<InstanceConstSharedPtr> Ipv6Instance::Ipv6Helper::v4CompatibleAddress() const {
+
+InstanceConstSharedPtr Ipv6Instance::Ipv6Helper::v4CompatibleAddress() const {
   if (!v6only_ && IN6_IS_ADDR_V4MAPPED(&address_.sin6_addr)) {
     struct sockaddr_in sin;
     ipv6ToIpv4CompatibleAddress(&address_, &sin);
-    return Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sin);
+    auto addr = Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sin);
+    return addr.ok() ? addr.value() : nullptr;
   }
-  return absl::InvalidArgumentError("It isn't Ipv4-mapped Ipv6 address");
+  return nullptr;
 }
 
 Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only,

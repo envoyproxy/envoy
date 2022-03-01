@@ -10,8 +10,6 @@
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 
-#include "source/common/common/statusor.h"
-
 #include "absl/numeric/int128.h"
 #include "absl/strings/string_view.h"
 
@@ -57,9 +55,10 @@ public:
   virtual bool v6only() const PURE;
 
   /**
-   * @return Ipv4 address from Ipv4-compatible Ipv6 address.
+   * @return Ipv4 address from Ipv4-compatible Ipv6 address. Return `nullptr`
+   * if the Ipv6 address isn't Ipv4 mapped.
    */
-  virtual StatusOr<InstanceConstSharedPtr> v4CompatibleAddress() const PURE;
+  virtual InstanceConstSharedPtr v4CompatibleAddress() const PURE;
 };
 
 enum class IpVersion { v4, v6 }; // NOLINT(readability-identifier-naming)

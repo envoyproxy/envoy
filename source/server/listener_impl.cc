@@ -352,7 +352,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       config.address().socket_address().ipv4_compat() &&
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_check_on_ipv4_compat")) {
     if (address_->ip()->version() != Network::Address::IpVersion::v6 ||
-        !address_->ip()->ipv6()->v4CompatibleAddress().ok()) {
+        address_->ip()->ipv6()->v4CompatibleAddress() == nullptr) {
       throw EnvoyException(
           "Only IPv6 address '::' or valid IPv4-mapped IPv6 addresses can set ipv4_compat");
     }

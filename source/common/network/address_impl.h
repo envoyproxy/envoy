@@ -232,7 +232,7 @@ private:
     absl::uint128 address() const override;
     bool v6only() const override;
     uint32_t port() const;
-    StatusOr<InstanceConstSharedPtr> v4CompatibleAddress() const override;
+    InstanceConstSharedPtr v4CompatibleAddress() const override;
 
     std::string makeFriendlyAddress() const;
 
