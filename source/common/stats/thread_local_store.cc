@@ -150,7 +150,7 @@ ScopeSharedPtr ThreadLocalStoreImpl::createScope(const std::string& name) {
 }
 
 ScopeSharedPtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
-  auto new_scope = std::make_unique<ScopeImpl>(*this, name);
+  auto new_scope = std::make_shared<ScopeImpl>(*this, name);
   Thread::LockGuard lock(lock_);
   scopes_.emplace(new_scope.get());
   return new_scope;
