@@ -173,7 +173,7 @@ On the upstream side all http2 statistics are rooted at *cluster.<name>.http2.*
    keepalive_timeout, Counter, Total number of connections closed due to :ref:`keepalive timeout <envoy_v3_api_field_config.core.v3.KeepaliveSettings.timeout>`
    streams_active, Gauge, Active streams as observed by the codec
    pending_send_bytes, Gauge, Currently buffered body data in bytes waiting to be written when stream/connection window is opened.
-   deferred_stream_close, Gauge, Number of HTTP/2 streams where the stream has been closed, but processing of the stream close has been deferred due to network backup. This is expected to be incremented when a downstream stream is backed up and the corresponding upstream stream has received end stream but we defer processing of the upstream stream close due to downstream backup. This is decremented as we finally delete the stream when either the deferred close stream has its buffered data drained or receives a reset.
+   deferred_stream_close, Gauge, Number of HTTP/2 streams where the stream has been closed but processing of the stream close has been deferred due to network backup. This is expected to be incremented when a downstream stream is backed up and the corresponding upstream stream has received end stream but we defer processing of the upstream stream close due to downstream backup. This is decremented as we finally delete the stream when either the deferred close stream has its buffered data drained or receives a reset.
 .. attention::
 
   The HTTP/2 `streams_active` gauge may be greater than the HTTP connection manager
