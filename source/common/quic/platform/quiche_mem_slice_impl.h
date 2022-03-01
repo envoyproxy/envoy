@@ -14,33 +14,33 @@
 
 #include "quiche/quic/core/quic_buffer_allocator.h"
 
-namespace quic {
+namespace quiche {
 
 // Implements the interface required by
-// https://quiche.googlesource.com/quiche/+/refs/heads/master/quic/platform/api/quic_mem_slice.h
-class QuicMemSliceImpl {
+// https://github.com/google/quiche/blob/main/common/platform/api/quiche_mem_slice.h
+class QuicheMemSliceImpl {
 public:
-  // Constructs an empty QuicMemSliceImpl.
-  QuicMemSliceImpl() = default;
+  // Constructs an empty QuicheMemSliceImpl.
+  QuicheMemSliceImpl() = default;
 
-  ~QuicMemSliceImpl();
+  ~QuicheMemSliceImpl();
 
-  // Constructs a QuicMemSliceImpl by taking ownership of the memory in |buffer|.
-  QuicMemSliceImpl(QuicUniqueBufferPtr buffer, size_t length);
-  QuicMemSliceImpl(std::unique_ptr<char[]> buffer, size_t length);
+  // Constructs a QuicheMemSliceImpl by taking ownership of the memory in |buffer|.
+  QuicheMemSliceImpl(quic::QuicUniqueBufferPtr buffer, size_t length);
+  QuicheMemSliceImpl(std::unique_ptr<char[]> buffer, size_t length);
 
-  // Constructs a QuicMemSliceImpl from a Buffer::Instance with first |length| bytes in it.
+  // Constructs a QuicheMemSliceImpl from a Buffer::Instance with first |length| bytes in it.
   // Data will be moved from |buffer| to this mem slice.
   // Prerequisite: |buffer| has at least |length| bytes of data and not empty.
-  explicit QuicMemSliceImpl(Envoy::Buffer::Instance& buffer, size_t length);
+  explicit QuicheMemSliceImpl(Envoy::Buffer::Instance& buffer, size_t length);
 
-  QuicMemSliceImpl(const QuicMemSliceImpl& other) = delete;
+  QuicheMemSliceImpl(const QuicheMemSliceImpl& other) = delete;
   // Move constructors. |other| will not hold a reference to the data buffer
   // after this call completes.
-  QuicMemSliceImpl(QuicMemSliceImpl&& other) noexcept { *this = std::move(other); }
+  QuicheMemSliceImpl(QuicheMemSliceImpl&& other) noexcept { *this = std::move(other); }
 
-  QuicMemSliceImpl& operator=(const QuicMemSliceImpl& other) = delete;
-  QuicMemSliceImpl& operator=(QuicMemSliceImpl&& other) noexcept {
+  QuicheMemSliceImpl& operator=(const QuicheMemSliceImpl& other) = delete;
+  QuicheMemSliceImpl& operator=(QuicheMemSliceImpl&& other) noexcept {
     if (this != &other) {
       fragment_ = std::move(other.fragment_);
       single_slice_buffer_.move(other.single_slice_buffer_);
@@ -48,7 +48,7 @@ public:
     return *this;
   }
 
-  // Below methods implements interface needed by QuicMemSlice.
+  // Below methods implements interface needed by QuicheMemSlice.
   // NOLINTNEXTLINE(readability-identifier-naming)
   void Reset() {
     single_slice_buffer_.drain(length());
@@ -70,4 +70,4 @@ private:
   Envoy::Buffer::OwnedImpl single_slice_buffer_;
 };
 
-} // namespace quic
+} // namespace quiche
