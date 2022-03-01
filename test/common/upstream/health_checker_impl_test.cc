@@ -4143,7 +4143,7 @@ public:
     auto config = createGrpcHealthCheckConfig();
     config.mutable_grpc_health_check()->set_service_name("service");
     for (const auto& pair : headers_to_add) {
-      auto header_value_option = config.mutable_grpc_health_check()->add_request_headers_to_add();
+      auto header_value_option = config.mutable_grpc_health_check()->add_initial_metadata();
       header_value_option->mutable_append()->set_value(false);
       auto header = header_value_option->mutable_header();
       header->set_key(pair.first);

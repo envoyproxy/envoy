@@ -191,14 +191,7 @@ message HealthCheck {
     // that is sent to the health checked cluster. For more information, including details on header value syntax,
     // see the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
-    repeated HeaderValueOption request_headers_to_add = 3
-        [(validate.rules).repeated = {max_items: 1000}];
-
-    // Specifies a list of keys that should be removed from the metadata of each GRPC call
-    // that is sent to the health checked cluster.
-    repeated string request_headers_to_remove = 4 [(validate.rules).repeated = {
-      items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
-    }];
+    repeated HeaderValueOption initial_metadata = 3 [(validate.rules).repeated = {max_items: 1000}];
   }
 
   // Custom health check.
