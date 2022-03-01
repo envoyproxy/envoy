@@ -51,6 +51,7 @@ RUNTIME_GUARD(envoy_reloadable_features_support_locality_update_on_eds_cluster_e
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_udp_listener_updates_filter_chain_in_place);
 RUNTIME_GUARD(envoy_reloadable_features_update_expected_rq_timeout_on_retry);
+RUNTIME_GUARD(envoy_reloadable_features_update_grpc_response_error_tag);
 RUNTIME_GUARD(envoy_reloadable_features_use_dns_ttl);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
@@ -165,6 +166,7 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_udp_listener_updates_filter_chain_in_place,
   &FLAGS_envoy_reloadable_features_unified_mux,
   &FLAGS_envoy_reloadable_features_update_expected_rq_timeout_on_retry,
+  &FLAGS_envoy_reloadable_features_update_grpc_response_error_tag,
   &FLAGS_envoy_reloadable_features_use_dns_ttl,
   &FLAGS_envoy_reloadable_features_validate_connect,
   &FLAGS_envoy_restart_features_explicit_wildcard_resource,
