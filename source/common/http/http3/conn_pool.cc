@@ -126,8 +126,6 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
     auto host_address = host()->address();
     source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
   }
-  std::cerr << "========= createQuicNetworkConnection with source address "
-            << (source_address ? source_address->asString() : "") << "\n";
 
   return Quic::createQuicNetworkConnection(quic_info_, std::move(crypto_config), server_id_,
                                            dispatcher(), host()->address(), source_address,
