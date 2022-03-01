@@ -904,14 +904,13 @@ message RouteAction {
     // for additional documentation.
     WeightedCluster weighted_clusters = 3;
 
-    // Name of the cluster provider to use to determine the cluster for
-    // requests on this route. The plugin name must be defined in the associated
-    // :ref:`envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_providers`
-    // in the
-    // :ref:`envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name` field.
+    // Name of the cluster provider to use to determine the cluster for requests on this route.
+    // The cluster provider name must be defined in the associated
+    // :ref:`cluster providers <envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_providers>`
+    // in the :ref:`name <envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name>` field.
     string cluster_provider_name = 37;
 
-    // Custom cluster provider configuration.
+    // Custom cluster provider configuration to use to determine the cluster for requests on this route.
     core.v3.TypedExtensionConfig cluster_provider = 39;
   }
 

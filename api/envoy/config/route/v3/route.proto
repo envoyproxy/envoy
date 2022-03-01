@@ -123,8 +123,8 @@ message RouteConfiguration {
   google.protobuf.UInt32Value max_direct_response_body_size_bytes = 11;
 
   // A list of cluster providers and their configurations which may be used by a
-  // :ref:`envoy_v3_api_field_config.route.v3.RouteAction.cluster_provider_name` within the route.
-  // All *name* fields in this list must be unique.
+  // :ref:`cluster provider name <envoy_v3_api_field_config.route.v3.RouteAction.cluster_provider_name>`
+  // within the route. All *name* fields in this list must be unique.
   repeated core.v3.TypedExtensionConfig cluster_providers = 12;
 }
 
