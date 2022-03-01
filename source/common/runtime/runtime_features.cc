@@ -27,6 +27,7 @@ RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3);
 RUNTIME_GUARD(envoy_reloadable_features_correct_scheme_and_xfp);
 RUNTIME_GUARD(envoy_reloadable_features_correctly_validate_alpn);
+RUNTIME_GUARD(envoy_reloadable_features_deprecate_global_ints);
 RUNTIME_GUARD(envoy_reloadable_features_disable_tls_inspector_injection);
 RUNTIME_GUARD(envoy_reloadable_features_do_not_await_headers_on_upstream_timeout_to_emit_stats);
 RUNTIME_GUARD(envoy_reloadable_features_enable_grpc_async_client_cache);
@@ -142,6 +143,7 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3,
   &FLAGS_envoy_reloadable_features_correct_scheme_and_xfp,
   &FLAGS_envoy_reloadable_features_correctly_validate_alpn,
+  &FLAGS_envoy_reloadable_features_deprecate_global_ints,
   &FLAGS_envoy_reloadable_features_disable_tls_inspector_injection,
   &FLAGS_envoy_reloadable_features_do_not_await_headers_on_upstream_timeout_to_emit_stats,
   &FLAGS_envoy_reloadable_features_enable_grpc_async_client_cache,
@@ -187,17 +189,29 @@ void maybeSetDeprecatedInts(absl::string_view name, uint32_t value) {
     return;
   }
 
+  bool set = false;
   // DO NOT ADD MORE FLAGS HERE. This function deprecated and being removed.
   if (name == "envoy.buffer.overflow_multiplier") {
+    set = true;
     absl::SetFlag(&FLAGS_envoy_buffer_overflow_multiplier, value);
   } else if (name == "envoy.do_not_use_going_away_max_http2_outbound_responses") {
+    set = true;
     absl::SetFlag(&FLAGS_envoy_do_not_use_going_away_max_http2_outbound_response, value);
   } else if (name == "envoy.http.headermap.lazy_map_min_size") {
+    set = true;
     absl::SetFlag(&FLAGS_envoy_headermap_lazy_map_min_size, value);
   } else if (name == "re2.max_program_size.error_level") {
+    set = true;
     absl::SetFlag(&FLAGS_re2_max_program_size_error_level, value);
   } else if (name == "re2.max_program_size.warn_level") {
+    set = true;
     absl::SetFlag(&FLAGS_re2_max_program_size_warn_level, value);
+  }
+  if (set && Runtime::runtimeFeatureEnabled("envoy.reloadable_features.deprecate_global_ints")) {
+    IS_ENVOY_BUG(absl::StrCat(
+        "The Envoy community is attempting to remove global integers. Given you use ", name,
+        " please immediately file an upstream issue to retain the functionality as it will "
+        "otherwise be removed following the usual deprecation cycle."));
   }
 }
 

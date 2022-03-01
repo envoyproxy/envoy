@@ -21,7 +21,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
   // Set the lazy header-map threshold if found.
   if (input.has_config()) {
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.http.headermap.lazy_map_min_size",
+        {{"envoy.reloadable_features.deprecate_global_ints", "false"},
+         {"envoy.http.headermap.lazy_map_min_size",
           absl::StrCat(input.config().lazy_map_min_size())}});
   }
 
