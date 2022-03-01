@@ -408,12 +408,21 @@ void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
   }
   closeIdleConnectionsForDrainingPool();
   if (pending_streams_.empty()) {
+    // The remaining connecting clients are non-idle. And some new clients may have been created,
+    // which are addded to the front of the list.
     while (!connecting_clients_.empty()) {
+      // Check from the back to the front of the list because newly created clients are added to the
+      // front.
+      if (connecting_clients_.back()->numActiveStreams() == 0u) {
+        // This is the first newly created connecting client for new streams, no
+        // need to drain it and the rest connecting clients.
+        break;
+      }
       // These clients are non-idle and EARLY_DATA_READY.
       ENVOY_LOG_EVENT(debug, "draining_non_idle_connecting_client",
                       "draining connecting client {} for cluster {}",
-                      connecting_clients_.front()->id(), host_->cluster().name());
-      transitionActiveClientState(*connecting_clients_.front(), ActiveClient::State::DRAINING);
+                      connecting_clients_.back()->id(), host_->cluster().name());
+      transitionActiveClientState(*connecting_clients_.back(), ActiveClient::State::DRAINING);
     }
   }
 

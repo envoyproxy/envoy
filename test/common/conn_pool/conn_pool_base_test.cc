@@ -143,7 +143,6 @@ public:
     }));
     ON_CALL(pool_, onPoolReady(_, _))
         .WillByDefault(Invoke([](ActiveClient& client, AttachContext&) {
-          std::cerr << "========= onPoolReady\n";
           TestActiveClient::incrementActiveStreams(client);
         }));
   }
@@ -530,7 +529,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, ConnectedZeroRttSendsEarlyData) {
   // The first stream should be attached a client upon 0-RTT connected.
   EXPECT_CALL(pool_, onPoolReady);
   client_ref.onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
-  EXPECT_TRUE(client_ref.allows_early_data_);
+  EXPECT_TRUE(client_ref.readyForStream());
   pool_.onUpstreamReadyForEarlyData(client_ref);
 
   CHECK_STATE(1 /*active*/, 0 /*pending*/, concurrent_streams_ - 1 /*connecting capacity*/);
@@ -547,6 +546,85 @@ TEST_F(ConnPoolImplDispatcherBaseTest, ConnectedZeroRttSendsEarlyData) {
 
   // Clean up.
   closeStreamAndDrainClient();
+}
+
+TEST_F(ConnPoolImplDispatcherBaseTest, EarlyDataStreamsReachConcurrentStreamLimit) {
+  concurrent_streams_ = 2u;
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
+
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  EXPECT_NE(nullptr, pool_.newStreamImpl(context_, /*can_send_early_data=*/true));
+
+  ActiveClient& client_ref = *clients_.back();
+  // The first stream should be attached a client upon 0-RTT connected.
+  EXPECT_CALL(pool_, onPoolReady);
+  client_ref.onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+  EXPECT_TRUE(client_ref.readyForStream());
+  pool_.onUpstreamReadyForEarlyData(client_ref);
+
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, concurrent_streams_ - 1 /*connecting capacity*/);
+  EXPECT_EQ(1, pool_.host()->cluster().stats().upstream_rq_0rtt_.value());
+
+  EXPECT_CALL(pool_, onPoolReady);
+  EXPECT_EQ(nullptr, pool_.newStreamImpl(context_, /*can_send_early_data=*/true));
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, concurrent_streams_ - 2 /*connecting capacity*/);
+  EXPECT_EQ(2, pool_.host()->cluster().stats().upstream_rq_0rtt_.value());
+  EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
+
+  // After 1 stream gets closed, the client should transit to CONNECTING.
+  --clients_.back()->active_streams_;
+  pool_.onStreamClosed(*clients_.back(), false);
+  EXPECT_EQ(ActiveClient::State::CONNECTING, clients_.back()->state());
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, concurrent_streams_ - 1 /*connecting capacity*/);
+
+  // Creating another early data stream should be immediate.
+  EXPECT_CALL(pool_, onPoolReady);
+  EXPECT_EQ(nullptr, pool_.newStreamImpl(context_, /*can_send_early_data=*/true));
+  EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
+
+  // Even after the client gets connected, it should still be BUSY.
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, 0 /*connecting capacity*/);
+
+  // After 1 stream gets closed, the client should transit to READY.
+  --clients_.back()->active_streams_;
+  pool_.onStreamClosed(*clients_.back(), false);
+  EXPECT_EQ(ActiveClient::State::READY, clients_.back()->state());
+
+  // Clean up.
+  closeStreamAndDrainClient();
+}
+
+TEST_F(ConnPoolImplDispatcherBaseTest, PoolDrainsWithEarlyDataStreams) {
+  concurrent_streams_ = 2u;
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(2.1));
+
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(2);
+  EXPECT_NE(nullptr, pool_.newStreamImpl(context_, /*can_send_early_data=*/true));
+
+  EXPECT_EQ(2u, clients_.size());
+  ActiveClient& client_ref = *clients_.back();
+  // The first stream should be attached a client upon 0-RTT connected.
+  EXPECT_CALL(pool_, onPoolReady);
+  client_ref.onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+  EXPECT_TRUE(client_ref.readyForStream());
+  pool_.onUpstreamReadyForEarlyData(client_ref);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 3 /*connecting capacity*/);
+
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  pool_.drainConnectionsImpl(DrainBehavior::DrainExistingConnections);
+  EXPECT_EQ(3u, clients_.size());
+  EXPECT_EQ(ActiveClient::State::DRAINING, client_ref.state());
+  EXPECT_EQ(ActiveClient::State::CLOSED, clients_.front()->state());
+  EXPECT_EQ(ActiveClient::State::CONNECTING, clients_.back()->state());
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 2 /*connecting capacity*/);
+
+  // Clean up.
+  pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
+  EXPECT_EQ(ActiveClient::State::CLOSED, clients_.back()->state());
+  clients_.pop_back();
+  closeStream();
 }
 
 } // namespace ConnectionPool
