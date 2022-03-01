@@ -43,6 +43,7 @@ envoy_cc_library(
         ":tls_context_match_criteria_lib",
         "//envoy/config:typed_metadata_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/router:cluster_provider_interface",
         "//envoy/router:router_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/server:filter_config_interface",  # TODO(rodaine): break dependency on server

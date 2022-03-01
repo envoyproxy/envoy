@@ -583,6 +583,17 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               "not be stripped: {}",
               path_redirect_);
   }
+
+  if (route.route().has_cluster_provider_name()) {
+    cluster_provider_ =
+        vhost_.globalRouteConfig().clusterProvider(route.route().cluster_provider_name());
+  } else if (route.route().has_cluster_provider()) {
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<ClusterProviderFactoryConfig>(
+        route.route().cluster_provider());
+    auto config = Envoy::Config::Utility::translateToFactoryConfig(route.route().cluster_provider(),
+                                                                   validator, factory);
+    cluster_provider_ = factory.createClusterProvider(*config, factory_context);
+  }
 }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
@@ -1088,16 +1099,20 @@ RouteEntryImplBase::pickClusterViaClusterHeader(const Http::LowerCaseString& clu
   return std::make_shared<DynamicRouteEntry>(this, final_cluster_name);
 }
 
-RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& headers,
+RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMap& headers,
                                                      uint64_t random_value) const {
   // Gets the route object chosen from the list of weighted clusters
   // (if there is one) or returns self.
   if (weighted_clusters_.empty()) {
     if (!cluster_name_.empty() || isDirectResponse()) {
       return shared_from_this();
-    } else {
-      ASSERT(!cluster_header_name_.get().empty());
+    } else if (!cluster_header_name_.get().empty()) {
       return pickClusterViaClusterHeader(cluster_header_name_, headers);
+    } else {
+      // TODO(wbpcode): make the cluster header or weighted clusters an implementation of the
+      // cluster provider.
+      ASSERT(cluster_provider_ != nullptr);
+      return cluster_provider_->route(*this, headers);
     }
   }
   return pickWeightedCluster(headers, random_value, true);
@@ -1739,6 +1754,15 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
       HeaderParser::configure(config.request_headers_to_add(), config.request_headers_to_remove());
   response_headers_parser_ = HeaderParser::configure(config.response_headers_to_add(),
                                                      config.response_headers_to_remove());
+
+  for (const auto& cluster_provider_proto : config.cluster_providers()) {
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<ClusterProviderFactoryConfig>(
+        cluster_provider_proto);
+    auto config = Envoy::Config::Utility::translateToFactoryConfig(cluster_provider_proto,
+                                                                   validator, factory);
+    cluster_providers_.emplace(cluster_provider_proto.name(),
+                               factory.createClusterProvider(*config, factory_context));
+  }
 }
 
 RouteConstSharedPtr ConfigImpl::route(const RouteCallback& cb,
@@ -1746,6 +1770,15 @@ RouteConstSharedPtr ConfigImpl::route(const RouteCallback& cb,
                                       const StreamInfo::StreamInfo& stream_info,
                                       uint64_t random_value) const {
   return route_matcher_->route(cb, headers, stream_info, random_value);
+}
+
+ClusterProviderSharedPtr ConfigImpl::clusterProvider(absl::string_view provider) const {
+  auto iter = cluster_providers_.find(provider);
+  if (iter == cluster_providers_.end()) {
+    throw EnvoyException(
+        fmt::format("Unknown cluster provider name: {} is used in the route", provider));
+  }
+  return iter->second;
 }
 
 RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFilterConfig(
