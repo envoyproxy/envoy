@@ -12,7 +12,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/config/opaque_resource_decoder_impl.h"
-#include "source/common/rds/basic/route_config_provider_manager_impl.h"
+#include "source/common/rds/common/route_config_provider_manager_impl.h"
 #include "source/common/rds/rds_route_config_provider_impl.h"
 #include "source/common/rds/rds_route_config_subscription.h"
 #include "source/common/rds/route_config_provider_manager.h"
@@ -79,8 +79,8 @@ public:
         ->route(path);
   }
 
-  Basic::ProtoTraitsImpl<envoy::config::route::v3::RouteConfiguration, 1> proto_traits_;
-  Basic::ConfigTraitsImpl<envoy::config::route::v3::RouteConfiguration, TestConfig, TestConfig>
+  Common::ProtoTraitsImpl<envoy::config::route::v3::RouteConfiguration, 1> proto_traits_;
+  Common::ConfigTraitsImpl<envoy::config::route::v3::RouteConfiguration, TestConfig, TestConfig>
       config_traits_;
   RouteConfigUpdatePtr config_update_;
 };
@@ -178,9 +178,9 @@ virtual_hosts: null
   }
 
   NiceMock<Init::MockManager> outer_init_manager_;
-  Basic::RouteConfigProviderManagerImpl<envoy::extensions::filters::network::thrift_proxy::v3::Trds,
-                                        envoy::config::route::v3::RouteConfiguration, 1, TestConfig,
-                                        TestConfig>
+  Common::RouteConfigProviderManagerImpl<
+      envoy::extensions::filters::network::thrift_proxy::v3::Trds,
+      envoy::config::route::v3::RouteConfiguration, 1, TestConfig, TestConfig>
       manager_;
 };
 

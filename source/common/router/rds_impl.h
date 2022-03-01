@@ -31,7 +31,7 @@
 #include "source/common/init/target_impl.h"
 #include "source/common/init/watcher_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/rds/basic/proto_traits_impl.h"
+#include "source/common/rds/common/proto_traits_impl.h"
 #include "source/common/rds/rds_route_config_provider_impl.h"
 #include "source/common/rds/rds_route_config_subscription.h"
 #include "source/common/rds/route_config_provider_manager.h"
@@ -174,7 +174,7 @@ private:
 using RdsRouteConfigProviderImplSharedPtr = std::shared_ptr<RdsRouteConfigProviderImpl>;
 
 using ProtoTraitsImpl =
-    Rds::Basic::ProtoTraitsImpl<envoy::config::route::v3::RouteConfiguration, 1>;
+    Rds::Common::ProtoTraitsImpl<envoy::config::route::v3::RouteConfiguration, 1>;
 
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
                                        public Singleton::Instance {

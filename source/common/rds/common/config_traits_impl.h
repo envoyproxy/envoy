@@ -6,7 +6,7 @@
 
 namespace Envoy {
 namespace Rds {
-namespace Basic {
+namespace Common {
 
 /**
  * Basic implementation of ConfigTraits interface. It can be used in simple protocols where no
@@ -25,6 +25,6 @@ public:
   }
 };
 
-} // namespace Basic
+} // namespace Common
 } // namespace Rds
 } // namespace Envoy

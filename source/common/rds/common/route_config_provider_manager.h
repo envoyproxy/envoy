@@ -8,7 +8,7 @@
 
 namespace Envoy {
 namespace Rds {
-namespace Basic {
+namespace Common {
 
 /**
  * The RouteConfigProviderManager exposes the ability to get a RouteConfigProvider. This interface
@@ -48,6 +48,6 @@ public:
       Server::Configuration::ServerFactoryContext& factory_context) PURE;
 };
 
-} // namespace Basic
+} // namespace Common
 } // namespace Rds
 } // namespace Envoy

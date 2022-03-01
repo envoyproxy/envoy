@@ -6,9 +6,9 @@
 
 #include "source/common/config/opaque_resource_decoder_impl.h"
 #include "source/common/config/resource_name.h"
-#include "source/common/rds/basic/config_traits_impl.h"
-#include "source/common/rds/basic/proto_traits_impl.h"
-#include "source/common/rds/basic/route_config_provider_manager.h"
+#include "source/common/rds/common/config_traits_impl.h"
+#include "source/common/rds/common/proto_traits_impl.h"
+#include "source/common/rds/common/route_config_provider_manager.h"
 #include "source/common/rds/rds_route_config_provider_impl.h"
 #include "source/common/rds/rds_route_config_subscription.h"
 #include "source/common/rds/route_config_provider_manager.h"
@@ -19,7 +19,7 @@
 
 namespace Envoy {
 namespace Rds {
-namespace Basic {
+namespace Common {
 
 /**
  * Implementation of RouteConfigProviderManager interface.
@@ -85,6 +85,6 @@ private:
   }
 };
 
-} // namespace Basic
+} // namespace Common
 } // namespace Rds
 } // namespace Envoy

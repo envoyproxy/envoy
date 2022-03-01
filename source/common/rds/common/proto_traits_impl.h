@@ -8,7 +8,7 @@
 
 namespace Envoy {
 namespace Rds {
-namespace Basic {
+namespace Common {
 
 /**
  * Basic implementation of ProtoTraits interface. It can be used in all protocols.
@@ -30,6 +30,6 @@ private:
   const std::string resource_type_;
 };
 
-} // namespace Basic
+} // namespace Common
 } // namespace Rds
 } // namespace Envoy
