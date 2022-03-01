@@ -6,34 +6,27 @@ namespace UdpFilters {
 namespace UdpProxy {
 
 UdpFileAccessLog::UdpFileAccessLog(const Filesystem::FilePathAndType& access_log_file_info,
-                                   Formatter::FormatterPtr&& formatter,
-                                   AccessLog::AccessLogManager& log_manager)
-    : formatter_(std::move(formatter)) {
+                                   AccessLog::AccessLogManager& log_manager) {
   log_file_ = log_manager.createAccessLog(access_log_file_info);
 }
 
 void UdpFileAccessLog::log(std::shared_ptr<UdpSessionStats> udp_stats){
-    (void)udp_stats;
+
+  static const std::string log_format =
+      "{{\"time\": \"{}\"}}\n";
+
+  std::string log_line =
+      fmt::format(log_format, AccessLogDateTimeFormatter::fromTime(udp_stats->start_time));
+
+  log_file_->write(log_line);
 }
 
 UdpInstanceSharedPtr createUdpAccessLogInstance(
-    const Protobuf::Message& config,
+    const std::string& config,
     Server::Configuration::CommonFactoryContext& context) {
 
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(config);
-  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      config, context.messageValidationVisitor(), factory);
-      
-  const auto& fal_config = MessageUtil::downcastAndValidate<
-      const envoy::extensions::access_loggers::file::v3::FileAccessLog&>(
-      config, context.messageValidationVisitor());
-  Formatter::FormatterPtr formatter = Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter();
- 
-
-  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, fal_config.path()};
-  return std::make_shared<UdpFileAccessLog>(file_info, std::move(formatter),
-                                         context.accessLogManager());
+  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, config};
+  return std::make_shared<UdpFileAccessLog>(file_info, context.accessLogManager());
 }
 
 } // namespace UdpProxy

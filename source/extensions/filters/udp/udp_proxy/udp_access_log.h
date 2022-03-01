@@ -5,7 +5,6 @@
 #include "envoy/server/filter_config.h"
 #include "source/extensions/access_loggers/common/access_log_base.h"
 
-#include "source/common/formatter/substitution_formatter.h"
 
 
 namespace Envoy {
@@ -44,20 +43,18 @@ struct UdpSessionStats {
  */
 class UdpFileAccessLog {
 public:
-  UdpFileAccessLog(const Filesystem::FilePathAndType& access_log_file_info,
-                  Formatter::FormatterPtr&& formatter, AccessLog::AccessLogManager& log_manager);
+  UdpFileAccessLog(const Filesystem::FilePathAndType& access_log_file_info, AccessLog::AccessLogManager& log_manager);
 
   void log(std::shared_ptr<UdpSessionStats> udp_stats);
 private:
 
   AccessLog::AccessLogFileSharedPtr log_file_;
-  Formatter::FormatterPtr formatter_;
 };
 
 using UdpInstanceSharedPtr = std::shared_ptr<UdpFileAccessLog>;
 
 UdpInstanceSharedPtr createUdpAccessLogInstance(
-    const Protobuf::Message& config,
+    const std::string& config,
     Server::Configuration::CommonFactoryContext& context);
 
 } // namespace UdpProxy

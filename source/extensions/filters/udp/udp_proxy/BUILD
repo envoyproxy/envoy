@@ -26,7 +26,6 @@ envoy_cc_library(
     srcs = ["udp_access_log.cc"],
     hdrs = ["udp_access_log.h"],
     deps = [
-        "//source/common/formatter:substitution_format_string_lib",
         "//source/extensions/access_loggers/common:access_log_base",
         "//envoy/server:filter_config_interface",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
