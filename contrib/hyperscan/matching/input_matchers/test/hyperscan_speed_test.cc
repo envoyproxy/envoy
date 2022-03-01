@@ -21,9 +21,7 @@ const std::vector<std::string>& clusterInputs() {
 }
 
 const std::vector<const char*>& clusterRePatterns() {
-  CONSTRUCT_ON_FIRST_USE(std::vector<const char*>, {
-                                                       "^cluster\\.((.*?)\\.)",
-                                                   });
+  CONSTRUCT_ON_FIRST_USE(std::vector<const char*>, "^cluster\\.((.*?)\\.)");
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
