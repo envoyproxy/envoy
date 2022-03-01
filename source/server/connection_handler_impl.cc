@@ -115,12 +115,11 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         }
       } else {
         auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
-        // Remove this check when runtime flag
-        // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
-        // If this isn't a valid Ipv4-mapped address, then do nothing.
         if (v4_compatible_addr != nullptr) {
           tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr->asStringView(),
                                                         details);
+        } else {
+          IS_ENVOY_BUG("If the Ipv6 address isn't v6only, it supposed to be Ipv4-mapped");
         }
       }
     }
