@@ -45,6 +45,9 @@ jobs:
           ./bazelw test \
             --test_output=all \
             --build_tests_only \
+            --config=remote-ci-macos \
+            --config=remote-ci-local-java8 \
+            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/kotlin/io/...
   javatestsmac:
     name: java_tests_mac
@@ -83,6 +86,7 @@ jobs:
             --test_output=all \
             --build_tests_only \
             --config=remote-ci-macos \
+            --config=remote-ci-local-java8 \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --define=signal_trace=disabled \
             //test/java/...
@@ -127,6 +131,6 @@ jobs:
             --test_output=all \
             --build_tests_only \
             --config=remote-ci-linux-clang \
-            --config=remote-ci-linux-local-java8 \
+            --config=remote-ci-local-java8 \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/kotlin/...

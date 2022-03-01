@@ -119,6 +119,11 @@ build:remote-ci-common --spawn_strategy=remote,sandboxed,local
 # sends a keepalive if we don't receive any messages (server updates every 60s).
 build:remote-ci-common --grpc_keepalive_time=61s
 #############################################################################
+# remote-ci-local-java8: Use a local Java 8 (JDK)
+#############################################################################
+build:remote-ci-local-java8 --java_runtime_version=local_jdk
+build:remote-ci-local-java8 --java_language_version=8
+#############################################################################
 # remote-ci-linux: These options are linux-only using GCC by default
 #############################################################################
 # Common Engflow flags
@@ -174,13 +179,6 @@ build:remote-ci-linux-tsan --extra_toolchains=//third_party/rbe_configs/config:c
 build:remote-ci-linux-tsan --host_platform=//third_party/rbe_configs/config:platform
 build:remote-ci-linux-tsan --platforms=//third_party/rbe_configs/config:platform
 build:remote-ci-linux-tsan --config=remote-ci-common
-#############################################################################
-# remote-ci-linux-local-java8: These options are linux-only using a local Java 8 (JDK)
-#############################################################################
-build:remote-ci-linux-local-java8 --extra_toolchains=@local_jdk//:all
-build:remote-ci-linux-local-java8 --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_java8
-build:remote-ci-linux-local-java8 --java_toolchain=@bazel_tools//tools/jdk:toolchain_java8
-build:remote-ci-linux-local-java8 --config=remote-ci-common
 #############################################################################
 # remote-ci-linux-coverage: These options are Linux-only using Clang and LLVM coverage
 #############################################################################
