@@ -99,7 +99,7 @@ private:
 
   static MaglevLoadBalancerStats generateStats(Stats::Scope& scope);
 
-  Stats::ScopeSharedPtr scope_;
+  Stats::ScopePtr scope_;
   MaglevLoadBalancerStats stats_;
   const uint64_t table_size_;
   const bool use_hostname_for_hashing_;

@@ -31,7 +31,7 @@ class OriginalDstCluster : public ClusterImplBase {
 public:
   OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
                      Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                     Stats::ScopeSharedPtr&& stats_scope, bool added_via_api);
+                     Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -135,7 +135,7 @@ private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
       const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopeSharedPtr&& stats_scope) override;
+      Stats::ScopePtr&& stats_scope) override;
 };
 
 } // namespace Upstream
