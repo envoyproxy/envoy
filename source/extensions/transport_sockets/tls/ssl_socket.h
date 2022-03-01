@@ -14,6 +14,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/transport_sockets/tls/context_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
@@ -97,7 +98,7 @@ private:
   SslHandshakerImplSharedPtr info_;
 };
 
-class ClientSslSocketFactory : public Network::TransportSocketFactory,
+class ClientSslSocketFactory : public Network::CommonTransportSocketFactory,
                                public Secret::SecretCallbacks,
                                Logger::Loggable<Logger::Id::config> {
 public:
@@ -109,7 +110,6 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override { return false; }
   bool supportsAlpn() const override { return true; }
 
   // Secret::SecretCallbacks
@@ -128,7 +128,7 @@ private:
   Envoy::Ssl::ClientContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
 };
 
-class ServerSslSocketFactory : public Network::TransportSocketFactory,
+class ServerSslSocketFactory : public Network::CommonTransportSocketFactory,
                                public Secret::SecretCallbacks,
                                Logger::Loggable<Logger::Id::config> {
 public:
@@ -141,7 +141,6 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override { return false; }
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
