@@ -193,9 +193,10 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseDataBadResponderIdVariantTest) {
   std::vector<uint8_t> data = {
       // SEQUENCE
       0x30,
-      6,
+      7,
       // version
-      0,
+      0xa0,
+      0x02,
       1,
       0,
       // Invalid Responder ID tag 3
