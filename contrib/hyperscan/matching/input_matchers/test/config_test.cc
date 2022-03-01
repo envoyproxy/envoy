@@ -12,22 +12,28 @@ namespace Matching {
 namespace InputMatchers {
 namespace Hyperscan {
 
-static const std::string yaml_string = R"EOF(
+const std::string& yamlString() {
+  CONSTRUCT_ON_FIRST_USE(std::string, R"EOF(
 name: hyperscan
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan
   regexes:{}
-)EOF";
+)EOF");
+}
 
-static const std::string regex_string = R"EOF(
+const std::string& regexString() {
+  CONSTRUCT_ON_FIRST_USE(std::string, R"EOF(
 
   - regex: {}{}
-)EOF";
+)EOF");
+}
 
-static const std::string option_string = R"EOF(
+const std::string& optionString() {
+  CONSTRUCT_ON_FIRST_USE(std::string, R"EOF(
 
     {}: {}
-)EOF";
+)EOF");
+}
 
 class ConfigTest : public ::testing::Test {
 protected:
@@ -39,12 +45,12 @@ protected:
     for (auto& setup_config : setup_configs) {
       std::string option_strs;
       for (auto& option : setup_config.second) {
-        option_strs += fmt::format(option_string, option.first, option.second);
+        option_strs += fmt::format(optionString(), option.first, option.second);
       }
-      regex_strs += fmt::format(regex_string, setup_config.first, option_strs);
+      regex_strs += fmt::format(regexString(), setup_config.first, option_strs);
     }
     envoy::config::core::v3::TypedExtensionConfig config;
-    TestUtility::loadFromYaml(fmt::format(yaml_string, regex_strs), config);
+    TestUtility::loadFromYaml(fmt::format(yamlString(), regex_strs), config);
 
     Config factory;
     auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(

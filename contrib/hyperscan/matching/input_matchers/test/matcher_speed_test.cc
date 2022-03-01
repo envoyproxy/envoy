@@ -10,24 +10,30 @@
 
 namespace Envoy {
 
-static const std::vector<std::string> ClusterInputs = {
-    "cluster.no_trailing_dot",
-    "cluster.match.",
-    "cluster.match.normal",
-    "cluster.match.and.a.whole.lot.of.things.coming.after.the.matches.really.too.much.stuff",
-};
+const std::vector<std::string>& clusterInputs() {
+  CONSTRUCT_ON_FIRST_USE(
+      std::vector<std::string>,
+      {
+          "cluster.no_trailing_dot",
+          "cluster.match.",
+          "cluster.match.normal",
+          "cluster.match.and.a.whole.lot.of.things.coming.after.the.matches.really.too.much.stuff",
+      });
+}
 
-static const std::string ClusterRePattern = "^cluster\\.((.*?)\\.)";
+const std::string& clusterRePattern() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "^cluster\\.((.*?)\\.)");
+}
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_CompiledGoogleReMatcher(benchmark::State& state) {
   envoy::type::matcher::v3::RegexMatcher config;
   config.mutable_google_re2();
-  config.set_regex(ClusterRePattern);
+  config.set_regex(clusterRePattern());
   const auto matcher = Regex::CompiledGoogleReMatcher(config);
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
-    for (const std::string& cluster_input : ClusterInputs) {
+    for (const std::string& cluster_input : clusterInputs()) {
       if (matcher.match(cluster_input)) {
         ++passes;
       }
@@ -41,12 +47,12 @@ BENCHMARK(BM_CompiledGoogleReMatcher);
 static void BM_HyperscanMatcher(benchmark::State& state) {
   envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan config;
   auto regex = config.add_regexes();
-  regex->set_regex(ClusterRePattern);
+  regex->set_regex(clusterRePattern());
   auto instance = ThreadLocal::InstanceImpl();
   auto matcher = Extensions::Matching::InputMatchers::Hyperscan::Matcher(config, instance);
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
-    for (const std::string& cluster_input : ClusterInputs) {
+    for (const std::string& cluster_input : clusterInputs()) {
       if (matcher.match(cluster_input)) {
         ++passes;
       }
