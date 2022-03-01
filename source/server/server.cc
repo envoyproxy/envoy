@@ -525,6 +525,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
   if (parent_admin_shutdown_response.has_value()) {
     original_start_time_ = parent_admin_shutdown_response.value().original_start_time_;
+    // TODO(soulxu): This is added for switching the reuse port default value as true (#17259).
+    // It ensures the same default value during the hot restart. This can be removed when
+    // everyone switches to the new default value.
     enable_reuse_port_default_ =
         parent_admin_shutdown_response.value().enable_reuse_port_default_ ? true : false;
   }
@@ -619,6 +622,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
   initial_config.initAdminAccessLog(bootstrap_, *this);
+  validation_context_.setRuntime(runtime());
 
   if (initial_config.admin().address()) {
     admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
