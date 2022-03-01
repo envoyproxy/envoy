@@ -2596,7 +2596,7 @@ TEST_P(ProtocolIntegrationTest, MaxStreamTimeoutWhenRequestIsNotComplete) {
 }
 
 // Test case above except disabling runtime guard "override_request_timeout_by_gateway_timeout".
-// Verify the old behavior is restorable by disabling the runtime guard.
+// Verify the old behavior is reverted by disabling the runtime guard.
 TEST_P(ProtocolIntegrationTest, MaxStreamTimeoutWhenRequestIsNotCompleteRuntimeDisabled) {
   config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
 
