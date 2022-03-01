@@ -10,16 +10,22 @@ namespace Extensions {
 namespace HttpFilters {
 namespace OnDemand {
 
+// OnDemandFilterConfig contains information from either the extension's
+// proto config or the extension's per-route proto config.
 class OnDemandFilterConfig : public Router::RouteSpecificFilterConfig {
 public:
   explicit OnDemandFilterConfig(Upstream::OdCdsApiHandlePtr odcds);
+  // Constructs config from extension's proto config.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
       Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor);
+  // Constructs config from extension's per-route proto config.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
       Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor);
 
+  // Get the handle to on-demand cluster discovery service. It may be
+  // null if it was not enabled.
   Upstream::OdCdsApiHandle* odcds() const { return odcds_.get(); }
 
 private:
@@ -32,9 +38,15 @@ class OnDemandRouteUpdate : public Http::StreamDecoderFilter {
 public:
   OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config) : config_(std::move(config)) {}
 
+  // Callback invoked when route config update is finished.
   void onRouteConfigUpdateCompletion(bool route_exists);
+  // Callback invoked when on-demand cluster discovery is finished.
   void onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status);
+  // Do on-demand cluster discovery if the cluster used by the route
+  // is missing.
   void handleOnDemandCDS(const Router::RouteConstSharedPtr& route);
+  // Get the per-route config if it's available, otherwise the
+  // extension's config.
   const OnDemandFilterConfig* getConfig(const Router::RouteConstSharedPtr& route);
 
   void setFilterIterationState(Envoy::Http::FilterHeadersStatus status) {
