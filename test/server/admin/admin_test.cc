@@ -66,7 +66,7 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 }
 
 TEST_P(AdminInstanceTest, AdminAddress) {
-  std::string address_out_path = TestEnvironment::temporaryPath("admin.address");
+  const std::string address_out_path = TestEnvironment::temporaryPath("admin.address");
   AdminImpl admin_address_out_path(cpu_profile_path_, server_, false);
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
@@ -81,7 +81,8 @@ TEST_P(AdminInstanceTest, AdminAddress) {
 }
 
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
-  std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
+  const std::string bad_path =
+      TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
   AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_, false);
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
@@ -219,6 +220,69 @@ TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   const std::string stats_href = "<a href='stats'";
   EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0, 0));
   EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0, 0));
+}
+
+class AdminTestingPeer {
+public:
+  AdminTestingPeer(AdminImpl& admin)
+      : admin_(admin), server_(admin.server_), listener_scope_(server_.stats().createScope("")) {}
+  AdminImpl::NullRouteConfigProvider& routeConfigProvider() { return route_config_provider_; }
+  AdminImpl::NullScopedRouteConfigProvider& scopedRouteConfigProvider() {
+    return scoped_route_config_provider_;
+  }
+  AdminImpl::NullOverloadManager& overloadManager() { return admin_.null_overload_manager_; }
+  AdminImpl::NullOverloadManager::OverloadState& overloadState() { return overload_state_; }
+  AdminImpl::AdminListenSocketFactory& socketFactory() { return socket_factory_; }
+  AdminImpl::AdminListener& listener() { return listener_; }
+
+private:
+  AdminImpl& admin_;
+  Server::Instance& server_;
+  AdminImpl::NullRouteConfigProvider route_config_provider_{server_.timeSource()};
+  AdminImpl::NullScopedRouteConfigProvider scoped_route_config_provider_{server_.timeSource()};
+  AdminImpl::NullOverloadManager::OverloadState overload_state_{server_.dispatcher()};
+  AdminImpl::AdminListenSocketFactory socket_factory_{nullptr};
+  Stats::ScopeSharedPtr listener_scope_;
+  AdminImpl::AdminListener listener_{admin_, std::move(listener_scope_)};
+};
+
+// Covers override methods for admin-specific implementations of classes in
+// admin.h, reducing a major source of reduced coverage-percent expectations in
+// source/server/admin. There remain a few uncovered lines that are somewhat
+// harder to construct tests for.
+TEST_P(AdminInstanceTest, Overrides) {
+  admin_.http1Settings();
+  admin_.originalIpDetectionExtensions();
+
+  AdminTestingPeer peer(admin_);
+
+  peer.routeConfigProvider().config();
+  peer.routeConfigProvider().configInfo();
+  peer.routeConfigProvider().lastUpdated();
+  peer.routeConfigProvider().onConfigUpdate();
+
+  peer.scopedRouteConfigProvider().lastUpdated();
+  peer.scopedRouteConfigProvider().getConfigProto();
+  peer.scopedRouteConfigProvider().getConfigVersion();
+  peer.scopedRouteConfigProvider().getConfig();
+  peer.scopedRouteConfigProvider().apiType();
+  peer.scopedRouteConfigProvider().getConfigProtos();
+
+  auto overload_name = Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections;
+  peer.overloadState().tryAllocateResource(overload_name, 0);
+  peer.overloadState().tryDeallocateResource(overload_name, 0);
+  peer.overloadState().isResourceMonitorEnabled(overload_name);
+
+  peer.overloadManager().scaledTimerFactory();
+
+  peer.socketFactory().clone();
+  peer.socketFactory().closeAllSockets();
+  peer.socketFactory().doFinalPreWorkerInit();
+
+  peer.listener().name();
+  peer.listener().udpListenerConfig();
+  peer.listener().direction();
+  peer.listener().tcpBacklogSize();
 }
 
 } // namespace Server

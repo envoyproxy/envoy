@@ -189,7 +189,7 @@ TEST_P(AdminStatsTest, HandlerStatsJson) {
 
   store_->mergeHistograms([]() -> void {});
 
-  CodeResponse code_response = handlerStats(url);
+  const CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::OK, code_response.first);
 
   const std::string expected_json_old = R"EOF({
@@ -713,7 +713,7 @@ TEST_P(AdminStatsTest, SortedCountersAndGauges) {
   store_->counterFromString("s1");
   store_->gaugeFromString("s2", Stats::Gauge::ImportMode::Accumulate);
   for (const std::string& url : {"/stats", "/stats?format=json"}) {
-    CodeResponse code_response = handlerStats(url);
+    const CodeResponse code_response = handlerStats(url);
     ASSERT_EQ(Http::Code::OK, code_response.first);
     checkOrder(code_response.second, {"s1", "s2", "s3", "s4"});
   }
@@ -744,7 +744,7 @@ TEST_P(AdminStatsTest, SortedTextReadouts) {
   store_->textReadoutFromString("t1");
   store_->textReadoutFromString("t2");
   for (const std::string& url : {"/stats", "/stats?format=json"}) {
-    CodeResponse code_response = handlerStats(url);
+    const CodeResponse code_response = handlerStats(url);
     ASSERT_EQ(Http::Code::OK, code_response.first);
     checkOrder(code_response.second, {"t1", "t2", "t3", "t4"});
   }
@@ -756,7 +756,7 @@ TEST_P(AdminStatsTest, SortedHistograms) {
   store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
   store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
   for (const std::string& url : {"/stats", "/stats?format=json"}) {
-    CodeResponse code_response = handlerStats(url);
+    const CodeResponse code_response = handlerStats(url);
     ASSERT_EQ(Http::Code::OK, code_response.first);
     checkOrder(code_response.second, {"h1", "h2", "h3", "h4"});
   }
@@ -821,8 +821,17 @@ TEST_P(AdminInstanceTest, RecentLookups) {
   EXPECT_THAT(body, HasSubstr("Lookup tracking is not enabled"));
   EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
 
-  // We can't test RecentLookups in admin unit tests as it doesn't work with a
-  // fake symbol table. However we cover this solidly in integration tests.
+  EXPECT_EQ(Http::Code::OK,
+            admin_.request("/stats/recentlookups/enable", "POST", response_headers, body));
+  Stats::StatNamePool pool(server_.stats().symbolTable());
+  pool.add("alpha");
+  pool.add("beta");
+  pool.add("gamma");
+  pool.add("alpha");
+  pool.add("beta");
+  pool.add("alpha");
+  EXPECT_EQ(Http::Code::OK, admin_.request("/stats/recentlookups", "GET", response_headers, body));
+  EXPECT_THAT(body, HasSubstr("       1 gamma\n       2 beta\n       3 alpha\n"));
 }
 
 class StatsHandlerPrometheusTest : public StatsHandlerTest {
@@ -860,7 +869,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, StatsHandlerPrometheusDefaultTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusDefaultTest) {
-  std::string url = "/stats?format=prometheus";
+  const std::string url = "/stats?format=prometheus";
 
   createTestStats();
 
@@ -874,9 +883,19 @@ envoy_cluster_upstream_cx_active{cluster="c2"} 12
 
 )EOF";
 
-  CodeResponse code_response = handlerStats(url);
+  const CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::OK, code_response.first);
-  EXPECT_THAT(expected_response, code_response.second);
+  EXPECT_EQ(expected_response, code_response.second);
+}
+
+TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusInvalidRegex) {
+  const std::string url = "/stats?format=prometheus&filter=(+invalid)";
+
+  createTestStats();
+
+  const CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_THAT(code_response.second, HasSubstr("Invalid regex"));
 }
 
 class StatsHandlerPrometheusWithTextReadoutsTest
@@ -892,7 +911,7 @@ INSTANTIATE_TEST_SUITE_P(
                                      "/stats?format=prometheus&text_readouts=abc")));
 
 TEST_P(StatsHandlerPrometheusWithTextReadoutsTest, StatsHandlerPrometheusWithTextReadoutsTest) {
-  std::string url = std::get<1>(GetParam());
+  const std::string url = std::get<1>(GetParam());
 
   createTestStats();
 
@@ -909,7 +928,7 @@ envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
 
 )EOF";
 
-  CodeResponse code_response = handlerStats(url);
+  const CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::OK, code_response.first);
   EXPECT_THAT(expected_response, code_response.second);
 }
