@@ -41,7 +41,6 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/callback_impl.h"
-#include "source/common/common/dns_utils.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
