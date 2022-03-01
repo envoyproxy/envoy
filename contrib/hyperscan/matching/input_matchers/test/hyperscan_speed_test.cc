@@ -9,21 +9,29 @@
 
 namespace Envoy {
 
-static const std::vector<std::string> ClusterInputs = {
-    "cluster.no_trailing_dot",
-    "cluster.match.",
-    "cluster.match.normal",
-    "cluster.match.and.a.whole.lot.of.things.coming.after.the.matches.really.too.much.stuff",
-};
+const std::vector<std::string>& clusterInputs() {
+  CONSTRUCT_ON_FIRST_USE(
+      std::vector<std::string>,
+      {
+          "cluster.no_trailing_dot",
+          "cluster.match.",
+          "cluster.match.normal",
+          "cluster.match.and.a.whole.lot.of.things.coming.after.the.matches.really.too.much.stuff",
+      });
+}
 
-static const std::vector<const char*> ClusterRePatterns = {"^cluster\\.((.*?)\\.)"};
+const std::vector<const char*>& clusterRePatterns() {
+  CONSTRUCT_ON_FIRST_USE(std::vector<const char*>, {
+                                                       "^cluster\\.((.*?)\\.)",
+                                                   });
+}
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_RE2(benchmark::State& state) {
-  re2::RE2 re(ClusterRePatterns[0]);
+  re2::RE2 re(clusterRePatterns()[0]);
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
-    for (const std::string& cluster_input : ClusterInputs) {
+    for (const std::string& cluster_input : clusterInputs()) {
       if (re2::RE2::FullMatch(cluster_input, re)) {
         ++passes;
       }
@@ -38,14 +46,14 @@ static void BM_Hyperscan(benchmark::State& state) {
   hs_database_t* database{};
   hs_scratch_t* scratch{};
   hs_compile_error_t* compile_err;
-  RELEASE_ASSERT(hs_compile_multi(ClusterRePatterns.data(), nullptr, nullptr,
-                                  ClusterRePatterns.size(), HS_MODE_BLOCK, nullptr, &database,
+  RELEASE_ASSERT(hs_compile_multi(clusterRePatterns().data(), nullptr, nullptr,
+                                  clusterRePatterns().size(), HS_MODE_BLOCK, nullptr, &database,
                                   &compile_err) == HS_SUCCESS,
                  "");
   RELEASE_ASSERT(hs_alloc_scratch(database, &scratch) == HS_SUCCESS, "");
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
-    for (const std::string& cluster_input : ClusterInputs) {
+    for (const std::string& cluster_input : clusterInputs()) {
       hs_error_t err = hs_scan(
           database, cluster_input.data(), cluster_input.size(), 0, scratch,
           [](unsigned int, unsigned long long, unsigned long long, unsigned int,
