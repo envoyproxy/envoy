@@ -245,6 +245,7 @@ TEST(DefaultCertValidatorTest, WithVerifyDepth) {
 
   // Re-initialize context
   ssl_ctx = SSL_CTX_new(TLS_method());
+  store_ctx = X509_STORE_CTX_new();
   storep = SSL_CTX_get_cert_store(ssl_ctx.get());
   X509_STORE_add_cert(storep, ca_cert.get());
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), storep, cert.get(), intermediates));

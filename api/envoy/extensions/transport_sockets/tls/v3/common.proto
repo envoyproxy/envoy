@@ -491,5 +491,5 @@ message CertificateValidationContext {
   // This does not include the leaf certificate. If configured, and the certificate chain is longer than allowed, the certificates
   // above the limit are ignored, and certificate validation will fail.
   // https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set_verify_depth.html
-  uint32 max_verify_depth = 16 [(validate.rules).uint32 = {lte: 100}];
+  google.protobuf.UInt32Value max_verify_depth = 16 [(validate.rules).uint32 = {lte: 100}];
 }
