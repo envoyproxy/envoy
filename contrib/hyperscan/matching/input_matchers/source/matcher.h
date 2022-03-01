@@ -33,7 +33,7 @@ private:
   std::vector<unsigned int> flags_{};
   std::vector<unsigned int> ids_{};
   hs_database_t* database_{};
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::TypedSlotPtr<ScratchThreadLocal> tls_;
 };
 
 } // namespace Hyperscan

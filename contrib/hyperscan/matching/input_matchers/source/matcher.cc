@@ -17,7 +17,7 @@ ScratchThreadLocal::ScratchThreadLocal(hs_database_t* database) {
 Matcher::Matcher(
     const envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan& config,
     ThreadLocal::SlotAllocator& tls)
-    : tls_(tls.allocateSlot()) {
+    : tls_(ThreadLocal::TypedSlot<ScratchThreadLocal>::makeUnique(tls)) {
   std::vector<const char*> expressions;
   expressions.reserve(config.regexes_size());
   flags_.reserve(config.regexes_size());
@@ -71,9 +71,8 @@ Matcher::Matcher(
     }
   }
 
-  tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ScratchThreadLocal>(this->database_);
-  });
+  tls_->set(
+      [this](Event::Dispatcher&) { return std::make_shared<ScratchThreadLocal>(this->database_); });
 }
 
 bool Matcher::match(absl::optional<absl::string_view> input) {
@@ -83,9 +82,9 @@ bool Matcher::match(absl::optional<absl::string_view> input) {
 
   bool matched = false;
   const absl::string_view input_str = *input;
-  ScratchThreadLocal& scratch = tls_->getTyped<ScratchThreadLocal>();
+  hs_scratch_t* scratch = tls_->get()->scratch_;
   hs_error_t err = hs_scan(
-      database_, input_str.data(), input_str.size(), 0, scratch.scratch_,
+      database_, input_str.data(), input_str.size(), 0, scratch,
       [](unsigned int, unsigned long long, unsigned long long, unsigned int, void* context) -> int {
         bool* matched = static_cast<bool*>(context);
         *matched = true;
