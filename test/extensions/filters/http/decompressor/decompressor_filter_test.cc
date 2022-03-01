@@ -206,6 +206,33 @@ decompressor_library:
     expectDecompression(decompressor_ptr, end_with_data);
   }
 
+  void testAcceptEncodingFilter(bool legacy, std::string original_accept_encoding,
+                                std::string final_accept_encoding) {
+    TestScopedRuntime scoped_runtime;
+    if (legacy) {
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.append_to_accept_content_encoding_only_once", "false"}});
+
+    } else {
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.append_to_accept_content_encoding_only_once", "true"}});
+    }
+    setUpFilter(R"EOF(
+decompressor_library:
+  typed_config:
+    "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+request_direction_config:
+  advertise_accept_encoding: true
+)EOF");
+    Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
+                                                         {"content-length", "256"}};
+    if (isRequestDirection()) {
+      headers_before_filter.addCopy("accept-encoding", original_accept_encoding);
+    }
+    decompressionActive(headers_before_filter, true /* end_with_data */, absl::nullopt,
+                        final_accept_encoding);
+  }
+
   Compression::Decompressor::MockDecompressorFactory* decompressor_factory_{};
   DecompressorFilterConfigSharedPtr config_;
   std::unique_ptr<DecompressorFilter> filter_;
@@ -301,85 +328,17 @@ request_direction_config:
 }
 
 TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingOnlyOnce) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.append_to_accept_content_encoding_only_once", "true"}});
-  setUpFilter(R"EOF(
-decompressor_library:
-  typed_config:
-    "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
-request_direction_config:
-  advertise_accept_encoding: true
-)EOF");
-  Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
-                                                       {"content-length", "256"}};
-  if (isRequestDirection()) {
-    // Do not duplicate accept-encoding values. Remove extra accept-encoding values for the
-    // content-type we specify. Also remove q-values from our content-type (if not set, it defaults
-    // to 1.0). Test also whitespace in accept-encoding value string.
-    headers_before_filter.addCopy("accept-encoding", "br,mock, mock\t,mock ;q=0.3");
-  }
-  decompressionActive(headers_before_filter, true /* end_with_data */, absl::nullopt, "br,mock");
-}
+  // Do not duplicate accept-encoding values. Remove extra accept-encoding values for the
+  // content-type we specify. Also remove q-values from our content-type (if not set, it defaults
+  // to 1.0). Test also whitespace in accept-encoding value string.
+  testAcceptEncodingFilter(false, "br,mock, mock\t,mock ;q=0.3", "br,mock");
+  // legacy test to avoid a breaking change
+  testAcceptEncodingFilter(true, "br,mock, mock\t,mock ;q=0.3", "br,mock, mock\t,mock ;q=0.3,mock");
 
-TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingOnlyOnceLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.append_to_accept_content_encoding_only_once", "false"}});
-  setUpFilter(R"EOF(
-decompressor_library:
-  typed_config:
-    "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
-request_direction_config:
-  advertise_accept_encoding: true
-)EOF");
-  Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
-                                                       {"content-length", "256"}};
-  if (isRequestDirection()) {
-    headers_before_filter.addCopy("accept-encoding", "br,mock, mock\t,mock ;q=0.3");
-  }
-  decompressionActive(headers_before_filter, true /* end_with_data */, absl::nullopt,
-                      "br,mock, mock\t,mock ;q=0.3,mock");
-}
-
-TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingRemoveQValue) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.append_to_accept_content_encoding_only_once", "true"}});
-  setUpFilter(R"EOF(
-decompressor_library:
-  typed_config:
-    "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
-request_direction_config:
-  advertise_accept_encoding: true
-)EOF");
-  Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
-                                                       {"content-length", "256"}};
-  if (isRequestDirection()) {
-    // If the accept-encoding header had a q-value, it needs to be removed.
-    headers_before_filter.addCopy("accept-encoding", "mock;q=0.6");
-  }
-  decompressionActive(headers_before_filter, true /* end_with_data */, absl::nullopt, "mock");
-}
-
-TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingRemoveQValueLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.append_to_accept_content_encoding_only_once", "false"}});
-  setUpFilter(R"EOF(
-decompressor_library:
-  typed_config:
-    "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
-request_direction_config:
-  advertise_accept_encoding: true
-)EOF");
-  Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
-                                                       {"content-length", "256"}};
-  if (isRequestDirection()) {
-    headers_before_filter.addCopy("accept-encoding", "mock;q=0.6");
-  }
-  decompressionActive(headers_before_filter, true /* end_with_data */, absl::nullopt,
-                      "mock;q=0.6,mock");
+  // If the accept-encoding header had a q-value, it needs to be removed.
+  testAcceptEncodingFilter(false, "mock;q=0.6", "mock");
+  // legacy test to avoid a breaking change
+  testAcceptEncodingFilter(true, "mock;q=0.6", "mock;q=0.6,mock");
 }
 
 TEST_P(DecompressorFilterTest, DecompressionDisabled) {
