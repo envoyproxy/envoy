@@ -226,7 +226,7 @@ private:
   const Network::DnsLookupFamily dns_lookup_family_;
   const Network::DnsResolverSharedPtr resolver_;
   ThreadLocal::TypedSlot<ThreadLocalHostInfo> tls_slot_;
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   DnsCacheStats stats_;
   std::list<AddUpdateCallbacksHandleImpl*> update_callbacks_;
   absl::Mutex primary_hosts_lock_;

@@ -119,7 +119,7 @@ private:
 
     // Return the currently available network interfaces.
     // Note: this call uses syscalls.
-    static AvailableInterfaces availableInterfaces();
+    AvailableInterfaces availableInterfaces();
 
     // Perform a second resolution under certain conditions. If dns_lookup_family_ is V4Preferred
     // or Auto: perform a second resolution if the first one fails. If dns_lookup_family_ is All:
