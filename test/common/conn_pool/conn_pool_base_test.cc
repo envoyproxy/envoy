@@ -18,14 +18,6 @@ using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Return;
 
-class ConnPoolImplBasePeer {
-public:
-  static void setConnectingStreamCapacity(ConnPoolImplBase& pool,
-                                          uint64_t connecting_stream_capacity) {
-    pool.connecting_stream_capacity_ = connecting_stream_capacity;
-  }
-};
-
 class TestActiveClient : public ActiveClient {
 public:
   using ActiveClient::ActiveClient;
@@ -52,12 +44,6 @@ public:
 
   uint32_t active_streams_{};
 
-  void overrideCurrentCapacity(uint64_t capacity) {
-    capacity_override_ = capacity;
-    ConnPoolImplBasePeer::setConnectingStreamCapacity(parent_, capacity);
-  }
-
-private:
   absl::optional<uint64_t> capacity_override_;
 };
 
@@ -447,7 +433,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, NoAvailableStreams) {
   // Start with a concurrent stream limit of 0.
   stream_limit_ = 1;
   newConnectingClient();
-  clients_.back()->overrideCurrentCapacity(0);
+  clients_.back()->capacity_override_ = 0;
   pool_.decrClusterStreamCapacity(stream_limit_);
 
   // Make sure that when the connected event is raised, there is no call to

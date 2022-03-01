@@ -456,6 +456,7 @@ void ConnectivityGrid::onHandshakeComplete() {
 
 void ConnectivityGrid::onZeroRttHandshakeFailed() {
   ENVOY_LOG(trace, "Marking HTTP/3 failed for host '{}'.", host_->hostname());
+  ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"));
   http3_status_tracker_->markHttp3FailedRecently();
 }
 

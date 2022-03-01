@@ -372,8 +372,6 @@ protected:
   uint32_t connecting_stream_capacity_{0};
 
 private:
-  friend class ConnPoolImplBasePeer;
-
   std::list<PendingStreamPtr> pending_streams_;
 
   // The number of streams currently attached to clients.
