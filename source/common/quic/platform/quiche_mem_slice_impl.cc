@@ -4,15 +4,15 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "source/common/quic/platform/quic_mem_slice_impl.h"
+#include "source/common/quic/platform/quiche_mem_slice_impl.h"
 
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/common/assert.h"
 
-namespace quic {
+namespace quiche {
 
-QuicMemSliceImpl::QuicMemSliceImpl(QuicUniqueBufferPtr buffer, size_t length)
+QuicheMemSliceImpl::QuicheMemSliceImpl(quic::QuicUniqueBufferPtr buffer, size_t length)
     : fragment_(std::make_unique<Envoy::Buffer::BufferFragmentImpl>(
           buffer.get(), length,
           // TODO(danzh) change the buffer fragment constructor to take the lambda by move instead
@@ -28,13 +28,13 @@ QuicMemSliceImpl::QuicMemSliceImpl(QuicUniqueBufferPtr buffer, size_t length)
   ASSERT(this->length() == length);
 }
 
-QuicMemSliceImpl::QuicMemSliceImpl(Envoy::Buffer::Instance& buffer, size_t length) {
+QuicheMemSliceImpl::QuicheMemSliceImpl(Envoy::Buffer::Instance& buffer, size_t length) {
   ASSERT(firstSliceLength(buffer) == length);
   single_slice_buffer_.move(buffer, length);
   ASSERT(single_slice_buffer_.getRawSlices().size() == 1);
 }
 
-QuicMemSliceImpl::QuicMemSliceImpl(std::unique_ptr<char[]> buffer, size_t length)
+QuicheMemSliceImpl::QuicheMemSliceImpl(std::unique_ptr<char[]> buffer, size_t length)
     : fragment_(std::make_unique<Envoy::Buffer::BufferFragmentImpl>(
           buffer.release(), length,
           [](const void* p, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
@@ -44,17 +44,17 @@ QuicMemSliceImpl::QuicMemSliceImpl(std::unique_ptr<char[]> buffer, size_t length
   ASSERT(this->length() == length);
 }
 
-QuicMemSliceImpl::~QuicMemSliceImpl() {
+QuicheMemSliceImpl::~QuicheMemSliceImpl() {
   ASSERT(fragment_ == nullptr || (firstSliceLength(single_slice_buffer_) == fragment_->size() &&
                                   data() == fragment_->data()));
 }
 
-const char* QuicMemSliceImpl::data() const {
+const char* QuicheMemSliceImpl::data() const {
   return reinterpret_cast<const char*>(single_slice_buffer_.frontSlice().mem_);
 }
 
-size_t QuicMemSliceImpl::firstSliceLength(Envoy::Buffer::Instance& buffer) {
+size_t QuicheMemSliceImpl::firstSliceLength(Envoy::Buffer::Instance& buffer) {
   return buffer.frontSlice().len_;
 }
 
-} // namespace quic
+} // namespace quiche

@@ -70,15 +70,11 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_platform_base_impl_lib",
-    srcs = [
-        "quic_mem_slice_impl.cc",
-    ],
     hdrs = [
         "quic_client_stats_impl.h",
         "quic_error_code_wrappers_impl.h",
         "quic_flags_impl.h",
         "quic_iovec_impl.h",
-        "quic_mem_slice_impl.h",
         "quic_reference_counted_impl.h",
         "quic_server_stats_impl.h",
         "quic_stack_trace_impl.h",
@@ -98,10 +94,8 @@ envoy_cc_library(
     deps = [
         ":quiche_flags_impl_lib",
         "//envoy/api:io_error_interface",
-        "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/server:backtrace_lib",
-        "@com_github_google_quiche//:quic_core_buffer_allocator_lib",
         "@com_github_google_quiche//:quic_platform_export",
         "@com_github_google_quiche//:quic_platform_ip_address_family",
         "@com_github_google_quiche//:quiche_common_platform",
@@ -160,8 +154,12 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quiche_common_platform_impl_lib",
+    srcs = [
+        "quiche_mem_slice_impl.cc",
+    ],
     hdrs = [
         "quiche_logging_impl.h",
+        "quiche_mem_slice_impl.h",
     ],
     external_deps = [
         "abseil_hash",
@@ -171,5 +169,7 @@ envoy_cc_library(
     deps = [
         ":quic_platform_logging_impl_lib",
         ":quiche_flags_impl_lib",
+        "//source/common/buffer:buffer_lib",
+        "@com_github_google_quiche//:quic_core_buffer_allocator_lib",
     ],
 )
