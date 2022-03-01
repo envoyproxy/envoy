@@ -626,6 +626,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
     runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(std::move(runtime_ptr));
   }
   initial_config.initAdminAccessLog(bootstrap_, *this);
+  validation_context_.setRuntime(runtime());
 
   if (initial_config.admin().address()) {
     admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
