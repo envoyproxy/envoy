@@ -458,7 +458,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapContent) {
   const std::string admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     any_match: true
   output_config:
     sinks:
@@ -507,7 +507,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapConcurrent) {
   const std::string admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     any_match: true
   output_config:
     sinks:
@@ -589,7 +589,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapTimeout) {
   const std::string admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     any_match: true
   output_config:
     sinks:
@@ -643,7 +643,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapLongTimeout) {
   const std::string admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     any_match: true
   output_config:
     sinks:
@@ -688,7 +688,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapConsecutive) {
   const std::string admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     any_match: true
   output_config:
     sinks:
@@ -770,7 +770,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapBuffering) {
   const std::string admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     any_match: true
   output_config:
     sinks:
@@ -817,7 +817,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapEmptyResponse) {
   const std::string admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     any_match: true
   output_config:
     sinks:
