@@ -18,9 +18,6 @@ namespace CustomCel {
 namespace ExtendedRequest {
 
 using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::Utility::createCelMap;
-using google::api::expr::runtime::CelFunction;
-using google::api::expr::runtime::CelFunctionDescriptor;
-using google::api::expr::runtime::CelMap;
 using google::api::expr::runtime::CelValue;
 using google::api::expr::runtime::CreateErrorValue;
 using Http::Utility::parseCookies;

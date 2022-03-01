@@ -13,10 +13,9 @@ namespace Expr {
 namespace CustomCel {
 namespace ExtendedRequest {
 
-using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::Utility::appendList;
-using google::api::expr::runtime::CelList;
-using google::api::expr::runtime::ContainerBackedListImpl;
 using google::api::expr::runtime::CreateErrorValue;
+using Http::Utility::parseAndDecodeQueryString;
+using Http::Utility::QueryParams;
 
 // ExtendedRequestWrapper extends RequestWrapper
 // If ExtendedRequestWrapper[key] is not found, then the base RequestWrapper[key] is returned.
@@ -46,7 +45,7 @@ absl::optional<CelValue> ExtendedRequestWrapper::operator[](CelValue key) const 
 // getMapFromQueryStr
 // converts std::map to CelMap
 absl::optional<CelValue> ExtendedRequestWrapper::getMapFromQueryStr(absl::string_view url) const {
-  Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
+  QueryParams query_params = parseAndDecodeQueryString(url);
   std::vector<std::pair<CelValue, CelValue>> key_value_pairs;
   // create vector of key value pairs from QueryParams map
   for (const auto& [key, value] : query_params) {

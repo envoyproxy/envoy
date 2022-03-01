@@ -12,7 +12,7 @@
 #include "eval/public/containers/container_backed_list_impl.h"
 #include "eval/public/containers/container_backed_map_impl.h"
 
-// Custom Variable Set / Activation Value Producer Definitions and Implementations
+// Custom Attribute / Activation Value Producer Definitions and Implementations
 
 namespace Envoy {
 namespace Extensions {
@@ -39,11 +39,10 @@ public:
       : RequestWrapper(arena, headers, info), arena_(arena),
         return_url_query_string_as_map_(return_url_query_string_as_map),
         request_header_map_(headers) {
-    auto base_class_keys = dynamic_cast<const google::api::expr::runtime::ContainerBackedListImpl*>(
-        RequestWrapper::ListKeys());
-    keys_ = Utility::appendList(arena_, base_class_keys, &ExtendedRequestList);
+    keys_ = Utility::appendList(arena_, RequestWrapper::ListKeys(), &ExtendedRequestList);
   }
-  absl::optional<CelValue> operator[](CelValue key) const override;
+  absl::optional<google::api::expr::runtime::CelValue>
+  operator[](google::api::expr::runtime::CelValue key) const override;
 
   const google::api::expr::runtime::CelList* ListKeys() const override { return keys_; }
 
@@ -53,7 +52,6 @@ private:
   const bool return_url_query_string_as_map_;
   const Http::RequestHeaderMap* request_header_map_;
   // keys of base class and the derived class
-  //  const google::api::expr::runtime::ContainerBackedListImpl* keys_;
   const google::api::expr::runtime::CelList* keys_;
 };
 

@@ -17,10 +17,7 @@ namespace Expr {
 namespace CustomCel {
 namespace ExtendedRequest {
 
-using google::api::expr::runtime::CelFunctionDescriptor;
-using google::api::expr::runtime::CelMap;
 using google::api::expr::runtime::CelValue;
-using testing::Return;
 
 // tests for the custom CEL functions in the reference implementation
 

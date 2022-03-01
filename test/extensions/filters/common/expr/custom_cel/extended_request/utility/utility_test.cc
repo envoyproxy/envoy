@@ -17,7 +17,6 @@ namespace ExtendedRequest {
 namespace Utility {
 
 using google::api::expr::runtime::CelList;
-using google::api::expr::runtime::CelMap;
 using google::api::expr::runtime::CelValue;
 using google::api::expr::runtime::ContainerBackedListImpl;
 
