@@ -40,16 +40,28 @@ index 230bf1e..6e1b9e5 100644
 
 
  // ABSL_OPTION_USE_INLINE_NAMESPACE
-diff --git a/absl/flags/commandlineflag.h b/absl/flags/commandlineflag.h
-index f2fa08977f..8e97fdb0ca 100644
---- a/absl/flags/commandlineflag.h
+diff --git a/absl/flags/commandlineflagnew.h b/absl/flags/commandlineflag.h
+index f2fa089..85144df 100644
+--- a/absl/flags/commandlineflagnew.h
 +++ b/absl/flags/commandlineflag.h
-@@ -153,7 +153,7 @@ class CommandLineFlag {
-   bool ParseFrom(absl::string_view value, std::string* error);
+@@ -59,6 +59,10 @@ class PrivateHandleAccessor;
+ //   // Now you can get flag info from that reflection handle.
+ //   std::string flag_location = my_flag_data->Filename();
+ //   ...
++#if defined(__GNUC__)
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
++#endif
+ class CommandLineFlag {
+  public:
+   constexpr CommandLineFlag() = default;
+@@ -193,6 +197,9 @@ class CommandLineFlag {
+   // flag's value type.
+   virtual void CheckDefaultValueParsingRoundtrip() const = 0;
+ };
++#if defined(__GNUC__)
++#pragma GCC diagnostic pop
++#endif
  
-  protected:
--  ~CommandLineFlag() = default;
-+  virtual ~CommandLineFlag() = default;
- 
-  private:
-   friend class flags_internal::PrivateHandleAccessor;
+ ABSL_NAMESPACE_END
+ }  // namespace absl
