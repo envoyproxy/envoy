@@ -1143,13 +1143,38 @@ void ServerConnectionImpl::onBody(Buffer::Instance& data) {
   }
 }
 
+Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
+  if (active_request_ != nullptr && active_request_->remote_complete_) {
+    // Active downstream request remote complete but there is some new data comming then try to
+    // disable the connection reading. Connection reading will be re-enabled after the current
+    // active downstream request has completed.
+    // This ensures that the new comming data can be consumed after the current active downstream
+    // request has completed.
+    active_request_->response_encoder_.readDisable(true);
+    return okStatus();
+  }
+
+  Http::Status status = ConnectionImpl::dispatch(data);
+
+  if (active_request_ != nullptr && active_request_->remote_complete_) {
+    // Active downstream request remote complete but there is some remaining data in the read buffer
+    // then try to disable the connection reading. Connection reading will be re-enabled after the
+    // current active downstream request has completed.
+    // This ensures that the remaining data can be consumed after the current active downstream
+    // request has completed.
+    if (data.length() > 0) {
+      active_request_->response_encoder_.readDisable(true);
+    }
+  }
+  return status;
+}
+
 ParserStatus ServerConnectionImpl::onMessageCompleteBase() {
   ASSERT(!handling_upgrade_);
   if (active_request_) {
 
     // The request_decoder should be non-null after we've called the newStream on callbacks.
     ASSERT(active_request_->request_decoder_);
-    active_request_->response_encoder_.readDisable(true);
     active_request_->remote_complete_ = true;
 
     if (deferred_end_stream_headers_) {
