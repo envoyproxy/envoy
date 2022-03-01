@@ -66,8 +66,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
-ABSL_FLAG(uint64_t, envoy_buffer_overflow_multiplier, 0, "");                        // NOLINT
-ABSL_FLAG(uint64_t, envoy_do_not_use_going_away_max_http2_outbound_response, 2, ""); // NOLINT
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");                       // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, "");                      // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,                                 // NOLINT
@@ -92,11 +90,7 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
 uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
   if (absl::StartsWith(feature, "envoy.")) {
     // DO NOT ADD MORE FLAGS HERE. This function deprecated and being removed.
-    if (feature == "envoy.buffer.overflow_multiplier") {
-      return absl::GetFlag(FLAGS_envoy_buffer_overflow_multiplier);
-    } else if (feature == "envoy.do_not_use_going_away_max_http2_outbound_responses") {
-      return absl::GetFlag(FLAGS_envoy_do_not_use_going_away_max_http2_outbound_response);
-    } else if (feature == "envoy.http.headermap.lazy_map_min_size") {
+    if (feature == "envoy.http.headermap.lazy_map_min_size") {
       return absl::GetFlag(FLAGS_envoy_headermap_lazy_map_min_size);
     }
   }
@@ -191,13 +185,7 @@ void maybeSetDeprecatedInts(absl::string_view name, uint32_t value) {
 
   bool set = false;
   // DO NOT ADD MORE FLAGS HERE. This function deprecated and being removed.
-  if (name == "envoy.buffer.overflow_multiplier") {
-    set = true;
-    absl::SetFlag(&FLAGS_envoy_buffer_overflow_multiplier, value);
-  } else if (name == "envoy.do_not_use_going_away_max_http2_outbound_responses") {
-    set = true;
-    absl::SetFlag(&FLAGS_envoy_do_not_use_going_away_max_http2_outbound_response, value);
-  } else if (name == "envoy.http.headermap.lazy_map_min_size") {
+  if (name == "envoy.http.headermap.lazy_map_min_size") {
     set = true;
     absl::SetFlag(&FLAGS_envoy_headermap_lazy_map_min_size, value);
   } else if (name == "re2.max_program_size.error_level") {
@@ -241,8 +229,6 @@ void RuntimeFeatures::restoreDefaults() const {
   for (const auto& feature : disabled_features_) {
     absl::SetFlag(feature.second, false);
   }
-  absl::SetFlag(&FLAGS_envoy_buffer_overflow_multiplier, 0);
-  absl::SetFlag(&FLAGS_envoy_do_not_use_going_away_max_http2_outbound_response, 2);
   absl::SetFlag(&FLAGS_envoy_headermap_lazy_map_min_size, 3);
   absl::SetFlag(&FLAGS_re2_max_program_size_error_level, 100);
   absl::SetFlag(&FLAGS_re2_max_program_size_warn_level, std::numeric_limits<uint32_t>::max());
