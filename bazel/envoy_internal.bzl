@@ -68,7 +68,7 @@ def envoy_copts(repository, test = False):
                    "-Wc++2a-extensions",
                    "-Wrange-loop-analysis",
                ],
-               repository + "//bazel:gcc_build": ["-Wno-maybe-uninitialized"],
+               repository + "//bazel:gcc_build": ["-Wno-maybe-uninitialized", "-Wno-non-virtual-dtor"],
                # Allow 'nodiscard' function results values to be discarded for test code only
                # TODO(envoyproxy/windows-dev): Replace /Zc:preprocessor with /experimental:preprocessor
                # for msvc versions between 15.8 through 16.4.x. see
