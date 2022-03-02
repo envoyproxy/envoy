@@ -93,7 +93,7 @@ public:
   /**
    * @return the max depth used when verifying the certificate-chain
    */
-  virtual const absl::optional<uint32_t> maxVerifyDepth() const PURE;
+  virtual absl::optional<uint32_t> maxVerifyDepth() const PURE;
 };
 
 using CertificateValidationContextConfigPtr = std::unique_ptr<CertificateValidationContextConfig>;

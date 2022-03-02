@@ -13,8 +13,6 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-static const uint32_t SSL_VERIFY_DEPTH_DEFAULT = 9;
-
 class TestSslExtendedSocketInfo : public Envoy::Ssl::SslExtendedSocketInfo {
 public:
   TestSslExtendedSocketInfo() = default;
@@ -80,7 +78,7 @@ public:
   Api::Api& api() const override { return *api_; }
   bool onlyVerifyLeafCertificateCrl() const override { return false; }
 
-  const absl::optional<uint32_t> maxVerifyDepth() const override { return max_verify_depth_; }
+  absl::optional<uint32_t> maxVerifyDepth() const override { return max_verify_depth_; }
 
 private:
   bool allow_expired_certificate_{false};
