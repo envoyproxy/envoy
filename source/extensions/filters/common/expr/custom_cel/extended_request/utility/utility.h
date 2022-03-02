@@ -13,7 +13,7 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 namespace CustomCel {
-namespace ExtendedRequest { 
+namespace ExtendedRequest {
 namespace Utility {
 
 // appendList: Appends one CelList to another.
