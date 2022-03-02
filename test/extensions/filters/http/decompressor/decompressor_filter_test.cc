@@ -206,8 +206,8 @@ decompressor_library:
     expectDecompression(decompressor_ptr, end_with_data);
   }
 
-  void testAcceptEncodingFilter(bool legacy, std::string original_accept_encoding,
-                                std::string final_accept_encoding) {
+  void testAcceptEncodingFilter(bool legacy, const std::string& original_accept_encoding,
+                                const std::string& final_accept_encoding) {
     TestScopedRuntime scoped_runtime;
     if (legacy) {
       Runtime::LoaderSingleton::getExisting()->mergeValues(
@@ -332,11 +332,19 @@ TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingOnlyOnce) 
   // content-type we specify. Also remove q-values from our content-type (if not set, it defaults
   // to 1.0). Test also whitespace in accept-encoding value string.
   testAcceptEncodingFilter(false, "br,mock, mock\t,mock ;q=0.3", "br,mock");
+}
+
+TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingOnlyOnceLegacy) {
   // legacy test to avoid a breaking change
   testAcceptEncodingFilter(true, "br,mock, mock\t,mock ;q=0.3", "br,mock, mock\t,mock ;q=0.3,mock");
+}
 
+TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingRemoveQValue) {
   // If the accept-encoding header had a q-value, it needs to be removed.
   testAcceptEncodingFilter(false, "mock;q=0.6", "mock");
+}
+
+TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingRemoveQValueLegacy) {
   // legacy test to avoid a breaking change
   testAcceptEncodingFilter(true, "mock;q=0.6", "mock;q=0.6,mock");
 }
