@@ -234,8 +234,6 @@ public:
    * @return filter state from the downstream request or connection.
    */
   virtual const StreamInfo::FilterStateSharedPtr& filterState() const PURE;
-  virtual void hashKey(std::vector<uint8_t>& key,
-                       const Network::TransportSocketFactory& factory) const PURE;
 };
 
 using TransportSocketOptionsConstSharedPtr = std::shared_ptr<const TransportSocketOptions>;

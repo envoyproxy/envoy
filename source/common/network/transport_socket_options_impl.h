@@ -32,8 +32,6 @@ public:
   const StreamInfo::FilterStateSharedPtr& filterState() const override {
     return inner_options_->filterState();
   }
-  void hashKey(std::vector<uint8_t>& key,
-               const Network::TransportSocketFactory& factory) const override;
 
 private:
   const std::vector<std::string> alpn_fallback_;
@@ -72,8 +70,6 @@ public:
     return proxy_protocol_options_;
   }
   const StreamInfo::FilterStateSharedPtr& filterState() const override { return filter_state_; }
-  void hashKey(std::vector<uint8_t>& key,
-               const Network::TransportSocketFactory& factory) const override;
 
 private:
   const absl::optional<std::string> override_server_name_;
