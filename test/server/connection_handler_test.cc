@@ -982,7 +982,7 @@ TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedAnyAddressListener) {
 }
 
 TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedAnyAddressListenerOnOldBehavior) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.listener_wildcard_match_ip_family", "false"}});
 
   Network::TcpListenerCallbacks* listener_callbacks;
@@ -1103,7 +1103,7 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
 }
 
 TEST_F(ConnectionHandlerTest, OldBehaviorWildcardListener) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.listener_wildcard_match_ip_family", "false"}});
 
   Network::TcpListenerCallbacks* listener_callbacks1;

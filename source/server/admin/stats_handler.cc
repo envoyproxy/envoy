@@ -501,8 +501,6 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
   Context context(params, *render, response);
   context.collectAndEmitStats(stats);
   render->render();
-
-  return Http::Code::OK;
 }
 
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,

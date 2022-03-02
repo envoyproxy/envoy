@@ -72,6 +72,11 @@ public:
   Http::Code handlerStats(absl::string_view path_and_query,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                           AdminStream&);
+  static Http::Code handlerStats(Stats::Store& stats, bool used_only, bool json,
+                                 const absl::optional<std::regex>& filter,
+                                 Http::ResponseHeaderMap& response_headers,
+                                 Buffer::Instance& response);
+
   Http::Code handlerPrometheusStats(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
