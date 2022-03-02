@@ -18,19 +18,36 @@ namespace CustomCel {
 namespace ExtendedRequest {
 
 using google::api::expr::runtime::CelValue;
+using ::google::api::expr::runtime::ContainerBackedListImpl;
+using ::google::api::expr::runtime::CelMap;
 
 // tests for the custom CEL functions in the reference implementation
+
+CelValue createStrToIntCelMap(Protobuf::Arena& arena, absl::flat_hash_map<std::string, int64_t> map);
 
 class CustomCelFunctionTests : public testing::Test {
 public:
   Protobuf::Arena arena;
   CelValue result;
 
-  void urlFunctionTest(absl::flat_hash_map<std::string, std::string> map,
+  void urlFunctionTest(absl::flat_hash_map<std::string, std::string> headers,
                        absl::StatusCode expected_status_code, absl::string_view expected_url) {
+
+    CelValue headers_cel_map = Utility::createCelMap(arena, headers);
+    evaluateUrlFunction(headers_cel_map, expected_status_code, expected_url);
+  }
+
+  void urlFunctionTestWithBadHeaders(absl::flat_hash_map<std::string, int64_t> bad_headers,
+                       absl::StatusCode expected_status_code, absl::string_view expected_url) {
+
+    CelValue bad_headers_cel_map = createStrToIntCelMap(arena, bad_headers);
+    evaluateUrlFunction(bad_headers_cel_map, expected_status_code, expected_url);    
+  }
+
+  void evaluateUrlFunction(CelValue headers_cel_map,
+                          absl::StatusCode expected_status_code, absl::string_view expected_url) {
     UrlFunction function("url");
-    CelValue cel_map = Utility::createCelMap(arena, map);
-    std::vector<CelValue> input_values = {cel_map};
+    std::vector<CelValue> input_values = {headers_cel_map};
     auto args = absl::Span<CelValue>(input_values);
     absl::Status status = function.Evaluate(args, &result, &arena);
     EXPECT_EQ(status.code(), expected_status_code);
@@ -42,10 +59,27 @@ public:
   }
 };
 
-TEST_F(CustomCelFunctionTests, UrlFunctionTests) {
-  std::vector<std::pair<CelValue, CelValue>> header_key_value_pairs;
-  absl::flat_hash_map<std::string, std::string> map = {{"host", "abc.com:1234"}, {"path", ""}};
+CelValue createStrToIntCelMap(Protobuf::Arena& arena, absl::flat_hash_map<std::string, int64_t> map) {
 
+  std::vector<std::pair<CelValue, CelValue>> key_value_pairs;
+  // create vector of key value pairs from cookies map
+  for (auto& [key, value] : map) {
+    auto key_value_pair =
+        std::make_pair(CelValue::CreateString(Protobuf::Arena::Create<std::string>(&arena, key)),
+                       CelValue::CreateInt64(value));
+    key_value_pairs.push_back(key_value_pair);
+  }
+  std::unique_ptr<CelMap> map_unique_ptr =
+      CreateContainerBackedMap(absl::Span<std::pair<CelValue, CelValue>>(key_value_pairs)).value();
+  // transfer ownership of map from unique_ptr to arena
+  CelMap* map_raw_ptr = map_unique_ptr.release();
+  arena.Own(map_raw_ptr);
+  return CelValue::CreateMap(map_raw_ptr);
+}
+
+TEST_F(CustomCelFunctionTests, UrlFunctionTests) {
+  absl::flat_hash_map<std::string, std::string> map = {{"host", "abc.com:1234"}, {"path", ""}};
+ 
   urlFunctionTest(map, absl::StatusCode::kOk, "abc.com:1234");
 
   map.clear();
@@ -55,11 +89,21 @@ TEST_F(CustomCelFunctionTests, UrlFunctionTests) {
   map.clear();
   map["path"] = "";
   urlFunctionTest(map, absl::StatusCode::kNotFound, "");
+
+  absl::flat_hash_map<std::string, int64_t> str_to_int_map = {{"host", 1}, {"path", 2}};
+
+  urlFunctionTestWithBadHeaders(str_to_int_map, absl::StatusCode::kNotFound, "");
+
+  map.erase("host");
+  urlFunctionTestWithBadHeaders(str_to_int_map, absl::StatusCode::kNotFound, "");
 }
 
 TEST_F(CustomCelFunctionTests, CookieTests) {
   Http::TestRequestHeaderMapImpl request_headers = {
-      {"cookie", "fruit=apple"}, {"cookie", "fruit=banana"}, {"cookie", "veg=carrot"}};
+                            {"cookie", "fruit=apple"}, 
+                            {"cookie", "fruit=banana"}, 
+                            {"cookie", "veg=carrot"}
+                          };
   auto cookie_map = cookie(&arena, request_headers).MapOrDie();
   auto value = (*cookie_map)[CelValue::CreateStringView("fruit")]->StringOrDie().value();
   EXPECT_EQ(value, "apple");
@@ -74,7 +118,10 @@ TEST_F(CustomCelFunctionTests, CookieTests) {
 
 TEST_F(CustomCelFunctionTests, CookieValueTests) {
   Http::TestRequestHeaderMapImpl request_headers = {
-      {"cookie", "fruit=apple"}, {"cookie", "fruit=banana"}, {"cookie", "veg=carrot"}};
+                            {"cookie", "fruit=apple"}, 
+                            {"cookie", "fruit=banana"}, 
+                            {"cookie", "veg=carrot"}
+                          };
   auto cookie_value = cookieValue(&arena, request_headers, CelValue::CreateStringView("fruit"));
   auto value = cookie_value.StringOrDie().value();
   EXPECT_EQ(value, "apple");

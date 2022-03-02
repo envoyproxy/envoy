@@ -50,6 +50,7 @@ envoy_cc_test(
         "@com_google_cel_cpp//eval/public:activation",
         "@com_google_cel_cpp//eval/public:cel_function_registry",
         "@com_google_cel_cpp//eval/public:cel_value",
+        "@com_google_cel_cpp//eval/public/containers:container_backed_map_impl",        
     ],
 )
 

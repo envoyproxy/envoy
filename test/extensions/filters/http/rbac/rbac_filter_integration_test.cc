@@ -810,7 +810,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, RbacWithCustomCelVocabularyIntegrationTests,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Custom CEL Vocabulary - DENY if request[query][key1]==correct_value
-TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelAttributeExprIfMatchDeny) {
+TEST_P(RbacWithCustomCelVocabularyIntegrationTests, QueryIfMatchDeny) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(
       fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
@@ -819,15 +819,14 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelAttributeExprIfMatc
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "GET"},
-          {":path", "/query?key1=correct_value"},
-          {":scheme", "http"},
-          {":authority", "host"},
-          {"x-forwarded-for", "10.0.0.1"},
-      },
-      1024);
+  Http::TestRequestHeaderMapImpl headers{
+    {":method", "GET"},
+    {":path", "/query?key1=correct_value"},
+    {":scheme", "http"},
+    {":authority", "host"},
+    {"x-forwarded-for", "10.0.0.1"},
+  };
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
@@ -838,7 +837,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelAttributeExprIfMatc
 }
 
 // Custom CEL Vocabulary - ALLOW if request[query][key1]!=correct_value
-TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelAttributeExprIfNoMatchAllow) {
+TEST_P(RbacWithCustomCelVocabularyIntegrationTests, QueryIfNoMatchAllow) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(
       fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
@@ -847,15 +846,14 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CustomCelAttributeExprIfNoMa
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "GET"},
-          {":path", "/query?key1=correct_value"},
-          {":scheme", "http"},
-          {":authority", "host"},
-          {"x-forwarded-for", "10.0.0.1"},
-      },
-      1024);
+  Http::TestRequestHeaderMapImpl headers{
+    {":method", "GET"},
+    {":path", "/query?key1=correct_value"},
+    {":scheme", "http"},
+    {":authority", "host"},
+    {"x-forwarded-for", "10.0.0.1"},
+  };
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
@@ -874,16 +872,15 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfMatchDeny) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "GET"},
-          {":path", "/path"},
-          {":scheme", "http"},
-          {":authority", "host"},
-          {"x-forwarded-for", "10.0.0.1"},
-          {"cookie", "fruit=apple"},
-      },
-      1024);
+  Http::TestRequestHeaderMapImpl headers{
+    {":method", "GET"},
+    {":path", "/query?key1=correct_value"},
+    {":scheme", "http"},
+    {":authority", "host"},
+    {"x-forwarded-for", "10.0.0.1"},
+    {"cookie", "fruit=apple"},    
+  };
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
@@ -902,16 +899,15 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfNoMatchAllow) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "GET"},
-          {":path", "/path"},
-          {":scheme", "http"},
-          {":authority", "host"},
-          {"x-forwarded-for", "10.0.0.1"},
-          {"cookie", "fruit=apple"},
-      },
-      1024);
+  Http::TestRequestHeaderMapImpl headers{
+    {":method", "GET"},
+    {":path", "/path"},
+    {":scheme", "http"},
+    {":authority", "host"},
+    {"x-forwarded-for", "10.0.0.1"},
+    {"cookie", "fruit=apple"},    
+  };
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
@@ -930,16 +926,15 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfMatchDeny) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "GET"},
-          {":path", "/path"},
-          {":scheme", "http"},
-          {":authority", "host"},
-          {"x-forwarded-for", "10.0.0.1"},
-          {"cookie", "fruit=apple"},
-      },
-      1024);
+  Http::TestRequestHeaderMapImpl headers{
+    {":method", "GET"},
+    {":path", "/path"},
+    {":scheme", "http"},
+    {":authority", "host"},
+    {"x-forwarded-for", "10.0.0.1"},
+    {"cookie", "fruit=apple"},    
+  };
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
@@ -958,16 +953,15 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfNoMatchAllow) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "GET"},
-          {":path", "/path"},
-          {":scheme", "http"},
-          {":authority", "host"},
-          {"x-forwarded-for", "10.0.0.1"},
-          {"cookie", "fruit=apple"},
-      },
-      1024);
+  Http::TestRequestHeaderMapImpl headers{
+    {":method", "GET"},
+    {":path", "/path"},
+    {":scheme", "http"},
+    {":authority", "host"},
+    {"x-forwarded-for", "10.0.0.1"},
+    {"cookie", "fruit=apple"},    
+  };
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
@@ -986,15 +980,15 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfMatchDeny) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/correct_path"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"},
-                                     {"x-forwarded-for", "10.0.0.1"},
-                                     {"cookie", "fruit=apple"},
-                                     {"host", "abc.com:1234"}},
-      1024);
+  Http::TestRequestHeaderMapImpl headers{
+    {":method", "GET"},
+    {":path", "/correct_path"},
+    {":scheme", "http"},
+    {":authority", "host"},
+    {"x-forwarded-for", "10.0.0.1"},
+    {"host", "abc.com:1234"},    
+  };
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
@@ -1013,15 +1007,15 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfNoMatchAllow) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/correct_path"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"},
-                                     {"x-forwarded-for", "10.0.0.1"},
-                                     {"cookie", "fruit=apple"},
-                                     {"host", "abc.com:1234"}},
-      1024);
+  Http::TestRequestHeaderMapImpl headers{
+    {":method", "GET"},
+    {":path", "/correct_path"},
+    {":scheme", "http"},
+    {":authority", "host"},
+    {"x-forwarded-for", "10.0.0.1"},
+    {"host", "abc.com:1234"}    
+  };
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
