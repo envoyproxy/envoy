@@ -50,7 +50,7 @@ public:
         .WillOnce(
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
     buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
-        *io_handle_, dispatcher_, []() {}, []() {}, cfg_->maxClientHelloSize());
+        *io_handle_, dispatcher_, [](bool) {}, []() {}, cfg_->maxClientHelloSize());
     filter_->onAccept(cb_);
   }
 
@@ -271,7 +271,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
       .WillOnce(
           DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
   buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
-      *io_handle_, dispatcher_, []() {}, []() {}, cfg_->maxClientHelloSize());
+      *io_handle_, dispatcher_, [](bool) {}, []() {}, cfg_->maxClientHelloSize());
 
   filter_->onAccept(cb_);
 #ifdef WIN32

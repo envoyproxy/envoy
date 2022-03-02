@@ -1375,17 +1375,17 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
   EXPECT_CALL(io_handle, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
                                           Event::FileReadyType::Read));
-  EXPECT_CALL(io_handle, recv).WillOnce([&](void*, size_t, int) {
-    return Api::IoCallUint64Result(
-        0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                           Network::IoSocketError::deleteIoError));
-  });
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
       }));
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
   EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
+  EXPECT_CALL(io_handle, recv).WillOnce([&](void*, size_t, int) {
+    return Api::IoCallUint64Result(
+        0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                           Network::IoSocketError::deleteIoError));
+  });
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000), _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
@@ -1434,13 +1434,6 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
       .RetiresOnSaturation();
 
   std::string data = "test";
-  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(
-          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-            ASSERT(length >= data.size());
-            memcpy(buffer, data.data(), data.size());
-            return Api::SysCallSizeResult{ssize_t(data.size()), 0};
-          }));
 
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
@@ -1449,6 +1442,13 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
   EXPECT_CALL(*accepted_socket, ioHandle())
       .WillRepeatedly(ReturnRef(io_handle))
       .RetiresOnSaturation();
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(
+          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= data.size());
+            memcpy(buffer, data.data(), data.size());
+            return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+          }));
   EXPECT_CALL(*test_filter, onData(_))
       .WillOnce(Invoke([&](Network::ListenerFilterBuffer&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
@@ -1508,13 +1508,6 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
       .WillRepeatedly(ReturnRef(io_handle))
       .RetiresOnSaturation();
   std::string data = "test";
-  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(
-          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-            ASSERT(length >= data.size());
-            memcpy(buffer, data.data(), data.size());
-            return Api::SysCallSizeResult{ssize_t(data.size()), 0};
-          }));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
         listener_filter_cb = &cb;
@@ -1523,6 +1516,13 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   EXPECT_CALL(*accepted_socket, ioHandle())
       .WillRepeatedly(ReturnRef(io_handle))
       .RetiresOnSaturation();
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(
+          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= data.size());
+            memcpy(buffer, data.data(), data.size());
+            return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+          }));
   EXPECT_CALL(*test_filter, onData(_))
       .WillOnce(Invoke([&](Network::ListenerFilterBuffer&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
@@ -1571,18 +1571,17 @@ TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
   EXPECT_CALL(io_handle, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
                                           Event::FileReadyType::Read));
-  EXPECT_CALL(io_handle, recv).WillOnce([&](void*, size_t, int) {
-    return Api::IoCallUint64Result(
-        0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                           Network::IoSocketError::deleteIoError));
-  });
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
       }));
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
   EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
-  // EXPECT_CALL(*access_log_, log(_, _, _, _));
+  EXPECT_CALL(io_handle, recv).WillOnce([&](void*, size_t, int) {
+    return Api::IoCallUint64Result(
+        0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                           Network::IoSocketError::deleteIoError));
+  });
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
   EXPECT_CALL(*test_filter, destroy_());
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});

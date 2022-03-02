@@ -48,7 +48,7 @@ public:
         .WillOnce(
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
     buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
-        *io_handle_, dispatcher_, []() {}, []() {}, filter_->maxReadBytes());
+        *io_handle_, dispatcher_, [](bool) {}, []() {}, filter_->maxReadBytes());
   }
 
   void testHttpInspectMultipleReadsSuccess(absl::string_view header, bool http2 = false) {

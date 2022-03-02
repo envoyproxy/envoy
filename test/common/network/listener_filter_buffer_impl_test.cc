@@ -25,9 +25,9 @@ public:
 
     listener_buffer_ = std::make_unique<ListenerFilterBufferImpl>(
         io_handle_, dispatcher_,
-        [&]() {
+        [&](bool error) {
           if (on_close_cb_) {
-            on_close_cb_();
+            on_close_cb_(error);
           }
         },
         [&]() {
@@ -41,8 +41,8 @@ public:
   Network::MockIoHandle io_handle_;
   Event::MockDispatcher dispatcher_;
   uint64_t buffer_size_{512};
-  ListenerFilterBufferOnDataCb on_close_cb_;
-  ListenerFilterBufferOnCloseCb on_data_cb_;
+  ListenerFilterBufferOnDataCb on_data_cb_;
+  ListenerFilterBufferOnCloseCb on_close_cb_;
   Event::FileReadyCb file_event_callback_;
 };
 
@@ -95,7 +95,7 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
 
   // On socket failure
   bool is_closed = false;
-  on_close_cb_ = [&]() { is_closed = true; };
+  on_close_cb_ = [&](bool) { is_closed = true; };
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(Return(
           ByMove(Api::IoCallUint64Result(-1, Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INTR),
@@ -105,7 +105,7 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
 
   // On remote closed
   is_closed = false;
-  on_close_cb_ = [&]() { is_closed = true; };
+  on_close_cb_ = [&](bool) { is_closed = true; };
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(Return(
           ByMove(Api::IoCallUint64Result(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
