@@ -33,6 +33,11 @@ envoy.access_loggers.wasm:
   - envoy.access_loggers
   security_posture: unknown
   status: alpha
+envoy.bootstrap.internal_listener_registry:
+  categories:
+  - envoy.bootstrap
+  security_posture: unknown
+  status: wip
 envoy.bootstrap.wasm:
   categories:
   - envoy.bootstrap

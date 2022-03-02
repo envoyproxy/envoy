@@ -1,18 +1,18 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
-#include "envoy/extensions/io_socket/user_space/v3/internal_listener.pb.h"
+#include "envoy/extensions/bootstrap/internal_listener_registry/v3/internal_listener.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 
-#include "source/extensions/io_socket/user_space/thread_local_registry.h"
+#include "source/extensions/bootstrap/internal_listener_registry/thread_local_registry.h"
 
 #include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace IoSocket {
-namespace UserSpace {
+namespace Bootstrap {
+namespace InternalListenerRegistry {
 
 // This InternalListenerRegistry implementation owns a thread local slot.
 class TlsInternalListenerRegistry : public Singleton::Instance,
@@ -25,7 +25,9 @@ public:
     return nullptr;
   }
 
-  std::unique_ptr<ThreadLocal::TypedSlot<IoSocket::UserSpace::ThreadLocalRegistryImpl>> tls_slot_;
+  std::unique_ptr<
+      ThreadLocal::TypedSlot<Bootstrap::InternalListenerRegistry::ThreadLocalRegistryImpl>>
+      tls_slot_;
 };
 
 // This extension maintains maintain the life of the ``TlsInternalListenerRegistry`` singleton.
@@ -53,12 +55,12 @@ public:
                            Server::Configuration::ServerFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::io_socket::user_space::v3::InternalListenerRegistry>();
+        envoy::extensions::bootstrap::internal_listener_registry::v3::InternalListenerRegistry>();
   }
   std::string name() const override { return "envoy.bootstrap.internal_listener_registry"; };
 };
 
-} // namespace UserSpace
-} // namespace IoSocket
+} // namespace InternalListenerRegistry
+} // namespace Bootstrap
 } // namespace Extensions
 } // namespace Envoy

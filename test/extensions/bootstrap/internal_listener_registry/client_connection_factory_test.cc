@@ -5,7 +5,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/fancy_logger.h"
 #include "source/common/network/address_impl.h"
-#include "source/extensions/io_socket/user_space/client_connection_factory.h"
+#include "source/extensions/bootstrap/internal_listener_registry/client_connection_factory.h"
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -20,8 +20,8 @@ using testing::NiceMock;
 
 namespace Envoy {
 namespace Extensions {
-namespace IoSocket {
-namespace UserSpace {
+namespace Bootstrap {
+namespace InternalListenerRegistry {
 
 namespace {
 
@@ -38,28 +38,28 @@ public:
   ClientConnectionFactoryTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         buf_(1024) {
-    std::tie(io_handle_, io_handle_peer_) = IoHandleFactory::createIoHandlePair();
+    std::tie(io_handle_, io_handle_peer_) =
+        IoSocket::UserSpace::IoHandleFactory::createIoHandlePair();
     EXPECT_CALL(tls_allocator_, allocateSlot());
-    tls_slot_ = ThreadLocal::TypedSlot<IoSocket::UserSpace::ThreadLocalRegistryImpl>::makeUnique(
-        tls_allocator_);
+    tls_slot_ = ThreadLocal::TypedSlot<
+        Bootstrap::InternalListenerRegistry::ThreadLocalRegistryImpl>::makeUnique(tls_allocator_);
     tls_slot_->set([r = registry_](Event::Dispatcher&) { return r; });
     // TODO: restore the original value via RAII.
-    Extensions::IoSocket::UserSpace::InternalClientConnectionFactory::registry_tls_slot_ =
+    Bootstrap::InternalListenerRegistry::InternalClientConnectionFactory::registry_tls_slot_ =
         tls_slot_.get();
   }
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   MockInternalListenerManger internal_listener_manager_;
-  std::shared_ptr<IoSocket::UserSpace::ThreadLocalRegistryImpl> registry_{
-      std::make_shared<IoSocket::UserSpace::ThreadLocalRegistryImpl>()};
+  std::shared_ptr<ThreadLocalRegistryImpl> registry_{std::make_shared<ThreadLocalRegistryImpl>()};
   ThreadLocal::MockInstance tls_allocator_;
-  std::unique_ptr<ThreadLocal::TypedSlot<IoSocket::UserSpace::ThreadLocalRegistryImpl>> tls_slot_;
+  std::unique_ptr<ThreadLocal::TypedSlot<ThreadLocalRegistryImpl>> tls_slot_;
 
   // Owned by IoHandleImpl.
   NiceMock<Event::MockSchedulableCallback>* schedulable_cb_;
-  std::unique_ptr<IoHandleImpl> io_handle_;
-  std::unique_ptr<IoHandleImpl> io_handle_peer_;
+  std::unique_ptr<IoSocket::UserSpace::IoHandleImpl> io_handle_;
+  std::unique_ptr<IoSocket::UserSpace::IoHandleImpl> io_handle_peer_;
   absl::FixedArray<char> buf_;
   Network::Address::EnvoyInternalInstance listener_addr{"listener_internal_address"};
 };
@@ -142,7 +142,7 @@ TEST_F(ClientConnectionFactoryTest, ConnectSucceeds) {
   server_socket->close();
 }
 } // namespace
-} // namespace UserSpace
-} // namespace IoSocket
+} // namespace InternalListenerRegistry
+} // namespace Bootstrap
 } // namespace Extensions
 } // namespace Envoy

@@ -1,19 +1,18 @@
 syntax = "proto3";
 
-package envoy.extensions.io_socket.user_space.v3;
-
-import "google/protobuf/any.proto";
+package envoy.extensions.bootstrap.internal_listener_registry.v3;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "xds/annotations/v3/status.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.io_socket.user_space.v3";
+option java_package = "io.envoyproxy.envoy.extensions.bootstrap.internal_listener_registry.v3";
 option java_outer_classname = "InternalListenerProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/io_socket/user_space/v3;user_spacev3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/bootstrap/internal_listener_registry/v3;internal_listener_registryv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
 
-// [#protodoc-title: Internal Listener]
+// [#protodoc-title: InternalListenerRegistry]
 //
 // This extension contains 2 major components to add a listener with
 // an :ref:`envoy internal address <envoy_v3_api_msg_config.core.v3.EnvoyInternalAddress>`
@@ -29,7 +28,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This factory is implicitly instantiated by the dispatcher to establish a client connection to the above
 // internal listener,
 //
-// [#extension: envoy.io_socket.user_space]
+// [#extension: envoy.bootstrap.internal_listener_registry]
 
 // [#not-implemented-hide:]
 // Configuration for internal listener registry.

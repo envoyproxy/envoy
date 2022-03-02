@@ -1,4 +1,4 @@
-#include "source/extensions/io_socket/user_space/client_connection_factory.h"
+#include "source/extensions/bootstrap/internal_listener_registry/client_connection_factory.h"
 
 #include "envoy/registry/registry.h"
 
@@ -10,10 +10,10 @@
 namespace Envoy {
 
 namespace Extensions {
-namespace IoSocket {
-namespace UserSpace {
+namespace Bootstrap {
+namespace InternalListenerRegistry {
 
-ThreadLocal::TypedSlot<IoSocket::UserSpace::ThreadLocalRegistryImpl>*
+ThreadLocal::TypedSlot<Bootstrap::InternalListenerRegistry::ThreadLocalRegistryImpl>*
     InternalClientConnectionFactory::registry_tls_slot_ = nullptr;
 
 Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnection(
@@ -69,7 +69,7 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
 
 REGISTER_FACTORY(InternalClientConnectionFactory, Network::ClientConnectionFactory);
 
-} // namespace UserSpace
-} // namespace IoSocket
+} // namespace InternalListenerRegistry
+} // namespace Bootstrap
 } // namespace Extensions
 } // namespace Envoy

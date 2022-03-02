@@ -1682,7 +1682,9 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
+        "//source/extensions/bootstrap/internal_listener_regsitry:config",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/io_socket/user_space:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:v2_link_hacks",
         "//test/integration/filters:address_restore_listener_filter_lib",
@@ -1693,8 +1695,6 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-        # TODO: move to extenstion
-        "//source/extensions/io_socket/user_space:config",
     ],
 )
 

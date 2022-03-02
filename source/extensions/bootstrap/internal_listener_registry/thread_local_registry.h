@@ -5,8 +5,8 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace IoSocket {
-namespace UserSpace {
+namespace Bootstrap {
+namespace InternalListenerRegistry {
 
 // The registry is constructed and accessed on each silo.
 class ThreadLocalRegistryImpl : public ThreadLocal::ThreadLocalObject,
@@ -33,7 +33,7 @@ private:
   // The typical instance is the ``ConnectionHandlerImpl`` on the same thread.
   Network::InternalListenerManager* manager_{nullptr};
 };
-} // namespace UserSpace
-} // namespace IoSocket
+} // namespace InternalListenerRegistry
+} // namespace Bootstrap
 } // namespace Extensions
 } // namespace Envoy

@@ -170,8 +170,9 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/matching/input_matchers/consistent_hashing @snowp @donyu
 # environment generic input
 /*/extensions/matching/common_inputs/environment @snowp @donyu
-# user space socket pair and event
+# user space socket pair, event, connection and listener
 /*/extensions/io_socket/user_space @lambdai @antoniovicente
+/*/extensions/bootstrap/internal_listener_registry @lambdai @adisuissa
 # Default UUID4 request ID extension
 /*/extensions/request_id/uuid @mattklein123 @alyssawilk
 # HTTP header formatters
