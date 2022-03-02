@@ -46,9 +46,6 @@ absl::optional<CelValue> ExtendedRequestWrapper::operator[](CelValue key) const 
 // converts std::map to CelMap
 absl::optional<CelValue> ExtendedRequestWrapper::getMapFromQueryStr(absl::string_view url) const {
   QueryParams query_params = parseAndDecodeQueryString(url);
-  if (query_params.empty()) {
-    return CreateErrorValue(&arena_, "query: empty string", absl::StatusCode::kNotFound);
-  }
   return Utility::createCelMap(arena_, query_params);
 }
 

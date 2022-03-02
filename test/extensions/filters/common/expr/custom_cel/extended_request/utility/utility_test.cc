@@ -6,6 +6,7 @@
 #include "eval/public/containers/container_backed_map_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
