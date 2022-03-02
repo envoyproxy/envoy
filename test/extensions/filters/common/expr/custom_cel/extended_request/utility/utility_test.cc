@@ -1,12 +1,12 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/expr/custom_cel/extended_request/utility/utility.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "eval/public/cel_value.h"
 #include "eval/public/containers/container_backed_list_impl.h"
 #include "eval/public/containers/container_backed_map_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
