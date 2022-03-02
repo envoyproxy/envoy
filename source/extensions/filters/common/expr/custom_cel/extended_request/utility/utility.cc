@@ -15,10 +15,10 @@ namespace CustomCel {
 namespace ExtendedRequest {
 namespace Utility {
 
-using ::google::api::expr::runtime::CelList;
-using ::google::api::expr::runtime::CelMap;
-using ::google::api::expr::runtime::CelValue;
-using ::google::api::expr::runtime::ContainerBackedListImpl;
+using google::api::expr::runtime::CelList;
+using google::api::expr::runtime::CelMap;
+using google::api::expr::runtime::CelValue;
+using google::api::expr::runtime::ContainerBackedListImpl;
 
 template <typename M> CelValue createCelMapImpl(Protobuf::Arena& arena, M& map);
 

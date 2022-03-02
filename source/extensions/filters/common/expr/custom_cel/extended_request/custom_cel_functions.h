@@ -34,20 +34,20 @@ class UrlFunction : public ::google::api::expr::runtime::CelFunction {
 public:
   explicit UrlFunction(absl::string_view name)
       : ::google::api::expr::runtime::CelFunction(
-            {std::string(name), true, {::google::api::expr::runtime::CelValue::Type::kMap}}) {}
+            {std::string(name), true, {google::api::expr::runtime::CelValue::Type::kMap}}) {}
 
-  absl::Status Evaluate(absl::Span<const ::google::api::expr::runtime::CelValue> args,
-                        ::google::api::expr::runtime::CelValue* output,
+  absl::Status Evaluate(absl::Span<const google::api::expr::runtime::CelValue> args,
+                        google::api::expr::runtime::CelValue* output,
                         Protobuf::Arena* arena) const override;
 };
 
 // lazy/stateful functions
-::google::api::expr::runtime::CelValue cookie(Protobuf::Arena* arena,
-                                              const Http::RequestHeaderMap& request_header_map);
+google::api::expr::runtime::CelValue cookie(Protobuf::Arena* arena,
+                                            const Http::RequestHeaderMap& request_header_map);
 
-::google::api::expr::runtime::CelValue cookieValue(Protobuf::Arena* arena,
-                                                   const Http::RequestHeaderMap& request_header_map,
-                                                   ::google::api::expr::runtime::CelValue key);
+google::api::expr::runtime::CelValue cookieValue(Protobuf::Arena* arena,
+                                                 const Http::RequestHeaderMap& request_header_map,
+                                                 google::api::expr::runtime::CelValue key);
 
 } // namespace ExtendedRequest
 } // namespace CustomCel

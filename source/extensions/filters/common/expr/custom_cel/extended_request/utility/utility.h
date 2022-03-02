@@ -18,15 +18,15 @@ namespace Utility {
 
 // appendList: Appends one CelList to another.
 // Memory is allocated for it on the arena.
-::google::api::expr::runtime::CelList*
-appendList(Protobuf::Arena& arena, const ::google::api::expr::runtime::CelList* list1,
-           const ::google::api::expr::runtime::CelList* list2);
+google::api::expr::runtime::CelList* appendList(Protobuf::Arena& arena,
+                                                const google::api::expr::runtime::CelList* list1,
+                                                const google::api::expr::runtime::CelList* list2);
 
-::google::api::expr::runtime::CelValue
+google::api::expr::runtime::CelValue
 createCelMap(Protobuf::Arena& arena, absl::flat_hash_map<std::string, std::string> map);
 
-::google::api::expr::runtime::CelValue createCelMap(Protobuf::Arena& arena,
-                                                    std::map<std::string, std::string> map);
+google::api::expr::runtime::CelValue createCelMap(Protobuf::Arena& arena,
+                                                  std::map<std::string, std::string> map);
 
 } // namespace Utility
 } // namespace ExtendedRequest
