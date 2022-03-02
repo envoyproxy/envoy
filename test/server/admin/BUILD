@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -78,17 +77,19 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_benchmark_binary(
-    name = "stats_handler_speed_test",
-    srcs = ["stats_handler_speed_test.cc"],
-    deps = [
-        "//source/common/buffer:buffer_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/stats:thread_local_store_lib",
-        "//source/server/admin:stats_handler_lib",
-        "//test/mocks/server:admin_stream_mocks",
-    ],
-)
+# Temporarily comment this out until https://github.com/envoyproxy/envoy/pull/19693 merges.
+#
+# envoy_cc_benchmark_binary(
+#     name = "stats_handler_speed_test",
+#     srcs = ["stats_handler_speed_test.cc"],
+#     deps = [
+#         "//source/common/buffer:buffer_lib",
+#         "//source/common/http:header_map_lib",
+#         "//source/common/stats:thread_local_store_lib",
+#         "//source/server/admin:stats_handler_lib",
+#         "//test/mocks/server:admin_stream_mocks",
+#     ],
+# )
 
 envoy_cc_test(
     name = "runtime_handler_test",

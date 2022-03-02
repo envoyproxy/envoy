@@ -6,8 +6,6 @@
 #include "source/common/stats/thread_local_store.h"
 #include "source/server/admin/stats_handler.h"
 
-#include "test/mocks/server/admin_stream.h"
-
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
@@ -19,7 +17,7 @@ public:
     // Benchmark will be 10k clusters each with 100 counters, with 100+
     // character names. The first counter in each scope will be given a value so
     // it will be included in 'usedonly'.
-    std::string prefix(100, 'a');
+    const std::string prefix(100, 'a');
     for (uint32_t s = 0; s < 10000; ++s) {
       Stats::ScopeSharedPtr scope = store_.createScope(absl::StrCat("scope_", s));
       scopes_.emplace_back(scope);
