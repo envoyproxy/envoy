@@ -84,10 +84,7 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
               continueFilterChain(false);
             },
             [this](Network::ListenerFilterBuffer& filter_buffer) {
-              // If the filter doesn't need any data, then return directly.
-              if ((*iter_)->maxReadBytes() == 0) {
-                return;
-              }
+              ASSERT((*iter_)->maxReadBytes() > 0);
               Network::FilterStatus status = (*iter_)->onData(filter_buffer);
               if (status == Network::FilterStatus::StopIteration) {
                 if (socket_->ioHandle().isOpen()) {
