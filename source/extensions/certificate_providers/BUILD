@@ -22,6 +22,7 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//envoy/config:subscription_interface",
         "//envoy/registry",
         "@com_google_absl//absl/strings",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

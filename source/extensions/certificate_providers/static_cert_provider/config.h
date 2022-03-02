@@ -18,23 +18,26 @@ public:
 
   Capabilites capabilities() const override { return capabilities_; };
 
-  const std::string& getCACertificate(absl::string_view /* cert_name */) const override {
+  const std::string& getCACertificate(absl::string_view /*cert_name*/) const override {
     return ca_cert_;
   };
 
-  std::list<Certpair> getIdentityCertificates(absl::string_view /* cert_name */) override {
-    return tls_certificates_;
-  };
+  std::list<Certpair> getCertpair(absl::string_view /*cert_name*/) override { return certpairs_; };
 
-  Certpair* generateTlsCertificate(absl::string_view /* server_name */) override {
+  Certpair* generateIdentityCertificate(const SSL_CLIENT_HELLO* /* ssl_client_hello */) override {
     return nullptr;
   };
 
+  // This is static certificate provider, so callbacks and subsription are not used.
+  void onCertpairUpdated(absl::string_view, Certpair) override{};
+  void onCACertUpdated(absl::string_view, const std::string) override{};
+  void onUpatedFailed() override{};
+  void addSubsription(CertificateSubscriptionPtr, std::string) override{};
+
 private:
-  const std::string ca_cert_;
   Capabilites capabilities_;
-  std::list<Certpair> tls_certificates_;
-  std::map<absl::string_view, Certpair> cached_tls_certificates_;
+  const std::string ca_cert_;
+  std::list<Certpair> certpairs_;
 };
 
 class StaticCertificateProviderFactory : public CertificateProviderFactory {

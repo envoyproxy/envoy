@@ -25,7 +25,7 @@ StaticCertificateProvider::StaticCertificateProvider(
   const std::string& cert = Config::DataSource::read(message.certificate(), true, api);
   const std::string& key = Config::DataSource::read(message.private_key(), true, api);
   Certpair certpair = {cert, key};
-  tls_certificates_.emplace_back(certpair);
+  certpairs_.emplace_back(certpair);
 }
 
 } // namespace CertificateProviders
