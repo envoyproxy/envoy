@@ -229,7 +229,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       *persistent_info,
       std::make_shared<quic::QuicCryptoClientConfig>(
           std::make_unique<Quic::EnvoyQuicProofVerifier>(quic_transport_socket_factory.sslCtx()),
-          persistent_info->getQuicSessionCacheDelegate()),
+          persistent_info->createQuicSessionCacheWrapper()),
       quic::QuicServerId(quic_transport_socket_factory.clientContextConfig().serverNameIndication(),
                          static_cast<uint16_t>(addr->ip()->port())),
       *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store);

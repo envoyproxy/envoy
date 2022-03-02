@@ -107,7 +107,7 @@ std::shared_ptr<quic::QuicCryptoClientConfig> Http3ConnPoolImpl::cryptoConfig() 
     client_context_ = context;
     crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
         std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context)),
-        quic_info_.getQuicSessionCacheDelegate());
+        quic_info_.createQuicSessionCacheWrapper());
   }
   // Return the latest client config.
   return crypto_config_;

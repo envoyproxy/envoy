@@ -155,7 +155,7 @@ public:
   AlternateProtocolsCacheSharedPtr alternate_protocols_;
   Stats::IsolatedStoreImpl store_;
   Quic::QuicStatNames quic_stat_names_;
-  std::unique_ptr<Http::PersistentQuicInfo> quic_connection_persistent_info_;
+  PersistentQuicInfoPtr quic_connection_persistent_info_;
   std::unique_ptr<ConnectivityGridForTest> grid_;
   Upstream::HostDescriptionConstSharedPtr host_;
 

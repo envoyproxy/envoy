@@ -25,7 +25,7 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   PersistentQuicInfoImpl(Event::Dispatcher& dispatcher, uint32_t buffer_limit);
 
   // Get a delegate to access the quic session cache.
-  std::unique_ptr<quic::SessionCache> getQuicSessionCacheDelegate();
+  std::unique_ptr<quic::SessionCache> createQuicSessionCacheWrapper();
 
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;

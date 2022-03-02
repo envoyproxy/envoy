@@ -51,7 +51,7 @@ protected:
         context_);
     crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
         std::make_unique<Quic::EnvoyQuicProofVerifier>(factory_->sslCtx()),
-        quic_info_->getQuicSessionCacheDelegate());
+        quic_info_->createQuicSessionCacheWrapper());
   }
 
   uint32_t highWatermark(EnvoyQuicClientSession* session) {

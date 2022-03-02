@@ -9,5 +9,7 @@ struct PersistentQuicInfo {
   virtual ~PersistentQuicInfo() = default;
 };
 
+using PersistentQuicInfoPtr = std::unique_ptr<PersistentQuicInfo>;
+
 } // namespace Http
 } // namespace Envoy

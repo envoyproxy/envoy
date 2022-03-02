@@ -518,7 +518,7 @@ private:
       LoadBalancerPtr lb_;
       ClusterInfoConstSharedPtr cluster_info_;
       Http::AsyncClientImpl http_async_client_;
-      std::unique_ptr<Http::PersistentQuicInfo> quic_info_;
+      Http::PersistentQuicInfoPtr quic_info_;
     };
 
     using ClusterEntryPtr = std::unique_ptr<ClusterEntry>;

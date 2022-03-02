@@ -7,10 +7,13 @@
 namespace Envoy {
 namespace Quic {
 
-// A wrapper class for quic::SessionCache.
-class QuicSessionCacheDelegate : public quic::SessionCache {
+// A wrapper class for quic::SessionCache which delegates interface calls to the
+// wrapped session cache object. This wrapper is owned by quic crypto config and lives within the
+// life time of a HTTP/3 connection pool. It is needed because the wrapped session cache object
+// needs to outlive the connection pool.
+class QuicSessionCacheWrapper : public quic::SessionCache {
 public:
-  explicit QuicSessionCacheDelegate(quic::SessionCache& cache) : cache_(cache) {}
+  explicit QuicSessionCacheWrapper(quic::SessionCache& cache) : cache_(cache) {}
 
   void Insert(const quic::QuicServerId& server_id, bssl::UniquePtr<SSL_SESSION> session,
               const quic::TransportParameters& params,
@@ -46,8 +49,8 @@ PersistentQuicInfoImpl::PersistentQuicInfoImpl(Event::Dispatcher& dispatcher, ui
   quiche::FlagRegistry::getInstance();
 }
 
-std::unique_ptr<quic::SessionCache> PersistentQuicInfoImpl::getQuicSessionCacheDelegate() {
-  return std::make_unique<QuicSessionCacheDelegate>(session_cache_);
+std::unique_ptr<quic::SessionCache> PersistentQuicInfoImpl::createQuicSessionCacheWrapper() {
+  return std::make_unique<QuicSessionCacheWrapper>(session_cache_);
 }
 
 std::unique_ptr<PersistentQuicInfoImpl>

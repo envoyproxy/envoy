@@ -251,7 +251,7 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
           std::make_unique<Quic::EnvoyQuicProofVerifier>(
               quic_transport_socket_factory_ref.sslCtx()),
           dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
-              .getQuicSessionCacheDelegate()),
+              .createQuicSessionCacheWrapper()),
       quic::QuicServerId(
           quic_transport_socket_factory_ref.clientContextConfig().serverNameIndication(),
           static_cast<uint16_t>(port)),

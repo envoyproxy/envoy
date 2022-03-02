@@ -264,7 +264,7 @@ public:
     crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
         std::make_unique<Quic::EnvoyQuicProofVerifier>(transport_socket_factory_->sslCtx()),
         dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
-            .getQuicSessionCacheDelegate());
+            .createQuicSessionCacheWrapper());
     registerTestServerPorts({"http"});
 
     ASSERT(&transport_socket_factory_->clientContextConfig());
