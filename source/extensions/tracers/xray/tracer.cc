@@ -151,12 +151,25 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   return span_ptr;
 }
 
-XRay::SpanPtr Tracer::createNonSampledSpan() const {
+XRay::SpanPtr Tracer::createNonSampledSpan(const Tracing::Config& config,
+                                           const std::string& operation_name,
+                                           Envoy::SystemTime start_time,
+                                           const absl::optional<XRayHeader>& xray_header) const {
   auto span_ptr = std::make_unique<XRay::Span>(time_source_, random_, *daemon_broker_);
   span_ptr->setName(segment_name_);
+  span_ptr->setOperation(operation_name);
+  span_ptr->setDirection(Tracing::HttpTracerUtility::toString(config.operationName()));
+  // Even though we have a TimeSource member in the tracer, we assume the start_time argument has a
+  // more precise value than calling the systemTime() at this point in time.
+  span_ptr->setStartTime(start_time);
   span_ptr->setOrigin(origin_);
-  span_ptr->setTraceId(generateTraceId(time_source_.systemTime(), random_));
   span_ptr->setAwsMetadata(aws_metadata_);
+  if (xray_header) { // there's a previous span that this span should be based-on
+    span_ptr->setParentId(xray_header->parent_id_);
+    span_ptr->setTraceId(xray_header->trace_id_);
+  } else {
+    span_ptr->setTraceId(generateTraceId(time_source_.systemTime(), random_));
+  }
   span_ptr->setSampled(false);
   return span_ptr;
 }
