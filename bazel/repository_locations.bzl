@@ -1118,7 +1118,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/FDio/vpp/archive/{version}.tar.gz"],
         use_category = ["other"],
         extensions = ["envoy.bootstrap.vcl"],
-        release_date = "2021-12-10",
+        release_date = "2022-03-02",
         cpe = "N/A",
     ),
 )
