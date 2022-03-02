@@ -263,6 +263,7 @@ EXTENSIONS = {
 
     "envoy.io_socket.user_space":                       "//source/extensions/io_socket/user_space:config",
     "envoy.bootstrap.internal_listener_registry":       "//source/extensions/bootstrap/internal_listener_registry:config",
+
     #
     # TLS peer certification validators
     #
