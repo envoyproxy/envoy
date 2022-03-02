@@ -83,15 +83,15 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
                     : listener_.stats_.downstream_peek_remote_close_.inc();
               continueFilterChain(false);
             },
-            [this]() {
+            [this](Network::ListenerFilterBuffer& filter_buffer) {
               // If the filter doesn't need any data, then return directly.
               if ((*iter_)->maxReadBytes() == 0) {
                 return;
               }
-              Network::FilterStatus status = (*iter_)->onData(*listener_filter_buffer_);
+              Network::FilterStatus status = (*iter_)->onData(filter_buffer);
               if (status == Network::FilterStatus::StopIteration) {
                 // There is no more data when the buffer reaches the max read bytes.
-                ASSERT(listener_filter_buffer_->length() < listener_filter_max_read_bytes_);
+                ASSERT(filter_buffer.length() < listener_filter_max_read_bytes_);
                 return;
               }
               continueFilterChain(true);

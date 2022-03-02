@@ -30,9 +30,9 @@ public:
             on_close_cb_(error);
           }
         },
-        [&]() {
+        [&](ListenerFilterBuffer& filter_buffer) {
           if (on_data_cb_) {
-            on_data_cb_();
+            on_data_cb_(filter_buffer);
           }
         },
         buffer_size_);
@@ -59,9 +59,9 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
     }
     return Api::IoCallUint64Result(length / 2, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
   });
-  on_data_cb_ = [&]() {
-    EXPECT_EQ(buffer_size_ / 2, listener_buffer_->length());
-    auto raw_buffer = listener_buffer_->rawSlice();
+  on_data_cb_ = [&](ListenerFilterBuffer& filter_buffer) {
+    EXPECT_EQ(buffer_size_ / 2, filter_buffer.length());
+    auto raw_buffer = filter_buffer.rawSlice();
     const char* buf = static_cast<const char*>(raw_buffer.mem_);
     for (uint64_t i = 0; i < raw_buffer.len_; i++) {
       EXPECT_EQ(buf[i], 'a');
@@ -80,9 +80,9 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
     return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
   });
 
-  on_data_cb_ = [&]() {
-    EXPECT_EQ(buffer_size_, listener_buffer_->length());
-    auto raw_buffer = listener_buffer_->rawSlice();
+  on_data_cb_ = [&](ListenerFilterBuffer& filter_buffer) {
+    EXPECT_EQ(buffer_size_, filter_buffer.length());
+    auto raw_buffer = filter_buffer.rawSlice();
     const char* buf = static_cast<const char*>(raw_buffer.mem_);
     for (uint64_t i = 0; i < buffer_size_ / 2; i++) {
       EXPECT_EQ(buf[i], 'a');
@@ -135,9 +135,9 @@ TEST_F(ListenerFilterBufferImplTest, DrainData) {
     }
     return Api::IoCallUint64Result(length / 2, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
   });
-  on_data_cb_ = [&]() {
-    EXPECT_EQ(buffer_size_ / 2, listener_buffer_->length());
-    auto raw_buffer = listener_buffer_->rawSlice();
+  on_data_cb_ = [&](ListenerFilterBuffer& filter_buffer) {
+    EXPECT_EQ(buffer_size_ / 2, filter_buffer.length());
+    auto raw_buffer = filter_buffer.rawSlice();
     const char* buf = static_cast<const char*>(raw_buffer.mem_);
     for (uint64_t i = 0; i < raw_buffer.len_; i++) {
       EXPECT_EQ(buf[i], 'a');
@@ -187,8 +187,8 @@ TEST_F(ListenerFilterBufferImplTest, DrainData) {
     }
     return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
   });
-  on_data_cb_ = [&]() {
-    auto raw_slice = listener_buffer_->rawSlice();
+  on_data_cb_ = [&](ListenerFilterBuffer& filter_buffer) {
+    auto raw_slice = filter_buffer.rawSlice();
     EXPECT_EQ(buffer_size_ - drained_size, raw_slice.len_);
     buf = static_cast<const char*>(raw_slice.mem_);
     for (uint64_t i = 0; i < raw_slice.len_; i++) {

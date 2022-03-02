@@ -86,7 +86,7 @@ void ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
 
   auto state = peekFromSocket();
   if (state == PeekState::Done) {
-    on_data_cb_();
+    on_data_cb_(*this);
   } else if (state == PeekState::Error) {
     on_close_cb_(true);
   } else if (state == PeekState::RemoteClose) {

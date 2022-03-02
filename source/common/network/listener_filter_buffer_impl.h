@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Network {
 
 using ListenerFilterBufferOnCloseCb = std::function<void(bool)>;
-using ListenerFilterBufferOnDataCb = std::function<void()>;
+using ListenerFilterBufferOnDataCb = std::function<void(ListenerFilterBuffer&)>;
 
 enum class PeekState {
   // Peek data status successful.
