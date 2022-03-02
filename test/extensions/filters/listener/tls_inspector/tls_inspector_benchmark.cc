@@ -78,7 +78,8 @@ static void BM_TlsInspector(benchmark::State& state) {
   NiceMock<FastMockDispatcher> dispatcher;
   FastMockListenerFilterCallbacks cb(socket);
   Network::ListenerFilterBufferImpl buffer(
-      socket.ioHandle(), dispatcher, [](bool) {}, []() {}, cfg->maxClientHelloSize());
+      socket.ioHandle(), dispatcher, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
+      cfg->maxClientHelloSize());
   dispatcher.file_event_callback_(Event::FileReadyType::Read);
 
   for (auto _ : state) {
