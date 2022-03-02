@@ -33,11 +33,11 @@ public:
     std::vector<CelValue> input_values = {cel_map};
     auto args = absl::Span<CelValue>(input_values);
     absl::Status status = function.Evaluate(args, &result, &arena);
-    ASSERT_EQ(status.code(), expected_status_code);
+    EXPECT_EQ(status.code(), expected_status_code);
     if (status.ok()) {
-      ASSERT_EQ(result.StringOrDie().value(), expected_url);
+      EXPECT_EQ(result.StringOrDie().value(), expected_url);
     } else {
-      ASSERT_TRUE(result.IsError());
+      EXPECT_TRUE(result.IsError());
     }
   }
 };
@@ -62,14 +62,14 @@ TEST_F(CustomCelFunctionTests, CookieTests) {
       {"cookie", "fruit=apple"}, {"cookie", "fruit=banana"}, {"cookie", "veg=carrot"}};
   auto cookie_map = cookie(&arena, request_headers).MapOrDie();
   auto value = (*cookie_map)[CelValue::CreateStringView("fruit")]->StringOrDie().value();
-  ASSERT_EQ(value, "apple");
+  EXPECT_EQ(value, "apple");
   value = (*cookie_map)[CelValue::CreateStringView("veg")]->StringOrDie().value();
-  ASSERT_EQ(value, "carrot");
+  EXPECT_EQ(value, "carrot");
 
   Http::TestRequestHeaderMapImpl no_cookie_request_headers = {{"path", "/query?a=apple"}};
   auto error = cookie(&arena, no_cookie_request_headers);
-  ASSERT_TRUE(error.IsError());
-  ASSERT_EQ(error.ErrorOrDie()->message(), "cookie() no cookies found");
+  EXPECT_TRUE(error.IsError());
+  EXPECT_EQ(error.ErrorOrDie()->message(), "cookie() no cookies found");
 }
 
 TEST_F(CustomCelFunctionTests, CookieValueTests) {
@@ -77,19 +77,19 @@ TEST_F(CustomCelFunctionTests, CookieValueTests) {
       {"cookie", "fruit=apple"}, {"cookie", "fruit=banana"}, {"cookie", "veg=carrot"}};
   auto cookie_value = cookieValue(&arena, request_headers, CelValue::CreateStringView("fruit"));
   auto value = cookie_value.StringOrDie().value();
-  ASSERT_EQ(value, "apple");
+  EXPECT_EQ(value, "apple");
   cookie_value = cookieValue(&arena, request_headers, CelValue::CreateStringView("veg"));
   value = cookie_value.StringOrDie().value();
-  ASSERT_EQ(value, "carrot");
+  EXPECT_EQ(value, "carrot");
 
   auto error = cookieValue(&arena, request_headers, CelValue::CreateStringView("legume"));
   ASSERT_TRUE(error.IsError());
-  ASSERT_EQ(error.ErrorOrDie()->message(), "cookieValue() cookie value not found");
+  EXPECT_EQ(error.ErrorOrDie()->message(), "cookieValue() cookie value not found");
 
   Http::TestRequestHeaderMapImpl no_cookie_request_headers = {{"path", "/query?a=apple"}};
   error = cookieValue(&arena, no_cookie_request_headers, CelValue::CreateStringView("fruit"));
   ASSERT_TRUE(error.IsError());
-  ASSERT_EQ(error.ErrorOrDie()->message(), "cookieValue() cookie value not found");
+  EXPECT_EQ(error.ErrorOrDie()->message(), "cookieValue() cookie value not found");
 }
 
 } // namespace ExtendedRequest

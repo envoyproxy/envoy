@@ -46,15 +46,10 @@ absl::optional<CelValue> ExtendedRequestWrapper::operator[](CelValue key) const 
 // converts std::map to CelMap
 absl::optional<CelValue> ExtendedRequestWrapper::getMapFromQueryStr(absl::string_view url) const {
   QueryParams query_params = parseAndDecodeQueryString(url);
-  std::vector<std::pair<CelValue, CelValue>> key_value_pairs;
-  // create vector of key value pairs from QueryParams map
-  for (const auto& [key, value] : query_params) {
-    auto key_value_pair = std::make_pair(
-        CelValue::CreateString(Protobuf::Arena::Create<std::string>(&arena_, key)),
-        CelValue::CreateString(Protobuf::Arena::Create<std::string>(&arena_, value)));
-    key_value_pairs.push_back(key_value_pair);
+  if (query_params.empty()) {
+    return CreateErrorValue(&arena_, "query: empty string", absl::StatusCode::kNotFound);
   }
-  return Utility::createCelMap(arena_, key_value_pairs);
+  return Utility::createCelMap(arena_, query_params);
 }
 
 } // namespace ExtendedRequest

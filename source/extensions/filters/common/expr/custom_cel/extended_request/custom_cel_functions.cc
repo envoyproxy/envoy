@@ -18,8 +18,8 @@ namespace CustomCel {
 namespace ExtendedRequest {
 
 using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::Utility::createCelMap;
-using google::api::expr::runtime::CelValue;
-using google::api::expr::runtime::CreateErrorValue;
+using ::google::api::expr::runtime::CelValue;
+using ::google::api::expr::runtime::CreateErrorValue;
 using Http::Utility::parseCookies;
 using Http::Utility::parseCookieValue;
 
@@ -33,8 +33,6 @@ absl::Status UrlFunction::Evaluate(absl::Span<const CelValue> args, CelValue* ou
   }
   auto path = (*request_header_map)[CelValue::CreateStringView(Path)];
   if (!path.has_value() || !path->IsString()) {
-    if (!path.has_value()) {
-    }
     *output = CreateErrorValue(arena, "url() path missing", absl::StatusCode::kNotFound);
     return absl::NotFoundError("url() path missing");
   }
@@ -48,15 +46,7 @@ CelValue cookie(Protobuf::Arena* arena, const Http::RequestHeaderMap& request_he
   if (cookies.empty()) {
     return CreateErrorValue(arena, "cookie() no cookies found", absl::StatusCode::kNotFound);
   }
-  std::vector<std::pair<CelValue, CelValue>> key_value_pairs;
-  // create vector of key value pairs from cookies map
-  for (const auto& [key, value] : cookies) {
-    auto key_value_pair =
-        std::make_pair(CelValue::CreateString(Protobuf::Arena::Create<std::string>(arena, key)),
-                       CelValue::CreateString(Protobuf::Arena::Create<std::string>(arena, value)));
-    key_value_pairs.push_back(key_value_pair);
-  }
-  return Utility::createCelMap(*arena, key_value_pairs);
+  return Utility::createCelMap(*arena, cookies);
 }
 
 CelValue cookieValue(Protobuf::Arena* arena, const Http::RequestHeaderMap& request_header_map,

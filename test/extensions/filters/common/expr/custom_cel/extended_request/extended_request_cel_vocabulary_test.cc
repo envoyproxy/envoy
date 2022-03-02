@@ -57,19 +57,19 @@ TEST(ExtendedRequestCelVocabularyFactoryTests, CreateCustomCelVocabularyFromProt
   // validation visitor
   EXPECT_NO_THROW(custom_cel_vocabulary = factory.createCustomCelVocabulary(
                       config, ProtobufMessage::getStrictValidationVisitor()));
-  ASSERT_TRUE(custom_cel_vocabulary);
+  EXPECT_TRUE(custom_cel_vocabulary);
   ExtendedRequestCelVocabulary* extended_request_cel_vocabulary =
       dynamic_cast<ExtendedRequestCelVocabulary*>(custom_cel_vocabulary.get());
-  ASSERT_TRUE(extended_request_cel_vocabulary->returnUrlQueryStringAsMap());
+  EXPECT_TRUE(extended_request_cel_vocabulary->returnUrlQueryStringAsMap());
 }
 
 TEST(ExtendedRequestCelVocabularyFactoryTests, CreateEmptyConfigProtoTest) {
   ExtendedRequestCelVocabularyFactory factory;
   ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
-  ASSERT_TRUE(message);
+  EXPECT_TRUE(message);
   ExtendedRequestCelVocabularyConfig* extended_request_cel_vocab_config =
       dynamic_cast<ExtendedRequestCelVocabularyConfig*>(message.get());
-  ASSERT_TRUE(extended_request_cel_vocab_config);
+  EXPECT_TRUE(extended_request_cel_vocab_config);
 }
 
 TEST(ExtendedRequestCelVocabularyFactoryTests, FactoryCategoryTest) {
@@ -104,7 +104,7 @@ TEST_F(ExtendedRequestCelVocabularyTests, FillActivationTest) {
 
   // verify that the variable sets are in the activation
   for (int i = 0; static_cast<size_t>(i) < attribute_set_names.size(); ++i) {
-    ASSERT_TRUE(activation.FindValue(attribute_set_names[i], &arena).has_value());
+    EXPECT_TRUE(activation.FindValue(attribute_set_names[i], &arena).has_value());
   }
   // verify that the functions are in the activation
   for (int i = 0; static_cast<size_t>(i) < lazy_function_names.size(); ++i) {
@@ -122,7 +122,7 @@ TEST_F(ExtendedRequestCelVocabularyTests, FillActivationWithNullRequestHeadersTe
                                        nullptr);
   // verify that value producers have not been added
   for (int i = 0; static_cast<size_t>(i) < attribute_set_names.size(); ++i) {
-    ASSERT_FALSE(activation.FindValue(attribute_set_names[i], &arena).has_value());
+    EXPECT_FALSE(activation.FindValue(attribute_set_names[i], &arena).has_value());
   }
   // verify that the functions are NOT in the activation
   for (int i = 0; static_cast<size_t>(i) < lazy_function_names.size(); ++i) {
@@ -183,7 +183,7 @@ TEST_F(ExtendedRequestCelVocabularyTests,
   // The check for custom CEL fields should evaluate to false.
   auto has_custom_field_status = evaluateExpressionWithCustomCelVocabulary(
       activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
-  ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() &&
+  EXPECT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() &&
               !has_custom_field_status.value().BoolOrDie());
 
   custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
@@ -193,8 +193,7 @@ TEST_F(ExtendedRequestCelVocabularyTests,
   // The check for custom CEL fields should evaluate to true.
   has_custom_field_status = evaluateExpressionWithCustomCelVocabulary(
       activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
-  ASSERT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() &&
-              has_custom_field_status.value().BoolOrDie());
+  EXPECT_TRUE(has_custom_field_status.value().BoolOrDie());
 }
 
 TEST_F(ExtendedRequestCelVocabularyTests, AddCustomMappingsToActivationTwiceTest) {
@@ -234,7 +233,7 @@ TEST_F(ExtendedRequestCelVocabularyTests, AddCustomMappingsToActivationTwiceTest
 
   // verify that the attribute sets are in the activation
   for (int i = 0; static_cast<size_t>(i) < attribute_set_names.size(); ++i) {
-    ASSERT_TRUE(activation.FindValue(attribute_set_names[i], &arena).has_value());
+    EXPECT_TRUE(activation.FindValue(attribute_set_names[i], &arena).has_value());
   }
   // verify that the functions are in the activation
   for (int i = 0; static_cast<size_t>(i) < lazy_function_names.size(); ++i) {

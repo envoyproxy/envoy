@@ -36,6 +36,13 @@ TEST_F(ExtendedRequestAttributesTests, ListKeysTest) {
             ExtendedRequestList.size() + request_vars.ListKeys()->size());
 }
 
+TEST_F(ExtendedRequestAttributesTests, NonStringKeyTest) {
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/query?"}};
+  ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, false);
+  auto value = extended_request_vars[CelValue::CreateInt64(0)];
+  EXPECT_FALSE(value.has_value());
+}
+
 TEST_F(ExtendedRequestAttributesTests, EmptyQueryStringTest) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/query?"}};
   ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, false);
@@ -57,7 +64,7 @@ TEST_F(ExtendedRequestAttributesTests, QueryWithNoPathTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, false);
   bool isError = extended_request_vars[CelValue::CreateStringView("query")]->IsError();
-  ASSERT_TRUE(isError);
+  EXPECT_TRUE(isError);
 }
 
 TEST_F(ExtendedRequestAttributesTests, QueryAsStringTest) {

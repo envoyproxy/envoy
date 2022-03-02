@@ -26,7 +26,7 @@ namespace ExtendedRequest {
 constexpr absl::string_view Query = "query";
 
 // ExtendedRequestList: keys, returned by ListKeys for ExtendedRequestWrapper
-const google::api::expr::runtime::ContainerBackedListImpl ExtendedRequestList{{
+const ::google::api::expr::runtime::ContainerBackedListImpl ExtendedRequestList{{
     CelValue::CreateStringView(Query),
 }};
 
@@ -42,9 +42,9 @@ public:
     keys_ = Utility::appendList(arena_, RequestWrapper::ListKeys(), &ExtendedRequestList);
   }
   absl::optional<google::api::expr::runtime::CelValue>
-  operator[](google::api::expr::runtime::CelValue key) const override;
+  operator[](::google::api::expr::runtime::CelValue key) const override;
 
-  const google::api::expr::runtime::CelList* ListKeys() const override { return keys_; }
+  const ::google::api::expr::runtime::CelList* ListKeys() const override { return keys_; }
 
 private:
   absl::optional<CelValue> getMapFromQueryStr(absl::string_view query) const;
@@ -52,7 +52,7 @@ private:
   const bool return_url_query_string_as_map_;
   const Http::RequestHeaderMap* request_header_map_;
   // keys of base class and the derived class
-  const google::api::expr::runtime::CelList* keys_;
+  const ::google::api::expr::runtime::CelList* keys_;
 };
 
 } // namespace ExtendedRequest
