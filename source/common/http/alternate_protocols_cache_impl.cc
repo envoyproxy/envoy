@@ -107,19 +107,28 @@ AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
     : time_source_(time_source), key_value_store_(std::move(key_value_store)),
       max_entries_(max_entries > 0 ? max_entries : 1024) {
   if (key_value_store_) {
-    KeyValueStore::ConstIterateCb load = [this](const std::string& key, const std::string& value) {
-      absl::optional<OriginData> origin_data = originDataFromString(value, time_source_, true);
-      absl::optional<Origin> origin = stringToOrigin(key);
-      if (origin_data.has_value() && origin.has_value()) {
-        setAlternativesImpl(origin.value(), origin_data.value().protocols);
-        setSrtt(origin.value(), origin_data.value().srtt);
-      } else {
-        ENVOY_LOG(warn,
-                  fmt::format("Unable to parse cache entry with key: {} value: {}", key, value));
-      }
-      return KeyValueStore::Iterate::Continue;
-    };
-    key_value_store_->iterate(load);
+    std::vector<std::pair<Origin, OriginData>> queued_origin_updates;
+
+    KeyValueStore::ConstIterateCb delayed_load =
+        [&queued_origin_updates, &time_source = time_source_](const std::string& key,
+                                                              const std::string& value) {
+          absl::optional<OriginData> origin_data = originDataFromString(value, time_source, true);
+          absl::optional<Origin> origin = stringToOrigin(key);
+          if (origin_data.has_value() && origin.has_value()) {
+            queued_origin_updates.emplace_back(origin.value(), origin_data.value());
+          } else {
+            ENVOY_LOG(warn, fmt::format("Unable to parse cache entry with key: {} value: {}", key,
+                                        value));
+          }
+          return KeyValueStore::Iterate::Continue;
+        };
+    key_value_store_->iterate(delayed_load);
+
+    // Apply updates.
+    for (auto& [origin, origin_data] : queued_origin_updates) {
+      setAlternativesImpl(origin, origin_data.protocols);
+      setSrtt(origin, origin_data.srtt);
+    }
   }
 }
 

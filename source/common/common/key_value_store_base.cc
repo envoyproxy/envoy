@@ -1,5 +1,7 @@
 #include "source/common/common/key_value_store_base.h"
 
+#include "absl/cleanup/cleanup.h"
+
 namespace Envoy {
 namespace {
 
@@ -63,8 +65,10 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents,
 }
 
 void KeyValueStoreBase::addOrUpdate(absl::string_view key, absl::string_view value) {
-  store_.erase(key);
-  store_.emplace(key, value);
+  // Avoids rehashing if the key already exists, moving the value into the map.
+  // If the key did not already exists, inserts both into the map, which
+  // might trigger a rehash.
+  store_.insert_or_assign(key, std::string(value));
   if (!flush_timer_->enabled()) {
     flush();
   }
@@ -86,6 +90,16 @@ absl::optional<absl::string_view> KeyValueStoreBase::get(absl::string_view key) 
 }
 
 void KeyValueStoreBase::iterate(ConstIterateCb cb) const {
+#ifndef NDEBUG
+  // When running in debug mode, verify we don't modify the underlying store
+  // while iterating.
+  absl::flat_hash_map store_before_iteration = store_;
+  absl::Cleanup verify_store_is_not_modified = [this, &store_before_iteration] {
+    ASSERT(store_ == store_before_iteration,
+           "Expected iterate to not modify the underlying store.");
+  };
+#endif
+
   for (const auto& [key, value] : store_) {
     Iterate ret = cb(key, value);
     if (ret == Iterate::Break) {

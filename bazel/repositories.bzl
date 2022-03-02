@@ -681,6 +681,10 @@ def _com_google_absl():
         name = "abseil_status",
         actual = "@com_google_absl//absl/status",
     )
+    native.bind(
+        name = "abseil_cleanup",
+        actual = "@com_google_absl//absl/cleanup:cleanup",
+    )
 
 def _com_google_protobuf():
     external_http_archive(
