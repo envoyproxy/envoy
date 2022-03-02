@@ -1,0 +1,3 @@
+Flask==2.0.3
+requests==2.18.4
+psycopg2-binary

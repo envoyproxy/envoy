@@ -1,7 +1,8 @@
 FROM alpine:latest
 
 RUN apk update && apk add py3-pip
-RUN pip3 install -q Flask==2.0.3
+Add requirements.txt /requirements.txt
+RUN pip3 install -q -r /requirements.txt
 RUN mkdir /code
 ADD ./service.py ./index.html /code/
 

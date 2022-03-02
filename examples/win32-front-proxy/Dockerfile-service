@@ -3,7 +3,8 @@ FROM envoyproxy/envoy-windows-dev:latest
 COPY ./setup_python.ps1 /
 
 RUN powershell.exe .\\setup_python.ps1
-RUN pip3 install -q Flask==2.0.3 requests==2.18.4
+Add requirements.txt /requirements.txt
+RUN pip3 install -q -r /requirements.txt
 
 RUN powershell mkdir code
 ADD ./service.py ./code
