@@ -30,7 +30,7 @@ public:
       tls_slot_;
 };
 
-// This extension maintains maintain the life of the ``TlsInternalListenerRegistry`` singleton.
+// This extension maintains the life of the ``TlsInternalListenerRegistry`` singleton.
 // The ``TlsInternalListenerRegistry`` is functionally ready after the Envoy thread local system is
 // initialized.
 class InternalListenerExtension : public Server::BootstrapExtension {

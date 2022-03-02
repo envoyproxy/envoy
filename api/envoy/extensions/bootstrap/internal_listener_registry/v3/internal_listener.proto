@@ -26,12 +26,11 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // 2. The client connection factory `network.connection.client.envoy_internal`
 //
 // This factory is implicitly instantiated by the dispatcher to establish a client connection to the above
-// internal listener,
+// internal listener.
 //
 // [#extension: envoy.bootstrap.internal_listener_registry]
 
 // [#not-implemented-hide:]
 // Configuration for internal listener registry.
-// [#extension-category: envoy.bootstrap]
 message InternalListenerRegistry {
 }
