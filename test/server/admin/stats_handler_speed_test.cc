@@ -32,12 +32,12 @@ public:
 
   /**
    * Issues an admin request against the stats saved in store_.
-   *
-   * @param path the admin endpoint to query.
-   * @return the Http Code and the response body as a string.
    */
-  uint64_t handlerStats(bool used_only, bool json, const absl::optional<std::regex>& filter) {
-    Admin::RequestPtr request = StatsHandler::makeRequest(store_, used_only, json, filter);
+  uint64_t handlerStats(bool used_only, bool json,
+                        Utility::HistogramBucketsMode histogram_buckets_mode,
+                        const absl::optional<std::regex>& filter) {
+    Admin::RequestPtr request = StatsHandler::makeRequest(store_, used_only, json,
+                                                          histogram_buckets_mode, filter);
     auto response_headers = Http::ResponseHeaderMapImpl::create();
     request->start(*response_headers);
     Buffer::OwnedImpl data;

@@ -11,6 +11,7 @@
 
 #include "source/common/stats/histogram_impl.h"
 #include "source/server/admin/handler_ctx.h"
+#include "source/server/admin/utils.h"
 
 #include "absl/strings/string_view.h"
 
@@ -47,6 +48,7 @@ public:
 
   Admin::RequestPtr makeRequest(absl::string_view path, AdminStream& admin_stream);
   static Admin::RequestPtr makeRequest(Stats::Store& stats, bool used_only, bool json,
+                                       Utility::HistogramBucketsMode histogram_buckets_mode,
                                        const absl::optional<std::regex>& regex);
 
   class JsonRender;
@@ -56,6 +58,24 @@ public:
 
 private:
   friend class StatsHandlerTest;
+
+  static std::string computeDisjointBucketSummary(const Stats::ParentHistogramSharedPtr& histogram);
+
+  static void statsAsJsonQuantileSummaryHelper(
+      Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
+      const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
+      const absl::optional<std::regex>& regex);
+
+  static void statsAsJsonHistogramBucketsHelper(
+      Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
+      const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
+      const absl::optional<std::regex>& regex,
+      std::function<std::vector<uint64_t>(const Stats::HistogramStatistics&)> computed_buckets);
+
+  static ProtobufWkt::Value statsAsJsonHistogramBucketsCreateHistogramElementHelper(
+      Stats::ConstSupportedBuckets& supported_buckets,
+      const std::vector<uint64_t>& interval_buckets,
+      const std::vector<uint64_t>& cumulative_buckets, const std::string& name);
 };
 
 } // namespace Server
