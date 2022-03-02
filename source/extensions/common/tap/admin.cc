@@ -127,7 +127,6 @@ AdminHandler::createPerTapSinkHandle(uint64_t,
   case ProtoOutputSinkType::kBufferedAdmin:
     return std::make_unique<BufferedPerTapSinkHandle>(*this, attached_request_->traceBuffer());
   case ProtoOutputSinkType::kFilePerTap:
-    PANIC("not implemented");
   case ProtoOutputSinkType::kStreamingGrpc:
     PANIC("not implemented");
   case ProtoOutputSinkType::OUTPUT_SINK_TYPE_NOT_SET:
@@ -274,8 +273,6 @@ void AdminHandler::AttachedRequest::streamMsg(const Protobuf::Message& message, 
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
     output_string = MessageUtil::getJsonStringFromMessageOrError(message, true, true);
     break;
-  case envoy::config::tap::v3::OutputSink::PROTO_BINARY:
-    PANIC("not implemented");
   case envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED: {
     Protobuf::io::StringOutputStream stream(&output_string);
     Protobuf::io::CodedOutputStream coded_stream(&stream);
@@ -283,6 +280,7 @@ void AdminHandler::AttachedRequest::streamMsg(const Protobuf::Message& message, 
     message.SerializeWithCachedSizes(&coded_stream);
     break;
   }
+  case envoy::config::tap::v3::OutputSink::PROTO_BINARY:
   case envoy::config::tap::v3::OutputSink::PROTO_TEXT:
     PANIC("not implemented");
   }

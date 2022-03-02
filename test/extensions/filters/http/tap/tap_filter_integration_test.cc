@@ -842,6 +842,52 @@ tap_config:
   admin_client_->close();
 }
 
+// Verify Sending more traces than expected still returns the expected size buffer
+TEST_P(TapIntegrationTest, AdminBufferedTapOverBuffering) {
+  using TraceWrapper = envoy::data::tap::v3::TraceWrapper;
+  using namespace std::chrono_literals;
+  const int num_req = 4; // # of requests to buffer before responding
+
+  initializeFilter(admin_filter_config_);
+
+  // Initial request / response with no tap
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+
+  const std::string admin_request_yaml = R"EOF(
+config_id: test_config_id
+tap_config:
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - format: PROTO_BINARY_LENGTH_DELIMITED
+        buffered_admin:
+          max_traces: {}
+  )EOF";
+
+  startAdminRequest(fmt::format(admin_request_yaml, num_req));
+
+  // Make num_req tapped requests
+  for (size_t i = 0; i < num_req * 2; i++) {
+    makeRequest(request_headers_no_tap_, {{std::to_string(i) + "request"}}, nullptr,
+                response_headers_no_tap_, {{std::to_string(i) + "response"}}, nullptr);
+  }
+
+  auto result = admin_response_->waitForEndStream();
+  RELEASE_ASSERT(result, result.message());
+
+  std::vector<TraceWrapper> traces;
+  parseLengthDelimited(admin_response_.get(), traces);
+
+  // Assert we buffered num_req traces as required
+  EXPECT_EQ(traces.size(), num_req);
+
+  admin_response_->clearBody();
+  admin_client_->close();
+}
+
+
 // Verify both request and response trailer matching works.
 TEST_P(TapIntegrationTest, AdminTrailers) {
   initializeFilter(admin_filter_config_);
