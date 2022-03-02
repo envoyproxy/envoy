@@ -71,7 +71,7 @@ PeekState ListenerFilterBufferImpl::peekFromSocket() {
   // Remote closed
   if (result.return_value_ == 0) {
     ENVOY_LOG(debug, "recv failed: remote closed");
-    return PeekState::Error;
+    return PeekState::RemoteClose;
   }
   data_size_ = result.return_value_;
   ASSERT(data_size_ <= buffer_size_);
@@ -86,7 +86,9 @@ void ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
   if (state == PeekState::Done) {
     on_data_cb_();
   } else if (state == PeekState::Error) {
-    on_close_cb_();
+    on_close_cb_(true);
+  } else if (state == PeekState::RemoteClose) {
+    on_close_cb_(false);
   }
   // Did nothing for `Api::IoError::IoErrorCode::Again`
 }

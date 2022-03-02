@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Network {
 
-using ListenerFilterBufferOnCloseCb = std::function<void()>;
+using ListenerFilterBufferOnCloseCb = std::function<void(bool)>;
 using ListenerFilterBufferOnDataCb = std::function<void()>;
 
 enum class PeekState {
@@ -21,7 +21,9 @@ enum class PeekState {
   // Need to try again.
   Again,
   // Error to peek data.
-  Error
+  Error,
+  // Connection closed by remote.
+  RemoteClose,
 };
 
 class ListenerFilterBufferImpl : public ListenerFilterBuffer, Logger::Loggable<Logger::Id::filter> {
@@ -32,9 +34,7 @@ public:
 
   // ListenerFilterBuffer
   const Buffer::ConstRawSlice rawSlice() const override;
-  // ListenerFilterBuffer
   void drain(uint64_t length) override;
-  // ListenerFilterBuffer
   uint64_t length() const override { return data_size_; }
 
   /**

@@ -171,6 +171,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataFailedWithInitPeek) {
       .WillOnce(Return(
           ByMove(Api::IoCallUint64Result(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
   generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true);
+  EXPECT_EQ(generic_active_listener_->stats_.downstream_peek_error_.value(), 1);
 }
 
 /**
@@ -206,6 +207,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataFailedWithPeek) {
                                                      Network::IoSocketError::deleteIoError)))));
 
   file_event_callback(Event::FileReadyType::Read);
+  EXPECT_EQ(generic_active_listener_->stats_.downstream_peek_error_.value(), 1);
 }
 
 /**
@@ -278,18 +280,39 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose) {
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(
           inspect_size_ / 2, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
-  EXPECT_CALL(io_handle_, close)
-      .WillOnce(Return(
-          ByMove(Api::IoCallUint64Result(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
   // the filter is looking for more data
   EXPECT_CALL(*filter_, onData(_)).WillOnce(Return(Network::FilterStatus::StopIteration));
   generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true);
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(Return(
           ByMove(Api::IoCallUint64Result(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
-
+  EXPECT_CALL(io_handle_, close)
+      .WillOnce(Return(
+          ByMove(Api::IoCallUint64Result(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
   // emit the read event
   file_event_callback(Event::FileReadyType::Read);
+  EXPECT_EQ(generic_active_listener_->stats_.downstream_peek_remote_close_.value(), 1);
+}
+
+/**
+ * Trigger the file closed event at initial peek.
+ */
+TEST_F(ActiveTcpListenerTest, ListenerFilterWithCloseAtInitPeek) {
+  initializeWithInspectFilter();
+
+  Event::FileReadyCb file_event_callback;
+  // ensure the listener filter buffer will register the file event.
+  EXPECT_CALL(io_handle_,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+      .WillOnce(SaveArg<1>(&file_event_callback));
+  EXPECT_CALL(io_handle_, recv)
+      .WillOnce(Return(
+          ByMove(Api::IoCallUint64Result(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  EXPECT_CALL(io_handle_, close)
+      .WillOnce(Return(
+          ByMove(Api::IoCallUint64Result(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true);
+  EXPECT_EQ(generic_active_listener_->stats_.downstream_peek_remote_close_.value(), 1);
 }
 
 TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout2) {
