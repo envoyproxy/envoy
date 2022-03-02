@@ -68,7 +68,7 @@ TEST_F(CustomCelFunctionTests, CookieTests) {
 
   Http::TestRequestHeaderMapImpl no_cookie_request_headers = {{"path", "/query?a=apple"}};
   auto error = cookie(&arena, no_cookie_request_headers);
-  EXPECT_TRUE(error.IsError());
+  ASSERT_TRUE(error.IsError());
   EXPECT_EQ(error.ErrorOrDie()->message(), "cookie() no cookies found");
 }
 

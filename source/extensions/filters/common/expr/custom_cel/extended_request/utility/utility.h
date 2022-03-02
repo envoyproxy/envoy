@@ -22,9 +22,6 @@ namespace Utility {
 appendList(Protobuf::Arena& arena, const ::google::api::expr::runtime::CelList* list1,
            const ::google::api::expr::runtime::CelList* list2);
 
-template <typename M>
-::google::api::expr::runtime::CelValue createCelMap(Protobuf::Arena& arena, M& map);
-
 ::google::api::expr::runtime::CelValue
 createCelMap(Protobuf::Arena& arena, absl::flat_hash_map<std::string, std::string> map);
 

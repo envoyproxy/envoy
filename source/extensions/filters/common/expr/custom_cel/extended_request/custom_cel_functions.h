@@ -44,6 +44,7 @@ public:
 // lazy/stateful functions
 ::google::api::expr::runtime::CelValue cookie(Protobuf::Arena* arena,
                                               const Http::RequestHeaderMap& request_header_map);
+
 ::google::api::expr::runtime::CelValue cookieValue(Protobuf::Arena* arena,
                                                    const Http::RequestHeaderMap& request_header_map,
                                                    ::google::api::expr::runtime::CelValue key);
