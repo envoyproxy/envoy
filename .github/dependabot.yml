@@ -7,11 +7,6 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/examples/grpc-bridge/client"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
   directory: "/tools/base"
   schedule:
     interval: "daily"
@@ -40,3 +35,68 @@ updates:
   directory: "/"
   schedule:
     interval: daily
+
+- package-ecosystem: "pip"
+  directory: "/examples/brotli"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/examples/cache"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/examples/cors"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/examples/csrf/crosssite"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/examples/csrf/samesite"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/examples/double-proxy"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/examples/ext_authz/upstream/service"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/examples/front-proxy"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/examples/grpc-bridge/client"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/examples/gzip"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/examples/load-reporting-service"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/examples/locality-load-balancing"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/examples/win32-front-proxy"
+  schedule:
+    interval: "daily"
