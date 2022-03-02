@@ -26,10 +26,10 @@ public:
   Protobuf::Arena arena;
   CelValue result;
 
-  void urlFunctionTest(std::vector<std::pair<CelValue, CelValue>> header_key_value_pairs,
+  void urlFunctionTest(absl::flat_hash_map<std::string, std::string> map,
                        absl::StatusCode expected_status_code, absl::string_view expected_url) {
     UrlFunction function("url");
-    CelValue cel_map = Utility::createCelMap(arena, header_key_value_pairs);
+    CelValue cel_map = Utility::createCelMap(arena, map);
     std::vector<CelValue> input_values = {cel_map};
     auto args = absl::Span<CelValue>(input_values);
     absl::Status status = function.Evaluate(args, &result, &arena);
@@ -44,21 +44,17 @@ public:
 
 TEST_F(CustomCelFunctionTests, UrlFunctionTests) {
   std::vector<std::pair<CelValue, CelValue>> header_key_value_pairs;
-  auto host = std::make_pair(CelValue::CreateStringView("host"),
-                             CelValue::CreateStringView("abc.com:1234"));
-  auto path = std::make_pair(CelValue::CreateStringView("path"), CelValue::CreateStringView(""));
+  absl::flat_hash_map<std::string, std::string> map = {{"host", "abc.com:1234"}, {"path", ""}};
 
-  header_key_value_pairs.push_back(host);
-  header_key_value_pairs.push_back(path);
-  urlFunctionTest(header_key_value_pairs, absl::StatusCode::kOk, "abc.com:1234");
+  urlFunctionTest(map, absl::StatusCode::kOk, "abc.com:1234");
 
-  header_key_value_pairs.clear();
-  header_key_value_pairs.push_back(host);
-  urlFunctionTest(header_key_value_pairs, absl::StatusCode::kNotFound, "");
+  map.clear();
+  map["host"] = "abc.com:1234";
+  urlFunctionTest(map, absl::StatusCode::kNotFound, "");
 
-  header_key_value_pairs.clear();
-  header_key_value_pairs.push_back(path);
-  urlFunctionTest(header_key_value_pairs, absl::StatusCode::kNotFound, "");
+  map.clear();
+  map["path"] = "";
+  urlFunctionTest(map, absl::StatusCode::kNotFound, "");
 }
 
 TEST_F(CustomCelFunctionTests, CookieTests) {

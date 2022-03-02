@@ -46,22 +46,26 @@ TEST_F(UtilityTests, AppendListTest) {
   }
 }
 
-TEST_F(UtilityTests, CreateCelMapTest) {
+template <typename M> void mapTestImpl(M& map) {
   Protobuf::Arena arena;
-  std::vector<std::pair<CelValue, CelValue>> key_value_pairs;
-  auto fruit =
-      std::make_pair(CelValue::CreateStringView("fruit"), CelValue::CreateStringView("apple"));
-  auto veg =
-      std::make_pair(CelValue::CreateStringView("veg"), CelValue::CreateStringView("carrot"));
-
-  key_value_pairs.push_back(fruit);
-  key_value_pairs.push_back(veg);
-  CelValue cel_value = Utility::createCelMap(arena, key_value_pairs);
+  CelValue cel_value = Utility::createCelMap(arena, map);
   auto cel_map = cel_value.MapOrDie();
   auto value = (*cel_map)[CelValue::CreateStringView("fruit")]->StringOrDie().value();
   ASSERT_EQ(value, "apple");
   value = (*cel_map)[CelValue::CreateStringView("veg")]->StringOrDie().value();
   ASSERT_EQ(value, "carrot");
+}
+
+void mapTest(std::map<std::string, std::string> map) { mapTestImpl(map); }
+
+void mapTest(absl::flat_hash_map<std::string, std::string> map) { mapTestImpl(map); }
+
+TEST_F(UtilityTests, CreateCelMapTest) {
+  absl::flat_hash_map<std::string, std::string> absl_map = {{"fruit", "apple"}, {"veg", "carrot"}};
+  std::map<std::string, std::string> std_map = {{"fruit", "apple"}, {"veg", "carrot"}};
+
+  mapTest(absl_map);
+  mapTest(std_map);
 }
 
 } // namespace Utility
