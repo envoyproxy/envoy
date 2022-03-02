@@ -44,8 +44,9 @@ static void BM_Hyperscan(benchmark::State& state) {
   hs_database_t* database{};
   hs_scratch_t* scratch{};
   hs_compile_error_t* compile_err;
-  RELEASE_ASSERT(hs_compile_multi(clusterRePatterns().data(), nullptr, nullptr,
-                                  clusterRePatterns().size(), HS_MODE_BLOCK, nullptr, &database,
+  const std::vector<const char*>& cluster_re_patterns = clusterRePatterns();
+  RELEASE_ASSERT(hs_compile_multi(cluster_re_patterns.data(), nullptr, nullptr,
+                                  cluster_re_patterns.size(), HS_MODE_BLOCK, nullptr, &database,
                                   &compile_err) == HS_SUCCESS,
                  "");
   RELEASE_ASSERT(hs_alloc_scratch(database, &scratch) == HS_SUCCESS, "");
