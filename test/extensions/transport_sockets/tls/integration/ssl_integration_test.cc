@@ -144,7 +144,7 @@ public:
   }
   void negativeCheck() {
     auto size = api_->fileSystem().fileSize(TestEnvironment::temporaryPath("tlskey-negative.log"));
-    EXPECT_EQ(0, size);
+    EXPECT_FALSE(size > 0);
   }
 };
 
