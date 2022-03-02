@@ -525,6 +525,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
   if (parent_admin_shutdown_response.has_value()) {
     original_start_time_ = parent_admin_shutdown_response.value().original_start_time_;
+    // TODO(soulxu): This is added for switching the reuse port default value as true (#17259).
+    // It ensures the same default value during the hot restart. This can be removed when
+    // everyone switches to the new default value.
     enable_reuse_port_default_ =
         parent_admin_shutdown_response.value().enable_reuse_port_default_ ? true : false;
   }
@@ -618,9 +621,14 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
-  runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
-      component_factory.createRuntime(*this, initial_config));
+  Runtime::LoaderPtr runtime_ptr = component_factory.createRuntime(*this, initial_config);
+  if (runtime_ptr->snapshot().getBoolean("envoy.restart_features.no_runtime_singleton", false)) {
+    runtime_ = std::move(runtime_ptr);
+  } else {
+    runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(std::move(runtime_ptr));
+  }
   initial_config.initAdminAccessLog(bootstrap_, *this);
+  validation_context_.setRuntime(runtime());
 
   if (initial_config.admin().address()) {
     admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
@@ -646,10 +654,10 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,
-      *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
-      messageValidationContext(), *api_, http_context_, grpc_context_, router_context_,
-      access_log_manager_, *singleton_manager_, options_, quic_stat_names_);
+      *admin_, runtime(), stats_store_, thread_local_, dns_resolver_, *ssl_context_manager_,
+      *dispatcher_, *local_info_, *secret_manager_, messageValidationContext(), *api_,
+      http_context_, grpc_context_, router_context_, access_log_manager_, *singleton_manager_,
+      options_, quic_stat_names_);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -673,7 +681,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // We have to defer RTDS initialization until after the cluster manager is
   // instantiated (which in turn relies on runtime...).
-  Runtime::LoaderSingleton::get().initialize(clusterManager());
+  runtime().initialize(clusterManager());
 
   clusterManager().setPrimaryClustersInitializedCb(
       [this]() { onClusterManagerPrimaryInitializationComplete(); });
@@ -704,7 +712,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
   // If RTDS was not configured the `onRuntimeReady` callback is immediately invoked.
-  Runtime::LoaderSingleton::get().startRtdsSubscriptions([this]() { onRuntimeReady(); });
+  runtime().startRtdsSubscriptions([this]() { onRuntimeReady(); });
 }
 
 void InstanceImpl::onRuntimeReady() {
@@ -728,8 +736,8 @@ void InstanceImpl::onRuntimeReady() {
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
                                                          stats_store_, false)
               ->createUncachedRawAsyncClient(),
-          *dispatcher_, Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_,
-          info_factory_, access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
+          *dispatcher_, runtime(), stats_store_, *ssl_context_manager_, info_factory_,
+          access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
           *singleton_manager_, thread_local_, messageValidationContext().dynamicValidationVisitor(),
           *api_, options_);
     }
@@ -929,7 +937,12 @@ void InstanceImpl::terminate() {
   FatalErrorHandler::clearFatalActionsOnTerminate();
 }
 
-Runtime::Loader& InstanceImpl::runtime() { return Runtime::LoaderSingleton::get(); }
+Runtime::Loader& InstanceImpl::runtime() {
+  if (runtime_singleton_) {
+    return runtime_singleton_->instance();
+  }
+  return *runtime_;
+}
 
 void InstanceImpl::shutdown() {
   ENVOY_LOG(info, "shutting down server instance");

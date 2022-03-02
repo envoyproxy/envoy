@@ -372,7 +372,7 @@ class HeaderMapImplTest : public testing::TestWithParam<uint32_t> {
 public:
   HeaderMapImplTest() {
     // Set the lazy map threshold using the test parameter.
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
+    scoped_runtime_.mergeValues(
         {{"envoy.http.headermap.lazy_map_min_size", absl::StrCat(GetParam())}});
   }
 
@@ -380,7 +380,7 @@ public:
     return absl::StrCat(params.param);
   }
 
-  TestScopedRuntime runtime;
+  TestScopedRuntime scoped_runtime_;
 };
 
 INSTANTIATE_TEST_SUITE_P(HeaderMapThreshold, HeaderMapImplTest,

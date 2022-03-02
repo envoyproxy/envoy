@@ -127,7 +127,7 @@ public:
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
         singleton_manager_, tls_, validation_visitor_, *api_, options_);
-    cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, runtime_, factory_context,
+    cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, runtime_.loader(), factory_context,
                                                 std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = cm_.subscription_factory_.callbacks_;
@@ -154,7 +154,7 @@ public:
   EdsClusterImplSharedPtr cluster_;
   Config::SubscriptionCallbacks* eds_callbacks_{};
   NiceMock<Random::MockRandomGenerator> random_;
-  NiceMock<Runtime::MockLoader> runtime_;
+  TestScopedRuntime runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
@@ -1520,8 +1520,7 @@ TEST_F(EdsTest, EndpointLocalityUpdated) {
 // Unlike EndpointLocalityUpdated, runtime feature flag is disabled this time and then it is
 // verified that locality update does not happen on eds cluster endpoints.
 TEST_F(EdsTest, EndpointLocalityNotUpdatedIfFixDisabled) {
-  TestScopedRuntime runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  runtime_.mergeValues(
       {{"envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints", "false"}});
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
@@ -1579,7 +1578,6 @@ TEST_F(EdsTest, EndpointLocalityNotUpdatedIfFixDisabled) {
     EXPECT_EQ("hello", locality.zone());
     EXPECT_EQ("world", locality.sub_zone());
   }
-  Runtime::LoaderSingleton::clear();
 }
 
 // Validate that onConfigUpdate() does not propagate locality weights to the host set when

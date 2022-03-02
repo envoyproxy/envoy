@@ -94,7 +94,7 @@ public:
   CertificateProvider::CertificateProviderManager& certificateProviderManager() override {
     return *certificate_provider_manager_;
   }
-  Runtime::Loader& runtime() override { return Runtime::LoaderSingleton::get(); }
+  Runtime::Loader& runtime() override { return runtime_singleton_->instance(); }
   void shutdown() override;
   bool isShutdown() override { return false; }
   void shutdownAdmin() override {}

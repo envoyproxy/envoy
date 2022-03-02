@@ -450,8 +450,10 @@ private:
 } // namespace
 
 void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
-                                           ProtobufMessage::ValidationVisitor& validation_visitor,
-                                           Runtime::Loader* runtime) {
+                                           ProtobufMessage::ValidationVisitor& validation_visitor) {
+  Runtime::Loader* runtime = validation_visitor.runtime().has_value()
+                                 ? &validation_visitor.runtime().value().get()
+                                 : nullptr;
   UnexpectedFieldProtoVisitor unexpected_field_visitor(validation_visitor, runtime);
   ProtobufMessage::traverseMessage(unexpected_field_visitor, message, nullptr);
 }

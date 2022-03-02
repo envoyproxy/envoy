@@ -40,6 +40,11 @@ public:
   Http::Code handlerStats(absl::string_view path_and_query,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                           AdminStream&);
+  static Http::Code handlerStats(Stats::Store& stats, bool used_only, bool json,
+                                 const absl::optional<std::regex>& filter,
+                                 Http::ResponseHeaderMap& response_headers,
+                                 Buffer::Instance& response);
+
   Http::Code handlerPrometheusStats(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
@@ -63,11 +68,11 @@ private:
                                  bool used_only, const absl::optional<std::regex>& regex,
                                  bool pretty_print = false);
 
-  void statsAsText(const std::map<std::string, uint64_t>& all_stats,
-                   const std::map<std::string, std::string>& text_readouts,
-                   const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                   bool used_only, const absl::optional<std::regex>& regex,
-                   Buffer::Instance& response);
+  static void statsAsText(const std::map<std::string, uint64_t>& all_stats,
+                          const std::map<std::string, std::string>& text_readouts,
+                          const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
+                          bool used_only, const absl::optional<std::regex>& regex,
+                          Buffer::Instance& response);
 };
 
 } // namespace Server

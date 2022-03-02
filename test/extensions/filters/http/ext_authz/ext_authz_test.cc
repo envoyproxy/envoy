@@ -1691,7 +1691,7 @@ TEST_P(HttpFilterTestParam, NoRoute) {
 // `envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect` is false.
 TEST_P(HttpFilterTestParam, NoRouteWithSkipAuth) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect",
         "false"}});
   EXPECT_CALL(*decoder_filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
