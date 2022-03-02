@@ -11,8 +11,7 @@ namespace {
 
 TEST(DnsUtils, LegacyGenerateTest) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.allow_multiple_dns_addresses", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.allow_multiple_dns_addresses", "false"}});
 
   std::list<Network::DnsResponse> responses =
       TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.2"});
@@ -23,8 +22,7 @@ TEST(DnsUtils, LegacyGenerateTest) {
 
 TEST(DnsUtils, MultipleGenerateTest) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
 
   std::list<Network::DnsResponse> responses =
       TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.2"});
@@ -37,8 +35,7 @@ TEST(DnsUtils, MultipleGenerateTest) {
 
 TEST(DnsUtils, ListChanged) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
 
   Network::Address::InstanceConstSharedPtr address1 =
       Network::Utility::parseInternetAddress("10.0.0.1");

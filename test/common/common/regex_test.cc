@@ -73,7 +73,7 @@ TEST(Utility, ParseRegex) {
   // The deprecated field codepath precedes any runtime settings.
   {
     TestScopedRuntime scoped_runtime;
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
+    scoped_runtime.mergeValues(
         {{"envoy.reloadable_features.deprecate_global_ints", "false"},
          {"re2.max_program_size.error_level", "3"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
@@ -91,7 +91,7 @@ TEST(Utility, ParseRegex) {
   // Verify that an exception is thrown for the error level max program size.
   {
     TestScopedRuntime scoped_runtime;
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
+    scoped_runtime.mergeValues(
         {{"envoy.reloadable_features.deprecate_global_ints", "false"},
          {"re2.max_program_size.error_level", "1"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
@@ -111,7 +111,7 @@ TEST(Utility, ParseRegex) {
   // Verify that the error level max program size defaults to 100 if not set by runtime.
   {
     TestScopedRuntime scoped_runtime;
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
+    scoped_runtime.mergeValues(
         {{"envoy.reloadable_features.deprecate_global_ints", "false"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex(
@@ -131,7 +131,7 @@ TEST(Utility, ParseRegex) {
   // Verify that a warning is logged for the warn level max program size.
   {
     TestScopedRuntime scoped_runtime;
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
+    scoped_runtime.mergeValues(
         {{"envoy.reloadable_features.deprecate_global_ints", "false"},
          {"re2.max_program_size.warn_level", "1"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
