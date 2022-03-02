@@ -28,7 +28,6 @@ namespace Envoy {
 class TestScopedRuntime {
 public:
   TestScopedRuntime() : api_(Api::createApiForTest()) {
-    std::cerr << "Creating\n";
     envoy::config::bootstrap::v3::LayeredRuntime config;
     // The existence of an admin layer is required for mergeValues() to work.
     config.add_layers()->mutable_admin_layer();

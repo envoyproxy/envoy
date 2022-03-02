@@ -22,12 +22,13 @@ namespace Envoy {
 // be a tax paid by every test method in the codebase.
 class TestListener : public ::testing::EmptyTestEventListener {
 public:
-  TestListener(bool validate_singletons = true) : validate_singletons_(validate_singletons) {}
+  TestListener(bool validate_singletons = true) : saver_(std::make_unique<absl::FlagSaver>()),
+                                                  validate_singletons_(validate_singletons) {}
   void OnTestEnd(const ::testing::TestInfo& test_info) override;
 
 private:
   // Make sure runtime guards are restored to defaults on test completion.
-  absl::FlagSaver saver_;
+  std::unique_ptr<absl::FlagSaver> saver_;
   bool validate_singletons_;
 };
 

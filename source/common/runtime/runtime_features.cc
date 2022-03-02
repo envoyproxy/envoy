@@ -99,10 +99,10 @@ bool isRuntimeFeature(absl::string_view feature) {
   return absl::FindCommandLineFlag(revertPrefix(std::string(feature)));
 }
 
+// DO NOT SUBMIT WITH STRING LOGIC IN THE CRITICAL PATH.
 bool runtimeFeatureEnabled(absl::string_view feature) {
   absl::CommandLineFlag* flag = absl::FindCommandLineFlag(revertPrefix(std::string(feature)));
   if (flag) {
-    std::cerr << "Getting " << feature << " as " << flag->CurrentValue() << std::endl;
     return flag->CurrentValue() == "true";
   } else {
     IS_ENVOY_BUG(absl::StrCat("Unable to find runtime feature ", feature));
@@ -123,8 +123,6 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
   }
   if (absl::StartsWith(feature, "re2.")) {
     if (feature == "re2.max_program_size.error_level") {
-      std::cerr << "Getting " << feature << " as "
-                << absl::GetFlag(FLAGS_re2_max_program_size_error_level) << std::endl;
       return absl::GetFlag(FLAGS_re2_max_program_size_error_level);
     } else if (feature == "re2.max_program_size.warn_level") {
       return absl::GetFlag(FLAGS_re2_max_program_size_warn_level);
@@ -135,7 +133,6 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
 }
 
 void maybeSetRuntimeGuard(absl::string_view name, bool value) {
-  std::cerr << "Setting " << name << " to " << value << std::endl;
   bool set = false;
   absl::CommandLineFlag* flag = absl::FindCommandLineFlag(revertPrefix(std::string(name)));
   if (flag) {
@@ -149,9 +146,7 @@ void maybeSetRuntimeGuard(absl::string_view name, bool value) {
   }
 }
 
-// TODO(alyssawilk) deprecate use of this
 void maybeSetDeprecatedInts(absl::string_view name, uint32_t value) {
-  std::cerr << "Setting " << name << " to " << value << std::endl;
   if (!absl::StartsWith(name, "envoy.") && !absl::StartsWith(name, "re2.")) {
     return;
   }
