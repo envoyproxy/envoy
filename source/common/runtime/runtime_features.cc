@@ -87,27 +87,54 @@ ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,                            
 namespace Envoy {
 namespace Runtime {
 
+class RuntimeFeatures {
+public:
+  RuntimeFeatures();
+
+  absl::CommandLineFlag* getFlag(absl::string_view feature) const {
+    auto it = all_features_.find(feature);
+    if (it == all_features_.end()) {
+      return nullptr;
+    }
+    return it->second;
+  }
+
+private:
+  absl::flat_hash_map<std::string, absl::CommandLineFlag*> all_features_;
+};
+
+using RuntimeFeaturesDefaults = ConstSingleton<RuntimeFeatures>;
+
 std::string swapPrefix(std::string name) {
   return absl::StrReplaceAll(name, {{"envoy_", "envoy."}, {"features_", "features."}});
 }
 
-std::string revertPrefix(std::string name) {
-  return absl::StrReplaceAll(name, {{"envoy.", "envoy_"}, {"features.", "features_"}});
+RuntimeFeatures::RuntimeFeatures() {
+  absl::flat_hash_map<absl::string_view, absl::CommandLineFlag*> flags = absl::GetAllFlags();
+  for (auto& it : flags) {
+    absl::string_view name = it.second->Name();
+    if ((!absl::StartsWith(name, "envoy_reloadable_features_") &&
+         !absl::StartsWith(name, "envoy_restart_features_")) ||
+        !it.second->TryGet<bool>().has_value()) {
+      continue;
+    }
+    std::string envoy_name = swapPrefix(std::string(name));
+    all_features_.emplace(envoy_name, it.second);
+  }
 }
 
 bool isRuntimeFeature(absl::string_view feature) {
-  return absl::FindCommandLineFlag(revertPrefix(std::string(feature)));
+  return RuntimeFeaturesDefaults::get().getFlag(feature) != nullptr;
 }
 
-// DO NOT SUBMIT WITH STRING LOGIC IN THE CRITICAL PATH.
 bool runtimeFeatureEnabled(absl::string_view feature) {
-  absl::CommandLineFlag* flag = absl::FindCommandLineFlag(revertPrefix(std::string(feature)));
-  if (flag) {
-    return flag->CurrentValue() == "true";
-  } else {
+  auto* flag = RuntimeFeaturesDefaults::get().getFlag(feature);
+  if (flag == nullptr) {
     IS_ENVOY_BUG(absl::StrCat("Unable to find runtime feature ", feature));
     return false;
   }
+  // We validate in map creation that the flag is a boolean.
+  return flag->TryGet<bool>().value();
 }
 
 uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
@@ -133,17 +160,12 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
 }
 
 void maybeSetRuntimeGuard(absl::string_view name, bool value) {
-  bool set = false;
-  absl::CommandLineFlag* flag = absl::FindCommandLineFlag(revertPrefix(std::string(name)));
-  if (flag) {
-    set = flag->ParseFrom(value ? "true" : "false", nullptr);
-  }
-  if (!set) {
+  auto* flag = RuntimeFeaturesDefaults::get().getFlag(name);
+  if (flag == nullptr) {
     IS_ENVOY_BUG(absl::StrCat("Unable to find runtime feature ", name));
     return;
-  } else {
-    ASSERT(runtimeFeatureEnabled(swapPrefix(std::string(name))) == value);
   }
+  flag->ParseFrom(value ? "true" : "false", nullptr);
 }
 
 void maybeSetDeprecatedInts(absl::string_view name, uint32_t value) {

@@ -22,8 +22,8 @@ namespace Envoy {
 // be a tax paid by every test method in the codebase.
 class TestListener : public ::testing::EmptyTestEventListener {
 public:
-  TestListener(bool validate_singletons = true) : saver_(std::make_unique<absl::FlagSaver>()),
-                                                  validate_singletons_(validate_singletons) {}
+  TestListener(bool validate_singletons = true)
+      : saver_(std::make_unique<absl::FlagSaver>()), validate_singletons_(validate_singletons) {}
   void OnTestEnd(const ::testing::TestInfo& test_info) override;
 
 private:
