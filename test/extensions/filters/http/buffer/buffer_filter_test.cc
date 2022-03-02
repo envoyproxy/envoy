@@ -11,7 +11,6 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -40,8 +39,6 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   BufferFilterConfigSharedPtr config_;
   BufferFilter filter_;
-  // Create a runtime loader, so that tests can manually manipulate runtime guarded features.
-  TestScopedRuntime scoped_runtime;
 };
 
 TEST_F(BufferFilterTest, HeaderOnlyRequest) {
