@@ -868,7 +868,7 @@ TEST_F(HttpTracerImplTest, ChildUpstreamSpanTest) {
               setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("ob fake cluster")));
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
-  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("available")));
+  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("unavailable")));
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
 
   HttpTracerUtility::finalizeUpstreamSpan(*child_span, &response_headers_, &response_trailers_,
