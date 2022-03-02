@@ -105,11 +105,14 @@ public:
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogLocal, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogRemote, (), (const));
   MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
+  MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), (const));
   Ssl::HandshakerCapabilities capabilities_;
   std::string sni_{"default_sni.example.com"};
   std::string ciphers_{"RSA"};
   std::string alpn_{""};
   std::string test_{};
+  Network::Address::IpList iplist_;
+  std::string path_{};
 };
 
 class MockServerContextConfig : public ServerContextConfig {
@@ -139,6 +142,8 @@ public:
   MOCK_METHOD(bool, disableStatelessSessionResumption, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogLocal, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogRemote, (), (const));
+  MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
+  MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), (const));
 };
 
 class MockTlsCertificateConfig : public TlsCertificateConfig {
