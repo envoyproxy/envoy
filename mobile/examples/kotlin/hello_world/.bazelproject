@@ -1,5 +1,7 @@
 workspace_type: android
 
+bazel_binary: bazelw
+
 directories:
   -bazel-bin
   -bazel-instant-android
