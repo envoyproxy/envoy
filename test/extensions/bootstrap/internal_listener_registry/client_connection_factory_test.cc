@@ -41,6 +41,8 @@ public:
     std::tie(io_handle_, io_handle_peer_) =
         IoSocket::UserSpace::IoHandleFactory::createIoHandlePair();
     EXPECT_CALL(tls_allocator_, allocateSlot());
+  }
+  void setupTlsSlot() {
     tls_slot_ = ThreadLocal::TypedSlot<
         Bootstrap::InternalListenerRegistry::ThreadLocalRegistryImpl>::makeUnique(tls_allocator_);
     tls_slot_->set([r = registry_](Event::Dispatcher&) { return r; });
@@ -48,7 +50,6 @@ public:
     Bootstrap::InternalListenerRegistry::InternalClientConnectionFactory::registry_tls_slot_ =
         tls_slot_.get();
   }
-
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   MockInternalListenerManger internal_listener_manager_;
@@ -70,7 +71,27 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
 };
 
+TEST_F(ClientConnectionFactoryTest,
+       ConnectFailsIfInternalConnectionThreadLocalRegistryIsNotPublished) {
+  tls_slot_ = ThreadLocal::TypedSlot<
+      Bootstrap::InternalListenerRegistry::ThreadLocalRegistryImpl>::makeUnique(tls_allocator_);
+  // This slot set publish a nullptr.
+  tls_slot_->set([](Event::Dispatcher&) { return nullptr; });
+  Bootstrap::InternalListenerRegistry::InternalClientConnectionFactory::registry_tls_slot_ =
+      tls_slot_.get();
+  auto client_conn = dispatcher_->createClientConnection(
+      std::make_shared<Network::Address::EnvoyInternalInstance>(listener_addr),
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
+  EXPECT_NE(nullptr, client_conn);
+  EXPECT_TRUE(client_conn->connecting());
+  client_conn->connect();
+  // Connect returns error immediately because TLS internal listener registry is not ready.
+  EXPECT_FALSE(client_conn->connecting());
+  client_conn->close(Network::ConnectionCloseType::NoFlush);
+}
+
 TEST_F(ClientConnectionFactoryTest, ConnectFailsIfInternalConnectionManagerNotExist) {
+  setupTlsSlot();
   auto client_conn = dispatcher_->createClientConnection(
       std::make_shared<Network::Address::EnvoyInternalInstance>(listener_addr),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
@@ -83,6 +104,7 @@ TEST_F(ClientConnectionFactoryTest, ConnectFailsIfInternalConnectionManagerNotEx
 }
 
 TEST_F(ClientConnectionFactoryTest, ConnectFailsIfInternalListenerNotExist) {
+  setupTlsSlot();
   registry_->setInternalListenerManager(internal_listener_manager_);
 
   EXPECT_CALL(internal_listener_manager_, findByAddress(_))
@@ -103,6 +125,7 @@ TEST_F(ClientConnectionFactoryTest, ConnectFailsIfInternalListenerNotExist) {
 // Verify that the client connection to envoy internal address can be established. This test case
 // does not instantiate a server connection. The server connection is tested in internal listener.
 TEST_F(ClientConnectionFactoryTest, ConnectSucceeds) {
+  setupTlsSlot();
   registry_->setInternalListenerManager(internal_listener_manager_);
   MockInternalListener internal_listener;
   Network::InternalListenerOptRef internal_listener_opt{internal_listener};

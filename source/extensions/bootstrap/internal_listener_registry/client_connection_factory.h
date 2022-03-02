@@ -19,7 +19,6 @@ namespace InternalListenerRegistry {
 class InternalClientConnectionFactory : public Network::ClientConnectionFactory,
                                         Logger::Loggable<Logger::Id::connection> {
 public:
-  ~InternalClientConnectionFactory() override = default;
   std::string name() const override { return "envoy_internal"; }
   Network::ClientConnectionPtr
   createClientConnection(Event::Dispatcher& dispatcher,

@@ -24,3 +24,13 @@ envoy_extension_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "internal_listener_registry_test",
+    srcs = ["internal_listener_registry_test.cc"],
+    extension_names = ["envoy.bootstrap.internal_listener_registry"],
+    deps = [
+        "//source/extensions/bootstrap/internal_listener_registry:config",
+        "//test/mocks/thread_local:thread_local_mocks",
+    ],
+)

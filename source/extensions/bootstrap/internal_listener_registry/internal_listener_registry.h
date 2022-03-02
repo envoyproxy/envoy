@@ -19,6 +19,10 @@ class TlsInternalListenerRegistry : public Singleton::Instance,
                                     public Network::InternalListenerRegistry {
 public:
   Network::LocalInternalListenerRegistry* getLocalRegistry() override {
+    // The tls slot may not initialized yet. This can happen in production when Envoy is starting.
+    if (!tls_slot_) {
+      return nullptr;
+    }
     if (auto opt = tls_slot_->get(); opt.has_value()) {
       return &opt.value().get();
     }
