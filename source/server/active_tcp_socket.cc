@@ -90,8 +90,10 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
               }
               Network::FilterStatus status = (*iter_)->onData(filter_buffer);
               if (status == Network::FilterStatus::StopIteration) {
-                // There is no more data when the buffer reaches the max read bytes.
-                ASSERT(filter_buffer.length() < listener_filter_max_read_bytes_);
+                if (socket_->ioHandle().isOpen()) {
+                  // There is no more data when the buffer reaches the max read bytes.
+                  ASSERT(filter_buffer.length() < listener_filter_max_read_bytes_);
+                }
                 return;
               }
               continueFilterChain(true);
