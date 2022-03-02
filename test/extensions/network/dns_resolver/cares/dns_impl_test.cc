@@ -790,7 +790,9 @@ public:
                            const DnsLookupFamily lookup_family,
                            const std::list<std::string>& expected_addresses,
                            const DnsResolver::ResolutionStatus resolution_status =
-                               DnsResolver::ResolutionStatus::Success) {
+                               DnsResolver::ResolutionStatus::Success,
+                           const bool getifaddrs_supported = true,
+                           const bool getiffaddrs_success = true) {
     server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
     server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
@@ -798,15 +800,24 @@ public:
     Api::MockOsSysCalls os_sys_calls;
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
-    EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(true));
-    EXPECT_CALL(os_sys_calls, getifaddrs(_))
-        .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
-          for (uint32_t i = 0; i < ifaddrs.size(); i++) {
-            auto addr = Network::Utility::parseInternetAddressAndPort(ifaddrs[i]);
-            vector.emplace_back(fmt::format("interface_{}", i), 0, addr);
-          }
-          return {0, 0};
-        }));
+    EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(getifaddrs_supported));
+    if (getifaddrs_supported) {
+      if (getiffaddrs_success) {
+        EXPECT_CALL(os_sys_calls, getifaddrs(_))
+            .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+              for (uint32_t i = 0; i < ifaddrs.size(); i++) {
+                auto addr = Network::Utility::parseInternetAddressAndPort(ifaddrs[i]);
+                vector.emplace_back(fmt::format("interface_{}", i), 0, addr);
+              }
+              return {0, 0};
+            }));
+      } else {
+        EXPECT_CALL(os_sys_calls, getifaddrs(_))
+            .WillOnce(Invoke([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult {
+              return {-1, 1};
+            }));
+      }
+    }
 
     // These passthrough calls are needed to let the resolver communicate with the DNS server
     EXPECT_CALL(os_sys_calls, accept(_, _, _))
@@ -1315,6 +1326,17 @@ TEST_P(DnsImplFilterUnroutableFamiliesTest, FilterAllV6) {
   testFilterAddresses({"1.2.3.4:80"}, DnsLookupFamily::All, {"201.134.56.7"});
 }
 
+TEST_P(DnsImplFilterUnroutableFamiliesTest, DontFilterIfGetiffaddrsIsNotSupported) {
+  testFilterAddresses({}, DnsLookupFamily::All, {"201.134.56.7", "1::2"},
+                      DnsResolver::ResolutionStatus::Success, false /* getifaddrs_supported */);
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesTest, DontFilterIfThereIsAGetiffaddrsFailure) {
+  testFilterAddresses({}, DnsLookupFamily::All, {"201.134.56.7", "1::2"},
+                      DnsResolver::ResolutionStatus::Success, true /* getifaddrs_supported */,
+                      false /* getifaddrs_success */);
+}
+
 class DnsImplFilterUnroutableFamiliesDontFilterTest : public DnsImplTest {
 protected:
   bool filterUnroutableFamilies() const override { return false; }
@@ -1357,12 +1379,12 @@ TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, DontFilterAll) {
                       DnsLookupFamily::All, {"201.134.56.7", "1::2"});
 }
 
-TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, FilterAllV4) {
+TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, DontFilterAllV4) {
   testFilterAddresses({"[2001:0000:3238:DFE1:0063:0000:0000:FEFB]:54"}, DnsLookupFamily::All,
                       {"201.134.56.7", "1::2"});
 }
 
-TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, FilterAllV6) {
+TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, DontFilterAllV6) {
   testFilterAddresses({"1.2.3.4:80"}, DnsLookupFamily::All, {"201.134.56.7", "1::2"});
 }
 
