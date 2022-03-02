@@ -138,7 +138,7 @@ private:
                             std::vector<Network::InterfacePair>& interfaces);
 
   Event::Dispatcher* event_dispatcher_{};
-  Stats::ScopePtr client_scope_;
+  Stats::ScopeSharedPtr client_scope_;
   Stats::StatNameSetPtr stat_name_set_;
   envoy_engine_callbacks callbacks_;
   envoy_logger logger_;
