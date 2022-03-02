@@ -119,9 +119,9 @@ TEST_F(KeyValueStoreTest, HandleBadFile) {
 
 #ifndef WIN32
 TEST_F(KeyValueStoreTest, HandleInvalidFile) {
-  filename_ = "/foo";
+  filename_ = TestEnvironment::temporaryPath("some/unlikely/bad/path/bar");
   createStore();
-  EXPECT_LOG_CONTAINS("error", "Failed to flush cache to file /foo", store_->flush());
+  EXPECT_LOG_CONTAINS("error", "Failed to flush cache to file " + filename_, store_->flush());
 }
 #endif
 

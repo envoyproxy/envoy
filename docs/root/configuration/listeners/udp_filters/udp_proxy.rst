@@ -82,7 +82,7 @@ statistics are rooted at *udp.<stat_prefix>.* with the following statistics:
   downstream_sess_total, Counter, Number sessions created in total
   downstream_sess_tx_bytes, Counter, Number of bytes transmitted
   downstream_sess_tx_datagrams, Counter, Number of datagrams transmitted
-  downstream_sess_tx_errors, counter, Number of datagram transmission errors
+  downstream_sess_tx_errors, Counter, Number of datagram transmission errors
   idle_timeout, Counter, Number of sessions destroyed due to idle timeout
   downstream_sess_active, Gauge, Number of sessions currently active
 

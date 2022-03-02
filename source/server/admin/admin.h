@@ -93,7 +93,7 @@ public:
                          const std::string& address_out_path,
                          Network::Address::InstanceConstSharedPtr address,
                          const Network::Socket::OptionsSharedPtr& socket_options,
-                         Stats::ScopePtr&& listener_scope) override;
+                         Stats::ScopeSharedPtr&& listener_scope) override;
   uint32_t concurrency() const override { return server_.options().concurrency(); }
 
   // Network::FilterChainManager
@@ -200,17 +200,10 @@ public:
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
   void closeSocket();
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
-  Server::Instance& server() { return server_; }
 
   GenHandlerCb createHandlerFunction() {
     return [this](absl::string_view path_and_query, AdminStream& admin_stream) -> HandlerPtr {
       return findHandler(path_and_query, admin_stream);
-    };
-  }
-  AdminFilter::AdminServerCallbackFunction createCallbackFunction() {
-    return [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
-                  Buffer::OwnedImpl& response, AdminFilter& filter) -> Http::Code {
-      return runCallback(path_and_query, response_headers, response, filter);
     };
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
@@ -227,6 +220,8 @@ public:
   static HandlerPtr makeStaticTextHandler(absl::string_view response_text, Http::Code code);
 
 private:
+  friend class AdminTestingPeer;
+
   /**
    * Individual admin handler including prefix, help text, and callback.
    */
@@ -255,14 +250,16 @@ private:
     NullRouteConfigProvider(TimeSource& time_source);
 
     // Router::RouteConfigProvider
-    Router::ConfigConstSharedPtr config() override { return config_; }
-    absl::optional<ConfigInfo> configInfo() const override { return {}; }
+    Rds::ConfigConstSharedPtr config() const override { return config_; }
+    const absl::optional<ConfigInfo>& configInfo() const override { return config_info_; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
+    Router::ConfigConstSharedPtr configCast() const override { return config_; }
     void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
                                    std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {}
 
     Router::ConfigConstSharedPtr config_;
+    absl::optional<ConfigInfo> config_info_;
     TimeSource& time_source_;
   };
 
@@ -293,8 +290,8 @@ private:
    * OverloadManager keeps the admin interface accessible even when the proxy is overloaded.
    */
   struct NullOverloadManager : public OverloadManager {
-    struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
-      NullThreadLocalOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+    struct OverloadState : public ThreadLocalOverloadState {
+      OverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
       bool tryAllocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
       bool tryDeallocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
@@ -308,12 +305,12 @@ private:
 
     void start() override {
       tls_->set([](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        return std::make_shared<NullThreadLocalOverloadState>(dispatcher);
+        return std::make_shared<OverloadState>(dispatcher);
       });
     }
 
     ThreadLocalOverloadState& getThreadLocalOverloadState() override {
-      return tls_->getTyped<NullThreadLocalOverloadState>();
+      return tls_->getTyped<OverloadState>();
     }
 
     Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override { return nullptr; }
@@ -368,7 +365,7 @@ private:
 
   class AdminListener : public Network::ListenerConfig {
   public:
-    AdminListener(AdminImpl& parent, Stats::ScopePtr&& listener_scope)
+    AdminListener(AdminImpl& parent, Stats::ScopeSharedPtr&& listener_scope)
         : parent_(parent), name_("admin"), scope_(std::move(listener_scope)),
           stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)),
           init_manager_(nullptr), ignore_global_conn_limit_(parent.ignore_global_conn_limit_) {}
@@ -407,7 +404,7 @@ private:
 
     AdminImpl& parent_;
     const std::string name_;
-    Stats::ScopePtr scope_;
+    Stats::ScopeSharedPtr scope_;
     Http::ConnectionManagerListenerStats stats_;
     Network::NopConnectionBalancerImpl connection_balancer_;
     BasicResourceLimitImpl open_connections_;

@@ -32,18 +32,18 @@ namespace Config {
 class FilesystemSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   FilesystemSubscriptionTestHarness()
-      : path_(TestEnvironment::temporaryPath("eds.json")),
+      : path_(makePathConfigSource(TestEnvironment::temporaryPath("eds.json"))),
         api_(Api::createApiForTest(stats_store_, simTime())), dispatcher_(setupDispatcher()),
         subscription_(*dispatcher_, path_, callbacks_, resource_decoder_, stats_,
                       validation_visitor_, *api_) {}
 
-  ~FilesystemSubscriptionTestHarness() override { TestEnvironment::removePath(path_); }
+  ~FilesystemSubscriptionTestHarness() override { TestEnvironment::removePath(path_.path()); }
 
   Event::DispatcherPtr setupDispatcher() {
     auto dispatcher = std::make_unique<Event::MockDispatcher>();
     EXPECT_CALL(*dispatcher, createFilesystemWatcher_()).WillOnce(InvokeWithoutArgs([this] {
       Filesystem::MockWatcher* mock_watcher = new Filesystem::MockWatcher();
-      EXPECT_CALL(*mock_watcher, addWatch(path_, Filesystem::Watcher::Events::MovedTo, _))
+      EXPECT_CALL(*mock_watcher, addWatch(path_.path(), Filesystem::Watcher::Events::MovedTo, _))
           .WillOnce(Invoke([this](absl::string_view, uint32_t,
                                   Filesystem::Watcher::OnChangedCb cb) { on_changed_cb_ = cb; }));
       return mock_watcher;
@@ -52,7 +52,7 @@ public:
   }
 
   void startSubscription(const std::set<std::string>& cluster_names) override {
-    std::ifstream config_file(path_);
+    std::ifstream config_file(path_.path());
     file_at_start_ = config_file.good();
     subscription_.start(flattenResources(cluster_names));
   }
@@ -64,7 +64,7 @@ public:
   void updateFile(const std::string& json, bool run_dispatcher = true) {
     // Write JSON contents to file, rename to path_ and invoke on change callback
     const std::string temp_path = TestEnvironment::writeStringToFileForTest("eds.json.tmp", json);
-    TestEnvironment::renameFile(temp_path, path_);
+    TestEnvironment::renameFile(temp_path, path_.path());
     if (run_dispatcher) {
       on_changed_cb_(Filesystem::Watcher::Events::MovedTo);
     }
@@ -125,7 +125,7 @@ public:
     // initial_fetch_timeout not implemented
   }
 
-  const std::string path_;
+  const envoy::config::core::v3::PathConfigSource path_;
   std::string version_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;

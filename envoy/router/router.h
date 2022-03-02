@@ -18,6 +18,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/hash_policy.h"
+#include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/http_tracer.h"
@@ -382,7 +383,7 @@ public:
   /**
    * Determine whether a request should be retried based on the response headers.
    * @param response_headers supplies the response headers.
-   * @param original_request supplies the orignal request headers.
+   * @param original_request supplies the original request headers.
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. The callback will never be called
    *                 inline.
@@ -400,7 +401,7 @@ public:
    * the information about whether a response is "good" or not is useful, but a retry should
    * not be attempted for other reasons.
    * @param response_headers supplies the response headers.
-   * @param original_request supplies the orignal request headers.
+   * @param original_request supplies the original request headers.
    * @param retry_as_early_data output argument to tell the caller if a retry should be sent as
    *        early data if it is warranted.
    * @return RetryDecision if a retry would be warranted based on the retry policy and if it would
@@ -1149,10 +1150,8 @@ using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteE
 /**
  * The router configuration.
  */
-class Config {
+class Config : public Rds::Config {
 public:
-  virtual ~Config() = default;
-
   /**
    * Based on the incoming HTTP request headers, determine the target route (containing either a
    * route entry or a direct response entry) for the request.

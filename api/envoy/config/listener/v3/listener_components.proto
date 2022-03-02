@@ -334,6 +334,7 @@ message ListenerFilterChainMatchPredicate {
   }
 }
 
+// [#next-free-field: 6]
 message ListenerFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.ListenerFilter";
@@ -351,6 +352,12 @@ message ListenerFilter {
     // instantiated. See the supported filters for further documentation.
     // [#extension-category: envoy.filters.listener,envoy.filters.udp_listener]
     google.protobuf.Any typed_config = 3;
+
+    // Configuration source specifier for an extension configuration discovery
+    // service. In case of a failure and without the default configuration, the
+    // listener closes the connections.
+    // [#not-implemented-hide:]
+    core.v3.ExtensionConfigSource config_discovery = 5;
   }
 
   // Optional match predicate used to disable the filter. The filter is enabled when this field is empty.
