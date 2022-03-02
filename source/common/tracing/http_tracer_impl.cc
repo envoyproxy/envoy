@@ -117,7 +117,7 @@ template <class T> static void addGrpcResponseTags(Span& span, const T& headers)
           span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
           break;
         default:
-          PANIC("not implemented");
+          PANIC("new grpc error code not added");
         }
       }
     }
