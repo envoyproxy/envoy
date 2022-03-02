@@ -40,11 +40,11 @@ Step 2: Test rate limiting of upstream service
 
 The sandbox is configured with `10000` port for upstream service.
 
-Now, use ``curl`` to make a request three times for the limited upsteam service:
+Now, use ``curl`` to make a request four times for the limited upsteam service:
 
 .. code-block:: console
 
-    $ for i in {1..3}; do curl -si -H "Accept-Encoding: ratelimit" localhost:10000 | grep "x-local-rate-limit"; done
+    $ for i in {1..4}; do curl -si localhost:10000 | grep "x-local-rate-limit"; done
     x-local-rate-limit: true
     x-local-rate-limit: true
 
@@ -58,17 +58,17 @@ The sandbox is configured with two ports serving Envoy’s admin and statistics 
 - ``9901`` exposes the standard admin interface
 - ``9902`` exposes a rate limitied version of the admin interface
 
-Use ``curl`` to make a request three times for unlimited statistics on port ``9901``, it should not contain the ``x-local-rate-limit`` header in the response:
+Use ``curl`` to make a request four times for unlimited statistics on port ``9901``, it should not contain the ``x-local-rate-limit`` header in the response:
 
 .. code-block:: console
 
-    $ for i in {1..3}; do curl -si -H "Accept-Encoding: ratelimit" localhost:9901/stats/prometheus | grep "x-local-rate-limit"; done
+    $ for i in {1..4}; do curl -si localhost:9901/stats/prometheus | grep "x-local-rate-limit"; done
 
-Now, use ``curl`` to make a request three times for the limited statistics:
+Now, use ``curl`` to make a request four times for the limited statistics:
 
 .. code-block:: console
 
-    $ for i in {1..3}; do curl -si -H "Accept-Encoding: ratelimit" localhost:9902/stats/prometheus | grep "x-local-rate-limit"; done
+    $ for i in {1..4}; do curl -si localhost:9902/stats/prometheus | grep "x-local-rate-limit"; done
     x-local-rate-limit: true
     x-local-rate-limit: true
 

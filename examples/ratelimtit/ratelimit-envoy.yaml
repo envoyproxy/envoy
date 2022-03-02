@@ -27,9 +27,9 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
               stat_prefix: http_local_rate_limiter
               token_bucket:
-                max_tokens: 1
+                max_tokens: 2
                 tokens_per_fill: 1
-                fill_interval: 30s
+                fill_interval: 1s
               filter_enabled:
                 runtime_key: local_rate_limit_enabled
                 default_value:
@@ -74,9 +74,9 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
               stat_prefix: http_local_rate_limiter
               token_bucket:
-                max_tokens: 1
+                max_tokens: 2
                 tokens_per_fill: 1
-                fill_interval: 30s
+                fill_interval: 1s
               filter_enabled:
                 runtime_key: local_rate_limit_enabled
                 default_value:
