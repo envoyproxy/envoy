@@ -28,9 +28,9 @@ const Buffer::ConstRawSlice ListenerFilterBufferImpl::rawSlice() const {
   return slice;
 }
 
-bool ListenerFilterBufferImpl::drain(uint64_t length) {
+void ListenerFilterBufferImpl::drain(uint64_t length) {
   if (length == 0) {
-    return true;
+    return;
   }
 
   ASSERT(length <= data_size_);
@@ -53,7 +53,6 @@ bool ListenerFilterBufferImpl::drain(uint64_t length) {
     buffer_size_ -= length;
     break;
   }
-  return true;
 }
 
 PeekState ListenerFilterBufferImpl::peekFromSocket() {

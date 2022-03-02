@@ -33,7 +33,7 @@ public:
   // ListenerFilterBuffer
   const Buffer::ConstRawSlice rawSlice() const override;
   // ListenerFilterBuffer
-  bool drain(uint64_t length) override;
+  void drain(uint64_t length) override;
   // ListenerFilterBuffer
   uint64_t length() const override { return data_size_; }
 

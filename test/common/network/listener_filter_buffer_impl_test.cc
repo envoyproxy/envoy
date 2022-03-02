@@ -168,8 +168,7 @@ TEST_F(ListenerFilterBufferImplTest, DrainData) {
                                        Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
       });
 
-  auto ret = listener_buffer_->drain(drained_size);
-  EXPECT_TRUE(ret);
+  listener_buffer_->drain(drained_size);
   // Then should only can access the last 128 bytes
   auto slice1 = listener_buffer_->rawSlice();
   EXPECT_EQ(drained_size, slice1.len_);
