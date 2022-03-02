@@ -22,7 +22,6 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 #include "source/extensions/transport_sockets/tls/stats.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
 
@@ -86,7 +85,9 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       ssl_ciphers_(stat_name_set_->add("ssl.ciphers")),
       ssl_versions_(stat_name_set_->add("ssl.versions")),
       ssl_curves_(stat_name_set_->add("ssl.curves")),
-      ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")), capabilities_(config.capabilities()) {
+      ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")), capabilities_(config.capabilities()),
+      tls_keylog_local_(config.tlsKeyLogLocal()),
+      tls_keylog_remote_(config.tlsKeyLogRemote()), access_log_{nullptr} {
 
   auto cert_validator_name = getCertValidatorName(config.certificateValidationContext());
   auto cert_validator_factory =
@@ -338,39 +339,38 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   // Note that if a negotiated version is outside of this set, we'll issue an ENVOY_BUG.
   stat_name_set_->rememberBuiltins({"TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"});
 
-  if (config.tlsKeyLogFile() != nullptr) {
+  if (!config.tlsKeyLogPath().empty()) {
     ENVOY_LOG(debug, "Enable tls key log");
+    access_log_ = config.accessLogManager().createAccessLog(
+        Filesystem::FilePathAndType{Filesystem::DestinationType::File, config.tlsKeyLogPath()});
     enableTlsKeyLog();
   }
 }
 
-bool ContextImpl::tlsKeyLogMatch(const Network::Address::InstanceConstSharedPtr local,
-                                 const Network::Address::InstanceConstSharedPtr remote,
-                                 const Ssl::ContextConfig& config) {
-  const Network::Address::IpList& local_ip = config.tlsKeyLogLocal();
-  const Network::Address::IpList& remote_ip = config.tlsKeyLogRemote();
-  bool match = (local_ip.getIpListSize() == 0 || local_ip.contains(*local)) &&
-               (remote_ip.getIpListSize() == 0 || remote_ip.contains(*remote));
-
-  ENVOY_LOG(trace, "tls key log match: {}", match);
-  return match;
-}
-
 void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
   ASSERT(ssl != nullptr);
-  auto ssl_socket = SslSocket::get(ssl);
-  auto match = tlsKeyLogMatch(
-      ssl_socket.transportSocketCallbacks()->connection().connectionInfoProvider().localAddress(),
-      ssl_socket.transportSocketCallbacks()->connection().connectionInfoProvider().remoteAddress(),
-      ssl_socket.config());
-  if (match) {
-    ssl_socket.config().tlsKeyLogFile()->write(absl::StrCat(line, "\n"));
+  auto tls_keylog_data = static_cast<TlsKeyLogData*>(SSL_get_ex_data(ssl, Tls::sslSocketIndex()));
+  ASSERT(tls_keylog_data != nullptr);
+
+  if ((tls_keylog_data->config_local_ip_.getIpListSize() == 0 ||
+       tls_keylog_data->config_local_ip_.contains(tls_keylog_data->local_)) &&
+      (tls_keylog_data->config_remote_ip_.getIpListSize() == 0 ||
+       tls_keylog_data->config_remote_ip_.contains(tls_keylog_data->remote_))) {
+    tls_keylog_data->access_log->write(absl::StrCat(line, "\n"));
   }
 }
 
+int sslSocketIndex() {
+  CONSTRUCT_ON_FIRST_USE(int, []() -> int {
+    int ssl_socket_index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+    RELEASE_ASSERT(ssl_socket_index >= 0, "");
+    return ssl_socket_index;
+  }());
+}
+
 void ContextImpl::enableTlsKeyLog(void) {
-  for (size_t i = 0; i < tls_contexts_.size(); i++) {
-    SSL_CTX* ctx = tls_contexts_[i].ssl_ctx_.get();
+  for (auto& context : tls_contexts_) {
+    SSL_CTX* ctx = context.ssl_ctx_.get();
     ASSERT(ctx != nullptr);
     SSL_CTX_set_keylog_callback(ctx, keylogCallback);
   }

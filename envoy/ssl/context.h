@@ -6,6 +6,8 @@
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/common/pure.h"
 
+#include "source/common/network/cidr_range.h"
+
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -40,6 +42,16 @@ public:
    * expire, or `absl::nullopt` if no OCSP responses exist.
    */
   virtual absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const PURE;
+
+  /**
+   * @return the TLS key log local filter.
+   */
+  virtual const Network::Address::IpList& tlsKeyLogLocal() const PURE;
+
+  /**
+   * @return the TLS key log remote filter.
+   */
+  virtual const Network::Address::IpList& tlsKeyLogRemote() const PURE;
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 

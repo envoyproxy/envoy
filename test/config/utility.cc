@@ -1214,26 +1214,43 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
 
 void ConfigHelper::initializeTlsKeyLog(
     envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& tls_context,
-    bool keylog_local_filter, bool keylog_remote_filter) {
+    bool keylog_local_filter, bool keylog_remote_filter, bool keylog_negative,
+    const Network::Address::IpVersion version) {
   if (!keylog_local_filter && !keylog_local_filter) {
     return;
   }
   auto tls_keylog_path = tls_context.mutable_tls_keylog()->mutable_logfile_path();
-#ifdef _MSC_VER
-  *tls_keylog_path = std::string("%temp%\\keylog");
-#else
-  *tls_keylog_path = std::string("/tmp/keylog");
-#endif
+  if (!keylog_negative) {
+    *tls_keylog_path = TestEnvironment::temporaryPath("tlskey.log");
+  } else {
+    *tls_keylog_path = TestEnvironment::temporaryPath("tlskey-negative.log");
+  }
   if (keylog_local_filter) {
     auto tls_keylog_local = tls_context.mutable_tls_keylog()->mutable_local_address_range();
     auto new_element_local = tls_keylog_local->Add();
-    new_element_local->set_address_prefix("127.0.0.1");
+    if (!keylog_negative) {
+      new_element_local->set_address_prefix(Network::Test::getLoopbackAddressString(version));
+    } else {
+      if (version == Network::Address::IpVersion::v6) {
+        new_element_local->set_address_prefix("1::2");
+      } else {
+        new_element_local->set_address_prefix("127.0.0.2");
+      }
+    }
     new_element_local->mutable_prefix_len()->set_value(32);
   }
   if (keylog_remote_filter) {
     auto tls_keylog_remote = tls_context.mutable_tls_keylog()->mutable_remote_address_range();
     auto new_element_remote = tls_keylog_remote->Add();
-    new_element_remote->set_address_prefix("127.0.0.1");
+    if (!keylog_negative) {
+      new_element_remote->set_address_prefix(Network::Test::getLoopbackAddressString(version));
+    } else {
+      if (version == Network::Address::IpVersion::v6) {
+        new_element_remote->set_address_prefix("1::2");
+      } else {
+        new_element_remote->set_address_prefix("127.0.0.2");
+      }
+    }
     new_element_remote->mutable_prefix_len()->set_value(32);
   }
 }
@@ -1287,7 +1304,7 @@ void ConfigHelper::initializeTls(
                                                                     options.san_matchers_.end()};
   }
   initializeTlsKeyLog(common_tls_context, options.keylog_local_filter_,
-                      options.keylog_remote_filter_);
+                      options.keylog_remote_filter_, options.keylog_negative_, options.ip_version_);
 }
 
 void ConfigHelper::renameListener(const std::string& name) {

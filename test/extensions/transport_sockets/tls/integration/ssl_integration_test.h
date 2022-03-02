@@ -41,6 +41,7 @@ protected:
   bool debug_with_s_client_{false};
   bool keylog_local_{false};
   bool keylog_remote_{false};
+  bool keylog_negative_{false};
   std::unique_ptr<ContextManager> context_manager_;
 };
 

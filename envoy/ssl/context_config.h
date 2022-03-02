@@ -103,9 +103,14 @@ public:
   virtual const Network::Address::IpList& tlsKeyLogRemote() const PURE;
 
   /**
-   * @return the access log object
+   * @return the TLS key log path
    */
-  virtual const AccessLog::AccessLogFileSharedPtr tlsKeyLogFile() const PURE;
+  virtual const std::string& tlsKeyLogPath() const PURE;
+
+  /**
+   * @return the access log manager object reference
+   */
+  virtual AccessLog::AccessLogManager& accessLogManager() const PURE;
 };
 
 using ContextConfigPtr = std::unique_ptr<ContextConfig>;

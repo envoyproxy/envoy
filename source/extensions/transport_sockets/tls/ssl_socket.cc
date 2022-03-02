@@ -49,34 +49,19 @@ public:
 
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
                      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                     Ssl::HandshakerFactoryCb handshaker_factory_cb,
-                     const Ssl::ContextConfig& config)
+                     Ssl::HandshakerFactoryCb handshaker_factory_cb)
     : transport_socket_options_(transport_socket_options),
       ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
       info_(std::dynamic_pointer_cast<SslHandshakerImpl>(
           handshaker_factory_cb(ctx_->newSsl(transport_socket_options_.get()),
                                 ctx_->sslExtendedSocketInfoIndex(), this))),
-      config_(config) {
+      tls_keylog_data_(nullptr) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(rawSsl());
   } else {
     ASSERT(state == InitialState::Server);
     SSL_set_accept_state(rawSsl());
   }
-}
-
-int SslSocket::sslSocketIndex() {
-  CONSTRUCT_ON_FIRST_USE(int, []() -> int {
-    int ssl_socket_index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
-    RELEASE_ASSERT(ssl_socket_index >= 0, "");
-    return ssl_socket_index;
-  }());
-}
-
-SslSocket& SslSocket::get(const SSL* ssl) {
-  auto ssl_socket = static_cast<SslSocket*>(SSL_get_ex_data(ssl, sslSocketIndex()));
-  ASSERT(ssl_socket);
-  return *ssl_socket;
 }
 
 void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
@@ -92,7 +77,14 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   // Use custom BIO that reads from/writes to IoHandle
   BIO* bio = BIO_new_io_handle(&callbacks_->ioHandle());
   SSL_set_bio(rawSsl(), bio, bio);
-  SSL_set_ex_data(rawSsl(), sslSocketIndex(), static_cast<void*>(this));
+  if (ctx_->tlsKeyLogFile() != nullptr) {
+    tls_keylog_data_ = std::make_unique<TlsKeyLogData>(
+        TlsKeyLogData{*(callbacks_->connection().connectionInfoProvider().localAddress().get()),
+                      *(callbacks_->connection().connectionInfoProvider().remoteAddress().get()),
+                      ctx_->tlsKeyLogLocal(), ctx_->tlsKeyLogRemote(), ctx_->tlsKeyLogFile()});
+
+    SSL_set_ex_data(rawSsl(), Tls::sslSocketIndex(), static_cast<void*>(tls_keylog_data_.get()));
+  }
 }
 
 SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
@@ -394,10 +386,8 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
-    ENVOY_LOG(debug, "Create ClientSslSocket");
     return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Client,
-                                       transport_socket_options, config_->createHandshaker(),
-                                       *config_);
+                                       transport_socket_options, config_->createHandshaker());
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.upstream_context_secrets_not_ready_.inc();
@@ -448,8 +438,7 @@ Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket(
   if (ssl_ctx) {
     ENVOY_LOG(debug, "Create ServerSslSocket");
     return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server,
-                                       transport_socket_options, config_->createHandshaker(),
-                                       *config_);
+                                       transport_socket_options, config_->createHandshaker());
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.downstream_context_secrets_not_ready_.inc();

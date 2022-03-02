@@ -50,7 +50,7 @@ class SslSocket : public Network::TransportSocket,
 public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
             const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-            Ssl::HandshakerFactoryCb handshaker_factory_cb, const Ssl::ContextConfig& config);
+            Ssl::HandshakerFactoryCb handshaker_factory_cb);
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -71,11 +71,8 @@ public:
   void onSuccess(SSL* ssl) override;
   void onFailure() override;
   Network::TransportSocketCallbacks* transportSocketCallbacks() override { return callbacks_; }
-  const Envoy::Ssl::ContextConfig& config() const { return config_; }
 
   SSL* rawSslForTest() const { return rawSsl(); }
-  static int sslSocketIndex();
-  static SslSocket& get(const SSL* ssl);
 
 protected:
   SSL* rawSsl() const { return info_->ssl(); }
@@ -99,7 +96,7 @@ private:
   std::string failure_reason_;
 
   SslHandshakerImplSharedPtr info_;
-  const Envoy::Ssl::ContextConfig& config_;
+  TlsKeyLogDataPtr tls_keylog_data_;
 };
 
 class ClientSslSocketFactory : public Network::CommonTransportSocketFactory,

@@ -34,15 +34,16 @@ namespace Envoy {
 namespace Ssl {
 
 void SslIntegrationTestBase::initialize() {
-  config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
-                                  .setRsaCert(server_rsa_cert_)
-                                  .setRsaCertOcspStaple(server_rsa_cert_ocsp_staple_)
-                                  .setEcdsaCert(server_ecdsa_cert_)
-                                  .setEcdsaCertOcspStaple(server_ecdsa_cert_ocsp_staple_)
-                                  .setOcspStapleRequired(ocsp_staple_required_)
-                                  .setTlsV13(server_tlsv1_3_)
-                                  .setExpectClientEcdsaCert(client_ecdsa_cert_)
-                                  .setTlsKeyLogFilter(keylog_local_, keylog_remote_));
+  config_helper_.addSslConfig(
+      ConfigHelper::ServerSslOptions()
+          .setRsaCert(server_rsa_cert_)
+          .setRsaCertOcspStaple(server_rsa_cert_ocsp_staple_)
+          .setEcdsaCert(server_ecdsa_cert_)
+          .setEcdsaCertOcspStaple(server_ecdsa_cert_ocsp_staple_)
+          .setOcspStapleRequired(ocsp_staple_required_)
+          .setTlsV13(server_tlsv1_3_)
+          .setExpectClientEcdsaCert(client_ecdsa_cert_)
+          .setTlsKeyLogFilter(keylog_local_, keylog_remote_, keylog_negative_, version_));
 
   HttpIntegrationTest::initialize();
 
@@ -94,30 +95,56 @@ public:
   void setLocalFilter() {
     keylog_local_ = true;
     keylog_remote_ = false;
+    keylog_negative_ = false;
   }
   void setRemoteFilter() {
     keylog_remote_ = true;
     keylog_local_ = false;
+    keylog_negative_ = false;
   }
   void setBothLocalAndRemoteFilter() {
     keylog_local_ = true;
     keylog_remote_ = true;
+    keylog_negative_ = false;
+  }
+  void setNegative() {
+    keylog_local_ = true;
+    keylog_remote_ = true;
+    keylog_negative_ = true;
   }
   void logCheck() {
-#ifdef _MSC_VER
-    std::string log = waitForAccessLog("%temp%\\keylog");
-#else
-    std::string log = waitForAccessLog("/tmp/keylog");
-#endif
+    std::string log = waitForAccessLog(TestEnvironment::temporaryPath("tlskey.log"));
     if (server_tlsv1_3_) {
+      /** The keylog for TLS1.3 is as follows:
+       * CLIENT_HANDSHAKE_TRAFFIC_SECRET
+         c62fe86cb3a714451abc7496062251e16862ca3dfc1487c97ab4b291b83a1787
+         b335f2ce9079d824a7d2f5ef9af6572d43942d6803bac1ae9de1e840c15c993ae4efdf4ac087877031d1936d5bb858e3
+         SERVER_HANDSHAKE_TRAFFIC_SECRET
+         c62fe86cb3a714451abc7496062251e16862ca3dfc1487c97ab4b291b83a1787
+         f498c03446c936d8a17f31669dd54cee2d9bc8d5b7e1a658f677b5cd6e0965111c2331fcc337c01895ec9a0ed12be34a
+         CLIENT_TRAFFIC_SECRET_0 c62fe86cb3a714451abc7496062251e16862ca3dfc1487c97ab4b291b83a1787
+         0bbbb2056f3d35a3b610c5cc8ae0b9b63a120912ff25054ee52b853fefc59e12e9fdfebc409347c737394457bfd36bde
+         SERVER_TRAFFIC_SECRET_0 c62fe86cb3a714451abc7496062251e16862ca3dfc1487c97ab4b291b83a1787
+         bd3e1757174d82c308515a0c02b981084edda53e546df551ddcf78043bff831c07ff93c7ab3e8ef9e2206c8319c25331
+         EXPORTER_SECRET c62fe86cb3a714451abc7496062251e16862ca3dfc1487c97ab4b291b83a1787
+         6bd19fbdd12e6710159bcb406fd42a580c41236e2d53072dba3064f9b3ff214662081f023e9b22325e31fee5bb11b172
+       */
       EXPECT_THAT(log, testing::HasSubstr("CLIENT_TRAFFIC_SECRET"));
       EXPECT_THAT(log, testing::HasSubstr("SERVER_TRAFFIC_SECRET"));
       EXPECT_THAT(log, testing::HasSubstr("CLIENT_HANDSHAKE_TRAFFIC_SECRET"));
       EXPECT_THAT(log, testing::HasSubstr("SERVER_HANDSHAKE_TRAFFIC_SECRET"));
       EXPECT_THAT(log, testing::HasSubstr("EXPORTER_SECRET"));
     } else {
+      /** The keylog for TLS1.1/1.2 is as follows:
+       * CLIENT_RANDOM 5a479a50fe3e85295840b84e298aeb184cecc34ced22d963e16b01dc48c9530f
+         d6840f8100e4ceeb282946cdd72fe403b8d0724ee816ab2d0824b6d6b5033d333ec4b2e77f515226f5d829e137855ef1
+       */
       EXPECT_THAT(log, testing::HasSubstr("CLIENT_RANDOM"));
     }
+  }
+  void negativeCheck() {
+    auto size = api_->fileSystem().fileSize(TestEnvironment::temporaryPath("tlskey-negative.log"));
+    EXPECT_EQ(0, size);
   }
 };
 
@@ -929,6 +956,20 @@ TEST_P(SslKeyLogTest, SetLocalAndRemoteFilter) {
   auto result = codec_client_->startRequest(request_headers);
   codec_client_->close();
   logCheck();
+}
+
+TEST_P(SslKeyLogTest, SetLocalAndRemoteFilterNegative) {
+  setNegative();
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  codec_client_ = makeHttpConnection(creator());
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto result = codec_client_->startRequest(request_headers);
+  codec_client_->close();
+  negativeCheck();
 }
 
 } // namespace Ssl

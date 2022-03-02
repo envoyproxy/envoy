@@ -60,8 +60,19 @@ struct TlsContext {
   void checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path);
 };
 
+struct TlsKeyLogData {
+  const Network::Address::Instance& local_;
+  const Network::Address::Instance& remote_;
+  const Network::Address::IpList& config_local_ip_;
+  const Network::Address::IpList& config_remote_ip_;
+  AccessLog::AccessLogFileSharedPtr access_log;
+};
+using TlsKeyLogDataPtr = std::unique_ptr<TlsKeyLogData>;
+
+int sslSocketIndex();
+
 class ContextImpl : public virtual Envoy::Ssl::Context,
-                    protected Logger::Loggable<Logger::Id::misc> {
+                    protected Logger::Loggable<Logger::Id::connection> {
 public:
   virtual bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptions* options);
 
@@ -88,6 +99,13 @@ public:
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
   bool verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates, std::string& error_details);
+
+  const Network::Address::IpList& tlsKeyLogLocal() const override { return tls_keylog_local_; };
+  const Network::Address::IpList& tlsKeyLogRemote() const override { return tls_keylog_remote_; };
+  const AccessLog::AccessLogFileSharedPtr tlsKeyLogFile() const { return access_log_; };
+  void enableTlsKeyLog();
+
+  static void keylogCallback(const SSL* ssl, const char* line);
 
 protected:
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
@@ -131,12 +149,9 @@ protected:
   const Stats::StatName ssl_curves_;
   const Stats::StatName ssl_sigalgs_;
   const Ssl::HandshakerCapabilities capabilities_;
-  static bool tlsKeyLogMatch(const Network::Address::InstanceConstSharedPtr local,
-                             const Network::Address::InstanceConstSharedPtr remote,
-                             const Ssl::ContextConfig& config);
-  void enableTlsKeyLog();
-  void disableTlsKeyLog();
-  static void keylogCallback(const SSL* ssl, const char* line);
+  const Network::Address::IpList tls_keylog_local_;
+  const Network::Address::IpList tls_keylog_remote_;
+  AccessLog::AccessLogFileSharedPtr access_log_;
 };
 
 using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;
