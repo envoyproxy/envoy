@@ -3,11 +3,8 @@
 // As long as this class is in scope one can do runtime feature overrides:
 //
 //  TestScopedRuntime scoped_runtime;
-//  Runtime::LoaderSingleton::getExisting()->mergeValues(
+//  scoped_runtime.mergeValues(
 //      {{"envoy.reloadable_features.test_feature_true", "false"}});
-//
-//  As long as a TestScopedRuntime exists, Runtime::LoaderSingleton::getExisting()->mergeValues()
-//  can safely be called to override runtime values.
 
 #pragma once
 
@@ -43,6 +40,10 @@ public:
 
   Runtime::Loader& loader() { return *Runtime::LoaderSingleton::getExisting(); }
 
+  void mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
+    loader().mergeValues(values);
+  }
+
 protected:
   absl::FlagSaver saver_;
   Event::MockDispatcher dispatcher_;
@@ -57,7 +58,8 @@ protected:
 
 class TestDeprecatedV2Api : public TestScopedRuntime {
 public:
-  TestDeprecatedV2Api() {
+  TestDeprecatedV2Api() { allowDeprecatedV2(); }
+  static void allowDeprecatedV2() {
     Runtime::LoaderSingleton::getExisting()->mergeValues({
         {"envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true"},
         {"envoy.features.enable_all_deprecated_features", "true"},

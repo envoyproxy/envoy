@@ -12,18 +12,20 @@
 
 namespace quiche {
 
-QuicheMemSliceImpl::QuicheMemSliceImpl(quic::QuicUniqueBufferPtr buffer, size_t length)
-    : fragment_(std::make_unique<Envoy::Buffer::BufferFragmentImpl>(
-          buffer.get(), length,
-          // TODO(danzh) change the buffer fragment constructor to take the lambda by move instead
-          // of copy, so that the ownership of |buffer| can be transferred to lambda via capture
-          // here and below to unify and simplify the constructor implementations.
-          [allocator = buffer.get_deleter().allocator()](const void* p, size_t,
+QuicheMemSliceImpl::QuicheMemSliceImpl(quic::QuicBuffer buffer) {
+  size_t length = buffer.size();
+  quic::QuicUniqueBufferPtr buffer_ptr = buffer.Release();
+  fragment_ = std::make_unique<Envoy::Buffer::BufferFragmentImpl>(
+      buffer_ptr.get(), length,
+      // TODO(danzh) change the buffer fragment constructor to take the lambda by move instead
+      // of copy, so that the ownership of |buffer| can be transferred to lambda via capture
+      // here and below to unify and simplify the constructor implementations.
+      [allocator = buffer_ptr.get_deleter().allocator()](const void* p, size_t,
                                                          const Envoy::Buffer::BufferFragmentImpl*) {
-            quic::QuicBufferDeleter deleter(allocator);
-            deleter(const_cast<char*>(static_cast<const char*>(p)));
-          })) {
-  buffer.release();
+        quic::QuicBufferDeleter deleter(allocator);
+        deleter(const_cast<char*>(static_cast<const char*>(p)));
+      });
+  buffer_ptr.release();
   single_slice_buffer_.addBufferFragment(*fragment_);
   ASSERT(this->length() == length);
 }

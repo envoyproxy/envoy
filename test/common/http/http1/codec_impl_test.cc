@@ -1118,10 +1118,6 @@ TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
 // Ensures that requests with invalid HTTP header values are properly rejected
 // when the runtime guard is enabled for the feature.
 TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
-  TestScopedRuntime scoped_runtime;
-  // When the runtime-guarded feature is enabled, invalid header values
-  // should result in a rejection.
-
   initialize();
 
   MockRequestDecoder decoder;
@@ -1211,8 +1207,6 @@ TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreCauseRequestReject
 }
 
 TEST_F(Http1ServerConnectionImplTest, HeaderInvalidAuthority) {
-  TestScopedRuntime scoped_runtime;
-
   initialize();
 
   MockRequestDecoder decoder;
