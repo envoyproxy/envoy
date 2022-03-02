@@ -151,8 +151,8 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
       for (const envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher& matcher :
            cert_validation_config->subjectAltNameMatchers()) {
         auto san_matcher = createStringSanMatcher(matcher);
-        if san_matcher != nullptr {
-          subject_alt_name_matchers_.emplace_back(std::move(matcher));
+        if (san_matcher != nullptr) {
+          subject_alt_name_matchers_.push_back(std::move(san_matcher));
         }
       }
       verify_mode = verify_mode_validation_context;
