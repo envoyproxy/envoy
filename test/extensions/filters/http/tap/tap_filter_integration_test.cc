@@ -887,7 +887,6 @@ tap_config:
   admin_client_->close();
 }
 
-
 // Verify both request and response trailer matching works.
 TEST_P(TapIntegrationTest, AdminTrailers) {
   initializeFilter(admin_filter_config_);

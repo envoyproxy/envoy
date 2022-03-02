@@ -188,15 +188,13 @@ private:
    * Sink for buffering a variable number of traces in a TraceBuffer
    */
   struct BufferedPerTapSinkHandle : public PerTapSinkHandle {
-    BufferedPerTapSinkHandle(AdminHandler& parent, TraceBuffer* trace_buffer)
-        : parent_(parent), trace_buffer_(trace_buffer) {}
+    BufferedPerTapSinkHandle(AdminHandler& parent) : parent_(parent) {}
 
     // Extensions::Common::Tap::PerTapSinkHandle
     void submitTrace(TraceWrapperPtr&& trace,
                      envoy::config::tap::v3::OutputSink::Format format) override;
 
     AdminHandler& parent_;
-    TraceBuffer* const trace_buffer_;
   };
 
   Http::Code handler(absl::string_view path_and_query, Http::HeaderMap& response_headers,

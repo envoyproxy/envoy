@@ -125,7 +125,7 @@ AdminHandler::createPerTapSinkHandle(uint64_t,
   case ProtoOutputSinkType::kStreamingAdmin:
     return std::make_unique<AdminPerTapSinkHandle>(*this);
   case ProtoOutputSinkType::kBufferedAdmin:
-    return std::make_unique<BufferedPerTapSinkHandle>(*this, attached_request_->traceBuffer());
+    return std::make_unique<BufferedPerTapSinkHandle>(*this);
   case ProtoOutputSinkType::kFilePerTap:
   case ProtoOutputSinkType::kStreamingGrpc:
     PANIC("not implemented");
