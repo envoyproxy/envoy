@@ -95,18 +95,6 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
               continueFilterChain(true);
             },
             listener_filter_max_read_bytes_);
-        // The socket may already has the data after the socket accepted. Trigger
-        // the data peek manually instead of waiting for next reading event.
-        auto peek_state = listener_filter_buffer_->peekFromSocket();
-        if (peek_state == Network::PeekState::Error ||
-            peek_state == Network::PeekState::RemoteClose) {
-          socket_->ioHandle().close();
-          peek_state == Network::PeekState::Error
-              ? listener_.stats_.downstream_peek_error_.inc()
-              : listener_.stats_.downstream_peek_remote_close_.inc();
-          continueFilterChain(false);
-          return;
-        }
       }
     } else {
       iter_ = std::next(iter_);
@@ -127,13 +115,7 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
           ASSERT((*iter_)->maxReadBytes() > 0);
           // There may already have data peeked due to previous filter.
           if (listener_filter_buffer_ != nullptr) {
-            if (listener_filter_buffer_->length() > 0) {
-              Network::FilterStatus status = (*iter_)->onData(*listener_filter_buffer_);
-              // The filter needn't to inspect more data, then go to next filter.
-              if (status == Network::FilterStatus::Continue) {
-                continue;
-              }
-            }
+            listener_filter_buffer_->activateFileEvent(Event::FileReadyType::Read);
           }
           // waiting for more data
           return;

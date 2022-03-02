@@ -44,6 +44,8 @@ public:
 
   void reset() { io_handle_.resetFileEvents(); }
 
+  void activateFileEvent(uint32_t events);
+
 private:
   void onFileEvent(uint32_t events);
 
