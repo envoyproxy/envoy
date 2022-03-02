@@ -115,7 +115,7 @@ public:
   void logCheck() {
     std::string log = waitForAccessLog(TestEnvironment::temporaryPath("tlskey.log"));
     if (server_tlsv1_3_) {
-      /** The keylog for TLS1.3 is as follows:
+      /** The key log for TLS1.3 is as follows:
        * CLIENT_HANDSHAKE_TRAFFIC_SECRET
          c62fe86cb3a714451abc7496062251e16862ca3dfc1487c97ab4b291b83a1787
          b335f2ce9079d824a7d2f5ef9af6572d43942d6803bac1ae9de1e840c15c993ae4efdf4ac087877031d1936d5bb858e3
@@ -135,7 +135,7 @@ public:
       EXPECT_THAT(log, testing::HasSubstr("SERVER_HANDSHAKE_TRAFFIC_SECRET"));
       EXPECT_THAT(log, testing::HasSubstr("EXPORTER_SECRET"));
     } else {
-      /** The keylog for TLS1.1/1.2 is as follows:
+      /** The key log for TLS1.1/1.2 is as follows:
        * CLIENT_RANDOM 5a479a50fe3e85295840b84e298aeb184cecc34ced22d963e16b01dc48c9530f
          d6840f8100e4ceeb282946cdd72fe403b8d0724ee816ab2d0824b6d6b5033d333ec4b2e77f515226f5d829e137855ef1
        */
