@@ -24,6 +24,9 @@ build --define cxxopts=-std=c++17
 build --features=-per_object_debug_info
 # Suppress deprecated declaration warnings due to extensive transitive noise from protobuf.
 build --copt -Wno-deprecated-declarations
+# Abseil Flag literals are compiled out by default on mobile platforms. These flags are needed for
+# Envoy's runtime system. This option prevents them from being compiled out.
+build --copt -DABSL_FLAGS_STRIP_NAMES=0
 
 # Override PGV validation with NOP functions
 build --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=nop

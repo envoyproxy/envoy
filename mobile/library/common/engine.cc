@@ -134,7 +134,7 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
   // Ensure destructors run on Envoy's main thread.
   postinit_callback_handler_.reset(nullptr);
   network_configurator_.reset();
-  client_scope_.reset(nullptr);
+  client_scope_.reset();
   stat_name_set_.reset();
   log_delegate_ptr_.reset(nullptr);
   main_common.reset(nullptr);
