@@ -24,6 +24,7 @@ envoy_cmake(
     cache_entries = {
         "BOOST_ROOT": "$EXT_BUILD_ROOT/external/org_boost",
         "BUILD_EXAMPLES": "off",
+        "CMAKE_INSTALL_LIBDIR": "lib",
         "RAGEL": "$EXT_BUILD_DEPS/ragel/bin/ragel",
     },
     lib_source = "@io_hyperscan//:all",
