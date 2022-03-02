@@ -605,8 +605,9 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
 void ConnPoolImplBase::decrConnectingAndConnectedStreamCapacity(uint32_t delta,
                                                                 ActiveClient& client) {
   state_.decrConnectingAndConnectedStreamCapacity(delta);
-  if (client.isContributingToConnectingStreamCapacity()) {
-    // If connecting, update the local connecting capacity as well.
+  if (!client.hasHandshakeCompleted()) {
+    // If still doing handshake, it is contributing to the local connecting stream capacity. Update
+    // the capacity as well.
     ASSERT(connecting_stream_capacity_ >= delta);
     connecting_stream_capacity_ -= delta;
   }
@@ -615,7 +616,7 @@ void ConnPoolImplBase::decrConnectingAndConnectedStreamCapacity(uint32_t delta,
 void ConnPoolImplBase::incrConnectingAndConnectedStreamCapacity(uint32_t delta,
                                                                 ActiveClient& client) {
   state_.incrConnectingAndConnectedStreamCapacity(delta);
-  if (client.isContributingToConnectingStreamCapacity()) {
+  if (!client.hasHandshakeCompleted()) {
     connecting_stream_capacity_ += delta;
   }
 }

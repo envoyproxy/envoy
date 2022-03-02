@@ -55,9 +55,7 @@ public:
 
   // Overridden to return true as long as the client is doing handshake even when it is ready for
   // early data streams.
-  bool isContributingToConnectingStreamCapacity() const override {
-    return connect_timer_ != nullptr;
-  }
+  bool hasHandshakeCompleted() const override { return connect_timer_ == nullptr; }
 
   void updateCapacity(uint64_t new_quiche_capacity) {
     // Each time we update the capacity make sure to reflect the update in the
