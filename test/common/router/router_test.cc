@@ -4324,7 +4324,7 @@ TEST_F(RouterTest, InternalRedirectStripsFragment) {
 
 TEST_F(RouterTest, InternalRedirectKeepsFragmentWithOveride) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.http_reject_path_with_fragment", "false"}});
   enableRedirects();
   default_request_headers_.setForwardedProto("http");
@@ -5914,7 +5914,7 @@ TEST_F(RouterTest, ExpectedUpstreamTimeoutUpdatedDuringRetries) {
 
 TEST_F(RouterTest, ExpectedUpstreamTimeoutNotUpdatedDuringRetriesWhenRuntimeGuardDisabled) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.update_expected_rq_timeout_on_retry", "false"}});
 
   auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();
