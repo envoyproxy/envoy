@@ -96,18 +96,35 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   }
 
   const absl::optional<std::string> format_value = Utility::formatParam(params);
-  if (format_value.has_value() && format_value.value() == "prometheus") {
-    return handlerPrometheusStats(url, response_headers, response, admin_stream);
+  bool json = false;
+  if (format_value.has_value()) {
+    if (format_value.value() == "prometheus") {
+      return handlerPrometheusStats(url, response_headers, response, admin_stream);
+    } else if (format_value.value() == "json") {
+      json = true;
+    } else {
+      response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
+      response.add("\n");
+      return Http::Code::NotFound;
+    }
   }
+  return handlerStats(server_.stats(), used_only, json, regex, histogram_buckets_mode,
+                      response_headers, response);
+}
 
+Http::Code StatsHandler::handlerStats(Stats::Store& stats, bool used_only, bool json,
+                                      const absl::optional<std::regex>& regex,
+                                      Utility::HistogramBucketsMode histogram_buckets_mode,
+                                      Http::ResponseHeaderMap& response_headers,
+                                      Buffer::Instance& response) {
   std::map<std::string, uint64_t> all_stats;
-  for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
+  for (const Stats::CounterSharedPtr& counter : stats.counters()) {
     if (shouldShowMetric(*counter, used_only, regex)) {
       all_stats.emplace(counter->name(), counter->value());
     }
   }
 
-  for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
+  for (const Stats::GaugeSharedPtr& gauge : stats.gauges()) {
     if (shouldShowMetric(*gauge, used_only, regex)) {
       ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
       all_stats.emplace(gauge->name(), gauge->value());
@@ -115,35 +132,28 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   }
 
   std::map<std::string, std::string> text_readouts;
-  for (const auto& text_readout : server_.stats().textReadouts()) {
+  for (const auto& text_readout : stats.textReadouts()) {
     if (shouldShowMetric(*text_readout, used_only, regex)) {
       text_readouts.emplace(text_readout->name(), text_readout->value());
     }
   }
 
-  Stats::Store& stats = server_.stats();
   std::vector<Stats::ParentHistogramSharedPtr> histograms = stats.histograms();
   stats.symbolTable().sortByStatNames<Stats::ParentHistogramSharedPtr>(
       histograms.begin(), histograms.end(),
       [](const Stats::ParentHistogramSharedPtr& a) -> Stats::StatName { return a->statName(); });
 
-  if (!format_value.has_value()) {
+  if (!json) {
     // Display plain stats if format query param is not there.
-    statsAsText(all_stats, text_readouts, histograms, used_only, histogram_buckets_mode, regex,
+    statsAsText(all_stats, text_readouts, histograms, used_only, regex, histogram_buckets_mode,
                 response);
     return Http::Code::OK;
   }
 
-  if (format_value.value() == "json") {
-    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-    response.add(statsAsJson(all_stats, text_readouts, histograms, used_only,
-                             histogram_buckets_mode, regex));
-    return Http::Code::OK;
-  }
-
-  response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
-  response.add("\n");
-  return Http::Code::NotFound;
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+  response.add(
+      statsAsJson(all_stats, text_readouts, histograms, used_only, regex, histogram_buckets_mode));
+  return Http::Code::OK;
 }
 
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
@@ -191,8 +201,8 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
 void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
                                const std::map<std::string, std::string>& text_readouts,
                                const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                               bool used_only, Utility::HistogramBucketsMode histogram_buckets_mode,
-                               const absl::optional<std::regex>& regex,
+                               bool used_only, const absl::optional<std::regex>& regex,
+                               Utility::HistogramBucketsMode histogram_buckets_mode,
                                Buffer::Instance& response) {
   // Display plain stats if format query param is not there.
   for (const auto& text_readout : text_readouts) {
@@ -235,9 +245,9 @@ std::string
 StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                           const std::map<std::string, std::string>& text_readouts,
                           const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                          const bool used_only,
+                          const bool used_only, const absl::optional<std::regex>& regex,
                           Utility::HistogramBucketsMode histogram_buckets_mode,
-                          const absl::optional<std::regex>& regex, const bool pretty_print) {
+                          const bool pretty_print) {
 
   ProtobufWkt::Struct document;
   std::vector<ProtobufWkt::Value> stats_array;

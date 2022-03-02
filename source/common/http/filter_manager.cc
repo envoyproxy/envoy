@@ -78,7 +78,7 @@ void ActiveStreamFilterBase::commonContinue() {
   allowIteration();
 
   // Only resume with do1xxHeaders() if we've actually seen 1xx headers.
-  if (has1xxheaders()) {
+  if (has1xxHeaders()) {
     continued_1xx_headers_ = true;
     do1xxHeaders();
     // If the response headers have not yet come in, don't continue on with
@@ -1550,7 +1550,7 @@ Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
   return parent_.buffered_response_data_;
 }
 bool ActiveStreamEncoderFilter::complete() { return parent_.state_.local_complete_; }
-bool ActiveStreamEncoderFilter::has1xxheaders() {
+bool ActiveStreamEncoderFilter::has1xxHeaders() {
   return parent_.state_.has_1xx_headers_ && !continued_1xx_headers_;
 }
 void ActiveStreamEncoderFilter::do1xxHeaders() {

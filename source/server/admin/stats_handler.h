@@ -41,6 +41,12 @@ public:
   Http::Code handlerStats(absl::string_view path_and_query,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                           AdminStream&);
+  static Http::Code handlerStats(Stats::Store& stats, bool used_only, bool json,
+                                 const absl::optional<std::regex>& filter,
+                                 Utility::HistogramBucketsMode histogram_buckets_mode,
+                                 Http::ResponseHeaderMap& response_headers,
+                                 Buffer::Instance& response);
+
   Http::Code handlerPrometheusStats(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
@@ -61,16 +67,16 @@ private:
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                  const std::map<std::string, std::string>& text_readouts,
                                  const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                                 bool used_only,
+                                 bool used_only, const absl::optional<std::regex>& regex,
                                  Utility::HistogramBucketsMode histogram_buckets_mode,
-                                 const absl::optional<std::regex>& regex,
                                  bool pretty_print = false);
 
-  void statsAsText(const std::map<std::string, uint64_t>& all_stats,
-                   const std::map<std::string, std::string>& text_readouts,
-                   const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                   bool used_only, Utility::HistogramBucketsMode histogram_buckets_mode,
-                   const absl::optional<std::regex>& regex, Buffer::Instance& response);
+  static void statsAsText(const std::map<std::string, uint64_t>& all_stats,
+                          const std::map<std::string, std::string>& text_readouts,
+                          const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
+                          bool used_only, const absl::optional<std::regex>& regex,
+                          Utility::HistogramBucketsMode histogram_buckets_mode,
+                          Buffer::Instance& response);
 
   static std::string computeDisjointBucketSummary(const Stats::ParentHistogramSharedPtr& histogram);
 
