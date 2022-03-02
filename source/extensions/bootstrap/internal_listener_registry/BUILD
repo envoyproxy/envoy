@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_extension(
-    name = "lib",
+    name = "config",
     # for integration tests
     visibility = ["//visibility:public"],
     deps = [
