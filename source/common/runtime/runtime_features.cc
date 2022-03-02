@@ -66,10 +66,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
-ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");                       // NOLINT
-ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, "");                      // NOLINT
-ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,                                 // NOLINT
-          std::numeric_limits<uint32_t>::max(), "");                                 // NOLINT
+ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT
+ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
+ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
+          std::numeric_limits<uint32_t>::max(), "");            // NOLINT
 
 namespace Envoy {
 namespace Runtime {
