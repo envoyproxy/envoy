@@ -820,11 +820,8 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, QueryIfMatchDeny) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   Http::TestRequestHeaderMapImpl headers{
-    {":method", "GET"},
-    {":path", "/query?key1=correct_value"},
-    {":scheme", "http"},
-    {":authority", "host"},
-    {"x-forwarded-for", "10.0.0.1"},
+      {":method", "GET"},     {":path", "/query?key1=correct_value"}, {":scheme", "http"},
+      {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"},
   };
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
@@ -847,11 +844,8 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, QueryIfNoMatchAllow) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   Http::TestRequestHeaderMapImpl headers{
-    {":method", "GET"},
-    {":path", "/query?key1=correct_value"},
-    {":scheme", "http"},
-    {":authority", "host"},
-    {"x-forwarded-for", "10.0.0.1"},
+      {":method", "GET"},     {":path", "/query?key1=correct_value"}, {":scheme", "http"},
+      {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"},
   };
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
@@ -873,12 +867,8 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfMatchDeny) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   Http::TestRequestHeaderMapImpl headers{
-    {":method", "GET"},
-    {":path", "/query?key1=correct_value"},
-    {":scheme", "http"},
-    {":authority", "host"},
-    {"x-forwarded-for", "10.0.0.1"},
-    {"cookie", "fruit=apple"},    
+      {":method", "GET"},     {":path", "/query?key1=correct_value"}, {":scheme", "http"},
+      {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"},        {"cookie", "fruit=apple"},
   };
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
@@ -900,12 +890,12 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfNoMatchAllow) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   Http::TestRequestHeaderMapImpl headers{
-    {":method", "GET"},
-    {":path", "/path"},
-    {":scheme", "http"},
-    {":authority", "host"},
-    {"x-forwarded-for", "10.0.0.1"},
-    {"cookie", "fruit=apple"},    
+      {":method", "GET"},
+      {":path", "/path"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"x-forwarded-for", "10.0.0.1"},
+      {"cookie", "fruit=apple"},
   };
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
@@ -927,12 +917,12 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfMatchDeny) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   Http::TestRequestHeaderMapImpl headers{
-    {":method", "GET"},
-    {":path", "/path"},
-    {":scheme", "http"},
-    {":authority", "host"},
-    {"x-forwarded-for", "10.0.0.1"},
-    {"cookie", "fruit=apple"},    
+      {":method", "GET"},
+      {":path", "/path"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"x-forwarded-for", "10.0.0.1"},
+      {"cookie", "fruit=apple"},
   };
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
@@ -954,12 +944,12 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfNoMatchAllow) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   Http::TestRequestHeaderMapImpl headers{
-    {":method", "GET"},
-    {":path", "/path"},
-    {":scheme", "http"},
-    {":authority", "host"},
-    {"x-forwarded-for", "10.0.0.1"},
-    {"cookie", "fruit=apple"},    
+      {":method", "GET"},
+      {":path", "/path"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"x-forwarded-for", "10.0.0.1"},
+      {"cookie", "fruit=apple"},
   };
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
@@ -981,12 +971,8 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfMatchDeny) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   Http::TestRequestHeaderMapImpl headers{
-    {":method", "GET"},
-    {":path", "/correct_path"},
-    {":scheme", "http"},
-    {":authority", "host"},
-    {"x-forwarded-for", "10.0.0.1"},
-    {"host", "abc.com:1234"},    
+      {":method", "GET"},     {":path", "/correct_path"},      {":scheme", "http"},
+      {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"host", "abc.com:1234"},
   };
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
@@ -1008,13 +994,8 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfNoMatchAllow) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   Http::TestRequestHeaderMapImpl headers{
-    {":method", "GET"},
-    {":path", "/correct_path"},
-    {":scheme", "http"},
-    {":authority", "host"},
-    {"x-forwarded-for", "10.0.0.1"},
-    {"host", "abc.com:1234"}    
-  };
+      {":method", "GET"},     {":path", "/correct_path"},      {":scheme", "http"},
+      {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"host", "abc.com:1234"}};
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
   waitForNextUpstreamRequest();
