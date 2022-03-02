@@ -1,6 +1,6 @@
 .. _config_internal_listener:
 
-Internal Listener 
+Internal Listener
 =================
 
 How it works
