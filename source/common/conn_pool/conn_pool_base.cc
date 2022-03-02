@@ -153,11 +153,10 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
     }
     ASSERT(client->state() == ActiveClient::State::CONNECTING);
     ASSERT(std::numeric_limits<uint64_t>::max() - connecting_stream_capacity_ >=
-           client->effectiveConcurrentStreamLimit());
+           static_cast<uint64_t>(client->currentUnusedCapacity()));
     ASSERT(client->real_host_description_);
     // Increase the connecting capacity to reflect the streams this connection can serve.
-    state_.incrConnectingAndConnectedStreamCapacity(client->effectiveConcurrentStreamLimit());
-    connecting_stream_capacity_ += client->effectiveConcurrentStreamLimit();
+    incrConnectingAndConnectedStreamCapacity(client->currentUnusedCapacity(), *client);
     LinkedList::moveIntoList(std::move(client), owningList(client->state()));
     return can_create_connection ? ConnectionResult::CreatedNewConnection
                                  : ConnectionResult::CreatedButRateLimited;
@@ -241,7 +240,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
     // Close out the draining client if we no longer have active streams.
     client.close();
   } else if (client.state() == ActiveClient::State::BUSY && client.currentUnusedCapacity() > 0) {
-    if (client.isConnecting()) {
+    if (!client.hasHandshakeCompleted()) {
       transitionActiveClientState(client, ActiveClient::State::CONNECTING);
       if (!delay_attaching_stream) {
         onUpstreamReadyForEarlyData(client);
@@ -473,26 +472,15 @@ void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
 
 void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                                          Network::ConnectionEvent event) {
-  bool was_connecting = client.isConnecting();
-  if (event != Network::ConnectionEvent::ConnectedZeroRtt) {
-    if (was_connecting) {
-      ASSERT(connecting_stream_capacity_ >= client.currentUnusedCapacity(),
-             fmt::format("connecting_stream_capacity_ {}, currentUnusedCapacity {}",
-                         connecting_stream_capacity_, client.currentUnusedCapacity()));
-      connecting_stream_capacity_ -= client.currentUnusedCapacity();
-    }
-
-    if (client.connect_timer_) {
-      client.connect_timer_->disableTimer();
-      client.connect_timer_.reset();
-    }
-  }
-
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
   case Network::ConnectionEvent::LocalClose: {
     const bool contributed_to_connecting_stream_capacity = client.currentUnusedCapacity() > 0;
-    state_.decrConnectingAndConnectedStreamCapacity(client.currentUnusedCapacity());
+    decrConnectingAndConnectedStreamCapacity(client.currentUnusedCapacity(), client);
+    if (client.connect_timer_) {
+      client.connect_timer_->disableTimer();
+      client.connect_timer_.reset();
+    }
     // Make sure that onStreamClosed won't double count.
     client.remaining_streams_ = 0;
     // The client died.
@@ -504,7 +492,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(host_, event);
     }
 
-    if (was_connecting) {
+    if (!client.hasHandshakeCompleted()) {
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
 
@@ -571,6 +559,11 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     break;
   }
   case Network::ConnectionEvent::Connected: {
+    ASSERT(connecting_stream_capacity_ >= client.currentUnusedCapacity());
+    connecting_stream_capacity_ -= client.currentUnusedCapacity();
+    client.connect_timer_->disableTimer();
+    client.connect_timer_.reset();
+
     client.conn_connect_ms_->complete();
     client.conn_connect_ms_.reset();
     if (client.state() == ActiveClient::State::CONNECTING) {
@@ -682,9 +675,9 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
 void ConnPoolImplBase::decrConnectingAndConnectedStreamCapacity(uint32_t delta,
                                                                 ActiveClient& client) {
   state_.decrConnectingAndConnectedStreamCapacity(delta);
-  if (client.isConnecting()) {
-    // If connecting, this client must have been serving early data streams, update the local
-    // connecting capacity.
+  if (!client.hasHandshakeCompleted()) {
+    // If still doing handshake, it is contributing to the local connecting stream capacity. Update
+    // the capacity as well.
     ASSERT(connecting_stream_capacity_ >= delta);
     connecting_stream_capacity_ -= delta;
   }
@@ -693,13 +686,13 @@ void ConnPoolImplBase::decrConnectingAndConnectedStreamCapacity(uint32_t delta,
 void ConnPoolImplBase::incrConnectingAndConnectedStreamCapacity(uint32_t delta,
                                                                 ActiveClient& client) {
   state_.incrConnectingAndConnectedStreamCapacity(delta);
-  if (client.isConnecting()) {
+  if (!client.hasHandshakeCompleted()) {
     connecting_stream_capacity_ += delta;
   }
 }
 
 void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
-  ASSERT(client.isConnecting() && client.readyForStream());
+  ASSERT(!client.hasHandshakeCompleted() && client.readyForStream());
   // Check pending streams backward for safe request.
   auto it = pending_streams_.end();
   if (it == pending_streams_.begin()) {
@@ -775,7 +768,7 @@ void ActiveClient::onConnectTimeout() {
 }
 
 void ActiveClient::onConnectionDurationTimeout() {
-  if (isConnecting()) {
+  if (!hasHandshakeCompleted()) {
     // The connection duration timer should only have started after we were connected.
     ENVOY_BUG(false, "max connection duration reached while connecting");
     return;
@@ -809,7 +802,6 @@ void ActiveClient::drain() {
   if (currentUnusedCapacity() == 0) {
     return;
   }
-
   parent_.decrConnectingAndConnectedStreamCapacity(currentUnusedCapacity(), *this);
 
   remaining_streams_ = 0;
@@ -818,8 +810,6 @@ void ActiveClient::drain() {
 bool ActiveClient::readyForStream() const {
   return state_ == State::READY || (allows_early_data_ && state_ == State::CONNECTING);
 }
-
-bool ActiveClient::isConnecting() const { return connect_timer_ != nullptr; }
 
 } // namespace ConnectionPool
 } // namespace Envoy

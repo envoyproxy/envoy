@@ -76,9 +76,6 @@ public:
   // Return true if it is ready to dispatch the next stream.
   bool readyForStream() const;
 
-  // Return true if it hasn't received Connected network event yet.
-  bool isConnecting() const;
-
   // This function is called onStreamClosed to see if there was a negative delta
   // and (if necessary) update associated bookkeeping.
   // HTTP/1 and TCP pools can not have negative delta so the default implementation simply returns
@@ -111,6 +108,8 @@ public:
 
   // Sets the remaining streams to 0, and updates pool and cluster capacity.
   virtual void drain();
+
+  virtual bool hasHandshakeCompleted() const { return state_ != State::CONNECTING; }
 
   ConnPoolImplBase& parent_;
   // The count of remaining streams allowed for this connection.
@@ -289,7 +288,6 @@ public:
   }
   Upstream::ClusterConnectivityState& state() { return state_; }
 
-  // Update the cluster capacity and the local connecting capacity if applicable.
   void decrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client);
   void incrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client);
 
