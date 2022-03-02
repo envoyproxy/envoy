@@ -59,16 +59,16 @@ public:
 private:
   friend class StatsHandlerTest;
 
-  static std::string computeDisjointBucketSummary(const Stats::ParentHistogramSharedPtr& histogram);
+  static std::string computeDisjointBucketSummary(const Stats::ParentHistogram& histogram);
 
   static void statsAsJsonQuantileSummaryHelper(
       Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
-      const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
+      const std::vector<Stats::ParentHistogram&>& all_histograms, bool used_only,
       const absl::optional<std::regex>& regex);
 
   static void statsAsJsonHistogramBucketsHelper(
       Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
-      const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
+      const std::vector<Stats::ParentHistogram&>& all_histograms, bool used_only,
       const absl::optional<std::regex>& regex,
       std::function<std::vector<uint64_t>(const Stats::HistogramStatistics&)> computed_buckets);
 
