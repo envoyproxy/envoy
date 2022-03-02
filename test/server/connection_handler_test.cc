@@ -1429,9 +1429,7 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
       }));
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   Network::IoSocketHandleImpl io_handle{42};
-  EXPECT_CALL(*accepted_socket, ioHandle())
-      .WillRepeatedly(ReturnRef(io_handle))
-      .RetiresOnSaturation();
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
 
   std::string data = "test";
 
@@ -1439,9 +1437,7 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
       }));
-  EXPECT_CALL(*accepted_socket, ioHandle())
-      .WillRepeatedly(ReturnRef(io_handle))
-      .RetiresOnSaturation();
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(
           Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -1453,6 +1449,7 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
       .WillOnce(Invoke([&](Network::ListenerFilterBuffer&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
       }));
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
 
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000), _));
@@ -1504,18 +1501,14 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   Network::ListenerFilterCallbacks* listener_filter_cb{};
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   Network::IoSocketHandleImpl io_handle{42};
-  EXPECT_CALL(*accepted_socket, ioHandle())
-      .WillRepeatedly(ReturnRef(io_handle))
-      .RetiresOnSaturation();
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
   std::string data = "test";
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
         listener_filter_cb = &cb;
         return Network::FilterStatus::StopIteration;
       }));
-  EXPECT_CALL(*accepted_socket, ioHandle())
-      .WillRepeatedly(ReturnRef(io_handle))
-      .RetiresOnSaturation();
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(
           Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -1527,6 +1520,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
       .WillOnce(Invoke([&](Network::ListenerFilterBuffer&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
       }));
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
 
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000), _));

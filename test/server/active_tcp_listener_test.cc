@@ -126,7 +126,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectData) {
 
   // The filter stop the filter iteration and waiting for the data.
   EXPECT_CALL(*filter_, onAccept(_)).WillOnce(Return(Network::FilterStatus::StopIteration));
-  EXPECT_CALL(io_handle_, isOpen()).WillOnce(Return(true));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
 
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
@@ -160,7 +160,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataFailedWithPeek) {
   // The filter stop the filter iteration and waiting for the data.
   EXPECT_CALL(*filter_, onAccept(_)).WillOnce(Return(Network::FilterStatus::StopIteration));
 
-  EXPECT_CALL(io_handle_, isOpen()).WillOnce(Return(true));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
@@ -214,7 +214,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters) {
   auto accepted_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
 
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle_));
-  EXPECT_CALL(io_handle_, isOpen()).WillOnce(Return(true)).WillRepeatedly(Return(true));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
@@ -248,7 +248,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose) {
   // The filter stop the filter iteration and waiting for the data.
   EXPECT_CALL(*filter_, onAccept(_)).WillOnce(Return(Network::FilterStatus::StopIteration));
 
-  EXPECT_CALL(io_handle_, isOpen()).WillOnce(Return(true));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
@@ -276,7 +276,7 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout2) {
 
   // The filter stop the filter iteration and waiting for the data.
   EXPECT_CALL(*filter_, onAccept(_)).WillOnce(Return(Network::FilterStatus::StopIteration));
-  EXPECT_CALL(io_handle_, isOpen()).WillOnce(Return(true));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
 
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
