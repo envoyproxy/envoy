@@ -14,8 +14,8 @@ public:
 // of special cases to get remaining coverage.
 TEST(UtilsTest, BadServerState) {
   Utility::serverState(Init::Manager::State::Uninitialized, true);
-  EXPECT_THROW_WITH_REGEX(Utility::serverState(static_cast<Init::Manager::State>(123), true),
-                          EnvoyException, "unexpected server state");
+  EXPECT_ENVOY_BUG(Utility::serverState(static_cast<Init::Manager::State>(123), true),
+                    "unexpected server state");
 }
 
 } // namespace Server
