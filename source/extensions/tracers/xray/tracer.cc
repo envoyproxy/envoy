@@ -110,7 +110,7 @@ void Span::injectContext(Tracing::TraceContext& trace_context) {
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& operation_name,
                                   Envoy::SystemTime start_time) {
   auto child_span = std::make_unique<XRay::Span>(time_source_, random_, broker_);
-  child_span->setName(name());
+  child_span->setName(operation_name);
   child_span->setOperation(operation_name);
   child_span->setDirection(Tracing::HttpTracerUtility::toString(config.operationName()));
   child_span->setStartTime(start_time);

@@ -103,7 +103,7 @@ public:
   }
 
   /**
-   * Sets the type of the Span. In Xray, an independent subsegment has a type of ``subsegment``.
+   * Sets the type of the Span. In Xray, an independent subsegment has a type of "subsegment".
    * https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html#api-segmentdocuments-subsegments
    */
   void setType(absl::string_view type) { type_ = std::string(type); }
