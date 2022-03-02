@@ -102,15 +102,22 @@ template <class T> static void addGrpcResponseTags(Span& span, const T& headers)
         case Grpc::Status::WellKnownGrpcStatus::NotFound:
         case Grpc::Status::WellKnownGrpcStatus::AlreadyExists:
         case Grpc::Status::WellKnownGrpcStatus::PermissionDenied:
-        case Grpc::Status::WellKnownGrpcStatus::ResourceExhausted:
         case Grpc::Status::WellKnownGrpcStatus::FailedPrecondition:
         case Grpc::Status::WellKnownGrpcStatus::Aborted:
         case Grpc::Status::WellKnownGrpcStatus::OutOfRange:
         case Grpc::Status::WellKnownGrpcStatus::Unauthenticated:
           break;
-        default:
+        case Grpc::Status::WellKnownGrpcStatus::Unknown:
+        case Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded:
+        case Grpc::Status::WellKnownGrpcStatus::Unimplemented:
+        case Grpc::Status::WellKnownGrpcStatus::ResourceExhausted:
+        case Grpc::Status::WellKnownGrpcStatus::Internal:
+        case Grpc::Status::WellKnownGrpcStatus::Unavailable:
+        case Grpc::Status::WellKnownGrpcStatus::DataLoss:
           span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
           break;
+        default:
+          PANIC("not implemented");
         }
       }
     }
