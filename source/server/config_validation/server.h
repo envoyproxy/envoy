@@ -91,7 +91,7 @@ public:
   ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
-  Runtime::Loader& runtime() override { return Runtime::LoaderSingleton::get(); }
+  Runtime::Loader& runtime() override { return runtime_singleton_->instance(); }
   void shutdown() override;
   bool isShutdown() override { return false; }
   void shutdownAdmin() override {}
