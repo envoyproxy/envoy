@@ -547,10 +547,9 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplTest, UnsupportedInternalListener) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
+  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
   // Workaround of triggering death at windows platform.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.internal_address", "false"}});
+  scoped_runtime->mergeValues({{"envoy.reloadable_features.internal_address", "false"}});
 
   const std::string yaml = R"EOF(
     name: "foo"
@@ -565,9 +564,8 @@ TEST_F(ListenerManagerImplTest, UnsupportedInternalListener) {
 }
 
 TEST_F(ListenerManagerImplTest, RejectListenerWithSocketAddressWithInternalListenerConfig) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.internal_address", "true"}});
+  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
+  scoped_runtime->mergeValues({{"envoy.reloadable_features.internal_address", "true"}});
 
   const std::string yaml = R"EOF(
     name: "foo"
@@ -587,9 +585,8 @@ TEST_F(ListenerManagerImplTest, RejectListenerWithSocketAddressWithInternalListe
 }
 
 TEST_F(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.internal_address", "true"}});
+  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
+  scoped_runtime->mergeValues({{"envoy.reloadable_features.internal_address", "true"}});
 
   const std::string yaml = R"EOF(
     name: "foo"
@@ -4874,9 +4871,8 @@ api_listener:
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, AddOrUpdateInternalListener) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.internal_address", "true"}});
+  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
+  scoped_runtime->mergeValues({{"envoy.reloadable_features.internal_address", "true"}});
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
 
   InSequence s;
