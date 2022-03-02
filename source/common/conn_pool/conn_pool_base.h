@@ -102,7 +102,9 @@ public:
   // Sets the remaining streams to 0, and updates pool and cluster capacity.
   virtual void drain();
 
-  bool isConnecting() const { return connect_timer_ != nullptr; }
+  virtual bool isContributingToConnectingStreamCapacity() const {
+    return state_ == State::CONNECTING;
+  }
 
   ConnPoolImplBase& parent_;
   // The count of remaining streams allowed for this connection.
