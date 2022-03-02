@@ -1051,7 +1051,7 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithNullAddress) {
 
   auto query = resolver_->resolve(
       hostname, Network::DnsLookupFamily::Auto,
-      [](DnsResolver::ResolutionStatus, std::list<DnsResponse>&&) -> void { FAIL(); });
+      [](DnsResolver::ResolutionStatus, std::list<DnsResponse> &&) -> void { FAIL(); });
   ASSERT_NE(nullptr, query);
 
   EXPECT_DEATH(reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError,
