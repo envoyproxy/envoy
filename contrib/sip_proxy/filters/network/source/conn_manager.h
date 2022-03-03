@@ -5,7 +5,6 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/upstream.h"
 
@@ -337,12 +336,6 @@ private:
   void sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
   void doDeferredTransDestroy(ActiveTrans& trans);
   void resetAllTrans(bool local_reset);
-  absl::string_view localAddress() {
-    auto& local_address =
-        context_.getTransportSocketFactoryContext().localInfo().address()->ip()->addressAsString();
-    ENVOY_LOG(debug, "localAddress {}", local_address);
-    return local_address;
-  }
 
   Config& config_;
   SipFilterStats& stats_;

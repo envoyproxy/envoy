@@ -56,7 +56,6 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
-        "//envoy/server:transport_socket_config_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:timespan_interface",
         "//source/common/buffer:buffer_lib",
@@ -127,6 +126,8 @@ envoy_cc_library(
     deps = [
         ":utility_interface",
         "//contrib/sip_proxy/filters/network/source/filters:filter_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/server:transport_socket_config_interface",
     ],
 )
 

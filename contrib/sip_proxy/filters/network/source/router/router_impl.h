@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "envoy/router/router.h"
-#include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/tcp/conn_pool.h"
@@ -293,13 +292,6 @@ private:
 
   QueryStatus handleCustomizedAffinity(std::string type, std::string key,
                                        MessageMetadataSharedPtr metadata);
-
-  absl::string_view localAddress() {
-    auto& local_address =
-        context_.getTransportSocketFactoryContext().localInfo().address()->ip()->addressAsString();
-    ENVOY_LOG(debug, "localAddress {}", local_address);
-    return local_address;
-  }
 
   Upstream::ClusterManager& cluster_manager_;
   RouterStats stats_;

@@ -428,8 +428,8 @@ FilterStatus Router::messageEnd() {
   Buffer::OwnedImpl transport_buffer;
 
   // set EP/Opaque, used in upstream
-  ENVOY_STREAM_LOG(debug, "set EP {}", *callbacks_, localAddress());
-  metadata_->setEP(localAddress());
+  ENVOY_STREAM_LOG(debug, "set EP {}", *callbacks_, Utility::localAddress(context_));
+  metadata_->setEP(Utility::localAddress(context_));
 
   std::shared_ptr<Encoder> encoder = std::make_shared<EncoderImpl>();
   ENVOY_STREAM_LOG(debug, "before encode", *callbacks_);

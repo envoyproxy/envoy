@@ -49,7 +49,6 @@ envoy_cc_library(
         "//contrib/sip_proxy/filters/network/source/filters:filter_interface",
         "//contrib/sip_proxy/filters/network/source/filters:well_known_names",
         "//contrib/sip_proxy/filters/network/source/tra:tra_lib",
-        "//envoy/server:transport_socket_config_interface",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:load_balancer_interface",
