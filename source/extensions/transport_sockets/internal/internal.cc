@@ -54,7 +54,7 @@ Config::extractMetadata(Upstream::HostDescriptionConstSharedPtr host) const {
       break;
     }
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("not reached");
     }
   }
   return metadata;
