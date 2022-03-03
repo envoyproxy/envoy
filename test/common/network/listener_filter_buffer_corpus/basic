@@ -1,0 +1,10 @@
+max_bytes_read: 10
+actions {
+  peek_from_socket: 3
+}
+actions {
+  drain: 1
+}
+actions {
+  peek_from_socket: 5
+}
