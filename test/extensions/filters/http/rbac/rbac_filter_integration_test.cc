@@ -747,6 +747,8 @@ typed_config:
 
 )EOF";
 
+#endif
+
 using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::COOKIE_EXPR;
 using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::
     COOKIE_VALUE_EXPR;
@@ -801,8 +803,6 @@ public:
     cleanupUpstreamAndDownstream();
   }
 };
-
-#endif
 
 INSTANTIATE_TEST_SUITE_P(Protocols, RbacWithCustomCelVocabularyIntegrationTests,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
