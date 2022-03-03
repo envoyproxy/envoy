@@ -93,8 +93,16 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "stats_handler_lib",
-    srcs = ["stats_handler.cc"],
-    hdrs = ["stats_handler.h"],
+    srcs = [
+        "stats_handler.cc",
+        "stats_render.cc",
+        "stats_request.cc",
+    ],
+    hdrs = [
+        "stats_handler.h",
+        "stats_render.h",
+        "stats_request.h",
+    ],
     deps = [
         ":handler_ctx_lib",
         ":prometheus_stats_lib",

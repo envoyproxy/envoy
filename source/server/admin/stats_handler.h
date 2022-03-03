@@ -9,7 +9,6 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
-#include "source/common/stats/histogram_impl.h"
 #include "source/server/admin/handler_ctx.h"
 #include "source/server/admin/utils.h"
 
