@@ -15,7 +15,7 @@ public:
 TEST(UtilsTest, BadServerState) {
   Utility::serverState(Init::Manager::State::Uninitialized, true);
   EXPECT_ENVOY_BUG(Utility::serverState(static_cast<Init::Manager::State>(123), true),
-                    "unexpected server state");
+                   "unexpected server state");
 }
 
 } // namespace Server
