@@ -80,24 +80,24 @@ CelValue createStrToIntCelMap(Protobuf::Arena& arena,
 }
 
 TEST_F(CustomCelFunctionTests, UrlFunctionTests) {
-  absl::flat_hash_map<std::string, std::string> map = {{"host", "abc.com:1234"}, {"path", ""}};
+  absl::flat_hash_map<std::string, std::string> headers = {{"host", "abc.com:1234"}, {"path", ""}};
 
-  urlFunctionTest(map, absl::StatusCode::kOk, "abc.com:1234");
+  urlFunctionTest(headers, absl::StatusCode::kOk, "abc.com:1234");
 
-  map.clear();
-  map["host"] = "abc.com:1234";
-  urlFunctionTest(map, absl::StatusCode::kNotFound, "");
+  headers.clear();
+  headers["host"] = "abc.com:1234";
+  urlFunctionTest(headers, absl::StatusCode::kNotFound, "");
 
-  map.clear();
-  map["path"] = "";
-  urlFunctionTest(map, absl::StatusCode::kNotFound, "");
+  headers.clear();
+  headers["path"] = "";
+  urlFunctionTest(headers, absl::StatusCode::kNotFound, "");
 
-  absl::flat_hash_map<std::string, int64_t> str_to_int_map = {{"host", 1}, {"path", 2}};
+  absl::flat_hash_map<std::string, int64_t> bad_headers = {{"host", 1}, {"path", 2}};
 
-  urlFunctionTestWithBadHeaders(str_to_int_map, absl::StatusCode::kNotFound, "");
+  urlFunctionTestWithBadHeaders(bad_headers, absl::StatusCode::kNotFound, "");
 
-  map.erase("host");
-  urlFunctionTestWithBadHeaders(str_to_int_map, absl::StatusCode::kNotFound, "");
+  headers.erase("host");
+  urlFunctionTestWithBadHeaders(bad_headers, absl::StatusCode::kNotFound, "");
 }
 
 TEST_F(CustomCelFunctionTests, CookieTests) {

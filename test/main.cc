@@ -30,6 +30,6 @@ int main(int argc, char** argv) {
   // phased out of network operations. Set to "all" (or don't set) if testing both
   // v4 and v6 addresses is desired. This feature is in progress and will be rolled out to all tests
   // in upcoming PRs.
-  Envoy::TestEnvironment::setEnvVar("ENVOY_IP_TEST_VERSIONS", "v4only", 0);
+  Envoy::TestEnvironment::setEnvVar("ENVOY_IP_TEST_VERSIONS", "all", 0);
   return Envoy::TestRunner::RunTests(argc, argv);
 }

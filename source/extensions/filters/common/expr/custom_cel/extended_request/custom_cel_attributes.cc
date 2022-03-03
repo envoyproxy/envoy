@@ -43,7 +43,7 @@ absl::optional<CelValue> ExtendedRequestWrapper::operator[](CelValue key) const 
 }
 
 // getMapFromQueryStr
-// converts std::map to CelMap
+// converts QueryParams (std::map) to CelMap
 absl::optional<CelValue> ExtendedRequestWrapper::getMapFromQueryStr(absl::string_view url) const {
   QueryParams query_params = parseAndDecodeQueryString(url);
   return Utility::createCelMap(arena_, query_params);

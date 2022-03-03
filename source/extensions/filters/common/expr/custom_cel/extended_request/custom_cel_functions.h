@@ -11,12 +11,13 @@
 #include "eval/public/cel_value.h"
 #include "eval/public/containers/container_backed_map_impl.h"
 
-// Toy functions for the Extended Request CEL Vocabulary
+// Functions for the Extended Request CEL Vocabulary
 //
-// Either standard functions or google::api::expr::runtime::CelFunctions can be used.
-// The standard functions will be converted to google::api::expr::runtime::CelFunctions when added
-// to the registry and activation. All standard functions will need a Protobuf Arena because
-// google::api::expr::runtime::CelFunction::Evaluate takes Arena as a parameter.
+// Either standard functions or CelFunctions can be used.
+// The standard functions will be converted to CelFunctions when added
+// to the registry and activation.  All standard functions will need a Protobuf Arena because
+// CelFunction::Evaluate takes Arena as a parameter. Any other parameters must be of type CelValue.
+// Non-CelValue parameters can be added via lambda captures.
 //
 // Receiver style: If set to true, function calls have the form arg.function instead of
 // function(arg)
@@ -42,9 +43,12 @@ public:
 };
 
 // lazy/stateful functions
+
+// cookie: Get cookies as a map.
 google::api::expr::runtime::CelValue cookie(Protobuf::Arena* arena,
                                             const Http::RequestHeaderMap& request_header_map);
 
+// cookieValue: given a cookie name, get its value
 google::api::expr::runtime::CelValue cookieValue(Protobuf::Arena* arena,
                                                  const Http::RequestHeaderMap& request_header_map,
                                                  google::api::expr::runtime::CelValue key);
