@@ -176,5 +176,27 @@ template <class T> OnMatch<T> stringOnMatch(absl::string_view value) {
   return OnMatch<T>{[s = std::string(value)]() { return stringValue(s); }, nullptr};
 }
 
+void verifyNoMatch(const MatchTree<TestData>::MatchResult& result) {
+  EXPECT_EQ(MatchState::MatchComplete, result.match_state_);
+  EXPECT_FALSE(result.on_match_.has_value());
+}
+
+void verifyImmediateMatch(const MatchTree<TestData>::MatchResult& result,
+                          absl::string_view expected_value) {
+  EXPECT_EQ(MatchState::MatchComplete, result.match_state_);
+  EXPECT_TRUE(result.on_match_.has_value());
+
+  EXPECT_EQ(nullptr, result.on_match_->matcher_);
+  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+
+  EXPECT_EQ(*static_cast<StringAction*>(result.on_match_->action_cb_().get()),
+            *stringValue(expected_value));
+}
+
+void verifyNotEnoughDataForMatch(const MatchTree<TestData>::MatchResult& result) {
+  EXPECT_EQ(MatchState::UnableToMatch, result.match_state_);
+  EXPECT_FALSE(result.on_match_.has_value());
+}
+
 } // namespace Matcher
 } // namespace Envoy
