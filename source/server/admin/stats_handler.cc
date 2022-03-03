@@ -88,7 +88,7 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
 //
 // There are currently Json and Text implementations of this interface, and in
 // #19546 an HTML version will be added to provide a hierarchical view.
-class StatsHandler::Render {
+class Render {
 public:
   virtual ~Render() = default;
 
@@ -111,7 +111,7 @@ public:
 };
 
 // Implements the Render interface for simple textual representation of stats.
-class StatsHandler::TextRender : public StatsHandler::Render {
+class TextRender : public Render {
 public:
   explicit TextRender(Utility::HistogramBucketsMode histogram_buckets_mode)
       : histogram_buckets_mode_(histogram_buckets_mode) {}
@@ -182,7 +182,7 @@ private:
 };
 
 // Implements the Render interface for json output.
-class StatsHandler::JsonRender : public StatsHandler::Render {
+class JsonRender : public Render {
 public:
   JsonRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
              Utility::HistogramBucketsMode histogram_buckets_mode)
@@ -392,7 +392,6 @@ private:
       bucket_array.push_back(ValueUtil::structValue(bucket));
     }
     histogram_obj_fields["buckets"] = ValueUtil::listValue(bucket_array);
-    // addJson(response, ValueUtil::structValue(histogram_obj));
     histogram_array_.push_back(ValueUtil::structValue(histogram_obj));
   }
 
@@ -406,7 +405,7 @@ private:
 };
 
 // Captures context for a streaming request, implementing the AdminHandler interface.
-class StatsHandler::StreamingRequest : public Admin::Request {
+class StreamingRequest : public Admin::Request {
   using ScopeVec = std::vector<Stats::ConstScopeSharedPtr>;
   using StatOrScopes = absl::variant<ScopeVec, Stats::TextReadoutSharedPtr, Stats::CounterSharedPtr,
                                      Stats::GaugeSharedPtr, Stats::HistogramSharedPtr>;

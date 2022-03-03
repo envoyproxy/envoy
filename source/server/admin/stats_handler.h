@@ -50,11 +50,6 @@ public:
   static Admin::RequestPtr makeRequest(Stats::Store& stats, bool used_only, bool json,
                                        Utility::HistogramBucketsMode histogram_buckets_mode,
                                        const absl::optional<std::regex>& regex);
-
-  class JsonRender;
-  class Render;
-  class TextRender;
-  class StreamingRequest;
 };
 
 } // namespace Server
