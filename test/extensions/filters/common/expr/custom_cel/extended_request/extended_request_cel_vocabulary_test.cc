@@ -175,25 +175,25 @@ TEST_F(ExtendedRequestCelVocabularyTests,
   Protobuf::Arena arena;
   Activation activation;
 
-  activation.InsertValueProducer(Source, std::make_unique<PeerWrapper>(mock_stream_info, false));
   activation.InsertValueProducer(
       Request, std::make_unique<RequestWrapper>(arena, &request_headers, mock_stream_info));
 
   // The activation does not contain the mappings for the custom CEL vocabulary yet.
   // The check for custom CEL fields should evaluate to false.
-  auto has_custom_field_status = evaluateExpressionWithCustomCelVocabulary(
+  auto has_custom_field_or = evaluateExpressionWithCustomCelVocabulary(
       activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
-  EXPECT_TRUE(has_custom_field_status.ok() && has_custom_field_status.value().IsBool() &&
-              !has_custom_field_status.value().BoolOrDie());
+  EXPECT_TRUE(has_custom_field_or.ok() && has_custom_field_or.value().IsBool() &&
+            !has_custom_field_or.value().BoolOrDie());
 
   custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
                                        nullptr, nullptr);
 
   // The activation now contains the mappings for the custom CEL vocabulary.
   // The check for custom CEL fields should evaluate to true.
-  has_custom_field_status = evaluateExpressionWithCustomCelVocabulary(
+  has_custom_field_or = evaluateExpressionWithCustomCelVocabulary(
       activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
-  EXPECT_TRUE(has_custom_field_status.value().BoolOrDie());
+  EXPECT_TRUE(has_custom_field_or.ok() && has_custom_field_or.value().IsBool() &&
+            has_custom_field_or.value().BoolOrDie());
 }
 
 TEST_F(ExtendedRequestCelVocabularyTests, AddCustomMappingsToActivationTwiceTest) {
