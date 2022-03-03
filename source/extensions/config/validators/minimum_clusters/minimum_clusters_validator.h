@@ -20,10 +20,10 @@ public:
       : min_clusters_num_(config.min_clusters_num()) {}
 
   // ConfigValidator
-  bool validate(Server::Instance& server,
+  bool validate(const Server::Instance& server,
                 const std::vector<Envoy::Config::DecodedResourcePtr>& resources) override;
 
-  bool validate(Server::Instance& server,
+  bool validate(const Server::Instance& server,
                 const std::vector<Envoy::Config::DecodedResourcePtr>& added_resources,
                 const Protobuf::RepeatedPtrField<std::string>& removed_resources) override;
 

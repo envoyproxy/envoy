@@ -59,7 +59,7 @@ public:
                             Router::Context& router_context,
                             AccessLog::AccessLogManager& log_manager,
                             Singleton::Manager& singleton_manager, const Server::Options& options,
-                            Quic::QuicStatNames& quic_stat_names, Server::Instance& server)
+                            Quic::QuicStatNames& quic_stat_names, const Server::Instance& server)
       : context_(options, main_thread_dispatcher, api, local_info, admin, runtime,
                  singleton_manager, validation_context.staticValidationVisitor(), stats, tls),
         validation_context_(validation_context), http_context_(http_context),
@@ -115,7 +115,7 @@ protected:
   Quic::QuicStatNames& quic_stat_names_;
   Http::AlternateProtocolsCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
   Http::AlternateProtocolsCacheManagerSharedPtr alternate_protocols_cache_manager_;
-  Server::Instance& server_;
+  const Server::Instance& server_;
 };
 
 // For friend declaration in ClusterManagerInitHelper.
@@ -247,7 +247,7 @@ public:
                      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                      Http::Context& http_context, Grpc::Context& grpc_context,
-                     Router::Context& router_context, Server::Instance& server);
+                     Router::Context& router_context, const Server::Instance& server);
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 

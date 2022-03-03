@@ -18,7 +18,7 @@ public:
   SubscriptionFactoryImpl(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                           Upstream::ClusterManager& cm,
                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                          Server::Instance& server);
+                          const Server::Instance& server);
 
   // Config::SubscriptionFactory
   SubscriptionPtr subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config,
@@ -39,7 +39,7 @@ private:
   Upstream::ClusterManager& cm_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
-  Server::Instance& server_;
+  const Server::Instance& server_;
 };
 
 } // namespace Config

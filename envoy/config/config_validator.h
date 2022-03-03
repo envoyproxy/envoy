@@ -33,7 +33,7 @@ public:
    * @throw optional EnvoyException if the config should be rejected.
    * @return whether the config is valid or not.
    */
-  virtual bool validate(Server::Instance& server,
+  virtual bool validate(const Server::Instance& server,
                         const std::vector<DecodedResourcePtr>& resources) PURE;
 
   /**
@@ -44,7 +44,7 @@ public:
    * @throw optional EnvoyException if the config should be rejected.
    * @return whether the config is valid or not.
    */
-  virtual bool validate(Server::Instance& server,
+  virtual bool validate(const Server::Instance& server,
                         const std::vector<DecodedResourcePtr>& added_resources,
                         const Protobuf::RepeatedPtrField<std::string>& removed_resources) PURE;
 };

@@ -19,8 +19,8 @@ public:
     ON_CALL(server_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   }
 
-  NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  NiceMock<Server::MockInstance> server_;
+  const NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  const NiceMock<Server::MockInstance> server_;
 };
 
 // Validates that an empty config accepts an update with no clusters.

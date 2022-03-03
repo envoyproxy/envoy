@@ -10,7 +10,7 @@ namespace Config {
 class CustomConfigValidatorsImpl : public CustomConfigValidators {
 public:
   CustomConfigValidatorsImpl(
-      ProtobufMessage::ValidationVisitor& validation_visitor, Server::Instance& server,
+      ProtobufMessage::ValidationVisitor& validation_visitor, const Server::Instance& server,
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
           validators_configs);
 
@@ -39,7 +39,7 @@ public:
 
 private:
   absl::flat_hash_map<std::string, std::vector<Envoy::Config::ConfigValidatorPtr>> validators_map_;
-  Server::Instance& server_;
+  const Server::Instance& server_;
 };
 
 } // namespace Config

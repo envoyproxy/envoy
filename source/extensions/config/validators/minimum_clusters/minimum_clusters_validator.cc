@@ -10,7 +10,7 @@ namespace Config {
 namespace Validators {
 
 bool MinimumClustersValidator::validate(
-    Server::Instance&, const std::vector<Envoy::Config::DecodedResourcePtr>& resources) {
+    const Server::Instance&, const std::vector<Envoy::Config::DecodedResourcePtr>& resources) {
   absl::flat_hash_set<std::string> next_cluster_names(resources.size());
   for (const auto& resource : resources) {
     envoy::config::cluster::v3::Cluster cluster =
@@ -30,7 +30,7 @@ bool MinimumClustersValidator::validate(
 }
 
 bool MinimumClustersValidator::validate(
-    Server::Instance& server, const std::vector<Envoy::Config::DecodedResourcePtr>& added_resources,
+    const Server::Instance& server, const std::vector<Envoy::Config::DecodedResourcePtr>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
   const Upstream::ClusterManager& cm = server.clusterManager();
   // If the number of clusters after removing all of the clusters in the removed_resources list is

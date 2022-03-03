@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Config {
 
 CustomConfigValidatorsImpl::CustomConfigValidatorsImpl(
-    ProtobufMessage::ValidationVisitor& validation_visitor, Server::Instance& server,
+    ProtobufMessage::ValidationVisitor& validation_visitor, const Server::Instance& server,
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
         validators_configs)
     : server_(server) {

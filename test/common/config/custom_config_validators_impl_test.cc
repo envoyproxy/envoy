@@ -30,11 +30,11 @@ public:
   }
 
   // ConfigValidator
-  bool validate(Server::Instance&, const std::vector<Envoy::Config::DecodedResourcePtr>&) override {
+  bool validate(const Server::Instance&, const std::vector<Envoy::Config::DecodedResourcePtr>&) override {
     return emulateAction(action_);
   }
 
-  bool validate(Server::Instance&, const std::vector<Envoy::Config::DecodedResourcePtr>&,
+  bool validate(const Server::Instance&, const std::vector<Envoy::Config::DecodedResourcePtr>&,
                 const Protobuf::RepeatedPtrField<std::string>&) override {
     return emulateAction(action_);
   }
@@ -88,7 +88,7 @@ public:
   Registry::InjectFactory<ConfigValidatorFactory> register_factory_false_;
   Registry::InjectFactory<ConfigValidatorFactory> register_factory_throw_;
   testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  testing::NiceMock<Server::MockInstance> server_;
+  const testing::NiceMock<Server::MockInstance> server_;
   const std::string type_url_{Envoy::Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()};
 
   static constexpr char returnTrueValidatorConfig[] =

@@ -167,6 +167,11 @@ Upstream::ClusterManager& InstanceImpl::clusterManager() {
   return *config_.clusterManager();
 }
 
+const Upstream::ClusterManager& InstanceImpl::clusterManager() const {
+  ASSERT(config_.clusterManager() != nullptr);
+  return *config_.clusterManager();
+}
+
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
   listener_manager_->stopListeners(ListenerManager::StopListenersType::All);
