@@ -126,6 +126,8 @@ public:
   Event::TimerPtr connection_duration_timer_;
   bool resources_released_{false};
   bool timed_out_{false};
+  // TODO(danzh) remove this once http codec exposes the handshake state for h3.
+  bool has_handshake_completed_{false};
 
 private:
   State state_{State::CONNECTING};
