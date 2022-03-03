@@ -543,7 +543,6 @@ public:
   COUNTER(upstream_cx_connect_attempts_exceeded)                                                   \
   COUNTER(upstream_cx_connect_fail)                                                                \
   COUNTER(upstream_cx_connect_timeout)                                                             \
-  COUNTER(upstream_cx_connect_with_0_rtt)                                                          \
   COUNTER(upstream_cx_destroy)                                                                     \
   COUNTER(upstream_cx_destroy_local)                                                               \
   COUNTER(upstream_cx_destroy_local_with_active_rq)                                                \

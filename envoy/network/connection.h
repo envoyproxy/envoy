@@ -30,7 +30,6 @@ enum class ConnectionEvent {
   RemoteClose,
   LocalClose,
   Connected,
-  ConnectedZeroRtt,
 };
 
 /**
