@@ -11,7 +11,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/event/scaled_range_timer_manager_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/server/resource_monitor_config_impl.h"
 
 #include "absl/container/node_hash_map.h"
@@ -256,8 +256,8 @@ OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction
     case envoy::config::overload::v3::Trigger::TriggerOneofCase::kScaled:
       trigger = std::make_unique<ScaledTriggerImpl>(trigger_config.scaled());
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::overload::v3::Trigger::TriggerOneofCase::TRIGGER_ONEOF_NOT_SET:
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
 
     if (!triggers_.try_emplace(trigger_config.name(), std::move(trigger)).second) {

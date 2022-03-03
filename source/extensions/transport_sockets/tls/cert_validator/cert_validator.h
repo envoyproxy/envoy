@@ -14,7 +14,7 @@
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
 #include "source/common/common/matchers.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/extensions/transport_sockets/tls/stats.h"
 
 #include "openssl/ssl.h"
@@ -62,7 +62,10 @@ public:
                                     bool handshaker_provides_certificates) PURE;
 
   /**
-   * Called when calculation hash for session context ids
+   * Called when calculation hash for session context ids. This hash MUST include all
+   * configuration used to validate a peer certificate, so that if this configuration
+   * is changed, sessions cannot be re-used and must be re-negotiated and re-validated
+   * using the new settings.
    *
    * @param md the store context
    * @param hash_buffer the buffer used for digest calculation

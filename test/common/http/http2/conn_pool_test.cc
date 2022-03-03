@@ -228,9 +228,13 @@ public:
       EXPECT_CALL(*test.test_clients_[client_index].codec_, newStream(_))
           .WillOnce(DoAll(SaveArgAddress(&inner_decoder_), ReturnRef(inner_encoder_)));
       EXPECT_CALL(callbacks_.pool_ready_, ready());
-      EXPECT_EQ(nullptr, test.pool_->newStream(decoder_, callbacks_));
+      EXPECT_EQ(nullptr, test.pool_->newStream(decoder_, callbacks_,
+                                               {/*can_send_early_data_=*/false,
+                                                /*can_use_http3_=*/false}));
     } else {
-      handle_ = test.pool_->newStream(decoder_, callbacks_);
+      handle_ = test.pool_->newStream(decoder_, callbacks_,
+                                      {/*can_send_early_data_=*/false,
+                                       /*can_use_http3_=*/false});
       EXPECT_NE(nullptr, handle_);
     }
   }
@@ -922,7 +926,9 @@ TEST_F(Http2ConnPoolImplTest, PendingStreamsMaxPendingCircuitBreaker) {
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
   EXPECT_CALL(callbacks.pool_failure_, ready());
-  EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks));
+  EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks,
+                                      {/*can_send_early_data_=*/false,
+                                       /*can_use_http3_=*/false}));
 
   expectStreamConnect(0, r1);
   expectClientConnect(0);
@@ -1290,7 +1296,9 @@ TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {
   ConnPoolCallbacks callbacks;
   MockResponseDecoder decoder;
   EXPECT_CALL(callbacks.pool_failure_, ready());
-  EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks));
+  EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks,
+                                      {/*can_send_early_data_=*/false,
+                                       /*can_use_http3_=*/false}));
 
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
@@ -1435,7 +1443,6 @@ TEST_F(Http2ConnPoolImplTest, PreconnectWithoutMultiplexing) {
 }
 
 TEST_F(Http2ConnPoolImplTest, IncreaseCapacityWithSettingsFrame) {
-  TestScopedRuntime scoped_runtime;
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(100);
   ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
 
@@ -1478,7 +1485,6 @@ TEST_F(Http2ConnPoolImplTest, IncreaseCapacityWithSettingsFrame) {
 }
 
 TEST_F(Http2ConnPoolImplTest, DisconnectWithNegativeCapacity) {
-  TestScopedRuntime scoped_runtime;
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(6);
   ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
 

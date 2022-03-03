@@ -8,6 +8,7 @@
 #include "envoy/network/post_io_action.h"
 #include "envoy/network/proxy_protocol.h"
 #include "envoy/ssl/connection.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "absl/types/optional.h"
 
@@ -161,6 +162,17 @@ public:
    * @return boolean indicating if the transport socket was able to start secure transport.
    */
   virtual bool startSecureTransport() PURE;
+
+  /**
+   * Try to configure the connection's initial congestion window.
+   * The operation is advisory - the connection may not support it, even if it's supported, it may
+   * not do anything after the first few network round trips with the peer.
+   * @param bandwidth_bits_per_sec The estimated bandwidth between the two endpoints of the
+   * connection.
+   * @param rtt The estimated round trip time between the two endpoints of the connection.
+   */
+  virtual void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                                std::chrono::microseconds rtt) PURE;
 };
 
 using TransportSocketPtr = std::unique_ptr<TransportSocket>;
@@ -214,13 +226,9 @@ public:
   virtual absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const PURE;
 
   /**
-   * @param key supplies a vector of bytes to which the option should append hash key data that will
-   *        be used to separate connections based on the option. Any data already in the key vector
-   *        must not be modified.
-   * @param factory supplies the factor which will be used for creating the transport socket.
+   * @return filter state from the downstream request or connection.
    */
-  virtual void hashKey(std::vector<uint8_t>& key,
-                       const Network::TransportSocketFactory& factory) const PURE;
+  virtual const StreamInfo::FilterStateSharedPtr& filterState() const PURE;
 
   /**
    * @return optional upstream host description.
@@ -250,15 +258,19 @@ public:
   createTransportSocket(TransportSocketOptionsConstSharedPtr options) const PURE;
 
   /**
-   * @return bool whether the transport socket will use proxy protocol options.
-   */
-  virtual bool usesProxyProtocolOptions() const PURE;
-
-  /**
    * Returns true if the transport socket created by this factory supports some form of ALPN
    * negotiation.
    */
   virtual bool supportsAlpn() const { return false; }
+
+  /**
+   * @param key supplies a vector of bytes to which the option should append hash key data that will
+   *        be used to separate connections based on the option. Any data already in the key vector
+   *        must not be modified.
+   * @param options supplies the transport socket options.
+   */
+  virtual void hashKey(std::vector<uint8_t>& key,
+                       TransportSocketOptionsConstSharedPtr options) const PURE;
 };
 
 using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;

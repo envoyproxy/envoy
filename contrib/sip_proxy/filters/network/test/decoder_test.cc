@@ -1,3 +1,5 @@
+#include <cstdio>
+
 #include "source/common/buffer/buffer_impl.h"
 
 #include "test/mocks/network/mocks.h"
@@ -10,6 +12,7 @@
 #include "contrib/sip_proxy/filters/network/source/config.h"
 #include "contrib/sip_proxy/filters/network/source/conn_manager.h"
 #include "contrib/sip_proxy/filters/network/source/decoder.h"
+#include "contrib/sip_proxy/filters/network/source/encoder.h"
 #include "contrib/sip_proxy/filters/network/test/mocks.h"
 #include "contrib/sip_proxy/filters/network/test/utility.h"
 #include "gmock/gmock.h"
@@ -133,8 +136,13 @@ route_config:
       cluster: "test"
 settings:
   transaction_timeout: 32s
-  own_domain: pcsf-cfed.cncs.svc.cluster.local
-  domain_match_parameter_name: x-suri
+  local_services:
+  - domain: pcsf-cfed.cncs.svc.cluster.local
+    parameter : transport
+  - domain: pcsf-cfed.cncs.svc.cluster.local
+    parameter : x-suri
+  - domain: pcsf-cfed.cncs.svc.cluster.local
+    parameter : host
 )EOF";
 
 TEST_F(SipDecoderTest, DecodeINVITE) {
@@ -148,16 +156,28 @@ TEST_F(SipDecoderTest, DecodeINVITE) {
       "To: <sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
       "From: <sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
       "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
-      "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
-      "Record-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+      "Route: "
+      "<sip:+16959000000:15306;role=anch;lr;transport=udp;x-suri=sip:pcsf-cfed.cncs.svc.cluster."
+      "local:5060>\x0d\x0a"
+      "Record-Route: "
+      "<sip:+16959000000:15306;role=anch;lr;transport=udp;x-suri=sip:pcsf-cfed.cncs.svc.cluster."
+      "local:5060>\x0d\x0a"
+      "Service-Route: "
+      "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri=sip:scsf-cfed."
+      "cncs.svc.cluster.local:5060>\x0d\x0a"
       "CSeq: 1 INVITE\x0d\x0a"
       "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
       "Max-Forwards: 70\x0d\x0a"
+      "P-Charging-Vector: orig-ioi=ims.com;term-ioi= ims.com\x0d\x0a"
+      "P-Charging-Vector: orig-ioi=ims1.com;term-ioi= ims1.com\x0d\x0a"
+      "P-Charging-Function-Addresses: ccf=0.0.0.0\x0d\x0a"
       "Content-Length:  0\x0d\x0a"
       "\x0d\x0a";
 
   buffer_.add(SIP_INVITE_FULL);
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+  Buffer::OwnedImpl response_buffer;
 
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
@@ -414,8 +434,8 @@ TEST_F(SipDecoderTest, DecodeEMPTY) {
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-  EXPECT_EQ(0U, store_.counter("test.request").value());
-  EXPECT_EQ(0U, stats_.request_active_.value());
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 
@@ -537,19 +557,6 @@ TEST_F(SipDecoderTest, DecodeNOTIFY) {
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
-}
-
-TEST_F(SipDecoderTest, HandleState) {
-  MessageMetadataSharedPtr metadata;
-  MockDecoderEventHandler handler;
-  DecoderStateMachine machine(metadata, handler);
-  /* TODO  panic:     not reached
-  machine.setCurrentState(State::WaitForData);
-  */
-  machine.setCurrentState(State::MessageEnd);
-  EXPECT_CALL(handler, messageEnd()).WillOnce(Return(FilterStatus::StopIteration));
-  machine.run();
-  EXPECT_EQ(State::TransportEnd, machine.currentState());
 }
 
 TEST_F(SipDecoderTest, HeaderTest) {
