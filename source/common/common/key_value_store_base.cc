@@ -63,7 +63,8 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents,
 }
 
 void KeyValueStoreBase::addOrUpdate(absl::string_view key, absl::string_view value) {
-  store_.insert_or_assign(key, std::string(value));
+  store_.erase(key);
+  store_.emplace(key, value);
   if (!flush_timer_->enabled()) {
     flush();
   }
