@@ -931,7 +931,11 @@ docker  copy $dockerContainerID:/opt/llvm/bin/clang-format clang-format-ci
 ```
 * Replace the host `clang-format` with the new one. Ensure that the copied `clang-format` is the default one. You can do this by ensuring it is in $PATH or by creatig a symbolic link:
 ```shell
-ln -s clang-format-ci /usr/bin/clang-format
+copy clang-format-ci $PATH/clang-format
+```
+or
+```
+ln -s clang-format-ci $PATH/clang-format
 ```
 Once this is set up, you can run clang-format without docker:
 
