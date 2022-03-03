@@ -30,11 +30,8 @@ void CustomConfigValidatorsImpl::executeValidators(
   if (validators_it != validators_map_.end()) {
     auto& validators = validators_it->second;
     for (auto& validator : validators) {
-      // A validator can either return false, or throw an EnvoyException.
-      // Both will result in this method throwing an EnvoyException.
-      if (!validator->validate(server_, resources)) {
-        throw EnvoyException("Custom validator rejected the config.");
-      }
+      // A validator can either succeed, or throw an EnvoyException.
+      validator->validate(server_, resources);
     }
   }
 }
@@ -46,11 +43,8 @@ void CustomConfigValidatorsImpl::executeValidators(
   if (validators_it != validators_map_.end()) {
     auto& validators = validators_it->second;
     for (auto& validator : validators) {
-      // A validator can either return false, or throw an EnvoyException.
-      // Both will result in this method throwing an EnvoyException.
-      if (!validator->validate(server_, added_resources, removed_resources)) {
-        throw EnvoyException("Custom validator rejected the config.");
-      }
+      // A validator can either succeed, or throw an EnvoyException.
+      validator->validate(server_, added_resources, removed_resources);
     }
   }
 }

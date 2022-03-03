@@ -10,45 +10,34 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-enum class FakeValidatorAction { ReturnTrue, ReturnFalse, ThrowException };
-
 class FakeConfigValidator : public ConfigValidator {
 public:
-  FakeConfigValidator(FakeValidatorAction action) : action_(action) {}
+  FakeConfigValidator(bool should_reject) : should_reject_(should_reject) {}
 
-  static bool emulateAction(FakeValidatorAction action) {
-    switch (action) {
-    case FakeValidatorAction::ReturnTrue:
-      return true;
-    case FakeValidatorAction::ReturnFalse:
-      return false;
-    case FakeValidatorAction::ThrowException:
-      throw EnvoyException("Emulating fake action throw exception");
-    default:
-      PANIC("reached unexpected code");
+  // ConfigValidator
+  void validate(const Server::Instance&, const std::vector<Envoy::Config::DecodedResourcePtr>&) override {
+    if (should_reject_) {
+      throw EnvoyException("Emulating fake action throw exception (SotW)");
     }
   }
 
-  // ConfigValidator
-  bool validate(const Server::Instance&, const std::vector<Envoy::Config::DecodedResourcePtr>&) override {
-    return emulateAction(action_);
-  }
-
-  bool validate(const Server::Instance&, const std::vector<Envoy::Config::DecodedResourcePtr>&,
+  void validate(const Server::Instance&, const std::vector<Envoy::Config::DecodedResourcePtr>&,
                 const Protobuf::RepeatedPtrField<std::string>&) override {
-    return emulateAction(action_);
+    if (should_reject_) {
+      throw EnvoyException("Emulating fake action throw exception (Delta)");
+    }
   }
 
-  FakeValidatorAction action_;
+  bool should_reject_;
 };
 
 class FakeConfigValidatorFactory : public ConfigValidatorFactory {
 public:
-  FakeConfigValidatorFactory(FakeValidatorAction action) : action_(action) {}
+  FakeConfigValidatorFactory(bool should_reject) : should_reject_(should_reject) {}
 
   ConfigValidatorPtr createConfigValidator(const ProtobufWkt::Any&,
                                            ProtobufMessage::ValidationVisitor&) override {
-    return std::make_unique<FakeConfigValidator>(action_);
+    return std::make_unique<FakeConfigValidator>(should_reject_);
   }
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -57,23 +46,23 @@ public:
   }
 
   std::string name() const override {
-    return absl::StrCat(category(), ".fake_config_validator_", enumToInt(action_));
+    return absl::StrCat(category(), absl::StrCat(".fake_config_validator_",
+                                                 should_reject_ ? "reject" : "accept"));
   }
 
   std::string typeUrl() const override {
     return Envoy::Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
   }
 
-  FakeValidatorAction action_;
+  bool should_reject_;
 };
 
 class CustomConfigValidatorsImplTest : public testing::Test {
 public:
   CustomConfigValidatorsImplTest()
-      : factory_true_(FakeValidatorAction::ReturnTrue),
-        factory_false_(FakeValidatorAction::ReturnFalse),
-        factory_throw_(FakeValidatorAction::ThrowException), register_factory_true_(factory_true_),
-        register_factory_false_(factory_false_), register_factory_throw_(factory_throw_) {}
+      : factory_accept_(false), factory_reject_(true),
+        register_factory_accept_(factory_accept_),
+        register_factory_reject_(factory_reject_) {}
 
   static envoy::config::core::v3::TypedExtensionConfig parseConfig(const std::string& config) {
     envoy::config::core::v3::TypedExtensionConfig proto;
@@ -81,25 +70,21 @@ public:
     return proto;
   }
 
-  FakeConfigValidatorFactory factory_true_;
-  FakeConfigValidatorFactory factory_false_;
-  FakeConfigValidatorFactory factory_throw_;
-  Registry::InjectFactory<ConfigValidatorFactory> register_factory_true_;
-  Registry::InjectFactory<ConfigValidatorFactory> register_factory_false_;
-  Registry::InjectFactory<ConfigValidatorFactory> register_factory_throw_;
+  FakeConfigValidatorFactory factory_accept_;
+  FakeConfigValidatorFactory factory_reject_;
+  Registry::InjectFactory<ConfigValidatorFactory> register_factory_accept_;
+  Registry::InjectFactory<ConfigValidatorFactory> register_factory_reject_;
   testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   const testing::NiceMock<Server::MockInstance> server_;
   const std::string type_url_{Envoy::Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()};
 
-  static constexpr char returnTrueValidatorConfig[] =
-      "name: envoy.config.validators.fake_config_validator_0";
-  static constexpr char returnFalseValidatorConfig[] =
-      "name: envoy.config.validators.fake_config_validator_1";
-  static constexpr char throwExceptionValidatorConfig[] =
-      "name: envoy.config.validators.fake_config_validator_2";
+  static constexpr char AcceptValidatorConfig[] =
+      "name: envoy.config.validators.fake_config_validator_accept";
+  static constexpr char RejectValidatorConfig[] =
+      "name: envoy.config.validators.fake_config_validator_reject";
 };
 
-// Validates that empty config that has no validators always returns true.
+// Validates that empty config that has no validators is always accepted.
 TEST_F(CustomConfigValidatorsImplTest, EmptyConfigValidator) {
   const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> empty_list;
   CustomConfigValidatorsImpl validators(validation_visitor_, server_, empty_list);
@@ -114,11 +99,11 @@ TEST_F(CustomConfigValidatorsImplTest, EmptyConfigValidator) {
   }
 }
 
-// Validates that a config that creates a validator that returns true does so.
-TEST_F(CustomConfigValidatorsImplTest, ReturnTrueConfigValidator) {
+// Validates that a config that creates a validator that accepts does so.
+TEST_F(CustomConfigValidatorsImplTest, AcceptConfigValidator) {
   Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> configs_list;
   auto* entry = configs_list.Add();
-  *entry = parseConfig(returnTrueValidatorConfig);
+  *entry = parseConfig(AcceptValidatorConfig);
   CustomConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
   {
     const std::vector<DecodedResourcePtr> resources;
@@ -131,79 +116,57 @@ TEST_F(CustomConfigValidatorsImplTest, ReturnTrueConfigValidator) {
   }
 }
 
-// Validates that a config that creates a validator that returns false throws an
-// exception.
-TEST_F(CustomConfigValidatorsImplTest, ReturnFalseConfigValidator) {
+// Validates that a config that creates a validator that rejects throws an exception.
+TEST_F(CustomConfigValidatorsImplTest, RejectConfigValidator) {
   Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> configs_list;
   auto* entry = configs_list.Add();
-  *entry = parseConfig(returnFalseValidatorConfig);
+  *entry = parseConfig(RejectValidatorConfig);
   CustomConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
   {
     const std::vector<DecodedResourcePtr> resources;
     EXPECT_THROW_WITH_MESSAGE(validators.executeValidators(type_url_, resources), EnvoyException,
-                              "Custom validator rejected the config.");
+                              "Emulating fake action throw exception (SotW)");
   }
   {
     const std::vector<DecodedResourcePtr> added_resources;
     const Protobuf::RepeatedPtrField<std::string> removed_resources;
     EXPECT_THROW_WITH_MESSAGE(
         validators.executeValidators(type_url_, added_resources, removed_resources), EnvoyException,
-        "Custom validator rejected the config.");
+        "Emulating fake action throw exception (Delta)");
   }
 }
 
-// Validates that a config that creates a validator that throws an
-// exception, passes that exception out.
-TEST_F(CustomConfigValidatorsImplTest, ThrowExceptionConfigValidator) {
-  Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> configs_list;
-  auto* entry = configs_list.Add();
-  *entry = parseConfig(throwExceptionValidatorConfig);
-  CustomConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
-  {
-    const std::vector<DecodedResourcePtr> resources;
-    EXPECT_THROW_WITH_MESSAGE(validators.executeValidators(type_url_, resources), EnvoyException,
-                              "Emulating fake action throw exception");
-  }
-  {
-    const std::vector<DecodedResourcePtr> added_resources;
-    const Protobuf::RepeatedPtrField<std::string> removed_resources;
-    EXPECT_THROW_WITH_MESSAGE(
-        validators.executeValidators(type_url_, added_resources, removed_resources), EnvoyException,
-        "Emulating fake action throw exception");
-  }
-}
-
-// Validates that a config that contains a validator that returns true, followed
-// by a validator that returns false, throws an exception.
-TEST_F(CustomConfigValidatorsImplTest, ReturnTrueThenFalseConfigValidator) {
+// Validates that a config that contains a validator that accepts, followed
+// by a validator that rejects, throws an exception.
+TEST_F(CustomConfigValidatorsImplTest, AcceptThenRejectConfigValidators) {
   Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> configs_list;
   auto* entry1 = configs_list.Add();
-  *entry1 = parseConfig(returnTrueValidatorConfig);
+  *entry1 = parseConfig(AcceptValidatorConfig);
   auto* entry2 = configs_list.Add();
-  *entry2 = parseConfig(returnFalseValidatorConfig);
+  *entry2 = parseConfig(RejectValidatorConfig);
   CustomConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
   {
     const std::vector<DecodedResourcePtr> resources;
     EXPECT_THROW_WITH_MESSAGE(validators.executeValidators(type_url_, resources), EnvoyException,
-                              "Custom validator rejected the config.");
+                              "Emulating fake action throw exception (SotW)");
   }
   {
     const std::vector<DecodedResourcePtr> added_resources;
     const Protobuf::RepeatedPtrField<std::string> removed_resources;
     EXPECT_THROW_WITH_MESSAGE(
         validators.executeValidators(type_url_, added_resources, removed_resources), EnvoyException,
-        "Custom validator rejected the config.");
+        "Emulating fake action throw exception (Delta)");
   }
 }
 
-// Validates that a config that creates a validator that returns false on
+// Validates that a config that creates a validator that rejects on
 // different type_url isn't rejected.
 TEST_F(CustomConfigValidatorsImplTest, ReturnFalseDifferentTypeConfigValidator) {
   const std::string type_url{
       Envoy::Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>()};
   Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> configs_list;
   auto* entry = configs_list.Add();
-  *entry = parseConfig(returnFalseValidatorConfig);
+  *entry = parseConfig(RejectValidatorConfig);
   CustomConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
   {
     const std::vector<DecodedResourcePtr> resources;

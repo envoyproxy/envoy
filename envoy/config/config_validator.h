@@ -30,10 +30,9 @@ public:
    * Validates a given set of resources matching a State-of-the-World update.
    * @param server A server instance to fetch the state before applying the config.
    * @param resources List of decoded resources that reflect the new state.
-   * @throw optional EnvoyException if the config should be rejected.
-   * @return whether the config is valid or not.
+   * @throw EnvoyException if the config should be rejected.
    */
-  virtual bool validate(const Server::Instance& server,
+  virtual void validate(const Server::Instance& server,
                         const std::vector<DecodedResourcePtr>& resources) PURE;
 
   /**
@@ -41,10 +40,9 @@ public:
    * @param server A server instance to fetch the state before applying the config.
    * @param added_resources A list of decoded resources to add to the current state.
    * @param removed_resources A list of resources to remove from the current state.
-   * @throw optional EnvoyException if the config should be rejected.
-   * @return whether the config is valid or not.
+   * @throw EnvoyException if the config should be rejected.
    */
-  virtual bool validate(const Server::Instance& server,
+  virtual void validate(const Server::Instance& server,
                         const std::vector<DecodedResourcePtr>& added_resources,
                         const Protobuf::RepeatedPtrField<std::string>& removed_resources) PURE;
 };

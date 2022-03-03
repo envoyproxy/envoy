@@ -33,7 +33,8 @@ TEST_F(MinimumClustersValidatorTest, NoMinimumNoClusters) {
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
 
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
-  EXPECT_TRUE(validator.validate(server_, added_resources, removed_resources));
+  // No exception should occur.
+  validator.validate(server_, added_resources, removed_resources);
 }
 
 // Validates that a config with threshold 1 rejects an update with no clusters.
@@ -65,7 +66,8 @@ TEST_F(MinimumClustersValidatorTest, Minimum1SingleCluster) {
       new Envoy::Config::DecodedResourceImpl(std::move(cluster), "name", {}, "ver"));
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
-  EXPECT_TRUE(validator.validate(server_, added_resources, removed_resources));
+  // No exception should occur.
+  validator.validate(server_, added_resources, removed_resources);
 }
 
 // Validates that a config with threshold 2 and a config that has two clusters
@@ -102,7 +104,8 @@ TEST_F(MinimumClustersValidatorTest, NoMinimumSingleCluster) {
   const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
-  EXPECT_TRUE(validator.validate(server_, added_resources, removed_resources));
+  // No exception should occur.
+  validator.validate(server_, added_resources, removed_resources);
 }
 
 // Validates that a config with threshold 1 and a server that already has a
@@ -117,7 +120,8 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1Empty) {
   const std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
-  EXPECT_TRUE(validator.validate(server_, added_resources, removed_resources));
+  // No exception should occur.
+  validator.validate(server_, added_resources, removed_resources);
 }
 
 // Validates that a config with threshold 1 and a server that already has 2
@@ -134,7 +138,8 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters2Remove1) {
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   removed_resources.Add("foo");
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
-  EXPECT_TRUE(validator.validate(server_, added_resources, removed_resources));
+  // No exception should occur.
+  validator.validate(server_, added_resources, removed_resources);
 }
 
 // Validates that a config with threshold 1 and a server that already has 1
@@ -150,7 +155,8 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1RemoveNonExistent) {
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   removed_resources.Add("bar");
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
-  EXPECT_TRUE(validator.validate(server_, added_resources, removed_resources));
+  // No exception should occur.
+  validator.validate(server_, added_resources, removed_resources);
 }
 
 // Validates that a config with threshold 1 and a server that already has 1
@@ -186,7 +192,8 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1Remove1NonApi) {
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   removed_resources.Add("foo");
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
-  EXPECT_TRUE(validator.validate(server_, added_resources, removed_resources));
+  // No exception should occur.
+  validator.validate(server_, added_resources, removed_resources);
 }
 
 // Add a test with high threshold, and small update (only additions) below the

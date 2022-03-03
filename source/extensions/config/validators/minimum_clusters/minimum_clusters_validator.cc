@@ -9,7 +9,7 @@ namespace Extensions {
 namespace Config {
 namespace Validators {
 
-bool MinimumClustersValidator::validate(
+void MinimumClustersValidator::validate(
     const Server::Instance&, const std::vector<Envoy::Config::DecodedResourcePtr>& resources) {
   absl::flat_hash_set<std::string> next_cluster_names(resources.size());
   for (const auto& resource : resources) {
@@ -25,11 +25,9 @@ bool MinimumClustersValidator::validate(
   if (next_cluster_names.size() < min_clusters_num_) {
     throw EnvoyException("CDS update attempts to reduce clusters below configured minimum.");
   }
-
-  return true;
 }
 
-bool MinimumClustersValidator::validate(
+void MinimumClustersValidator::validate(
     const Server::Instance& server, const std::vector<Envoy::Config::DecodedResourcePtr>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
   const Upstream::ClusterManager& cm = server.clusterManager();
@@ -40,7 +38,7 @@ bool MinimumClustersValidator::validate(
   const uint32_t removed_resources_size = static_cast<uint32_t>(removed_resources.size());
   if ((cur_clusters_num >= removed_resources_size) &&
       (cur_clusters_num - removed_resources_size >= min_clusters_num_)) {
-    return true;
+    return;
   }
 
   // It could be that the removed clusters gets us below the threshold, simulate what happens if
@@ -78,8 +76,6 @@ bool MinimumClustersValidator::validate(
   if (new_clusters_num < min_clusters_num_) {
     throw EnvoyException("CDS update attempts to reduce clusters below configured minimum.");
   }
-
-  return true;
 }
 
 } // namespace Validators
