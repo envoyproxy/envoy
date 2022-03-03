@@ -31,7 +31,7 @@ private:
     const MetadataKind kind_;
     const std::string name_;
   };
-  absl::flat_hash_map<std::string, MetadataSource> metadata_sources_;
+  std::vector<MetadataSource> metadata_sources_;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;

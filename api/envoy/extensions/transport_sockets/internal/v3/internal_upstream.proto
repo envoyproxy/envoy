@@ -17,8 +17,20 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Internal Upstream]
 // [#extension: envoy.transport_sockets.internal_upstream]
 
-// Configuration for the internal upstream address. An internal address is a
-// loopback user space socket residing in the same proxy instance.
+// Configuration for the internal upstream address. An internal address defines
+// a loopback user space socket residing in the same proxy instance. This
+// extension allows passing additional structured state across the user space
+// socket in addition to the regular byte stream. The purpose is to facilitate
+// communication between filters on the physical and the internal connections.
+//
+// Because the passthrough state is transferred once per the upstream
+// connection, the passthrough state is included in the hash key used to select
+// an upstream connection.
+//
+// .. note::
+//
+//  Using internal upstream transport affects load balancing decisions if the passthrough
+//  state is derived from the downstream connection.
 message InternalUpstreamTransport {
   // Describes the location of the metadata value in the upstream cluster context.
   message MetadataValueSource {
@@ -31,8 +43,12 @@ message InternalUpstreamTransport {
 
   // Specifies the metadata namespaces and values to insert into the downstream
   // internal connection dynamic metadata when an internal address is used as a host.
-  map<string, MetadataValueSource> passthrough_metadata = 1;
+  repeated MetadataValueSource passthrough_metadata = 1;
+
+  // Specifies the list of filter state object names to insert into the downstream
+  // internal connection when an internal address is used as a host.
+  repeated string passthrough_filter_state_objects = 2;
 
   // The underlying transport socket being wrapped.
-  config.core.v3.TransportSocket transport_socket = 2 [(validate.rules).message = {required: true}];
+  config.core.v3.TransportSocket transport_socket = 3 [(validate.rules).message = {required: true}];
 }

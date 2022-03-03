@@ -18,7 +18,7 @@ Config::Config(const envoy::extensions::transport_sockets::internal::v3::Interna
                Stats::Scope&) {
   for (const auto& metadata : config_proto.passthrough_metadata()) {
     MetadataKind kind;
-    switch (metadata.second.kind().kind_case()) {
+    switch (metadata.kind().kind_case()) {
     case envoy::type::metadata::v3::MetadataKind::KindCase::kHost:
       kind = MetadataKind::Host;
       break;
@@ -28,7 +28,7 @@ Config::Config(const envoy::extensions::transport_sockets::internal::v3::Interna
     default:
       throw EnvoyException("Metadata type is not supported");
     }
-    metadata_sources_.try_emplace(metadata.first, MetadataSource(kind, metadata.second.name()));
+    metadata_sources_.push_back(MetadataSource(kind, metadata.name()));
   }
 }
 envoy::config::core::v3::Metadata
@@ -37,18 +37,18 @@ Config::extractMetadata(Upstream::HostDescriptionConstSharedPtr host) const {
   if (!host) {
     return metadata;
   }
-  for (const auto& [name, source] : metadata_sources_) {
+  for (const auto& source : metadata_sources_) {
     switch (source.kind_) {
     case MetadataKind::Host: {
       if (host->metadata()->filter_metadata().contains(source.name_)) {
-        (*metadata.mutable_filter_metadata())[name] =
+        (*metadata.mutable_filter_metadata())[source.name_] =
             host->metadata()->filter_metadata().at(source.name_);
       }
       break;
     }
     case MetadataKind::Cluster: {
       if (host->cluster().metadata().filter_metadata().contains(source.name_)) {
-        (*metadata.mutable_filter_metadata())[name] =
+        (*metadata.mutable_filter_metadata())[source.name_] =
             host->cluster().metadata().filter_metadata().at(source.name_);
       }
       break;
