@@ -5,8 +5,6 @@
 This page lists all active maintainers and their areas of expertise. This can be used for
 routing PRs, questions, etc. to the right place.
 
-* Alan Chiu ([buildbreaker](https://github.com/buildbreaker)) (achiu@lyft.com)
-  * Android (kotlin/java) platform bindings.
 * Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
   * Envoy mobile core, C bridge layer, C++ extensions, build system, Envoy upstream.
 * Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)
@@ -17,6 +15,8 @@ routing PRs, questions, etc. to the right place.
   * iOS (swift/objective-c) platform bindings.
 * Charles Le Borgne ([carloseltuerto](http://github.com/carloseltuerto)) (cleborgne@google.com)
   * Cronvoy.
+* Rafal Augustyniak ([Augustyniak](https://github.com/Augustyniak)) (raugustyniak@lyft.com)
+  * iOS (swift/objective-c) platform bindings.
 
 # Friends of Envoy Mobile
 
@@ -37,3 +37,4 @@ matter expert reviews. Feel free to loop them in as needed.
 # Emeritus maintainers
 
 * Michael Rebello ([rebello95](https://github.com/rebello95)) (mrebello@lyft.com)
+* Alan Chiu ([buildbreaker](https://github.com/buildbreaker)) (achiu@lyft.com)
