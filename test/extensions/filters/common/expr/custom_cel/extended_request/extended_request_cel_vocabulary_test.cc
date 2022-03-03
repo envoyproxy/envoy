@@ -235,7 +235,7 @@ TEST_F(ExtendedRequestCelVocabularyTests, AddCustomMappingsToActivationTwiceTest
   for (int i = 0; static_cast<size_t>(i) < attribute_set_names.size(); ++i) {
     EXPECT_TRUE(activation.FindValue(attribute_set_names[i], &arena).has_value());
   }
-  // verify that the functions are in the activation
+  // verify that the functions are in the activation (once)
   for (int i = 0; static_cast<size_t>(i) < lazy_function_names.size(); ++i) {
     EXPECT_EQ(activation.FindFunctionOverloads(lazy_function_names[i]).size(), 1);
   }
@@ -284,7 +284,7 @@ TEST_F(ExtendedRequestCelVocabularyTests, AddRegistrationsToRegistryTwiceTest) {
   custom_cel_vocabulary.registerFunctions(&registry);
   auto functions = registry.ListFunctions();
 
-  // verify that functions are in the registry
+  // verify that functions are in the registry (once)
   for (int i = 0; static_cast<size_t>(i) < lazy_function_names.size(); ++i) {
     EXPECT_EQ(functions.count(lazy_function_names[i]), 1);
     function_descriptor = functions[lazy_function_names[i]].front();

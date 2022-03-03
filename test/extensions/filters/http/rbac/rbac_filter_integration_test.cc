@@ -724,6 +724,7 @@ typed_config:
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
 }
+#endif
 
 const std::string RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY = R"EOF(
 name: rbac
@@ -744,10 +745,7 @@ typed_config:
           - any: true
         condition:
           {}
-
 )EOF";
-
-#endif
 
 using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::COOKIE_EXPR;
 using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::
