@@ -7,7 +7,7 @@ namespace Server {
 
 class UtilsTest : public testing::Test {
 public:
-  UtilsTest() {}
+  UtilsTest() = default;
 };
 
 // Most utils paths are covered through other tests, these tests take of
