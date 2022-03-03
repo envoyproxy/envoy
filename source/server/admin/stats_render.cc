@@ -116,18 +116,20 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
   case Utility::HistogramBucketsMode::NoBuckets:
     summarizeBuckets(name, histogram);
     break;
-  case Utility::HistogramBucketsMode::Cumulative:
-    collectBuckets(name, histogram,
-                   [](const Stats::HistogramStatistics& histogram_statistics) -> UInt64Vec {
-                     return histogram_statistics.computedBuckets();
-                   });
+  case Utility::HistogramBucketsMode::Cumulative: {
+    const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
+    const UInt64Vec& interval_buckets = interval_statistics.computedBuckets();
+    const UInt64Vec& cumulative_buckets = histogram.cumulativeStatistics().computedBuckets();
+    collectBuckets(name, histogram, interval_buckets, cumulative_buckets);
     break;
-  case Utility::HistogramBucketsMode::Disjoint:
-    collectBuckets(name, histogram,
-                   [](const Stats::HistogramStatistics& histogram_statistics) -> UInt64Vec {
-                     return histogram_statistics.computeDisjointBuckets();
-                   });
+  }
+  case Utility::HistogramBucketsMode::Disjoint: {
+    const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
+    const UInt64Vec& interval_buckets = interval_statistics.computeDisjointBuckets();
+    const UInt64Vec& cumulative_buckets = histogram.cumulativeStatistics().computeDisjointBuckets();
+    collectBuckets(name, histogram, interval_buckets, cumulative_buckets);
     break;
+  }
   }
 }
 
@@ -241,10 +243,8 @@ void StatsJsonRender::summarizeBuckets(const std::string& name,
   const std::vector<double>& computed_quantiles = interval_statistics.computedQuantiles();
   const std::vector<double>& cumulative_quantiles =
       histogram.cumulativeStatistics().computedQuantiles();
-  size_t min_size = std::min({
-      computed_quantiles.size(),
-      cumulative_quantiles.size(),
-      interval_statistics.supportedQuantiles().size()});
+  size_t min_size = std::min({computed_quantiles.size(), cumulative_quantiles.size(),
+                              interval_statistics.supportedQuantiles().size()});
   ASSERT(min_size == computed_quantiles.size());
   ASSERT(min_size == cumulative_quantiles.size());
 
@@ -266,13 +266,12 @@ void StatsJsonRender::summarizeBuckets(const std::string& name,
 
 // Collects the buckets from the specified histogram, using either the cumulative
 // or disjoint views, as controlled by buckets_fn.
-void StatsJsonRender::collectBuckets(
-    const std::string& name, const Stats::ParentHistogram& histogram,
-    std::function<UInt64Vec(const Stats::HistogramStatistics&)> buckets_fn) {
+void StatsJsonRender::collectBuckets(const std::string& name,
+                                     const Stats::ParentHistogram& histogram,
+                                     const UInt64Vec& interval_buckets,
+                                     const UInt64Vec& cumulative_buckets) {
   const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
   Stats::ConstSupportedBuckets& supported_buckets = interval_statistics.supportedBuckets();
-  const UInt64Vec& interval_buckets = buckets_fn(interval_statistics);
-  const UInt64Vec& cumulative_buckets = buckets_fn(histogram.cumulativeStatistics());
 
   // Make sure all vectors are the same size.
   ASSERT(interval_buckets.size() == cumulative_buckets.size());

@@ -5,7 +5,6 @@
 
 namespace {
 constexpr uint64_t ChunkSize = 2 * 1000 * 1000;
-using UInt64Vec = std::vector<uint64_t>;
 } // namespace
 
 namespace Envoy {
@@ -36,6 +35,9 @@ public:
 
   // Determines whether the current chunk is full.
   bool isChunkFull(Buffer::Instance& response) { return response.length() > ChunkSize; }
+
+protected:
+  using UInt64Vec = std::vector<uint64_t>;
 };
 
 // Implements the Render interface for simple textual representation of stats.
@@ -99,10 +101,9 @@ private:
   // stats json schema, where histograms are grouped together.
   void summarizeBuckets(const std::string& name, const Stats::ParentHistogram& histogram);
 
-  // Collects the buckets from the specified histogram, using either the cumulative
-  // or disjoint views, as controlled by buckets_fn.
+  // Collects the buckets from the specified histogram.
   void collectBuckets(const std::string& name, const Stats::ParentHistogram& histogram,
-                      std::function<UInt64Vec(const Stats::HistogramStatistics&)> buckets_fn);
+                      const UInt64Vec& interval_buckets, const UInt64Vec& cumulative_buckets);
 
   std::vector<ProtobufWkt::Value> stats_array_;
   ProtobufWkt::Struct histograms_obj_;
