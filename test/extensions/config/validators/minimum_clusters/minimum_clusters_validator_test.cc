@@ -68,6 +68,30 @@ TEST_F(MinimumClustersValidatorTest, Minimum1SingleCluster) {
   EXPECT_TRUE(validator.validate(server_, added_resources, removed_resources));
 }
 
+// Validates that a config with threshold 2 and a config that has two clusters
+// with the same name is rejected.
+TEST_F(MinimumClustersValidatorTest, Minimum1TwoClustersSameName) {
+  envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;
+  config.set_min_clusters_num(2);
+  Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{}, {}, 0};
+  MinimumClustersValidator validator(config);
+
+  auto cluster1 = std::make_unique<envoy::config::cluster::v3::Cluster>();
+  cluster1->set_name("clusterA");
+  auto cluster2 = std::make_unique<envoy::config::cluster::v3::Cluster>();
+  cluster2->set_name("clusterA");
+  std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
+  added_resources.emplace_back(
+      new Envoy::Config::DecodedResourceImpl(std::move(cluster1), "nameA", {}, "ver"));
+  added_resources.emplace_back(
+      new Envoy::Config::DecodedResourceImpl(std::move(cluster2), "nameB", {}, "ver"));
+  const Protobuf::RepeatedPtrField<std::string> removed_resources;
+  EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_info));
+  EXPECT_THROW_WITH_MESSAGE(validator.validate(server_, added_resources, removed_resources),
+                            EnvoyException,
+                            "CDS update attempts to reduce clusters below configured minimum.");
+}
+
 // Validates that an empty config accepts an update with a single cluster.
 TEST_F(MinimumClustersValidatorTest, NoMinimumSingleCluster) {
   envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;

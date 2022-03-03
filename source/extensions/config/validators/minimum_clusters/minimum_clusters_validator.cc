@@ -48,7 +48,7 @@ bool MinimumClustersValidator::validate(
   uint32_t newly_added_clusters_num = 0;
   absl::flat_hash_set<std::string> added_cluster_names(added_resources.size());
   for (const auto& resource : added_resources) {
-    envoy::config::cluster::v3::Cluster cluster =
+    const envoy::config::cluster::v3::Cluster& cluster =
         dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource->resource());
 
     // If the cluster was already added in the current update, skip this cluster.
@@ -66,7 +66,7 @@ bool MinimumClustersValidator::validate(
   for (const auto& removed_cluster : removed_resources) {
     Upstream::ClusterConstOptRef cluster = cur_clusters.getCluster(removed_cluster);
     // Only clusters that were added via api can be removed.
-    if ((cluster.has_value()) && (cluster->get().info()->addedViaApi())) {
+    if (cluster.has_value() && cluster->get().info()->addedViaApi()) {
       ++removed_clusters_num;
     }
   }
