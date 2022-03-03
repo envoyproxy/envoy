@@ -29,16 +29,14 @@ public:
 };
 
 TEST_F(ExtendedRequestAttributesTests, ListKeysTest) {
-  Http::TestRequestHeaderMapImpl request_headers;
-  ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, false);
-  RequestWrapper request_vars(arena, &request_headers, mock_stream_info);
+  ExtendedRequestWrapper extended_request_vars(arena, nullptr, mock_stream_info, false);
+  RequestWrapper request_vars(arena, nullptr, mock_stream_info);
   EXPECT_EQ(extended_request_vars.ListKeys()->size(),
             ExtendedRequestList.size() + request_vars.ListKeys()->size());
 }
 
 TEST_F(ExtendedRequestAttributesTests, NonStringKeyTest) {
-  Http::TestRequestHeaderMapImpl request_headers{{":path", "/query?"}};
-  ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, false);
+  ExtendedRequestWrapper extended_request_vars(arena, nullptr, mock_stream_info, false);
   auto value = extended_request_vars[CelValue::CreateInt64(0)];
   EXPECT_FALSE(value.has_value());
 }
@@ -51,7 +49,7 @@ TEST_F(ExtendedRequestAttributesTests, EmptyQueryStringTest) {
   EXPECT_EQ(value, "");
 }
 
-TEST_F(ExtendedRequestAttributesTests, GetMethodTest) {
+TEST_F(ExtendedRequestAttributesTests, FallThroughToBaseClassTest) {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}};
   ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, false);
   // Should fall through to RequestWrapper for "method"
