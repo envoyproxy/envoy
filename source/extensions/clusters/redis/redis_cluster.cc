@@ -332,6 +332,8 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
     ClusterSlotsSharedPtr&& slots,
     std::shared_ptr<std::uint64_t> hostname_resolution_required_cnt) {
   for (uint64_t slot_idx = 0; slot_idx < slots->size(); slot_idx++) {
+    ENVOY_LOG(debug, "resolveClusterHostnames: hostname_resolution_required_cnt at beginning: {}",
+              *hostname_resolution_required_cnt);
     auto& slot = (*slots)[slot_idx];
     if (slot.primary() == nullptr) {
       ENVOY_LOG(debug,
@@ -357,6 +359,10 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
             slot.setPrimary(Network::Utility::getAddressWithPort(
                 *response.front().addrInfo().address_, slot.primary_port_));
             (*hostname_resolution_required_cnt)--;
+            ENVOY_LOG(debug,
+                      "resolveClusterHostnames: hostname_resolution_required_cnt at end after "
+                      "resolving primary {}: {}",
+                      slot.primary_hostname_, *hostname_resolution_required_cnt);
             // Continue on to resolve replicas
             resolveReplicas(slots, slot_idx, hostname_resolution_required_cnt);
           });
@@ -380,6 +386,8 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
     ClusterSlotsSharedPtr slots, std::size_t index,
     std::shared_ptr<std::uint64_t> hostname_resolution_required_cnt) {
   auto& slot = (*slots)[index];
+  ENVOY_LOG(debug, "resolveReplicas: hostname_resolution_required_cnt at beginning: {}",
+            *hostname_resolution_required_cnt);
   if (slot.replicas_to_resolve_.empty()) {
     if (*hostname_resolution_required_cnt == 0) {
       finishClusterHostnameResolution(slots);
@@ -409,6 +417,10 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
                 *response.front().addrInfo().address_, replica.second));
           }
           (*hostname_resolution_required_cnt)--;
+          ENVOY_LOG(debug,
+                    "resolveReplicas: hostname_resolution_required_cnt at end after "
+                    "resolving replica {}: {}",
+                    replica.first, *hostname_resolution_required_cnt);
           // finish resolution if all the addresses have been resolved.
           if (*hostname_resolution_required_cnt <= 0) {
             finishClusterHostnameResolution(slots);
