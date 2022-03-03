@@ -182,8 +182,9 @@ TEST_F(ExtendedRequestCelVocabularyTests,
   // The check for custom CEL fields should evaluate to false.
   auto has_custom_field_or = evaluateExpressionWithCustomCelVocabulary(
       activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
-  EXPECT_TRUE(has_custom_field_or.ok() && has_custom_field_or.value().IsBool() &&
-              !has_custom_field_or.value().BoolOrDie());
+  EXPECT_TRUE(has_custom_field_or.ok());
+  EXPECT_TRUE(has_custom_field_or.value().IsBool());
+  EXPECT_TRUE(!has_custom_field_or.value().BoolOrDie());
 
   custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
                                        nullptr, nullptr);
