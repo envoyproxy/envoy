@@ -182,9 +182,10 @@ TEST_F(ExtendedRequestCelVocabularyTests,
   // The check for custom CEL fields should evaluate to false.
   auto has_custom_field_or = evaluateExpressionWithCustomCelVocabulary(
       activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
-  EXPECT_TRUE(has_custom_field_or.ok());
-  EXPECT_TRUE(has_custom_field_or.value().IsBool());
-  EXPECT_TRUE(!has_custom_field_or.value().BoolOrDie());
+  ASSERT_TRUE(has_custom_field_or.ok());
+  auto has_custom_field = has_custom_field_or.value();
+  EXPECT_TRUE(has_custom_field.IsBool());
+  EXPECT_TRUE(!has_custom_field.BoolOrDie());
 
   custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
                                        nullptr, nullptr);
@@ -193,8 +194,10 @@ TEST_F(ExtendedRequestCelVocabularyTests,
   // The check for custom CEL fields should evaluate to true.
   has_custom_field_or = evaluateExpressionWithCustomCelVocabulary(
       activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
-  EXPECT_TRUE(has_custom_field_or.ok() && has_custom_field_or.value().IsBool() &&
-              has_custom_field_or.value().BoolOrDie());
+  ASSERT_TRUE(has_custom_field_or.ok());
+  has_custom_field = has_custom_field_or.value();
+  EXPECT_TRUE(has_custom_field.IsBool());
+  EXPECT_TRUE(has_custom_field.BoolOrDie());
 }
 
 TEST_F(ExtendedRequestCelVocabularyTests, AddCustomMappingsToActivationTwiceTest) {
