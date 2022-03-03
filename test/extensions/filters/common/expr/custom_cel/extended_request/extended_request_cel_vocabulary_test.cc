@@ -183,7 +183,7 @@ TEST_F(ExtendedRequestCelVocabularyTests,
   auto has_custom_field_or = evaluateExpressionWithCustomCelVocabulary(
       activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
   EXPECT_TRUE(has_custom_field_or.ok() && has_custom_field_or.value().IsBool() &&
-            !has_custom_field_or.value().BoolOrDie());
+              !has_custom_field_or.value().BoolOrDie());
 
   custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
                                        nullptr, nullptr);
@@ -193,7 +193,7 @@ TEST_F(ExtendedRequestCelVocabularyTests,
   has_custom_field_or = evaluateExpressionWithCustomCelVocabulary(
       activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
   EXPECT_TRUE(has_custom_field_or.ok() && has_custom_field_or.value().IsBool() &&
-            has_custom_field_or.value().BoolOrDie());
+              has_custom_field_or.value().BoolOrDie());
 }
 
 TEST_F(ExtendedRequestCelVocabularyTests, AddCustomMappingsToActivationTwiceTest) {
