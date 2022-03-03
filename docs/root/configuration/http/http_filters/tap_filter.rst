@@ -28,14 +28,11 @@ Example configuration
 
 Example filter configuration:
 
-.. code-block:: yaml
-
-  name: envoy.filters.http.tap
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
-    common_config:
-      admin_config:
-        config_id: test_config_id
+.. literalinclude:: _include/tap-filter.yaml
+    :language: yaml
+    :lines: 24-29
+    :linenos:
+    :lineno-start: 1
 
 The previous snippet configures the filter for control via the :http:post:`/tap` admin handler.
 See the following section for more details.
@@ -68,26 +65,11 @@ tapping and debugging of HTTP traffic. It works as follows:
 
 An example POST body:
 
-.. code-block:: yaml
-
-  config_id: test_config_id
-  tap_config:
-    match:
-      and_match:
-        rules:
-          - http_request_headers_match:
-              headers:
-                - name: foo
-                  string_match:
-                    exact: bar
-          - http_response_headers_match:
-              headers:
-                - name: bar
-                  string_match:
-                    exact: baz
-    output_config:
-      sinks:
-        - streaming_admin: {}
+.. literalinclude:: _include/tap-filter.yaml
+    :language: yaml
+    :lines: 35-52
+    :linenos:
+    :lineno-start: 1
 
 The preceding configuration instructs the tap filter to match any HTTP requests in which a request
 header ``foo: bar`` is present AND a response header ``bar: baz`` is present. If both of these
@@ -95,26 +77,11 @@ conditions are met, the request will be tapped and streamed out the admin endpoi
 
 Another example POST body:
 
-.. code-block:: yaml
-
-  config_id: test_config_id
-  tap_config:
-    match:
-      or_match:
-        rules:
-          - http_request_headers_match:
-              headers:
-                - name: foo
-                  string_match:
-                    exact: bar
-          - http_response_headers_match:
-              headers:
-                - name: bar
-                  string_match:
-                    exact: baz
-    output_config:
-      sinks:
-        - streaming_admin: {}
+.. literalinclude:: _include/tap-filter.yaml
+    :language: yaml
+    :lines: 58-75
+    :linenos:
+    :lineno-start: 1
 
 The preceding configuration instructs the tap filter to match any HTTP requests in which a request
 header ``foo: bar`` is present OR a response header ``bar: baz`` is present. If either of these
@@ -122,45 +89,22 @@ conditions are met, the request will be tapped and streamed out the admin endpoi
 
 Another example POST body:
 
-.. code-block:: yaml
-
-  config_id: test_config_id
-  tap_config:
-    match:
-      any_match: true
-    output_config:
-      sinks:
-        - streaming_admin: {}
+.. literalinclude:: _include/tap-filter.yaml
+    :language: yaml
+    :lines: 81-87
+    :linenos:
+    :lineno-start: 1
 
 The preceding configuration instructs the tap filter to match any HTTP requests. All requests will
 be tapped and streamed out the admin endpoint.
 
 Another example POST body:
 
-.. code-block:: yaml
-
-  config_id: test_config_id
-  tap_config:
-    match:
-      and_match:
-        rules:
-          - http_request_headers_match:
-              headers:
-                - name: foo
-                  string_match:
-                    exact: bar
-          - http_request_generic_body_match:
-              patterns:
-                - string_match: test
-                - binary_match: 3q2+7w==
-              bytes_limit: 128
-          - http_response_generic_body_match:
-              patterns:
-                - binary_match: vu8=
-              bytes_limit: 64
-    output_config:
-      sinks:
-        - streaming_admin: {}
+.. literalinclude:: _include/tap-filter.yaml
+    :language: yaml
+    :lines: 93-114
+    :linenos:
+    :lineno-start: 1
 
 The preceding configuration instructs the tap filter to match any HTTP requests in which a request
 header ``foo: bar`` is present AND request body contains string ``test`` and hex bytes ``deadbeef`` (``3q2+7w==`` in base64 format)
@@ -188,16 +132,11 @@ more user friendly. See the reference documentation for more information on othe
 An example of a streaming admin tap configuration that uses the :ref:`JSON_BODY_AS_STRING
 <envoy_v3_api_enum_value_config.tap.v3.OutputSink.Format.JSON_BODY_AS_STRING>` format:
 
-.. code-block:: yaml
-
-  config_id: test_config_id
-  tap_config:
-    match:
-      any_match: true
-    output_config:
-      sinks:
-        - format: JSON_BODY_AS_STRING
-          streaming_admin: {}
+.. literalinclude:: _include/tap-filter.yaml
+    :language: yaml
+    :lines: 120-127
+    :linenos:
+    :lineno-start: 1
 
 Buffered body limits
 --------------------
@@ -236,25 +175,11 @@ format should be used.
 
 An static filter configuration to enable streaming output looks like:
 
-.. code-block:: yaml
-
-  name: envoy.filters.http.tap
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
-    common_config:
-      static_config:
-        match:
-          http_response_headers_match:
-            headers:
-              - name: bar
-                string_match:
-                  exact: baz
-        output_config:
-          streaming: true
-          sinks:
-            - format: PROTO_BINARY_LENGTH_DELIMITED
-              file_per_tap:
-                path_prefix: /tmp/
+.. literalinclude:: _include/tap-filter.yaml
+    :language: yaml
+    :lines: 128-144
+    :linenos:
+    :lineno-start: 1
 
 The previous configuration will match response headers, and as such will buffer request headers,
 body, and trailers until a match can be determined (buffered data limits still apply as described

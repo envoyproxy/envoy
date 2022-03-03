@@ -1,0 +1,144 @@
+static_resources:
+  listeners:
+  - name: listener1
+    address:
+      socket_address: {address: 0.0.0.0, port_value: 51051}
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: grpc_json
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              routes:
+              # NOTE: by default, matching happens based on the gRPC route, and not on the incoming request path.
+              # Reference: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/grpc_json_transcoder_filter#route-configs-for-transcoded-requests
+              - match: {prefix: "/helloworld.Greeter"}
+                route: {cluster: grpc, timeout: 60s}
+          http_filters:
+          - name: envoy.filters.http.tap
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
+              common_config:
+                admin_config:
+                  config_id: test_config_id
+          - name: envoy.filters.http.tap
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
+              common_config:
+                admin_config:
+                  config_id: test_config_id
+                  tap_config:
+                    match:
+                      and_match:
+                        rules:
+                          - http_request_headers_match:
+                              headers:
+                                - name: foo
+                                  string_match:
+                                    exact: bar
+                          - http_response_headers_match:
+                              headers:
+                                - name: bar
+                                  string_match:
+                                    exact: baz
+                    output_config:
+                      sinks:
+                        - streaming_admin: {}
+          - name: envoy.filters.http.tap
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
+              common_config:
+                admin_config:
+                  config_id: test_config_id
+                  tap_config:
+                    match:
+                      or_match:
+                        rules:
+                          - http_request_headers_match:
+                              headers:
+                                - name: foo
+                                  string_match:
+                                    exact: bar
+                          - http_response_headers_match:
+                              headers:
+                                - name: bar
+                                  string_match:
+                                    exact: baz
+                    output_config:
+                      sinks:
+                        - streaming_admin: {}
+          - name: envoy.filters.http.tap
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
+              common_config:
+                admin_config:
+                  config_id: test_config_id
+                  tap_config:
+                    match:
+                      any_match: true
+                    output_config:
+                      sinks:
+                        - streaming_admin: {}
+          - name: envoy.filters.http.tap
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
+              common_config:
+                admin_config:
+                  config_id: test_config_id
+                  tap_config:
+                    match:
+                      and_match:
+                        rules:
+                          - http_request_headers_match:
+                              headers:
+                                - name: foo
+                                  string_match:
+                                    exact: bar
+                          - http_request_generic_body_match:
+                              patterns:
+                                - string_match: test
+                                - binary_match: 3q2+7w==
+                              bytes_limit: 128
+                          - http_response_generic_body_match:
+                              patterns:
+                                - binary_match: vu8=
+                              bytes_limit: 64
+                    output_config:
+                      sinks:
+                        - streaming_admin: {}
+          - name: envoy.filters.http.tap
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
+              common_config:
+                admin_config:
+                  config_id: test_config_id
+                  tap_config:
+                    match:
+                      any_match: true
+                    output_config:
+                      sinks:
+                        - format: JSON_BODY_AS_STRING
+                          streaming_admin: {}
+          - name: envoy.filters.http.tap
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
+              common_config:
+                static_config:
+                  match:
+                    http_response_headers_match:
+                      headers:
+                        - name: bar
+                          string_match:
+                            exact: baz
+                  output_config:
+                    streaming: true
+                    sinks:
+                      - format: PROTO_BINARY_LENGTH_DELIMITED
+                        file_per_tap:
+                          path_prefix: /tmp/
