@@ -25,11 +25,6 @@
     </licenses>
     <developers>
         <developer>
-            <id>buildbreaker</id>
-            <name>Alan Chiu</name>
-            <email>awlchiu@gmail.com</email>
-        </developer>
-        <developer>
             <id>jpsim</id>
             <name>JP Simard</name>
             <email>jp@jpsim.com</email>
@@ -43,6 +38,11 @@
             <id>goaway</id>
             <name>Mike Schore</name>
             <email>mike.schore@gmail.com</email>
+        </developer>
+        <developer>
+            <id>Augustyniak</id>
+            <name>Rafal Augustyniak</name>
+            <email>rafalaugustyniak@gmail.com</email>
         </developer>
     </developers>
     <scm>
