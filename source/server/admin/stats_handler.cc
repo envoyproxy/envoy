@@ -23,6 +23,9 @@ constexpr uint64_t JsonStatsFlushCount = 64; // This value found by iterating in
 } // namespace
 
 namespace Envoy {
+
+using ProtoMap = Protobuf::Map<std::string, ProtobufWkt::Value>;
+
 namespace Server {
 
 const uint64_t RecentLookupsCapacity = 100;
@@ -242,15 +245,15 @@ public:
       flushStats(response);
     }
     if (!histogram_array_.empty()) {
-      auto* histograms_obj_container_fields = histograms_obj_container_.mutable_fields();
+      ProtoMap& histograms_obj_container_fields = *histograms_obj_container_.mutable_fields();
       if (found_used_histogram_) {
         ASSERT(histogram_buckets_mode_ == Utility::HistogramBucketsMode::NoBuckets);
-        auto* histograms_obj_fields = histograms_obj_.mutable_fields();
-        (*histograms_obj_fields)["computed_quantiles"] = ValueUtil::listValue(histogram_array_);
-        (*histograms_obj_container_fields)["histograms"] = ValueUtil::structValue(histograms_obj_);
+        ProtoMap& histograms_obj_fields = *histograms_obj_.mutable_fields();
+        histograms_obj_fields["computed_quantiles"] = ValueUtil::listValue(histogram_array_);
+        histograms_obj_container_fields["histograms"] = ValueUtil::structValue(histograms_obj_);
       } else {
         ASSERT(histogram_buckets_mode_ != Utility::HistogramBucketsMode::NoBuckets);
-        (*histograms_obj_container_fields)["histograms"] = ValueUtil::listValue(histogram_array_);
+        histograms_obj_container_fields["histograms"] = ValueUtil::listValue(histogram_array_);
       }
       auto str = MessageUtil::getJsonStringFromMessageOrDie(
           ValueUtil::structValue(histograms_obj_container_), false /* pretty */, true);
@@ -267,9 +270,9 @@ private:
   template <class Value>
   void addScalar(Buffer::Instance& response, const std::string& name, const Value& value) {
     ProtobufWkt::Struct stat_obj;
-    auto* stat_obj_fields = stat_obj.mutable_fields();
-    (*stat_obj_fields)["name"] = ValueUtil::stringValue(name);
-    (*stat_obj_fields)["value"] = value;
+    ProtoMap& stat_obj_fields = *stat_obj.mutable_fields();
+    stat_obj_fields["name"] = ValueUtil::stringValue(name);
+    stat_obj_fields["value"] = value;
     addJson(response, ValueUtil::structValue(stat_obj));
   }
 
@@ -322,8 +325,6 @@ private:
   // stats json schema, where histograms are grouped together.
   void summarizeBuckets(const std::string& name, const Stats::ParentHistogram& histogram) {
     if (!found_used_histogram_) {
-      auto* histograms_obj_fields = histograms_obj_.mutable_fields();
-
       // It is not possible for the supported quantiles to differ across histograms, so it is ok
       // to send them once.
       Stats::HistogramStatisticsImpl empty_statistics;
@@ -331,29 +332,31 @@ private:
       for (double quantile : empty_statistics.supportedQuantiles()) {
         supported_quantile_array.push_back(ValueUtil::numberValue(quantile * 100));
       }
-      (*histograms_obj_fields)["supported_quantiles"] =
-          ValueUtil::listValue(supported_quantile_array);
+
+      ProtoMap& histograms_obj_fields = *histograms_obj_.mutable_fields();
+      histograms_obj_fields["supported_quantiles"] = ValueUtil::listValue(supported_quantile_array);
       found_used_histogram_ = true;
     }
 
     ProtobufWkt::Struct computed_quantile;
-    auto* computed_quantile_fields = computed_quantile.mutable_fields();
-    (*computed_quantile_fields)["name"] = ValueUtil::stringValue(name);
+    ProtoMap& computed_quantile_fields = *computed_quantile.mutable_fields();
+    computed_quantile_fields["name"] = ValueUtil::stringValue(name);
 
     std::vector<ProtobufWkt::Value> computed_quantile_value_array;
     for (size_t i = 0; i < histogram.intervalStatistics().supportedQuantiles().size(); ++i) {
       ProtobufWkt::Struct computed_quantile_value;
-      auto* computed_quantile_value_fields = computed_quantile_value.mutable_fields();
+      ProtoMap& computed_quantile_value_fields =
+          *computed_quantile_value.mutable_fields();
       const auto& interval = histogram.intervalStatistics().computedQuantiles()[i];
       const auto& cumulative = histogram.cumulativeStatistics().computedQuantiles()[i];
-      (*computed_quantile_value_fields)["interval"] =
+      computed_quantile_value_fields["interval"] =
           std::isnan(interval) ? ValueUtil::nullValue() : ValueUtil::numberValue(interval);
-      (*computed_quantile_value_fields)["cumulative"] =
+      computed_quantile_value_fields["cumulative"] =
           std::isnan(cumulative) ? ValueUtil::nullValue() : ValueUtil::numberValue(cumulative);
 
       computed_quantile_value_array.push_back(ValueUtil::structValue(computed_quantile_value));
     }
-    (*computed_quantile_fields)["values"] = ValueUtil::listValue(computed_quantile_value_array);
+    computed_quantile_fields["values"] = ValueUtil::listValue(computed_quantile_value_array);
     histogram_array_.push_back(ValueUtil::structValue(computed_quantile));
   }
 
@@ -373,21 +376,22 @@ private:
         std::min({interval_buckets.size(), cumulative_buckets.size(), supported_buckets.size()});
 
     ProtobufWkt::Struct histogram_obj;
-    auto* histogram_obj_fields = histogram_obj.mutable_fields();
-    (*histogram_obj_fields)["name"] = ValueUtil::stringValue(name);
+    ProtoMap& histogram_obj_fields =
+        *histogram_obj.mutable_fields();
+    histogram_obj_fields["name"] = ValueUtil::stringValue(name);
 
     std::vector<ProtobufWkt::Value> bucket_array;
     for (size_t i = 0; i < min_size; ++i) {
       ProtobufWkt::Struct bucket;
-      auto* bucket_fields = bucket.mutable_fields();
-      (*bucket_fields)["upper_bound"] = ValueUtil::numberValue(supported_buckets[i]);
+      ProtoMap& bucket_fields = *bucket.mutable_fields();
+      bucket_fields["upper_bound"] = ValueUtil::numberValue(supported_buckets[i]);
 
       // ValueUtil::numberValue does unnecessary conversions from uint64_t values to doubles.
-      (*bucket_fields)["interval"] = ValueUtil::numberValue(interval_buckets[i]);
-      (*bucket_fields)["cumulative"] = ValueUtil::numberValue(cumulative_buckets[i]);
+      bucket_fields["interval"] = ValueUtil::numberValue(interval_buckets[i]);
+      bucket_fields["cumulative"] = ValueUtil::numberValue(cumulative_buckets[i]);
       bucket_array.push_back(ValueUtil::structValue(bucket));
     }
-    (*histogram_obj_fields)["buckets"] = ValueUtil::listValue(bucket_array);
+    histogram_obj_fields["buckets"] = ValueUtil::listValue(bucket_array);
     // addJson(response, ValueUtil::structValue(histogram_obj));
     histogram_array_.push_back(ValueUtil::structValue(histogram_obj));
   }
