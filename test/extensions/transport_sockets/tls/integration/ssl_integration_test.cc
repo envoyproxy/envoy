@@ -93,7 +93,6 @@ void SslIntegrationTestBase::checkStats() {
 
 class SslKeyLogTest : public SslIntegrationTest {
 public:
-  SslKeyLogTest(){};
   void setLogPath() { keylog_path_ = TestUtility::uniqueFilename(); }
   void setLocalFilter() {
     keylog_local_ = true;
