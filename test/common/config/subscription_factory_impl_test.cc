@@ -82,8 +82,7 @@ class SubscriptionFactoryTestUnifiedOrLegacyMux
 public:
   SubscriptionFactoryTestUnifiedOrLegacyMux() {
     if (GetParam() == LegacyOrUnified::Unified) {
-      Runtime::LoaderSingleton::getExisting()->mergeValues(
-          {{"envoy.reloadable_features.unified_mux", "true"}});
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.unified_mux", "true"}});
     }
   }
 
