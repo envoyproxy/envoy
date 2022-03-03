@@ -15,7 +15,7 @@
 //
 // Either standard functions or CelFunctions can be used.
 // The standard functions will be converted to CelFunctions when added
-// to the registry and activation.  All standard functions will need a Protobuf Arena because
+// to the registry and activation. All standard functions will need a Protobuf Arena because
 // CelFunction::Evaluate takes Arena as a parameter. Any other parameters must be of type CelValue.
 // Non-CelValue parameters can be added via lambda captures.
 //
