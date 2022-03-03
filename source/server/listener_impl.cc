@@ -348,13 +348,17 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
               validation_visitor_, parent_.server_.api(), parent_.server_.options())),
       quic_stat_names_(parent_.quicStatNames()) {
 
-  if (address_->type() == Network::Address::Type::Ip &&
-      config.address().socket_address().ipv4_compat() &&
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_check_on_ipv4_compat")) {
-    if (address_->ip()->version() != Network::Address::IpVersion::v6 ||
-        address_->ip()->ipv6()->v4CompatibleAddress() == nullptr) {
-      throw EnvoyException(
-          "Only IPv6 address '::' or valid IPv4-mapped IPv6 addresses can set ipv4_compat");
+  if ((address_->type() == Network::Address::Type::Ip &&
+       config.address().socket_address().ipv4_compat()) &&
+      (address_->ip()->version() != Network::Address::IpVersion::v6 ||
+       address_->ip()->ipv6()->v4CompatibleAddress() == nullptr)) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_check_on_ipv4_compat")) {
+      throw EnvoyException(fmt::format(
+          "Only IPv6 address '::' or valid IPv4-mapped IPv6 address can set ipv4_compat: {}",
+          address_->asStringView()));
+    } else {
+      ENVOY_LOG(warn, "An invalid IPv4-mapped IPv6 address is used when ipv4_compat is set: {}",
+                address_->asStringView());
     }
   }
 
