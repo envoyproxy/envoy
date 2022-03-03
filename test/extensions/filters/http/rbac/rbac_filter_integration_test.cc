@@ -774,6 +774,8 @@ public:
     // Note the whitespace in the policy id is replaced by '_'.
     EXPECT_THAT(waitForAccessLog(access_log_name_),
                 testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
+
+    cleanupUpstreamAndDownstream();
   }
 
   void ifDenyRuleConditionIsFalseThenAllowTest(Http::TestRequestHeaderMapImpl headers,
@@ -795,6 +797,8 @@ public:
     ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
+
+    cleanupUpstreamAndDownstream();
   }
 };
 
