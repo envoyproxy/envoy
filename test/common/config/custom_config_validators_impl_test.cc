@@ -47,8 +47,8 @@ public:
   }
 
   std::string name() const override {
-    return absl::StrCat(
-        category(), absl::StrCat(".fake_config_validator_", should_reject_ ? "reject" : "accept"));
+    return absl::StrCat(category(), ".fake_config_validator_",
+                        should_reject_ ? "reject" : "accept");
   }
 
   std::string typeUrl() const override {
