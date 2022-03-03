@@ -55,9 +55,6 @@ public:
   class Render;
   class TextRender;
   class StreamingRequest;
-
-private:
-  friend class StatsHandlerTest;
 };
 
 } // namespace Server
