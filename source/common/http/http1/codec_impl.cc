@@ -1145,11 +1145,9 @@ void ServerConnectionImpl::onBody(Buffer::Instance& data) {
 
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   if (active_request_ != nullptr && active_request_->remote_complete_) {
-    // Active downstream request remote complete but there is some new data comming then try to
-    // disable the connection reading. Connection reading will be re-enabled after the current
-    // active downstream request has completed.
-    // This ensures that the new comming data can be consumed after the current active downstream
-    // request has completed.
+    // Eagerly read disable the connection if the downstream is sending pipelined requests as we
+    // serially process them. Reading from the connection will be re-enabled after the active
+    // request is completed.
     active_request_->response_encoder_.readDisable(true);
     return okStatus();
   }
@@ -1157,11 +1155,9 @@ Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   Http::Status status = ConnectionImpl::dispatch(data);
 
   if (active_request_ != nullptr && active_request_->remote_complete_) {
-    // Active downstream request remote complete but there is some remaining data in the read buffer
-    // then try to disable the connection reading. Connection reading will be re-enabled after the
-    // current active downstream request has completed.
-    // This ensures that the remaining data can be consumed after the current active downstream
-    // request has completed.
+    // Read disable the connection if the downstream is sending additional data while we are working
+    // on an existing request. Reading from the connection will be re-enabled after the active
+    // request is completed.
     if (data.length() > 0) {
       active_request_->response_encoder_.readDisable(true);
     }
