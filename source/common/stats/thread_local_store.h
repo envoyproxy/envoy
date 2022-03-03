@@ -104,8 +104,8 @@ public:
   const HistogramStatistics& cumulativeStatistics() const override {
     return cumulative_statistics_;
   }
-  const std::string quantileSummary() const override;
-  const std::string bucketSummary() const override;
+  std::string quantileSummary() const override;
+  std::string bucketSummary() const override;
 
   // Stats::Metric
   SymbolTable& symbolTable() override;
