@@ -34,6 +34,20 @@ if [[ "${BAD_CONFIG_OUTPUT}" != *"reason INVALID_ARGUMENT:foo: Cannot find field
   exit 1
 fi
 
+# Invalid type struct URL cases
+BAD_CONFIG_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/lds_invalid_typed_struct.yaml" "-t" \
+  "discovery_response" 2>&1) ||
+  echo "${BAD_CONFIG_OUTPUT:-no-output}"
+if [[ "${BAD_CONFIG_OUTPUT}" != *"Invalid type_url 'blah' during traversal"* ]]; then
+  exit 1
+fi
+BAD_CONFIG_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/lds_invalid_typed_struct_2.yaml" "-t" \
+  "discovery_response" 2>&1) ||
+  echo "${BAD_CONFIG_OUTPUT:-no-output}"
+if [[ "${BAD_CONFIG_OUTPUT}" != *"Invalid type_url 'bleh' during traversal"* ]]; then
+  exit 1
+fi
+
 # No errors without fail on WiP
 "${PATH_BIN}" "-c" "${PATH_CONFIG}/lds_wip.yaml" "-t" "discovery_response"
 
