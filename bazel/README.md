@@ -929,7 +929,7 @@ docker ps | grep envoy-build-ubuntu | awk '{print $1}'
 ```shell
 docker  copy $dockerContainerID:/opt/llvm/bin/clang-format clang-format-ci
 ```
-* Replace the host `clang-format` with the new one. Ensure that the copied `clang-format` is the default one. You can do this by ensuring it is in $PATH or by creatig a symbolic link:
+* Replace the host `clang-format` with the new one. Ensure that the copied `clang-format` is the default one. You can do this by ensuring it is in `$PATH` or by creating a symbolic link:
 ```shell
 copy clang-format-ci $PATH/clang-format
 ```
