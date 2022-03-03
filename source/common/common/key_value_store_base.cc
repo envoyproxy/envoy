@@ -65,9 +65,6 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents,
 }
 
 void KeyValueStoreBase::addOrUpdate(absl::string_view key, absl::string_view value) {
-  // Avoids rehashing if the key already exists, moving the value into the map.
-  // If the key did not already exists, inserts both into the map, which
-  // might trigger a rehash.
   store_.insert_or_assign(key, std::string(value));
   if (!flush_timer_->enabled()) {
     flush();
