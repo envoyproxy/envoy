@@ -408,7 +408,7 @@ void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
   closeIdleConnectionsForDrainingPool();
   if (pending_streams_.empty()) {
     // The remaining connecting clients are non-idle. And some new clients may have been created,
-    // which are addded to the front of the list.
+    // which are added to the front of the list.
     while (!connecting_clients_.empty()) {
       // Check from the back to the front of the list because newly created clients are added to the
       // front.
@@ -434,7 +434,7 @@ void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
     transitionActiveClientState(*ready_clients_.front(), ActiveClient::State::DRAINING);
   }
 
-  // Changing busy_clients_ to draning does not move them between lists,
+  // Changing busy_clients_ to draining does not move them between lists,
   // so use a for-loop since the list is not mutated.
   ASSERT(&owningList(ActiveClient::State::DRAINING) == &busy_clients_);
   for (auto& busy_client : busy_clients_) {
@@ -478,10 +478,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     const bool contributed_to_connecting_stream_capacity = client.currentUnusedCapacity() > 0;
     decrConnectingAndConnectedStreamCapacity(client.currentUnusedCapacity(), client);
     if (client.connect_timer_) {
-      ASSERT(!client.has_handshake_completed_);
       client.connect_timer_->disableTimer();
       client.connect_timer_.reset();
-      client.has_handshake_completed_ = true;
     }
     // Make sure that onStreamClosed won't double count.
     client.remaining_streams_ = 0;
@@ -495,6 +493,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     }
 
     if (!client.hasHandshakeCompleted()) {
+      ASSERT(!client.has_handshake_completed_);
+      client.has_handshake_completed_ = true;
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
 
@@ -802,7 +802,7 @@ void ActiveClient::onConnectionDurationTimeout() {
 }
 
 void ActiveClient::drain() {
-  if (currentUnusedCapacity() == 0) {
+  if (currentUnusedCapacity() <= 0) {
     return;
   }
   parent_.decrConnectingAndConnectedStreamCapacity(currentUnusedCapacity(), *this);

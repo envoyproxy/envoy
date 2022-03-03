@@ -447,11 +447,11 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "http3_status_tracker_test",
-    srcs = ["http3_status_tracker_test.cc"],
+    name = "http3_status_tracker_impl_test",
+    srcs = ["http3_status_tracker_impl_test.cc"],
     deps = [
         ":common_lib",
-        "//source/common/http:http3_status_tracker",
+        "//source/common/http:http3_status_tracker_impl_lib",
         "//test/mocks:common_lib",
     ],
 )
