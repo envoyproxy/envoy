@@ -784,7 +784,6 @@ public:
     Upstream::HostDescriptionConstSharedPtr shared_host(host_);
     stream_info_.upstreamInfo()->setUpstreamHost(shared_host);
   }
-
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}, {":authority", "test"}};
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
