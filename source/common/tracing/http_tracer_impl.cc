@@ -116,8 +116,6 @@ template <class T> static void addGrpcResponseTags(Span& span, const T& headers)
         case Grpc::Status::WellKnownGrpcStatus::DataLoss:
           span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
           break;
-        default:
-          PANIC("new grpc error code not added");
         }
       }
     }
