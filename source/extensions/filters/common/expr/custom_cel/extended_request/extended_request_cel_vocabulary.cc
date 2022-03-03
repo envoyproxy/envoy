@@ -74,11 +74,6 @@ void addValueProducerToActivation(Activation* activation,
   activation->InsertValueProducer(value_producer_name, std::move(value_producer));
 }
 
-void addLazyFunctionToActivation(Activation* activation, std::unique_ptr<CelFunction> function) {
-  activation->RemoveFunctionEntries(function->descriptor());
-  absl::Status status = activation->InsertFunction(std::move(function));
-}
-
 template <typename ReturnType, typename... Arguments>
 void addLazyFunctionToActivation(
     Activation* activation, absl::string_view function_name, bool receiver_type,
