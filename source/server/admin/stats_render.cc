@@ -125,8 +125,8 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
   }
   case Utility::HistogramBucketsMode::Disjoint: {
     const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
-    const UInt64Vec& interval_buckets = interval_statistics.computeDisjointBuckets();
-    const UInt64Vec& cumulative_buckets = histogram.cumulativeStatistics().computeDisjointBuckets();
+    const UInt64Vec interval_buckets = interval_statistics.computeDisjointBuckets();
+    const UInt64Vec cumulative_buckets = histogram.cumulativeStatistics().computeDisjointBuckets();
     collectBuckets(name, histogram, interval_buckets, cumulative_buckets);
     break;
   }
