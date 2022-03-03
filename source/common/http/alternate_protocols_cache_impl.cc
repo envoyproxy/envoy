@@ -127,7 +127,7 @@ AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
     // Apply updates.
     for (auto& [origin, origin_data] : queued_origin_updates) {
       setAlternativesImpl(origin, origin_data.protocols);
-      setSrtt(origin, origin_data.srtt);
+      setSrttImpl(origin, origin_data.srtt);
     }
   }
 }
@@ -145,6 +145,11 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
 }
 
 void AlternateProtocolsCacheImpl::setSrtt(const Origin& origin, std::chrono::microseconds srtt) {
+  setSrttImpl(origin, srtt);
+}
+
+void AlternateProtocolsCacheImpl::setSrttImpl(const Origin& origin,
+                                              std::chrono::microseconds srtt) {
   auto entry_it = protocols_.find(origin);
   if (entry_it == protocols_.end()) {
     return;
