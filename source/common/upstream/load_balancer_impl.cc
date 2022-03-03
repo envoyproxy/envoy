@@ -532,6 +532,7 @@ uint32_t LoadBalancerContextBase::createOverrideHostStatus(
 
   for (auto single_status : common_config.override_host_status().statuses()) {
     switch (static_cast<envoy::config::core::v3::HealthStatus>(single_status)) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::config::core::v3::HealthStatus::UNKNOWN:
     case envoy::config::core::v3::HealthStatus::HEALTHY:
       override_host_status |= singleHealthStatusToUint(Host::Health::Healthy);
@@ -543,10 +544,6 @@ uint32_t LoadBalancerContextBase::createOverrideHostStatus(
       break;
     case envoy::config::core::v3::HealthStatus::DEGRADED:
       override_host_status |= singleHealthStatusToUint(Host::Health::Degraded);
-      break;
-    default:
-      ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::assert), warn,
-                          "Unknown health status: {} for override host", single_status);
       break;
     }
   }
