@@ -83,6 +83,7 @@ New Features
 * schema_validator_tool: added ``bootstrap`` checking to the
   :ref:`schema validator check tool <install_tools_schema_validator_check_tool>`. Also fixed linking
   of all extensions into the tool so that all typed configurations can be properly verified.
+* stats: histogram_buckets query parameter added to stats endpoint to change histogram output to show buckets.
 * tools: the project now ships a :ref:`tools docker image <install_tools>` which contains tools
   useful in support systems such as CI, CD, etc. The
   :ref:`schema validator check tool <install_tools_schema_validator_check_tool>` has been added
