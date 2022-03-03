@@ -237,11 +237,22 @@ void StatsJsonRender::summarizeBuckets(const std::string& name,
   computed_quantile_fields["name"] = ValueUtil::stringValue(name);
 
   std::vector<ProtobufWkt::Value> computed_quantile_value_array;
-  for (size_t i = 0; i < histogram.intervalStatistics().supportedQuantiles().size(); ++i) {
+  const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
+  const std::vector<double>& computed_quantiles = interval_statistics.computedQuantiles();
+  const std::vector<double>& cumulative_quantiles =
+      histogram.cumulativeStatistics().computedQuantiles();
+  size_t min_size = std::min({
+      computed_quantiles.size(),
+      cumulative_quantiles.size(),
+      interval_statistics.supportedQuantiles().size()});
+  ASSERT(min_size == computed_quantiles.size());
+  ASSERT(min_size == cumulative_quantiles.size());
+
+  for (size_t i = 0; i < min_size; ++i) {
     ProtobufWkt::Struct computed_quantile_value;
     ProtoMap& computed_quantile_value_fields = *computed_quantile_value.mutable_fields();
-    const auto& interval = histogram.intervalStatistics().computedQuantiles()[i];
-    const auto& cumulative = histogram.cumulativeStatistics().computedQuantiles()[i];
+    const auto& interval = computed_quantiles[i];
+    const auto& cumulative = cumulative_quantiles[i];
     computed_quantile_value_fields["interval"] =
         std::isnan(interval) ? ValueUtil::nullValue() : ValueUtil::numberValue(interval);
     computed_quantile_value_fields["cumulative"] =
@@ -260,8 +271,8 @@ void StatsJsonRender::collectBuckets(
     std::function<UInt64Vec(const Stats::HistogramStatistics&)> buckets_fn) {
   const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
   Stats::ConstSupportedBuckets& supported_buckets = interval_statistics.supportedBuckets();
-  UInt64Vec interval_buckets = buckets_fn(interval_statistics);
-  UInt64Vec cumulative_buckets = buckets_fn(histogram.cumulativeStatistics());
+  const UInt64Vec& interval_buckets = buckets_fn(interval_statistics);
+  const UInt64Vec& cumulative_buckets = buckets_fn(histogram.cumulativeStatistics());
 
   // Make sure all vectors are the same size.
   ASSERT(interval_buckets.size() == cumulative_buckets.size());
