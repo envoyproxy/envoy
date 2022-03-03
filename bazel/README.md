@@ -759,7 +759,7 @@ local_repository(
 
 When performing custom builds, it is acceptable to include contrib extensions as well. This can
 be done by including the desired Bazel paths from [contrib_build_config.bzl](../contrib/contrib_build_config.bzl)
-into the overriden `extensions_build_config.bzl`. (There is no need to specifically perform
+into the overridden `extensions_build_config.bzl`. (There is no need to specifically perform
 a contrib build to include a contrib extension.)
 
 ## Extra extensions
