@@ -1,12 +1,17 @@
-FROM envoyproxy/envoy-dev:latest
+FROM python:3.8-slim-bullseye
 
-RUN apt-get update && apt-get -q install --no-install-recommends -y python3-pip curl
 Add requirements.txt /requirements.txt
 RUN pip3 install -q -r /requirements.txt
 RUN mkdir /code
 ADD ./service.py /code
 ADD ./start_service.sh /usr/local/bin/start_service.sh
 RUN chmod u+x /usr/local/bin/start_service.sh
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y curl tar \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
 #
 # for discussion on jaeger binary compatibility, and the source of the file, see here:
 #  https://github.com/envoyproxy/envoy/issues/11382#issuecomment-638012072

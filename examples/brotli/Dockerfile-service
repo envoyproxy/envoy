@@ -1,10 +1,5 @@
-FROM debian:buster-slim
+FROM python:3.8-slim-bullseye
 
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y python3 python3-pip python3-setuptools \
-    && apt-get autoremove -y && apt-get clean \
-    && rm -rf /tmp/* /var/tmp/* \
-    && rm -rf /var/lib/apt/lists/*
 Add requirements.txt /requirements.txt
 RUN pip3 install -q -r /requirements.txt
 RUN mkdir -p /code/data

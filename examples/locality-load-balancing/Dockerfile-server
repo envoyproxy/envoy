@@ -1,7 +1,5 @@
-FROM alpine:latest
+FROM python:3.8-slim-bullseye
 
-RUN apk update && apk add py3-pip
-RUN pip3 install -q Flask==2.0.3
 RUN mkdir /code
 COPY ./service.py /code
 

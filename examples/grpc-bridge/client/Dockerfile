@@ -1,11 +1,11 @@
-FROM python:3.8-slim
+FROM python:3.8-slim-bullseye
 
 WORKDIR /client
 
 COPY requirements.txt /client/requirements.txt
 
 # Cache the dependencies
-RUN pip install --require-hashes -r /client/requirements.txt
+RUN pip3 install -q -r /client/requirements.txt
 
 # Copy the sources, including the stubs
 COPY client.py /client/grpc-kv-client.py

@@ -1,6 +1,5 @@
-FROM envoyproxy/envoy-dev:latest
+FROM python:3.8-slim-bullseye
 
-RUN apt-get update && apt-get -q install --no-install-recommends -y python3-pip curl
 Add requirements.txt /requirements.txt
 RUN pip3 install -q -r /requirements.txt
 RUN mkdir /code

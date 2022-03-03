@@ -1,6 +1,5 @@
-FROM python:3.8-alpine
+FROM python:3.8-slim-bullseye
 
-RUN apk update && apk add postgresql-dev gcc python3-dev musl-dev
 Add requirements.txt /requirements.txt
 RUN pip3 install -q -r /requirements.txt
 RUN mkdir /code
