@@ -22,23 +22,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "udp_access_log_lib",
-    srcs = ["udp_access_log.cc"],
-    hdrs = ["udp_access_log.h"],
-    deps = [
-        "//source/extensions/access_loggers/common:access_log_base",
-        "//envoy/server:filter_config_interface",
-        "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
-    ]
-)
-
-envoy_cc_library(
     name = "udp_proxy_filter_lib",
     srcs = ["udp_proxy_filter.cc"],
     hdrs = ["udp_proxy_filter.h"],
     deps = [
         ":hash_policy_lib",
-        ":udp_access_log_lib",
         "//envoy/access_log:access_log_interface",
         "//envoy/event:file_event_interface",
         "//envoy/event:timer_interface",
@@ -51,6 +39,7 @@ envoy_cc_library(
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:load_balancer_lib",
+        "//source/common/stream_info:stream_info_lib",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
     ],
 )

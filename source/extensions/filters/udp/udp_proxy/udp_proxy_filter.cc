@@ -50,7 +50,7 @@ Network::FilterStatus UdpProxyFilter::onData(Network::UdpRecvData& data) {
     config_->stats().downstream_sess_no_route_.inc();
     return Network::FilterStatus::StopIteration;
   }
-
+  
   return cluster_info_.value()->onData(data);
 }
 
@@ -80,7 +80,13 @@ UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
                 host_to_sessions_.erase(host_sessions_it);
               }
             }
-          })) {}
+          })) {
+            if(!filter_.config_->accessLogs().empty()){
+              udp_sess_stats_.emplace(StreamInfo::StreamInfoImpl(filter_.config_->timeSource(), nullptr));
+
+              ASSERT(udp_sess_stats_.has_value());
+            }
+          }
 
 UdpProxyFilter::ClusterInfo::~ClusterInfo() {
   // Sanity check the session accounting. This is not as fast as a straight teardown, but this is
@@ -90,9 +96,8 @@ UdpProxyFilter::ClusterInfo::~ClusterInfo() {
   }
   ASSERT(host_to_sessions_.empty());
 
-  auto stats = std::make_shared<UdpSessionStats>();
   for (const auto& access_log : filter_.config_->accessLogs()) {
-    access_log->log(stats);
+    access_log->log(nullptr, nullptr, nullptr, udp_sess_stats_.value());
   }
 }
 
