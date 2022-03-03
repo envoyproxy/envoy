@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/http/alternate_protocols_cache.h"
 
 #include "source/common/http/alternate_protocols_cache_impl.h"
@@ -110,9 +112,11 @@ public:
         quic_stat_names_(store_.symbolTable()) {}
 
   void initialize() {
-#ifdef ENVOY_ENABLE_QUIC
     quic_connection_persistent_info_ =
+#ifdef ENVOY_ENABLE_QUIC
         std::make_unique<Quic::PersistentQuicInfoImpl>(dispatcher_, 0);
+#else
+        std::make_unique<PersistentQuicInfo>();
 #endif
 
     grid_ = std::make_unique<ConnectivityGridForTest>(

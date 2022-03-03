@@ -425,7 +425,9 @@ void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
 
 void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                                          Network::ConnectionEvent event) {
-  if (event != Network::ConnectionEvent::ConnectedZeroRtt) {
+  switch (event) {
+  case Network::ConnectionEvent::RemoteClose:
+  case Network::ConnectionEvent::LocalClose: {
     if (client.state() == ActiveClient::State::CONNECTING) {
       ASSERT(connecting_stream_capacity_ >= client.effectiveConcurrentStreamLimit());
       connecting_stream_capacity_ -= client.effectiveConcurrentStreamLimit();
@@ -435,11 +437,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       client.connect_timer_->disableTimer();
       client.connect_timer_.reset();
     }
-  }
 
-  switch (event) {
-  case Network::ConnectionEvent::RemoteClose:
-  case Network::ConnectionEvent::LocalClose: {
     state_.decrConnectingAndConnectedStreamCapacity(client.currentUnusedCapacity());
     // Make sure that onStreamClosed won't double count.
     client.remaining_streams_ = 0;
@@ -516,6 +514,14 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     break;
   }
   case Network::ConnectionEvent::Connected: {
+    ASSERT(connecting_stream_capacity_ >= client.effectiveConcurrentStreamLimit());
+    connecting_stream_capacity_ -= client.effectiveConcurrentStreamLimit();
+
+    if (client.connect_timer_) {
+      client.connect_timer_->disableTimer();
+      client.connect_timer_.reset();
+    }
+
     client.conn_connect_ms_->complete();
     client.conn_connect_ms_.reset();
     ASSERT(client.state() == ActiveClient::State::CONNECTING);
@@ -542,8 +548,10 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     break;
   }
   case Network::ConnectionEvent::ConnectedZeroRtt: {
+    // No need to update connecting capacity and connect_timer_ as the client is still connecting.
     ASSERT(client.state() == ActiveClient::State::CONNECTING);
     host()->cluster().stats().upstream_cx_connect_with_0_rtt_.inc();
+    // TODO(danzh) mark the client able to handle early data requests.
     break;
   }
   }

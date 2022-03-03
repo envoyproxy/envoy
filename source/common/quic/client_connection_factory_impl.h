@@ -37,6 +37,7 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   quic::QuicClientPushPromiseIndex push_promise_index_;
   // Hard code with the default crypto stream as there's no pluggable crypto for upstream Envoy.
   EnvoyQuicCryptoClientStreamFactoryImpl crypto_stream_factory_;
+  // Caches TLS resumption keys for each host.
   quic::QuicClientSessionCache session_cache_;
 };
 

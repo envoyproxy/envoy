@@ -518,6 +518,8 @@ private:
       LoadBalancerPtr lb_;
       ClusterInfoConstSharedPtr cluster_info_;
       Http::AsyncClientImpl http_async_client_;
+      // Stores QUICHE specific objects which live through out the life time of the cluster and can
+      // be shared across its hosts.
       Http::PersistentQuicInfoPtr quic_info_;
     };
 
