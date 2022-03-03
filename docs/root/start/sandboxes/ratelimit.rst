@@ -40,18 +40,24 @@ Step 2: Test rate limiting of upstream service
 
 The sandbox is configured with `10000` port for upstream service.
 
-If a request reaches rate limiting, Envoy will add `x-local-rate-limit` header and refuse the request with the 429 HTTP code.
+If a request reaches rate limiting, Envoy will add `x-local-rate-limit` header and refuse with "local_rate_limited" response and 429 HTTP code.
 
-Now, use ``curl`` to make a request four times for the limited upsteam service:
+Now, use ``curl`` to make a request five times for the limited upsteam service:
 
 .. code-block:: console
 
-    $ for i in {1..5}; do curl -si localhost:10000 | grep "x-local-rate-limit"; done
+    $ for i in {1..5}; do curl -si localhost:10000 | grep -E "x-local-rate-limit|429|local_rate_limited"; done
+    HTTP/1.1 429 Too Many Requests
     x-local-rate-limit: true
+    local_rate_limited
+    HTTP/1.1 429 Too Many Requests
     x-local-rate-limit: true
+    local_rate_limited
+    HTTP/1.1 429 Too Many Requests
     x-local-rate-limit: true
+    local_rate_limited
 
-The first two requests get responses, and the rest requests are refused as expected.
+The first two requests get responses, and the rest requests are refused with expected responses.
 
 
 Step 3: Test rate limiting of Envoy’s statistics
@@ -62,22 +68,28 @@ The sandbox is configured with two ports serving Envoy’s admin and statistics 
 - ``9901`` exposes the standard admin interface
 - ``9902`` exposes a rate limitied version of the admin interface
 
-Use ``curl`` to make a request four times for unlimited statistics on port ``9901``, it should not contain the ``x-local-rate-limit`` header in the response:
+Use ``curl`` to make a request five times for unlimited statistics on port ``9901``, it should not contain any  rate limiting responses:
 
 .. code-block:: console
 
-    $ for i in {1..5}; do curl -si localhost:9901/stats/prometheus | grep "x-local-rate-limit"; done
+    $ for i in {1..5}; do curl -si localhost:9901/stats/prometheus | grep -E "x-local-rate-limit|429|local_rate_limited"; done
 
-Now, use ``curl`` to make a request four times for the limited statistics:
+Now, use ``curl`` to make a request five times for the limited statistics:
 
 .. code-block:: console
 
-    $ for i in {1..5}; do curl -si localhost:9902/stats/prometheus | grep "x-local-rate-limit"; done
+    $ for i in {1..5}; do curl -si localhost:9902/stats/prometheus | grep -E "x-local-rate-limit|429|local_rate_limited"; done
+    HTTP/1.1 429 Too Many Requests
     x-local-rate-limit: true
+    local_rate_limited
+    HTTP/1.1 429 Too Many Requests
     x-local-rate-limit: true
+    local_rate_limited
+    HTTP/1.1 429 Too Many Requests
     x-local-rate-limit: true
+    local_rate_limited
 
-The first two requests get responses, and the rest requests are refused as expected.
+The results are expected.
 
 .. seealso::
    :ref:`global rate limiting <arch_overview_global_rate_limit>`

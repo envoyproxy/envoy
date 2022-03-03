@@ -89,7 +89,7 @@ responds_with () {
     local expected
     expected="$1"
     shift
-    _curl "${@}" | grep "$expected" || {
+    _curl "${@}" | grep -E "$expected" || {
         echo "ERROR: curl expected (${*}): $expected" >&2
         return 1
     }
@@ -99,7 +99,7 @@ responds_without () {
     local expected
     expected="$1"
     shift
-    _curl "${@}" | grep "$expected" | [[ "$(wc -l)" -eq 0 ]] || {
+    _curl "${@}" | grep -E "$expected" | [[ "$(wc -l)" -eq 0 ]] || {
         echo "ERROR: curl without (${*}): $expected" >&2
         return 1
     }
@@ -109,7 +109,7 @@ responds_with_header () {
     local expected
     expected="$1"
     shift
-    _curl --head "${@}" | grep "$expected"  || {
+    _curl --head "${@}" | grep -E "$expected"  || {
         echo "ERROR: curl header (${*}): $expected" >&2
         return 1
     }
@@ -119,7 +119,7 @@ responds_without_header () {
     local expected
     expected="$1"
     shift
-    _curl --head "${@}" | grep "$expected" | [[ "$(wc -l)" -eq 0 ]] || {
+    _curl --head "${@}" | grep -E "$expected" | [[ "$(wc -l)" -eq 0 ]] || {
         echo "ERROR: curl without header (${*}): $expected" >&2
         return 1
     }
