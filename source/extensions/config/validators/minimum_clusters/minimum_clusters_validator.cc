@@ -13,7 +13,7 @@ void MinimumClustersValidator::validate(
     const Server::Instance&, const std::vector<Envoy::Config::DecodedResourcePtr>& resources) {
   absl::flat_hash_set<std::string> next_cluster_names(resources.size());
   for (const auto& resource : resources) {
-    envoy::config::cluster::v3::Cluster cluster =
+    const envoy::config::cluster::v3::Cluster& cluster =
         dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource->resource());
 
     // If the cluster was already added in the current update, it won't be added twice.

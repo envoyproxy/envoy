@@ -196,8 +196,8 @@ TEST_F(MinimumClustersValidatorTest, Minimum1Clusters1Remove1NonApi) {
   validator.validate(server_, added_resources, removed_resources);
 }
 
-// Add a test with high threshold, and small update (only additions) below the
-// threshold, which will be rejected.
+// Validate that high threshold, and small update (only additions) below the
+// threshold will be rejected.
 TEST_F(MinimumClustersValidatorTest, Minimum5AddingOneCluster) {
   envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;
   config.set_min_clusters_num(5);
