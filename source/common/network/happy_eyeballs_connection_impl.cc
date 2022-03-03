@@ -286,6 +286,11 @@ absl::optional<std::chrono::milliseconds> HappyEyeballsConnectionImpl::lastRound
   return connections_[0]->lastRoundTripTime();
 }
 
+absl::optional<uint64_t> HappyEyeballsConnectionImpl::congestionWindowInBytes() const {
+  // Note, this value changes constantly even within the same connection.
+  return connections_[0]->congestionWindowInBytes();
+}
+
 void HappyEyeballsConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb) {
   if (connect_finished_) {
     connections_[0]->addConnectionCallbacks(cb);

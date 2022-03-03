@@ -94,7 +94,11 @@ public:
   makeClientConnectionWithOptions(uint32_t port,
                                   const Network::ConnectionSocket::OptionsSharedPtr& options);
 
-  void registerTestServerPorts(const std::vector<std::string>& port_names);
+  void registerTestServerPorts(const std::vector<std::string>& port_names) {
+    registerTestServerPorts(port_names, test_server_);
+  }
+  void registerTestServerPorts(const std::vector<std::string>& port_names,
+                               IntegrationTestServerPtr& test_server);
   void createGeneratedApiTestServer(const std::string& bootstrap_path,
                                     const std::vector<std::string>& port_names,
                                     Server::FieldValidationConfig validator_config,
@@ -103,6 +107,12 @@ public:
                            const std::vector<std::string>& port_names,
                            Server::FieldValidationConfig validator_config,
                            bool allow_lds_rejection);
+
+  void createGeneratedApiTestServer(const std::string& bootstrap_path,
+                                    const std::vector<std::string>& port_names,
+                                    Server::FieldValidationConfig validator_config,
+                                    bool allow_lds_rejection,
+                                    IntegrationTestServerPtr& test_server);
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
@@ -333,6 +343,9 @@ public:
   }
 
 protected:
+  static std::string finalizeConfigWithPorts(ConfigHelper& helper, std::vector<uint32_t>& ports,
+                                             bool use_lds);
+
   void setUdpFakeUpstream(absl::optional<FakeUpstreamConfig::UdpConfig> config) {
     upstream_config_.udp_fake_upstream_ = config;
   }

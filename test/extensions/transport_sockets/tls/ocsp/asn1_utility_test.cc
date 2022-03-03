@@ -171,7 +171,7 @@ TEST_F(Asn1UtilityTest, GetOptionalMissingValueTest) {
 
 TEST_F(Asn1UtilityTest, ParseOptionalTest) {
   std::vector<uint8_t> nothing;
-  std::vector<uint8_t> explicit_optional_true = {0, 3, 0x1u, 1, 0xff};
+  std::vector<uint8_t> explicit_optional_true = {0xa0, 3, 0x1u, 1, 0xff};
   std::vector<uint8_t> missing_val_bool = {0x1u, 1};
 
   auto parse_bool = [](CBS& cbs) -> bool {
@@ -191,8 +191,9 @@ TEST_F(Asn1UtilityTest, ParseOptionalTest) {
              explicit_optional_true.size());
 
     absl::optional<bool> expected(true);
-    EXPECT_EQ(expected, absl::get<0>(Asn1Utility::parseOptional<bool>(cbs_explicit_optional_true,
-                                                                      parse_bool, 0)));
+    EXPECT_EQ(expected, absl::get<0>(Asn1Utility::parseOptional<bool>(
+                            cbs_explicit_optional_true, parse_bool,
+                            CBS_ASN1_CONTEXT_SPECIFIC | CBS_ASN1_CONSTRUCTED | 0)));
   }
 
   {
@@ -224,8 +225,9 @@ TEST_F(Asn1UtilityTest, ParseOptionalTest) {
     CBS_init(&cbs_explicit_optional_true, explicit_optional_true.data(),
              explicit_optional_true.size());
 
-    EXPECT_EQ("failed", absl::get<1>(Asn1Utility::parseOptional<bool>(cbs_explicit_optional_true,
-                                                                      parse_bool_fail, 0)));
+    EXPECT_EQ("failed", absl::get<1>(Asn1Utility::parseOptional<bool>(
+                            cbs_explicit_optional_true, parse_bool_fail,
+                            CBS_ASN1_CONTEXT_SPECIFIC | CBS_ASN1_CONSTRUCTED | 0)));
   }
 }
 

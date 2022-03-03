@@ -13,7 +13,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+      uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846
       with:
         # We must fetch at least the immediate parents so that if this is
         # a pull request then we can checkout the head.
@@ -26,7 +26,7 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@2b46439dd5477d8a1659811cdc500d35e601a1cb # v1.0.32
+      uses: github/codeql-action/init@75f07e7ab2ee63cba88752d8c696324e4df67466
       # Override language selection by uncommenting this and choosing your languages
       with:
         languages: cpp
@@ -53,4 +53,4 @@ jobs:
         git clean -xdf
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@2b46439dd5477d8a1659811cdc500d35e601a1cb # v1.0.32
+      uses: github/codeql-action/analyze@75f07e7ab2ee63cba88752d8c696324e4df67466
