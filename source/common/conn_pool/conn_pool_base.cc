@@ -478,8 +478,10 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     const bool contributed_to_connecting_stream_capacity = client.currentUnusedCapacity() > 0;
     decrConnectingAndConnectedStreamCapacity(client.currentUnusedCapacity(), client);
     if (client.connect_timer_) {
+      ASSERT(!client.has_handshake_completed_);
       client.connect_timer_->disableTimer();
       client.connect_timer_.reset();
+      client.has_handshake_completed_ = true;
     }
     // Make sure that onStreamClosed won't double count.
     client.remaining_streams_ = 0;
@@ -563,7 +565,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     connecting_stream_capacity_ -= client.currentUnusedCapacity();
     client.connect_timer_->disableTimer();
     client.connect_timer_.reset();
-
+    ASSERT(!client.has_handshake_completed_);
+    client.has_handshake_completed_ = true;
     client.conn_connect_ms_->complete();
     client.conn_connect_ms_.reset();
     if (client.state() == ActiveClient::State::CONNECTING) {
