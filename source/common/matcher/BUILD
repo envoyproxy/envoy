@@ -17,6 +17,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "prefix_map_matcher_lib",
+    hdrs = ["prefix_map_matcher.h"],
+    deps = [
+        "//envoy/matcher:matcher_interface",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "value_input_matcher_lib",
     hdrs = ["value_input_matcher.h"],
     deps = [
@@ -58,6 +67,7 @@ envoy_cc_library(
         ":exact_map_matcher_lib",
         ":field_matcher_lib",
         ":list_matcher_lib",
+        ":prefix_map_matcher_lib",
         ":validation_visitor_lib",
         ":value_input_matcher_lib",
         "//envoy/config:typed_config_interface",
