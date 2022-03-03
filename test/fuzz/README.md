@@ -97,7 +97,7 @@ perform is specified with `-runs`. For example,
 
 ```console
 bazel run //test/common/common:base64_fuzz_test --config asan-fuzzer \
--- test/common/common/base64_corpus -runs=1000
+    -- test/common/common/base64_corpus -runs=1000
 ```
 
 The fuzzer prints information to stderr:
