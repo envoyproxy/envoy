@@ -22,7 +22,7 @@ namespace Expr {
 namespace CustomCel {
 namespace ExtendedRequest {
 
-// variable names for ExtendedRequestWrapper
+// Attribute names for ExtendedRequestWrapper
 constexpr absl::string_view Query = "query";
 
 // ExtendedRequestList: keys, returned by ListKeys for ExtendedRequestWrapper
@@ -30,7 +30,6 @@ const google::api::expr::runtime::ContainerBackedListImpl ExtendedRequestList{{
     CelValue::CreateStringView(Query),
 }};
 
-// ExtendedRequestWrapper extends RequestWrapper
 // ExtendedRequestWrapper contains custom defined keys and all the keys of RequestWrapper.
 class ExtendedRequestWrapper : public RequestWrapper {
 public:

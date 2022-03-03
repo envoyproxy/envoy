@@ -19,7 +19,6 @@ namespace ExtendedRequest {
 
 using ::google::api::expr::runtime::CelMap;
 using google::api::expr::runtime::CelValue;
-using ::google::api::expr::runtime::ContainerBackedListImpl;
 
 // tests for the custom CEL functions in the reference implementation
 

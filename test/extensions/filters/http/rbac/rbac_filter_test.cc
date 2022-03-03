@@ -13,6 +13,7 @@
 #include "test/extensions/filters/http/rbac/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/custom_cel_test_config.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -596,22 +597,6 @@ TEST_F(UpstreamIpPortMatcherTests, EmptyUpstreamConfigPolicyDeny) {
       "and/or `upstream_port_range`");
 }
 
-const std::string CUSTOM_CEL_ATTRIBUTE_EXPR = R"EOF(
-           call_expr:
-             function: contains
-             args:
-             - select_expr:
-                 operand:
-                   select_expr:
-                     operand:
-                       ident_expr:
-                         name: request
-                     field: query
-                 field: key1
-             - const_expr:
-                 string_value: {}
-)EOF";
-
 class CustomCelVocabularyTests : public RoleBasedAccessControlFilterTest {
 public:
   void rbacFilterConfigSetup(const std::string& condition,
@@ -643,9 +628,11 @@ public:
   }
 };
 
+using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::QUERY_EXPR;
+
 TEST_F(CustomCelVocabularyTests, CustomCelVocabularyDeny) {
   // should deny
-  rbacFilterConfigSetup(fmt::format(CUSTOM_CEL_ATTRIBUTE_EXPR, "correct_value"),
+  rbacFilterConfigSetup(fmt::format(std::string(QUERY_EXPR), "correct_value"),
                         envoy::config::rbac::v3::RBAC::DENY);
 
   // Filter iteration should stop since the policy is DENY.
@@ -659,7 +646,7 @@ TEST_F(CustomCelVocabularyTests, CustomCelVocabularyDeny) {
 TEST_F(CustomCelVocabularyTests, CustomCelVocabularyAllow) {
   // should NOT deny
 
-  rbacFilterConfigSetup(fmt::format(CUSTOM_CEL_ATTRIBUTE_EXPR, "something_wrong"),
+  rbacFilterConfigSetup(fmt::format(std::string(QUERY_EXPR), "something_wrong"),
                         envoy::config::rbac::v3::RBAC::DENY);
 
   // Filter iteration should continue since it should NOT deny.

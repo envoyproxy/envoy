@@ -341,3 +341,11 @@ envoy_cc_test_library(
         "//source/common/router:delegating_route_lib",
     ],
 )
+
+envoy_cc_test_library(
+    name = "custom_cel_test_config_lib",
+    hdrs = ["custom_cel_test_config.h"],
+    deps = [
+        "@com_google_absl//absl/strings",
+    ],
+)

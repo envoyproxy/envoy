@@ -10,6 +10,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/custom_cel_test_config.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -469,25 +470,11 @@ TEST(RoleBasedAccessControlEngineImpl, LogIfMatched) {
   checkEngine(engine, true, RBAC::LogResult::No, info, conn, headers);
 }
 
-const std::string CUSTOM_CEL_ATTRIBUTE_EXPR = R"EOF(
-           call_expr:
-             function: contains
-             args:
-             - select_expr:
-                 operand:
-                   select_expr:
-                     operand:
-                       ident_expr:
-                         name: request
-                     field: query
-                 field: key1
-             - const_expr:
-                 string_value: {}
-)EOF";
-
 TEST(RoleBasedAccessControlEngineImpl, CustomCelVocabularyTest) {
   using envoy::extensions::expr::custom_cel_vocabulary::extended_request::v3::
       ExtendedRequestCelVocabularyConfig;
+  using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::
+      QUERY_EXPR;
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/query?key1=correct_value"}};
@@ -505,7 +492,7 @@ TEST(RoleBasedAccessControlEngineImpl, CustomCelVocabularyTest) {
 
   // test 1: should deny
   policy.mutable_condition()->MergeFrom(TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(
-      fmt::format(CUSTOM_CEL_ATTRIBUTE_EXPR, "correct_value")));
+      fmt::format(std::string(QUERY_EXPR), "correct_value")));
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac,
                                                 ProtobufMessage::getStrictValidationVisitor());
@@ -519,7 +506,7 @@ TEST(RoleBasedAccessControlEngineImpl, CustomCelVocabularyTest) {
   // test 2: should NOT deny
   policy.mutable_condition()->Clear();
   policy.mutable_condition()->MergeFrom(TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(
-      fmt::format(CUSTOM_CEL_ATTRIBUTE_EXPR, "something_wrong")));
+      fmt::format(std::string(QUERY_EXPR), "something_wrong")));
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine2(rbac,
                                                  ProtobufMessage::getStrictValidationVisitor());

@@ -5,6 +5,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/custom_cel_test_config.h"
 
 namespace Envoy {
 namespace {
@@ -746,64 +747,56 @@ typed_config:
 
 )EOF";
 
-const std::string CUSTOM_CEL_ATTRIBUTE_EXPR = R"EOF(
-           call_expr:
-             function: contains
-             args:
-             - select_expr:
-                 operand:
-                   select_expr:
-                     operand:
-                       ident_expr:
-                         name: request
-                     field: query
-                 field: key1
-             - const_expr:
-                 string_value: {}
-)EOF";
+using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::COOKIE_EXPR;
+using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::
+    COOKIE_VALUE_EXPR;
+using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::QUERY_EXPR;
+using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::URL_EXPR;
 
-const std::string COOKIE_EXPR = R"EOF(
-            call_expr:
-              function: contains
-              args:
-              - call_expr:
-                  function: _[_]
-                  args:
-                  - call_expr:
-                      function: cookie
-                  - const_expr:
-                      string_value: fruit
-              - const_expr:
-                  string_value: {}
-)EOF";
+class RbacWithCustomCelVocabularyIntegrationTests : public HttpProtocolIntegrationTest {
+public:
+  void ifDenyRuleConditionIsTrueThenDenyTest(Http::TestRequestHeaderMapImpl headers,
+                                             absl::string_view rule_conditional_expr,
+                                             absl::string_view conditional_expr_param_value) {
+    useAccessLog("%RESPONSE_CODE_DETAILS%");
+    config_helper_.prependFilter(
+        fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
+                    fmt::format(std::string(rule_conditional_expr), conditional_expr_param_value)));
+    initialize();
 
-const std::string COOKIE_VALUE_EXPR = R"EOF(
-             call_expr:
-               function: contains
-               args:
-               - call_expr:
-                   function: cookieValue
-                   args:
-                   - const_expr:
-                       string_value: fruit
-               - const_expr:
-                   string_value: {}
-)EOF";
+    codec_client_ = makeHttpConnection(lookupPort("http"));
 
-const std::string URL_EXPR = R"EOF(
-             call_expr:
-               function: contains
-               args:
-               - call_expr:
-                   target:
-                     ident_expr:
-                       name: request
-                   function: url
-               - const_expr:
-                   string_value: {}
-)EOF";
+    auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
-using RbacWithCustomCelVocabularyIntegrationTests = HttpProtocolIntegrationTest;
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("403", response->headers().getStatusValue());
+    // Note the whitespace in the policy id is replaced by '_'.
+    EXPECT_THAT(waitForAccessLog(access_log_name_),
+                testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
+  }
+
+  void ifDenyRuleConditionIsFalseThenAllowTest(Http::TestRequestHeaderMapImpl headers,
+                                               absl::string_view rule_conditional_expr,
+                                               absl::string_view conditional_expr_param_value) {
+    useAccessLog("%RESPONSE_CODE_DETAILS%");
+    config_helper_.prependFilter(
+        fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
+                    fmt::format(std::string(rule_conditional_expr), conditional_expr_param_value)));
+    initialize();
+
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    auto response = codec_client_->makeHeaderOnlyRequest(headers);
+
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+};
 
 INSTANTIATE_TEST_SUITE_P(Protocols, RbacWithCustomCelVocabularyIntegrationTests,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
@@ -811,84 +804,33 @@ INSTANTIATE_TEST_SUITE_P(Protocols, RbacWithCustomCelVocabularyIntegrationTests,
 
 // Custom CEL Vocabulary - DENY if request[query][key1]==correct_value
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, QueryIfMatchDeny) {
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter(
-      fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
-                  fmt::format(CUSTOM_CEL_ATTRIBUTE_EXPR, "correct_value")));
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},     {":path", "/query?key1=correct_value"}, {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"},
   };
-  auto response = codec_client_->makeHeaderOnlyRequest(headers);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("403", response->headers().getStatusValue());
-  // Note the whitespace in the policy id is replaced by '_'.
-  EXPECT_THAT(waitForAccessLog(access_log_name_),
-              testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
+  ifDenyRuleConditionIsTrueThenDenyTest(headers, QUERY_EXPR, "correct_value");
 }
 
 // Custom CEL Vocabulary - ALLOW if request[query][key1]!=correct_value
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, QueryIfNoMatchAllow) {
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter(
-      fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
-                  fmt::format(CUSTOM_CEL_ATTRIBUTE_EXPR, "something_wrong")));
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},     {":path", "/query?key1=correct_value"}, {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"},
   };
-  auto response = codec_client_->makeHeaderOnlyRequest(headers);
-
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  ifDenyRuleConditionIsFalseThenAllowTest(headers, QUERY_EXPR, "something_wrong");
 }
 
 // Custom CEL Vocabulary - DENY if cookie(fruit)==apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfMatchDeny) {
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
-                                           fmt::format(COOKIE_EXPR, "apple")));
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},     {":path", "/query?key1=correct_value"}, {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"},        {"cookie", "fruit=apple"},
   };
-  auto response = codec_client_->makeHeaderOnlyRequest(headers);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("403", response->headers().getStatusValue());
-  // Note the whitespace in the policy id is replaced by '_'.
-  EXPECT_THAT(waitForAccessLog(access_log_name_),
-              testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
+  ifDenyRuleConditionIsTrueThenDenyTest(headers, COOKIE_EXPR, "apple");
 }
 
 // Custom CEL Vocabulary - ALLOW if cookie(fruit)!=apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfNoMatchAllow) {
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
-                                           fmt::format(COOKIE_EXPR, "veg")));
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},
       {":path", "/path"},
@@ -897,25 +839,11 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfNoMatchAllow) {
       {"x-forwarded-for", "10.0.0.1"},
       {"cookie", "fruit=apple"},
   };
-  auto response = codec_client_->makeHeaderOnlyRequest(headers);
-
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  ifDenyRuleConditionIsFalseThenAllowTest(headers, COOKIE_EXPR, "veg");
 }
 
 // Custom CEL Vocabulary - DENY if cookieValue(fruit)==apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfMatchDeny) {
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
-                                           fmt::format(COOKIE_VALUE_EXPR, "apple")));
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},
       {":path", "/path"},
@@ -924,25 +852,11 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfMatchDeny) {
       {"x-forwarded-for", "10.0.0.1"},
       {"cookie", "fruit=apple"},
   };
-  auto response = codec_client_->makeHeaderOnlyRequest(headers);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("403", response->headers().getStatusValue());
-  // Note the whitespace in the policy id is replaced by '_'.
-  EXPECT_THAT(waitForAccessLog(access_log_name_),
-              testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
+  ifDenyRuleConditionIsTrueThenDenyTest(headers, COOKIE_VALUE_EXPR, "apple");
 }
 
 // Custom CEL Vocabulary - ALLOW if cookieValue(fruit)!=apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfNoMatchAllow) {
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
-                                           fmt::format(COOKIE_VALUE_EXPR, "veg")));
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},
       {":path", "/path"},
@@ -951,59 +865,24 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfNoMatchAllow) {
       {"x-forwarded-for", "10.0.0.1"},
       {"cookie", "fruit=apple"},
   };
-  auto response = codec_client_->makeHeaderOnlyRequest(headers);
-
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  ifDenyRuleConditionIsFalseThenAllowTest(headers, COOKIE_VALUE_EXPR, "veg");
 }
 
 // Custom CEL Vocabulary - ALLOW if request.url() contains(correct_path)
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfMatchDeny) {
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
-                                           fmt::format(URL_EXPR, "correct_path")));
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},     {":path", "/correct_path"},      {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"host", "abc.com:1234"},
   };
-  auto response = codec_client_->makeHeaderOnlyRequest(headers);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("403", response->headers().getStatusValue());
-  // Note the whitespace in the policy id is replaced by '_'.
-  EXPECT_THAT(waitForAccessLog(access_log_name_),
-              testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
+  ifDenyRuleConditionIsTrueThenDenyTest(headers, URL_EXPR, "correct_path");
 }
 
 // Custom CEL Vocabulary - ALLOW if request.url() !contains(correct_path)
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfNoMatchAllow) {
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter(fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
-                                           fmt::format(URL_EXPR, "wrong_path")));
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},     {":path", "/correct_path"},      {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"host", "abc.com:1234"}};
-  auto response = codec_client_->makeHeaderOnlyRequest(headers);
-
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  ifDenyRuleConditionIsFalseThenAllowTest(headers, URL_EXPR, "wrong_path");
 }
 
 #endif
