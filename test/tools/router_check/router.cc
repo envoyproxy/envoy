@@ -137,9 +137,9 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
       route_config, Router::OptionalHttpFilters(), *factory_context,
       ProtobufMessage::getNullValidationVisitor(), false);
   if (!disable_deprecation_check) {
-    MessageUtil::checkForUnexpectedFields(route_config,
-                                          ProtobufMessage::getStrictValidationVisitor(),
-                                          &factory_context->runtime_loader_);
+    ProtobufMessage::StrictValidationVisitorImpl visitor;
+    visitor.setRuntime(factory_context->runtime_loader_);
+    MessageUtil::checkForUnexpectedFields(route_config, visitor);
   }
 
   return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
