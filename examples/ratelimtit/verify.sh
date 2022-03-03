@@ -19,8 +19,8 @@ for i in {1..3}; do
         http://localhost:10000
 done
 
-run_log "Sleep 5s to wait rate limiting refresh"
-sleep 5
+run_log "Sleep 2s to wait rate limiting refresh"
+sleep 2
 
 run_log "Test upstream: localhost:10000 without rate limit response two times"
 for i in {1..2}; do
@@ -64,8 +64,8 @@ for i in {1..3}; do
         http://localhost:9902/stats/prometheus
 done
 
-run_log "Sleep 5s to wait rate limiting refresh"
-sleep 5
+run_log "Sleep 2s to wait rate limiting refresh"
+sleep 2
 
 run_log "Test admin interface: localhost:9902/stats/prometheus without rate limit response two times"
 for i in {1..2}; do

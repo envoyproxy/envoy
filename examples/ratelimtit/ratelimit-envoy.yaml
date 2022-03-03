@@ -29,7 +29,7 @@ static_resources:
               token_bucket:
                 max_tokens: 2
                 tokens_per_fill: 2
-                fill_interval: 5s
+                fill_interval: 2s
               filter_enabled:
                 runtime_key: local_rate_limit_enabled
                 default_value:
@@ -76,7 +76,7 @@ static_resources:
               token_bucket:
                 max_tokens: 2
                 tokens_per_fill: 2
-                fill_interval: 5s
+                fill_interval: 2s
               filter_enabled:
                 runtime_key: local_rate_limit_enabled
                 default_value:
