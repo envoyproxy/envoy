@@ -96,8 +96,14 @@ UdpProxyFilter::ClusterInfo::~ClusterInfo() {
   }
   ASSERT(host_to_sessions_.empty());
 
-  for (const auto& access_log : filter_.config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, udp_sess_stats_.value());
+  if(!filter_.config_->accessLogs().empty()){
+
+    udp_sess_stats_.value().addBytesReceived(filter_.config_->stats().downstream_sess_rx_bytes_.value());
+    udp_sess_stats_.value().addBytesSent(filter_.config_->stats().downstream_sess_tx_bytes_.value());
+    
+    for (const auto& access_log : filter_.config_->accessLogs()) {
+      access_log->log(nullptr, nullptr, nullptr, udp_sess_stats_.value());
+    }
   }
 }
 
