@@ -802,6 +802,8 @@ public:
   }
 };
 
+#endif
+
 INSTANTIATE_TEST_SUITE_P(Protocols, RbacWithCustomCelVocabularyIntegrationTests,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
@@ -888,8 +890,6 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfNoMatchAllow) {
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"host", "abc.com:1234"}};
   ifDenyRuleConditionIsFalseThenAllowTest(headers, URL_EXPR, "wrong_path");
 }
-
-#endif
 
 } // namespace
 } // namespace Envoy
