@@ -125,24 +125,24 @@ public:
   void generate(Buffer::Instance& response, const std::string& name,
                 const Stats::ParentHistogram& histogram) override {
     switch (histogram_buckets_mode_) {
-      case Utility::HistogramBucketsMode::NoBuckets:
-        response.addFragments({name, ": ", histogram.quantileSummary(), "\n"});
-        break;
-      case Utility::HistogramBucketsMode::Cumulative:
-        response.addFragments({name, ": ", histogram.bucketSummary(), "\n"});
-        break;
-      case Utility::HistogramBucketsMode::Disjoint:
-        addDisjointBuckets(name, histogram, response);
-        break;
+    case Utility::HistogramBucketsMode::NoBuckets:
+      response.addFragments({name, ": ", histogram.quantileSummary(), "\n"});
+      break;
+    case Utility::HistogramBucketsMode::Cumulative:
+      response.addFragments({name, ": ", histogram.bucketSummary(), "\n"});
+      break;
+    case Utility::HistogramBucketsMode::Disjoint:
+      addDisjointBuckets(name, histogram, response);
+      break;
     }
   }
 
   void render(Buffer::Instance&) override {}
 
- private:
+private:
   // Computes disjoint buckets as text and adds them to the response buffer.
-  void addDisjointBuckets(
-      const std::string& name, const Stats::ParentHistogram& histogram, Buffer::Instance& response) {
+  void addDisjointBuckets(const std::string& name, const Stats::ParentHistogram& histogram,
+                          Buffer::Instance& response) {
     if (!histogram.used()) {
       response.addFragments({name, ": No recorded values\n"});
       return;
@@ -158,8 +158,8 @@ public:
     // Make sure all vectors are the same size.
     ASSERT(disjoint_interval_buckets.size() == disjoint_cumulative_buckets.size());
     ASSERT(disjoint_cumulative_buckets.size() == supported_buckets.size());
-    size_t min_size = std::min({disjoint_interval_buckets.size(), disjoint_cumulative_buckets.size(),
-        supported_buckets.size()});
+    size_t min_size = std::min({disjoint_interval_buckets.size(),
+                                disjoint_cumulative_buckets.size(), supported_buckets.size()});
     std::vector<std::string> bucket_strings;
     bucket_strings.reserve(min_size);
     for (size_t i = 0; i < min_size; ++i) {
@@ -170,7 +170,6 @@ public:
                                            disjoint_interval_buckets[i],
                                            disjoint_cumulative_buckets[i]));
       bucket_summary.push_back(bucket_strings.back());
-
     }
     bucket_summary.push_back("\n");
     response.addFragments(bucket_summary);
@@ -192,10 +191,14 @@ public:
     response.add("{\"stats\":[");
   }
 
+  // Buffers a JSON fragment for a numeric stats, flushing to the response
+  // buffer once we exceed JsonStatsFlushCount stats.
   void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override {
     addScalar(response, name, ValueUtil::numberValue(value));
   }
 
+  // Buffers a JSON fragment for a text-readout stat, flushing to the response
+  // buffer once we exceed JsonStatsFlushCount stats.
   void generate(Buffer::Instance& response, const std::string& name,
                 const std::string& value) override {
     addScalar(response, name, ValueUtil::stringValue(value));
@@ -207,24 +210,28 @@ public:
   //
   // This is counter to the goals of streaming and chunked interfaces, but
   // usually there are far fewer histograms than counters or gauges.
+  //
+  // We can further optimize this by streaming out the histograms object, one
+  // histogram at a time, in case buffering all the histograms in Envoy
+  // buffers up too much memory.
   void generate(Buffer::Instance& response, const std::string& name,
                 const Stats::ParentHistogram& histogram) override {
     switch (histogram_buckets_mode_) {
-      case Utility::HistogramBucketsMode::NoBuckets:
-        bucketSummary(name, histogram);
-        break;
-      case Utility::HistogramBucketsMode::Cumulative:
-        bucketsHelper(name, histogram,
-                      [](const Stats::HistogramStatistics& histogram_statistics) -> UInt64Vec {
-                        return histogram_statistics.computedBuckets();
-                      });
-        break;
-      case Utility::HistogramBucketsMode::Disjoint:
-        bucketsHelper(name, histogram,
-                      [](const Stats::HistogramStatistics& histogram_statistics) -> UInt64Vec {
-                        return histogram_statistics.computeDisjointBuckets();
-                      });
-        break;
+    case Utility::HistogramBucketsMode::NoBuckets:
+      summarizeBuckets(name, histogram);
+      break;
+    case Utility::HistogramBucketsMode::Cumulative:
+      collectBuckets(name, histogram,
+                     [](const Stats::HistogramStatistics& histogram_statistics) -> UInt64Vec {
+                       return histogram_statistics.computedBuckets();
+                     });
+      break;
+    case Utility::HistogramBucketsMode::Disjoint:
+      collectBuckets(name, histogram,
+                     [](const Stats::HistogramStatistics& histogram_statistics) -> UInt64Vec {
+                       return histogram_statistics.computeDisjointBuckets();
+                     });
+      break;
     }
   }
 
@@ -266,6 +273,7 @@ private:
     addJson(response, ValueUtil::structValue(stat_obj));
   }
 
+  // Adds a JSON stat to our buffer, flushing to response every JsonStatsFlushCount stats.
   void addJson(Buffer::Instance& response, ProtobufWkt::Value json) {
     stats_array_.push_back(json);
 
@@ -279,7 +287,7 @@ private:
     }
   }
 
-  // Flushes all scalar stats that were buffered in add() above.
+  // Flushes all stats that were buffered in addJson() above.
   void flushStats(Buffer::Instance& response) {
     ASSERT(!stats_array_.empty());
     const std::string json_array = MessageUtil::getJsonStringFromMessageOrDie(
@@ -307,7 +315,12 @@ private:
     }
   }
 
-  void bucketSummary(const std::string& name, const Stats::ParentHistogram& histogram) {
+  // Summarizes the buckets in the specified histogram, collecting JSON objects.
+  // Note, we do not flush this buffer to the network when it grows large, and
+  // if this becomes an issue it should be possible to do, noting that we are
+  // one or two levels nesting below the list of scalar stats due to the Envoy
+  // stats json schema, where histograms are grouped together.
+  void summarizeBuckets(const std::string& name, const Stats::ParentHistogram& histogram) {
     if (!found_used_histogram_) {
       auto* histograms_obj_fields = histograms_obj_.mutable_fields();
 
@@ -344,9 +357,10 @@ private:
     histogram_array_.push_back(ValueUtil::structValue(computed_quantile));
   }
 
-  void bucketsHelper(
-      const std::string& name, const Stats::ParentHistogram& histogram,
-      std::function<UInt64Vec(const Stats::HistogramStatistics&)> buckets_fn) {
+  // Collects the buckets from the specified histogram, using either the cumulative
+  // or disjoint views, as controlled by buckets_fn.
+  void collectBuckets(const std::string& name, const Stats::ParentHistogram& histogram,
+                      std::function<UInt64Vec(const Stats::HistogramStatistics&)> buckets_fn) {
     const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
     Stats::ConstSupportedBuckets& supported_buckets = interval_statistics.supportedBuckets();
     UInt64Vec interval_buckets = buckets_fn(interval_statistics);
@@ -356,7 +370,7 @@ private:
     ASSERT(interval_buckets.size() == cumulative_buckets.size());
     ASSERT(cumulative_buckets.size() == supported_buckets.size());
     size_t min_size =
-      std::min({interval_buckets.size(), cumulative_buckets.size(), supported_buckets.size()});
+        std::min({interval_buckets.size(), cumulative_buckets.size(), supported_buckets.size()});
 
     ProtobufWkt::Struct histogram_obj;
     auto* histogram_obj_fields = histogram_obj.mutable_fields();
@@ -374,7 +388,7 @@ private:
       bucket_array.push_back(ValueUtil::structValue(bucket));
     }
     (*histogram_obj_fields)["buckets"] = ValueUtil::listValue(bucket_array);
-    //addJson(response, ValueUtil::structValue(histogram_obj));
+    // addJson(response, ValueUtil::structValue(histogram_obj));
     histogram_array_.push_back(ValueUtil::structValue(histogram_obj));
   }
 
