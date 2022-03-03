@@ -3,7 +3,8 @@
 set -e
 
 readonly DEFAULT_VALIDITY_DAYS=${DEFAULT_VALIDITY_DAYS:-730}
-readonly HERE=$(cd "$(dirname "$0")" && pwd)
+readonly HERE
+HERE=$(cd "$(dirname "$0")" && pwd)
 
 cd "$HERE" || exit 1
 trap cleanup EXIT
