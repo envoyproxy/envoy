@@ -86,8 +86,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       ssl_versions_(stat_name_set_->add("ssl.versions")),
       ssl_curves_(stat_name_set_->add("ssl.curves")),
       ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")), capabilities_(config.capabilities()),
-      tls_keylog_local_(config.tlsKeyLogLocal()),
-      tls_keylog_remote_(config.tlsKeyLogRemote()), access_log_{nullptr} {
+      tls_keylog_local_(config.tlsKeyLogLocal()), tls_keylog_remote_(config.tlsKeyLogRemote()) {
 
   auto cert_validator_name = getCertValidatorName(config.certificateValidationContext());
   auto cert_validator_factory =
@@ -343,7 +342,11 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     ENVOY_LOG(debug, "Enable tls key log");
     access_log_ = config.accessLogManager().createAccessLog(
         Filesystem::FilePathAndType{Filesystem::DestinationType::File, config.tlsKeyLogPath()});
-    enableTlsKeyLog();
+    for (auto& context : tls_contexts_) {
+      SSL_CTX* ctx = context.ssl_ctx_.get();
+      ASSERT(ctx != nullptr);
+      SSL_CTX_set_keylog_callback(ctx, keylogCallback);
+    }
   }
 }
 
@@ -366,14 +369,6 @@ int sslSocketIndex() {
     RELEASE_ASSERT(ssl_socket_index >= 0, "");
     return ssl_socket_index;
   }());
-}
-
-void ContextImpl::enableTlsKeyLog(void) {
-  for (auto& context : tls_contexts_) {
-    SSL_CTX* ctx = context.ssl_ctx_.get();
-    ASSERT(ctx != nullptr);
-    SSL_CTX_set_keylog_callback(ctx, keylogCallback);
-  }
 }
 
 int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned char* outlen,

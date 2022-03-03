@@ -72,7 +72,7 @@ using TlsKeyLogDataPtr = std::unique_ptr<TlsKeyLogData>;
 int sslSocketIndex();
 
 class ContextImpl : public virtual Envoy::Ssl::Context,
-                    protected Logger::Loggable<Logger::Id::connection> {
+                    protected Logger::Loggable<Logger::Id::config> {
 public:
   virtual bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptions* options);
 
@@ -103,8 +103,6 @@ public:
   const Network::Address::IpList& tlsKeyLogLocal() const override { return tls_keylog_local_; };
   const Network::Address::IpList& tlsKeyLogRemote() const override { return tls_keylog_remote_; };
   const AccessLog::AccessLogFileSharedPtr tlsKeyLogFile() const { return access_log_; };
-  void enableTlsKeyLog();
-
   static void keylogCallback(const SSL* ssl, const char* line);
 
 protected:

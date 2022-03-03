@@ -87,11 +87,15 @@ public:
       return *this;
     }
 
-    ServerSslOptions& setTlsKeyLogFilter(bool local, bool remote, bool negative,
-                                         Network::Address::IpVersion version) {
+    ServerSslOptions& setTlsKeyLogFilter(bool local, bool remote, bool local_negative,
+                                         bool remote_negative, std::string log_path,
+                                         bool multiple_ips, Network::Address::IpVersion version) {
       keylog_local_filter_ = local;
       keylog_remote_filter_ = remote;
-      keylog_negative_ = negative;
+      keylog_local_negative_ = local_negative;
+      keylog_remote_negative_ = remote_negative;
+      keylog_path_ = log_path;
+      keylog_multiple_ips_ = multiple_ips;
       ip_version_ = version;
       return *this;
     }
@@ -107,7 +111,10 @@ public:
     bool expect_client_ecdsa_cert_{false};
     bool keylog_local_filter_{false};
     bool keylog_remote_filter_{false};
-    bool keylog_negative_{false};
+    bool keylog_local_negative_{false};
+    bool keylog_remote_negative_{false};
+    bool keylog_multiple_ips_{false};
+    std::string keylog_path_;
     Network::Address::IpVersion ip_version_{Network::Address::IpVersion::v4};
     std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
         san_matchers_{};
@@ -127,8 +134,7 @@ public:
 
   static void initializeTlsKeyLog(
       envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
-      bool keylog_local_filter, bool keylog_remote_filter, bool keylog_negative_,
-      Network::Address::IpVersion version);
+      const ServerSslOptions& options);
   using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v3::Bootstrap&)>;
   using HttpModifierFunction = std::function<void(HttpConnectionManager&)>;
 
