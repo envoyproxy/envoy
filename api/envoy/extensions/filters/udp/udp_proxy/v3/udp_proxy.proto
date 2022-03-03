@@ -92,6 +92,5 @@ message UdpProxyConfig {
 
   // Configuration for :ref:`access logs <arch_overview_access_logs>`
   // emitted by the this udp_proxy.
-  // repeated config.accesslog.v3.AccessLog access_log = 8;
-  repeated string access_log = 8;
+  repeated config.accesslog.v3.AccessLog access_log = 8;
 }
