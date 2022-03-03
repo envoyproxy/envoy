@@ -1732,6 +1732,25 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RecurseIntoAny)) {
       checkForDeprecation(discovery_response_config, true));
 }
 
+// Make sure recursing into an typed struct fails if the type url is invalid. This will not be
+// caught during initial load.
+TEST_F(DeprecatedFieldsTest, RecurseIntoAnyInvalidTypedStruct) {
+  envoy::service::discovery::v3::DiscoveryResponse discovery_response_config;
+  TestUtility::loadFromFile(
+      TestEnvironment::runfilesPath(
+          "test/tools/schema_validator/test/config/lds_invalid_typed_struct.yaml"),
+      discovery_response_config, *api_);
+  EXPECT_THROW_WITH_MESSAGE(checkForDeprecation(discovery_response_config, true), EnvoyException,
+                            "Invalid type_url 'blah' during traversal");
+
+  TestUtility::loadFromFile(
+      TestEnvironment::runfilesPath(
+          "test/tools/schema_validator/test/config/lds_invalid_typed_struct_2.yaml"),
+      discovery_response_config, *api_);
+  EXPECT_THROW_WITH_MESSAGE(checkForDeprecation(discovery_response_config, true), EnvoyException,
+                            "Invalid type_url 'bleh' during traversal");
+}
+
 TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecatedEmitsCrash) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");

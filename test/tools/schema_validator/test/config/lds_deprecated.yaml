@@ -11,16 +11,18 @@ resources:
     filters:
     - name: envoy.filters.network.http_connection_manager
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-        stat_prefix: ingress_http
-        use_remote_address: true
-        rds:
-          route_config_name: ingress_http
-          config_source:
-            resource_api_version: V3
-            path_config_source:
-              path: /config_map/rds/rds.yaml
-              watched_directory:
-                path: /config_map/rds
-        http_filters:
-        - name: envoy.filters.http.router
+        "@type": type.googleapis.com/xds.type.v3.TypedStruct
+        type_url: type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+        value:
+          stat_prefix: ingress_http
+          use_remote_address: true
+          rds:
+            route_config_name: ingress_http
+            config_source:
+              resource_api_version: V3
+              path_config_source:
+                path: /config_map/rds/rds.yaml
+                watched_directory:
+                  path: /config_map/rds
+          http_filters:
+          - name: envoy.filters.http.router
