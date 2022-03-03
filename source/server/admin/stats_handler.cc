@@ -214,7 +214,7 @@ public:
   // We can further optimize this by streaming out the histograms object, one
   // histogram at a time, in case buffering all the histograms in Envoy
   // buffers up too much memory.
-  void generate(Buffer::Instance& response, const std::string& name,
+  void generate(Buffer::Instance&, const std::string& name,
                 const Stats::ParentHistogram& histogram) override {
     switch (histogram_buckets_mode_) {
     case Utility::HistogramBucketsMode::NoBuckets:

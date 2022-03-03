@@ -58,24 +58,6 @@ public:
 
 private:
   friend class StatsHandlerTest;
-
-  static std::string computeDisjointBucketSummary(const Stats::ParentHistogram& histogram);
-
-  static void statsAsJsonQuantileSummaryHelper(
-      Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
-      const std::vector<Stats::ParentHistogram&>& all_histograms, bool used_only,
-      const absl::optional<std::regex>& regex);
-
-  static void statsAsJsonHistogramBucketsHelper(
-      Protobuf::Map<std::string, ProtobufWkt::Value>& histograms_obj_container_fields,
-      const std::vector<Stats::ParentHistogram&>& all_histograms, bool used_only,
-      const absl::optional<std::regex>& regex,
-      std::function<std::vector<uint64_t>(const Stats::HistogramStatistics&)> computed_buckets);
-
-  static ProtobufWkt::Value statsAsJsonHistogramBucketsCreateHistogramElementHelper(
-      Stats::ConstSupportedBuckets& supported_buckets,
-      const std::vector<uint64_t>& interval_buckets,
-      const std::vector<uint64_t>& cumulative_buckets, const std::string& name);
 };
 
 } // namespace Server
