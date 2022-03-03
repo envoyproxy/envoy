@@ -13,10 +13,11 @@ public:
   ~MockConfigValidator() override;
 
   MOCK_METHOD(void, validate,
-              (const Server::Instance & server, const std::vector<DecodedResourcePtr>& resources));
+              (const Server::Instance& server, const std::vector<DecodedResourcePtr>& resources));
 
   MOCK_METHOD(void, validate,
-              (const Server::Instance & server, const std::vector<DecodedResourcePtr>& added_resources,
+              (const Server::Instance& server,
+               const std::vector<DecodedResourcePtr>& added_resources,
                const Protobuf::RepeatedPtrField<std::string>& removed_resources));
 };
 

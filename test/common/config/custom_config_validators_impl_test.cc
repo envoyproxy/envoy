@@ -15,7 +15,8 @@ public:
   FakeConfigValidator(bool should_reject) : should_reject_(should_reject) {}
 
   // ConfigValidator
-  void validate(const Server::Instance&, const std::vector<Envoy::Config::DecodedResourcePtr>&) override {
+  void validate(const Server::Instance&,
+                const std::vector<Envoy::Config::DecodedResourcePtr>&) override {
     if (should_reject_) {
       throw EnvoyException("Emulating fake action throw exception (SotW)");
     }
@@ -46,8 +47,8 @@ public:
   }
 
   std::string name() const override {
-    return absl::StrCat(category(), absl::StrCat(".fake_config_validator_",
-                                                 should_reject_ ? "reject" : "accept"));
+    return absl::StrCat(
+        category(), absl::StrCat(".fake_config_validator_", should_reject_ ? "reject" : "accept"));
   }
 
   std::string typeUrl() const override {
@@ -60,8 +61,7 @@ public:
 class CustomConfigValidatorsImplTest : public testing::Test {
 public:
   CustomConfigValidatorsImplTest()
-      : factory_accept_(false), factory_reject_(true),
-        register_factory_accept_(factory_accept_),
+      : factory_accept_(false), factory_reject_(true), register_factory_accept_(factory_accept_),
         register_factory_reject_(factory_reject_) {}
 
   static envoy::config::core::v3::TypedExtensionConfig parseConfig(const std::string& config) {

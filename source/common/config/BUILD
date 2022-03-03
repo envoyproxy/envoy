@@ -327,6 +327,7 @@ envoy_cc_library(
         ":xds_resource_lib",
         "//envoy/config:subscription_factory_interface",
         "//envoy/config:subscription_interface",
+        "//envoy/server:instance_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config/xds_mux:grpc_mux_lib",
@@ -455,6 +456,7 @@ envoy_cc_library(
         ":custom_config_validators_interface",
         ":opaque_resource_decoder_lib",
         ":resource_name_lib",
+        "//envoy/server:instance_interface",
         "//source/common/config:utility_lib",
     ],
 )

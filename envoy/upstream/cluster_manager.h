@@ -36,12 +36,6 @@
 #include "absl/container/node_hash_map.h"
 
 namespace Envoy {
-
-// Forward declaration.
-namespace Server {
-class Instance;
-} // namespace Server
-
 namespace Upstream {
 
 /**

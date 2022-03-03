@@ -28,7 +28,8 @@ void MinimumClustersValidator::validate(
 }
 
 void MinimumClustersValidator::validate(
-    const Server::Instance& server, const std::vector<Envoy::Config::DecodedResourcePtr>& added_resources,
+    const Server::Instance& server,
+    const std::vector<Envoy::Config::DecodedResourcePtr>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
   const Upstream::ClusterManager& cm = server.clusterManager();
   // If the number of clusters after removing all of the clusters in the removed_resources list is
