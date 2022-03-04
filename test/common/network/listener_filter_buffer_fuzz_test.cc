@@ -78,7 +78,7 @@ public:
       }
       case test::common::network::Action::kDrain: {
         // The drain method only support drain size less than the buffer size.
-        auto drain_size = std::min(input.actions(i).drain(), listener_buffer->length());
+        auto drain_size = std::min(input.actions(i).drain(), listener_buffer->rawSlice().len_);
         if (drain_size != 0) {
           EXPECT_CALL(io_handle_, recv).WillOnce([&](void* buffer, size_t length, int flags) {
             EXPECT_EQ(0, flags);

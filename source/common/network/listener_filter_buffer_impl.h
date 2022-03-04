@@ -35,7 +35,6 @@ public:
   // ListenerFilterBuffer
   const Buffer::ConstRawSlice rawSlice() const override;
   void drain(uint64_t length) override;
-  uint64_t length() const override { return data_size_; }
 
   /**
    * Trigger the data peek from the socket.

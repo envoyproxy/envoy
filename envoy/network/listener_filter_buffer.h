@@ -26,12 +26,6 @@ public:
    * @param length the length of data to drain.
    */
   virtual void drain(uint64_t length) PURE;
-
-  /**
-   * Return the length of data in the buffer
-   * @return length The length of data in the buffer.
-   */
-  virtual uint64_t length() const PURE;
 };
 
 } // namespace Network
