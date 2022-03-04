@@ -71,6 +71,7 @@ public:
 
 private:
   void setAlternativesImpl(const Origin& origin, std::vector<AlternateProtocol>& protocols);
+  void setSrttImpl(const Origin& origin, std::chrono::microseconds srtt);
   // Time source used to check expiration of entries.
   TimeSource& time_source_;
 
