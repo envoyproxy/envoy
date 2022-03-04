@@ -14,6 +14,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["simple_http_cache.cc"],
     hdrs = ["simple_http_cache.h"],
+    external_deps = ["simple_lru_cache_lib"],
     deps = [
         "//envoy/registry",
         "//envoy/runtime:runtime_interface",

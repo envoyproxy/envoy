@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.cache.simple_http_cache.v3;
 
+import "google/protobuf/wrappers.proto";
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.cache.simple_http_cache.v3";
@@ -14,4 +15,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#extension: envoy.cache.simple_http_cache]
 message SimpleHttpCacheConfig {
+  // The maximum size of the cache to the specified number of bytes.
+  // When the cache is full, entries will be evicted following LRU. If not set
+  // defaults to 100 MiB.
+  google.protobuf.UInt64Value approximated_max_size = 1;
 }

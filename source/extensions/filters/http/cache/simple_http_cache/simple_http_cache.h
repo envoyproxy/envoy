@@ -6,9 +6,15 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
+#include "simple_lru_cache/simple_lru_cache_inl.h"
 
 // included to make code_format happy
 #include "envoy/extensions/cache/simple_http_cache/v3/config.pb.h"
+
+using ::google::simple_lru_cache::SimpleLRUCache;
+
+// The default maximum size of the cache is 100MiB
+constexpr uint64_t kSimpleHttpCacheDefaultSize = 100 * 1024 * 1024;
 
 namespace Envoy {
 namespace Extensions {
@@ -17,12 +23,22 @@ namespace Cache {
 
 // Example cache backend that never evicts. Not suitable for production use.
 class SimpleHttpCache : public HttpCache {
+
 private:
   struct Entry {
     Http::ResponseHeaderMapPtr response_headers_;
     ResponseMetadata metadata_;
     std::string body_;
     Http::ResponseTrailerMapPtr trailers_;
+
+    // @return uint64_t calculates an approximated size (in bytes) by only
+    // measuring the bytes in the {header, body, trailers}. This does not account
+    // for data structures.
+    uint64_t byteSize() {
+      uint64_t headers_size = response_headers_ != nullptr ? response_headers_->byteSize() : 0;
+      uint64_t trailers_size = trailers_ != nullptr ? trailers_->byteSize() : 0;
+      return headers_size + sizeof(metadata_) + body_.size() + trailers_size;
+    }
   };
 
   // Looks for a response that has been varied. Only called from lookup.
@@ -35,8 +51,12 @@ private:
   // https://www.ietf.org/archive/id/draft-ietf-httpbis-cache-18.html s3.2
   static const absl::flat_hash_set<Http::LowerCaseString> headersNotToUpdate();
 
+  typedef SimpleLRUCache<Key, Entry, MessageUtil, MessageUtil> LRUCache;
+
 public:
   // HttpCache
+  SimpleHttpCache() { lru_cache_ = std::make_unique<LRUCache>(kSimpleHttpCacheDefaultSize); }
+
   LookupContextPtr makeLookupContext(LookupRequest&& request,
                                      Http::StreamDecoderFilterCallbacks& callbacks) override;
   InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context,
@@ -57,8 +77,12 @@ public:
                   const Http::RequestHeaderMap& request_headers,
                   const VaryAllowList& vary_allow_list, Http::ResponseTrailerMapPtr&& trailers);
 
+  // Change the maximum size of the cache to the specified number of bytes.
+  // If necessary, entries will be evicted to comply with the new size.
+  void setMaxSize(uint64_t bytes);
+
   absl::Mutex mutex_;
-  absl::flat_hash_map<Key, Entry, MessageUtil, MessageUtil> map_ ABSL_GUARDED_BY(mutex_);
+  std::unique_ptr<LRUCache> lru_cache_ ABSL_GUARDED_BY(mutex_);
 };
 
 } // namespace Cache
