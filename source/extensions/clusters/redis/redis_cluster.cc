@@ -342,8 +342,8 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
       parent_.dns_resolver_->resolve(
           slot.primary_hostname_, parent_.dns_lookup_family_,
           [this, slot_idx, slots,
-           &hostname_resolution_required_cnt](Network::DnsResolver::ResolutionStatus status,
-                                              std::list<Network::DnsResponse>&& response) -> void {
+           hostname_resolution_required_cnt](Network::DnsResolver::ResolutionStatus status,
+                                             std::list<Network::DnsResponse>&& response) -> void {
             auto& slot = (*slots)[slot_idx];
             ENVOY_LOG(debug, "async DNS resolution complete for {}", slot.primary_hostname_);
             updateDnsStats(status, response.empty());
@@ -401,8 +401,8 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
     parent_.dns_resolver_->resolve(
         replica.first, parent_.dns_lookup_family_,
         [this, index, slots, replica_idx,
-         &hostname_resolution_required_cnt](Network::DnsResolver::ResolutionStatus status,
-                                            std::list<Network::DnsResponse>&& response) -> void {
+         hostname_resolution_required_cnt](Network::DnsResolver::ResolutionStatus status,
+                                           std::list<Network::DnsResponse>&& response) -> void {
           auto& slot = (*slots)[index];
           auto& replica = slot.replicas_to_resolve_[replica_idx];
           ENVOY_LOG(debug, "async DNS resolution complete for {}", replica.first);
