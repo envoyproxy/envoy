@@ -23,27 +23,32 @@ using google::api::expr::runtime::ContainerBackedListImpl;
 
 class UtilityTests : public testing::Test {};
 
-TEST_F(UtilityTests, AppendListTest) {
+TEST_F(UtilityTests, MergeListsTest) {
   Protobuf::Arena arena;
-  ContainerBackedListImpl list1{{
+  ContainerBackedListImpl list{{
       CelValue::CreateStringView("foo"),
-  }};
-  ContainerBackedListImpl list2{{
       CelValue::CreateStringView("bar"),
   }};
 
-  CelList* list3 = appendList(arena, &list1, &list2);
-  EXPECT_EQ(list1.size() + list2.size(), list3->size());
+  // merge a list with itself
+  CelList* merged_list = mergeLists(arena, &list, &list);
+  // size of merged list should be equivalent to size of list
+  EXPECT_EQ(list.size(), merged_list->size());
 
-  for (int i = 0; i < list1.size(); i++) {
-    auto list1_val = list1[i].StringOrDie().value();
-    auto list3_val = (*list3)[i].StringOrDie().value();
-    EXPECT_EQ(list1_val, list3_val);
+  auto cel_value_comparator = [](CelValue a, CelValue b) {
+    return a.StringOrDie().value() < b.StringOrDie().value();
+  };
+
+  // add merged list to a set and check that every value of list
+  // is in the merged list set
+  std::set<CelValue, decltype(cel_value_comparator)> merged_list_set(cel_value_comparator);
+  for (int i = 0; i < merged_list->size(); i++) {
+    const auto& val = (*merged_list)[i];
+    merged_list_set.emplace(val);
   }
-  for (int j = 0; j < list2.size(); j++) {
-    auto list2_val = list2[j].StringOrDie().value();
-    auto list3_val = (*list3)[list1.size() + j].StringOrDie().value();
-    EXPECT_EQ(list2_val, list3_val);
+  for (int i = 0; i < list.size(); i++) {
+    int count = merged_list_set.count(list[i]);
+    EXPECT_TRUE(count == 1);
   }
 }
 

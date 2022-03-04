@@ -23,6 +23,7 @@ envoy_cc_test(
         "//source/common/protobuf:message_validator_lib",
         "//source/extensions/filters/common/expr/custom_cel:custom_cel_vocabulary_lib",
         "//source/extensions/filters/common/expr/custom_cel/extended_request:extended_request_cel_vocabulary_lib",
+        "//source/extensions/filters/common/expr/custom_cel/extended_request/utility:utility_lib",
         "//test/config:utility_lib",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",

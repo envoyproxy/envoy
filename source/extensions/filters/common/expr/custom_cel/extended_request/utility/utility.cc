@@ -22,16 +22,26 @@ using google::api::expr::runtime::ContainerBackedListImpl;
 
 template <typename M> CelValue createCelMapImpl(Protobuf::Arena& arena, M& map);
 
-CelList* appendList(Protobuf::Arena& arena, const CelList* list1, const CelList* list2) {
-  std::vector<CelValue> keys;
-  keys.reserve(list1->size() + list2->size());
+CelList* mergeLists(Protobuf::Arena& arena, const CelList* list1, const CelList* list2) {
+  auto cel_value_comparator = [](CelValue a, CelValue b) {
+    return a.StringOrDie().value() < b.StringOrDie().value();
+  };
+  std::set<CelValue, decltype(cel_value_comparator)> keys_set(cel_value_comparator);
+  // add both list contents to a set to remove duplicates
   for (int i = 0; i < list1->size(); ++i) {
-    keys.push_back(((*list1)[i]));
+    const auto& val = (*list1)[i];
+    keys_set.emplace(val);
   }
   for (int i = 0; i < list2->size(); i++) {
-    keys.push_back(((*list2)[i]));
+    const auto& val = (*list2)[i];
+    keys_set.emplace(val);
   }
-  return Protobuf::Arena::Create<ContainerBackedListImpl>(&arena, keys);
+  std::vector<CelValue> keys_vector;
+  keys_vector.reserve(keys_set.size());
+  // copy set to vector
+  keys_vector.assign(keys_set.begin(), keys_set.end());
+  // create CelList on arena
+  return Protobuf::Arena::Create<ContainerBackedListImpl>(&arena, keys_vector);
 }
 
 CelValue createCelMap(Protobuf::Arena& arena, absl::flat_hash_map<std::string, std::string> map) {

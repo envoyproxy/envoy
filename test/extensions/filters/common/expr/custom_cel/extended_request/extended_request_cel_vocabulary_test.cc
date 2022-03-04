@@ -130,8 +130,7 @@ TEST_F(ExtendedRequestCelVocabularyTests, FillActivationWithNullRequestHeadersTe
   }
 }
 
-const std::string PATH_QUERY_STR =
-  R"EOF(/query?a=apple&a=apricot&b=banana&=&c=cranberry)EOF";
+const std::string PATH_QUERY_STR = R"EOF(/query?a=apple&a=apricot&b=banana&=&c=cranberry)EOF";
 
 // request[query][a].contains(apple)
 const std::string REQUEST_HAS_QUERY_AS_MAP_EXPR = R"EOF(
@@ -175,8 +174,7 @@ evaluateExpressionWithCustomCelVocabulary(Activation& activation, Protobuf::Aren
 TEST_F(ExtendedRequestCelVocabularyTests,
        ReplaceDefaultMappingsWithCustomMappingsInActivationTest) {
   ExtendedRequestCelVocabulary custom_cel_vocabulary(true);
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":path", PATH_QUERY_STR}};
+  Http::TestRequestHeaderMapImpl request_headers{{":path", PATH_QUERY_STR}};
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   Protobuf::Arena arena;
   Activation activation;
@@ -197,7 +195,8 @@ TEST_F(ExtendedRequestCelVocabularyTests,
   // Evaluation of the expression with custom vocabulary should work.
   custom_field_evalation_result = evaluateExpressionWithCustomCelVocabulary(
       activation, arena, REQUEST_HAS_QUERY_AS_MAP_EXPR, custom_cel_vocabulary);
-  EXPECT_TRUE(custom_field_evalation_result->IsBool() && custom_field_evalation_result->BoolOrDie());
+  EXPECT_TRUE(custom_field_evalation_result->IsBool() &&
+              custom_field_evalation_result->BoolOrDie());
 }
 
 TEST_F(ExtendedRequestCelVocabularyTests, AddCustomMappingsToActivationTwiceTest) {

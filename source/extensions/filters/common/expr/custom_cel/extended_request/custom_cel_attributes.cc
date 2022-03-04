@@ -25,18 +25,16 @@ absl::optional<CelValue> ExtendedRequestWrapper::operator[](CelValue key) const 
   }
   auto value = key.StringOrDie().value();
   if (value == Query) {
+    // return base class value
+    if (!return_url_query_string_as_map_) {
+      return RequestWrapper::operator[](key);
+    }
     absl::string_view path = request_header_map_->getPathValue();
+    // path is empty; return error
     if (path == nullptr) {
       return CreateErrorValue(&arena_, "request.query path missing", absl::StatusCode::kNotFound);
     }
-    size_t query_offset = path.find('?');
-    if (query_offset == absl::string_view::npos) {
-      return {};
-    }
-    absl::string_view query = path.substr(query_offset + 1);
-    if (!return_url_query_string_as_map_) {
-      return CelValue::CreateString(Protobuf::Arena::Create<std::string>(&arena_, query));
-    }
+    // return a map, even if the query is an empty string
     return getMapFromQueryStr(path);
   }
   return RequestWrapper::operator[](key);
@@ -44,6 +42,7 @@ absl::optional<CelValue> ExtendedRequestWrapper::operator[](CelValue key) const 
 
 // getMapFromQueryStr
 // converts QueryParams (std::map) to CelMap
+// can take an empty string
 absl::optional<CelValue> ExtendedRequestWrapper::getMapFromQueryStr(absl::string_view url) const {
   QueryParams query_params = parseAndDecodeQueryString(url);
   return Utility::createCelMap(arena_, query_params);

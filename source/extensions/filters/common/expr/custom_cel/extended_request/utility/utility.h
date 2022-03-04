@@ -16,9 +16,10 @@ namespace CustomCel {
 namespace ExtendedRequest {
 namespace Utility {
 
-// appendList: Appends one CelList to another.
-// Memory is allocated for it on the arena.
-google::api::expr::runtime::CelList* appendList(Protobuf::Arena& arena,
+// mergeLists: Merges two CelLists and removes duplicates.
+// Order isn't preserved.
+// Memory is allocated for the list on the arena.
+google::api::expr::runtime::CelList* mergeLists(Protobuf::Arena& arena,
                                                 const google::api::expr::runtime::CelList* list1,
                                                 const google::api::expr::runtime::CelList* list2);
 

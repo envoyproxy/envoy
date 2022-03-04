@@ -38,7 +38,7 @@ public:
       : RequestWrapper(arena, headers, info), arena_(arena),
         return_url_query_string_as_map_(return_url_query_string_as_map),
         request_header_map_(headers) {
-    keys_ = Utility::appendList(arena_, RequestWrapper::ListKeys(), &ExtendedRequestList);
+    keys_ = Utility::mergeLists(arena_, RequestWrapper::ListKeys(), &ExtendedRequestList);
   }
   absl::optional<google::api::expr::runtime::CelValue>
   operator[](google::api::expr::runtime::CelValue key) const override;
