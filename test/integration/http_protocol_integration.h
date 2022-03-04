@@ -6,11 +6,17 @@
 
 namespace Envoy {
 
+enum Http2Implementation {
+  kBareHttp2,
+  kWrappedHttp2,
+  kOgHttp2
+};
+
 struct HttpProtocolTestParams {
   Network::Address::IpVersion version;
   Http::CodecType downstream_protocol;
   Http::CodecType upstream_protocol;
-  bool http2_new_codec_wrapper;
+  Http2Implementation http2_new_codec_wrapper;
 };
 
 // Allows easy testing of Envoy code for HTTP/HTTP2 upstream/downstream.
@@ -54,8 +60,24 @@ public:
             GetParam().downstream_protocol, GetParam().version,
             ConfigHelper::httpProxyConfig(/*downstream_is_quic=*/GetParam().downstream_protocol ==
                                           Http::CodecType::HTTP3)) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
-                                      GetParam().http2_new_codec_wrapper ? "true" : "false");
+    switch (GetParam().http2_new_codec_wrapper) {
+      case kBareHttp2:
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                          "false");
+        break;
+      case kWrappedHttp2:
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                          "true");
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2",
+                                          "false");
+        break;
+      case kOgHttp2:
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                          "true");
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2",
+                                          "true");
+        break;
+    }
   }
 
   void SetUp() override {

@@ -13,11 +13,13 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
       for (auto upstream_protocol : upstream_protocols) {
 #ifdef ENVOY_ENABLE_QUIC
         ret.push_back(
-            HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, false});
+            HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, kBareHttp2});
         if (downstream_protocol == Http::CodecType::HTTP2 ||
             upstream_protocol == Http::CodecType::HTTP2) {
           ret.push_back(
-              HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, true});
+              HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, kWrappedHttp2});
+          ret.push_back(
+              HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, kOgHttp2});
         }
 #else
         if (downstream_protocol == Http::CodecType::HTTP3 ||
@@ -25,11 +27,13 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
           ENVOY_LOG_MISC(warn, "Skipping HTTP/3 as support is compiled out");
         } else {
           ret.push_back(
-              HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, false});
+              HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, kBareHttp2});
           if (downstream_protocol == Http::CodecType::HTTP2 ||
               upstream_protocol == Http::CodecType::HTTP2) {
             ret.push_back(
-                HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, true});
+                HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, kWrappedHttp2});
+            ret.push_back(
+                HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, kOgHttp2});
           }
         }
 #endif
@@ -63,12 +67,24 @@ absl::string_view downstreamToString(Http::CodecType type) {
   return "UnknownDownstream";
 }
 
+absl::string_view implementationToString(Http2Implementation impl) {
+  switch (impl) {
+    case kBareHttp2:
+      return "BareHttp2";
+    case kWrappedHttp2:
+      return "WrappedHttp2";
+    case kOgHttp2:
+      return "OgHttp2";
+  }
+  return "UnknownHttp2Impl";
+}
+
 std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
     const ::testing::TestParamInfo<HttpProtocolTestParams>& params) {
   return absl::StrCat((params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
                       downstreamToString(params.param.downstream_protocol),
                       upstreamToString(params.param.upstream_protocol),
-                      params.param.http2_new_codec_wrapper ? "WrappedHttp2" : "BareHttp2");
+                      implementationToString(params.param.http2_new_codec_wrapper));
 }
 
 void HttpProtocolIntegrationTest::expectUpstreamBytesSentAndReceived(

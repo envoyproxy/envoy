@@ -48,8 +48,14 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+enum Http2Implementation {
+  kBareHttp2,
+  kWrappedHttp2,
+  kOgHttp2,
+};
+
 using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
-using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool>;
+using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, Http2Implementation>;
 namespace CommonUtility = ::Envoy::Http2::Utility;
 
 class Http2CodecImplTestFixture {
@@ -101,7 +107,7 @@ public:
 
   Http2CodecImplTestFixture() = default;
   Http2CodecImplTestFixture(Http2SettingsTuple client_settings, Http2SettingsTuple server_settings,
-                            bool enable_new_codec_wrapper)
+                            Http2Implementation enable_new_codec_wrapper)
       : client_settings_(client_settings), server_settings_(server_settings),
         enable_new_codec_wrapper_(enable_new_codec_wrapper) {
     // Make sure we explicitly test for stream flush timer creation.
@@ -135,9 +141,25 @@ public:
   }
 
   virtual void initialize() {
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.http2_new_codec_wrapper",
-          enable_new_codec_wrapper_ ? "true" : "false"}});
+    switch (enable_new_codec_wrapper_) {
+      case kBareHttp2:
+        Runtime::LoaderSingleton::getExisting()->mergeValues(
+            {{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
+        break;
+      case kWrappedHttp2:
+        Runtime::LoaderSingleton::getExisting()->mergeValues(
+            {{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+        Runtime::LoaderSingleton::getExisting()->mergeValues(
+            {{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+        break;
+      case kOgHttp2:
+        Runtime::LoaderSingleton::getExisting()->mergeValues(
+            {{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+        Runtime::LoaderSingleton::getExisting()->mergeValues(
+            {{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
+        break;
+    }
+
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<TestClientConnectionImpl>(
@@ -230,7 +252,7 @@ public:
 
   template <typename T>
   uint32_t getStreamReceiveWindowLimit(std::unique_ptr<T>& connection, int32_t stream_id) {
-    if (enable_new_codec_wrapper_) {
+    if (enable_new_codec_wrapper_ != kBareHttp2) {
       return connection->adapter()->GetStreamReceiveWindowLimit(stream_id);
     } else {
       return nghttp2_session_get_stream_effective_local_window_size(connection->session(),
@@ -240,7 +262,7 @@ public:
 
   template <typename T>
   uint32_t getStreamReceiveWindowSize(std::unique_ptr<T>& connection, int32_t stream_id) {
-    if (enable_new_codec_wrapper_) {
+    if (enable_new_codec_wrapper_ != kBareHttp2) {
       return connection->adapter()->GetStreamReceiveWindowSize(stream_id);
     } else {
       return nghttp2_session_get_stream_local_window_size(connection->session(), stream_id);
@@ -249,7 +271,7 @@ public:
 
   template <typename T>
   uint32_t getStreamSendWindowSize(std::unique_ptr<T>& connection, int32_t stream_id) {
-    if (enable_new_codec_wrapper_) {
+    if (enable_new_codec_wrapper_ != kBareHttp2) {
       return connection->adapter()->GetStreamSendWindowSize(stream_id);
     } else {
       return nghttp2_session_get_stream_remote_window_size(connection->session(), stream_id);
@@ -257,7 +279,7 @@ public:
   }
 
   template <typename T> uint32_t getSendWindowSize(std::unique_ptr<T>& connection) {
-    if (enable_new_codec_wrapper_) {
+    if (enable_new_codec_wrapper_ != kBareHttp2) {
       return connection->adapter()->GetSendWindowSize();
     } else {
       return nghttp2_session_get_remote_window_size(connection->session());
@@ -267,7 +289,7 @@ public:
   template <typename T>
   void submitSettings(std::unique_ptr<T>& connection,
                       const std::list<std::pair<uint16_t, uint32_t>>& settings_values) {
-    if (enable_new_codec_wrapper_) {
+    if (enable_new_codec_wrapper_ != kBareHttp2) {
       std::vector<http2::adapter::Http2Setting> settings;
       for (const auto& setting_pair : settings_values) {
         settings.push_back({setting_pair.first, setting_pair.second});
@@ -284,7 +306,7 @@ public:
   }
 
   template <typename T> int getHpackEncoderDynamicTableSize(std::unique_ptr<T>& connection) {
-    if (enable_new_codec_wrapper_) {
+    if (enable_new_codec_wrapper_ != kBareHttp2) {
       return connection->adapter()->GetHpackEncoderDynamicTableSize();
     } else {
       return nghttp2_session_get_hd_deflate_dynamic_table_size(connection->session());
@@ -292,7 +314,7 @@ public:
   }
 
   template <typename T> int getHpackDecoderDynamicTableSize(std::unique_ptr<T>& connection) {
-    if (enable_new_codec_wrapper_) {
+    if (enable_new_codec_wrapper_ != kBareHttp2) {
       return connection->adapter()->GetHpackDecoderDynamicTableSize();
     } else {
       return nghttp2_session_get_hd_inflate_dynamic_table_size(connection->session());
@@ -300,7 +322,7 @@ public:
   }
 
   template <typename T> void submitPing(std::unique_ptr<T>& connection, uint32_t ping_id) {
-    if (enable_new_codec_wrapper_) {
+    if (enable_new_codec_wrapper_ != kBareHttp2) {
       connection->adapter()->SubmitPing(ping_id);
     } else {
       EXPECT_EQ(0, nghttp2_submit_ping(connection->session(), NGHTTP2_FLAG_NONE, nullptr));
@@ -320,7 +342,7 @@ public:
   TestScopedRuntime scoped_runtime_;
   absl::optional<const Http2SettingsTuple> client_settings_;
   absl::optional<const Http2SettingsTuple> server_settings_;
-  bool enable_new_codec_wrapper_ = false;
+  Http2Implementation enable_new_codec_wrapper_ = kBareHttp2;
   bool allow_metadata_ = false;
   bool stream_error_on_invalid_http_messaging_ = false;
   Stats::TestUtil::TestStore client_stats_store_;
@@ -383,7 +405,7 @@ protected:
     constexpr uint32_t max_allowed =
         2 * CommonUtility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
     for (uint32_t i = 0; i < max_allowed + 1; ++i) {
-      if (enable_new_codec_wrapper_) {
+      if (enable_new_codec_wrapper_ != kBareHttp2) {
         client_->adapter()->SubmitPriorityForStream(1, 0, 10, false);
       } else {
         EXPECT_EQ(0, nghttp2_submit_priority(client_->session(), NGHTTP2_FLAG_NONE, 1, &spec));
@@ -416,7 +438,7 @@ protected:
                              DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT *
                          1);
     for (uint32_t i = 0; i < max_allowed + 1; ++i) {
-      if (enable_new_codec_wrapper_) {
+      if (enable_new_codec_wrapper_ != kBareHttp2) {
         client_->adapter()->SubmitWindowUpdate(1, 1);
       } else {
         EXPECT_EQ(0, nghttp2_submit_window_update(client_->session(), NGHTTP2_FLAG_NONE, 1, 1));
@@ -2091,12 +2113,12 @@ TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsConsumeErr
 // Deferred reset tests use only small windows so that we can test certain conditions.
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplDeferredResetTest, Http2CodecImplDeferredResetTest,
                          ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
-                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE, ::testing::Bool()));
+                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE, ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
 
 // Flow control tests only use only small windows so that we can test certain conditions.
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowControlTest,
                          ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
-                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE, ::testing::Bool()));
+                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE, ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
 
 // we separate default/edge cases here to avoid combinatorial explosion
 #define HTTP2SETTINGS_DEFAULT_COMBINE                                                              \
@@ -2110,11 +2132,11 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowContro
 // edge settings allow for the number of streams needed by the test.
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplStreamLimitTest, Http2CodecImplStreamLimitTest,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool()));
+                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
 
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool()));
+                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
 
 #define HTTP2SETTINGS_EDGE_COMBINE                                                                 \
   ::testing::Combine(                                                                              \
@@ -2134,10 +2156,10 @@ using Http2CodecImplTestAll = Http2CodecImplTest;
 
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTestAll,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool()));
+                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTestAll,
                          ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE, HTTP2SETTINGS_EDGE_COMBINE,
-                                            ::testing::Bool()));
+                                            ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
 
 TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {
@@ -2190,7 +2212,7 @@ public:
   };
 
   Http2CustomSettingsTestBase(Http2SettingsTuple client_settings,
-                              Http2SettingsTuple server_settings, bool use_new_codec_wrapper,
+                              Http2SettingsTuple server_settings, Http2Implementation use_new_codec_wrapper,
                               bool validate_client)
       : Http2CodecImplTestFixture(client_settings, server_settings, use_new_codec_wrapper),
         validate_client_(validate_client) {}
@@ -2236,7 +2258,7 @@ protected:
 class Http2CustomSettingsTest
     : public Http2CustomSettingsTestBase,
       public ::testing::TestWithParam<
-          ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool, bool>> {
+          ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, Http2Implementation, bool>> {
 public:
   Http2CustomSettingsTest()
       : Http2CustomSettingsTestBase(::testing::get<0>(GetParam()), ::testing::get<1>(GetParam()),
@@ -2244,8 +2266,9 @@ public:
 };
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CustomSettingsTest,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool(),
-                                            ::testing::Bool()));
+                                            HTTP2SETTINGS_DEFAULT_COMBINE,
+                                            ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2),
+                                             ::testing::Bool()));
 
 // Validates that custom parameters (those which are not explicitly named in the
 // envoy::config::core::v3::Http2ProtocolOptions proto) are properly sent and processed by
@@ -3365,9 +3388,24 @@ public:
 
 protected:
   void initialize() override {
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.http2_new_codec_wrapper",
-          enable_new_codec_wrapper_ ? "true" : "false"}});
+    switch (enable_new_codec_wrapper_) {
+      case kBareHttp2:
+        Runtime::LoaderSingleton::getExisting()->mergeValues(
+            {{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
+        break;
+      case kWrappedHttp2:
+        Runtime::LoaderSingleton::getExisting()->mergeValues(
+            {{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+        Runtime::LoaderSingleton::getExisting()->mergeValues(
+            {{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+        break;
+      case kOgHttp2:
+        Runtime::LoaderSingleton::getExisting()->mergeValues(
+            {{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+        Runtime::LoaderSingleton::getExisting()->mergeValues(
+            {{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
+        break;
+    }
     allow_metadata_ = true;
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
