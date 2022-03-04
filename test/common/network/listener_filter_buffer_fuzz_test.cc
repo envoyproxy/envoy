@@ -110,7 +110,6 @@ private:
   uint64_t drained_size_;
 };
 
-// Fuzz the old owned buffer implementation.
 DEFINE_PROTO_FUZZER(const test::common::network::ListenerFilterBufferFuzzTestCase& input) {
   auto fuzzer = ListenerFilterBufferFuzzer();
   fuzzer.fuzz(input);
