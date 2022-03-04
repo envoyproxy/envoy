@@ -937,10 +937,10 @@ or
 ```
 ln -s clang-format-ci $PATH/clang-format
 ```
-If you are a non-root user, alternative you can use a bin dir and add that to `$PATH`
+If you are a non-root user, alternatively you can use a bin dir and add that to `$PATH`
 ```shell
 mkdir bin
-mv clang-format-ci bin/
+mv clang-format-ci bin/clang-format
 export PATH=$PATH:$PWD/bin/
 ```
 Once this is set up, you can run clang-format without docker:
