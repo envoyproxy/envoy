@@ -26,7 +26,10 @@ Network::TransportSocketPtr InternalSocketFactory::createTransportSocket(
   if (inner_socket == nullptr) {
     return nullptr;
   }
-  return std::make_unique<InternalSocket>(config_, std::move(inner_socket), options->host());
+  // TODO: make sure robust to nullptr options.
+  return std::make_unique<InternalSocket>(config_, std::move(inner_socket),
+                                          options ? options->host() : nullptr,
+                                          options ? options->filterState() : nullptr);
 }
 
 class InternalUpstreamConfigFactory

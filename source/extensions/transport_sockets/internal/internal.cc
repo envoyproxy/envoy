@@ -30,6 +30,9 @@ Config::Config(const envoy::extensions::transport_sockets::internal::v3::Interna
     }
     metadata_sources_.push_back(MetadataSource(kind, metadata.name()));
   }
+  for (const auto& filter_state : config_proto.passthrough_filter_state_objects()) {
+    filter_state_names_.push_back(filter_state.name());
+  }
 }
 envoy::config::core::v3::Metadata
 Config::extractMetadata(Upstream::HostDescriptionConstSharedPtr host) const {
@@ -62,9 +65,17 @@ Config::extractMetadata(Upstream::HostDescriptionConstSharedPtr host) const {
 
 InternalSocket::InternalSocket(ConfigConstSharedPtr config,
                                Network::TransportSocketPtr inner_socket,
-                               Upstream::HostDescriptionConstSharedPtr host)
+                               Upstream::HostDescriptionConstSharedPtr host,
+                               StreamInfo::FilterStateSharedPtr filter_state)
     : PassthroughSocket(std::move(inner_socket)),
-      injected_metadata_(config->extractMetadata(host)) {}
+      injected_metadata_(config->extractMetadata(host)) {
+  if (filter_state) {
+    for (const auto& name : config->filterStateNames()) {
+      // TODO: catch exception.
+      filter_state_objects_.try_emplace(name, filter_state->getSharedDataMutableGeneric(name));
+    }
+  }
+}
 
 void InternalSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   transport_socket_->setTransportSocketCallbacks(callbacks);

@@ -117,6 +117,13 @@ public:
   virtual Object* getDataMutableGeneric(absl::string_view data_name) PURE;
 
   /**
+   * @param data_name the name of the data being looked up.
+   * @return a shared pointer to the stored data or nullptr if the data does not exist.
+   * An exception will be thrown if the data is not mutable.
+   */
+  virtual std::shared_ptr<Object> getSharedDataMutableGeneric(absl::string_view data_name) PURE;
+
+  /**
    * @param data_name the name of the data being probed.
    * @return Whether data of the type and name specified exists in the
    * data store.

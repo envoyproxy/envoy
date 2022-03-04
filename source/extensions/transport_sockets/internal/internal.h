@@ -23,6 +23,7 @@ public:
          Stats::Scope& scope);
   envoy::config::core::v3::Metadata
   extractMetadata(Upstream::HostDescriptionConstSharedPtr host) const;
+  const std::vector<std::string>& filterStateNames() const { return filter_state_names_; }
 
 private:
   enum class MetadataKind { Host, Cluster };
@@ -32,6 +33,7 @@ private:
     const std::string name_;
   };
   std::vector<MetadataSource> metadata_sources_;
+  std::vector<std::string> filter_state_names_;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
@@ -40,13 +42,16 @@ class InternalSocket : public TransportSockets::PassthroughSocket,
                        Logger::Loggable<Logger::Id::connection> {
 public:
   InternalSocket(ConfigConstSharedPtr config, Network::TransportSocketPtr inner_socket,
-                 Upstream::HostDescriptionConstSharedPtr host);
+                 Upstream::HostDescriptionConstSharedPtr host,
+                 StreamInfo::FilterStateSharedPtr filter_state);
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
 
 private:
   const envoy::config::core::v3::Metadata injected_metadata_;
+  absl::flat_hash_map<std::string, std::shared_ptr<StreamInfo::FilterState::Object>>
+      filter_state_objects_;
 };
 
 } // namespace Internal

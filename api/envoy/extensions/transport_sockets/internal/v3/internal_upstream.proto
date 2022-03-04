@@ -32,7 +32,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //  Using internal upstream transport affects load balancing decisions if the passthrough
 //  state is derived from the downstream connection.
 message InternalUpstreamTransport {
-  // Describes the location of the metadata value in the upstream cluster context.
+  // Describes the location of the imported metadata value.
   message MetadataValueSource {
     // Specifies what kind of metadata.
     type.metadata.v3.MetadataKind kind = 1;
@@ -41,13 +41,20 @@ message InternalUpstreamTransport {
     string name = 2 [(validate.rules).string = {min_len: 1}];
   }
 
+  // Describes the location of the imported filter state object from the downstream connection.
+  message FilterStateSource {
+    // Name is the imported filter state object name.
+    string name = 2 [(validate.rules).string = {min_len: 1}];
+  }
+
   // Specifies the metadata namespaces and values to insert into the downstream
   // internal connection dynamic metadata when an internal address is used as a host.
   repeated MetadataValueSource passthrough_metadata = 1;
 
   // Specifies the list of filter state object names to insert into the downstream
-  // internal connection when an internal address is used as a host.
-  repeated string passthrough_filter_state_objects = 2;
+  // internal connection when an internal address is used as a host. The filter state
+  // objects must be mutable. These objects participate in the connection hashing decisions.
+  repeated FilterStateSource passthrough_filter_state_objects = 2;
 
   // The underlying transport socket being wrapped.
   config.core.v3.TransportSocket transport_socket = 3 [(validate.rules).message = {required: true}];
