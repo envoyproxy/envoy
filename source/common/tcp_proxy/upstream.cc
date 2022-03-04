@@ -165,7 +165,7 @@ void TcpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   callbacks_ = &callbacks;
   // Given this function is reentrant, make sure we only reset the upstream_handle_ if given a
   // valid connection handle. If newConnection fails inline it may result in attempting to
-  // select a new host, and a recursive call to initializeUpstreamConnection. In this case the
+  // select a new host, and a recursive call to establishUpstreamConnection. In this case the
   // first call to newConnection will return null and the inner call will persist.
   Tcp::ConnectionPool::Cancellable* handle = conn_pool_data_.value().newConnection(*this);
   if (handle) {

@@ -160,6 +160,8 @@ public:
   }
   const Network::HashPolicy* hashPolicy() { return hash_policy_.get(); }
 
+  Upstream::OdCdsApiHandle* odcds() const { return nullptr; }
+
 private:
   struct SimpleRouteImpl : public Route {
     SimpleRouteImpl(const Config& parent, absl::string_view cluster_name);
@@ -211,6 +213,7 @@ private:
   std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
   Random::RandomGenerator& random_generator_;
   std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
+  Upstream::OdCdsApiHandlePtr odcds_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -340,7 +343,18 @@ protected:
   }
 
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
-  Network::FilterStatus initializeUpstreamConnection();
+
+  // Prepare the route for the upstream connection.
+  // It will be called exactly once.
+  void initializeUpstreamConnection();
+
+  // Create connection to the upstream cluster. This function can be repeatedly called on upstream
+  // connection failure.
+  Network::FilterStatus establishUpstreamConnection();
+
+  // The callback upon on demand cluster discovery response.
+  void onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status);
+
   bool maybeTunnel(Upstream::ThreadLocalCluster& cluster);
   void onConnectTimeout();
   void onDownstreamEvent(Network::ConnectionEvent event);
@@ -359,6 +373,9 @@ protected:
   DownstreamCallbacks downstream_callbacks_;
   Event::TimerPtr idle_timer_;
   Event::TimerPtr connection_duration_timer_;
+
+  // The on demand cluster response on the flight.
+  Upstream::ClusterDiscoveryCallbackHandlePtr cluster_discovery_handle_;
 
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
