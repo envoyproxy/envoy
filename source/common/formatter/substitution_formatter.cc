@@ -63,8 +63,20 @@ const std::string SubstitutionFormatUtils::DEFAULT_FORMAT =
     "\"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" "
     "\"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\"\n";
 
-FormatterPtr SubstitutionFormatUtils::defaultSubstitutionFormatter() {
-  return FormatterPtr{new FormatterImpl(DEFAULT_FORMAT, false)};
+const std::string SubstitutionFormatUtils::UDP_DEFAULT_FORMAT =
+    "[%START_TIME%] %UDP_DOWNSTREAM_BYTES_SENT% %UDP_DOWNSTREAM_BYTES_RECEIVED% "
+    "%UDP_DOWNSTREAM_ERRORS_SENT% %UDP_DOWNSTREAM_ERRORS_RECEIVED% "
+    "%UDP_DOWNSTREAM_DATAGRAMS_SENT% %UDP_DOWNSTREAM_DATAGRAMS_RECEIVED% "
+    "%UDP_DOWNSTREAM_SESS_TOTAL% %UDP_DOWNSTREAM_IDLE_TIMEOUT% "
+    "%UDP_UPSTREAM_NONE_HEALTHY% %UDP_UPSTREAM_DATAGRAMS_DROPPED%\n";
+
+FormatterPtr SubstitutionFormatUtils::defaultSubstitutionFormatter(bool udp_proxy) {
+
+  if(udp_proxy){
+    return FormatterPtr{new FormatterImpl(UDP_DEFAULT_FORMAT, false)};
+  }else{
+    return FormatterPtr{new FormatterImpl(DEFAULT_FORMAT, false)};
+  }
 }
 
 const absl::optional<std::reference_wrapper<const std::string>>
@@ -1173,6 +1185,72 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                   result = std::string(stream_info.downstreamAddressProvider().ja3Hash());
                 }
                 return result;
+              });
+        }},
+        {"UDP_DOWNSTREAM_BYTES_SENT",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesSent(); });
+        }},
+        {"UDP_DOWNSTREAM_BYTES_RECEIVED",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesReceived(); });
+        }},
+        {"UDP_DOWNSTREAM_ERRORS_SENT",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) { 
+                return stream_info.getDownstreamBytesMeter()->headerBytesSent(); 
+              });
+        }},
+        {"UDP_DOWNSTREAM_ERRORS_RECEIVED",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) { 
+                return stream_info.getDownstreamBytesMeter()->headerBytesReceived(); 
+              });
+        }},
+        {"UDP_DOWNSTREAM_DATAGRAMS_SENT",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) { 
+                return stream_info.getDownstreamBytesMeter()->wireBytesSent(); 
+              });
+        }},
+        {"UDP_DOWNSTREAM_DATAGRAMS_RECEIVED",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) { 
+                return stream_info.getDownstreamBytesMeter()->wireBytesReceived(); 
+              });
+        }},
+        {"UDP_DOWNSTREAM_SESS_TOTAL",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) { 
+                return stream_info.getUpstreamBytesMeter()->headerBytesSent(); 
+              });
+        }},
+        {"UDP_DOWNSTREAM_IDLE_TIMEOUT",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) { 
+                return stream_info.getUpstreamBytesMeter()->headerBytesReceived(); 
+              });
+        }},
+        {"UDP_UPSTREAM_NONE_HEALTHY",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) { 
+                return stream_info.getUpstreamBytesMeter()->wireBytesSent(); 
+              });
+        }},
+        {"UDP_UPSTREAM_DATAGRAMS_DROPPED",
+        []() {
+          return std::make_unique<StreamInfoUInt64FieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) { 
+                return stream_info.getUpstreamBytesMeter()->wireBytesReceived(); 
               });
         }}});
 }

@@ -120,7 +120,7 @@ private:
  */
 class SubstitutionFormatUtils {
 public:
-  static FormatterPtr defaultSubstitutionFormatter();
+  static FormatterPtr defaultSubstitutionFormatter(bool udp_proxy=false);
   // Optional references are not supported, but this method has large performance
   // impact, so using reference_wrapper.
   static const absl::optional<std::reference_wrapper<const std::string>>
@@ -134,6 +134,7 @@ private:
   SubstitutionFormatUtils();
 
   static const std::string DEFAULT_FORMAT;
+  static const std::string UDP_DEFAULT_FORMAT;
 };
 
 /**

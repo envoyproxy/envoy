@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Custom configuration for an :ref:`AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`
 // that writes log entries directly to a file. Configures the built-in *envoy.access_loggers.file*
 // AccessLog.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message FileAccessLog {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.accesslog.v2.FileAccessLog";
@@ -60,4 +60,7 @@ message FileAccessLog {
     config.core.v3.SubstitutionFormatString log_format = 5
         [(validate.rules).message = {required: true}];
   }
+
+  // UDP access logging
+  bool udp_proxy = 6;
 }

@@ -98,8 +98,8 @@ UdpProxyFilter::ClusterInfo::~ClusterInfo() {
 
   if(!filter_.config_->accessLogs().empty()){
 
-    udp_sess_stats_.value().addBytesReceived(filter_.config_->stats().downstream_sess_rx_bytes_.value());
     udp_sess_stats_.value().addBytesSent(filter_.config_->stats().downstream_sess_tx_bytes_.value());
+    udp_sess_stats_.value().addBytesReceived(filter_.config_->stats().downstream_sess_rx_bytes_.value());
 
     auto upstream_bytes_meter = std::make_shared<StreamInfo::BytesMeter>();
     upstream_bytes_meter->addHeaderBytesSent(filter_.config_->stats().downstream_sess_tx_errors_.value());
