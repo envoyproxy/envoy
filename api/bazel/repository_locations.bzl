@@ -28,17 +28,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "org_golang_x_text",
         ],
     ),
-    com_github_bazelbuild_buildtools = dict(
-        project_name = "Bazel build tools",
-        project_desc = "Developer tools for working with Google's bazel buildtool.",
-        project_url = "https://github.com/bazelbuild/buildtools",
-        version = "4.2.5",
-        sha256 = "d368c47bbfc055010f118efb2962987475418737e901f7782d2a966d1dc80296",
-        release_date = "2022-01-13",
-        strip_prefix = "buildtools-{version}",
-        urls = ["https://github.com/bazelbuild/buildtools/archive/{version}.tar.gz"],
-        use_category = ["api"],
-    ),
     com_github_cncf_udpa = dict(
         project_name = "xDS API",
         project_desc = "xDS API Working Group (xDS-WG)",
