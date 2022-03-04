@@ -28,9 +28,9 @@ public:
   ListenerFilterBufferFuzzer() : drained_size_(0) {}
 
   void fuzz(const test::common::network::ListenerFilterBufferFuzzTestCase& input) {
-    // Ensure the buffer is not excced the limit we set.
+    // Ensure the buffer is not exceed the limit we set.
     auto max_bytes_read = input.max_bytes_read() % max_buffer_size;
-    // There won't be anycase the max size of buffer is 0.
+    // There won't be any case the max size of buffer is 0.
     if (max_bytes_read == 0) {
       return;
     }
@@ -43,7 +43,7 @@ public:
     auto on_data_cb = [&](ListenerFilterBuffer& buffer) {
       auto raw_slice = buffer.rawSlice();
       std::string data(reinterpret_cast<const char*>(raw_slice.mem_), raw_slice.len_);
-      // The avaiable data may be more than the buffer size, also, the buffer size
+      // The available data may be more than the buffer size, also, the buffer size
       // can be reduced by drain.
       FUZZ_ASSERT(data == available_data_.substr(0, max_bytes_read - drained_size_));
     };
