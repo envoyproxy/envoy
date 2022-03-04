@@ -9,6 +9,7 @@ namespace Address {
 
 static void Ipv4InstanceCreate(benchmark::State& state) {
   sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
   addr.sin_port = htons(443);
   static constexpr uint32_t Addr = 0xc00002ff; // From the RFC 5737 example range.
@@ -22,6 +23,7 @@ BENCHMARK(Ipv4InstanceCreate);
 
 static void Ipv6InstanceCreate(benchmark::State& state) {
   sockaddr_in6 addr;
+  memset(&addr, 0, sizeof(addr));
   addr.sin6_family = AF_INET6;
   addr.sin6_port = htons(443);
   static const char* Addr = "2001:DB8::1234"; // From the RFC 3849 example range.
