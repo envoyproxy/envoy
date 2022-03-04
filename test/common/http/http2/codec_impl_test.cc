@@ -55,7 +55,8 @@ enum Http2Implementation {
 };
 
 using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
-using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, Http2Implementation>;
+using Http2SettingsTestParam =
+    ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, Http2Implementation>;
 namespace CommonUtility = ::Envoy::Http2::Utility;
 
 class Http2CodecImplTestFixture {
@@ -142,22 +143,22 @@ public:
 
   virtual void initialize() {
     switch (enable_new_codec_wrapper_) {
-      case kBareHttp2:
-        Runtime::LoaderSingleton::getExisting()->mergeValues(
-            {{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
-        break;
-      case kWrappedHttp2:
-        Runtime::LoaderSingleton::getExisting()->mergeValues(
-            {{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
-        Runtime::LoaderSingleton::getExisting()->mergeValues(
-            {{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
-        break;
-      case kOgHttp2:
-        Runtime::LoaderSingleton::getExisting()->mergeValues(
-            {{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
-        Runtime::LoaderSingleton::getExisting()->mergeValues(
-            {{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
-        break;
+    case kBareHttp2:
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
+      break;
+    case kWrappedHttp2:
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+      break;
+    case kOgHttp2:
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
+      break;
     }
 
     http2OptionsFromTuple(client_http2_options_, client_settings_);
@@ -2111,14 +2112,16 @@ TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsConsumeErr
       ::testing::Values(CommonUtility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE))
 
 // Deferred reset tests use only small windows so that we can test certain conditions.
-INSTANTIATE_TEST_SUITE_P(Http2CodecImplDeferredResetTest, Http2CodecImplDeferredResetTest,
-                         ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
-                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE, ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
+INSTANTIATE_TEST_SUITE_P(
+    Http2CodecImplDeferredResetTest, Http2CodecImplDeferredResetTest,
+    ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE, HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
+                       ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
 
 // Flow control tests only use only small windows so that we can test certain conditions.
-INSTANTIATE_TEST_SUITE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowControlTest,
-                         ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
-                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE, ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
+INSTANTIATE_TEST_SUITE_P(
+    Http2CodecImplFlowControlTest, Http2CodecImplFlowControlTest,
+    ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE, HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
+                       ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
 
 // we separate default/edge cases here to avoid combinatorial explosion
 #define HTTP2SETTINGS_DEFAULT_COMBINE                                                              \
@@ -2130,13 +2133,15 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowContro
 
 // Stream limit test only uses the default values because not all combinations of
 // edge settings allow for the number of streams needed by the test.
-INSTANTIATE_TEST_SUITE_P(Http2CodecImplStreamLimitTest, Http2CodecImplStreamLimitTest,
-                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
+INSTANTIATE_TEST_SUITE_P(
+    Http2CodecImplStreamLimitTest, Http2CodecImplStreamLimitTest,
+    ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE, HTTP2SETTINGS_DEFAULT_COMBINE,
+                       ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
 
-INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
-                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
+INSTANTIATE_TEST_SUITE_P(
+    Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
+    ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE, HTTP2SETTINGS_DEFAULT_COMBINE,
+                       ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
 
 #define HTTP2SETTINGS_EDGE_COMBINE                                                                 \
   ::testing::Combine(                                                                              \
@@ -2154,12 +2159,14 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
 // Use with caution as any test using this runs 255 times.
 using Http2CodecImplTestAll = Http2CodecImplTest;
 
-INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTestAll,
-                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
+INSTANTIATE_TEST_SUITE_P(
+    Http2CodecImplTestDefaultSettings, Http2CodecImplTestAll,
+    ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE, HTTP2SETTINGS_DEFAULT_COMBINE,
+                       ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTestAll,
                          ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE, HTTP2SETTINGS_EDGE_COMBINE,
-                                            ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2)));
+                                            ::testing::Values(kBareHttp2, kWrappedHttp2,
+                                                              kOgHttp2)));
 
 TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {
@@ -2212,8 +2219,8 @@ public:
   };
 
   Http2CustomSettingsTestBase(Http2SettingsTuple client_settings,
-                              Http2SettingsTuple server_settings, Http2Implementation use_new_codec_wrapper,
-                              bool validate_client)
+                              Http2SettingsTuple server_settings,
+                              Http2Implementation use_new_codec_wrapper, bool validate_client)
       : Http2CodecImplTestFixture(client_settings, server_settings, use_new_codec_wrapper),
         validate_client_(validate_client) {}
 
@@ -2268,7 +2275,7 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CustomSettingsTest
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
                                             HTTP2SETTINGS_DEFAULT_COMBINE,
                                             ::testing::Values(kBareHttp2, kWrappedHttp2, kOgHttp2),
-                                             ::testing::Bool()));
+                                            ::testing::Bool()));
 
 // Validates that custom parameters (those which are not explicitly named in the
 // envoy::config::core::v3::Http2ProtocolOptions proto) are properly sent and processed by
@@ -3330,9 +3337,9 @@ public:
   void initOld(nghttp2_session*, ConnectionImpl*,
                const envoy::config::core::v3::Http2ProtocolOptions&) override {}
 
-  std::unique_ptr<http2::adapter::Http2Adapter> create(const nghttp2_session_callbacks*,
-                                                       ConnectionImpl* connection,
-                                                       const http2::adapter::OgHttp2Adapter::Options& options) override {
+  std::unique_ptr<http2::adapter::Http2Adapter>
+  create(const nghttp2_session_callbacks*, ConnectionImpl* connection,
+         const http2::adapter::OgHttp2Adapter::Options& options) override {
     // Only need to provide callbacks required to send METADATA frames. The new codec wrapper
     // requires the send callback, but not the pack_extension callback.
     nghttp2_session_callbacks_new(&callbacks_);
@@ -3389,22 +3396,22 @@ public:
 protected:
   void initialize() override {
     switch (enable_new_codec_wrapper_) {
-      case kBareHttp2:
-        Runtime::LoaderSingleton::getExisting()->mergeValues(
-            {{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
-        break;
-      case kWrappedHttp2:
-        Runtime::LoaderSingleton::getExisting()->mergeValues(
-            {{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
-        Runtime::LoaderSingleton::getExisting()->mergeValues(
-            {{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
-        break;
-      case kOgHttp2:
-        Runtime::LoaderSingleton::getExisting()->mergeValues(
-            {{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
-        Runtime::LoaderSingleton::getExisting()->mergeValues(
-            {{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
-        break;
+    case kBareHttp2:
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
+      break;
+    case kWrappedHttp2:
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+      break;
+    case kOgHttp2:
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
+      break;
     }
     allow_metadata_ = true;
     http2OptionsFromTuple(client_http2_options_, client_settings_);

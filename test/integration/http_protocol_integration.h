@@ -6,11 +6,7 @@
 
 namespace Envoy {
 
-enum Http2Implementation {
-  kBareHttp2,
-  kWrappedHttp2,
-  kOgHttp2
-};
+enum Http2Implementation { kBareHttp2, kWrappedHttp2, kOgHttp2 };
 
 struct HttpProtocolTestParams {
   Network::Address::IpVersion version;
@@ -61,22 +57,20 @@ public:
             ConfigHelper::httpProxyConfig(/*downstream_is_quic=*/GetParam().downstream_protocol ==
                                           Http::CodecType::HTTP3)) {
     switch (GetParam().http2_new_codec_wrapper) {
-      case kBareHttp2:
-        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
-                                          "false");
-        break;
-      case kWrappedHttp2:
-        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
-                                          "true");
-        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2",
-                                          "false");
-        break;
-      case kOgHttp2:
-        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
-                                          "true");
-        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2",
-                                          "true");
-        break;
+    case kBareHttp2:
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                        "false");
+      break;
+    case kWrappedHttp2:
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                        "true");
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "false");
+      break;
+    case kOgHttp2:
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                        "true");
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "true");
+      break;
     }
   }
 

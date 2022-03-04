@@ -114,9 +114,9 @@ public:
   void initOld(nghttp2_session* session, ConnectionImpl* connection,
                const envoy::config::core::v3::Http2ProtocolOptions& options) override;
 
-  std::unique_ptr<http2::adapter::Http2Adapter> create(const nghttp2_session_callbacks* callbacks,
-                                                       ConnectionImpl* connection,
-                                                       const http2::adapter::OgHttp2Adapter::Options& options) override;
+  std::unique_ptr<http2::adapter::Http2Adapter>
+  create(const nghttp2_session_callbacks* callbacks, ConnectionImpl* connection,
+         const http2::adapter::OgHttp2Adapter::Options& options) override;
 
   std::unique_ptr<http2::adapter::Http2Adapter> create(const nghttp2_session_callbacks* callbacks,
                                                        ConnectionImpl* connection,
@@ -208,9 +208,7 @@ protected:
     ~Http2Options();
 
     const nghttp2_option* options() { return options_; }
-    const http2::adapter::OgHttp2Adapter::Options& og_options() {
-      return og_options_;
-    }
+    const http2::adapter::OgHttp2Adapter::Options& og_options() { return og_options_; }
 
   protected:
     nghttp2_option* options_;

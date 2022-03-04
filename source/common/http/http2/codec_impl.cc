@@ -125,7 +125,8 @@ void ProdNghttp2SessionFactory::initOld(
 
 std::unique_ptr<http2::adapter::Http2Adapter>
 ProdNghttp2SessionFactory::create(const nghttp2_session_callbacks* callbacks,
-                                  ConnectionImpl* connection, const http2::adapter::OgHttp2Adapter::Options& options) {
+                                  ConnectionImpl* connection,
+                                  const http2::adapter::OgHttp2Adapter::Options& options) {
   auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
       http2::adapter::Perspective::kClient, *callbacks, connection);
   http2::adapter::Http2VisitorInterface& v = *visitor;
@@ -1708,11 +1709,9 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks(bool use_new_codec_wrapper) {
 ConnectionImpl::Http2Callbacks::~Http2Callbacks() { nghttp2_session_callbacks_del(callbacks_); }
 
 ConnectionImpl::Http2Options::Http2Options(
-    const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-    uint32_t max_headers_kb) {
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_options, uint32_t max_headers_kb) {
   og_options_.perspective = http2::adapter::Perspective::kServer;
-  og_options_.max_hpack_encoding_table_capacity =
-      http2_options.hpack_table_size().value();
+  og_options_.max_hpack_encoding_table_capacity = http2_options.hpack_table_size().value();
   og_options_.max_header_list_bytes = max_headers_kb * 1024;
   og_options_.max_header_field_size = max_headers_kb * 1024;
   og_options_.allow_extended_connect = http2_options.allow_connect();
@@ -1753,8 +1752,7 @@ ConnectionImpl::Http2Options::Http2Options(
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
 
 ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
-    const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-    uint32_t max_headers_kb)
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_options, uint32_t max_headers_kb)
     : Http2Options(http2_options, max_headers_kb) {
   og_options_.perspective = http2::adapter::Perspective::kClient;
   // Temporarily disable initial max streams limit/protection, since we might want to create
@@ -2002,7 +2000,8 @@ ServerConnectionImpl::ServerConnectionImpl(
     if (use_oghttp2_library_) {
       adapter_ = http2::adapter::OgHttp2Adapter::Create(*visitor_, h2_options.og_options());
     } else {
-      adapter_ = http2::adapter::NgHttp2Adapter::CreateServerAdapter(*visitor_, h2_options.options());
+      adapter_ =
+          http2::adapter::NgHttp2Adapter::CreateServerAdapter(*visitor_, h2_options.options());
     }
   } else {
     nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),

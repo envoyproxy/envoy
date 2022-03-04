@@ -16,8 +16,8 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
             HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, kBareHttp2});
         if (downstream_protocol == Http::CodecType::HTTP2 ||
             upstream_protocol == Http::CodecType::HTTP2) {
-          ret.push_back(
-              HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, kWrappedHttp2});
+          ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
+                                               kWrappedHttp2});
           ret.push_back(
               HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, kOgHttp2});
         }
@@ -26,14 +26,14 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
             upstream_protocol == Http::CodecType::HTTP3) {
           ENVOY_LOG_MISC(warn, "Skipping HTTP/3 as support is compiled out");
         } else {
-          ret.push_back(
-              HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, kBareHttp2});
+          ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
+                                               kBareHttp2});
           if (downstream_protocol == Http::CodecType::HTTP2 ||
               upstream_protocol == Http::CodecType::HTTP2) {
-            ret.push_back(
-                HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, kWrappedHttp2});
-            ret.push_back(
-                HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, kOgHttp2});
+            ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
+                                                 kWrappedHttp2});
+            ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
+                                                 kOgHttp2});
           }
         }
 #endif
@@ -69,12 +69,12 @@ absl::string_view downstreamToString(Http::CodecType type) {
 
 absl::string_view implementationToString(Http2Implementation impl) {
   switch (impl) {
-    case kBareHttp2:
-      return "BareHttp2";
-    case kWrappedHttp2:
-      return "WrappedHttp2";
-    case kOgHttp2:
-      return "OgHttp2";
+  case kBareHttp2:
+    return "BareHttp2";
+  case kWrappedHttp2:
+    return "WrappedHttp2";
+  case kOgHttp2:
+    return "OgHttp2";
   }
   return "UnknownHttp2Impl";
 }
