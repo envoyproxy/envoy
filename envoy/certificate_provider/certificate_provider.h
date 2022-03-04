@@ -10,8 +10,7 @@
 #include "openssl/x509v3.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace CertificateProviders {
+namespace CertificateProvider {
 
 struct Certpair {
   const std::string& certificate_;
@@ -81,6 +80,5 @@ public:
 
 using CertificateProviderSharedPtr = std::shared_ptr<CertificateProvider>;
 
-} // namespace CertificateProviders
-} // namespace Extensions
+} // namespace CertificateProvider
 } // namespace Envoy

@@ -22,7 +22,7 @@ void CertificateProviderManagerImpl::addCertificateProvider(
   certificate_provider_instances_.emplace(name, cert_provider_instance);
 }
 
-Envoy::Extensions::CertificateProviders::CertificateProviderSharedPtr
+Envoy::CertificateProvider::CertificateProviderSharedPtr
 CertificateProviderManagerImpl::getCertificateProvider(std::string name) {
   auto it = certificate_provider_instances_.find(name);
   if (it != certificate_provider_instances_.end()) {

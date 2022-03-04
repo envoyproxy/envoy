@@ -10,9 +10,23 @@ envoy_package()
 
 envoy_cc_library(
     name = "certificate_provider_manager_interface",
-    hdrs = ["certificate_provider_manager.h"],
+    hdrs = [
+        "certificate_provider_manager.h",
+    ],
     deps = [
-        "//source/extensions/certificate_providers:certificate_provider_lib",
+        ":certificate_provider_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "certificate_provider_interface",
+    hdrs = ["certificate_provider.h"],
+    external_deps = [
+        "ssl",
+    ],
+    deps = [
+        "//envoy/config:subscription_interface",
+        "@com_google_absl//absl/strings",
     ],
 )

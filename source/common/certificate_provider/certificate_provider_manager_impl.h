@@ -21,13 +21,10 @@ public:
   void addCertificateProvider(std::string name,
                               const envoy::config::core::v3::TypedExtensionConfig& config) override;
 
-  Envoy::Extensions::CertificateProviders::CertificateProviderSharedPtr
-  getCertificateProvider(std::string name) override;
+  CertificateProviderSharedPtr getCertificateProvider(std::string name) override;
 
 private:
-  absl::flat_hash_map<std::string,
-                      Envoy::Extensions::CertificateProviders::CertificateProviderSharedPtr>
-      certificate_provider_instances_;
+  absl::flat_hash_map<std::string, CertificateProviderSharedPtr> certificate_provider_instances_;
   Api::Api& api_;
 };
 

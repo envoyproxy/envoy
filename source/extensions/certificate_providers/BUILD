@@ -9,20 +9,16 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "certificate_provider_lib",
+    name = "certificate_provider_factory_lib",
     srcs = [
         "factory.cc",
     ],
     hdrs = [
-        "certificate_provider.h",
         "factory.h",
-    ],
-    external_deps = [
-        "ssl",
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//envoy/config:subscription_interface",
+        "//envoy/certificate_provider:certificate_provider_interface",
         "//envoy/registry",
         "@com_google_absl//absl/strings",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

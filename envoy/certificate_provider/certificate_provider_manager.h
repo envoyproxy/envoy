@@ -2,10 +2,9 @@
 
 #include <string>
 
+#include "envoy/certificate_provider/certificate_provider.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/extension.pb.h"
-
-#include "source/extensions/certificate_providers/certificate_provider.h"
 
 namespace Envoy {
 namespace CertificateProvider {
@@ -21,8 +20,7 @@ public:
   addCertificateProvider(std::string name,
                          const envoy::config::core::v3::TypedExtensionConfig& config) PURE;
 
-  virtual Envoy::Extensions::CertificateProviders::CertificateProviderSharedPtr
-  getCertificateProvider(std::string name) PURE;
+  virtual CertificateProviderSharedPtr getCertificateProvider(std::string name) PURE;
 };
 
 using CertificateProviderManagerPtr = std::unique_ptr<CertificateProviderManager>;

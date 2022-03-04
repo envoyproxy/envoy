@@ -24,7 +24,7 @@ StaticCertificateProvider::StaticCertificateProvider(
 
   const std::string& cert = Config::DataSource::read(message.certificate(), true, api);
   const std::string& key = Config::DataSource::read(message.private_key(), true, api);
-  Certpair certpair = {cert, key};
+  Envoy::CertificateProvider::Certpair certpair = {cert, key};
   certpairs_.emplace_back(certpair);
 }
 
