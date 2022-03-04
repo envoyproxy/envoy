@@ -125,13 +125,8 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
   if (!eval_status.ok()) {
     return {};
   }
-  auto result = eval_status.value();
-  if (result.IsError()) {
-    auto error = result.ErrorOrDie();
-    ENVOY_LOG_MISC(debug, "Expr::evaluate error: ", error->message());
-  }
 
-  return result;
+  return eval_status.value();
 }
 
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
