@@ -8,6 +8,7 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/api/os_sys_calls_impl.h"
