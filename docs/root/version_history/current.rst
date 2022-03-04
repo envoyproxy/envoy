@@ -1,22 +1,21 @@
-1.18.6 (Pending)
-=====================
+1.18.7 (Pending)
+==========================
 
 Incompatible Behavior Changes
 -----------------------------
+*Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
 Minor Behavior Changes
 ----------------------
+*Changes that may cause incompatibilities for some users, but should not for most*
 
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
-* data plane: fix crash when internal redirect selects a route configured with direct response or redirect actions.
-* jwt_authn: fixed the crash when a CONNECT request is sent to JWT filter configured with regex match on the Host header.
-* tcp_proxy: fix a crash that occurs when configured for :ref:`upstream tunneling <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.tunneling_config>` and the downstream connection disconnects while the the upstream connection or http/2 stream is still being established.
-
 Removed Config or Runtime
 -------------------------
+*Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 New Features
 ------------
