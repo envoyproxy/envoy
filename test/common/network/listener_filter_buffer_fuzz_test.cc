@@ -25,8 +25,6 @@ constexpr uint32_t max_readable_size = max_buffer_size + 1024;
 
 class ListenerFilterBufferFuzzer {
 public:
-  ListenerFilterBufferFuzzer() : drained_size_(0) {}
-
   void fuzz(const test::common::network::ListenerFilterBufferFuzzTestCase& input) {
     // Ensure the buffer is not exceed the limit we set.
     auto max_bytes_read = input.max_bytes_read() % max_buffer_size;
@@ -107,7 +105,7 @@ private:
   Event::FileReadyCb file_event_callback_;
   std::string available_data_;
   // The size drained by the test. This is used to calculate the current buffer size.
-  uint64_t drained_size_;
+  uint64_t drained_size_{0};
 };
 
 DEFINE_PROTO_FUZZER(const test::common::network::ListenerFilterBufferFuzzTestCase& input) {
