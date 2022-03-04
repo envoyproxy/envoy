@@ -578,7 +578,7 @@ tap_config:
 TEST_P(TapIntegrationTest, AdminBufferedTapTimeout) {
   using TraceWrapper = envoy::data::tap::v3::TraceWrapper;
   const int num_req = 4;   // # of requests to buffer before responding
-  const int timeout = 200; // milliseconds
+  const int timeout = 1000; // milliseconds
 
   initializeFilter(admin_filter_config_);
 
@@ -649,11 +649,11 @@ tap_config:
     sinks:
       - format: PROTO_BINARY_LENGTH_DELIMITED
         buffered_admin:
-          timeout: {}
+          timeout: 60s
           max_traces: {}
   )EOF";
 
-  startAdminRequest(fmt::format(admin_request_yaml, "2s", num_req));
+  startAdminRequest(fmt::format(admin_request_yaml, num_req));
 
   // Make num_req tapped requests
   for (size_t i = 0; i < num_req; i++) {
