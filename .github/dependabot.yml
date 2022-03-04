@@ -47,7 +47,7 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/examples/cors"
+  directory: "/examples/cors/backend"
   schedule:
     interval: "daily"
 
