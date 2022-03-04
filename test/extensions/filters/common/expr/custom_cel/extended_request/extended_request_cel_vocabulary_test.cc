@@ -8,6 +8,7 @@
 #include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/custom_cel_test_config.h"
 #include "test/test_common/utility.h"
 
 #include "eval/public/activation.h"
@@ -130,36 +131,16 @@ TEST_F(ExtendedRequestCelVocabularyTests, FillActivationWithNullRequestHeadersTe
   }
 }
 
-const std::string PATH_QUERY_STR = R"EOF(/query?a=apple&a=apricot&b=banana&=&c=cranberry)EOF";
-
-// request[query][a].contains(apple)
-const std::string REQUEST_HAS_QUERY_AS_MAP_EXPR = R"EOF(
-              call_expr:
-                function: contains
-                args:
-                - select_expr:
-                    operand:
-                      select_expr:
-                        operand:
-                          ident_expr:
-                            name: request
-                        field: query
-                    field: a
-                - const_expr:
-                    string_value: apple
-)EOF";
-
 // evaluateExpressionWithCustomCelVocabulary:
 // Given an activation with mappings for vocabulary,
 // create a RBAC policy with a condition derived from the given yaml,
 // create a CEL expression, and evaluate it.
-absl::StatusOr<CelValue>
-evaluateExpressionWithCustomCelVocabulary(Activation& activation, Protobuf::Arena& arena,
-                                          const std::string& expr_yaml,
-                                          ExtendedRequestCelVocabulary& custom_cel_vocabulary) {
+absl::StatusOr<CelValue> evaluateExpressionWithCustomCelVocabulary(
+    Activation& activation, Protobuf::Arena& arena, const absl::string_view& expr_yaml,
+    const absl::string_view& param, ExtendedRequestCelVocabulary& custom_cel_vocabulary) {
   envoy::config::rbac::v3::Policy policy;
-  policy.mutable_condition()->MergeFrom(
-      TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(expr_yaml));
+  policy.mutable_condition()->MergeFrom(TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(
+      fmt::format(std::string(expr_yaml), param)));
 
   using Envoy::Extensions::Filters::Common::Expr::BuilderPtr;
   using Envoy::Extensions::Filters::Common::Expr::ExpressionPtr;
@@ -173,8 +154,11 @@ evaluateExpressionWithCustomCelVocabulary(Activation& activation, Protobuf::Aren
 
 TEST_F(ExtendedRequestCelVocabularyTests,
        ReplaceDefaultMappingsWithCustomMappingsInActivationTest) {
+  using TestConfig::QUERY_EXPR;
+  const std::string path = R"EOF(/query?key1=apple&key2=banana)EOF";
+
   ExtendedRequestCelVocabulary custom_cel_vocabulary(true);
-  Http::TestRequestHeaderMapImpl request_headers{{":path", PATH_QUERY_STR}};
+  Http::TestRequestHeaderMapImpl request_headers{{":path", path}};
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   Protobuf::Arena arena;
   Activation activation;
@@ -182,10 +166,11 @@ TEST_F(ExtendedRequestCelVocabularyTests,
   activation.InsertValueProducer(
       Request, std::make_unique<RequestWrapper>(arena, &request_headers, mock_stream_info));
 
+  // Evaluate: request[query] as map - request[query][key1].contains(apple)
   // The activation does not contain the mappings for the custom CEL vocabulary yet.
   // Evaluation of the expression with custom vocabulary should not work.
   auto custom_field_evalation_result = evaluateExpressionWithCustomCelVocabulary(
-      activation, arena, REQUEST_HAS_QUERY_AS_MAP_EXPR, custom_cel_vocabulary);
+      activation, arena, QUERY_EXPR, "apple", custom_cel_vocabulary);
   EXPECT_FALSE(custom_field_evalation_result.ok());
 
   custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
@@ -194,7 +179,7 @@ TEST_F(ExtendedRequestCelVocabularyTests,
   // The activation now contains the mappings for the custom CEL vocabulary.
   // Evaluation of the expression with custom vocabulary should work.
   custom_field_evalation_result = evaluateExpressionWithCustomCelVocabulary(
-      activation, arena, REQUEST_HAS_QUERY_AS_MAP_EXPR, custom_cel_vocabulary);
+      activation, arena, QUERY_EXPR, "apple", custom_cel_vocabulary);
   EXPECT_TRUE(custom_field_evalation_result->IsBool() &&
               custom_field_evalation_result->BoolOrDie());
 }
