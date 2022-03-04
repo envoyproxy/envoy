@@ -21,6 +21,8 @@ namespace Envoy {
 namespace Quic {
 
 // Information which can be shared across connections, though not across threads.
+// TODO(danzh) considering exposing these QUICHE interfaces via base class virtual methods, so that
+// down casting can be avoided while passing around this object.
 struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   PersistentQuicInfoImpl(Event::Dispatcher& dispatcher, uint32_t buffer_limit);
 
