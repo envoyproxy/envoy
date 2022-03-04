@@ -1,4 +1,4 @@
-FROM python:3.8-slim-bullseye
+FROM envoyproxy/envoy-windows-dev:latest
 
 COPY ./setup_python.ps1 /
 
