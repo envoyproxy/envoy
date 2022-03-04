@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -62,9 +63,22 @@ envoy_cc_test(
         ":admin_instance_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/server/admin:stats_handler_lib",
+        "//source/server/admin:utils_lib",
         "//test/mocks/server:admin_stream_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "stats_handler_speed_test",
+    srcs = ["stats_handler_speed_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/stats:thread_local_store_lib",
+        "//source/server/admin:stats_handler_lib",
+        "//test/mocks/server:admin_stream_mocks",
     ],
 )
 

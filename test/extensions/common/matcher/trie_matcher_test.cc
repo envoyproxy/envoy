@@ -134,6 +134,58 @@ matcher_tree:
   }
 }
 
+TEST_F(TrieMatcherTest, TestMatcherOnNoMatch) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  custom_match:
+    name: ip_matcher
+    typed_config:
+      "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+      range_matchers:
+      - ranges:
+        - address_prefix: 192.0.0.0
+          prefix_len: 2
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: foo
+on_no_match:
+  action:
+    name: bar
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: bar
+  )EOF";
+  loadConfig(yaml);
+
+  {
+    auto input = TestDataInputFactory("input", "192.0.100.1");
+    validateMatch("foo");
+  }
+  {
+    // No range matches.
+    auto input = TestDataInputFactory("input", "128.0.0.1");
+    validateMatch("bar");
+  }
+  {
+    // Input is not a valid IP.
+    auto input = TestDataInputFactory("input", "xxx");
+    validateMatch("bar");
+  }
+  {
+    // Input is nullopt.
+    auto input = TestDataInputFactory(
+        "input", {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+    validateMatch("bar");
+  }
+}
+
 TEST_F(TrieMatcherTest, OverlappingMatcher) {
   const std::string yaml = R"EOF(
 matcher_tree:

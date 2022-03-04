@@ -291,9 +291,12 @@ public:
  */
 template <class DataType> class CustomMatcherFactory : public Config::TypedFactory {
 public:
-  virtual MatchTreeFactoryCb<DataType> createCustomMatcherFactoryCb(
-      const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& factory_context,
-      DataInputFactoryCb<DataType> data_input, OnMatchFactory<DataType>& on_match_factory) PURE;
+  virtual MatchTreeFactoryCb<DataType>
+  createCustomMatcherFactoryCb(const Protobuf::Message& config,
+                               Server::Configuration::ServerFactoryContext& factory_context,
+                               DataInputFactoryCb<DataType> data_input,
+                               absl::optional<OnMatchFactoryCb<DataType>> on_no_match,
+                               OnMatchFactory<DataType>& on_match_factory) PURE;
   std::string category() const override {
     // Static assert to guide implementors to understand what is required.
     static_assert(std::is_convertible<absl::string_view, decltype(DataType::name())>(),
