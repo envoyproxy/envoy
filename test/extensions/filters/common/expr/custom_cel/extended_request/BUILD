@@ -67,6 +67,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/common/expr/custom_cel/extended_request:extended_request_cel_vocabulary_lib",
         "//test/config:utility_lib",
         "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:custom_cel_test_config_lib",
         "//test/test_common:utility_lib",
         "@com_google_cel_cpp//eval/public:activation",
         "@com_google_cel_cpp//eval/public:cel_function_adapter",

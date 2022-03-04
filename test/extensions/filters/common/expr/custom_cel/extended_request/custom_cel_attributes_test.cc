@@ -33,7 +33,7 @@ public:
   absl::string_view getQueryString(absl::string_view path) {
     auto query_offset = path.find('?');
     if (query_offset != absl::string_view::npos) {
-      return path.substr(query_offset+1);
+      return path.substr(query_offset + 1);
     }
     return "";
   }
