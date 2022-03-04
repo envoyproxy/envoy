@@ -1,6 +1,6 @@
 FROM python:3.8-slim-bullseye
 
-Add requirements.txt /requirements.txt
+Add ./crosssite/requirements.txt /requirements.txt
 RUN pip3 install -q -r /requirements.txt
 RUN mkdir /code
 ADD ./crosssite/service.py ./index.html /code/
