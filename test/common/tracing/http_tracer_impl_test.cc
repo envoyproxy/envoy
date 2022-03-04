@@ -605,50 +605,6 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcOkStatus) {
                                             &response_trailers, stream_info, config);
 }
 
-TEST_F(HttpConnManFinalizerImplTest, GrpcNonErrorTag) {
-  const std::string path_prefix = "http://";
-  const std::string expected_ip = "10.0.0.100";
-  const auto remote_address = Network::Address::InstanceConstSharedPtr{
-      new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
-
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
-                                                 {":scheme", "http"},
-                                                 {":path", "/pb.Foo/Bar"},
-                                                 {":authority", "example.com:80"},
-                                                 {"content-type", "application/grpc"},
-                                                 {"grpc-timeout", "10s"},
-                                                 {":scheme", "http"},
-                                                 {"te", "trailers"}};
-
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
-                                                   {"content-type", "application/grpc"}};
-  Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "7"},
-                                                     {"grpc-message", "permission denied"}};
-
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
-  absl::optional<uint32_t> response_code(200);
-  EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
-  EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
-  EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
-  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
-  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
-
-  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("POST")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcPath), Eq("/pb.Foo/Bar")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcAuthority), Eq("example.com:80")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcContentType), Eq("application/grpc")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcTimeout), Eq("10s")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("7")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
-
-  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
-                                            &response_trailers, stream_info, config);
-}
-
 TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
   const std::string path_prefix = "http://";
   const std::string expected_ip = "10.0.0.100";
@@ -666,8 +622,15 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
                                                    {"content-type", "application/grpc"}};
-  Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "14"},
-                                                     {"grpc-message", "unavailable"}};
+
+  Http::TestResponseTrailerMapImpl response_trailers;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.update_grpc_response_error_tag")) {
+    response_trailers.setGrpcStatus("14");
+    response_trailers.setGrpcMessage("unavailable");
+  } else {
+    response_trailers.setGrpcStatus("7");
+    response_trailers.setGrpcMessage("permission denied");
+  }
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
   absl::optional<uint32_t> response_code(200);
@@ -678,7 +641,6 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
   stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("POST")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
@@ -686,8 +648,14 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcAuthority), Eq("example.com:80")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcContentType), Eq("application/grpc")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcTimeout), Eq("10s")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("unavailable")));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.update_grpc_response_error_tag")) {
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("unavailable")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+  } else {
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("7")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
+  }
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
@@ -709,9 +677,16 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcTrailersOnly) {
                                                  {"te", "trailers"}};
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
-                                                   {"content-type", "application/grpc"},
-                                                   {"grpc-status", "14"},
-                                                   {"grpc-message", "unavailable"}};
+                                                   {"content-type", "application/grpc"}};
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.update_grpc_response_error_tag")) {
+    response_headers.setGrpcStatus("14");
+    response_headers.setGrpcMessage("unavailable");
+  } else {
+    response_headers.setGrpcStatus("7");
+    response_headers.setGrpcMessage("permission denied");
+  }
+
   Http::TestResponseTrailerMapImpl response_trailers;
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
@@ -723,15 +698,20 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcTrailersOnly) {
   stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("POST")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcPath), Eq("/pb.Foo/Bar")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcAuthority), Eq("example.com:80")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcContentType), Eq("application/grpc")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("unavailable")));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.update_grpc_response_error_tag")) {
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("unavailable")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+  } else {
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("7")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
+  }
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
