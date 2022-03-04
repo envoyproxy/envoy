@@ -35,6 +35,7 @@
 #include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"
 #include "quiche/http2/adapter/http2_adapter.h"
+#include "quiche/http2/adapter/oghttp2_adapter.h"
 
 namespace Envoy {
 namespace Http {
@@ -75,11 +76,11 @@ public:
 
 class ConnectionImpl;
 
-// Abstract nghttp2_session factory. Used to enable injection of factories for testing.
-class Nghttp2SessionFactory {
+// Abstract actory. Used to enable injection of factories for testing.
+class Http2SessionFactory {
 public:
   using ConnectionImplType = ConnectionImpl;
-  virtual ~Nghttp2SessionFactory() = default;
+  virtual ~Http2SessionFactory() = default;
 
   // Returns a new nghttp2_session to be used with |connection|.
   virtual nghttp2_session* createOld(const nghttp2_session_callbacks* callbacks,
@@ -90,7 +91,12 @@ public:
   virtual void initOld(nghttp2_session* session, ConnectionImplType* connection,
                        const envoy::config::core::v3::Http2ProtocolOptions& options) PURE;
 
-  // Returns a new nghttp2_session to be used with |connection|.
+  // Returns a new HTTP/2 session to be used with |connection|.
+  virtual std::unique_ptr<http2::adapter::Http2Adapter>
+  create(const nghttp2_session_callbacks* callbacks, ConnectionImplType* connection,
+         const http2::adapter::OgHttp2Adapter::Options& options) PURE;
+
+  // Returns a new HTTP/2 session to be used with |connection|.
   virtual std::unique_ptr<http2::adapter::Http2Adapter>
   create(const nghttp2_session_callbacks* callbacks, ConnectionImplType* connection,
          const nghttp2_option* options) PURE;
@@ -100,13 +106,17 @@ public:
                     const envoy::config::core::v3::Http2ProtocolOptions& options) PURE;
 };
 
-class ProdNghttp2SessionFactory : public Nghttp2SessionFactory {
+class ProdNghttp2SessionFactory : public Http2SessionFactory {
 public:
   nghttp2_session* createOld(const nghttp2_session_callbacks* callbacks, ConnectionImpl* connection,
                              const nghttp2_option* options) override;
 
   void initOld(nghttp2_session* session, ConnectionImpl* connection,
                const envoy::config::core::v3::Http2ProtocolOptions& options) override;
+
+  std::unique_ptr<http2::adapter::Http2Adapter> create(const nghttp2_session_callbacks* callbacks,
+                                                       ConnectionImpl* connection,
+                                                       const http2::adapter::OgHttp2Adapter::Options& options) override;
 
   std::unique_ptr<http2::adapter::Http2Adapter> create(const nghttp2_session_callbacks* callbacks,
                                                        ConnectionImpl* connection,
@@ -193,18 +203,24 @@ protected:
    */
   class Http2Options {
   public:
-    Http2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options);
+    Http2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                 uint32_t max_headers_kb);
     ~Http2Options();
 
     const nghttp2_option* options() { return options_; }
+    const http2::adapter::OgHttp2Adapter::Options& og_options() {
+      return og_options_;
+    }
 
   protected:
     nghttp2_option* options_;
+    http2::adapter::OgHttp2Adapter::Options og_options_;
   };
 
   class ClientHttp2Options : public Http2Options {
   public:
-    ClientHttp2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options);
+    ClientHttp2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                       uint32_t max_headers_kb);
   };
 
   /**
@@ -530,6 +546,8 @@ protected:
   // Uses a new wrapper API around the underlying HTTP/2 codec. Guarded by the
   // "envoy.reloadable_features.http2_new_codec_wrapper" runtime feature flag.
   const bool use_new_codec_wrapper_;
+  // Whether to use the new HTTP/2 library. Only has an effect if `use_new_codec_wrapper` is true.
+  const bool use_oghttp2_library_;
   // TODO(birenroy): Make this static again when removing
   // use_new_codec_wrapper_.
   Http2Callbacks http2_callbacks_;
@@ -631,7 +649,7 @@ private:
  */
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
-  using SessionFactory = Nghttp2SessionFactory;
+  using SessionFactory = Http2SessionFactory;
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
                        CodecStats& stats, Random::RandomGenerator& random_generator,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,

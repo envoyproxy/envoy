@@ -3232,7 +3232,7 @@ public:
       Network::Connection& connection, Http::ConnectionCallbacks& callbacks, Stats::Scope& scope,
       const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
       Random::RandomGenerator& random, uint32_t max_request_headers_kb,
-      uint32_t max_request_headers_count, Nghttp2SessionFactory& http2_session_factory)
+      uint32_t max_request_headers_count, Http2SessionFactory& http2_session_factory)
       : TestClientConnectionImpl(connection, callbacks, scope, http2_options, random,
                                  max_request_headers_kb, max_request_headers_count,
                                  http2_session_factory) {}
@@ -3269,7 +3269,7 @@ protected:
   NewMetadataEncoder encoder_;
 };
 
-class TestNghttp2SessionFactory : public Nghttp2SessionFactory {
+class TestNghttp2SessionFactory : public Http2SessionFactory {
 public:
   ~TestNghttp2SessionFactory() override {
     nghttp2_session_callbacks_del(callbacks_);
@@ -3306,6 +3306,27 @@ public:
 
   void initOld(nghttp2_session*, ConnectionImpl*,
                const envoy::config::core::v3::Http2ProtocolOptions&) override {}
+
+  std::unique_ptr<http2::adapter::Http2Adapter> create(const nghttp2_session_callbacks*,
+                                                       ConnectionImpl* connection,
+                                                       const http2::adapter::OgHttp2Adapter::Options& options) override {
+    // Only need to provide callbacks required to send METADATA frames. The new codec wrapper
+    // requires the send callback, but not the pack_extension callback.
+    nghttp2_session_callbacks_new(&callbacks_);
+    nghttp2_session_callbacks_set_send_callback(
+        callbacks_,
+        [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
+          // Cast down to MetadataTestClientConnectionImpl to leverage friendship.
+          return static_cast<MetadataTestClientConnectionImpl*>(
+                     static_cast<ConnectionImpl*>(user_data))
+              ->onSend(data, length);
+        });
+    auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
+        http2::adapter::Perspective::kClient, *callbacks_, connection);
+    http2::adapter::Http2VisitorInterface& v = *visitor;
+    connection->setVisitor(std::move(visitor));
+    return http2::adapter::OgHttp2Adapter::Create(v, options);
+  }
 
   std::unique_ptr<http2::adapter::Http2Adapter> create(const nghttp2_session_callbacks*,
                                                        ConnectionImpl* connection,

@@ -104,7 +104,7 @@ public:
                            const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                            Random::RandomGenerator& random, uint32_t max_request_headers_kb,
                            uint32_t max_request_headers_count,
-                           Nghttp2SessionFactory& http2_session_factory)
+                           Http2SessionFactory& http2_session_factory)
       : TestCodecStatsProvider(scope),
         ClientConnectionImpl(connection, callbacks, http2CodecStats(), random, http2_options,
                              max_request_headers_kb, max_request_headers_count,
