@@ -38,7 +38,7 @@ private:
  */
 class Options {
 public:
-  Options(int argc, char** argv);
+  Options(int argc, const char* const* argv);
 
   /**
    * @return the schema type.
@@ -73,6 +73,7 @@ private:
 class Validator {
 public:
   Validator() : api_(Api::createApiForTest(stats_)) {}
+
   /**
    * Validates the configuration at config_path against schema_type.
    * An EnvoyException is thrown in several cases:
@@ -82,6 +83,11 @@ public:
    * @param options supplies the validation options.
    */
   void validate(const Options& options);
+
+  /**
+   * Run the validator from command line arguments.
+   */
+  static void run(int argc, const char* const* argv);
 
 private:
   Stats::IsolatedStoreImpl stats_;

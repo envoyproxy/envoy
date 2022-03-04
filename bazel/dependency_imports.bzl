@@ -80,9 +80,9 @@ def envoy_dependency_imports(go_version = GO_VERSION):
         sum = "h1:xOpFu4vwmIoUeUrRuAtdCrZZymT/6AkW/bsUWA506Fo=",
         version = "v0.6.0",
         # project_url = "https://pkg.go.dev/github.com/lyft/protoc-gen-star",
-        # last_update = "2022-02-28"
+        # last_update = "2022-03-04"
         # use_category = ["api"],
-        # source = "https://github.com/envoyproxy/protoc-gen-validate/blob/v0.6.4/dependencies.bzl#L35-L40"
+        # source = "https://github.com/envoyproxy/protoc-gen-validate/blob/v0.6.7/dependencies.bzl#L35-L40"
     )
     go_repository(
         name = "com_github_iancoleman_strcase",

@@ -30,7 +30,7 @@ const std::string& Schema::toString(Type type) {
   PANIC("reached unexpected code");
 }
 
-Options::Options(int argc, char** argv) {
+Options::Options(int argc, const char* const* argv) {
   TCLAP::CmdLine cmd("schema_validator_tool", ' ', "none", false);
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", true,
                                            "", "string", cmd);
@@ -120,6 +120,13 @@ void Validator::validate(const Options& options) {
     break;
   }
   }
+}
+
+void Validator::run(int argc, const char* const* argv) {
+  Options options(argc, argv);
+  Validator v;
+
+  v.validate(options);
 }
 
 } // namespace Envoy

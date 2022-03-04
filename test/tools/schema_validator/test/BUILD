@@ -1,19 +1,21 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
     "envoy_package",
-    "envoy_sh_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_sh_test(
+envoy_cc_test(
     name = "schema_validator_test",
-    srcs = ["schema_validator_tests.sh"],
-    cc_binary = ["//test/tools/schema_validator:schema_validator_tool"],
+    srcs = ["schema_validator_test.cc"],
     data = [
         ":configs",
+    ],
+    deps = [
+        "//test/tools/schema_validator:schema_validator_lib",
     ],
 )
 

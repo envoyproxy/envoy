@@ -266,8 +266,6 @@ envoy_cc_test_binary(
     external_deps = [
         "abseil_symbolize",
     ],
-    # For reasons not clear this test fails if dynamically linked in coverage builds.
-    linkstatic = 1,
     stamped = True,
     deps = [
         "//source/exe:envoy_main_common_with_core_extensions_lib",

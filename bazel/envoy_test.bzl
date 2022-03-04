@@ -226,13 +226,11 @@ def envoy_cc_test_binary(
         name,
         tags = [],
         deps = [],
-        linkstatic = envoy_linkstatic(),
         **kargs):
     envoy_cc_binary(
         name,
         testonly = 1,
         linkopts = _envoy_test_linkopts(),
-        linkstatic = linkstatic,
         tags = tags + ["compilation_db_dep"],
         deps = deps + [
             "@envoy//test/test_common:test_version_linkstamp",

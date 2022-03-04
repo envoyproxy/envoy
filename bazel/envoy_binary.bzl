@@ -22,7 +22,6 @@ def envoy_cc_binary(
         stamped = False,
         deps = [],
         linkopts = [],
-        linkstatic = 1,
         tags = [],
         features = []):
     if not linkopts:
@@ -38,7 +37,7 @@ def envoy_cc_binary(
         copts = envoy_copts(repository),
         linkopts = linkopts,
         testonly = testonly,
-        linkstatic = linkstatic,
+        linkstatic = 1,
         visibility = visibility,
         malloc = tcmalloc_external_dep(repository),
         stamp = 1,

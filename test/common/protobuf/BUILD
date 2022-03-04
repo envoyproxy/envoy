@@ -37,9 +37,6 @@ envoy_proto_library(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
-    data = [
-        "//test/tools/schema_validator/test:configs",
-    ],
     deps = [
         ":utility_test_protos_cc_proto",
         "//source/common/config:api_version_lib",

@@ -1686,9 +1686,8 @@ TEST_F(ProtobufUtilityTest, MessageWip) {
 
 class DeprecatedFieldsTest : public testing::Test, protected RuntimeStatsHelper {
 protected:
-  void checkForDeprecation(const Protobuf::Message& message, bool recurse_into_any = false) {
-    MessageUtil::checkForUnexpectedFields(message, ProtobufMessage::getStrictValidationVisitor(),
-                                          recurse_into_any);
+  void checkForDeprecation(const Protobuf::Message& message) {
+    MessageUtil::checkForUnexpectedFields(message, ProtobufMessage::getStrictValidationVisitor());
   }
 };
 
@@ -1719,36 +1718,6 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecatedEm
                       checkForDeprecation(base));
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
   EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
-}
-
-// Make sure recursing into an Any works if asked.
-TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RecurseIntoAny)) {
-  envoy::service::discovery::v3::DiscoveryResponse discovery_response_config;
-  TestUtility::loadFromFile(
-      TestEnvironment::runfilesPath("test/tools/schema_validator/test/config/lds_deprecated.yaml"),
-      discovery_response_config, *api_);
-  EXPECT_LOG_CONTAINS(
-      "warning", "Using deprecated option 'envoy.config.listener.v3.FilterChain.use_proxy_proto'",
-      checkForDeprecation(discovery_response_config, true));
-}
-
-// Make sure recursing into an typed struct fails if the type url is invalid. This will not be
-// caught during initial load.
-TEST_F(DeprecatedFieldsTest, RecurseIntoAnyInvalidTypedStruct) {
-  envoy::service::discovery::v3::DiscoveryResponse discovery_response_config;
-  TestUtility::loadFromFile(
-      TestEnvironment::runfilesPath(
-          "test/tools/schema_validator/test/config/lds_invalid_typed_struct.yaml"),
-      discovery_response_config, *api_);
-  EXPECT_THROW_WITH_MESSAGE(checkForDeprecation(discovery_response_config, true), EnvoyException,
-                            "Invalid type_url 'blah' during traversal");
-
-  TestUtility::loadFromFile(
-      TestEnvironment::runfilesPath(
-          "test/tools/schema_validator/test/config/lds_invalid_typed_struct_2.yaml"),
-      discovery_response_config, *api_);
-  EXPECT_THROW_WITH_MESSAGE(checkForDeprecation(discovery_response_config, true), EnvoyException,
-                            "Invalid type_url 'bleh' during traversal");
 }
 
 TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecatedEmitsCrash) {
