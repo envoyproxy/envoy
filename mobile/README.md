@@ -28,6 +28,13 @@ Contributing to Envoy Mobile is fun! To get started:
 * [Contributing guide](CONTRIBUTING.md)
 * Please make sure that you let us know if you are working on an issue so we don't duplicate work!
 
+## Community Meeting
+
+The Envoy mobile team meets weekly on Tuesday at 11am PT. The meeting and zoom link are on the
+Envoy calendar [here](https://goo.gl/PkDijT)
+
+* Meeting minutes are [here](https://docs.google.com/document/d/1T5qNoUxh80HkCia7XXxUCC8CFs9W6UVx6S5r7n688Ns)
+
 ## Copyright and Trademark
 
 Envoy Mobile is licensed under the Apache 2.0 license and copyrighted by the Envoy Mobile Project Authors.
