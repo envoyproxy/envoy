@@ -923,7 +923,7 @@ ci/run_envoy_docker.sh bash
 ```
 * Get the docker container ID
 ```shell
-docker ps | grep envoy-build-ubuntu | awk '{print $1}'
+dockerContainerID=$(docker ps | grep envoy-build-ubuntu | awk '{print $1}')
 ```
 * Copy the `clang-format` to host machine
 ```shell
