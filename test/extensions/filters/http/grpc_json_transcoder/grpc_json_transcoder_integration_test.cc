@@ -1204,8 +1204,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetExceedsBufferLimit) 
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       R"([{"id":"1","author":"Neal Stephenson","title":"Readme"}])");
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.defer_processing_backedup_streams")) {
+  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
     // Over limit: The server streams two response messages. Because this is
     // larger than the buffer limits, we end up buffering both results in the
     // codec towards the upstream. When we finally process the buffered data, we

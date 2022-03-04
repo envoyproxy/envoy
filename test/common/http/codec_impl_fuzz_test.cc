@@ -355,8 +355,7 @@ public:
         // With this feature enabled for http2 we end up creating a schedulable
         // callback the first time we re-enable reading as it's used to process
         // the backed up data.
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.defer_processing_backedup_streams")) {
+        if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
           const bool expecting_schedulable_callback_creation =
               http_protocol_ == Protocol::Http2 && state.read_disable_count_ == 0 && !disable &&
               !state.created_schedulable_callback_;

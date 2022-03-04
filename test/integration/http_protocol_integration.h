@@ -57,7 +57,7 @@ public:
                                           Http::CodecType::HTTP3)) {
     config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
                                       GetParam().http2_new_codec_wrapper ? "true" : "false");
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.defer_processing_backedup_streams",
+    config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
                                       GetParam().defer_processing_backedup_streams ? "true"
                                                                                    : "false");
   }

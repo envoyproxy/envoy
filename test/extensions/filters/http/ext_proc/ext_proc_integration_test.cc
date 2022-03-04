@@ -645,8 +645,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetTrailersIncorrectlyOnResponse) {
     return true;
   });
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.defer_processing_backedup_streams")) {
+  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
     // We get a reset since we've received some of the response already.
     ASSERT_TRUE(response->waitForReset());
   } else {

@@ -140,7 +140,7 @@ public:
         {{"envoy.reloadable_features.http2_new_codec_wrapper",
           enable_new_codec_wrapper_ ? "true" : "false"}});
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.defer_processing_backedup_streams",
+        {{std::string(Runtime::defer_processing_backedup_streams),
           defer_processing_backedup_streams_ ? "true" : "false"}});
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
@@ -3603,7 +3603,7 @@ protected:
         {{"envoy.reloadable_features.http2_new_codec_wrapper",
           enable_new_codec_wrapper_ ? "true" : "false"}});
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.defer_processing_backedup_streams",
+        {{std::string(Runtime::defer_processing_backedup_streams),
           defer_processing_backedup_streams_ ? "true" : "false"}});
     allow_metadata_ = true;
     http2OptionsFromTuple(client_http2_options_, client_settings_);

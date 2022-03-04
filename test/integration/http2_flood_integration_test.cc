@@ -64,7 +64,7 @@ public:
     const bool enable_new_wrapper = std::get<1>(GetParam());
     config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
                                       enable_new_wrapper ? "true" : "false");
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.defer_processing_backedup_streams",
+    config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
                                       deferredProcessing(GetParam()) ? "true" : "false");
   }
 

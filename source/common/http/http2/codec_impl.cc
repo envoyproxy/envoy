@@ -159,8 +159,8 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
       received_noninformational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false),
-      defer_processing_backedup_streams_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.defer_processing_backedup_streams")) {
+      defer_processing_backedup_streams_(
+          Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
   parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit);
