@@ -6,6 +6,8 @@
 #include "envoy/network/transport_socket.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/scalar_to_byte_vector.h"
+#include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
@@ -117,6 +119,20 @@ Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportS
   }
   return std::make_unique<UpstreamProxyProtocolSocket>(std::move(inner_socket), options,
                                                        config_.version());
+}
+
+void UpstreamProxyProtocolSocketFactory::hashKey(
+    std::vector<uint8_t>& key, Network::TransportSocketOptionsConstSharedPtr options) const {
+  PassthroughFactory::hashKey(key, options);
+  // Proxy protocol options should only be included in the hash if the upstream
+  // socket intends to use them.
+  if (options) {
+    const auto& proxy_protocol_options = options->proxyProtocolOptions();
+    if (proxy_protocol_options.has_value()) {
+      pushScalarToByteVector(
+          StringUtil::CaseInsensitiveHash()(proxy_protocol_options.value().asStringForHash()), key);
+    }
+  }
 }
 
 } // namespace ProxyProtocol

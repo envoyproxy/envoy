@@ -28,10 +28,12 @@ RUNTIME_GUARD(envoy_reloadable_features_conn_pool_new_stream_with_early_data_and
 RUNTIME_GUARD(envoy_reloadable_features_correct_scheme_and_xfp);
 RUNTIME_GUARD(envoy_reloadable_features_correctly_validate_alpn);
 RUNTIME_GUARD(envoy_reloadable_features_disable_tls_inspector_injection);
+RUNTIME_GUARD(envoy_reloadable_features_do_not_await_headers_on_upstream_timeout_to_emit_stats);
 RUNTIME_GUARD(envoy_reloadable_features_enable_grpc_async_client_cache);
 RUNTIME_GUARD(envoy_reloadable_features_fix_added_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_handle_stream_reset_during_hcm_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_http2_allow_capacity_increase_by_settings);
+RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
 RUNTIME_GUARD(envoy_reloadable_features_http_ext_authz_do_not_skip_direct_response_and_redirect);
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
@@ -39,6 +41,7 @@ RUNTIME_GUARD(envoy_reloadable_features_internal_address);
 RUNTIME_GUARD(envoy_reloadable_features_listener_reuse_port_default_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_listener_wildcard_match_ip_family);
 RUNTIME_GUARD(envoy_reloadable_features_new_tcp_connection_pool);
+RUNTIME_GUARD(envoy_reloadable_features_postpone_h3_client_connect_to_next_loop);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_102_103);
 RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_json);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_http_header_referer);
@@ -60,8 +63,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 // TODO(adisuissa) reset to true to enable unified mux by default
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
-// TODO(birenroy) reset to true after bug fixes
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
+// TODO(alyssar) flip false once issue complete.
+FALSE_RUNTIME_GUARD(envoy_restart_features_no_runtime_singleton);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
 ABSL_FLAG(uint64_t, envoy_buffer_overflow_multiplier, 0, "");                        // NOLINT
@@ -142,6 +145,7 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_correct_scheme_and_xfp,
   &FLAGS_envoy_reloadable_features_correctly_validate_alpn,
   &FLAGS_envoy_reloadable_features_disable_tls_inspector_injection,
+  &FLAGS_envoy_reloadable_features_do_not_await_headers_on_upstream_timeout_to_emit_stats,
   &FLAGS_envoy_reloadable_features_enable_grpc_async_client_cache,
   &FLAGS_envoy_reloadable_features_fix_added_trailers,
   &FLAGS_envoy_reloadable_features_handle_stream_reset_during_hcm_encoding,
@@ -151,9 +155,9 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_http_reject_path_with_fragment,
   &FLAGS_envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled,
   &FLAGS_envoy_reloadable_features_internal_address,
-  &FLAGS_envoy_reloadable_features_listener_reuse_port_default_enabled,
   &FLAGS_envoy_reloadable_features_listener_wildcard_match_ip_family,
   &FLAGS_envoy_reloadable_features_new_tcp_connection_pool,
+  &FLAGS_envoy_reloadable_features_postpone_h3_client_connect_to_next_loop,
   &FLAGS_envoy_reloadable_features_proxy_102_103,
   &FLAGS_envoy_reloadable_features_remove_legacy_json,
   &FLAGS_envoy_reloadable_features_sanitize_http_header_referer,
@@ -167,6 +171,7 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_validate_connect,
   &FLAGS_envoy_restart_features_explicit_wildcard_resource,
   &FLAGS_envoy_restart_features_use_apple_api_for_dns_lookups,
+  &FLAGS_envoy_restart_features_no_runtime_singleton,
 };
 // clang-format on
 
