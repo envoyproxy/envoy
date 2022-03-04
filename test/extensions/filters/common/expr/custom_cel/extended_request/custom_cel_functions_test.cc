@@ -80,18 +80,21 @@ CelValue createStrToIntCelMap(Protobuf::Arena& arena,
 }
 
 TEST_F(CustomCelFunctionTests, UrlFunctionTests) {
+  // url = host+path
   absl::flat_hash_map<std::string, std::string> headers = {{"host", "abc.com:1234"}, {"path", ""}};
-
   urlFunctionTest(headers, absl::StatusCode::kOk, "abc.com:1234");
 
+  // no path
   headers.clear();
   headers["host"] = "abc.com:1234";
   urlFunctionTest(headers, absl::StatusCode::kNotFound, "");
 
+  // no host
   headers.clear();
   headers["path"] = "";
   urlFunctionTest(headers, absl::StatusCode::kNotFound, "");
 
+  // ints for header host and path header values
   absl::flat_hash_map<std::string, int64_t> bad_headers = {{"host", 1}, {"path", 2}};
 
   urlFunctionTestWithBadHeaders(bad_headers, absl::StatusCode::kNotFound, "");

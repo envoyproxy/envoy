@@ -185,7 +185,7 @@ TEST_F(ExtendedRequestCelVocabularyTests,
   ASSERT_TRUE(has_custom_field_or.ok());
   auto has_custom_field = has_custom_field_or.value();
   EXPECT_TRUE(has_custom_field.IsBool());
-  EXPECT_TRUE(!has_custom_field.BoolOrDie());
+  EXPECT_FALSE(has_custom_field.BoolOrDie());
 
   custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
                                        nullptr, nullptr);
