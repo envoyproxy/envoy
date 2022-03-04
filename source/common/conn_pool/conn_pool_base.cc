@@ -547,6 +547,13 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     checkForIdleAndCloseIdleConnsIfDraining();
     break;
   }
+  case Network::ConnectionEvent::ConnectedZeroRtt: {
+    // No need to update connecting capacity and connect_timer_ as the client is still connecting.
+    ASSERT(client.state() == ActiveClient::State::CONNECTING);
+    host()->cluster().stats().upstream_cx_connect_with_0_rtt_.inc();
+    // TODO(danzh) mark the client able to handle early data requests.
+    break;
+  }
   }
 }
 
