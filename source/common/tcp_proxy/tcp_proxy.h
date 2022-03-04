@@ -186,7 +186,7 @@ public:
   }
   const Network::HashPolicy* hashPolicy() { return hash_policy_.get(); }
 
-  Upstream::OdCdsApiHandle* odcds() const { return nullptr; }
+  Upstream::OdCdsApiHandle* odcds() const { return odcds_.get(); }
 
 private:
   struct SimpleRouteImpl : public Route {

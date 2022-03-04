@@ -129,6 +129,12 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
   if (!config.hash_policy().empty()) {
     hash_policy_ = std::make_unique<Network::HashPolicyImpl>(config.hash_policy());
   }
+
+  if (config.has_on_demand()) {
+    odcds_ = context.clusterManager().allocateOdCdsApi(config.on_demand().odcds_config(),
+                                                       OptRef<xds::core::v3::ResourceLocator>(),
+                                                       context.messageValidationVisitor());
+  }
 }
 
 RouteConstSharedPtr Config::getRegularRouteFromEntries(Network::Connection& connection) {
@@ -332,7 +338,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
       cluster_manager_.getThreadLocalCluster(cluster_name);
 
   if (!thread_local_cluster) {
-    auto odcds = config_->odcds();
+    auto* odcds = config_->odcds();
     if (odcds == nullptr) {
       // No ODCDS? It means that on-demand discovery is disabled.
       ENVOY_CONN_LOG(debug, "Cluster not found {} and no on demand cluster set.",
@@ -420,7 +426,9 @@ void Filter::onClusterDiscoveryCompletion(
   // Clear the handle_ before calling establishUpstreamConnection since we may request cluster
   // again.
   cluster_discovery_handle_.reset();
-  establishUpstreamConnection();
+  if (!downstream_closed_) {
+    establishUpstreamConnection();
+  }
 }
 
 bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
