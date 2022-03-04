@@ -645,12 +645,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetTrailersIncorrectlyOnResponse) {
     return true;
   });
 
-  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-    // We get a reset since we've received some of the response already.
-    ASSERT_TRUE(response->waitForReset());
-  } else {
-    verifyDownstreamResponse(*response, 500);
-  }
+  verifyDownstreamResponse(*response, 500);
 }
 
 // Test the filter configured to only send the response trailers message

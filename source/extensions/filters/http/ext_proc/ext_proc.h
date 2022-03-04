@@ -167,9 +167,6 @@ private:
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
                                       Http::RequestOrResponseHeaderMap& headers, bool end_stream);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
-  // Return a pair of whether to terminate returning the current result.
-  std::pair<bool, Http::FilterDataStatus>
-  processBufferedPartial(ProcessorState& state, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
 
   const FilterConfigSharedPtr config_;

@@ -1204,57 +1204,35 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetExceedsBufferLimit) 
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       R"([{"id":"1","author":"Neal Stephenson","title":"Readme"}])");
 
-  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-    // Over limit: The server streams two response messages. Because this is
-    // larger than the buffer limits, we end up buffering both results in the
-    // codec towards the upstream. When we finally process the buffered data, we
-    // end up resetting the stream as we've over the transcoder limit.
-    testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
-        Http::TestRequestHeaderMapImpl{
-            {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
-        "", {"shelf: 1"},
-        {R"(id: 1 author: "Neal Stephenson" title: "Readme")",
-         R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
-        Status(),
-        Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
-        /*expected_response_body=*/"", false, false, "", true, /*expect_response_complete=*/false);
-
-  } else {
-    // Over limit: The server streams two response messages. Even through the transcoder
-    // handles them independently, portions of the first message are still in the
-    // internal buffers while the second one is processed.
-    //
-    // Because the headers and body is already sent, the stream is closed with
-    // an incomplete response.
-    testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
-        Http::TestRequestHeaderMapImpl{
-            {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
-        "", {"shelf: 1"},
-        {R"(id: 1 author: "Neal Stephenson" title: "Readme")",
-         R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
-        Status(),
-        Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
-        // Incomplete response, not valid JSON.
-        R"([{"id":"1","author":"Neal Stephenson","title":"Readme"})", false, false, "", true,
-        /*expect_response_complete=*/false);
-  }
+  // Over limit: The server streams two response messages. Even through the transcoder
+  // handles them independently, portions of the first message are still in the
+  // internal buffers while the second one is processed.
+  //
+  // Because the headers and body is already sent, the stream is closed with
+  // an incomplete response.
+  testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
+      "", {"shelf: 1"},
+      {R"(id: 1 author: "Neal Stephenson" title: "Readme")",
+       R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
+      Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      // Incomplete response, not valid JSON.
+      R"([{"id":"1","author":"Neal Stephenson","title":"Readme"})", false, false, "", true,
+      /*expect_response_complete=*/false);
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetUnderBufferLimit) {
-  const int num_messages = 100;
-  const std::string grpc_response_message = R"(id: 1 author: "Neal Stephenson" title: "Readme")";
-  // The upstream will encode all of the response back to back, as such some of
-  // the responses will cluster together. It's unlikely that a majority of them
-  // will have been sent to the Envoy before it has streamed them to the
-  // downstream.
-  config_helper_.setBufferLimits(2 << 20, 60 * grpc_response_message.size());
+  const int num_messages = 20;
+  config_helper_.setBufferLimits(2 << 20, 80);
   HttpIntegrationTest::initialize();
 
   // Craft multiple response messages. IF combined together, they exceed the buffer limit.
   std::vector<std::string> grpc_response_messages;
   grpc_response_messages.reserve(num_messages);
   for (int i = 0; i < num_messages; i++) {
-    grpc_response_messages.push_back(grpc_response_message);
+    grpc_response_messages.push_back(R"(id: 1 author: "Neal Stephenson" title: "Readme")");
   }
 
   // Craft expected response.
