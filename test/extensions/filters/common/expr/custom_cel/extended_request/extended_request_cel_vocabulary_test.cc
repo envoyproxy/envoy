@@ -102,7 +102,7 @@ TEST_F(ExtendedRequestCelVocabularyTests, FillActivationTest) {
   custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
                                        nullptr, nullptr);
 
-  // verify that the variable sets are in the activation
+  // verify that the attributes in the activation
   for (int i = 0; static_cast<size_t>(i) < attribute_set_names.size(); ++i) {
     EXPECT_TRUE(activation.FindValue(attribute_set_names[i], &arena).has_value());
   }
@@ -130,18 +130,24 @@ TEST_F(ExtendedRequestCelVocabularyTests, FillActivationWithNullRequestHeadersTe
   }
 }
 
-const std::string REQUEST_HAS_QUERY_EXPR = R"EOF(
-          call_expr:
-            function: _==_
-            args:
-            - select_expr:
-                test_only: true
-                operand:
-                  ident_expr:
-                    name: request
-                field: query
-            - const_expr:
-               bool_value: true
+const std::string PATH_QUERY_STR =
+  R"EOF(/query?a=apple&a=apricot&b=banana&=&c=cranberry)EOF";
+
+// request[query][a].contains(apple)
+const std::string REQUEST_HAS_QUERY_AS_MAP_EXPR = R"EOF(
+              call_expr:
+                function: contains
+                args:
+                - select_expr:
+                    operand:
+                      select_expr:
+                        operand:
+                          ident_expr:
+                            name: request
+                        field: query
+                    field: a
+                - const_expr:
+                    string_value: apple
 )EOF";
 
 // evaluateExpressionWithCustomCelVocabulary:
@@ -170,7 +176,7 @@ TEST_F(ExtendedRequestCelVocabularyTests,
        ReplaceDefaultMappingsWithCustomMappingsInActivationTest) {
   ExtendedRequestCelVocabulary custom_cel_vocabulary(true);
   Http::TestRequestHeaderMapImpl request_headers{
-      {":path", "/query?a=apple&a=apricot&b=banana&=&c=cranberry"}};
+      {":path", PATH_QUERY_STR}};
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   Protobuf::Arena arena;
   Activation activation;
@@ -179,25 +185,19 @@ TEST_F(ExtendedRequestCelVocabularyTests,
       Request, std::make_unique<RequestWrapper>(arena, &request_headers, mock_stream_info));
 
   // The activation does not contain the mappings for the custom CEL vocabulary yet.
-  // The check for custom CEL fields should evaluate to false.
-  auto has_custom_field_or = evaluateExpressionWithCustomCelVocabulary(
-      activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
-  ASSERT_TRUE(has_custom_field_or.ok());
-  auto has_custom_field = has_custom_field_or.value();
-  EXPECT_TRUE(has_custom_field.IsBool());
-  EXPECT_FALSE(has_custom_field.BoolOrDie());
+  // Evaluation of the expression with custom vocabulary should not work.
+  auto custom_field_evalation_result = evaluateExpressionWithCustomCelVocabulary(
+      activation, arena, REQUEST_HAS_QUERY_AS_MAP_EXPR, custom_cel_vocabulary);
+  EXPECT_FALSE(custom_field_evalation_result.ok());
 
   custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
                                        nullptr, nullptr);
 
   // The activation now contains the mappings for the custom CEL vocabulary.
-  // The check for custom CEL fields should evaluate to true.
-  has_custom_field_or = evaluateExpressionWithCustomCelVocabulary(
-      activation, arena, REQUEST_HAS_QUERY_EXPR, custom_cel_vocabulary);
-  ASSERT_TRUE(has_custom_field_or.ok());
-  has_custom_field = has_custom_field_or.value();
-  EXPECT_TRUE(has_custom_field.IsBool());
-  EXPECT_TRUE(has_custom_field.BoolOrDie());
+  // Evaluation of the expression with custom vocabulary should work.
+  custom_field_evalation_result = evaluateExpressionWithCustomCelVocabulary(
+      activation, arena, REQUEST_HAS_QUERY_AS_MAP_EXPR, custom_cel_vocabulary);
+  EXPECT_TRUE(custom_field_evalation_result->IsBool() && custom_field_evalation_result->BoolOrDie());
 }
 
 TEST_F(ExtendedRequestCelVocabularyTests, AddCustomMappingsToActivationTwiceTest) {
