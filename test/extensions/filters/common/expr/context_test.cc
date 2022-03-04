@@ -63,7 +63,7 @@ TEST(Context, RequestAttributes) {
   EXPECT_CALL(info, requestComplete()).WillRepeatedly(Return(dur));
   EXPECT_CALL(info, protocol()).WillRepeatedly(Return(Http::Protocol::Http2));
 
-  EXPECT_EQ(14, request.size());
+  EXPECT_EQ(15, request.size());
   EXPECT_FALSE(request.empty());
 
   {
@@ -107,6 +107,13 @@ TEST(Context, RequestAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ("/meow", value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = request[CelValue::CreateStringView(Query)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ("yes=1", value.value().StringOrDie().value());
   }
 
   {
@@ -236,6 +243,30 @@ TEST(Context, RequestFallbackAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ("/meow", value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = request[CelValue::CreateStringView(Query)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ("", value.value().StringOrDie().value());
+  }
+}
+
+TEST(Context, RequestPathFragment) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  Http::TestRequestHeaderMapImpl header_map{
+      {":method", "POST"},
+      {":scheme", "http"},
+      {":path", "/meow?page=1&item=3#heading"},
+  };
+  Protobuf::Arena arena;
+  RequestWrapper request(arena, &header_map, info);
+  {
+    auto value = request[CelValue::CreateStringView(Query)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ("page=1&item=3", value.value().StringOrDie().value());
   }
 }
 
