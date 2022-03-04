@@ -23,6 +23,7 @@ using CelValue = google::api::expr::runtime::CelValue;
 using CelProtoWrapper = google::api::expr::runtime::CelProtoWrapper;
 
 // Symbols for traversing the request properties
+// New symbols must be added to WrapperFieldValues.
 constexpr absl::string_view Request = "request";
 constexpr absl::string_view Path = "path";
 constexpr absl::string_view UrlPath = "url_path";
@@ -38,8 +39,10 @@ constexpr absl::string_view Size = "size";
 constexpr absl::string_view TotalSize = "total_size";
 constexpr absl::string_view Duration = "duration";
 constexpr absl::string_view Protocol = "protocol";
+constexpr absl::string_view Query = "query";
 
 // Symbols for traversing the response properties
+// New symbols must be added to WrapperFieldValues.
 constexpr absl::string_view Response = "response";
 constexpr absl::string_view Code = "code";
 constexpr absl::string_view CodeDetails = "code_details";
@@ -48,12 +51,15 @@ constexpr absl::string_view Flags = "flags";
 constexpr absl::string_view GrpcStatus = "grpc_status";
 
 // Per-request or per-connection metadata
+// New symbols must be added to WrapperFieldValues.
 constexpr absl::string_view Metadata = "metadata";
 
 // Per-request or per-connection filter state
+// New symbols must be added to WrapperFieldValues.
 constexpr absl::string_view FilterState = "filter_state";
 
 // Connection properties
+// New symbols must be added to WrapperFieldValues.
 constexpr absl::string_view Connection = "connection";
 constexpr absl::string_view MTLS = "mtls";
 constexpr absl::string_view RequestedServerName = "requested_server_name";
@@ -67,14 +73,17 @@ constexpr absl::string_view DNSSanLocalCertificate = "dns_san_local_certificate"
 constexpr absl::string_view DNSSanPeerCertificate = "dns_san_peer_certificate";
 
 // Source properties
+// New symbols must be added to WrapperFieldValues.
 constexpr absl::string_view Source = "source";
 constexpr absl::string_view Address = "address";
 constexpr absl::string_view Port = "port";
 
 // Destination properties
+// New symbols must be added to WrapperFieldValues.
 constexpr absl::string_view Destination = "destination";
 
 // Upstream properties
+// New symbols must be added to WrapperFieldValues.
 constexpr absl::string_view Upstream = "upstream";
 constexpr absl::string_view UpstreamLocalAddress = "local_address";
 constexpr absl::string_view UpstreamTransportFailureReason = "transport_failure_reason";
@@ -90,7 +99,8 @@ public:
        CelValue::CreateStringView(Headers), CelValue::CreateStringView(Time),
        CelValue::CreateStringView(ID), CelValue::CreateStringView(UserAgent),
        CelValue::CreateStringView(Size), CelValue::CreateStringView(TotalSize),
-       CelValue::CreateStringView(Duration), CelValue::CreateStringView(Protocol)}};
+       CelValue::CreateStringView(Duration), CelValue::CreateStringView(Protocol),
+       CelValue::CreateStringView(Query)}};
   const ContainerBackedListImpl Response{{
       CelValue::CreateStringView(Code),
       CelValue::CreateStringView(CodeDetails),
