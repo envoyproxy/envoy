@@ -20,7 +20,11 @@ using testing::Return;
 
 class TestActiveClient : public ActiveClient {
 public:
-  using ActiveClient::ActiveClient;
+  TestActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
+                   uint32_t concurrent_stream_limit, bool supports_early_data)
+      : ActiveClient(parent, lifetime_stream_limit, concurrent_stream_limit),
+        supports_early_data_(supports_early_data) {}
+
   void close() override { onEvent(Network::ConnectionEvent::LocalClose); }
   uint64_t id() const override { return 1; }
   bool closingWithIncompleteStream() const override { return false; }
@@ -42,9 +46,27 @@ public:
     return ActiveClient::currentUnusedCapacity();
   }
 
+  bool readyForStream() const override {
+    if (!supports_early_data_) {
+      return ActiveClient::readyForStream();
+    }
+    return state() == ActiveClient::State::READY ||
+           state() == ActiveClient::State::READY_FOR_EARLY_DATA;
+  }
+
+  bool hasHandshakeCompleted() const override {
+    if (!supports_early_data_) {
+      return ActiveClient::hasHandshakeCompleted();
+    }
+    return has_handshake_completed_;
+  }
+
   uint32_t active_streams_{};
 
   absl::optional<uint64_t> capacity_override_;
+
+private:
+  bool supports_early_data_;
 };
 
 class TestPendingStream : public PendingStream {
@@ -79,8 +101,8 @@ public:
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
     ON_CALL(pool_, instantiateActiveClient).WillByDefault(Invoke([&]() -> ActiveClientPtr {
-      auto ret =
-          std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_, concurrent_streams_);
+      auto ret = std::make_unique<NiceMock<TestActiveClient>>(
+          pool_, stream_limit_, concurrent_streams_, /*supports_early_data=*/false);
       clients_.push_back(ret.get());
       ret->real_host_description_ = descr_;
       return ret;
@@ -121,8 +143,8 @@ public:
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
     ON_CALL(pool_, instantiateActiveClient).WillByDefault(Invoke([&]() -> ActiveClientPtr {
-      auto ret =
-          std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_, concurrent_streams_);
+      auto ret = std::make_unique<NiceMock<TestActiveClient>>(
+          pool_, stream_limit_, concurrent_streams_, clients_support_early_data_);
       clients_.push_back(ret.get());
       ret->real_host_description_ = descr_;
       return ret;
@@ -217,6 +239,7 @@ public:
   TestConnPoolImplBase pool_;
   AttachContext context_;
   std::vector<TestActiveClient*> clients_;
+  bool clients_support_early_data_{false};
 };
 
 TEST_F(ConnPoolImplBaseTest, DumpState) {
@@ -505,6 +528,7 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredLocalClose) {
 }
 
 TEST_F(ConnPoolImplDispatcherBaseTest, ConnectedZeroRttSendsEarlyData) {
+  clients_support_early_data_ = true;
   concurrent_streams_ = 2u;
   ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
 
@@ -535,6 +559,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, ConnectedZeroRttSendsEarlyData) {
 }
 
 TEST_F(ConnPoolImplDispatcherBaseTest, EarlyDataStreamsReachConcurrentStreamLimit) {
+  clients_support_early_data_ = true;
   concurrent_streams_ = 2u;
   ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
 
@@ -557,10 +582,10 @@ TEST_F(ConnPoolImplDispatcherBaseTest, EarlyDataStreamsReachConcurrentStreamLimi
   EXPECT_EQ(2, pool_.host()->cluster().stats().upstream_rq_0rtt_.value());
   EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
 
-  // After 1 stream gets closed, the client should transit to CONNECTING.
+  // After 1 stream gets closed, the client should transit to READY_FOR_EARLY_DATA.
   --clients_.back()->active_streams_;
   pool_.onStreamClosed(*clients_.back(), false);
-  EXPECT_EQ(ActiveClient::State::CONNECTING, clients_.back()->state());
+  EXPECT_EQ(ActiveClient::State::READY_FOR_EARLY_DATA, clients_.back()->state());
   CHECK_STATE(1 /*active*/, 0 /*pending*/, concurrent_streams_ - 1 /*connecting capacity*/);
 
   // Creating another early data stream should be immediate.
@@ -583,6 +608,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, EarlyDataStreamsReachConcurrentStreamLimi
 }
 
 TEST_F(ConnPoolImplDispatcherBaseTest, PoolDrainsWithEarlyDataStreams) {
+  clients_support_early_data_ = true;
   concurrent_streams_ = 2u;
   ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(2.1));
 
@@ -602,6 +628,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, PoolDrainsWithEarlyDataStreams) {
   pool_.drainConnectionsImpl(DrainBehavior::DrainExistingConnections);
   EXPECT_EQ(3u, clients_.size());
   EXPECT_EQ(ActiveClient::State::DRAINING, client_ref.state());
+  // The CONNECTING client should get closed and another new connection should be created.
   EXPECT_EQ(ActiveClient::State::CLOSED, clients_.front()->state());
   EXPECT_EQ(ActiveClient::State::CONNECTING, clients_.back()->state());
   CHECK_STATE(1 /*active*/, 0 /*pending*/, 2 /*connecting capacity*/);

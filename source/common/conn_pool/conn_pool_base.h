@@ -74,7 +74,10 @@ public:
   virtual uint32_t numActiveStreams() const PURE;
 
   // Return true if it is ready to dispatch the next stream.
-  bool readyForStream() const;
+  virtual bool readyForStream() const {
+    ASSERT(!supportsEarlyData());
+    return state_ == State::READY;
+  }
 
   // This function is called onStreamClosed to see if there was a negative delta
   // and (if necessary) update associated bookkeeping.
@@ -86,9 +89,10 @@ public:
     CONNECTING, // Connection is not yet established, but might be able to dispatch additional
                 // streams if this connection supports early data and the stream can be sent as
                 // early data.
-    READY,      // Any additional streams may be immediately dispatched to this connection.
-    BUSY,       // Connection is at its concurrent stream limit.
-    DRAINING,   // No more streams can be dispatched to this connection, and it will be closed
+    READY_FOR_EARLY_DATA,
+    READY,    // Any additional streams may be immediately dispatched to this connection.
+    BUSY,     // Connection is at its concurrent stream limit.
+    DRAINING, // No more streams can be dispatched to this connection, and it will be closed
     // when all streams complete.
     CLOSED // Connection is closed and object is queued for destruction.
   };
@@ -104,12 +108,13 @@ public:
     state_ = state;
   }
 
-  void allowEarlyData() { allows_early_data_ = true; }
-
   // Sets the remaining streams to 0, and updates pool and cluster capacity.
   virtual void drain();
 
-  virtual bool hasHandshakeCompleted() const { return state_ != State::CONNECTING; }
+  virtual bool hasHandshakeCompleted() const {
+    ASSERT(!supportsEarlyData());
+    return state_ != State::CONNECTING;
+  }
 
   ConnPoolImplBase& parent_;
   // The count of remaining streams allowed for this connection.
@@ -136,11 +141,11 @@ public:
   // TODO(danzh) remove this once http codec exposes the handshake state for h3.
   bool has_handshake_completed_{false};
 
+protected:
+  // HTTP/3 subclass should override this.
+  virtual bool supportsEarlyData() const { return false; }
+
 private:
-  // True if the client is connecting and it can send early data. This means if the client is
-  // CONNECTING, an early data stream may be immediately dispatched to this connection. Once
-  // connected, it will become false.
-  bool allows_early_data_{false};
   State state_{State::CONNECTING};
 };
 
@@ -321,7 +326,7 @@ protected:
 
   // A helper function which determines if a canceled pending connection should
   // be closed as excess or not.
-  bool connectingConnectionIsExcess() const;
+  bool connectingConnectionIsExcess(const ActiveClient& client) const;
 
   // A helper function which determines if a new incoming stream should trigger
   // connection preconnect.
@@ -366,6 +371,10 @@ protected:
 
   // Clients that are not ready to handle additional streams because they are CONNECTING.
   std::list<ActiveClientPtr> connecting_clients_;
+
+  // Clients that are ready to handle additional early data streams because they have 0-RTT
+  // credentials.
+  std::list<ActiveClientPtr> early_data_clients_;
 
   // The number of streams that can be immediately dispatched
   // if all CONNECTING connections become connected.

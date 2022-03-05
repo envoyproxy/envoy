@@ -59,6 +59,11 @@ public:
   // early data streams.
   bool hasHandshakeCompleted() const override { return has_handshake_completed_; }
 
+  // Overidden to include ready for early data state.
+  bool readyForStream() const override {
+    return state() == State::READY || state() == State::READY_FOR_EARLY_DATA;
+  }
+
   void updateCapacity(uint64_t new_quiche_capacity) {
     // Each time we update the capacity make sure to reflect the update in the
     // connection pool.
@@ -80,6 +85,9 @@ public:
   }
 
   bool hasCreatedStream() const { return stream_attached_; }
+
+protected:
+  bool supportsEarlyData() const override { return true; }
 
 private:
   // Unlike HTTP/2 and HTTP/1, rather than having a cap on the number of active
