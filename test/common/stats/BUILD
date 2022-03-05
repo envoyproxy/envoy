@@ -221,7 +221,27 @@ envoy_benchmark_test(
 
 envoy_cc_test(
     name = "tag_extractor_impl_test",
-    srcs = ["tag_extractor_impl_test.cc"],
+    srcs = [
+        "tag_extractor_impl_test.cc",
+        "tag_extractor_test_common.h",
+    ],
+    deps = [
+        "//source/common/stats:tag_extractor_lib",
+        "//source/common/stats:tag_producer_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "tag_extractor_impl_deprecated_test",
+    srcs = [
+        "tag_extractor_impl_deprecated_test.cc",
+        "tag_extractor_test_common.h",
+    ],
+    args = [
+        "--runtime-feature-disable-for-tests=envoy.restart_features.thrift_stat_prefix_tag_extraction",
+    ],
     deps = [
         "//source/common/stats:tag_extractor_lib",
         "//source/common/stats:tag_producer_lib",

@@ -1,5 +1,7 @@
 #include "source/common/config/well_known_names.h"
 
+#include "source/common/runtime/runtime_features.h"
+
 #include "absl/strings/str_replace.h"
 
 namespace Envoy {
@@ -143,6 +145,10 @@ TagNameValues::TagNameValues() {
 
   // mongo.(<stat_prefix>.)*
   addTokenized(MONGO_PREFIX, "mongo.$.**");
+
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.thrift_stat_prefix_tag_extraction")) {
+    addTokenized(THRIFT_PREFIX, "thrift.$.**");
+  }
 
   // http.[<stat_prefix>.]rds.(<route_config_name>.)<base_stat>
   // Note: <route_config_name> can contain dots thus we have to maintain full

@@ -54,6 +54,7 @@ RUNTIME_GUARD(envoy_reloadable_features_update_expected_rq_timeout_on_retry);
 RUNTIME_GUARD(envoy_reloadable_features_use_dns_ttl);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
+RUNTIME_GUARD(envoy_restart_features_thrift_stat_prefix_tag_extraction);
 RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
 
 // Begin false flags. These should come with a TODO to flip true.
@@ -170,6 +171,7 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_use_dns_ttl,
   &FLAGS_envoy_reloadable_features_validate_connect,
   &FLAGS_envoy_restart_features_explicit_wildcard_resource,
+  &FLAGS_envoy_restart_features_thrift_stat_prefix_tag_extraction,
   &FLAGS_envoy_restart_features_use_apple_api_for_dns_lookups,
   &FLAGS_envoy_restart_features_no_runtime_singleton,
 };

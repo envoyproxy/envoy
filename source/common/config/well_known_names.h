@@ -130,6 +130,8 @@ public:
   const std::string RDS_ROUTE_CONFIG = "envoy.rds_route_config";
   // Listener manager worker id
   const std::string WORKER_ID = "envoy.worker_id";
+  // Stats prefix for the Thrift Proxy network filter
+  const std::string THRIFT_PREFIX = "envoy.thrift_prefix";
 
   // Mapping from the names above to their respective regex strings.
   const std::vector<std::pair<std::string, std::string>> name_regex_pairs_;
