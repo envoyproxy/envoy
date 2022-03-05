@@ -68,8 +68,24 @@ message TcpProxy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.TunnelingConfig";
 
-    // The hostname to send in the synthesized CONNECT headers to the upstream proxy.
-    string hostname = 1 [(validate.rules).string = {min_len: 1}];
+    message AutoSni {
+      // Optional port used to create the request-target for all CONNECT request, i.e. CONNECT <hostname_from_sni>:<default_port>
+      // If default_port is not specified, 443 is used.
+      uint32 port = 1;
+    }
+
+    oneof hostname_config {
+      option (validate.required) = true;
+
+      // Static hostname used in request-target of CONNECT request
+      string hostname = 1;
+
+      // Automatically set hostname in the request-target for the underlying tunnel request
+      // using SNI from a downstream connection.
+      // Supports only TLS connections and requires to enable envoy.filters.listener.tls_inspector.
+      // In case of plain TCP request, upstream connection cannot be established and request is refused.
+      AutoSni auto_sni = 4;
+    }
 
     // Use POST method instead of CONNECT method to tunnel the TCP stream.
     // The 'protocol: bytestream' header is also NOT set for HTTP/2 to comply with the spec.
