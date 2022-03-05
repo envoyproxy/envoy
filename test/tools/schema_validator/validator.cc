@@ -8,6 +8,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.validate.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/version/version.h"
 
 #include "tclap/CmdLine.h"
 
@@ -31,7 +32,7 @@ const std::string& Schema::toString(Type type) {
 }
 
 Options::Options(int argc, const char* const* argv) {
-  TCLAP::CmdLine cmd("schema_validator_tool", ' ', "none", false);
+  TCLAP::CmdLine cmd("schema_validator_tool", ' ', VersionInfo::version());
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", true,
                                            "", "string", cmd);
   TCLAP::ValueArg<std::string> schema_type(
