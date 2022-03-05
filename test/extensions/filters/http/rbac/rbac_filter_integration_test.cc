@@ -891,8 +891,8 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfNoMatchAllow) {
 // Custom CEL Vocabulary - ALLOW if request.url() contains(correct_path)
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfMatchDeny) {
   Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"},      {":path", "/correct_path"},      {":scheme", "http"},
-      {":authority", "host"},  {"x-forwarded-for", "10.0.0.1"}, {"content-length", "0"},
+      {":method", "GET"},       {":path", "/correct_path"},      {":scheme", "http"},
+      {":authority", "host"},   {"x-forwarded-for", "10.0.0.1"}, {"content-length", "0"},
       {"host", "abc.com:1234"},
   };
   ifDenyRuleConditionIsTrueThenDenyTest(headers, UrlExpr, "correct_path");
@@ -901,8 +901,8 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfMatchDeny) {
 // Custom CEL Vocabulary - ALLOW if request.url() !contains(correct_path)
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfNoMatchAllow) {
   Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"},      {":path", "/correct_path"},      {":scheme", "http"},
-      {":authority", "host"},  {"x-forwarded-for", "10.0.0.1"}, {"content-length", "0"},
+      {":method", "GET"},       {":path", "/correct_path"},      {":scheme", "http"},
+      {":authority", "host"},   {"x-forwarded-for", "10.0.0.1"}, {"content-length", "0"},
       {"host", "abc.com:1234"},
   };
   ifDenyRuleConditionIsFalseThenAllowTest(headers, UrlExpr, "wrong_path");
