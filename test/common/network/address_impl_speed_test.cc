@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Network {
 namespace Address {
 
-static void Ipv4InstanceCreate(benchmark::State& state) {
+static void ipv4InstanceCreate(benchmark::State& state) {
   sockaddr_in addr;
   memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
@@ -19,9 +19,9 @@ static void Ipv4InstanceCreate(benchmark::State& state) {
     benchmark::DoNotOptimize(address.ip());
   }
 }
-BENCHMARK(Ipv4InstanceCreate);
+BENCHMARK(ipv4InstanceCreate);
 
-static void Ipv6InstanceCreate(benchmark::State& state) {
+static void ipv6InstanceCreate(benchmark::State& state) {
   sockaddr_in6 addr;
   memset(&addr, 0, sizeof(addr));
   addr.sin6_family = AF_INET6;
@@ -33,7 +33,7 @@ static void Ipv6InstanceCreate(benchmark::State& state) {
     benchmark::DoNotOptimize(address.ip());
   }
 }
-BENCHMARK(Ipv6InstanceCreate);
+BENCHMARK(ipv6InstanceCreate);
 
 } // namespace Address
 } // namespace Network
