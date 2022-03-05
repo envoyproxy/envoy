@@ -747,11 +747,11 @@ typed_config:
           {}
 )EOF";
 
-using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::COOKIE_EXPR;
+using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::CookieExpr;
 using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::
-    COOKIE_VALUE_EXPR;
-using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::QUERY_EXPR;
-using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::URL_EXPR;
+    CookieValueExpr;
+using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::QueryExpr;
+using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::UrlExpr;
 
 class RbacWithCustomCelVocabularyIntegrationTests : public HttpProtocolIntegrationTest {
 public:
@@ -812,7 +812,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, QueryIfMatchDeny) {
       {":method", "GET"},     {":path", "/query?key1=correct_value"}, {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"},
   };
-  ifDenyRuleConditionIsTrueThenDenyTest(headers, QUERY_EXPR, "correct_value");
+  ifDenyRuleConditionIsTrueThenDenyTest(headers, QueryExpr, "correct_value");
 }
 
 // Custom CEL Vocabulary - ALLOW if request[query][key1]!=correct_value
@@ -821,7 +821,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, QueryIfNoMatchAllow) {
       {":method", "GET"},     {":path", "/query?key1=correct_value"}, {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"},
   };
-  ifDenyRuleConditionIsFalseThenAllowTest(headers, QUERY_EXPR, "something_wrong");
+  ifDenyRuleConditionIsFalseThenAllowTest(headers, QueryExpr, "something_wrong");
 }
 
 // Custom CEL Vocabulary - DENY if cookie(fruit)==apple
@@ -830,7 +830,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfMatchDeny) {
       {":method", "GET"},     {":path", "/query?key1=correct_value"}, {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"},        {"cookie", "fruit=apple"},
   };
-  ifDenyRuleConditionIsTrueThenDenyTest(headers, COOKIE_EXPR, "apple");
+  ifDenyRuleConditionIsTrueThenDenyTest(headers, CookieExpr, "apple");
 }
 
 // Custom CEL Vocabulary - ALLOW if cookie(fruit)!=apple
@@ -843,7 +843,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfNoMatchAllow) {
       {"x-forwarded-for", "10.0.0.1"},
       {"cookie", "fruit=apple"},
   };
-  ifDenyRuleConditionIsFalseThenAllowTest(headers, COOKIE_EXPR, "veg");
+  ifDenyRuleConditionIsFalseThenAllowTest(headers, CookieExpr, "veg");
 }
 
 // Custom CEL Vocabulary - DENY if cookieValue(fruit)==apple
@@ -856,7 +856,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfMatchDeny) {
       {"x-forwarded-for", "10.0.0.1"},
       {"cookie", "fruit=apple"},
   };
-  ifDenyRuleConditionIsTrueThenDenyTest(headers, COOKIE_VALUE_EXPR, "apple");
+  ifDenyRuleConditionIsTrueThenDenyTest(headers, CookieValueExpr, "apple");
 }
 
 // Custom CEL Vocabulary - ALLOW if cookieValue(fruit)!=apple
@@ -869,7 +869,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfNoMatchAllow) {
       {"x-forwarded-for", "10.0.0.1"},
       {"cookie", "fruit=apple"},
   };
-  ifDenyRuleConditionIsFalseThenAllowTest(headers, COOKIE_VALUE_EXPR, "veg");
+  ifDenyRuleConditionIsFalseThenAllowTest(headers, CookieValueExpr, "veg");
 }
 
 // Custom CEL Vocabulary - ALLOW if request.url() contains(correct_path)
@@ -878,7 +878,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfMatchDeny) {
       {":method", "GET"},     {":path", "/correct_path"},      {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"host", "abc.com:1234"},
   };
-  ifDenyRuleConditionIsTrueThenDenyTest(headers, URL_EXPR, "correct_path");
+  ifDenyRuleConditionIsTrueThenDenyTest(headers, UrlExpr, "correct_path");
 }
 
 // Custom CEL Vocabulary - ALLOW if request.url() !contains(correct_path)
@@ -886,7 +886,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfNoMatchAllow) {
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},     {":path", "/correct_path"},      {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"host", "abc.com:1234"}};
-  ifDenyRuleConditionIsFalseThenAllowTest(headers, URL_EXPR, "wrong_path");
+  ifDenyRuleConditionIsFalseThenAllowTest(headers, UrlExpr, "wrong_path");
 }
 
 } // namespace

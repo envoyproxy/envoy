@@ -628,11 +628,11 @@ public:
   }
 };
 
-using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::QUERY_EXPR;
+using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::QueryExpr;
 
 TEST_F(CustomCelVocabularyTests, CustomCelVocabularyDeny) {
   // should deny
-  rbacFilterConfigSetup(fmt::format(std::string(QUERY_EXPR), "correct_value"),
+  rbacFilterConfigSetup(fmt::format(std::string(QueryExpr), "correct_value"),
                         envoy::config::rbac::v3::RBAC::DENY);
 
   // Filter iteration should stop since the policy is DENY.
@@ -646,7 +646,7 @@ TEST_F(CustomCelVocabularyTests, CustomCelVocabularyDeny) {
 TEST_F(CustomCelVocabularyTests, CustomCelVocabularyAllow) {
   // should NOT deny
 
-  rbacFilterConfigSetup(fmt::format(std::string(QUERY_EXPR), "something_wrong"),
+  rbacFilterConfigSetup(fmt::format(std::string(QueryExpr), "something_wrong"),
                         envoy::config::rbac::v3::RBAC::DENY);
 
   // Filter iteration should continue since it should NOT deny.

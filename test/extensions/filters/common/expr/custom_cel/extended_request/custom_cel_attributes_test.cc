@@ -57,7 +57,7 @@ TEST_F(ExtendedRequestAttributesTests, EmptyQueryStringTest) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/path"}};
   ExtendedRequestWrapper extended_request_vars(arena, &request_headers, mock_stream_info, true);
   auto query_params = extended_request_vars[CelValue::CreateStringView("query")];
-  EXPECT_TRUE(query_params->IsMap() && query_params->MapOrDie()->size() == 0);
+  EXPECT_TRUE(query_params->IsMap() && query_params->MapOrDie()->empty());
 }
 
 TEST_F(ExtendedRequestAttributesTests, DeferToBaseClassTest) {

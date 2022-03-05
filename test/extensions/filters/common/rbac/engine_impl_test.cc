@@ -473,8 +473,7 @@ TEST(RoleBasedAccessControlEngineImpl, LogIfMatched) {
 TEST(RoleBasedAccessControlEngineImpl, CustomCelVocabularyTest) {
   using envoy::extensions::expr::custom_cel_vocabulary::extended_request::v3::
       ExtendedRequestCelVocabularyConfig;
-  using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::
-      QUERY_EXPR;
+  using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::QueryExpr;
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/query?key1=correct_value"}};
@@ -492,7 +491,7 @@ TEST(RoleBasedAccessControlEngineImpl, CustomCelVocabularyTest) {
 
   // test 1: should deny
   policy.mutable_condition()->MergeFrom(TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(
-      fmt::format(std::string(QUERY_EXPR), "correct_value")));
+      fmt::format(std::string(QueryExpr), "correct_value")));
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac,
                                                 ProtobufMessage::getStrictValidationVisitor());
@@ -506,7 +505,7 @@ TEST(RoleBasedAccessControlEngineImpl, CustomCelVocabularyTest) {
   // test 2: should NOT deny
   policy.mutable_condition()->Clear();
   policy.mutable_condition()->MergeFrom(TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(
-      fmt::format(std::string(QUERY_EXPR), "something_wrong")));
+      fmt::format(std::string(QueryExpr), "something_wrong")));
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine2(rbac,
                                                  ProtobufMessage::getStrictValidationVisitor());

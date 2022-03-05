@@ -460,8 +460,7 @@ TEST(PolicyMatcher, PolicyMatcher) {
 }
 
 TEST(PolicyMatcherWithCustomCelVocabulary, PolicyMatcherWithCustomCelVocabulary) {
-  using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::
-      QUERY_EXPR;
+  using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::TestConfig::QueryExpr;
 
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/query?key1=correct_value"}};
@@ -471,7 +470,7 @@ TEST(PolicyMatcherWithCustomCelVocabulary, PolicyMatcherWithCustomCelVocabulary)
   policy.add_permissions()->set_any(true);
   policy.add_principals()->set_any(true);
   policy.mutable_condition()->MergeFrom(TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(
-      fmt::format(std::string(QUERY_EXPR), "correct_value")));
+      fmt::format(std::string(QueryExpr), "correct_value")));
 
   using Envoy::Extensions::Filters::Common::Expr::BuilderPtr;
   using Envoy::Extensions::Filters::Common::Expr::CustomCel::ExtendedRequest::
@@ -487,7 +486,7 @@ TEST(PolicyMatcherWithCustomCelVocabulary, PolicyMatcherWithCustomCelVocabulary)
 
   policy.mutable_condition()->Clear();
   policy.mutable_condition()->MergeFrom(TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(
-      fmt::format(std::string(QUERY_EXPR), "something_wrong")));
+      fmt::format(std::string(QueryExpr), "something_wrong")));
   RBAC::PolicyMatcher matcher2(policy, builder.get(), ProtobufMessage::getStrictValidationVisitor(),
                                &custom_cel_vocabulary);
   // the policy condition should evaluate to false and checkMatcher should return false

@@ -154,7 +154,7 @@ absl::StatusOr<CelValue> evaluateExpressionWithCustomCelVocabulary(
 
 TEST_F(ExtendedRequestCelVocabularyTests,
        ReplaceDefaultMappingsWithCustomMappingsInActivationTest) {
-  using TestConfig::QUERY_EXPR;
+  using TestConfig::QueryExpr;
   const std::string path = R"EOF(/query?key1=apple&key2=banana)EOF";
 
   ExtendedRequestCelVocabulary custom_cel_vocabulary(true);
@@ -170,7 +170,7 @@ TEST_F(ExtendedRequestCelVocabularyTests,
   // The activation does not contain the mappings for the custom CEL vocabulary yet.
   // Evaluation of the expression with custom vocabulary should not work.
   auto custom_field_evalation_result = evaluateExpressionWithCustomCelVocabulary(
-      activation, arena, QUERY_EXPR, "apple", custom_cel_vocabulary);
+      activation, arena, QueryExpr, "apple", custom_cel_vocabulary);
   EXPECT_FALSE(custom_field_evalation_result.ok());
 
   custom_cel_vocabulary.fillActivation(&activation, arena, mock_stream_info, &request_headers,
@@ -179,7 +179,7 @@ TEST_F(ExtendedRequestCelVocabularyTests,
   // The activation now contains the mappings for the custom CEL vocabulary.
   // Evaluation of the expression with custom vocabulary should work.
   custom_field_evalation_result = evaluateExpressionWithCustomCelVocabulary(
-      activation, arena, QUERY_EXPR, "apple", custom_cel_vocabulary);
+      activation, arena, QueryExpr, "apple", custom_cel_vocabulary);
   EXPECT_TRUE(custom_field_evalation_result->IsBool() &&
               custom_field_evalation_result->BoolOrDie());
 }

@@ -11,7 +11,7 @@ namespace CustomCel {
 namespace ExtendedRequest {
 namespace TestConfig {
 
-constexpr absl::string_view QUERY_EXPR = R"EOF(
+constexpr absl::string_view QueryExpr = R"EOF(
            call_expr:
              function: contains
              args:
@@ -27,7 +27,7 @@ constexpr absl::string_view QUERY_EXPR = R"EOF(
                  string_value: {}
 )EOF";
 
-constexpr absl::string_view COOKIE_EXPR = R"EOF(
+constexpr absl::string_view CookieExpr = R"EOF(
             call_expr:
               function: contains
               args:
@@ -42,7 +42,7 @@ constexpr absl::string_view COOKIE_EXPR = R"EOF(
                   string_value: {}
 )EOF";
 
-constexpr absl::string_view COOKIE_VALUE_EXPR = R"EOF(
+constexpr absl::string_view CookieValueExpr = R"EOF(
              call_expr:
                function: contains
                args:
@@ -55,7 +55,7 @@ constexpr absl::string_view COOKIE_VALUE_EXPR = R"EOF(
                    string_value: {}
 )EOF";
 
-constexpr absl::string_view URL_EXPR = R"EOF(
+constexpr absl::string_view UrlExpr = R"EOF(
              call_expr:
                function: contains
                args:
