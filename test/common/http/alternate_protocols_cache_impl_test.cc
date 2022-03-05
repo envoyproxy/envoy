@@ -298,6 +298,14 @@ TEST_F(AlternateProtocolsCacheImplTest, CacheLoad) {
   EXPECT_EQ(protocols1_, protocols.ref());
 }
 
+TEST_F(AlternateProtocolsCacheImplTest, ShouldNotUpdateStoreOnCacheLoad) {
+  EXPECT_CALL(*store_, addOrUpdate(_, _)).Times(0);
+  EXPECT_CALL(*store_, iterate(_)).WillOnce(Invoke([&](KeyValueStore::ConstIterateCb fn) {
+    fn("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0");
+  }));
+  initialize();
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy
