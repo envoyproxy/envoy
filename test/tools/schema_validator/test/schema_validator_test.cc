@@ -10,6 +10,7 @@ public:
   void run(const std::string& command_line, const std::string& config_file) {
     const std::string final_command_line = TestEnvironment::runfilesPath(
         absl::StrCat("test/tools/schema_validator/test/config/", config_file));
+    // Splitting on ' ' is not always reliable but works fine for these tests.
     const std::vector<std::string> split_command_line =
         absl::StrSplit(fmt::format(command_line, final_command_line), ' ');
     std::vector<const char*> c_command_line;
