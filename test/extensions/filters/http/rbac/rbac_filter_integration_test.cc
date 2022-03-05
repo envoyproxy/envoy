@@ -827,8 +827,12 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, QueryIfNoMatchAllow) {
 // Custom CEL Vocabulary - DENY if cookie(fruit)==apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfMatchDeny) {
   Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"},     {":path", "/query?key1=correct_value"}, {":scheme", "http"},
-      {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"},        {"cookie", "fruit=apple"},
+      {":method", "GET"},
+      {":path", "/query?key1=correct_value"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"x-forwarded-for", "10.0.0.1"},
+      {"cookie", "fruit=apple;fruit=banana"},
   };
   ifDenyRuleConditionIsTrueThenDenyTest(headers, CookieExpr, "apple");
 }
@@ -841,7 +845,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfNoMatchAllow) {
       {":scheme", "http"},
       {":authority", "host"},
       {"x-forwarded-for", "10.0.0.1"},
-      {"cookie", "fruit=apple"},
+      {"cookie", "fruit=apple;fruit=banana"},
   };
   ifDenyRuleConditionIsFalseThenAllowTest(headers, CookieExpr, "veg");
 }
@@ -854,7 +858,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfMatchDeny) {
       {":scheme", "http"},
       {":authority", "host"},
       {"x-forwarded-for", "10.0.0.1"},
-      {"cookie", "fruit=apple"},
+      {"cookie", "fruit=apple;fruit=banana"},
   };
   ifDenyRuleConditionIsTrueThenDenyTest(headers, CookieValueExpr, "apple");
 }
@@ -867,7 +871,7 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfNoMatchAllow) {
       {":scheme", "http"},
       {":authority", "host"},
       {"x-forwarded-for", "10.0.0.1"},
-      {"cookie", "fruit=apple"},
+      {"cookie", "fruit=apple;fruit=banana"},
   };
   ifDenyRuleConditionIsFalseThenAllowTest(headers, CookieValueExpr, "veg");
 }
