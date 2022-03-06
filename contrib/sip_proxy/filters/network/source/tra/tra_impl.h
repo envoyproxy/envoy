@@ -33,9 +33,8 @@ using TrafficRoutingAssistantAsyncRequestCallbacks = Grpc::AsyncRequestCallbacks
 using TrafficRoutingAssistantAsyncStreamCallbacks = Grpc::AsyncStreamCallbacks<
     envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>;
 
-// TODO(htuch): We should have only one client per thread, but today we create one per filter stack.
-// This will require support for more than one outstanding request per client (limit() assumes only
-// one today).
+// TODO: We should have only one client per thread, but today we create one per filter stack.
+// This will require support for more than one outstanding request per client.
 class GrpcClientImpl : public Client,
                        public TrafficRoutingAssistantAsyncRequestCallbacks,
                        public TrafficRoutingAssistantAsyncStreamCallbacks,
@@ -43,7 +42,12 @@ class GrpcClientImpl : public Client,
 public:
   GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
                  const absl::optional<std::chrono::milliseconds>& timeout);
-  ~GrpcClientImpl() override = default;
+  ~GrpcClientImpl() override {
+    if (request_ != nullptr) {
+      cancel();
+    }
+    stream_.resetStream();
+  }
 
   // Extensions::NetworkFilters::SipProxy::TrafficRoutingAssistant::Client
   void setRequestCallbacks(RequestCallbacks& callbacks) override;

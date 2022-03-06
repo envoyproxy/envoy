@@ -160,13 +160,13 @@ struct ThreadLocalTransactionInfo : public ThreadLocal::ThreadLocalObject,
       }
 
       ++it;
-      /* In single thread, this condition should be cover in line 160
-       * And Envoy should be single thread
-      if (it->second->deleted()) {
-        transaction_info_map_.erase(it++);
-      } else {
-        ++it;
-      }*/
+      // In single thread, this condition should be cover in line 160
+      // And Envoy should be single thread
+      // if (it->second->deleted()) {
+      //   transaction_info_map_.erase(it++);
+      // } else {
+      //   ++it;
+      // }
     }
     audit_timer_->enableTimer(std::chrono::seconds(2));
   }
@@ -271,7 +271,7 @@ public:
   }
 
   bool shouldSelectAnotherHost(const Upstream::Host& host) override {
-    if (!metadata_->destination().empty()) {
+    if (metadata_->destination().empty()) {
       return false;
     }
     return host.address()->ip()->addressAsString() != metadata_->destination();
@@ -373,6 +373,7 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   void setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
+  void delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
 
   ConnectionState connectionState() { return conn_state_; }
   void setConnectionState(ConnectionState state) { conn_state_ = state; }
