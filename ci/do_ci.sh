@@ -214,18 +214,18 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   # define the 'release' builds as canonical and test them only in CI, so the
   # toolchain is kept consistent. This ifdef is checked in
   # test/common/stats/stat_test_utility.cc when computing
-  # Stats::TestUtil::MemoryTest::mode().
-  # [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]] && BAZEL_BUILD_OPTIONS+=("--test_env=ENVOY_MEMORY_TEST_EXACT=true")
+  Stats::TestUtil::MemoryTest::mode().
+  [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]] && BAZEL_BUILD_OPTIONS+=("--test_env=ENVOY_MEMORY_TEST_EXACT=true")
 
-  # setup_clang_toolchain
-  # echo "Testing ${TEST_TARGETS[*]} with options: ${BAZEL_BUILD_OPTIONS[*]}"
-  # bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c opt "${TEST_TARGETS[@]}"
+  setup_clang_toolchain
+  echo "Testing ${TEST_TARGETS[*]} with options: ${BAZEL_BUILD_OPTIONS[*]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c opt "${TEST_TARGETS[@]}"
 
-  # echo "bazel release build..."
-  # bazel_envoy_binary_build release
+  echo "bazel release build..."
+  bazel_envoy_binary_build release
 
-  # echo "bazel contrib release build..."
-  # bazel_contrib_binary_build release
+  echo "bazel contrib release build..."
+  bazel_contrib_binary_build release
 
   exit 0
 elif [[ "$CI_TARGET" == "bazel.release.server_only" ]]; then
