@@ -14,7 +14,7 @@ namespace Envoy {
 
 // Provide a specialization for ProtobufWkt::Struct (for MockFilterConfigFactory)
 template <>
-void MessageUtil::validate(const ProtobufWkt::Struct&, ProtobufMessage::ValidationVisitor&) {}
+void MessageUtil::validate(const ProtobufWkt::Struct&, ProtobufMessage::ValidationVisitor&, bool) {}
 
 namespace Extensions {
 namespace NetworkFilters {
