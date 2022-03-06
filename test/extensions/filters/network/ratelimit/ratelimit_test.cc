@@ -173,10 +173,8 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpEnabled) {
     std::vector<RateLimit::DescriptorEntry> de2 = it_actual->entries_;
     for (auto de_expected = de1.begin(), de_actual = de2.begin();
          de_expected != de1.end() && de_actual != de2.end(); ++de_expected, ++de_actual) {
-      auto actual_entry = de_actual.base();
-      auto expected_entry = de_expected.base();
-      EXPECT_EQ(actual_entry->key_, expected_entry->key_);
-      EXPECT_EQ(actual_entry->value_, expected_entry->value_);
+      EXPECT_EQ(de_actual->key_, de_expected->key_);
+      EXPECT_EQ(de_actual->value_, de_expected->value_);
     }
   }
 
@@ -228,10 +226,8 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpDisabled) {
     std::vector<RateLimit::DescriptorEntry> de2 = it_actual->entries_;
     for (auto de_expected = de1.begin(), de_actual = de2.begin();
          de_expected != de1.end() && de_actual != de2.end(); ++de_expected, ++de_actual) {
-      auto actual_entry = de_actual.base();
-      auto expected_entry = de_expected.base();
-      EXPECT_EQ(actual_entry->key_, expected_entry->key_);
-      EXPECT_EQ(actual_entry->value_, expected_entry->value_);
+      EXPECT_EQ(de_actual->key_, de_expected->key_);
+      EXPECT_EQ(de_actual->value_, de_expected->value_);
     }
   }
 

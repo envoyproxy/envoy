@@ -44,9 +44,8 @@ ratelimit.tcp_filter_enforcing
   % of connections that will call the rate limit service and enforce the decision. Defaults to 100.
   This can be used to test what would happen before fully enforcing the outcome.
 
-envoy.reloadable_features.network.rate_limit.dynamic_downstream_ip
+The runtime flag envoy.reloadable_features.network.rate_limit.dynamic_downstream_ip
   replaces rate limit descriptor value of 'envoy.downstream_ip' with the downstream IP address in the connection
-  :ref:`substitution_formatter_flags <envoy_v3_api_field_extensions.filters.network.ratelimit.v3.RateLimit.substitution_formatter_flags>`
 
 Dynamic Metadata
 ----------------
