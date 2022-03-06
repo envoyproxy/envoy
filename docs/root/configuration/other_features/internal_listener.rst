@@ -94,7 +94,7 @@ cannot proxy a GET request in an upstream HTTP CONNECT request. This requirement
 can be acomplished by setting up the upstream endpoint of HttpConnectionManager to the internal listener address.
 Meanwhile, another internal listener binding to the above listener address includes a tcp_proxy with :ref:`tunneling_config <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.tunneling_config>`.
 
-**Decap the CONNECT requests** There are some complicated GET-in-CONNECT requests across services or edges. 
+**Decap the CONNECT requests** There are some complicated GET-in-CONNECT requests across services or edges.
 In order to proxy the GET request within Envoy, two layer of :ref:`HttpConnectionManager <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>`
 is demanded. The first HttpConnectionManager layer extract the TCP stream from a CONNECT request and redirect the TCP stream to the second
 HttpConnectionManager layer to parse the common GET requests.
