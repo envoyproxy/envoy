@@ -17,6 +17,10 @@ public:
   MOCK_METHOD(OptRef<const std::vector<AlternateProtocol>>, findAlternatives,
               (const Origin& origin));
   MOCK_METHOD(size_t, size, (), (const));
+  MOCK_METHOD(std::unique_ptr<Http3StatusTracker>, acquireHttp3StatusTracker,
+              (const Origin& origin));
+  MOCK_METHOD(void, storeHttp3StatusTracker,
+              (const Origin& origin, std::unique_ptr<Http3StatusTracker> h3_status_tracker));
 };
 
 class MockAlternateProtocolsCacheManager : public AlternateProtocolsCacheManager {
