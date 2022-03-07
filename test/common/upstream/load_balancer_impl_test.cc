@@ -1,3 +1,4 @@
+#include <bitset>
 #include <cstdint>
 #include <memory>
 #include <set>
@@ -64,9 +65,10 @@ public:
 
 namespace {
 
-static constexpr uint32_t UnhealthyStatus = 1u << static_cast<size_t>(Host::Health::Unhealthy);
-static constexpr uint32_t DegradedStatus = 1u << static_cast<size_t>(Host::Health::Degraded);
-static constexpr uint32_t HealthyStatus = 1u << static_cast<size_t>(Host::Health::Healthy);
+static constexpr std::bitset<32> UnhealthyStatus = 1u
+                                                   << static_cast<size_t>(Host::Health::Unhealthy);
+static constexpr std::bitset<32> DegradedStatus = 1u << static_cast<size_t>(Host::Health::Degraded);
+static constexpr std::bitset<32> HealthyStatus = 1u << static_cast<size_t>(Host::Health::Healthy);
 
 class LoadBalancerTestBase : public Event::TestUsingSimulatedTime,
                              public testing::TestWithParam<bool> {
@@ -2624,7 +2626,7 @@ TEST(LoadBalancerContextBaseTest, LoadBalancerContextBaseTest) {
 TEST(LoadBalancerContextBaseTest, SelectOverrideHostTest) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
 
-  constexpr uint32_t all_health_statuses = UnhealthyStatus | DegradedStatus | HealthyStatus;
+  const std::bitset<32> all_health_statuses = UnhealthyStatus | DegradedStatus | HealthyStatus;
 
   {
     // No valid host map.

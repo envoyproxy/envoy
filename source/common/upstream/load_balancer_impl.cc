@@ -1,6 +1,7 @@
 #include "source/common/upstream/load_balancer_impl.h"
 
 #include <atomic>
+#include <bitset>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -23,14 +24,6 @@ namespace {
 static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
-
-constexpr uint32_t singleHealthStatusToUint(Host::Health status) {
-  return 1u << static_cast<size_t>(status);
-}
-
-static constexpr uint32_t DefaultOverrideHostStatus =
-    singleHealthStatusToUint(Host::Health::Degraded) |
-    singleHealthStatusToUint(Host::Health::Healthy);
 
 bool tooManyPreconnects(size_t num_preconnect_picks, uint32_t healthy_hosts) {
   // Currently we only allow the number of preconnected connections to equal the
@@ -522,28 +515,31 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   return false;
 }
 
-uint32_t LoadBalancerContextBase::createOverrideHostStatus(
+std::bitset<32> LoadBalancerContextBase::createOverrideHostStatus(
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) {
-  if (!common_config.has_override_host_status()) {
-    return DefaultOverrideHostStatus;
-  }
+  std::bitset<32> override_host_status;
 
-  uint32_t override_host_status = 0;
+  if (!common_config.has_override_host_status()) {
+    // No override host status and 'Healthy' and 'Degraded' will be applied by default.
+    override_host_status.set(static_cast<size_t>(Host::Health::Healthy));
+    override_host_status.set(static_cast<size_t>(Host::Health::Degraded));
+    return override_host_status;
+  }
 
   for (auto single_status : common_config.override_host_status().statuses()) {
     switch (static_cast<envoy::config::core::v3::HealthStatus>(single_status)) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::config::core::v3::HealthStatus::UNKNOWN:
     case envoy::config::core::v3::HealthStatus::HEALTHY:
-      override_host_status |= singleHealthStatusToUint(Host::Health::Healthy);
+      override_host_status.set(static_cast<size_t>(Host::Health::Healthy));
       break;
     case envoy::config::core::v3::HealthStatus::UNHEALTHY:
     case envoy::config::core::v3::HealthStatus::DRAINING:
     case envoy::config::core::v3::HealthStatus::TIMEOUT:
-      override_host_status |= singleHealthStatusToUint(Host::Health::Unhealthy);
+      override_host_status.set(static_cast<size_t>(Host::Health::Unhealthy));
       break;
     case envoy::config::core::v3::HealthStatus::DEGRADED:
-      override_host_status |= singleHealthStatusToUint(Host::Health::Degraded);
+      override_host_status.set(static_cast<size_t>(Host::Health::Degraded));
       break;
     }
   }
@@ -551,7 +547,7 @@ uint32_t LoadBalancerContextBase::createOverrideHostStatus(
 }
 
 HostConstSharedPtr LoadBalancerContextBase::selectOverrideHost(const HostMap* host_map,
-                                                               uint32_t status,
+                                                               std::bitset<32> status,
                                                                LoadBalancerContext* context) {
   if (context == nullptr) {
     return nullptr;
@@ -576,7 +572,7 @@ HostConstSharedPtr LoadBalancerContextBase::selectOverrideHost(const HostMap* ho
   HostConstSharedPtr host = host_iter->second;
   ASSERT(host != nullptr);
 
-  if (singleHealthStatusToUint(host->health()) & status) {
+  if (status[static_cast<size_t>(host->health())]) {
     return host;
   }
   return nullptr;

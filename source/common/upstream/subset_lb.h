@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bitset>
 #include <functional>
 #include <map>
 #include <memory>
@@ -297,7 +298,7 @@ private:
 
   TimeSource& time_source_;
 
-  const uint32_t override_host_status_{};
+  const std::bitset<32> override_host_status_{};
 
   friend class SubsetLoadBalancerDescribeMetadataTester;
 };
