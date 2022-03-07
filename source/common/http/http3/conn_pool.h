@@ -59,7 +59,7 @@ public:
   // early data streams.
   bool hasHandshakeCompleted() const override { return has_handshake_completed_; }
 
-  // Overidden to include ready for early data state.
+  // Overridden to include READY_FOR_EARLY_DATA state.
   bool readyForStream() const override {
     return state() == State::READY || state() == State::READY_FOR_EARLY_DATA;
   }
