@@ -176,11 +176,13 @@ template <class T> OnMatch<T> stringOnMatch(absl::string_view value) {
   return OnMatch<T>{[s = std::string(value)]() { return stringValue(s); }, nullptr};
 }
 
+// Verifies the match tree completes the matching with an not match result.
 void verifyNoMatch(const MatchTree<TestData>::MatchResult& result) {
   EXPECT_EQ(MatchState::MatchComplete, result.match_state_);
   EXPECT_FALSE(result.on_match_.has_value());
 }
 
+// Verifies the match tree completes the matching with the expected value.
 void verifyImmediateMatch(const MatchTree<TestData>::MatchResult& result,
                           absl::string_view expected_value) {
   EXPECT_EQ(MatchState::MatchComplete, result.match_state_);
@@ -193,6 +195,7 @@ void verifyImmediateMatch(const MatchTree<TestData>::MatchResult& result,
             *stringValue(expected_value));
 }
 
+// Verifies the match tree fails to match since the data are not enough.
 void verifyNotEnoughDataForMatch(const MatchTree<TestData>::MatchResult& result) {
   EXPECT_EQ(MatchState::UnableToMatch, result.match_state_);
   EXPECT_FALSE(result.on_match_.has_value());
