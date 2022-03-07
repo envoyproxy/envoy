@@ -2,8 +2,8 @@
 
 #include <list>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
-#include "envoy/config/subscription.h"
 
 #include "absl/strings/string_view.h"
 #include "openssl/ssl.h"
@@ -17,15 +17,14 @@ struct Certpair {
   const std::string& private_key_;
 };
 
-class CertificateSubscription : public Envoy::Config::Subscription {};
-
-using CertificateSubscriptionPtr = std::unique_ptr<CertificateSubscription>;
-
+/**
+ * This is used to implement asynchronous certificate provider.
+ */
 class CertificateSubscriptionCallbacks {
 public:
   virtual ~CertificateSubscriptionCallbacks() = default;
 
-  virtual void onCertpairUpdated(absl::string_view cert_name, Certpair certpair) PURE;
+  virtual void onCertpairsUpdated(absl::string_view cert_name, std::list<Certpair> certpairs) PURE;
   virtual void onCACertUpdated(absl::string_view cert_name, const std::string cert) PURE;
   virtual void onUpatedFail() PURE;
 };
@@ -36,13 +35,16 @@ public:
     /* whether or not a provider provides a ca cert directly */
     bool provide_ca_cert = false;
 
-    /* Whether or not a provider provides identity certs directly */
-    bool provide_identity_certs = false;
+    /* whether or not a provider providers ca certpairs for issuer */
+    bool provide_ca_certpairs = false;
 
-    /* whether or not a provider supports generating identity certs during handshake,
-     * which requires the capability provide_ca_cert to sign the certificates
+    /* Whether or not a provider provides identity certpairs directly */
+    bool provide_identity_certpairs = false;
+
+    /* whether or not a provider supports generating identity certpairs during handshake,
+     * which requires the capability provide_ca_certpairs to sign the certificates
      */
-    bool generate_identity_certs = false;
+    bool generate_identity_certpairs = false;
   };
 
   virtual ~CertificateProvider() = default;
@@ -50,32 +52,23 @@ public:
   virtual Capabilites capabilities() const PURE;
 
   /**
-   * @return CA certificate from provider
+   * @return CA certificate from provider used for validation
    */
-  virtual const std::string& getCACertificate(absl::string_view cert_name) const PURE;
+  virtual const std::string& caCert(absl::string_view cert_name) const PURE;
 
-  /*
-   * Get TLS certpair directly from provider, return identity cert and key for handshake
-   * or ca cert and key for issuer.
+  /**
+   * @return CertPairs, identity certpairs used for TLS handshake
    */
-  virtual std::list<Certpair> getCertpair(absl::string_view cert_name) PURE;
+  virtual std::list<Certpair> certPairs(absl::string_view cert_name) PURE;
 
-  /*
-   * Generate TLS identity certificate dynamically during TLS handshake
+  /**
+   * Add certificate update callback into certificate provider for asychronous usage.
+   *
+   * @param callback callback that is executed by certificate provider.
+   * @return CallbackHandle the handle which can remove that update callback.
    */
-  virtual Certpair* generateIdentityCertificate(const SSL_CLIENT_HELLO* ssl_client_hello) PURE;
-
-  /*
-   * CertificateSubsriptionCallbacks
-   */
-  virtual void onCertpairUpdated(absl::string_view cert_name, Certpair certpair) PURE;
-  virtual void onCACertUpdated(absl::string_view cert_name, const std::string cert) PURE;
-  virtual void onUpatedFailed() PURE;
-
-  /*
-   * Add subsription on one cert/certpair
-   */
-  virtual void addSubsription(CertificateSubscriptionPtr subscription, std::string cert_name) PURE;
+  virtual Common::CallbackHandlePtr addUpdateCallback(absl::string_view cert_name,
+                                                      std::function<void()> callback) PURE;
 };
 
 using CertificateProviderSharedPtr = std::shared_ptr<CertificateProvider>;

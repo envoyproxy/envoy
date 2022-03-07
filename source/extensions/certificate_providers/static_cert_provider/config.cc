@@ -19,13 +19,14 @@ StaticCertificateProvider::StaticCertificateProvider(
                                          ProtobufMessage::getStrictValidationVisitor(), message);
 
   capabilities_.provide_ca_cert = false;
-  capabilities_.provide_identity_certs = true;
-  capabilities_.generate_identity_certs = false;
+  capabilities_.provide_ca_certpairs = false;
+  capabilities_.provide_identity_certpairs = true;
+  capabilities_.generate_identity_certpairs = false;
 
   const std::string& cert = Config::DataSource::read(message.certificate(), true, api);
   const std::string& key = Config::DataSource::read(message.private_key(), true, api);
   Envoy::CertificateProvider::Certpair certpair = {cert, key};
-  certpairs_.emplace_back(certpair);
+  cert_pairs_.emplace_back(certpair);
 }
 
 } // namespace CertificateProviders

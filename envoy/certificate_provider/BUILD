@@ -26,7 +26,7 @@ envoy_cc_library(
         "ssl",
     ],
     deps = [
-        "//envoy/config:subscription_interface",
+        "//envoy/common:callback",
         "@com_google_absl//absl/strings",
     ],
 )

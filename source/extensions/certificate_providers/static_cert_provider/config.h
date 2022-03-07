@@ -17,31 +17,22 @@ public:
 
   Capabilites capabilities() const override { return capabilities_; };
 
-  const std::string& getCACertificate(absl::string_view /*cert_name*/) const override {
-    return ca_cert_;
-  };
+  const std::string& caCert(absl::string_view /*cert_name*/) const override { return ca_cert_; };
 
   std::list<Envoy::CertificateProvider::Certpair>
-  getCertpair(absl::string_view /*cert_name*/) override {
-    return certpairs_;
+  certPairs(absl::string_view /*cert_name*/) override {
+    return cert_pairs_;
   };
 
-  Envoy::CertificateProvider::Certpair*
-  generateIdentityCertificate(const SSL_CLIENT_HELLO* /* ssl_client_hello */) override {
+  Common::CallbackHandlePtr addUpdateCallback(absl::string_view /*cert_name*/,
+                                              std::function<void()> /*callback*/) override {
     return nullptr;
-  };
-
-  // This is static certificate provider, so callbacks and subsription are not used.
-  void onCertpairUpdated(absl::string_view, Envoy::CertificateProvider::Certpair) override{};
-  void onCACertUpdated(absl::string_view, const std::string) override{};
-  void onUpatedFailed() override{};
-  void addSubsription(Envoy::CertificateProvider::CertificateSubscriptionPtr,
-                      std::string) override{};
+  }
 
 private:
   Capabilites capabilities_;
   const std::string ca_cert_;
-  std::list<Envoy::CertificateProvider::Certpair> certpairs_;
+  std::list<Envoy::CertificateProvider::Certpair> cert_pairs_;
 };
 
 class StaticCertificateProviderFactory : public CertificateProviderFactory {
