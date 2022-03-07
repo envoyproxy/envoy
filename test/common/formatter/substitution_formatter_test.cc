@@ -1372,6 +1372,65 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
 }
 
+TEST(SubstitutionFormatterTest, streamInfoFormatterForUdp) {
+  EXPECT_THROW(StreamInfoFormatter formatter("unknown_field"), EnvoyException);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  std::string body;
+
+  {
+    StreamInfoFormatter udp_downstream_bytes_sent_format("UDP_DOWNSTREAM_BYTES_SENT");
+    EXPECT_CALL(stream_info, bytesSent()).WillRepeatedly(Return(1));
+    EXPECT_EQ("1", udp_downstream_bytes_sent_format.format(request_headers, response_headers,
+                                                response_trailers, stream_info, body));
+    EXPECT_THAT(udp_downstream_bytes_sent_format.formatValue(request_headers, response_headers,
+                                                  response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(1.0)));
+  }
+
+  {
+    StreamInfoFormatter udp_downstream_bytes_received_format("UDP_DOWNSTREAM_BYTES_RECEIVED");
+    EXPECT_CALL(stream_info, bytesReceived()).WillRepeatedly(Return(1));
+    EXPECT_EQ("1", udp_downstream_bytes_received_format.format(request_headers, response_headers,
+                                                response_trailers, stream_info, body));
+    EXPECT_THAT(udp_downstream_bytes_received_format.formatValue(request_headers, response_headers,
+                                                  response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(1.0)));
+  }
+
+  {
+    StreamInfo::BytesMeterSharedPtr downstream_bytes_meter{
+        std::make_shared<StreamInfo::BytesMeter>()};
+    downstream_bytes_meter->addHeaderBytesSent(1);
+    StreamInfoFormatter udp_downstream_errors_sent_format("UDP_DOWNSTREAM_ERRORS_SENT");
+    EXPECT_CALL(stream_info, getDownstreamBytesMeter())
+        .WillRepeatedly(ReturnRef(downstream_bytes_meter));
+    EXPECT_EQ("1", udp_downstream_errors_sent_format.format(request_headers, response_headers,
+                                                     response_trailers, stream_info, body));
+    EXPECT_THAT(udp_downstream_errors_sent_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(1.0)));
+  }
+
+  {
+    StreamInfo::BytesMeterSharedPtr downstream_bytes_meter{
+        std::make_shared<StreamInfo::BytesMeter>()};
+    downstream_bytes_meter->addHeaderBytesReceived(1);
+    StreamInfoFormatter udp_downstream_errors_received_format("UDP_DOWNSTREAM_ERRORS_RECEIVED");
+    EXPECT_CALL(stream_info, getDownstreamBytesMeter())
+        .WillRepeatedly(ReturnRef(downstream_bytes_meter));
+    EXPECT_EQ("1", udp_downstream_errors_received_format.format(request_headers, response_headers,
+                                                     response_trailers, stream_info, body));
+    EXPECT_THAT(udp_downstream_errors_received_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(1.0)));
+  }
+
+}
+
 TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
