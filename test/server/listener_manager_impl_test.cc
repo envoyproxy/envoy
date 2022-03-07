@@ -4215,9 +4215,6 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidServe
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch) {
-  if (matcher_) {
-    GTEST_SKIP() << "Unified matcher allows duplicated or missing filter chain match messages";
-  }
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
@@ -4233,6 +4230,10 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
+  if (matcher_) {
+    EXPECT_NO_THROW(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
+    return;
+  }
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
                             "error adding listener '127.0.0.1:1234': filter chain 'bar' has "
                             "the same matching rules defined as 'foo'");
@@ -4262,22 +4263,25 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappingRules) {
-  if (matcher_) {
-    GTEST_SKIP() << "Unified matcher ignores filter chain match messages";
-  }
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
     filter_chains:
-    - filter_chain_match:
+    - name: foo
+      filter_chain_match:
         server_names: "example.com"
-    - filter_chain_match:
+    - name: bar
+      filter_chain_match:
         server_names: ["example.com", "www.example.com"]
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
+  if (matcher_) {
+    EXPECT_NO_THROW(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
+    return;
+  }
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
                             "error adding listener '127.0.0.1:1234': multiple filter chains with "
                             "overlapping matching rules are defined");

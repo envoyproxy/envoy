@@ -353,6 +353,7 @@ protected:
   uint64_t listener_tag_{1};
   bool enable_dispatcher_stats_{false};
   NiceMock<testing::MockFunction<void()>> callback_;
+  // Test parameter indicating whether the unified filter chain matcher is enabled.
   bool matcher_;
 };
 } // namespace Server
