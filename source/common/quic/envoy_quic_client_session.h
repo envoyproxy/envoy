@@ -104,8 +104,6 @@ protected:
   quic::QuicConnection* quicConnection() override;
 
 private:
-  friend class EnvoyQuicClientSessionPeer;
-
   uint64_t streamsAvailable();
 
   // These callbacks are owned by network filters and quic session should outlive
