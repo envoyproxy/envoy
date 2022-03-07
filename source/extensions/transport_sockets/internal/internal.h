@@ -42,8 +42,7 @@ class InternalSocket : public TransportSockets::PassthroughSocket,
                        Logger::Loggable<Logger::Id::connection> {
 public:
   InternalSocket(ConfigConstSharedPtr config, Network::TransportSocketPtr inner_socket,
-                 Upstream::HostDescriptionConstSharedPtr host,
-                 StreamInfo::FilterStateSharedPtr filter_state);
+                 Upstream::HostDescriptionConstSharedPtr host);
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;

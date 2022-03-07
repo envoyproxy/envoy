@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.transport_sockets.internal.v3;
 
+import "xds/annotations/v3/status.proto";
+
 import "envoy/config/core/v3/base.proto";
 import "envoy/type/metadata/v3/metadata.proto";
 
@@ -54,7 +56,9 @@ message InternalUpstreamTransport {
   // Specifies the list of filter state object names to insert into the downstream
   // internal connection when an internal address is used as a host. The filter state
   // objects must be mutable. These objects participate in the connection hashing decisions.
-  repeated FilterStateSource passthrough_filter_state_objects = 2;
+  repeated FilterStateSource passthrough_filter_state_objects = 2
+      [(xds.annotations.v3.field_status).work_in_progress = true];
+  ;
 
   // The underlying transport socket being wrapped.
   config.core.v3.TransportSocket transport_socket = 3 [(validate.rules).message = {required: true}];
