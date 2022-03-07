@@ -424,15 +424,14 @@ void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
 
 void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                                          Network::ConnectionEvent event) {
+  if (client.connect_timer_) {
+    ASSERT(!client.has_handshake_completed_);
+    client.connect_timer_->disableTimer();
+    client.connect_timer_.reset();
+  }
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     decrConnectingAndConnectedStreamCapacity(client.currentUnusedCapacity(), client);
-    if (client.connect_timer_) {
-      ASSERT(!client.has_handshake_completed_);
-      client.connect_timer_->disableTimer();
-      client.connect_timer_.reset();
-      client.has_handshake_completed_ = true;
-    }
     // Make sure that onStreamClosed won't double count.
     client.remaining_streams_ = 0;
     // The client died.
@@ -444,7 +443,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(host_, event);
     }
 
-    if (client.state() == ActiveClient::State::CONNECTING) {
+    if (!client.hasHandshakeCompleted()) {
+      client.has_handshake_completed_ = true;
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
 
@@ -507,9 +507,6 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
   } else if (event == Network::ConnectionEvent::Connected) {
     ASSERT(connecting_stream_capacity_ >= client.currentUnusedCapacity());
     connecting_stream_capacity_ -= client.currentUnusedCapacity();
-    client.connect_timer_->disableTimer();
-    client.connect_timer_.reset();
-    ASSERT(!client.has_handshake_completed_);
     client.has_handshake_completed_ = true;
     client.conn_connect_ms_->complete();
     client.conn_connect_ms_.reset();
