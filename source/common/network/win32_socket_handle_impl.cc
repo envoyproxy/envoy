@@ -158,9 +158,9 @@ Api::IoCallUint64Result Win32SocketHandleImpl::readvFromPeekBuffer(uint64_t max_
 
 Api::IoCallUint64Result Win32SocketHandleImpl::readFromPeekBuffer(Buffer::Instance& buffer,
                                                                   size_t length) {
-  auto lenght_to_move = std::min(peek_buffer_.length(), static_cast<uint64_t>(length));
-  buffer.move(peek_buffer_, lenght_to_move);
-  return Api::IoCallUint64Result(lenght_to_move, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+  auto length_to_move = std::min(peek_buffer_.length(), static_cast<uint64_t>(length));
+  buffer.move(peek_buffer_, length_to_move);
+  return Api::IoCallUint64Result(length_to_move, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
 }
 
 Api::IoCallUint64Result Win32SocketHandleImpl::peekFromPeekBuffer(void* buffer, size_t length) {

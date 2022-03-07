@@ -186,6 +186,12 @@ message HealthCheck {
     // the :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
     string authority = 2
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+    // Specifies a list of key-value pairs that should be added to the metadata of each GRPC call
+    // that is sent to the health checked cluster. For more information, including details on header value syntax,
+    // see the documentation on :ref:`custom request headers
+    // <config_http_conn_man_headers_custom_request_headers>`.
+    repeated HeaderValueOption initial_metadata = 3 [(validate.rules).repeated = {max_items: 1000}];
   }
 
   // Custom health check.

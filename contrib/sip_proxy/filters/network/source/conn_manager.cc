@@ -231,7 +231,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
 
   Buffer::OwnedImpl buffer;
 
-  metadata.setEP(getLocalIp());
+  metadata.setEP(Utility::localAddress(context_));
   const DirectResponse::ResponseType result = response.encode(metadata, buffer);
 
   read_callbacks_->connection().write(buffer, end_stream);
@@ -348,7 +348,7 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
 
   Buffer::OwnedImpl buffer;
 
-  metadata_->setEP(getLocalIp());
+  metadata_->setEP(Utility::localAddress(cm.context_));
   std::shared_ptr<Encoder> encoder = std::make_shared<EncoderImpl>();
 
   encoder->encode(metadata_, buffer);

@@ -128,6 +128,7 @@ public:
   }
   Api::SysCallIntResult setBlockingForTest(bool) override { return {0, 0}; }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }
+  absl::optional<uint64_t> congestionWindowInBytes() const override { return {}; }
   void dumpState(std::ostream&, int) const override {}
 
 private:
