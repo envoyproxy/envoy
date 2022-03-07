@@ -1443,7 +1443,6 @@ TEST_F(Http2ConnPoolImplTest, PreconnectWithoutMultiplexing) {
 }
 
 TEST_F(Http2ConnPoolImplTest, IncreaseCapacityWithSettingsFrame) {
-  TestScopedRuntime scoped_runtime;
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(100);
   ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
 
@@ -1486,7 +1485,6 @@ TEST_F(Http2ConnPoolImplTest, IncreaseCapacityWithSettingsFrame) {
 }
 
 TEST_F(Http2ConnPoolImplTest, DisconnectWithNegativeCapacity) {
-  TestScopedRuntime scoped_runtime;
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(6);
   ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
 

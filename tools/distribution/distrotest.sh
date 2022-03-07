@@ -78,10 +78,10 @@ getent passwd envoy | cut -d":" -f6 | grep "/nonexistent"
 run_log user-shell "Check envoy user shell"
 getent passwd envoy | cut -d":" -f7 | grep "/bin/false"
 
-run_log binary-permissions "Check ownership/permissons of envoy binary"
+run_log binary-permissions "Check ownership/permissions of envoy binary"
 test "$(stat -L -c "%a %G %U" /usr/bin/envoy)" == "$BINARY_PERMISSIONS" && echo "Correct permissions: ${BINARY_PERMISSIONS}"
 
-run_log config-permissions "Check ownership/permissons of envoy config"
+run_log config-permissions "Check ownership/permissions of envoy config"
 test "$(stat -L -c "%a %G %U" /etc/envoy/envoy.yaml)" == "$CONFIG_PERMISSIONS" && echo "Correct permissions: ${CONFIG_PERMISSIONS}"
 
 run_log envoy-version "Envoy version"
