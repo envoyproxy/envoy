@@ -24,11 +24,27 @@ namespace {
 // A magic header value which marks header as not expected.
 constexpr char UnexpectedHeaderValue[] = "Unexpected header value";
 
+std::string ipAndDeferredProcessingParamsToString(
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& p) {
+  return fmt::format("{}_{}",
+                     std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+                     std::get<1>(p.param) ? "WithDeferredProcessing" : "NoDeferredProcessing");
+}
+
+// TODO(kbaichoo): Remove parameterizing by deferred processing when the feature
+// is enabled by default. The parameterization is to avoid bit rot since it's
+// off by default.
 class GrpcJsonTranscoderIntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion>,
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
       public HttpIntegrationTest {
 public:
-  GrpcJsonTranscoderIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+  GrpcJsonTranscoderIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {
+    // Parameterize with defer processing to prevent bit rot as filter made
+    // assumptions of data flow, prior relying on eager processing.
+    config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
+                                      deferredProcessing() ? "true" : "false");
+  }
 
   void SetUp() override {
     setUpstreamProtocol(Http::CodecType::HTTP2);
@@ -196,11 +212,14 @@ protected:
 
     config_helper_.addConfigModifier(modifier);
   }
+
+  bool deferredProcessing() const { return std::get<1>(GetParam()); }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, GrpcJsonTranscoderIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    ipAndDeferredProcessingParamsToString);
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPost) {
   HttpIntegrationTest::initialize();
@@ -1204,35 +1223,57 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetExceedsBufferLimit) 
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       R"([{"id":"1","author":"Neal Stephenson","title":"Readme"}])");
 
-  // Over limit: The server streams two response messages. Even through the transcoder
-  // handles them independently, portions of the first message are still in the
-  // internal buffers while the second one is processed.
-  //
-  // Because the headers and body is already sent, the stream is closed with
-  // an incomplete response.
-  testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
-      "", {"shelf: 1"},
-      {R"(id: 1 author: "Neal Stephenson" title: "Readme")",
-       R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
-      Status(),
-      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
-      // Incomplete response, not valid JSON.
-      R"([{"id":"1","author":"Neal Stephenson","title":"Readme"})", false, false, "", true,
-      /*expect_response_complete=*/false);
+  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
+    // Over limit: The server streams two response messages. Because this is
+    // larger than the buffer limits, we end up buffering both results in the
+    // codec towards the upstream. When we finally process the buffered data, we
+    // end up resetting the stream as we've over the transcoder limit.
+    testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
+        Http::TestRequestHeaderMapImpl{
+            {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
+        "", {"shelf: 1"},
+        {R"(id: 1 author: "Neal Stephenson" title: "Readme")",
+         R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
+        Status(),
+        Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+        /*expected_response_body=*/"", false, false, "", true, /*expect_response_complete=*/false);
+
+  } else {
+    // Over limit: The server streams two response messages. Even through the transcoder
+    // handles them independently, portions of the first message are still in the
+    // internal buffers while the second one is processed.
+    //
+    // Because the headers and body is already sent, the stream is closed with
+    // an incomplete response.
+    testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
+        Http::TestRequestHeaderMapImpl{
+            {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
+        "", {"shelf: 1"},
+        {R"(id: 1 author: "Neal Stephenson" title: "Readme")",
+         R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
+        Status(),
+        Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+        // Incomplete response, not valid JSON.
+        R"([{"id":"1","author":"Neal Stephenson","title":"Readme"})", false, false, "", true,
+        /*expect_response_complete=*/false);
+  }
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetUnderBufferLimit) {
-  const int num_messages = 20;
-  config_helper_.setBufferLimits(2 << 20, 80);
+  const int num_messages = 100;
+  const std::string grpc_response_message = R"(id: 1 author: "Neal Stephenson" title: "Readme")";
+  // The upstream will encode all of the response back to back, as such some of
+  // the responses will cluster together. It's unlikely that a majority of them
+  // will have been sent to the Envoy before it has streamed them to the
+  // downstream.
+  config_helper_.setBufferLimits(2 << 20, 60 * grpc_response_message.size());
   HttpIntegrationTest::initialize();
 
   // Craft multiple response messages. IF combined together, they exceed the buffer limit.
   std::vector<std::string> grpc_response_messages;
   grpc_response_messages.reserve(num_messages);
   for (int i = 0; i < num_messages; i++) {
-    grpc_response_messages.push_back(R"(id: 1 author: "Neal Stephenson" title: "Readme")");
+    grpc_response_messages.push_back(grpc_response_message);
   }
 
   // Craft expected response.
@@ -1290,9 +1331,10 @@ public:
     config_helper_.prependFilter(filter);
   }
 };
-INSTANTIATE_TEST_SUITE_P(IpVersions, OverrideConfigGrpcJsonTranscoderIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, OverrideConfigGrpcJsonTranscoderIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    ipAndDeferredProcessingParamsToString);
 
 TEST_P(OverrideConfigGrpcJsonTranscoderIntegrationTest, RouteOverride) {
   // add bookstore per-route override
