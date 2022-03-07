@@ -758,50 +758,106 @@ public:
   void ifDenyRuleConditionIsTrueThenDenyTest(Http::TestRequestHeaderMapImpl headers,
                                              absl::string_view rule_conditional_expr,
                                              absl::string_view conditional_expr_param_value) {
+    std::cerr << "Deny Test" << std::endl;
+
     useAccessLog("%RESPONSE_CODE_DETAILS%");
+
+    std::cerr << "after useAccessLog";
+
     config_helper_.prependFilter(
         fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
                     fmt::format(std::string(rule_conditional_expr), conditional_expr_param_value)));
+
+    std::cerr << "after prependFilter" << std::endl;
+
     initialize();
+
+    std::cerr << "after initialize" << std::endl;
 
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
+    std::cerr << "after makeHttpConnection" << std::endl;
+
     auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
-    ASSERT_TRUE(response->waitForEndStream());
+    std::cerr << "after makeHeaderOnlyRequest" << std::endl;
+
+    ASSERT_TRUE(response->waitForEndStream()) << std::endl;
+
+    std::cerr << "after response->waitForEndStream" << std::endl;
+
     ASSERT_TRUE(response->complete());
+
+    std::cerr << "after response->complete" << std::endl;
+
     EXPECT_EQ("403", response->headers().getStatusValue());
+
+    std::cerr << "after response->headers().getStatusValue" << std::endl;
+
     // Note the whitespace in the policy id is replaced by '_'.
     EXPECT_THAT(waitForAccessLog(access_log_name_),
                 testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
 
+    std::cerr << "after waitForAccessLog" << std::endl;
+
     cleanupUpstreamAndDownstream();
+
+    std::cerr << "after cleanupUpstreamAndDownstream" << std::endl;
   }
 
   void ifDenyRuleConditionIsFalseThenAllowTest(Http::TestRequestHeaderMapImpl headers,
                                                absl::string_view rule_conditional_expr,
                                                absl::string_view conditional_expr_param_value) {
+    std::cerr << "allow test" << std::endl;
+
     useAccessLog("%RESPONSE_CODE_DETAILS%");
+
+    std::cerr << "after useAccessLog" << std::endl;
+
     config_helper_.prependFilter(
         fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
                     fmt::format(std::string(rule_conditional_expr), conditional_expr_param_value)));
+
+    std::cerr << "after prependFilter" << std::endl;
+
     initialize();
+
+    std::cerr << "after initialize" << std::endl;
 
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
+    std::cerr << "after makeHttpConnection" << std::endl;
+
     auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
+    std::cerr << "after makeHeaderOnlyRequest" << std::endl;
+
     waitForNextUpstreamRequest();
+
+    std::cerr << "after waitForNextUpstreamRequest" << std::endl;
+
     Http::TestResponseHeaderMapImpl response_headers{
         {":status", "200"},
     };
     upstream_request_->encodeHeaders(response_headers, true);
 
+    std::cerr << "after encodeHeaders" << std::endl;
+
     ASSERT_TRUE(response->waitForEndStream());
+
+    std::cerr << "after response->waitForEndStream" << std::endl;
+
     ASSERT_TRUE(response->complete());
+
+    std::cerr << "after response->complete" << std::endl;
+
     EXPECT_EQ("200", response->headers().getStatusValue());
 
+    std::cerr << "after response->headers().getStatusValue" << std::endl;
+
     cleanupUpstreamAndDownstream();
+
+    std::cerr << "after cleanupUpstreamAndDownstream" << std::endl;
   }
 };
 
