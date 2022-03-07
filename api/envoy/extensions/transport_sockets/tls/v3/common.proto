@@ -489,8 +489,8 @@ message CertificateValidationContext {
 
   // Config for the max number of intermediate certificates in chain that are parsed during verification.
   // This does not include the leaf certificate. If configured, and the certificate chain is longer than allowed, the certificates
-  // above the limit are ignored, and certificate validation will fail. OpenSSL defines the default limit as
-  // 100, though this can be system-dependent.
+  // above the limit are ignored, and certificate validation will fail. The default limit is 100,
+  // though this can be system-dependent.
   // https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set_verify_depth.html
   google.protobuf.UInt32Value max_verify_depth = 16 [(validate.rules).uint32 = {lte: 100}];
 }

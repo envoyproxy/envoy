@@ -211,7 +211,7 @@ TEST(DefaultCertValidatorTest, WithVerifyDepth) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
 
   // Create the default validator object.
-  // Config includes ca_cert and the verify-depth
+  // Config includes ca_cert and the verify-depth.
   // Set verify depth < 3, so verification fails. ( There are 3 intermediate certs )
 
   std::string ca_cert_str(TestEnvironment::substitute(
@@ -237,7 +237,7 @@ TEST(DefaultCertValidatorTest, WithVerifyDepth) {
 
   EXPECT_EQ(X509_verify_cert(store_ctx.get()), 0);
 
-  // Now, create config with no depth configuration, verification should pass
+  // Now, create config with no depth configuration, verification should pass.
   test_config = std::make_unique<TestCertificateValidationContextConfig>(typed_conf, false,
                                                                          san_matchers, ca_cert_str);
   default_validator = std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
