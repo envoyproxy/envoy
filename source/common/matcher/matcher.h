@@ -201,6 +201,8 @@ private:
   template <class MatcherType>
   MatchTreeFactoryCb<DataType> createTreeMatcher(const MatcherType& matcher) {
     auto data_input = createDataInput(matcher.matcher_tree().input());
+    auto on_no_match = createOnMatch(matcher.on_no_match());
+
     switch (matcher.matcher_tree().tree_type_case()) {
     case MatcherType::MatcherTree::kExactMatchMap: {
       std::vector<std::pair<std::string, OnMatchFactoryCb<DataType>>> match_children;
@@ -210,8 +212,6 @@ private:
         match_children.push_back(
             std::make_pair(children.first, *MatchTreeFactory::createOnMatch(children.second)));
       }
-
-      auto on_no_match = createOnMatch(matcher.on_no_match());
 
       return [match_children, data_input, on_no_match]() {
         auto multimap_matcher = std::make_unique<ExactMapMatcher<DataType>>(
@@ -233,7 +233,7 @@ private:
           matcher.matcher_tree().custom_match().typed_config(),
           server_factory_context_.messageValidationVisitor(), factory);
       return factory.createCustomMatcherFactoryCb(*message, server_factory_context_, data_input,
-                                                  *this);
+                                                  on_no_match, *this);
     }
     }
     PANIC_DUE_TO_CORRUPT_ENUM;

@@ -941,7 +941,9 @@ ClusterInfoImpl::ClusterInfoImpl(
   DurationUtil::durationToMilliseconds(common_lb_config_.update_merge_window());
 
   // Create upstream filter factories
-  auto filters = config.filters();
+  const auto& filters = config.filters();
+  ASSERT(filter_factories_.empty());
+  filter_factories_.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     ENVOY_LOG(debug, "  upstream filter #{}:", i);
@@ -953,7 +955,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                                            factory_context.messageValidationVisitor(), *message);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, *factory_context_);
-    filter_factories_.push_back(callback);
+    filter_factories_.push_back(std::move(callback));
   }
 }
 
