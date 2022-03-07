@@ -17,6 +17,7 @@ Minor Behavior Changes
 * ext_authz: added requested server name in ext_authz network filter for auth review.
 * file: changed disk based files to truncate files which are not being appended to. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.append_or_truncate`` to false.
 * grpc: flip runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to be default enabled. async grpc client created through getOrCreateRawAsyncClient will be cached by default.
+* health_checker: exposing `initial_metadata` to GrpcHealthCheck in a way similar to `request_headers_to_add` of HttpHealthCheck.
 * http: avoiding delay-close for HTTP/1.0 responses framed by connection: close as well as HTTP/1.1 if the request is fully read. This means for responses to such requests, the FIN will be sent immediately after the response. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.skip_delay_close`` to false.  If clients are are seen to be receiving sporadic partial responses and flipping this flag fixes it, please notify the project immediately.
 * http: now the max concurrent streams of http2 connection can not only be adjusted down according to the SETTINGS frame but also can be adjusted up, of course, it can not exceed the configured upper bounds. This fix is guarded by ``envoy.reloadable_features.http2_allow_capacity_increase_by_settings``.
 * http: when writing custom filters, `injectEncodedDataToFilterChain` and `injectDecodedDataToFilterChain` now trigger sending of headers if they were not yet sent due to `StopIteration`. Previously, calling one of the inject functions in that state would trigger an assertion. See issue #19891 for more details.
@@ -81,8 +82,17 @@ New Features
 * outlier_detection: :ref:`max_ejection_time_jitter<envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>` configuration added to allow adding a random value to the ejection time to prevent 'thundering herd' scenarios. Defaults to 0 so as to not break or change the behavior of existing deployments.
 * redis: support for hostnames returned in `cluster slots` response is now available.
 * schema_validator_tool: added ``bootstrap`` checking to the
-  :ref:`schema validator check tool <install_tools_schema_validator_check_tool>`. Also fixed linking
-  of all extensions into the tool so that all typed configurations can be properly verified.
+  :ref:`schema validator check tool <install_tools_schema_validator_check_tool>`.
+* schema_validator_tool: added ``--fail-on-deprecated`` and ``--fail-on-wip`` to the
+  :ref:`schema validator check tool <install_tools_schema_validator_check_tool>` to allow failing
+  the check if either deprecated or work-in-progress fields are used.
+* schema_validator_tool: fixed linking of all extensions into the
+  :ref:`schema validator check tool <install_tools_schema_validator_check_tool>` so that all typed
+  configurations can be properly verified.
+* schema_validator_tool: the
+  :ref:`schema validator check tool <install_tools_schema_validator_check_tool>` will now recurse
+  into all sub messages, including Any messages, and perform full validation (deprecation,
+  work-in-progress, PGV, etc.). Previously only top-level messages were fully validated.
 * stats: histogram_buckets query parameter added to stats endpoint to change histogram output to show buckets.
 * tools: the project now ships a :ref:`tools docker image <install_tools>` which contains tools
   useful in support systems such as CI, CD, etc. The
@@ -94,5 +104,7 @@ Deprecated
 
 * config: deprecated :ref:`path <envoy_v3_api_field_config.core.v3.ConfigSource.path>` in favor of
   :ref:`path_config_source <envoy_v3_api_field_config.core.v3.ConfigSource.path_config_source>`
+* http: deprecated ``envoy.http.headermap.lazy_map_min_size``.  If you are using this config knob you can revert this temporarily by setting ``envoy.reloadable_features.deprecate_global_ints`` to true but you MUST file an upstream issue to ensure this feature remains available.
 * http: removing support for long-deprecated old style filter names, e.g. envoy.router, envoy.lua.
 * re2: removed undocumented histograms ``re2.program_size`` and ``re2.exceeded_warn_level``.
+* re2: deprecated ``re2.max_program_size.error_level`` and ``re2.max_program_size.warn_level``. If you are using these config knobs you can revert this temporarily by setting ``envoy.reloadable_features.deprecate_global_ints`` to true but you MUST file an upstream issue to ensure this feature remains available.
