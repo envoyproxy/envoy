@@ -205,6 +205,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/network/dns_resolver/apple @junr03 @yanavlasov
 # Config Validators
 /*/extensions/config/validators/minimum_clusters @adisuissa @htuch
+# support library for filesystem based extensions
+/*/extensions/common/async_files @mattklein123 @ravenblack
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
