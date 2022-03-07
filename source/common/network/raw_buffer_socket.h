@@ -26,10 +26,11 @@ public:
   void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
 
 protected:
-  TransportSocketCallbacks* callbacks_{};
+  TransportSocketCallbacks* transportSocketCallbacks() const { return callbacks_; };
 
 private:
   bool shutdown_{};
+  TransportSocketCallbacks* callbacks_{};
 };
 
 class RawBufferSocketFactory : public CommonTransportSocketFactory {
