@@ -762,7 +762,7 @@ public:
 
     useAccessLog("%RESPONSE_CODE_DETAILS%");
 
-    std::cerr << "after useAccessLog";
+    std::cerr << "after useAccessLog" << std::endl;
 
     config_helper_.prependFilter(
         fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
@@ -867,34 +867,41 @@ INSTANTIATE_TEST_SUITE_P(Protocols, RbacWithCustomCelVocabularyIntegrationTests,
 
 // Custom CEL Vocabulary - DENY if request[query][key1]==correct_value
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, QueryIfMatchDeny) {
+  std::cerr << "Test start" << std::endl;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},     {":path", "/query?key1=correct_value"}, {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"},
   };
+  std::cerr << "after headers creation" << std::endl;
   ifDenyRuleConditionIsTrueThenDenyTest(headers, QueryExpr, "correct_value");
 }
 
 // Custom CEL Vocabulary - ALLOW if request[query][key1]!=correct_value
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, QueryIfNoMatchAllow) {
+  std::cerr << "Test start" << std::endl;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},     {":path", "/query?key1=correct_value"}, {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"},
   };
+  std::cerr << "after headers creation" << std::endl;
   ifDenyRuleConditionIsFalseThenAllowTest(headers, QueryExpr, "something_wrong");
 }
 
 // Custom CEL Vocabulary - DENY if cookie(fruit)==apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfMatchDeny) {
+  std::cerr << "Test start" << std::endl;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},         {":path", "/query?key1=correct_value"}, {":scheme", "http"},
       {":authority", "host"},     {"x-forwarded-for", "10.0.0.1"},        {"cookie", "fruit=apple"},
       {"cookie", "fruit=banana"},
   };
+  std::cerr << "after headers creation" << std::endl;
   ifDenyRuleConditionIsTrueThenDenyTest(headers, CookieExpr, "apple");
 }
 
 // Custom CEL Vocabulary - ALLOW if cookie(fruit)!=apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfNoMatchAllow) {
+  std::cerr << "Test start" << std::endl;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},
       {":path", "/path"},
@@ -904,11 +911,13 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfNoMatchAllow) {
       {"cookie", "fruit=apple"},
       {"cookie", "fruit=banana"},
   };
+  std::cerr << "after headers creation" << std::endl;
   ifDenyRuleConditionIsFalseThenAllowTest(headers, CookieExpr, "veg");
 }
 
 // Custom CEL Vocabulary - DENY if cookieValue(fruit)==apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfMatchDeny) {
+  std::cerr << "Test start" << std::endl;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},
       {":path", "/path"},
@@ -918,11 +927,13 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfMatchDeny) {
       {"cookie", "fruit=apple"},
       {"cookie", "fruit=banana"},
   };
+  std::cerr << "after headers creation" << std::endl;
   ifDenyRuleConditionIsTrueThenDenyTest(headers, CookieValueExpr, "apple");
 }
 
 // Custom CEL Vocabulary - ALLOW if cookieValue(fruit)!=apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfNoMatchAllow) {
+  std::cerr << "Test start" << std::endl;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},
       {":path", "/path"},
@@ -932,24 +943,29 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfNoMatchAllow) {
       {"cookie", "fruit=apple"},
       {"cookie", "fruit=banana"},
   };
+  std::cerr << "after headers creation" << std::endl;
   ifDenyRuleConditionIsFalseThenAllowTest(headers, CookieValueExpr, "veg");
 }
 
 // Custom CEL Vocabulary - ALLOW if request.url() contains(correct_path)
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfMatchDeny) {
+  std::cerr << "Test start" << std::endl;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},     {":path", "/correct_path"},      {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"host", "abc.com:1234"},
   };
+  std::cerr << "after headers creation" << std::endl;
   ifDenyRuleConditionIsTrueThenDenyTest(headers, UrlExpr, "correct_path");
 }
 
 // Custom CEL Vocabulary - ALLOW if request.url() !contains(correct_path)
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfNoMatchAllow) {
+  std::cerr << "Test start" << std::endl;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},     {":path", "/correct_path"},      {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"host", "abc.com:1234"},
   };
+  std::cerr << "after headers creation" << std::endl;
   ifDenyRuleConditionIsFalseThenAllowTest(headers, UrlExpr, "wrong_path");
 }
 
