@@ -70,7 +70,7 @@ static_resources:
                 transport_api_version: V3
                 grpc_services:
                   envoy_grpc:
-                    cluster_name: xds_cluster    
+                    cluster_name: xds_cluster
 )EOF",
                                                   Platform::null_device_path));
 }
