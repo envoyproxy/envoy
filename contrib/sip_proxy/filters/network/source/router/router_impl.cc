@@ -428,8 +428,8 @@ FilterStatus Router::messageEnd() {
   Buffer::OwnedImpl transport_buffer;
 
   // set EP/Opaque, used in upstream
-  ENVOY_STREAM_LOG(debug, "set EP {}", *callbacks_, upstream_request_->localAddress());
-  metadata_->setEP(upstream_request_->localAddress());
+  ENVOY_STREAM_LOG(debug, "set EP {}", *callbacks_, Utility::localAddress(context_));
+  metadata_->setEP(Utility::localAddress(context_));
 
   std::shared_ptr<Encoder> encoder = std::make_shared<EncoderImpl>();
   ENVOY_STREAM_LOG(debug, "before encode", *callbacks_);
@@ -658,8 +658,6 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
 
   return FilterStatus::Continue;
 }
-
-absl::string_view ResponseDecoder::getLocalIp() { return parent_.localAddress(); }
 
 std::shared_ptr<SipSettings> ResponseDecoder::settings() const { return parent_.settings(); }
 
