@@ -77,6 +77,25 @@ TEST_F(FilterStateImplTest, Simple) {
   EXPECT_EQ(1u, destruction_count);
 }
 
+TEST_F(FilterStateImplTest, SharedPointerAccessor) {
+  size_t access_count = 0u;
+  size_t destruction_count = 0u;
+  filter_state().setData(
+      "test_name", std::make_shared<TestStoredTypeTracking>(5, &access_count, &destruction_count),
+      FilterState::StateType::Mutable, FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(0u, access_count);
+  EXPECT_EQ(0u, destruction_count);
+
+  auto obj = filter_state().getDataSharedMutableGeneric("test_name");
+  EXPECT_EQ(5, dynamic_cast<TestStoredTypeTracking*>(obj.get())->access());
+  EXPECT_EQ(1u, access_count);
+  EXPECT_EQ(0u, destruction_count);
+
+  resetFilterState();
+  EXPECT_EQ(1u, access_count);
+  EXPECT_EQ(0u, destruction_count);
+}
+
 TEST_F(FilterStateImplTest, SameTypes) {
   size_t access_count_1 = 0u;
   size_t access_count_2 = 0u;
@@ -187,6 +206,7 @@ TEST_F(FilterStateImplTest, NoNameConflictMutableAndMutable) {
 TEST_F(FilterStateImplTest, UnknownName) {
   EXPECT_EQ(nullptr, filter_state().getDataReadOnly<SimpleType>("test_1"));
   EXPECT_EQ(nullptr, filter_state().getDataMutable<SimpleType>("test_1"));
+  EXPECT_EQ(nullptr, filter_state().getDataSharedMutableGeneric("test_1"));
 }
 
 TEST_F(FilterStateImplTest, WrongTypeGet) {
@@ -203,6 +223,9 @@ TEST_F(FilterStateImplTest, ErrorAccessingReadOnlyAsMutable) {
   EXPECT_THROW_WITH_MESSAGE(
       filter_state().getDataMutable<TestStoredTypeTracking>("test_name"), EnvoyException,
       "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
+  EXPECT_THROW_WITH_MESSAGE(
+      filter_state().getDataSharedMutableGeneric("test_name"), EnvoyException,
+      "FilterState::getDataSharedMutableGeneric tried to access immutable data as mutable.");
 }
 
 namespace {
