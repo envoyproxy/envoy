@@ -102,9 +102,9 @@ Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFrom
   std::shared_ptr<Config> filter_config(new ConfigImpl(proto_config, context));
 
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(
-        std::make_shared<ConnectionManager>(*filter_config, context.api().randomGenerator(),
-                                            context.mainThreadDispatcher().timeSource()));
+    filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
+        *filter_config, context.api().randomGenerator(),
+        context.mainThreadDispatcher().timeSource(), context.drainDecision()));
   };
 }
 

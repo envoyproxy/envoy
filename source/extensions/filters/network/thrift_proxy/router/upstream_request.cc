@@ -125,11 +125,15 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
 
   const auto& cluster = parent_.cluster();
 
+  bool draining = false;
   const auto status = callbacks.upstreamData(data);
   if (status == ThriftFilters::ResponseStatus::Complete) {
     ENVOY_LOG(debug, "response complete");
 
     stats_.recordUpstreamResponseSize(cluster, response_size_);
+
+    // Is the upstream going away?
+    draining = !callbacks.responseMetadata().headers().get(DrainHeader).empty();
 
     switch (callbacks.responseMetadata()->messageType()) {
     case MessageType::Reply:
@@ -160,6 +164,11 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
     ENVOY_LOG(debug, "upstream reset");
     upstream_host_->outlierDetector().putResult(Upstream::Outlier::Result::ExtOriginRequestFailed);
     stats_.incResponseDecodingError(cluster, upstream_host_);
+    resetStream();
+  }
+
+  if (draining) {
+    // TODO(rgs1): bump stat for connection closed due to draining.
     resetStream();
   }
 

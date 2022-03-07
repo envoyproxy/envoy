@@ -75,6 +75,7 @@ envoy_cc_library(
         "//envoy/event:deferred_deletable",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",
+        "//envoy/network:drain_decision_interface",
         "//envoy/network:filter_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:timespan_interface",

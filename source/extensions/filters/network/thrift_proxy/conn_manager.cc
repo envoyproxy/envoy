@@ -13,11 +13,13 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 ConnectionManager::ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
-                                     TimeSource& time_source)
+                                     TimeSource& time_source,
+                                     const Network::DrainDecision& drain_decision)
     : config_(config), stats_(config_.stats()), transport_(config.createTransport()),
       protocol_(config.createProtocol()),
       decoder_(std::make_unique<Decoder>(*transport_, *protocol_, *this)),
-      random_generator_(random_generator), time_source_(time_source) {}
+      random_generator_(random_generator), time_source_(time_source),
+      drain_decision_(drain_decision) {}
 
 ConnectionManager::~ConnectionManager() = default;
 
@@ -220,6 +222,16 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
   if (metadata->hasReplyType()) {
     success_ = metadata->replyType() == ReplyType::Success;
   }
+
+  ConnectionManager& cm = parent_.parent_;
+  if (cm_.drain_decision_.drainClose()) {
+    // Notify downstream that we are going away.
+    // TODO(rgs1):
+    // * should the key value contain something useful? E.g.: minutes til drain is over?
+    // * this should be protected by a feature flag.
+    metadata->headers().addReferenceKey(DrainHeader, "close");
+  }
+
   return ProtocolConverter::messageBegin(metadata);
 }
 
