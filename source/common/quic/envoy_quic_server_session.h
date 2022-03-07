@@ -96,7 +96,7 @@ protected:
   std::unique_ptr<quic::QuicCryptoServerStreamBase>
   CreateQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
                                quic::QuicCompressedCertsCache* compressed_certs_cache) override;
-  quic::QuicSSLConfig GetSSLConfig() override;
+  quic::QuicSSLConfig GetSSLConfig() const override;
 
   // quic::QuicSession
   // Overridden to create stream as encoder and associate it with an decoder.

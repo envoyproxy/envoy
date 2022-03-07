@@ -479,6 +479,39 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   codec_client_->close();
 }
 
+TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
+  // Make sure all connections use the same PersistentQuicInfoImpl.
+  concurrency_ = 1;
+  enable_quic_early_data_ = false;
+  initialize();
+  // Start the first connection.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  EXPECT_EQ(transport_socket_factory_->clientContextConfig().serverNameIndication(),
+            codec_client_->connection()->requestedServerName());
+  // Send a complete request on the first connection.
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response1->waitForEndStream());
+  // Close the first connection.
+  codec_client_->close();
+
+  // Start a second connection.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  // Send a complete request on the second connection.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  // Ensure the 2nd connection is using resumption ticket but doesn't accept early data.
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_TRUE(quic_session->IsResumption());
+  EXPECT_FALSE(quic_session->EarlyDataAccepted());
+  // Close the second connection.
+  codec_client_->close();
+}
+
 // Ensure multiple quic connections work, regardless of platform BPF support
 TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsDefaultMode) {
   testMultipleQuicConnections();
@@ -1043,6 +1076,39 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
   codec_client_0->close();
   EXPECT_TRUE(codec_client_1->sawGoAway());
   codec_client_1->close();
+}
+
+TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
+  enable_quic_early_data_ = true;
+  inplaceInitialize(/*add_default_filter_chain=*/false);
+
+  auto codec_client_0 = makeRawHttp3Connection(
+      makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), absl::nullopt,
+      /*wait_for_1rtt_key*/ true);
+  makeRequestAndWaitForResponse(*codec_client_0);
+  codec_client_0->close();
+
+  // Modify 1st transport socket factory to disable early data.
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  new_config_helper.addQuicDownstreamTransportSocketConfig(/*enable_early_data=*/false);
+
+  new_config_helper.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
+  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
+
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
+  // The 2nd connection should try to do 0-RTT but get rejected and QUICHE will transparently retry
+  // the request after handshake completes.
+  auto codec_client_2 = makeRawHttp3Connection(
+      makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), absl::nullopt,
+      /*wait_for_1rtt_key*/ false);
+  makeRequestAndWaitForResponse(*codec_client_2);
+
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_2->connection());
+  EXPECT_FALSE(quic_session->EarlyDataAccepted());
+  codec_client_2->close();
 }
 
 } // namespace Quic
