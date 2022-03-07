@@ -1921,3 +1921,23 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "tcp_proxy_odcds_integration_test",
+    srcs = ["tcp_proxy_odcds_integration_test.cc"],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":ads_integration_lib",
+        ":fake_upstream_lib",
+        ":http_integration_lib",
+        "//source/common/common:macros",
+        "//source/common/tcp_proxy",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/test_common:resources_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
