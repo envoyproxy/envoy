@@ -76,7 +76,7 @@ public:
 
 class ConnectionImpl;
 
-// Abstract actory. Used to enable injection of factories for testing.
+// Abstract factory. Used to enable injection of factories for testing.
 class Http2SessionFactory {
 public:
   using ConnectionImplType = ConnectionImpl;
