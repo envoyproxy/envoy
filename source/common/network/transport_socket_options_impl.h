@@ -4,6 +4,8 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stream_info/filter_state.h"
 
+#include "source/common/singleton/const_singleton.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -72,33 +74,39 @@ public:
                TransportSocketOptionsConstSharedPtr options) const override;
 };
 
+using EmptyTransportSocketOptions = ConstSingleton<TransportSocketOptionsImpl>;
+
 // Base wrapper for transport socket options.
 class BaseWrapperTransportSocketOptions : public TransportSocketOptions {
 public:
   BaseWrapperTransportSocketOptions(TransportSocketOptionsConstSharedPtr inner_options)
-      : inner_options_(inner_options ? std::move(inner_options)
-                                     : std::make_shared<TransportSocketOptionsImpl>()) {}
+      : inner_options_(std::move(inner_options)) {}
   // Network::TransportSocketOptions
   const absl::optional<std::string>& serverNameOverride() const override {
-    return inner_options_->serverNameOverride();
+    return inner_options_ ? inner_options_->serverNameOverride()
+                          : EmptyTransportSocketOptions::get().serverNameOverride();
   }
   const std::vector<std::string>& verifySubjectAltNameListOverride() const override {
-    return inner_options_->verifySubjectAltNameListOverride();
+    return inner_options_ ? inner_options_->verifySubjectAltNameListOverride()
+                          : EmptyTransportSocketOptions::get().verifySubjectAltNameListOverride();
   }
   const std::vector<std::string>& applicationProtocolListOverride() const override {
-    return inner_options_->applicationProtocolListOverride();
+    return inner_options_ ? inner_options_->applicationProtocolListOverride()
+                          : EmptyTransportSocketOptions::get().applicationProtocolListOverride();
   }
   const std::vector<std::string>& applicationProtocolFallback() const override {
-    return inner_options_->applicationProtocolFallback();
+    return inner_options_ ? inner_options_->applicationProtocolFallback()
+                          : EmptyTransportSocketOptions::get().applicationProtocolFallback();
   }
   absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
-    return inner_options_->proxyProtocolOptions();
+    return inner_options_ ? inner_options_->proxyProtocolOptions() : absl::nullopt;
   }
   const StreamInfo::FilterStateSharedPtr& filterState() const override {
-    return inner_options_->filterState();
+    return inner_options_ ? inner_options_->filterState()
+                          : EmptyTransportSocketOptions::get().filterState();
   }
   std::shared_ptr<const Upstream::HostDescription> host() const override {
-    return inner_options_->host();
+    return inner_options_ ? inner_options_->host() : nullptr;
   }
 
 private:
@@ -125,7 +133,7 @@ class HostDecoratingTransportSocketOptions : public BaseWrapperTransportSocketOp
 public:
   HostDecoratingTransportSocketOptions(std::shared_ptr<const Upstream::HostDescription>& host,
                                        TransportSocketOptionsConstSharedPtr inner_options)
-      : BaseWrapperTransportSocketOptions(std::move(inner_options)), host_(std::move(host)) {}
+      : BaseWrapperTransportSocketOptions(std::move(inner_options)), host_(host) {}
   std::shared_ptr<const Upstream::HostDescription> host() const override { return host_; }
 
 private:

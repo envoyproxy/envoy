@@ -277,10 +277,8 @@ Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFact
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
-  HostDescriptionConstSharedPtr host = shared_from_this();
-  return {createConnection(dispatcher, host, transportSocketFactory(), options,
-                           transport_socket_options, false),
-          host};
+  return createConnection(dispatcher, cluster(), address(), addressList(), transportSocketFactory(),
+                          options, transport_socket_options, shared_from_this());
 }
 
 void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status) {
@@ -309,19 +307,19 @@ Host::CreateConnectionData HostImpl::createHealthCheckConnection(
   Network::TransportSocketFactory& factory =
       (metadata != nullptr) ? resolveTransportSocketFactory(healthCheckAddress(), metadata)
                             : transportSocketFactory();
-  HostDescriptionConstSharedPtr host = shared_from_this();
-  return {createConnection(dispatcher, host, factory, nullptr, transport_socket_options, true),
-          host};
+  return createConnection(dispatcher, cluster(), healthCheckAddress(), {}, factory, nullptr,
+                          transport_socket_options, shared_from_this());
 }
 
-Network::ClientConnectionPtr
-HostImpl::createConnection(Event::Dispatcher& dispatcher, HostDescriptionConstSharedPtr& host,
-                           Network::TransportSocketFactory& socket_factory,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options,
-                           Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-                           bool health_check) {
+Host::CreateConnectionData HostImpl::createConnection(
+    Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
+    const Network::Address::InstanceConstSharedPtr& address,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
+    Network::TransportSocketFactory& socket_factory,
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+    HostDescriptionConstSharedPtr host) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
-  const auto& cluster = host->cluster();
   if (cluster.clusterSocketOptions() != nullptr) {
     if (options) {
       connection_options = std::make_shared<Network::ConnectionSocket::Options>();
@@ -335,16 +333,13 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, HostDescriptionConstSh
     connection_options = options;
   }
 
-  static const std::vector<Network::Address::InstanceConstSharedPtr> empty;
-  const auto& address = health_check ? host->healthCheckAddress() : host->address();
-  const auto& address_list = health_check ? empty : host->addressList();
-
   ASSERT(!address->envoyInternalAddress() ||
          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address"));
 
   auto host_transport_socket_options =
       std::make_shared<Network::HostDecoratingTransportSocketOptions>(host,
                                                                       transport_socket_options);
+
   Network::ClientConnectionPtr connection =
       address_list.size() > 1
           ? std::make_unique<Network::HappyEyeballsConnectionImpl>(
@@ -357,7 +352,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, HostDescriptionConstSh
 
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);
-  return connection;
+  return {std::move(connection), std::move(host)};
 }
 
 void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, new_weight); }
