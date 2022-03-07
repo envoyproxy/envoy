@@ -224,12 +224,12 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
   }
 
   ConnectionManager& cm = parent_.parent_;
-  if (cm_.drain_decision_.drainClose()) {
+  if (cm.drain_decision_.drainClose()) {
     // Notify downstream that we are going away.
     // TODO(rgs1):
     // * should the key value contain something useful? E.g.: minutes til drain is over?
     // * this should be protected by a feature flag.
-    metadata->headers().addReferenceKey(DrainHeader, "close");
+    metadata->headers().addReferenceKey(parent_.parent_.DrainHeader, "close");
   }
 
   return ProtocolConverter::messageBegin(metadata);
