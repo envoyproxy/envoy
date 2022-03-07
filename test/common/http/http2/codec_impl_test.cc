@@ -136,7 +136,7 @@ public:
   }
 
   virtual void initialize() {
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
+    scoped_runtime_->mergeValues(
         {{"envoy.reloadable_features.http2_new_codec_wrapper",
           enable_new_codec_wrapper_ ? "true" : "false"}});
     Runtime::LoaderSingleton::getExisting()->mergeValues(
@@ -3599,7 +3599,7 @@ public:
 
 protected:
   void initialize() override {
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
+    scoped_runtime_->mergeValues(
         {{"envoy.reloadable_features.http2_new_codec_wrapper",
           enable_new_codec_wrapper_ ? "true" : "false"}});
     Runtime::LoaderSingleton::getExisting()->mergeValues(

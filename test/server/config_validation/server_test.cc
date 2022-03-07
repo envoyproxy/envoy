@@ -81,36 +81,6 @@ public:
     }
     return files;
   }
-
-  class TestConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {
-  public:
-    std::string name() const override { return "envoy.filters.network.test"; }
-
-    Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
-                                                          Configuration::FactoryContext&) override {
-      // Validate that the validation server loaded the runtime data and installed the singleton.
-      auto* runtime = Runtime::LoaderSingleton::getExisting();
-      if (runtime == nullptr) {
-        throw EnvoyException("Runtime::LoaderSingleton == nullptr");
-      }
-
-      if (!runtime->threadsafeSnapshot()->getBoolean("test.runtime.loaded", false)) {
-        throw EnvoyException(
-            "Found Runtime::LoaderSingleton, got wrong value for test.runtime.loaded");
-      }
-
-      return [](Network::FilterManager&) {};
-    }
-
-    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-      return ProtobufTypes::MessagePtr{new ProtobufWkt::Struct()};
-    }
-
-    bool isTerminalFilterByProto(const Protobuf::Message&,
-                                 Server::Configuration::FactoryContext&) override {
-      return true;
-    }
-  };
 };
 
 TEST_P(ValidationServerTest, Validate) {
@@ -192,15 +162,19 @@ INSTANTIATE_TEST_SUITE_P(AllConfigs, ValidationServerTest_1,
                          ::testing::ValuesIn(ValidationServerTest_1::getAllConfigFiles()));
 
 TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoaderSingleton) {
-  TestConfigFactory factory;
-  Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registration(factory);
-
-  auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-
-  // If this fails, it's likely because TestConfigFactory threw an exception related to the
-  // runtime loader.
-  ASSERT_TRUE(validateConfig(options_, local_address, component_factory_,
-                             Thread::threadFactoryForTest(), Filesystem::fileSystemForTest()));
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  ValidationInstance server(options_, time_system.timeSystem(),
+                            Network::Address::InstanceConstSharedPtr(), stats_store,
+                            access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                            Filesystem::fileSystemForTest());
+  EXPECT_TRUE(server.runtime().snapshot().getBoolean("test.runtime.loaded"));
+  server.registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [] { FAIL(); });
+  server.registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                          [](Event::PostCb) { FAIL(); });
+  server.setSinkPredicates(std::make_unique<testing::NiceMock<Stats::MockSinkPredicates>>());
+  server.shutdown();
 }
 
 // Test the admin handler stubs used in validation

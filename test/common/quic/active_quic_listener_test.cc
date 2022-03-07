@@ -82,10 +82,6 @@ protected:
   void SetUp() override {
     envoy::config::bootstrap::v3::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
-    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
-        Runtime::LoaderPtr{new Runtime::LoaderImpl(*dispatcher_, tls_, config, local_info_, store_,
-                                                   generator_, validation_visitor_, *api_)});
-
     listen_socket_ =
         std::make_shared<Network::UdpListenSocket>(local_address_, nullptr, /*bind*/ true);
     listen_socket_->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
@@ -294,7 +290,6 @@ protected:
   Network::ActiveUdpListenerFactoryPtr listener_factory_;
   NiceMock<Network::MockListenSocketFactory> socket_factory_;
   EnvoyQuicDispatcher* quic_dispatcher_;
-  std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::TestUtil::TestStore store_;
