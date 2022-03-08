@@ -44,8 +44,8 @@ Statistics
 
 The TCP proxy filter emits both its own downstream statistics,
  :ref:`access logs <config_access_log>` for upstream and downstream connections,
- as well as many of the :ref:`cluster
-upstream statistics <config_cluster_manager_cluster_stats>` where applicable.
+ as well as many of the
+ :ref:`cluster upstream statistics <config_cluster_manager_cluster_stats>` where applicable.
 The downstream statistics are rooted at *tcp.<stat_prefix>.* with the following statistics:
 
 .. csv-table::
