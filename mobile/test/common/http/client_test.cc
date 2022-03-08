@@ -196,7 +196,7 @@ TEST_P(ClientTest, SetDestinationClusterUpstreamProtocol) {
       {":method", "GET"},
       {":authority", "host"},
       {":path", "/"},
-      {"x-envoy-mobile-cluster", "base_alpn"},
+      {"x-envoy-mobile-cluster", "base"},
       {"x-forwarded-proto", "https"},
   };
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
@@ -204,6 +204,7 @@ TEST_P(ClientTest, SetDestinationClusterUpstreamProtocol) {
   EXPECT_CALL(*request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers_alpn), true));
   http_client_.sendHeaders(stream_, c_headers_alpn, true);
 
+  // FIXME(goaway): This doesn't force H1 and still performs ALPN!
   // Setting http1.
   TestRequestHeaderMapImpl headers4{{"x-envoy-mobile-upstream-protocol", "http1"}};
   HttpTestUtility::addDefaultHeaders(headers4);

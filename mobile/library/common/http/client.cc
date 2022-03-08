@@ -598,13 +598,12 @@ const LowerCaseString H2UpstreamHeader{"x-envoy-mobile-upstream-protocol"};
 const char* BaseCluster = "base";
 const char* H2Cluster = "base_h2";
 const char* ClearTextCluster = "base_clear";
-const char* AlpnCluster = "base_alpn";
 
 } // namespace
 
 void Client::setDestinationCluster(Http::RequestHeaderMap& headers) {
   // Determine upstream cluster:
-  // - Use TLS by default.
+  // - Use TLS with ALPN by default.
   // - Use http/2 or ALPN if requested explicitly via x-envoy-mobile-upstream-protocol.
   // - Force http/1.1 if request scheme is http (cleartext).
   const char* cluster{};
@@ -616,11 +615,11 @@ void Client::setDestinationCluster(Http::RequestHeaderMap& headers) {
     const auto value = h2_header[0]->value().getStringView();
     if (value == "http2") {
       cluster = H2Cluster;
-    } else if (value == "alpn") {
-      cluster = AlpnCluster;
-    } else {
-      RELEASE_ASSERT(value == "http1", fmt::format("using unsupported protocol version {}", value));
+      // FIXME(goaway): No cluster actually forces H1 today except cleartext!
+    } else if (value == "alpn" || value == "http1") {
       cluster = BaseCluster;
+    } else {
+      PANIC(fmt::format("using unsupported protocol version {}", value));
     }
   } else {
     cluster = BaseCluster;

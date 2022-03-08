@@ -42,6 +42,7 @@ open class EngineBuilder(
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 100000000
   private var h2ConnectionKeepaliveTimeoutSeconds = 10
+  private var h2RawDomains = listOf<String>()
   private var statsFlushSeconds = 60
   private var streamIdleTimeoutSeconds = 15
   private var perTryIdleTimeoutSeconds = 15
@@ -228,6 +229,18 @@ open class EngineBuilder(
    */
   fun addH2ConnectionKeepaliveTimeoutSeconds(timeoutSeconds: Int): EngineBuilder {
     this.h2ConnectionKeepaliveTimeoutSeconds = timeoutSeconds
+    return this
+  }
+
+  /**
+   * Add a list of domains to which h2 connections will be established without protocol negotiation.
+   *
+   * @param h2RawDomains list of domains to which connections should be raw h2.
+   *
+   * @return this builder.
+   */
+  fun addH2RawDomains(h2RawDomains: List<String>): EngineBuilder {
+    this.h2RawDomains = h2RawDomains
     return this
   }
 
@@ -442,6 +455,7 @@ open class EngineBuilder(
             enableInterfaceBinding,
             h2ConnectionKeepaliveIdleIntervalMilliseconds,
             h2ConnectionKeepaliveTimeoutSeconds,
+            h2RawDomains,
             statsFlushSeconds,
             streamIdleTimeoutSeconds,
             perTryIdleTimeoutSeconds,
@@ -476,6 +490,7 @@ open class EngineBuilder(
             enableInterfaceBinding,
             h2ConnectionKeepaliveIdleIntervalMilliseconds,
             h2ConnectionKeepaliveTimeoutSeconds,
+            h2RawDomains,
             statsFlushSeconds,
             streamIdleTimeoutSeconds,
             perTryIdleTimeoutSeconds,
