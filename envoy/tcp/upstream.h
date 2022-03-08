@@ -28,6 +28,10 @@ public:
   // The host name of the tunneling upstream HTTP request.
   virtual const std::string& hostname() const PURE;
 
+  virtual bool useAutoSni() const PURE;
+
+  virtual int defaultPort() const PURE;
+
   // The method of the upstream HTTP request. True if using POST method, CONNECT otherwise.
   virtual bool usePost() const PURE;
 

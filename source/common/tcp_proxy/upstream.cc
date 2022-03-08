@@ -9,6 +9,8 @@
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "fmt/printf.h"
+
 namespace Envoy {
 namespace TcpProxy {
 using TunnelingConfig =
@@ -270,12 +272,18 @@ bool Http2Upstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
 void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) {
   request_encoder_ = &request_encoder;
   request_encoder_->getStream().addCallbacks(*this);
-
+  const std::string& hostname =
+      config_.useAutoSni()
+          ? fmt::sprintf("%s:%d",
+                         downstream_info_.downstreamAddressProvider().requestedServerName(),
+                         config_.defaultPort())
+          : config_.hostname();
+  // downstream_info_.downstreamAddressProvider().requestedServerName()
   const std::string& scheme =
       is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
-      {Http::Headers::get().Host, config_.hostname()},
+      {Http::Headers::get().Host, hostname},
       {Http::Headers::get().Path, "/"},
       {Http::Headers::get().Scheme, scheme},
   });
@@ -302,9 +310,15 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
   request_encoder_->enableTcpTunneling();
   ASSERT(request_encoder_->http1StreamEncoderOptions() != absl::nullopt);
 
+  const std::string& hostname =
+      config_.useAutoSni()
+          ? fmt::sprintf("%s:%d",
+                         downstream_info_.downstreamAddressProvider().requestedServerName(),
+                         config_.defaultPort())
+          : config_.hostname();
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
-      {Http::Headers::get().Host, config_.hostname()},
+      {Http::Headers::get().Host, hostname},
   });
 
   if (config_.usePost()) {
