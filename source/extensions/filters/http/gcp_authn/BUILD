@@ -27,7 +27,6 @@ envoy_cc_library(
     ],
 )
 
-#TODO(tyxia) Why envoy_cc_extension
 envoy_cc_extension(
     name = "filter_config",
     srcs = ["filter_config.cc"],

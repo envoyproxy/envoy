@@ -16,10 +16,7 @@ namespace GcpAuthentication {
 namespace {
 
 using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
-// TODO(tyxia)
-// Update to use test fixture later
-// Add negative test
-// Add static yaml configuration
+
 TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithEmptyProto) {
   GcpAuthnFilterConfig filter_config;
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -52,13 +49,6 @@ TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithCorrectProto) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
-
-  //   const std::string retry_policy_core = R"(
-  // retry_back_off:
-  //   base_interval: 32s
-  //   max_interval: 1s
-  // num_retries: 10
-  // )";
 }
 
 } // namespace

@@ -10,7 +10,6 @@ namespace HttpFilters {
 namespace GcpAuthentication {
 
 using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
-using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterPerRouteConfig;
 
 Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
     const GcpAuthnFilterConfig& config, const std::string&, FactoryContext& context) {

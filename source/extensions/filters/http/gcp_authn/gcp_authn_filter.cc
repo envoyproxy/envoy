@@ -15,19 +15,15 @@ namespace GcpAuthentication {
 using ::google::jwt_verify::Status;
 using Http::FilterHeadersStatus;
 
-constexpr char kMetadataFlavorKey[] = "Metadata-Flavor";
-constexpr char kMetadataFlavor[] = "Google";
+constexpr char MetadataFlavorKey[] = "Metadata-Flavor";
+constexpr char MetadataFlavor[] = "Google";
 
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  // TODO(tyxia) This is on the worker thread
-  // Think about where to call this function.
-  client_->sendRequest();
+  client_->fetchToken();
   return FilterHeadersStatus::Continue;
 }
 
-// TODO(tyxia) Add `audience` into this
-Http::RequestMessagePtr GcpAuthnClient::buildRequest(const std::string& method,
-                                                     const std::string& server_url) const {
+Http::RequestMessagePtr buildRequest(const std::string& method, const std::string& server_url) {
   absl::string_view host;
   absl::string_view path;
   Envoy::Http::Utility::extractHostPathFromUri(server_url, host, path);
@@ -36,25 +32,23 @@ Http::RequestMessagePtr GcpAuthnClient::buildRequest(const std::string& method,
           {{Envoy::Http::Headers::get().Method, method},
            {Envoy::Http::Headers::get().Host, std::string(host)},
            {Envoy::Http::Headers::get().Path, std::string(path)},
-           {Envoy::Http::LowerCaseString(kMetadataFlavorKey), kMetadataFlavor}});
+           {Envoy::Http::LowerCaseString(MetadataFlavorKey), MetadataFlavor}});
 
   return std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
 }
 
-// TODO(tyxia) Pass the return of buildRequest to the sendRequest??
-void GcpAuthnClient::sendRequest() {
-  if (active_request_) {
-    active_request_->cancel();
-    active_request_ = nullptr;
-  }
+// TODO(tyxia) Pass the return of buildRequest to the fetchToken??
+void GcpAuthnClient::fetchToken() {
+  resetRequest();
 
   const auto thread_local_cluster =
       context_.clusterManager().getThreadLocalCluster(config_.http_uri().cluster());
 
   // Fail the request if the cluster is not configured.
   if (thread_local_cluster == nullptr) {
-    ENVOY_LOG(error, "{}: send request [uri = {}] failed: [cluster = {}] is not configured",
-              __func__, config_.http_uri().uri(), config_.http_uri().cluster());
+    ENVOY_LOG(error,
+              "Failed to fetch the token [uri = {}]: [cluster = {}] is not found or configured.",
+              config_.http_uri().uri(), config_.http_uri().cluster());
     // TODO(tyxia)
     // handleFailure here
     handleFailure();
@@ -69,6 +63,7 @@ void GcpAuthnClient::sendRequest() {
           // GCP metadata server rejects X-Forwarded-For requests.
           // https://cloud.google.com/compute/docs/storing-retrieving-metadata#x-forwarded-for_header
           .setSendXff(false);
+
   if (config_.has_retry_policy()) {
     envoy::config::route::v3::RetryPolicy route_retry_policy =
         Http::Utility::convertCoreToRouteRetryPolicy(config_.retry_policy(),
@@ -92,13 +87,9 @@ void GcpAuthnClient::onSuccess(const Http::AsyncClient::Request&,
       ::google::jwt_verify::Jwt jwt;
       Status status = jwt.parseFromString(response->bodyAsString());
       if (status == Status::Ok) {
-        uint64_t exp_time = jwt.exp_;
-        // TODO(tyxia) Test code
-        std::cout << exp_time << std::endl;
       }
-
     } else {
-      ENVOY_LOG(error, "{}: failed: {}", status_code);
+      ENVOY_LOG(error, "Failed to get the response status: {}", status_code);
       handleFailure();
     }
   } catch (const Envoy::EnvoyException& e) {
@@ -112,10 +103,10 @@ void GcpAuthnClient::onFailure(const Http::AsyncClient::Request&,
                                Http::AsyncClient::FailureReason reason) {
 
   if (reason == Http::AsyncClient::FailureReason::Reset) {
-    ENVOY_LOG(debug, "{}: fetch token [uri = {}] failed: the stream has been reset}", __func__,
+    ENVOY_LOG(error, "Failed to fetch the token [uri = {}]: the stream has been reset",
               config_.http_uri().uri());
   } else {
-    ENVOY_LOG(debug, "{}: fetch token [uri = {}]: failed network error {}", __func__,
+    ENVOY_LOG(debug, "Failed to fetch the token [uri = {}]: failed network error {}",
               config_.http_uri().uri(), enumToInt(reason));
   }
 
@@ -123,8 +114,8 @@ void GcpAuthnClient::onFailure(const Http::AsyncClient::Request&,
 }
 
 void GcpAuthnClient::handleFailure() {
-  // TODO(tyxia) Add logs or other monitor stats
-  active_request_ = nullptr;
+  // TODO(tyxia) Add logs here.
+  resetRequest();
 }
 
 } // namespace GcpAuthentication

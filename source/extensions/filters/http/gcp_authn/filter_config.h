@@ -13,20 +13,13 @@ namespace GcpAuthentication {
 
 class GcpAuthnFilterFactory
     : public Common::FactoryBase<
-          envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig,
-          envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterPerRouteConfig> {
+          envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig> {
 public:
   GcpAuthnFilterFactory() : FactoryBase("envoy.filters.http.gcp_authn") {}
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
       const std::string&, FactoryContext& context) override;
-
-  // TODO(tyxia) No need for perRouteConfig at this moment.
-  // Router::RouteSpecificFilterConfigConstSharedPtr
-  // createRouteSpecificFilterConfigTyped(const GcpAuthnFilterPerRouteConfig& config,
-  //                                      Server::Configuration::ServerFactoryContext&,
-  //                                      ProtobufMessage::ValidationVisitor&) override;
 };
 
 } // namespace GcpAuthentication

@@ -22,28 +22,4 @@ message GcpAuthnFilterConfig {
 
   // Retry policy for fetching tokens.
   config.core.v3.RetryPolicy retry_policy = 2;
-
-  // JWT filter Cache configuration
-  CacheConfig cache_config = 3;
-}
-
-// TODO(tyxia) This sits in cluster config
-message GcpAuthnFilterPerRouteConfig {
-  repeated string audience = 1;
-}
-
-// JWT Cache configuration.
-message CacheConfig {
-  enum ExpirationMode {
-    FIXED = 0;
-    TOKEN = 1;
-  }
-
-  // The unit is the number of JWT tokens.
-  uint32 cache_size = 1;
-
-  // Duration after which the cached JWT token should be expired.
-  google.protobuf.Duration cache_duration = 2;
-
-  ExpirationMode exp_mode = 3;
 }
