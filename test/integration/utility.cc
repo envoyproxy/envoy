@@ -226,10 +226,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
     local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
   }
   Network::ClientConnectionPtr connection = Quic::createQuicNetworkConnection(
-      *persistent_info,
-      std::make_shared<quic::QuicCryptoClientConfig>(
-          std::make_unique<Quic::EnvoyQuicProofVerifier>(quic_transport_socket_factory.sslCtx()),
-          persistent_info->createQuicSessionCacheWrapper()),
+      *persistent_info, quic_transport_socket_factory.getCryptoConfig(),
       quic::QuicServerId(quic_transport_socket_factory.clientContextConfig().serverNameIndication(),
                          static_cast<uint16_t>(addr->ip()->port())),
       *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store);

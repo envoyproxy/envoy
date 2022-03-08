@@ -9,6 +9,8 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
+#include "quiche/quic/core/crypto/quic_crypto_client_config.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -114,6 +116,8 @@ public:
     return fallback_factory_->config();
   }
 
+  std::shared_ptr<quic::QuicCryptoClientConfig> getCryptoConfig();
+
 protected:
   // fallback_factory_ will update the context.
   void onSecretUpdated() override {}
@@ -121,6 +125,11 @@ protected:
 private:
   // The QUIC client transport socket can create TLS sockets for fallback to TCP.
   std::unique_ptr<Extensions::TransportSockets::Tls::ClientSslSocketFactory> fallback_factory_;
+  // Latch the latest crypto config, to determine if it has updated since last
+  // checked.
+  Envoy::Ssl::ClientContextSharedPtr client_context_;
+  // If client_context_ changes, client config will be updated as well.
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
 };
 
 // Base class to create above QuicTransportSocketFactory for server and client
