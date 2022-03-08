@@ -1,4 +1,4 @@
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test_library", "envoy_package")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_test_library", "envoy_extension_package")
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
@@ -7,7 +7,7 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_test_library(
     name = "common",
