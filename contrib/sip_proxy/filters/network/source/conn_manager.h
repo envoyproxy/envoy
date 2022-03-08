@@ -113,23 +113,6 @@ public:
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) override;
 
-  absl::string_view getLocalIp() override {
-    // should return local address ip
-    // But after ORIGINAL_DEST, the local address update to upstream local address
-    // So here get downstream remote IP, which should in same pod car with envoy
-    ENVOY_LOG(debug, "Local ip: {}",
-              read_callbacks_->connection()
-                  .connectionInfoProvider()
-                  .localAddress()
-                  ->ip()
-                  ->addressAsString());
-    return read_callbacks_->connection()
-        .connectionInfoProvider()
-        .localAddress()
-        ->ip()
-        ->addressAsString();
-  }
-
   std::shared_ptr<SipSettings> settings() const override { return config_.settings(); }
 
   void continueHanding(const std::string& key);
@@ -174,13 +157,6 @@ private:
     DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) override {
       UNREFERENCED_PARAMETER(metadata);
       return *this;
-    }
-
-    absl::string_view getLocalIp() override {
-      // should return local address ip
-      // But after ORIGINAL_DEST, the local address update to upstream local address
-      // So here get downstream remote IP, which should in same pod car with envoy
-      return parent_.parent_.getLocalIp();
     }
 
     std::shared_ptr<SipSettings> settings() const override { return parent_.parent_.settings(); }
