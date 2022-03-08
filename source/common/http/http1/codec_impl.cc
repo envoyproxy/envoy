@@ -966,7 +966,7 @@ ServerConnectionImpl::ServerConnectionImpl(
       }),
       headers_with_underscores_action_(headers_with_underscores_action),
       runtime_lazy_read_disable_(
-          Runtime::runtimeFeatureEnabled("envoy_reloadable_features_http1_lazy_read_disable")) {}
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_lazy_read_disable")) {}
 
 uint32_t ServerConnectionImpl::getHeadersSize() {
   // Add in the size of the request URL if processing request headers.

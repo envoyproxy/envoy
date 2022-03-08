@@ -32,6 +32,7 @@ RUNTIME_GUARD(envoy_reloadable_features_do_not_await_headers_on_upstream_timeout
 RUNTIME_GUARD(envoy_reloadable_features_enable_grpc_async_client_cache);
 RUNTIME_GUARD(envoy_reloadable_features_fix_added_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_handle_stream_reset_during_hcm_encoding);
+RUNTIME_GUARD(envoy_reloadable_features_http1_lazy_read_disable);
 RUNTIME_GUARD(envoy_reloadable_features_http2_allow_capacity_increase_by_settings);
 RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
 RUNTIME_GUARD(envoy_reloadable_features_http_ext_authz_do_not_skip_direct_response_and_redirect);
@@ -53,7 +54,6 @@ RUNTIME_GUARD(envoy_reloadable_features_udp_listener_updates_filter_chain_in_pla
 RUNTIME_GUARD(envoy_reloadable_features_update_expected_rq_timeout_on_retry);
 RUNTIME_GUARD(envoy_reloadable_features_use_dns_ttl);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
-RUNTIME_GUARD(envoy_reloadable_features_http1_lazy_read_disable);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
 RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
 
@@ -148,6 +148,7 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_enable_grpc_async_client_cache,
   &FLAGS_envoy_reloadable_features_fix_added_trailers,
   &FLAGS_envoy_reloadable_features_handle_stream_reset_during_hcm_encoding,
+  &FLAGS_envoy_reloadable_features_http1_lazy_read_disable,
   &FLAGS_envoy_reloadable_features_http2_allow_capacity_increase_by_settings,
   &FLAGS_envoy_reloadable_features_http2_new_codec_wrapper,
   &FLAGS_envoy_reloadable_features_http_ext_authz_do_not_skip_direct_response_and_redirect,
@@ -168,7 +169,6 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_update_expected_rq_timeout_on_retry,
   &FLAGS_envoy_reloadable_features_use_dns_ttl,
   &FLAGS_envoy_reloadable_features_validate_connect,
-  &FLAGS_envoy_reloadable_features_http1_lazy_read_disable,
   &FLAGS_envoy_restart_features_explicit_wildcard_resource,
   &FLAGS_envoy_restart_features_use_apple_api_for_dns_lookups,
 };
