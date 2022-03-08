@@ -94,11 +94,11 @@ New Features
   into all sub messages, including Any messages, and perform full validation (deprecation,
   work-in-progress, PGV, etc.). Previously only top-level messages were fully validated.
 * stats: histogram_buckets query parameter added to stats endpoint to change histogram output to show buckets.
+* thrift: add support for connection draining. This can be enabled by setting the runtime guard ``envoy.reloadable_features.thrift_connection_draining`` to true.
 * tools: the project now ships a :ref:`tools docker image <install_tools>` which contains tools
   useful in support systems such as CI, CD, etc. The
   :ref:`schema validator check tool <install_tools_schema_validator_check_tool>` has been added
   to the tools image.
-* thrift: add support for connection draining. This can be enabled by setting the runtime guard ``envoy.reloadable_features.thrift_connection_draining`` to true.
 
 Deprecated
 ----------
