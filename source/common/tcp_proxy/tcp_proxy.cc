@@ -194,7 +194,10 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   // in onData(). This will get re-enabled when the upstream connection is
   // established.
   read_callbacks_->connection().readDisable(true);
+  getStreamInfo().setDownstreamBytesMeter(std::make_shared<StreamInfo::BytesMeter>());
+  getStreamInfo().setUpstreamBytesMeter(std::make_shared<StreamInfo::BytesMeter>());
   getStreamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+
   config_->stats().downstream_cx_total_.inc();
   if (set_connection_stats) {
     read_callbacks_->connection().setConnectionStats(
@@ -493,6 +496,8 @@ void Filter::onConnectTimeout() {
 Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "downstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
+  getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(data.length());
+  getStreamInfo().getDownstreamBytesMeter()->addWireBytesReceived(data.length());
   if (upstream_) {
     upstream_->encodeData(data, end_stream);
   }
@@ -547,6 +552,8 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
 void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "upstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
+  getStreamInfo().getUpstreamBytesMeter()->addWireBytesReceived(data.length());
+  getStreamInfo().getDownstreamBytesMeter()->addWireBytesSent(data.length());
   read_callbacks_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
