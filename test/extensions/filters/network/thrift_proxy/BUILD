@@ -277,6 +277,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:host_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/thrift/router/v2alpha1:pkg_cc_proto",
     ],
