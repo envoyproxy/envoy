@@ -119,9 +119,18 @@ bool InstanceImplWin32::directoryExists(const std::string& path) {
 }
 
 ssize_t InstanceImplWin32::fileSize(const std::string& path) {
-  auto fd = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, NULL);
+  if (illegalPath(path)) {
+    throw EnvoyException(absl::StrCat("Invalid path: ", path));
+  }
+  auto fd = CreateFileA(path.c_str(), GENERIC_READ,
+                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0, OPEN_EXISTING, 0,
+                        NULL);
   if (fd == INVALID_HANDLE) {
-    return -1;
+    auto last_error = ::GetLastError();
+    if (last_error == ERROR_FILE_NOT_FOUND) {
+      throw EnvoyException(absl::StrCat("Invalid path: ", path));
+    }
+    throw EnvoyException(absl::StrCat("unable to read file: ", path));
   }
   ssize_t result = 0;
   LARGE_INTEGER lFileSize;
