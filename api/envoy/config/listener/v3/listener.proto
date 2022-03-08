@@ -122,14 +122,14 @@ message Listener {
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
 
-  // :ref:`Unified matcher <arch_overview_matching_api>` resolving the filter chain name from the network properties. This matcher is used as a replacement
+  // :ref:`Unified matcher <arch_overview_matching>` resolving the filter chain name from the network properties. This matcher is used as a replacement
   // for the per-filter chain match condition
   // :ref:`filter_chain_match <envoy_v3_api_field_config.listener.v3.FilterChain.filter_chain_match>`.
   // If specified, all :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.filter_chains>` must
   // have non-empty and unique :ref:`name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` fields and omit
   // :ref:`filter_chain_match <envoy_v3_api_field_config.listener.v3.FilterChain.filter_chain_match>` field.
   //
-  // The list of matching inputs is available :ref:`here <envoy_v3_api_file_envoy/extensions/matching/common_inputs/network/v3/network_inputs.proto>`.
+  // The list of matching inputs is available :ref:`here <arch_overview_matching_network_inputs>`.
   //
   // Example: The following matcher selects three filter chains as follows:
   //
