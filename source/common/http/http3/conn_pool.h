@@ -53,6 +53,10 @@ public:
     return std::min<int64_t>(quiche_capacity_, effectiveConcurrentStreamLimit());
   }
 
+  // Overridden to return true as long as the client is doing handshake even when it is ready for
+  // early data streams.
+  bool hasHandshakeCompleted() const override { return has_handshake_completed_; }
+
   void updateCapacity(uint64_t new_quiche_capacity) {
     // Each time we update the capacity make sure to reflect the update in the
     // connection pool.
@@ -66,18 +70,10 @@ public:
     quiche_capacity_ = new_quiche_capacity;
     uint64_t new_capacity = currentUnusedCapacity();
 
-    if (connect_timer_) {
-      if (new_capacity < old_capacity) {
-        parent_.decrConnectingAndConnectedStreamCapacity(old_capacity - new_capacity);
-      } else if (old_capacity < new_capacity) {
-        parent_.incrConnectingAndConnectedStreamCapacity(new_capacity - old_capacity);
-      }
-    } else {
-      if (new_capacity < old_capacity) {
-        parent_.decrClusterStreamCapacity(old_capacity - new_capacity);
-      } else if (old_capacity < new_capacity) {
-        parent_.incrClusterStreamCapacity(new_capacity - old_capacity);
-      }
+    if (new_capacity < old_capacity) {
+      parent_.decrConnectingAndConnectedStreamCapacity(old_capacity - new_capacity, *this);
+    } else if (old_capacity < new_capacity) {
+      parent_.incrConnectingAndConnectedStreamCapacity(new_capacity - old_capacity, *this);
     }
   }
 
