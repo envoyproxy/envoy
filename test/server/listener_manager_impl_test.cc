@@ -599,6 +599,36 @@ TEST_F(ListenerManagerImplTest, RejectIpv4CompatOnNonIpv4MappedIpv6address) {
       "Only IPv6 address '::' or valid IPv4-mapped IPv6 address can set ipv4_compat: [::1]:13333");
 }
 
+TEST_F(ListenerManagerImplTest, AcceptIpv4CompatOnIpv6AnyAddress) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      socket_address:
+        address: "::"
+        port_value: 13333
+        ipv4_compat: true
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true));
+}
+
+TEST_F(ListenerManagerImplTest, AcceptIpv4CompatOnNonCanonicalIpv6AnyAddress) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      socket_address:
+        address: "::0"
+        port_value: 13333
+        ipv4_compat: true
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true));
+}
+
 TEST_F(ListenerManagerImplTest, AcceptIpv4CompatOnNonIpv4MappedIpv6address) {
   auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
   Runtime::LoaderSingleton::getExisting()->mergeValues(
