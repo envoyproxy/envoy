@@ -11,7 +11,7 @@ namespace Network {
 namespace Matching {
 
 TEST(MatchingData, DestinationIPInput) {
-  DestinationIPInput input;
+  DestinationIPInput<MatchingData> input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
@@ -35,7 +35,7 @@ TEST(MatchingData, DestinationIPInput) {
 }
 
 TEST(MatchingData, DestinationPortInput) {
-  DestinationPortInput input;
+  DestinationPortInput<MatchingData> input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
@@ -59,7 +59,7 @@ TEST(MatchingData, DestinationPortInput) {
 }
 
 TEST(MatchingData, SourceIPInput) {
-  SourceIPInput input;
+  SourceIPInput<MatchingData> input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
@@ -83,7 +83,7 @@ TEST(MatchingData, SourceIPInput) {
 }
 
 TEST(MatchingData, SourcePortInput) {
-  SourcePortInput input;
+  SourcePortInput<MatchingData> input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
@@ -234,7 +234,7 @@ TEST(MatchingData, ApplicationProtocolInput) {
 }
 
 TEST(UdpMatchingData, UdpDestinationIPInput) {
-  UdpDestinationIPInput input;
+  DestinationIPInput<UdpMatchingData> input;
   const Address::InstanceConstSharedPtr ip =
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
   const Address::InstanceConstSharedPtr pipe =
@@ -258,7 +258,7 @@ TEST(UdpMatchingData, UdpDestinationIPInput) {
 }
 
 TEST(UdpMatchingData, UdpDestinationPortInput) {
-  UdpDestinationPortInput input;
+  DestinationPortInput<UdpMatchingData> input;
   const Address::InstanceConstSharedPtr ip =
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
   const Address::InstanceConstSharedPtr pipe =
@@ -282,7 +282,7 @@ TEST(UdpMatchingData, UdpDestinationPortInput) {
 }
 
 TEST(UdpMatchingData, UdpSourceIPInput) {
-  UdpSourceIPInput input;
+  SourceIPInput<UdpMatchingData> input;
   const Address::InstanceConstSharedPtr ip =
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
   const Address::InstanceConstSharedPtr pipe =
@@ -306,7 +306,7 @@ TEST(UdpMatchingData, UdpSourceIPInput) {
 }
 
 TEST(UdpMatchingData, UdpSourcePortInput) {
-  UdpSourcePortInput input;
+  SourcePortInput<UdpMatchingData> input;
   const Address::InstanceConstSharedPtr ip =
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
   const Address::InstanceConstSharedPtr pipe =
