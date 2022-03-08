@@ -1220,6 +1220,7 @@ public:
   }
 
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
+
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;

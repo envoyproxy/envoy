@@ -3652,8 +3652,8 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  factory_context_.cluster_manager_.initializeClusters({"www2", "www3", "rc_cluster", "vh_cluster", "route_cluster"},
-                                                       {});
+  factory_context_.cluster_manager_.initializeClusters(
+      {"www2", "www3", "rc_cluster", "vh_cluster", "route_cluster"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   const auto& rc_vh_route_shadow_policies =
