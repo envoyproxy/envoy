@@ -342,7 +342,8 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, ExtProcIntegrationTest,
-                         testing::Combine(GRPC_CLIENT_INTEGRATION_PARAMS, testing::Bool()));
+                         testing::Combine(GRPC_CLIENT_INTEGRATION_PARAMS, testing::Bool()),
+                         ExtProcIntegrationTest::protocolTestParamsToString);
 
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
