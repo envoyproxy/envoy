@@ -108,9 +108,9 @@ public:
 
   Http2CodecImplTestFixture() = default;
   Http2CodecImplTestFixture(Http2SettingsTuple client_settings, Http2SettingsTuple server_settings,
-                            Http2Implementation enable_new_codec_wrapper)
+                            Http2Implementation http2_implementation)
       : client_settings_(client_settings), server_settings_(server_settings),
-        enable_new_codec_wrapper_(enable_new_codec_wrapper) {
+        http2_implementation_(http2_implementation) {
     // Make sure we explicitly test for stream flush timer creation.
     EXPECT_CALL(client_connection_.dispatcher_, createTimer_(_)).Times(0);
     EXPECT_CALL(server_connection_.dispatcher_, createTimer_(_)).Times(0);
@@ -142,7 +142,7 @@ public:
   }
 
   virtual void initialize() {
-    switch (enable_new_codec_wrapper_) {
+    switch (http2_implementation_) {
     case kBareHttp2:
       Runtime::LoaderSingleton::getExisting()->mergeValues(
           {{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
@@ -253,7 +253,7 @@ public:
 
   template <typename T>
   uint32_t getStreamReceiveWindowLimit(std::unique_ptr<T>& connection, int32_t stream_id) {
-    if (enable_new_codec_wrapper_ != kBareHttp2) {
+    if (http2_implementation_ != kBareHttp2) {
       return connection->adapter()->GetStreamReceiveWindowLimit(stream_id);
     } else {
       return nghttp2_session_get_stream_effective_local_window_size(connection->session(),
@@ -263,7 +263,7 @@ public:
 
   template <typename T>
   uint32_t getStreamReceiveWindowSize(std::unique_ptr<T>& connection, int32_t stream_id) {
-    if (enable_new_codec_wrapper_ != kBareHttp2) {
+    if (http2_implementation_ != kBareHttp2) {
       return connection->adapter()->GetStreamReceiveWindowSize(stream_id);
     } else {
       return nghttp2_session_get_stream_local_window_size(connection->session(), stream_id);
@@ -272,7 +272,7 @@ public:
 
   template <typename T>
   uint32_t getStreamSendWindowSize(std::unique_ptr<T>& connection, int32_t stream_id) {
-    if (enable_new_codec_wrapper_ != kBareHttp2) {
+    if (http2_implementation_ != kBareHttp2) {
       return connection->adapter()->GetStreamSendWindowSize(stream_id);
     } else {
       return nghttp2_session_get_stream_remote_window_size(connection->session(), stream_id);
@@ -280,7 +280,7 @@ public:
   }
 
   template <typename T> uint32_t getSendWindowSize(std::unique_ptr<T>& connection) {
-    if (enable_new_codec_wrapper_ != kBareHttp2) {
+    if (http2_implementation_ != kBareHttp2) {
       return connection->adapter()->GetSendWindowSize();
     } else {
       return nghttp2_session_get_remote_window_size(connection->session());
@@ -290,7 +290,7 @@ public:
   template <typename T>
   void submitSettings(std::unique_ptr<T>& connection,
                       const std::list<std::pair<uint16_t, uint32_t>>& settings_values) {
-    if (enable_new_codec_wrapper_ != kBareHttp2) {
+    if (http2_implementation_ != kBareHttp2) {
       std::vector<http2::adapter::Http2Setting> settings;
       for (const auto& setting_pair : settings_values) {
         settings.push_back({setting_pair.first, setting_pair.second});
@@ -307,7 +307,7 @@ public:
   }
 
   template <typename T> int getHpackEncoderDynamicTableSize(std::unique_ptr<T>& connection) {
-    if (enable_new_codec_wrapper_ != kBareHttp2) {
+    if (http2_implementation_ != kBareHttp2) {
       return connection->adapter()->GetHpackEncoderDynamicTableSize();
     } else {
       return nghttp2_session_get_hd_deflate_dynamic_table_size(connection->session());
@@ -315,7 +315,7 @@ public:
   }
 
   template <typename T> int getHpackDecoderDynamicTableSize(std::unique_ptr<T>& connection) {
-    if (enable_new_codec_wrapper_ != kBareHttp2) {
+    if (http2_implementation_ != kBareHttp2) {
       return connection->adapter()->GetHpackDecoderDynamicTableSize();
     } else {
       return nghttp2_session_get_hd_inflate_dynamic_table_size(connection->session());
@@ -323,7 +323,7 @@ public:
   }
 
   template <typename T> void submitPing(std::unique_ptr<T>& connection, uint32_t ping_id) {
-    if (enable_new_codec_wrapper_ != kBareHttp2) {
+    if (http2_implementation_ != kBareHttp2) {
       connection->adapter()->SubmitPing(ping_id);
     } else {
       EXPECT_EQ(0, nghttp2_submit_ping(connection->session(), NGHTTP2_FLAG_NONE, nullptr));
@@ -343,7 +343,7 @@ public:
   TestScopedRuntime scoped_runtime_;
   absl::optional<const Http2SettingsTuple> client_settings_;
   absl::optional<const Http2SettingsTuple> server_settings_;
-  Http2Implementation enable_new_codec_wrapper_ = kBareHttp2;
+  Http2Implementation http2_implementation_ = kBareHttp2;
   bool allow_metadata_ = false;
   bool stream_error_on_invalid_http_messaging_ = false;
   Stats::TestUtil::TestStore client_stats_store_;
@@ -406,7 +406,7 @@ protected:
     constexpr uint32_t max_allowed =
         2 * CommonUtility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
     for (uint32_t i = 0; i < max_allowed + 1; ++i) {
-      if (enable_new_codec_wrapper_ != kBareHttp2) {
+      if (http2_implementation_ != kBareHttp2) {
         client_->adapter()->SubmitPriorityForStream(1, 0, 10, false);
       } else {
         EXPECT_EQ(0, nghttp2_submit_priority(client_->session(), NGHTTP2_FLAG_NONE, 1, &spec));
@@ -439,7 +439,7 @@ protected:
                              DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT *
                          1);
     for (uint32_t i = 0; i < max_allowed + 1; ++i) {
-      if (enable_new_codec_wrapper_ != kBareHttp2) {
+      if (http2_implementation_ != kBareHttp2) {
         client_->adapter()->SubmitWindowUpdate(1, 1);
       } else {
         EXPECT_EQ(0, nghttp2_submit_window_update(client_->session(), NGHTTP2_FLAG_NONE, 1, 1));
@@ -2507,7 +2507,7 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersOverDefaultCodecLibraryLimit) {
 }
 
 TEST_P(Http2CodecImplTest, LargeRequestHeadersExceedPerHeaderLimit) {
-  if (enable_new_codec_wrapper_ == kOgHttp2) {
+  if (http2_implementation_ == kOgHttp2) {
     // The new HTTP/2 library does not have a hard-coded per-header limit.
     initialize();
     return;
@@ -3401,7 +3401,7 @@ public:
 
 protected:
   void initialize() override {
-    switch (enable_new_codec_wrapper_) {
+    switch (http2_implementation_) {
     case kBareHttp2:
       Runtime::LoaderSingleton::getExisting()->mergeValues(
           {{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});

@@ -996,7 +996,7 @@ TEST_P(MultiplexedIntegrationTest, BadFrame) {
         response.append(data.toString());
       });
   connection->run();
-  if (GetParam().http2_new_codec_wrapper == kOgHttp2) {
+  if (GetParam().http2_implementation == kOgHttp2) {
     EXPECT_THAT(response, HasSubstr("ParseError"));
   } else {
     EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
@@ -1327,7 +1327,7 @@ TEST_P(MultiplexedIntegrationTest, DelayedCloseAfterBadFrame) {
       });
 
   connection->run();
-  if (GetParam().http2_new_codec_wrapper == kOgHttp2) {
+  if (GetParam().http2_implementation == kOgHttp2) {
     EXPECT_THAT(response, HasSubstr("ParseError"));
   } else {
     EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
@@ -1360,7 +1360,7 @@ TEST_P(MultiplexedIntegrationTest, DelayedCloseDisabled) {
       });
 
   connection->run();
-  if (GetParam().http2_new_codec_wrapper == kOgHttp2) {
+  if (GetParam().http2_implementation == kOgHttp2) {
     EXPECT_THAT(response, HasSubstr("ParseError"));
   } else {
     EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
@@ -2033,7 +2033,7 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
   ASSERT_TRUE(response->waitForReset());
   // http3.inconsistent_content_length.
   if (downstreamProtocol() == Http::CodecType::HTTP3 ||
-      GetParam().http2_new_codec_wrapper == kOgHttp2) {
+      GetParam().http2_implementation == kOgHttp2) {
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
     if (downstreamProtocol() == Http::CodecType::HTTP3) {
       EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("inconsistent_content_length"));

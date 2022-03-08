@@ -68,6 +68,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 // TODO(alyssar) flip false once issue complete.
 FALSE_RUNTIME_GUARD(envoy_restart_features_no_runtime_singleton);
 // TODO(birenroy) flip after Google tests
+// Requires envoy_reloadable_features_http2_new_codec_wrapper to be enabled.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.

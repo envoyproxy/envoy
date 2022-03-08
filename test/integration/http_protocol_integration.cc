@@ -84,7 +84,7 @@ std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
   return absl::StrCat((params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
                       downstreamToString(params.param.downstream_protocol),
                       upstreamToString(params.param.upstream_protocol),
-                      implementationToString(params.param.http2_new_codec_wrapper));
+                      implementationToString(params.param.http2_implementation));
 }
 
 void HttpProtocolIntegrationTest::expectUpstreamBytesSentAndReceived(
