@@ -2507,6 +2507,12 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersOverDefaultCodecLibraryLimit) {
 }
 
 TEST_P(Http2CodecImplTest, LargeRequestHeadersExceedPerHeaderLimit) {
+  if (enable_new_codec_wrapper_ == kOgHttp2) {
+    // The new HTTP/2 library does not have a hard-coded per-header limit.
+    initialize();
+    return;
+  }
+
   // The name-value pair max is set by NGHTTP2_HD_MAX_NV in lib/nghttp2_hd.h to 64KB, and
   // creates a per-request header limit for us in h2. Note that the nghttp2
   // calculated byte size will differ from envoy due to H2 compression and frames.
