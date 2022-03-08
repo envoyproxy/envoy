@@ -62,11 +62,13 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
   Envoy::Ssl::ClientContextSharedPtr context = sslCtx();
   // If the secrets haven't been loaded, there is no crypto config.
   if (context == nullptr) {
+    ENVOY_LOG(warn, "SDS hasn't finished updating Ssl context config yet.");
+    stats_.upstream_context_secrets_not_ready_.inc();
     return nullptr;
   }
 
   if (client_context_ != context) {
-    // If the secret has been updated, update the proof verifier.
+    // If the context has been updated, update the crypto config.
     client_context_ = context;
     crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
         std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context)),
