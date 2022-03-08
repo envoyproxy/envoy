@@ -49,9 +49,7 @@ protected:
         std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
             new NiceMock<Ssl::MockClientContextConfig>),
         context_);
-    crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
-        std::make_unique<Quic::EnvoyQuicProofVerifier>(factory_->sslCtx()),
-        quic_info_->createQuicSessionCacheWrapper());
+    crypto_config_ = factory_->getCryptoConfig();
   }
 
   uint32_t highWatermark(EnvoyQuicClientSession* session) {

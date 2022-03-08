@@ -153,20 +153,12 @@ protected:
 private:
   friend class Http3ConnPoolImplPeer;
 
-  // Returns the most recent crypto config from host_;
-  std::shared_ptr<quic::QuicCryptoClientConfig> cryptoConfig();
-
   // Store quic helpers which can be shared between connections and must live
   // beyond the lifetime of individual connections.
   Quic::PersistentQuicInfoImpl& quic_info_;
   // server-id can change over the lifetime of Envoy but will be consistent for a
   // given connection pool.
   quic::QuicServerId server_id_;
-  // Latch the latest crypto config, to determine if it has updated since last
-  // checked.
-  Envoy::Ssl::ClientContextSharedPtr client_context_;
-  // If client_context_ changes, client config will be updated as well.
-  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   // If not nullopt, called when the handshake state changes.
   OptRef<PoolConnectResultCallback> connect_callback_;
 };

@@ -12,8 +12,6 @@
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
-#include "quiche/quic/core/crypto/quic_client_session_cache.h"
-
 namespace Envoy {
 namespace Http {
 namespace Http3 {
@@ -93,31 +91,13 @@ void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
 // Make sure all connections are torn down before quic_info_ is deleted.
 Http3ConnPoolImpl::~Http3ConnPoolImpl() { destructAllConnections(); }
 
-std::shared_ptr<quic::QuicCryptoClientConfig> Http3ConnPoolImpl::cryptoConfig() {
-  Envoy::Ssl::ClientContextSharedPtr context =
-      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(host_->transportSocketFactory())
-          .sslCtx();
-  // If the secrets haven't been loaded, there is no crypto config.
-  if (context == nullptr) {
-    return nullptr;
-  }
-
-  // If the secret has been updated, update the proof source.
-  if (context.get() != client_context_.get()) {
-    client_context_ = context;
-    crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
-        std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context)),
-        quic_info_.createQuicSessionCacheWrapper());
-  }
-  // Return the latest client config.
-  return crypto_config_;
-}
-
 std::unique_ptr<Network::ClientConnection>
 Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
                                           OptRef<Http::AlternateProtocolsCache> rtt_cache,
                                           Stats::Scope& scope) {
-  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config = cryptoConfig();
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config =
+      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(host_->transportSocketFactory())
+          .getCryptoConfig();
   if (crypto_config == nullptr) {
     return nullptr; // no secrets available yet.
   }
