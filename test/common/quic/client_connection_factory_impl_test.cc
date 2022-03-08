@@ -40,6 +40,9 @@ protected:
               protocol_options->max_concurrent_streams().value());
     EXPECT_EQ(quic_info_->quic_config_.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend(),
               protocol_options->initial_stream_window_size().value());
+    ASSERT_TRUE(quic_info_->quic_config_.HasSendConnectionOptions());
+    EXPECT_TRUE(
+        quic::ContainsQuicTag(quic_info_->quic_config_.SendConnectionOptions(), quic::kRVCM));
 
     test_address_ = Network::Utility::resolveUrl(
         absl::StrCat("tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":30"));
@@ -106,54 +109,6 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
       dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_);
 
   EXPECT_EQ(info.quic_config_.GetInitialRoundTripTimeUsToSend(), 5);
-
-  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
-  session->Initialize();
-  client_connection->connect();
-  EXPECT_TRUE(client_connection->connecting());
-  client_connection->close(Network::ConnectionCloseType::NoFlush);
-}
-
-TEST_P(QuicNetworkConnectionTest, DefaultRVCMInCleanConnectionOptions) {
-  initialize();
-
-  EXPECT_FALSE(quic_info_->quic_config_.HasSendConnectionOptions());
-
-  const int port = 30;
-  std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
-      *quic_info_, crypto_config_,
-      quic::QuicServerId{factory_->clientContextConfig().serverNameIndication(), port, false},
-      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, store_);
-
-  ASSERT_TRUE(quic_info_->quic_config_.HasSendConnectionOptions());
-  EXPECT_TRUE(quic::ContainsQuicTag(quic_info_->quic_config_.SendConnectionOptions(),
-                                    quic::ParseQuicTag("RVCM")));
-
-  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
-  session->Initialize();
-  client_connection->connect();
-  EXPECT_TRUE(client_connection->connecting());
-  client_connection->close(Network::ConnectionCloseType::NoFlush);
-}
-
-TEST_P(QuicNetworkConnectionTest, DefaultRVCMAppendedToConnectionOptions) {
-  initialize();
-
-  quic::QuicTagVector connection_options;
-  connection_options.push_back(quic::kTCID);
-  quic_info_->quic_config_.SetConnectionOptionsToSend(connection_options);
-
-  EXPECT_TRUE(quic_info_->quic_config_.HasSendConnectionOptions());
-
-  const int port = 30;
-  std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
-      *quic_info_, crypto_config_,
-      quic::QuicServerId{factory_->clientContextConfig().serverNameIndication(), port, false},
-      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, store_);
-
-  ASSERT_TRUE(quic_info_->quic_config_.HasSendConnectionOptions());
-  EXPECT_TRUE(quic::ContainsQuicTag(quic_info_->quic_config_.SendConnectionOptions(), quic::kRVCM));
-  EXPECT_TRUE(quic::ContainsQuicTag(quic_info_->quic_config_.SendConnectionOptions(), quic::kTCID));
 
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
