@@ -18,5 +18,5 @@ message SimpleHttpCacheConfig {
   // The maximum size of the cache to the specified number of bytes.
   // When the cache is full, entries will be evicted following LRU. If not set
   // defaults to 100 MiB.
-  google.protobuf.UInt64Value approximated_max_size = 1;
+  google.protobuf.Int64Value max_size = 1;
 }

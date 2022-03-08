@@ -298,8 +298,10 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
   }
 }
 
-void SimpleHttpCache::setMaxSize(uint64_t bytes) {
-  if (uint64_t(lru_cache_->maxSize()) != bytes) {
+void SimpleHttpCache::setMaxSize(int64_t bytes) {
+  ASSERT(bytes > 0);
+
+  if (bytes > 0 && lru_cache_.maxSize() != bytes) {
     lru_cache_->setMaxSize(bytes);
   }
 }
@@ -333,8 +335,8 @@ public:
     envoy::extensions::cache::simple_http_cache::v3::SimpleHttpCacheConfig typed_config;
     MessageUtil::unpackTo(config.typed_config(), typed_config);
 
-    uint64_t approximated_max_size = typed_config.approximated_max_size().value();
-    cache_.setMaxSize(approximated_max_size > 0 ? approximated_max_size : kSimpleHttpCacheDefaultSize);
+    uint64_t max_size = typed_config.max_size().value();
+    cache_.setMaxSize(max_size > 0 ? max_size : kSimpleHttpCacheDefaultSize);
     return cache_;
   }
 

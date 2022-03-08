@@ -11,19 +11,15 @@
 // included to make code_format happy
 #include "envoy/extensions/cache/simple_http_cache/v3/config.pb.h"
 
-using ::google::simple_lru_cache::SimpleLRUCache;
-
-// The default maximum size of the cache is 100MiB
-constexpr uint64_t kSimpleHttpCacheDefaultSize = 100 * 1024 * 1024;
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-// Example cache backend that never evicts. Not suitable for production use.
-class SimpleHttpCache : public HttpCache {
+// The default maximum size of the cache is 100MiB
+constexpr int64_t kSimpleHttpCacheDefaultSize = 100 * 1024 * 1024;
 
+class SimpleHttpCache : public HttpCache {
 private:
   struct Entry {
     Http::ResponseHeaderMapPtr response_headers_;
@@ -31,13 +27,13 @@ private:
     std::string body_;
     Http::ResponseTrailerMapPtr trailers_;
 
-    // @return uint64_t calculates an approximated size (in bytes) by only
+    // @return int64_t calculates an approximated size (in bytes) by only
     // measuring the bytes in the {header, body, trailers}. This does not account
     // for data structures.
-    uint64_t byteSize() {
-      uint64_t headers_size = response_headers_ != nullptr ? response_headers_->byteSize() : 0;
-      uint64_t trailers_size = trailers_ != nullptr ? trailers_->byteSize() : 0;
-      return headers_size + sizeof(metadata_) + body_.size() + trailers_size;
+    int64_t byteSize() const {
+      int64_t headers_size = response_headers_ != nullptr ? response_headers_->byteSize() : 0;
+      int64_t trailers_size = trailers_ != nullptr ? trailers_->byteSize() : 0;
+      return headers_size + sizeof(*this) + body_.size() + trailers_size;
     }
   };
 
@@ -79,7 +75,7 @@ public:
 
   // Change the maximum size of the cache to the specified number of bytes.
   // If necessary, entries will be evicted to comply with the new size.
-  void setMaxSize(uint64_t bytes);
+  void setMaxSize(int64_t bytes);
 
   absl::Mutex mutex_;
   std::unique_ptr<LRUCache> lru_cache_ ABSL_GUARDED_BY(mutex_);
