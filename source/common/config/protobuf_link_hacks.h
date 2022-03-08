@@ -12,7 +12,6 @@
 #include "envoy/service/route/v3/srds.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
-#include "envoy/service/thrift/v3/trds.pb.h"
 
 // API_NO_BOOST_FILE
 
@@ -31,6 +30,5 @@ const envoy::service::route::v3::SrdsDummy _srds_dummy_v3;
 const envoy::service::extension::v3::EcdsDummy _ecds_dummy_v3;
 const envoy::service::runtime::v3::RtdsDummy _rtds_dummy_v3;
 const envoy::service::health::v3::HdsDummy _hds_dummy_v3;
-const envoy::service::thrift::v3::TrdsDummy _trds_dummy_v3;
 
 } // namespace Envoy

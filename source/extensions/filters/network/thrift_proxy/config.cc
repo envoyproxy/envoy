@@ -153,6 +153,14 @@ ConfigImpl::ConfigImpl(
     if (config.has_route_config()) {
       throw EnvoyException("both trds and route_config is present in ThriftProxy");
     }
+    if (config.trds().config_source().config_source_specifier_case() ==
+        envoy::config::core::v3::ConfigSource::kApiConfigSource) {
+      const auto api_type = config.trds().config_source().api_config_source().api_type();
+      if (api_type != envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC &&
+          api_type != envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC) {
+        throw EnvoyException("trds supports only aggregated api_type in api_config_source");
+      }
+    }
     route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
         config.trds(), context_.getServerFactoryContext(), stats_prefix_, context_.initManager());
   } else {

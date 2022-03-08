@@ -280,6 +280,22 @@ trds:
                           "both trds and route_config is present in ThriftProxy");
 }
 
+TEST_F(ThriftFilterConfigTest, ThriftProxyTrdsApiConfigSource) {
+  const std::string yaml = R"EOF(
+stat_prefix: ingress
+trds:
+  config_source:
+    resource_api_version: V3
+    api_config_source: { api_type: GRPC, transport_api_version: V3 }
+  route_config_name: test_route
+)EOF";
+
+  envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
+      parseThriftProxyFromV2Yaml(yaml);
+  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
+                          "trds supports only aggregated api_type in api_config_source");
+}
+
 } // namespace ThriftProxy
 } // namespace NetworkFilters
 } // namespace Extensions

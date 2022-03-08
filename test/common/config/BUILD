@@ -392,7 +392,6 @@ envoy_cc_test(
         "//test/config:v2_link_hacks",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/route/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/thrift/v3:pkg_cc_proto",
     ],
 )
 

@@ -1,6 +1,5 @@
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/service/route/v3/rds.pb.h"
-#include "envoy/service/thrift/v3/trds.pb.h"
 
 #include "source/common/config/type_to_endpoint.h"
 
@@ -32,27 +31,6 @@ TEST(TypeToEndpoint, All) {
   // REST endpoints.
   EXPECT_EQ("envoy.service.route.v3.RouteDiscoveryService.FetchRoutes",
             restMethod("type.googleapis.com/envoy.config.route.v3.RouteConfiguration").full_name());
-}
-
-TEST(TypeToEndpoint, Thrift) {
-  // The dummy messages are included for link purposes only.
-  envoy::service::thrift::v3::TrdsDummy _v3_trds_dummy;
-
-  EXPECT_EQ(
-      "envoy.service.thrift.v3.ThriftRouteDiscoveryService.DeltaThriftRoutes",
-      deltaGrpcMethod(
-          "type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.RouteConfiguration")
-          .full_name());
-  EXPECT_EQ(
-      "envoy.service.thrift.v3.ThriftRouteDiscoveryService.StreamThriftRoutes",
-      sotwGrpcMethod(
-          "type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.RouteConfiguration")
-          .full_name());
-  EXPECT_EQ(
-      "envoy.service.thrift.v3.ThriftRouteDiscoveryService.FetchThriftRoutes",
-      restMethod(
-          "type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.RouteConfiguration")
-          .full_name());
 }
 
 } // namespace
