@@ -188,7 +188,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
-  absl::ReaderMutexLock lock(&mutex_);
+  absl::MutexLock lock(&mutex_);
 
   LRUCache::ScopedLookup lookup(&lru_cache_, request.key());
   if (!lookup.found()) {
