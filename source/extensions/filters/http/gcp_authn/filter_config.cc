@@ -18,13 +18,6 @@ Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-// Router::RouteSpecificFilterConfigConstSharedPtr
-// GcpAuthnFilterFactory::createRouteSpecificFilterConfigTyped(
-//     const GcpAuthnFilterPerRouteConfig& config,
-//     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-//   return std::make_shared<RouteSpecificGcpAuthnFilterConfig>(config);
-// }
-
 /**
  * Static registration for the filter. @see RegisterFactory.
  */

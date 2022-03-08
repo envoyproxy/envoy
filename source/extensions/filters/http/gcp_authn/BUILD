@@ -7,25 +7,10 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-envoy_extension_package()
+# GCP authorization L7 HTTP filter
+# Public docs: TODO(tyxia): Docs needed in docs/root/configuration/http/http_filters
 
-envoy_cc_library(
-    name = "gcp_authn_lib",
-    srcs = ["gcp_authn_filter.cc"],
-    hdrs = ["gcp_authn_filter.h"],
-    external_deps = [
-        "jwt_verify_lib",
-    ],
-    deps = [
-        # ":filter_config",
-        "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "//source/extensions/filters/http/common:factory_base_lib",
-        "//source/common/http:message_lib",
-        "//source/common/http:utility_lib",
-        "//source/common/http:headers_lib",
-        "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
-    ],
-)
+envoy_extension_package()
 
 envoy_cc_extension(
     name = "filter_config",
@@ -35,6 +20,23 @@ envoy_cc_extension(
         ":gcp_authn_lib",
         "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "gcp_authn_lib",
+    srcs = ["gcp_authn_filter.cc"],
+    hdrs = ["gcp_authn_filter.h"],
+    external_deps = [
+        "jwt_verify_lib",
+    ],
+    deps = [
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/common/http:message_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/http:headers_lib",
         "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
     ],
 )

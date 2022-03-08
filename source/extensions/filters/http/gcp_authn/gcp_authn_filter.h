@@ -42,6 +42,12 @@ public:
 
   void fetchToken();
 
+  void cancel() {
+    if (active_request_) {
+      active_request_->cancel();
+    }
+  }
+
 private:
   // Http::AsyncClient::Callbacks implemented by this class.
   void onSuccess(const Http::AsyncClient::Request& request,
@@ -74,6 +80,7 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
 
+  void onDestroy() override { client_->cancel();}
   ~GcpAuthnFilter() override = default;
 
 private:
@@ -84,11 +91,11 @@ private:
   Server::Configuration::FactoryContext& context_;
   std::unique_ptr<GcpAuthnClient> client_;
   // TODO(tyxia) Add state
-  // // State of this filter's communication with the external authorization service.
-  // // The filter has either not started calling the external service, in the middle of calling
-  // // it or has completed.
-  // enum class State { NotStarted, Calling, Complete };
-  // State state_{State::NotStarted};
+  // State of this filter's communication with the external authorization service.
+  // The filter has either not started calling the external service, in the middle of calling
+  // it or has completed.
+  enum class State { NotStarted, Calling, Complete };
+  //State state_{State::NotStarted};
 };
 
 } // namespace GcpAuthentication
