@@ -60,15 +60,6 @@ struct TlsContext {
   void checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path);
 };
 
-struct TlsKeyLogData {
-  const Network::Address::Instance& local_;
-  const Network::Address::Instance& remote_;
-  const Network::Address::IpList& config_local_ip_;
-  const Network::Address::IpList& config_remote_ip_;
-  AccessLog::AccessLogFileSharedPtr access_log;
-};
-using TlsKeyLogDataPtr = std::unique_ptr<TlsKeyLogData>;
-
 int sslSocketIndex();
 
 class ContextImpl : public virtual Envoy::Ssl::Context,

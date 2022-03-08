@@ -96,7 +96,6 @@ private:
   std::string failure_reason_;
 
   SslHandshakerImplSharedPtr info_;
-  TlsKeyLogDataPtr tls_keylog_data_;
 };
 
 class ClientSslSocketFactory : public Network::CommonTransportSocketFactory,

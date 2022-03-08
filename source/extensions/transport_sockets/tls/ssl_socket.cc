@@ -54,8 +54,7 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
       ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
       info_(std::dynamic_pointer_cast<SslHandshakerImpl>(
           handshaker_factory_cb(ctx_->newSsl(transport_socket_options_.get()),
-                                ctx_->sslExtendedSocketInfoIndex(), this))),
-      tls_keylog_data_(nullptr) {
+                                ctx_->sslExtendedSocketInfoIndex(), this))) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(rawSsl());
   } else {
@@ -78,12 +77,7 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   BIO* bio = BIO_new_io_handle(&callbacks_->ioHandle());
   SSL_set_bio(rawSsl(), bio, bio);
   if (ctx_->tlsKeyLogFile() != nullptr) {
-    tls_keylog_data_ = std::make_unique<TlsKeyLogData>(
-        TlsKeyLogData{*(callbacks_->connection().connectionInfoProvider().localAddress().get()),
-                      *(callbacks_->connection().connectionInfoProvider().remoteAddress().get()),
-                      ctx_->tlsKeyLogLocal(), ctx_->tlsKeyLogRemote(), ctx_->tlsKeyLogFile()});
-
-    SSL_set_ex_data(rawSsl(), Tls::sslSocketIndex(), static_cast<void*>(tls_keylog_data_.get()));
+    SSL_set_ex_data(rawSsl(), Tls::sslSocketIndex(), static_cast<void*>(callbacks_));
   }
 }
 

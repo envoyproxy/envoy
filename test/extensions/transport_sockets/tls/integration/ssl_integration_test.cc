@@ -171,7 +171,7 @@ public:
   void negativeCheck() {
     EXPECT_TRUE(api_->fileSystem().fileExists(TestEnvironment::temporaryPath(keylog_path_)));
     auto size = api_->fileSystem().fileSize(TestEnvironment::temporaryPath(keylog_path_));
-    EXPECT_FALSE(size > 0);
+    EXPECT_EQ(size, 0);
   }
 };
 
