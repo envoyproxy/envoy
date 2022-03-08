@@ -27,9 +27,11 @@ envoy_cc_library(
     srcs = [
         "opentelemetry_tracer_impl.cc",
         "tracer.cc",
+        "span_context_extractor.cc",
     ],
     hdrs = [
         "span_context.h",
+        "span_context_extractor.h",
         "opentelemetry_tracer_impl.h",
         "tracer.h",
     ],

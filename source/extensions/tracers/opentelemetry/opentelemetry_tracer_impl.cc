@@ -10,19 +10,13 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
 #include "span_context.h"
+#include "span_context_extractor.h"
 #include "tracer.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
-
-namespace {
-
-const Http::LowerCaseString& openTelemetryPropagationHeader() {
-  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "traceparent");
-}
-} // namespace
 
 Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
                Server::Configuration::TracerFactoryContext& context)
@@ -52,33 +46,19 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    const Tracing::Decision tracing_decision) {
   // Get tracer from TLS and start span.
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
-  auto propagation_header = trace_context.getByKey(openTelemetryPropagationHeader());
-  if (!propagation_header.has_value()) {
+  SpanContextExtractor extractor(trace_context);
+  if (!extractor.propagationHeaderPresent()) {
     // No propagation header, so we can create a fresh span with the given decision.
     Tracing::SpanPtr new_open_telemetry_span =
         tracer.startSpan(config, operation_name, start_time, tracing_decision);
     new_open_telemetry_span->setSampled(tracing_decision.traced);
     return new_open_telemetry_span;
   } else {
-    auto header_value_string = propagation_header.value();
-    // Try to split it into its component parts:
-    std::vector<std::string> propagation_header_components =
-        absl::StrSplit(header_value_string, '-', absl::SkipEmpty());
-    // TODO: handle tracestate
-    if (propagation_header_components.size() == 4) {
-      // TODO: should we try to parse these to ensure they're valid?
-      std::string version = propagation_header_components[0];
-      std::string trace_id = propagation_header_components[1];
-      std::string parent_id = propagation_header_components[2];
-      std::string trace_flags = propagation_header_components[3];
-      // Set whether or not the span is sampled from the trace flags.
-      // See https://w3c.github.io/trace-context/#trace-flags.
-      char decoded_trace_flags = absl::HexStringToBytes(trace_flags).front();
-      bool sampled = (decoded_trace_flags & 1);
-      SpanContext span_context(version, trace_id, parent_id, sampled);
+    try {
+      // Try to extract the span context. If we can't, just return a
+      SpanContext span_context = extractor.extractSpanContext();
       return tracer.startSpan(config, operation_name, start_time, tracing_decision, span_context);
-    } else {
-      // Something went wrong when parsing the propagation header.
+    } catch (const ExtractorException& e) {
       return std::make_unique<Tracing::NullSpan>();
     }
   }
