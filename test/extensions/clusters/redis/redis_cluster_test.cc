@@ -844,9 +844,7 @@ TEST_F(RedisClusterTest, AddressAsHostnameParallelResolution) {
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
   cluster_->initialize([&]() -> void { initialized_.ready(); });
-  ENVOY_LOG_MISC(info, "STARTING CALL TO EXPECT CLUSTER RESPONSE");
   expectClusterSlotResponse(twoSlotsPrimariesHostnames("primary1.com", "primary2.com", 22120));
-  ENVOY_LOG_MISC(info, "FINISHED CALL TO EXPECT CLUSTER RESPONSE");
   primary1_resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
                       TestUtility::makeDnsResponse(std::list<std::string>{"127.0.1.1"}));
   primary2_resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
