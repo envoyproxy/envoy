@@ -35,6 +35,7 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::stri
 }
 
 void Span::finishSpan() {
+  std::cout << "alexellis Span::finishSpan" << std::endl;
   // Call into the parent tracer so we can access the shared exporter.
   span_.set_end_time_unix_nano(
       std::chrono::nanoseconds(time_source_.systemTime().time_since_epoch()).count());
@@ -55,29 +56,45 @@ void Span::injectContext(Tracing::TraceContext& trace_context) {
 }
 
 Tracer::Tracer(OpenTelemetryGrpcTraceExporterPtr exporter, Envoy::TimeSource& time_source,
-               Random::RandomGenerator& random, Runtime::Loader& runtime)
+               Random::RandomGenerator& random, Runtime::Loader& runtime,
+               Event::Dispatcher& dispatcher)
     : exporter_(std::move(exporter)), time_source_(time_source), random_(random),
-      runtime_(runtime) {}
+      runtime_(runtime) {
+  flush_timer_ = dispatcher.createTimer([this]() -> void {
+    flushSpans();
+    enableTimer();
+  });
+  enableTimer();
+}
+
+void Tracer::enableTimer() {
+  const uint64_t flush_interval =
+      runtime_.snapshot().getInteger("tracing.open_telemetry.flush_interval_ms", 5000U);
+  flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
+}
+
+void Tracer::flushSpans() {
+  ExportTraceServiceRequest request;
+  // A request consists of ResourceSpans.
+  ::opentelemetry::proto::trace::v1::ResourceSpans* resource_span = request.add_resource_spans();
+  ::opentelemetry::proto::trace::v1::InstrumentationLibrarySpans* instrumentation_library_span =
+      resource_span->add_instrumentation_library_spans();
+  for (const auto& pending_span : span_buffer_) {
+    (*instrumentation_library_span->add_spans()) = pending_span;
+  }
+  if (!exporter_->log(request)) {
+    // TODO: should there be any sort of retry or reporting here?
+    ENVOY_LOG(trace, "Unsuccessful log request to OpenTelemetry trace collector.");
+  }
+  span_buffer_.clear();
+}
 
 void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
   span_buffer_.push_back(span);
-  // TODO: add timeout as well.
   const uint64_t min_flush_spans =
       runtime_.snapshot().getInteger("tracing.open_telemetry.min_flush_spans", 5U);
   if (span_buffer_.size() >= min_flush_spans) {
-    ExportTraceServiceRequest request;
-    // A request consists of ResourceSpans.
-    ::opentelemetry::proto::trace::v1::ResourceSpans* resource_span = request.add_resource_spans();
-    ::opentelemetry::proto::trace::v1::InstrumentationLibrarySpans* instrumentation_library_span =
-        resource_span->add_instrumentation_library_spans();
-    for (const auto& pending_span : span_buffer_) {
-      (*instrumentation_library_span->add_spans()) = pending_span;
-    }
-    if (!exporter_->log(request)) {
-      // TODO: should there be any sort of retry or reporting here?
-      ENVOY_LOG(trace, "Unsuccessful log request to OpenTelemetry trace collector.");
-    }
-    span_buffer_.clear();
+    flushSpans();
   }
 }
 

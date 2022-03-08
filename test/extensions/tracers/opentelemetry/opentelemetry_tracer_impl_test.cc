@@ -69,6 +69,7 @@ protected:
   std::string test_string = "ABCDEFGHIJKLMN";
   Tracing::DriverPtr driver_;
   NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Event::MockTimer>* timer_;
 };
 
 TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfig) {
@@ -155,7 +156,8 @@ TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {
 
   auto sampled_entry = request_headers.get(OpenTelemetryConstants::get().TRACE_PARENT);
 
-  // Ends in 01 because span should be sampled. See https://w3c.github.io/trace-context/#trace-flags.
+  // Ends in 01 because span should be sampled. See
+  // https://w3c.github.io/trace-context/#trace-flags.
   EXPECT_EQ(sampled_entry.size(), 1);
   EXPECT_EQ(sampled_entry[0]->value().getStringView(),
             "00-00000000000000010000000000000002-0000000000000003-01");
@@ -179,6 +181,64 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpan) {
   // We should see a call to sendMessage to export that single span.
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
   span->finishSpan();
+}
+
+TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithBuffer) {
+  // Set up driver
+  setupValidDriver();
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
+                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  // Flush after two spans.
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.open_telemetry.min_flush_spans", 5U))
+      .Times(2)
+      .WillRepeatedly(Return(2));
+  // We should not yet see a call to sendMessage to export that single span.
+  span->finishSpan();
+  // Once we create a
+  Tracing::SpanPtr second_span =
+      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
+                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+  EXPECT_NE(second_span.get(), nullptr);
+  // Only now should we see the span exported.
+  EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
+  second_span->finishSpan();
+}
+
+TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithFlushTimeout) {
+  timer_ =
+      new NiceMock<Event::MockTimer>(&context_.server_factory_context_.thread_local_.dispatcher_);
+  ON_CALL(context_.server_factory_context_.thread_local_.dispatcher_, createTimer_(_))
+      .WillByDefault(Invoke([this](Event::TimerCb) { return timer_; }));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
+  // Set up driver
+  setupValidDriver();
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
+                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  // Set it to flush after 2 spans so that the span will only be flushed by timeout.
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.open_telemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(2));
+  // We should not yet see a call to sendMessage to export that single span.
+  span->finishSpan();
+  // Only now should we see the span exported.
+  EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
+  // Timer should be reenabled.
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.open_telemetry.flush_interval_ms", 5000U))
+      .WillOnce(Return(5000U));
+  timer_->invokeCallback();
 }
 
 } // namespace OpenTelemetry

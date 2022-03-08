@@ -27,7 +27,7 @@ namespace OpenTelemetry {
 class Tracer : Logger::Loggable<Logger::Id::tracing> {
 public:
   Tracer(OpenTelemetryGrpcTraceExporterPtr exporter, Envoy::TimeSource& time_source,
-         Random::RandomGenerator& random, Runtime::Loader& runtime);
+         Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher);
 
   // TODO: maybe make this arg const
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
@@ -40,11 +40,21 @@ public:
                              const SpanContext& previous_span_context);
 
 private:
+  /**
+   * Enables the span-flushing timer.
+   */
+  void enableTimer();
+  /*
+   * Removes all spans from the span buffer and sends them to the collector.
+   */
+  void flushSpans();
+
   OpenTelemetryGrpcTraceExporterPtr exporter_;
   Envoy::TimeSource& time_source_;
   Random::RandomGenerator& random_;
   std::vector<::opentelemetry::proto::trace::v1::Span> span_buffer_;
   Runtime::Loader& runtime_;
+  Event::TimerPtr flush_timer_;
 };
 
 /**

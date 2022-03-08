@@ -62,7 +62,7 @@ envoy_extension_cc_test(
     srcs = ["span_context_extractor_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
     deps = [
-        "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib"
+        "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "//test/test_common:utility_lib",
     ]
 )

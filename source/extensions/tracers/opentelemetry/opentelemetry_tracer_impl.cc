@@ -34,7 +34,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
             std::make_unique<OpenTelemetryGrpcTraceExporter>(async_client_shared_ptr,
                                                              opentelemetry_config.trace_name()),
             factory_context.timeSource(), factory_context.api().randomGenerator(),
-            factory_context.runtime());
+            factory_context.runtime(), dispatcher);
 
         return std::make_shared<TlsTracer>(std::move(tracer));
       });
@@ -55,7 +55,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     return new_open_telemetry_span;
   } else {
     try {
-      // Try to extract the span context. If we can't, just return a
+      // Try to extract the span context. If we can't, just return a null span.
       SpanContext span_context = extractor.extractSpanContext();
       return tracer.startSpan(config, operation_name, start_time, tracing_decision, span_context);
     } catch (const ExtractorException& e) {
