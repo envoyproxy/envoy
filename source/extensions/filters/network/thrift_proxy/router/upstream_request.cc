@@ -158,17 +158,18 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
       stats_.incResponseInvalidType(cluster, upstream_host_);
       break;
     }
+
+    if (draining) {
+      // TODO(rgs1): bump stat for connection closed due to draining.
+      resetStream();
+    }
+
     onResponseComplete();
   } else if (status == ThriftFilters::ResponseStatus::Reset) {
     // Note: invalid responses are not accounted in the response size histogram.
     ENVOY_LOG(debug, "upstream reset");
     upstream_host_->outlierDetector().putResult(Upstream::Outlier::Result::ExtOriginRequestFailed);
     stats_.incResponseDecodingError(cluster, upstream_host_);
-    resetStream();
-  }
-
-  if (draining) {
-    // TODO(rgs1): bump stat for connection closed due to draining.
     resetStream();
   }
 

@@ -541,7 +541,8 @@ public:
     EXPECT_EQ(FilterStatus::Continue, router_->transportEnd());
   }
 
-  void returnResponse(MessageType msg_type = MessageType::Reply, bool is_success = true) {
+  void returnResponse(MessageType msg_type = MessageType::Reply, bool is_success = true,
+                      bool is_drain = false) {
     Buffer::OwnedImpl buffer;
 
     EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
@@ -549,6 +550,11 @@ public:
     auto metadata = std::make_shared<MessageMetadata>();
     metadata->setMessageType(msg_type);
     metadata->setSequenceId(1);
+
+    if (is_drain) {
+      metadata->headers().addReferenceKey(ThriftProxy::Headers::get().Drain, "true");
+    }
+
     ON_CALL(callbacks_, responseMetadata()).WillByDefault(Return(metadata));
     ON_CALL(callbacks_, responseSuccess()).WillByDefault(Return(is_success));
 
@@ -560,6 +566,11 @@ public:
         .WillOnce(Return(ThriftFilters::ResponseStatus::Complete));
     EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
                 released(Ref(upstream_connection_)));
+
+    if (is_drain) {
+      EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+    }
+
     upstream_callbacks_->onUpstreamData(buffer, false);
   }
 
@@ -1711,6 +1722,15 @@ TEST_F(ThriftRouterTest, RequestResponseSize) {
   sendTrivialStruct(FieldType::I32);
   completeRequest();
   returnResponse();
+  destroyRouter();
+}
+
+TEST_F(ThriftRouterTest, UpstreamDraining) {
+  initializeRouter();
+  startRequestWithExistingConnection(MessageType::Call);
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse(MessageType::Reply, true, true /* is_drain */);
   destroyRouter();
 }
 
