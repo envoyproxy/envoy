@@ -47,11 +47,11 @@ private:
   // https://www.ietf.org/archive/id/draft-ietf-httpbis-cache-18.html s3.2
   static const absl::flat_hash_set<Http::LowerCaseString> headersNotToUpdate();
 
-  typedef SimpleLRUCache<Key, Entry, MessageUtil, MessageUtil> LRUCache;
+  typedef google::simple_lru_cache::SimpleLRUCache<Key, Entry, MessageUtil, MessageUtil> LRUCache;
 
 public:
   // HttpCache
-  SimpleHttpCache() { lru_cache_ = std::make_unique<LRUCache>(kSimpleHttpCacheDefaultSize); }
+  SimpleHttpCache() : lru_cache_(LRUCache(kSimpleHttpCacheDefaultSize)) {}
 
   LookupContextPtr makeLookupContext(LookupRequest&& request,
                                      Http::StreamDecoderFilterCallbacks& callbacks) override;
@@ -78,7 +78,7 @@ public:
   void setMaxSize(int64_t bytes);
 
   absl::Mutex mutex_;
-  std::unique_ptr<LRUCache> lru_cache_ ABSL_GUARDED_BY(mutex_);
+  LRUCache lru_cache_ ABSL_GUARDED_BY(mutex_);
 };
 
 } // namespace Cache

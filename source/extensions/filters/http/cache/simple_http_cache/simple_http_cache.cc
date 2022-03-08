@@ -143,15 +143,16 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
   const Key& key = simple_lookup_context.request().key();
   absl::WriterMutexLock lock(&mutex_);
 
-  LRUCache::ScopedLookup lookup(lru_cache_.get(), key);
+  LRUCache::ScopedLookup lookup(&lru_cache_, key);
   if (!lookup.found()) {
     return;
   }
 
-  auto entry = lookup.value();
+  Entry& entry = *lookup.value();
+  ASSERT(entry.response_headers_);
 
   // TODO(tangsaidi) handle Vary header updates properly
-  if (!entry->response_headers_ || VaryHeaderUtils::hasVary(*(entry->response_headers_))) {
+  if (!entry.response_headers_ || VaryHeaderUtils::hasVary(*(entry.response_headers_))) {
     return;
   }
 
@@ -168,7 +169,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
   // field for the first time to handle the case where incoming headers have repeated values
   absl::flat_hash_set<Http::LowerCaseString> updatedHeaderFields;
   response_headers.iterate(
-      [entry, &updatedHeaderFields](
+      [&entry, &updatedHeaderFields](
           const Http::HeaderEntry& incoming_response_header) -> Http::HeaderMap::Iterate {
         Http::LowerCaseString lower_case_key{incoming_response_header.key().getStringView()};
         absl::string_view incoming_value{incoming_response_header.value().getStringView()};
@@ -176,37 +177,36 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
           return Http::HeaderMap::Iterate::Continue;
         }
         if (!updatedHeaderFields.contains(lower_case_key)) {
-          entry->response_headers_->setCopy(lower_case_key, incoming_value);
+          entry.response_headers_->setCopy(lower_case_key, incoming_value);
           updatedHeaderFields.insert(lower_case_key);
         } else {
-          entry->response_headers_->addCopy(lower_case_key, incoming_value);
+          entry.response_headers_->addCopy(lower_case_key, incoming_value);
         }
         return Http::HeaderMap::Iterate::Continue;
       });
-  entry->metadata_ = metadata;
+  entry.metadata_ = metadata;
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
   absl::ReaderMutexLock lock(&mutex_);
 
-  LRUCache::ScopedLookup lookup(lru_cache_.get(), request.key());
+  LRUCache::ScopedLookup lookup(&lru_cache_, request.key());
   if (!lookup.found()) {
     return Entry{};
   }
-  auto entry = lookup.value();
+  Entry& entry = *lookup.value();
+  ASSERT(entry.response_headers_);
 
-  ASSERT(entry->response_headers_);
-
-  if (VaryHeaderUtils::hasVary(*entry->response_headers_)) {
-    return varyLookup(request, entry->response_headers_);
+  if (VaryHeaderUtils::hasVary(*entry.response_headers_)) {
+    return varyLookup(request, entry.response_headers_);
   } else {
     Http::ResponseTrailerMapPtr trailers_map;
-    if (entry->trailers_) {
-      trailers_map = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*entry->trailers_);
+    if (entry.trailers_) {
+      trailers_map = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*entry.trailers_);
     }
     return SimpleHttpCache::Entry{
-        Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*entry->response_headers_),
-        entry->metadata_, entry->body_, std::move(trailers_map)};
+        Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*entry.response_headers_),
+        entry.metadata_, entry.body_, std::move(trailers_map)};
   }
 }
 
@@ -217,7 +217,7 @@ void SimpleHttpCache::insert(const Key& key, Http::ResponseHeaderMapPtr&& respon
 
   Entry* entry = new Entry{std::move(response_headers), std::move(metadata), std::move(body),
                            std::move(trailers)};
-  lru_cache_->insert(key, entry, entry->byteSize());
+  lru_cache_.insert(key, entry, entry->byteSize());
 }
 
 SimpleHttpCache::Entry
@@ -240,21 +240,21 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
   }
   varied_request_key.add_custom_fields(vary_identifier.value());
 
-  LRUCache::ScopedLookup lookup(lru_cache_.get(), varied_request_key);
+  LRUCache::ScopedLookup lookup(&lru_cache_, varied_request_key);
   if (!lookup.found()) {
     return Entry{};
   }
 
-  auto entry = lookup.value();
-  ASSERT(entry->response_headers_);
+  Entry& entry = *lookup.value();
+  ASSERT(entry.response_headers_);
   Http::ResponseTrailerMapPtr trailers_map;
-  if (entry->trailers_) {
-    trailers_map = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*entry->trailers_);
+  if (entry.trailers_) {
+    trailers_map = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*entry.trailers_);
   }
 
   return SimpleHttpCache::Entry{
-      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*entry->response_headers_),
-      entry->metadata_, entry->body_, std::move(trailers_map)};
+      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*entry.response_headers_), entry.metadata_,
+      entry.body_, std::move(trailers_map)};
 }
 
 void SimpleHttpCache::varyInsert(const Key& request_key,
@@ -283,7 +283,7 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
          std::move(trailers));
 
   // Add a special entry to flag that this request generates varied responses.
-  LRUCache::ScopedLookup lookup(lru_cache_.get(), request_key);
+  LRUCache::ScopedLookup lookup(&lru_cache_, request_key);
   if (!lookup.found()) {
     Envoy::Http::ResponseHeaderMapPtr vary_only_map =
         Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>({});
@@ -302,7 +302,7 @@ void SimpleHttpCache::setMaxSize(int64_t bytes) {
   ASSERT(bytes > 0);
 
   if (bytes > 0 && lru_cache_.maxSize() != bytes) {
-    lru_cache_->setMaxSize(bytes);
+    lru_cache_.setMaxSize(bytes);
   }
 }
 
