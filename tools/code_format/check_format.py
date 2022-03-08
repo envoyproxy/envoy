@@ -1067,9 +1067,11 @@ class FormatChecker:
             top_level = pathlib.PurePath('/', *pathlib.PurePath(dir_name).parts[:2], '/')
             self.check_owners(str(top_level), owned_directories, error_messages)
 
+        dir_name = normalize_path(dir_name)
+
         for file_name in names:
             result = pool.apply_async(
-                self.check_format_return_trace_on_error, args=(dir_name + "/" + file_name,))
+                self.check_format_return_trace_on_error, args=(dir_name + file_name,))
             result_list.append(result)
 
     # check_error_messages iterates over the list with error messages and prints
@@ -1083,6 +1085,18 @@ class FormatChecker:
 
     def whitelisted_for_memcpy(self, file_path):
         return file_path in MEMCPY_WHITELIST
+
+
+def normalize_path(path):
+    """Convert path to form ./path/to/dir/ for directories and ./path/to/file otherwise"""
+    if not path.startswith("./"):
+        path = "./" + path
+
+    isdir = os.path.isdir(path)
+    if isdir and not path.endswith("/"):
+        path += "/"
+
+    return path
 
 
 if __name__ == "__main__":
@@ -1229,9 +1243,7 @@ if __name__ == "__main__":
         # All of our EXCLUDED_PREFIXES start with "./", but the provided
         # target path argument might not. Add it here if it is missing,
         # and use that normalized path for both lookup and `check_format`.
-        normalized_target_path = args.target_path
-        if not normalized_target_path.startswith("./"):
-            normalized_target_path = "./" + normalized_target_path
+        normalized_target_path = normalize_path(args.target_path)
         if not normalized_target_path.startswith(
                 EXCLUDED_PREFIXES) and normalized_target_path.endswith(SUFFIXES):
             error_messages += format_checker.check_format(normalized_target_path)
