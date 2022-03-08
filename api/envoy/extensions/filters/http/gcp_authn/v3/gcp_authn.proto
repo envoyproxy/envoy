@@ -5,8 +5,6 @@ package envoy.extensions.filters.http.gcp_authn.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/http_uri.proto";
 
-import "google/protobuf/duration.proto";
-
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.gcp_authn.v3";
@@ -16,10 +14,13 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#not-implemented-hide:]
+// [#extension: envoy.filters.http.gcp_authn]
 message GcpAuthnFilterConfig {
+  // [#not-implemented-hide:]
   // The HTTP URI to to fetch token from Instance Metadata Server.
   config.core.v3.HttpUri http_uri = 1;
 
+  // [#not-implemented-hide:]
   // Retry policy for fetching tokens.
   config.core.v3.RetryPolicy retry_policy = 2;
 }

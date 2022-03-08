@@ -19,10 +19,14 @@ constexpr char MetadataFlavorKey[] = "Metadata-Flavor";
 constexpr char MetadataFlavor[] = "Google";
 
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  client_->fetchToken();
-  return FilterHeadersStatus::Continue;
+  state_ = State::Calling;
+  client_->fetchToken(*this);
+  return state_ == State::Complete ? FilterHeadersStatus::Continue
+                                   // TODO(tyxia) StopAllIterationAndWatermark vs StopAllIteration
+                                   : Http::FilterHeadersStatus::StopAllIterationAndWatermark;
 }
 
+// TODO(tyxia) Add audience field.
 Http::RequestMessagePtr buildRequest(const std::string& method, const std::string& server_url) {
   absl::string_view host;
   absl::string_view path;
@@ -37,8 +41,12 @@ Http::RequestMessagePtr buildRequest(const std::string& method, const std::strin
   return std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
 }
 
+void GcpAuthnFilter::onComplete(ResponseStatus) { state_ = State::Complete; }
+
 // TODO(tyxia) Pass the return of buildRequest to the fetchToken??
-void GcpAuthnClient::fetchToken() {
+void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks) {
+  ASSERT(callbacks_ == nullptr);
+  callbacks_ = &callbacks;
   resetRequest();
 
   const auto thread_local_cluster =
@@ -83,6 +91,8 @@ void GcpAuthnClient::onSuccess(const Http::AsyncClient::Request&,
     const uint64_t status_code = Envoy::Http::Utility::getResponseStatus(response->headers());
 
     if (status_code == Envoy::enumToInt(Envoy::Http::Code::OK)) {
+      callbacks_->onComplete(ResponseStatus::OK);
+      callbacks_ = nullptr;
       // Decode JWT Token
       ::google::jwt_verify::Jwt jwt;
       Status status = jwt.parseFromString(response->bodyAsString());
@@ -116,6 +126,8 @@ void GcpAuthnClient::onFailure(const Http::AsyncClient::Request&,
 void GcpAuthnClient::handleFailure() {
   // TODO(tyxia) Add logs here.
   resetRequest();
+  callbacks_->onComplete(ResponseStatus::Error);
+  callbacks_ = nullptr;
 }
 
 } // namespace GcpAuthentication

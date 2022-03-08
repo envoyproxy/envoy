@@ -34,6 +34,7 @@ public:
   const std::string Dynamo = "envoy.filters.http.dynamo";
   // Fault filter
   const std::string Fault = "envoy.filters.http.fault";
+  const std::string GcpAuthn = "envoy.filters.http.gcp_authn";
   // GRPC http1 bridge filter
   const std::string GrpcHttp1Bridge = "envoy.filters.http.grpc_http1_bridge";
   // GRPC json transcoder filter

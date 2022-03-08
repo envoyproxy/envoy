@@ -4,6 +4,7 @@
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
 
 #include "test/common/http/common.h"
+#include "test/extensions/filters/http/gcp_authn/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/init/mocks.h"
@@ -67,6 +68,7 @@ public:
   NiceMock<MockFactoryContext> context_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   Envoy::Http::MockAsyncClientRequest client_request_{&thread_local_cluster_.async_client_};
+  MockRequestCallbacks request_callbacks_;
 
   // Mocks for http request.
   Envoy::Http::AsyncClient::Callbacks* client_callback_;
@@ -76,13 +78,12 @@ public:
   std::unique_ptr<GcpAuthnClient> client_;
 };
 
-TEST_F(GcpAuthnFilterTest, Basic) {
+TEST_F(GcpAuthnFilterTest, Success) {
   setupMockObjects();
   // Create the client object.
   createClient();
 
-  // Start class under test.
-  client_->fetchToken();
+  client_->fetchToken(request_callbacks_);
   EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
   EXPECT_EQ(message_->headers().Host()->value().getStringView(), "testhost");
   EXPECT_EQ(message_->headers().Path()->value().getStringView(), "/path/test");
@@ -98,6 +99,7 @@ TEST_F(GcpAuthnFilterTest, Basic) {
   Envoy::Http::ResponseMessagePtr response(
       new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
 
+  EXPECT_CALL(request_callbacks_, onComplete_(ResponseStatus::OK));
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
@@ -116,25 +118,18 @@ TEST_F(GcpAuthnFilterTest, NoCluster) {
 
   EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, httpAsyncClient()).Times(0);
+  EXPECT_CALL(request_callbacks_, onComplete_(ResponseStatus::Error));
   createClient(no_cluster_config);
-  client_->fetchToken();
+  client_->fetchToken(request_callbacks_);
 }
 
 TEST_F(GcpAuthnFilterTest, Failure) {
-  EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(_))
-      .WillRepeatedly(Return(&thread_local_cluster_));
-  EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillRepeatedly(Invoke(
-          [&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks& callback,
-              const Envoy::Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            // TODO(tyxia) Re-visit
-            callback.onFailure(client_request_, Envoy::Http::AsyncClient::FailureReason::Reset);
-            return nullptr;
-          }));
+  setupMockObjects();
   // Create the client object.
   createClient();
-
-  client_->fetchToken();
+  EXPECT_CALL(request_callbacks_, onComplete_(ResponseStatus::Error));
+  client_->fetchToken(request_callbacks_);
+  client_->onFailure(client_request_, Http::AsyncClient::FailureReason::Reset);
   // client_callback_->onFailure(client_request_, Http::AsyncClient::FailureReason::Reset);
 }
 
