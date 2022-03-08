@@ -964,7 +964,9 @@ ServerConnectionImpl::ServerConnectionImpl(
       response_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundResponse(fragment);
       }),
-      headers_with_underscores_action_(headers_with_underscores_action) {}
+      headers_with_underscores_action_(headers_with_underscores_action),
+      runtime_lazy_read_disable_(
+          Runtime::runtimeFeatureEnabled("envoy_reloadable_features_http1_lazy_read_disable")) {}
 
 uint32_t ServerConnectionImpl::getHeadersSize() {
   // Add in the size of the request URL if processing request headers.
@@ -1144,7 +1146,8 @@ void ServerConnectionImpl::onBody(Buffer::Instance& data) {
 }
 
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
-  if (active_request_ != nullptr && active_request_->remote_complete_) {
+  if (runtime_lazy_read_disable_ && active_request_ != nullptr &&
+      active_request_->remote_complete_) {
     // Eagerly read disable the connection if the downstream is sending pipelined requests as we
     // serially process them. Reading from the connection will be re-enabled after the active
     // request is completed.
@@ -1154,7 +1157,8 @@ Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
 
   Http::Status status = ConnectionImpl::dispatch(data);
 
-  if (active_request_ != nullptr && active_request_->remote_complete_) {
+  if (runtime_lazy_read_disable_ && active_request_ != nullptr &&
+      active_request_->remote_complete_) {
     // Read disable the connection if the downstream is sending additional data while we are working
     // on an existing request. Reading from the connection will be re-enabled after the active
     // request is completed.
@@ -1171,6 +1175,9 @@ ParserStatus ServerConnectionImpl::onMessageCompleteBase() {
 
     // The request_decoder should be non-null after we've called the newStream on callbacks.
     ASSERT(active_request_->request_decoder_);
+    if (!runtime_lazy_read_disable_) {
+      active_request_->response_encoder_.readDisable(true);
+    }
     active_request_->remote_complete_ = true;
 
     if (deferred_end_stream_headers_) {
