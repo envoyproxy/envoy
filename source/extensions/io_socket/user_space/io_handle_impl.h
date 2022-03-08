@@ -88,6 +88,7 @@ public:
 
   Api::SysCallIntResult shutdown(int how) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return absl::nullopt; }
+  absl::optional<uint64_t> congestionWindowInBytes() const override { return absl::nullopt; }
   absl::optional<std::string> interfaceName() override { return absl::nullopt; }
 
   void setWatermarks(uint32_t watermark) { pending_received_data_.setWatermarks(watermark); }

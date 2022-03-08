@@ -781,7 +781,16 @@ absl::string_view ConnectionImpl::transportFailureReason() const {
 
 absl::optional<std::chrono::milliseconds> ConnectionImpl::lastRoundTripTime() const {
   return socket_->lastRoundTripTime();
-};
+}
+
+void ConnectionImpl::configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                                      std::chrono::microseconds rtt) {
+  return transport_socket_->configureInitialCongestionWindow(bandwidth_bits_per_sec, rtt);
+}
+
+absl::optional<uint64_t> ConnectionImpl::congestionWindowInBytes() const {
+  return socket_->congestionWindowInBytes();
+}
 
 void ConnectionImpl::flushWriteBuffer() {
   if (state() == State::Open && write_buffer_->length() > 0) {

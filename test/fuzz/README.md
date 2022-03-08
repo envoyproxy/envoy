@@ -95,8 +95,10 @@ your local machine vs. the fuzz cluster). The binary takes the location of the s
 directory. Fuzzing continues indefinitely until a bug is found or the number of iterations it should
 perform is specified with `-runs`. For example,
 
-`bazel run //test/common/common:base64_fuzz_test --config asan-fuzzer
---test/common/common/base64_corpus -runs=1000`
+```console
+bazel run //test/common/common:base64_fuzz_test --config asan-fuzzer \
+    -- test/common/common/base64_corpus -runs=1000
+```
 
 The fuzzer prints information to stderr:
 
