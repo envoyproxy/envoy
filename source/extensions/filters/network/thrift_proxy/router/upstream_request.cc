@@ -160,7 +160,7 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
     }
 
     if (draining) {
-      // TODO(rgs1): bump stat for connection closed due to draining.
+      stats_.incCloseDrain(cluster);
       resetStream();
     }
 
