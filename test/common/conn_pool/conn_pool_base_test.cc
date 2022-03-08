@@ -431,7 +431,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, NoAvailableStreams) {
   stream_limit_ = 1;
   newConnectingClient();
   clients_.back()->capacity_override_ = 0;
-  pool_.decrClusterStreamCapacity(stream_limit_);
+  pool_.decrConnectingAndConnectedStreamCapacity(stream_limit_, *clients_.back());
 
   // Make sure that when the connected event is raised, there is no call to
   // onPoolReady, and the client is marked as busy.
