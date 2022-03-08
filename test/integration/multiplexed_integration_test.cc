@@ -2032,14 +2032,12 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
   // stream error.
   ASSERT_TRUE(response->waitForReset());
   // http3.inconsistent_content_length.
-  if (downstreamProtocol() == Http::CodecType::HTTP3 ||
-      GetParam().http2_implementation == kOgHttp2) {
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
-    if (downstreamProtocol() == Http::CodecType::HTTP3) {
-      EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("inconsistent_content_length"));
-    } else {
-      EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.remote_reset"));
-    }
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("inconsistent_content_length"));
+  } else if (GetParam().http2_implementation == kOgHttp2) {
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.remote_reset"));
   } else {
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
     // http2.violation.of.messaging.rule
