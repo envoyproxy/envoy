@@ -410,8 +410,7 @@ public:
   }
 
   void onMessage(const Protobuf::Message& message,
-                 absl::Span<const Protobuf::Message* const> parents,
-                 bool was_any_or_top_level) override {
+                 absl::Span<const Protobuf::Message* const> parents, bool) override {
     if (message.GetDescriptor()
             ->options()
             .GetExtension(xds::annotations::v3::message_status)
