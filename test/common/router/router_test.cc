@@ -4389,9 +4389,9 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
 }
 
 TEST_F(RouterTest, Shadow) {
-  ShadowPolicyPtr policy = std::make_unique<TestShadowPolicy>("foo", "bar");
+  ShadowPolicyPtr policy = std::make_shared<TestShadowPolicy>("foo", "bar");
   callbacks_.route_->route_entry_.shadow_policies_.push_back(std::move(policy));
-  policy = std::make_unique<TestShadowPolicy>("fizz", "buzz", envoy::type::v3::FractionalPercent(),
+  policy = std::make_shared<TestShadowPolicy>("fizz", "buzz", envoy::type::v3::FractionalPercent(),
                                               false);
   callbacks_.route_->route_entry_.shadow_policies_.push_back(std::move(policy));
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));

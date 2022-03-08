@@ -3614,6 +3614,69 @@ virtual_hosts:
   EXPECT_EQ("foo", boz_shadow_policies[1]->runtimeKey());
 }
 
+TEST_F(RouteMatcherTest, RequestMirrorPoliciesLevels) {
+  const std::string yaml = R"EOF(
+name: RequestMirrorPoliciesLevels
+request_mirror_policies:
+  - cluster: rc_cluster
+virtual_hosts:
+- name: www2
+  request_mirror_policies:
+    - cluster: vh_cluster
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+        - cluster: route_cluster
+      cluster: www2
+  - match:
+      prefix: "/bar"
+    route:
+      cluster: www2
+- name: www3
+  domains:
+  - www2.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+        - cluster: route_cluster
+      cluster: www2
+  - match:
+      prefix: "/bar"
+    route:
+      cluster: www2
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www2", "www3", "rc_cluster", "vh_cluster", "route_cluster"},
+                                                       {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  const auto& rc_vh_route_shadow_policies =
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_EQ(1, rc_vh_route_shadow_policies.size());
+  EXPECT_EQ("route_cluster", rc_vh_route_shadow_policies[0]->cluster());
+
+  const auto& rc_vh_shadow_policies =
+      config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_EQ(1, rc_vh_shadow_policies.size());
+  EXPECT_EQ("vh_cluster", rc_vh_shadow_policies[0]->cluster());
+
+  const auto& rc_route_shadow_policies =
+      config.route(genHeaders("www2.lyft.com", "/foo", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_EQ(1, rc_route_shadow_policies.size());
+  EXPECT_EQ("route_cluster", rc_route_shadow_policies[0]->cluster());
+
+  const auto& rc_policies =
+      config.route(genHeaders("www2.lyft.com", "/bar", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_EQ(1, rc_policies.size());
+  EXPECT_EQ("rc_cluster", rc_policies[0]->cluster());
+}
+
 class RouteConfigurationV2 : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(RouteMatcherTest, Retry) {
