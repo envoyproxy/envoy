@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-from subprocess import check_output
-from subprocess import check_call
+from subprocess import check_output, STDOUT, CalledProcessError
 import argparse
 import glob
 import os
@@ -33,10 +32,15 @@ def generate_protobufs(targets, output, api_repo):
     # Each rule has the form @envoy_api//foo/bar:baz_go_proto.
     # First build all the rules to ensure we have the output files.
     # We preserve source info so comments are retained on generated code.
-    check_call([
-        'bazel', 'build', '-c', 'fastbuild',
-        '--experimental_proto_descriptor_sets_include_source_info'
-    ] + BAZEL_BUILD_OPTIONS + go_protos)
+    try:
+        check_output([
+            'bazel', 'build', '-c', 'fastbuild',
+            '--experimental_proto_descriptor_sets_include_source_info'
+        ] + BAZEL_BUILD_OPTIONS + go_protos,
+                     stderr=STDOUT)
+    except CalledProcessError as e:
+        print(e.output)
+        raise e
 
     for rule in go_protos:
         # Example rule:

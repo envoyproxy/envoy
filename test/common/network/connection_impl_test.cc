@@ -3035,9 +3035,8 @@ protected:
 
 TEST_F(InternalClientConnectionImplTest,
        CannotCreateConnectionToInternalAddressWithInternalAddressEnabled) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.internal_address", "true"}});
+  auto runtime = std::make_unique<TestScopedRuntime>();
+  runtime->mergeValues({{"envoy.reloadable_features.internal_address", "true"}});
 
   const Network::SocketInterface* sock_interface = Network::socketInterface(
       "envoy.extensions.network.socket_interface.default_socket_interface");
