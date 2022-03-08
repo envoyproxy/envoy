@@ -758,106 +758,54 @@ public:
   void ifDenyRuleConditionIsTrueThenDenyTest(Http::TestRequestHeaderMapImpl headers,
                                              absl::string_view rule_conditional_expr,
                                              absl::string_view conditional_expr_param_value) {
-    std::cerr << "Deny Test" << std::endl;
-
     useAccessLog("%RESPONSE_CODE_DETAILS%");
-
-    std::cerr << "after useAccessLog" << std::endl;
 
     config_helper_.prependFilter(
         fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
                     fmt::format(std::string(rule_conditional_expr), conditional_expr_param_value)));
 
-    std::cerr << "after prependFilter" << std::endl;
-
     initialize();
-
-    std::cerr << "after initialize" << std::endl;
 
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
-    std::cerr << "after makeHttpConnection" << std::endl;
-
     auto response = codec_client_->makeHeaderOnlyRequest(headers);
-
-    std::cerr << "after makeHeaderOnlyRequest" << std::endl;
 
     ASSERT_TRUE(response->waitForEndStream()) << std::endl;
 
-    std::cerr << "after response->waitForEndStream" << std::endl;
-
     ASSERT_TRUE(response->complete());
 
-    std::cerr << "after response->complete" << std::endl;
-
     EXPECT_EQ("403", response->headers().getStatusValue());
-
-    std::cerr << "after response->headers().getStatusValue" << std::endl;
 
     // Note the whitespace in the policy id is replaced by '_'.
     EXPECT_THAT(waitForAccessLog(access_log_name_),
                 testing::HasSubstr("rbac_access_denied_matched_policy[foo]"));
-
-    std::cerr << "after waitForAccessLog" << std::endl;
-
-    cleanupUpstreamAndDownstream();
-
-    std::cerr << "after cleanupUpstreamAndDownstream" << std::endl;
   }
 
   void ifDenyRuleConditionIsFalseThenAllowTest(Http::TestRequestHeaderMapImpl headers,
                                                absl::string_view rule_conditional_expr,
                                                absl::string_view conditional_expr_param_value) {
-    std::cerr << "allow test" << std::endl;
-
     useAccessLog("%RESPONSE_CODE_DETAILS%");
-
-    std::cerr << "after useAccessLog" << std::endl;
 
     config_helper_.prependFilter(
         fmt::format(RBAC_CONFIG_DENY_RULE_WITH_CUSTOM_CEL_VOCABULARY,
                     fmt::format(std::string(rule_conditional_expr), conditional_expr_param_value)));
 
-    std::cerr << "after prependFilter" << std::endl;
-
     initialize();
-
-    std::cerr << "after initialize" << std::endl;
 
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
-    std::cerr << "after makeHttpConnection" << std::endl;
-
     auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
-    std::cerr << "after makeHeaderOnlyRequest" << std::endl;
-
     waitForNextUpstreamRequest();
-
-    std::cerr << "after waitForNextUpstreamRequest" << std::endl;
 
     Http::TestResponseHeaderMapImpl response_headers{
         {":status", "200"},
     };
     upstream_request_->encodeHeaders(response_headers, true);
 
-    std::cerr << "after encodeHeaders" << std::endl;
-
     ASSERT_TRUE(response->waitForEndStream());
-
-    std::cerr << "after response->waitForEndStream" << std::endl;
-
     ASSERT_TRUE(response->complete());
-
-    std::cerr << "after response->complete" << std::endl;
-
     EXPECT_EQ("200", response->headers().getStatusValue());
-
-    std::cerr << "after response->headers().getStatusValue" << std::endl;
-
-    cleanupUpstreamAndDownstream();
-
-    std::cerr << "after cleanupUpstreamAndDownstream" << std::endl;
   }
 };
 
@@ -867,41 +815,34 @@ INSTANTIATE_TEST_SUITE_P(Protocols, RbacWithCustomCelVocabularyIntegrationTests,
 
 // Custom CEL Vocabulary - DENY if request[query][key1]==correct_value
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, QueryIfMatchDeny) {
-  std::cerr << "Test start" << std::endl;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},     {":path", "/query?key1=correct_value"}, {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"},
   };
-  std::cerr << "after headers creation" << std::endl;
   ifDenyRuleConditionIsTrueThenDenyTest(headers, QueryExpr, "correct_value");
 }
 
 // Custom CEL Vocabulary - ALLOW if request[query][key1]!=correct_value
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, QueryIfNoMatchAllow) {
-  std::cerr << "Test start" << std::endl;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},     {":path", "/query?key1=correct_value"}, {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"},
   };
-  std::cerr << "after headers creation" << std::endl;
   ifDenyRuleConditionIsFalseThenAllowTest(headers, QueryExpr, "something_wrong");
 }
 
 // Custom CEL Vocabulary - DENY if cookie(fruit)==apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfMatchDeny) {
-  std::cerr << "Test start" << std::endl;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},         {":path", "/query?key1=correct_value"}, {":scheme", "http"},
       {":authority", "host"},     {"x-forwarded-for", "10.0.0.1"},        {"cookie", "fruit=apple"},
       {"cookie", "fruit=banana"},
   };
-  std::cerr << "after headers creation" << std::endl;
   ifDenyRuleConditionIsTrueThenDenyTest(headers, CookieExpr, "apple");
 }
 
 // Custom CEL Vocabulary - ALLOW if cookie(fruit)!=apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfNoMatchAllow) {
-  std::cerr << "Test start" << std::endl;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},
       {":path", "/path"},
@@ -911,13 +852,11 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieIfNoMatchAllow) {
       {"cookie", "fruit=apple"},
       {"cookie", "fruit=banana"},
   };
-  std::cerr << "after headers creation" << std::endl;
   ifDenyRuleConditionIsFalseThenAllowTest(headers, CookieExpr, "veg");
 }
 
 // Custom CEL Vocabulary - DENY if cookieValue(fruit)==apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfMatchDeny) {
-  std::cerr << "Test start" << std::endl;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},
       {":path", "/path"},
@@ -927,13 +866,11 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfMatchDeny) {
       {"cookie", "fruit=apple"},
       {"cookie", "fruit=banana"},
   };
-  std::cerr << "after headers creation" << std::endl;
   ifDenyRuleConditionIsTrueThenDenyTest(headers, CookieValueExpr, "apple");
 }
 
 // Custom CEL Vocabulary - ALLOW if cookieValue(fruit)!=apple
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfNoMatchAllow) {
-  std::cerr << "Test start" << std::endl;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},
       {":path", "/path"},
@@ -943,29 +880,24 @@ TEST_P(RbacWithCustomCelVocabularyIntegrationTests, CookieValueIfNoMatchAllow) {
       {"cookie", "fruit=apple"},
       {"cookie", "fruit=banana"},
   };
-  std::cerr << "after headers creation" << std::endl;
   ifDenyRuleConditionIsFalseThenAllowTest(headers, CookieValueExpr, "veg");
 }
 
 // Custom CEL Vocabulary - ALLOW if request.url() contains(correct_path)
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfMatchDeny) {
-  std::cerr << "Test start" << std::endl;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},     {":path", "/correct_path"},      {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"host", "abc.com:1234"},
   };
-  std::cerr << "after headers creation" << std::endl;
   ifDenyRuleConditionIsTrueThenDenyTest(headers, UrlExpr, "correct_path");
 }
 
 // Custom CEL Vocabulary - ALLOW if request.url() !contains(correct_path)
 TEST_P(RbacWithCustomCelVocabularyIntegrationTests, UrlIfNoMatchAllow) {
-  std::cerr << "Test start" << std::endl;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},     {":path", "/correct_path"},      {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"host", "abc.com:1234"},
   };
-  std::cerr << "after headers creation" << std::endl;
   ifDenyRuleConditionIsFalseThenAllowTest(headers, UrlExpr, "wrong_path");
 }
 
