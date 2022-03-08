@@ -78,9 +78,6 @@ struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
   bool charged_response_timing_{false};
   MonotonicTime downstream_request_complete_time_;
   uint64_t response_size_{};
-
-  // TODO(rgs1): this should be configurable.
-  const Http::LowerCaseString DrainHeader{"x-thrift-draining"};
 };
 
 } // namespace Router

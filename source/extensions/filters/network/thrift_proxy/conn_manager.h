@@ -270,8 +270,6 @@ private:
   bool half_closed_{false};
   TimeSource& time_source_;
   const Network::DrainDecision& drain_decision_;
-  // TODO(rgs1): this should be configurable.
-  const Http::LowerCaseString DrainHeader{"x-thrift-draining"};
 
   // The number of requests accumulated on the current connection.
   uint64_t accumulated_requests_{};

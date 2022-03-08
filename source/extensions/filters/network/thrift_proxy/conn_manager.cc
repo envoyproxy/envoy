@@ -229,7 +229,7 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
     // TODO(rgs1):
     // * should the key value contain something useful? E.g.: minutes til drain is over?
     // * this should be protected by a feature flag.
-    metadata->headers().addReferenceKey(parent_.parent_.DrainHeader, "close");
+    metadata->headers().addReferenceKey(Headers::get().Drain, "true");
   }
 
   return ProtocolConverter::messageBegin(metadata);

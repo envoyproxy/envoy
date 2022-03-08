@@ -209,6 +209,7 @@ public:
   const Http::LowerCaseString ClientId{":client-id"};
   const Http::LowerCaseString Dest{":dest"};
   const Http::LowerCaseString MethodName{":method-name"};
+  const Http::LowerCaseString Drain{":drain"};
 };
 using Headers = ConstSingleton<HeaderValues>;
 

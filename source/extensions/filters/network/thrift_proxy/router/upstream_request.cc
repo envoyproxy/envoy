@@ -133,7 +133,7 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
     stats_.recordUpstreamResponseSize(cluster, response_size_);
 
     // Is the upstream going away?
-    draining = !callbacks.responseMetadata()->headers().get(DrainHeader).empty();
+    draining = !callbacks.responseMetadata()->headers().get(Headers::get().Drain).empty();
 
     switch (callbacks.responseMetadata()->messageType()) {
     case MessageType::Reply:
