@@ -217,7 +217,7 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(
-    IpVersions, GrpcJsonTranscoderIntegrationTest,
+    IpVersionsDeferredProcessing, GrpcJsonTranscoderIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
     ipAndDeferredProcessingParamsToString);
 
@@ -1332,7 +1332,7 @@ public:
   }
 };
 INSTANTIATE_TEST_SUITE_P(
-    IpVersions, OverrideConfigGrpcJsonTranscoderIntegrationTest,
+    IpVersionsDeferredProcessing, OverrideConfigGrpcJsonTranscoderIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
     ipAndDeferredProcessingParamsToString);
 

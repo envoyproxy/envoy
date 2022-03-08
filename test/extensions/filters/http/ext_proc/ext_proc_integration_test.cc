@@ -341,7 +341,7 @@ protected:
   FakeStreamPtr processor_stream_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, ExtProcIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
                          testing::Combine(GRPC_CLIENT_INTEGRATION_PARAMS, testing::Bool()),
                          ExtProcIntegrationTest::protocolTestParamsToString);
 

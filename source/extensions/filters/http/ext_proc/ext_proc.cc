@@ -363,13 +363,14 @@ Filter::processBufferedPartial(ProcessorState& state, Buffer::Instance& data, bo
     // Keep on running and buffering
     state.enqueueStreamingChunk(data, false, false);
 
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.defer_processing_backedup_streams") &&
+    if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams) &&
         state.queueOverHighLimit()) {
       // We just transitioned to queue over high limit, which will then cause
       // the receiving codec to buffer the data rather than send it to us.
       // Prior, we'd rely on eager processing to kick off sending the data to
       // the external processor, instead we kick it off here.
+      // The recursive call here should only be one deep as we should
+      // end up in the branch where we send data in buffered partial mode.
       Buffer::OwnedImpl empty_buffer{};
       return processBufferedPartial(state, empty_buffer, false);
     } else {
