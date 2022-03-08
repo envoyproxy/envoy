@@ -482,7 +482,8 @@ public:
     }
   }
 
-  void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) override {}
+  void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&,
+               absl::Span<const Protobuf::Message* const>) override {}
 };
 
 } // namespace
