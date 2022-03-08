@@ -160,6 +160,11 @@ public:
     protocol_upgrade_message_ = upgrade_message;
   }
 
+  bool isDraining() const { return is_draining_; }
+  void setDraining(bool draining) {
+    is_draining_ = draining;
+  }
+
   absl::optional<int64_t> traceId() const { return trace_id_; }
   void setTraceId(int64_t trace_id) { trace_id_ = trace_id; }
 
@@ -190,6 +195,7 @@ private:
   absl::optional<AppExceptionType> app_ex_type_;
   absl::optional<std::string> app_ex_msg_;
   bool protocol_upgrade_message_{false};
+  bool is_draining_{false};
   SpanList spans_;
   absl::optional<int64_t> trace_id_;
   absl::optional<int64_t> trace_id_high_;

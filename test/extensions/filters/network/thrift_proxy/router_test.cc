@@ -551,10 +551,7 @@ public:
     auto metadata = std::make_shared<MessageMetadata>();
     metadata->setMessageType(msg_type);
     metadata->setSequenceId(1);
-
-    if (is_drain) {
-      metadata->headers().addReferenceKey(ThriftProxy::Headers::get().Drain, "true");
-    }
+    metadata->setDraining(is_drain);
 
     ON_CALL(callbacks_, responseMetadata()).WillByDefault(Return(metadata));
     ON_CALL(callbacks_, responseSuccess()).WillByDefault(Return(is_success));

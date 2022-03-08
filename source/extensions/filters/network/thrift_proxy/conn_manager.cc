@@ -223,9 +223,15 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
     success_ = metadata->replyType() == ReplyType::Success;
   }
 
+  // Is the upstream host draining?
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_connection_draining")) {
+    metadata_->setDraining(!metadata->headers().get(Headers::get().Drain).empty());
+    metadata->headers().remove(Headers::get().Drain);
+  }
+
+  // Is this host draining?
   ConnectionManager& cm = parent_.parent_;
   if (cm.drain_decision_.drainClose()) {
-    // Notify downstream that we are going away.
     // TODO(rgs1): should the key value contain something useful? E.g.: minutes til drain is over?
     metadata->headers().addReferenceKey(Headers::get().Drain, "true");
   }
