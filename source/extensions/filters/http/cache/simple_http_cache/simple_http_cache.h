@@ -77,6 +77,10 @@ public:
   // If necessary, entries will be evicted to comply with the new size.
   void setMaxSize(int64_t bytes);
 
+  // Remove all items from the LRU cache as per
+  // https://github.com/google/jwt_verify_lib/blob/master/simple_lru_cache/simple_lru_cache_inl.h#L289
+  ~SimpleHttpCache() { lru_cache_.clear(); }
+
   absl::Mutex mutex_;
   LRUCache lru_cache_ ABSL_GUARDED_BY(mutex_);
 };
