@@ -1429,6 +1429,90 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterForUdp) {
                 ProtoEq(ValueUtil::numberValue(1.0)));
   }
 
+  {
+    StreamInfo::BytesMeterSharedPtr downstream_bytes_meter{
+        std::make_shared<StreamInfo::BytesMeter>()};
+    downstream_bytes_meter->addWireBytesSent(1);
+    StreamInfoFormatter udp_downstream_datagrams_sent_format("UDP_DOWNSTREAM_DATAGRAMS_SENT");
+    EXPECT_CALL(stream_info, getDownstreamBytesMeter())
+        .WillRepeatedly(ReturnRef(downstream_bytes_meter));
+    EXPECT_EQ("1", udp_downstream_datagrams_sent_format.format(request_headers, response_headers,
+                                                     response_trailers, stream_info, body));
+    EXPECT_THAT(udp_downstream_datagrams_sent_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(1.0)));
+  }
+
+  {
+    StreamInfo::BytesMeterSharedPtr downstream_bytes_meter{
+        std::make_shared<StreamInfo::BytesMeter>()};
+    downstream_bytes_meter->addWireBytesReceived(1);
+    StreamInfoFormatter udp_downstream_datagrams_received_format("UDP_DOWNSTREAM_DATAGRAMS_RECEIVED");
+    EXPECT_CALL(stream_info, getDownstreamBytesMeter())
+        .WillRepeatedly(ReturnRef(downstream_bytes_meter));
+    EXPECT_EQ("1", udp_downstream_datagrams_received_format.format(request_headers, response_headers,
+                                                     response_trailers, stream_info, body));
+    EXPECT_THAT(udp_downstream_datagrams_received_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(1.0)));
+  }
+  
+  {
+    StreamInfo::BytesMeterSharedPtr upstream_bytes_meter{
+        std::make_shared<StreamInfo::BytesMeter>()};
+    upstream_bytes_meter->addHeaderBytesSent(1);
+    StreamInfoFormatter udp_downstream_sess_total_format("UDP_DOWNSTREAM_SESS_TOTAL");
+    EXPECT_CALL(stream_info, getUpstreamBytesMeter())
+        .WillRepeatedly(ReturnRef(upstream_bytes_meter));
+    EXPECT_EQ("1", udp_downstream_sess_total_format.format(request_headers, response_headers,
+                                                     response_trailers, stream_info, body));
+    EXPECT_THAT(udp_downstream_sess_total_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(1.0)));
+  }
+
+  {
+    StreamInfo::BytesMeterSharedPtr upstream_bytes_meter{
+        std::make_shared<StreamInfo::BytesMeter>()};
+    upstream_bytes_meter->addHeaderBytesReceived(1);
+    StreamInfoFormatter udp_downstream_idle_timeout_format("UDP_DOWNSTREAM_IDLE_TIMEOUT");
+    EXPECT_CALL(stream_info, getUpstreamBytesMeter())
+        .WillRepeatedly(ReturnRef(upstream_bytes_meter));
+    EXPECT_EQ("1", udp_downstream_idle_timeout_format.format(request_headers, response_headers,
+                                                     response_trailers, stream_info, body));
+    EXPECT_THAT(udp_downstream_idle_timeout_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(1.0)));
+  }
+
+  {
+    StreamInfo::BytesMeterSharedPtr upstream_bytes_meter{
+        std::make_shared<StreamInfo::BytesMeter>()};
+    upstream_bytes_meter->addWireBytesSent(1);
+    StreamInfoFormatter udp_upstream_none_healthy_format("UDP_UPSTREAM_NONE_HEALTHY");
+    EXPECT_CALL(stream_info, getUpstreamBytesMeter())
+        .WillRepeatedly(ReturnRef(upstream_bytes_meter));
+    EXPECT_EQ("1", udp_upstream_none_healthy_format.format(request_headers, response_headers,
+                                                     response_trailers, stream_info, body));
+    EXPECT_THAT(udp_upstream_none_healthy_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(1.0)));
+  }
+
+  {
+    StreamInfo::BytesMeterSharedPtr upstream_bytes_meter{
+        std::make_shared<StreamInfo::BytesMeter>()};
+    upstream_bytes_meter->addWireBytesReceived(1);
+    StreamInfoFormatter udp_upstream_datagrams_dropped_format("UDP_UPSTREAM_DATAGRAMS_DROPPED");
+    EXPECT_CALL(stream_info, getUpstreamBytesMeter())
+        .WillRepeatedly(ReturnRef(upstream_bytes_meter));
+    EXPECT_EQ("1", udp_upstream_datagrams_dropped_format.format(request_headers, response_headers,
+                                                     response_trailers, stream_info, body));
+    EXPECT_THAT(udp_upstream_datagrams_dropped_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(1.0)));
+  }
+
 }
 
 TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
