@@ -269,7 +269,7 @@ protected:
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
     void resetStream(StreamResetReason reason) override;
     void readDisable(bool disable) override;
-    uint32_t bufferLimit() override { return pending_recv_data_->highWatermark(); }
+    uint32_t bufferLimit() const override { return pending_recv_data_->highWatermark(); }
     const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
       return parent_.connection_.connectionInfoProvider().localAddress();
     }
@@ -313,6 +313,9 @@ protected:
     // to the decoder_.
     virtual void decodeHeaders() PURE;
     virtual void decodeTrailers() PURE;
+    bool maybeDeferDecodeTrailers();
+    // Consumes any decoded data, buffering if backed up.
+    void decodeData();
 
     // Get MetadataEncoder for this stream.
     MetadataEncoder& getMetadataEncoderOld();
@@ -323,9 +326,14 @@ protected:
     void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
 
     bool buffersOverrun() const { return read_disable_count_ > 0; }
+    bool shouldAllowPeerAdditionalStreamWindow() const {
+      return !buffersOverrun() && !pending_recv_data_->highWatermarkTriggered();
+    }
 
     void encodeDataHelper(Buffer::Instance& data, bool end_stream,
                           bool skip_encoding_empty_trailers);
+    // Called from either process_buffered_data_callback_.
+    void processBufferedData();
 
     const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
     ConnectionImpl& parent_;
@@ -338,8 +346,11 @@ protected:
     // Note that in current implementation the watermark callbacks of the pending_recv_data_ are
     // never called. The watermark value is set to the size of the stream window. As a result this
     // watermark can never overflow because the peer can never send more bytes than the stream
-    // window without triggering protocol error and this buffer is drained after each DATA frame was
-    // dispatched through the filter chain. See source/docs/flow_control.md for more information.
+    // window without triggering protocol error. This buffer is drained after each DATA frame was
+    // dispatched through the filter chain unless
+    // envoy.reloadable_features.defer_processing_backedup_streams is enabled,
+    // in which case this buffer may accumulate data.
+    // See source/docs/flow_control.md for more information.
     Buffer::InstancePtr pending_recv_data_;
     Buffer::InstancePtr pending_send_data_;
     HeaderMapPtr pending_trailers_to_encode_;
@@ -347,6 +358,9 @@ protected:
     std::unique_ptr<NewMetadataEncoder> metadata_encoder_;
     std::unique_ptr<MetadataEncoder> metadata_encoder_old_;
     absl::optional<StreamResetReason> deferred_reset_;
+    // Holds the reset reason for this stream. Useful if we have buffered data
+    // to determine whether we should continue processing that data.
+    absl::optional<StreamResetReason> reset_reason_;
     HeaderString cookies_;
     bool local_end_stream_sent_ : 1;
     bool remote_end_stream_ : 1;
@@ -355,13 +369,54 @@ protected:
     bool pending_receive_buffer_high_watermark_called_ : 1;
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
+    bool defer_processing_backedup_streams_ : 1;
     absl::string_view details_;
+
+    /**
+     * Tracks buffering that may occur for a stream if it is backed up.
+     */
+    struct BufferedStreamManager {
+      bool body_buffered_{false};
+      bool trailers_buffered_{false};
+
+      // We received a call to onStreamClose for the stream, but deferred it
+      // as the stream had pending data to process and the stream was not reset.
+      bool buffered_on_stream_close_{false};
+
+      bool hasBufferedBodyOrTrailers() const { return body_buffered_ || trailers_buffered_; }
+    };
+
+    BufferedStreamManager stream_manager_;
+    Event::SchedulableCallbackPtr process_buffered_data_callback_;
 
   protected:
     // Http::MultiplexedStreamImplBase
     bool hasPendingData() override {
       return pending_send_data_->length() > 0 || pending_trailers_to_encode_ != nullptr;
     }
+    bool continueProcessingBufferedData() const {
+      // We should stop processing buffered data if either
+      // 1) Buffers become overrun
+      // 2) The stream ends up getting reset
+      // Both of these can end up changing as a result of processing buffered data.
+      return !buffersOverrun() && !reset_reason_.has_value();
+    }
+
+    // Avoid inversion in the case where we saw trailers, acquiring the
+    // remote_end_stream_ being set to true, but the trailers ended up being
+    // buffered.
+    // All buffered body must be consumed before we send end stream.
+    bool sendEndStream() const {
+      return remote_end_stream_ && !stream_manager_.trailers_buffered_ &&
+             !stream_manager_.body_buffered_;
+    }
+
+    // Schedules a callback to process buffered data.
+    void scheduleProcessingOfBufferedData();
+
+    // Marks data consumed by the stream, granting the peer additional stream
+    // window.
+    void grantPeerAdditionalStreamWindow();
   };
 
   using StreamImplPtr = std::unique_ptr<StreamImpl>;
@@ -609,7 +664,11 @@ private:
   int onError(absl::string_view error);
   virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
   int onInvalidFrame(int32_t stream_id, int error_code);
+  // Pass through invoking with the actual stream.
   int onStreamClose(int32_t stream_id, uint32_t error_code);
+  // Should be invoked directly in buffered onStreamClose scenarios
+  // where nghttp2 might have already forgotten about the stream.
+  int onStreamClose(StreamImpl* stream, uint32_t error_code);
   int onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len);
   int onMetadataFrameComplete(int32_t stream_id, bool end_metadata);
   // Called iff use_new_codec_wrapper_ is false.

@@ -30,14 +30,20 @@ namespace Envoy {
 namespace {
 const uint32_t ControlFrameFloodLimit = 100;
 const uint32_t AllFrameFloodLimit = 1000;
+
+bool deferredProcessing(std::tuple<Network::Address::IpVersion, bool, bool> params) {
+  return std::get<2>(params);
+}
+
 } // namespace
 
 std::string testParamsToString(
-    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>> params) {
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool, bool>> params) {
   const bool is_v4 = (std::get<0>(params.param) == Network::Address::IpVersion::v4);
   const bool http2_new_codec_wrapper = std::get<1>(params.param);
-  return absl::StrCat(is_v4 ? "IPv4" : "IPv6",
-                      http2_new_codec_wrapper ? "WrappedHttp2" : "BareHttp2");
+  return absl::StrCat(
+      is_v4 ? "IPv4" : "IPv6", http2_new_codec_wrapper ? "WrappedHttp2" : "BareHttp2",
+      deferredProcessing(params.param) ? "WithDeferredProcessing" : "NoDeferredProcessing");
 }
 
 // It is important that the new socket interface is installed before any I/O activity starts and
@@ -47,7 +53,7 @@ std::string testParamsToString(
 // Http2FrameIntegrationTest destructor completes.
 class Http2FloodMitigationTest
     : public SocketInterfaceSwap,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool, bool>>,
       public Http2RawFrameIntegrationTest {
 public:
   Http2FloodMitigationTest() : Http2RawFrameIntegrationTest(std::get<0>(GetParam())) {
@@ -58,6 +64,8 @@ public:
     const bool enable_new_wrapper = std::get<1>(GetParam());
     config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
                                       enable_new_wrapper ? "true" : "false");
+    config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
+                                      deferredProcessing(GetParam()) ? "true" : "false");
   }
 
 protected:
@@ -78,8 +86,8 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, Http2FloodMitigationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::ValuesIn({false, true})),
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), ::testing::Bool(),
+                     ::testing::Bool()),
     testParamsToString);
 
 void Http2FloodMitigationTest::initializeUpstreamFloodTest() {
@@ -595,6 +603,15 @@ TEST_P(Http2FloodMitigationTest, Trailers) {
 // Verify flood detection by the WINDOW_UPDATE frame when a decoder filter is resuming reading from
 // the downstream via DecoderFilterBelowWriteBufferLowWatermark.
 TEST_P(Http2FloodMitigationTest, WindowUpdateOnLowWatermarkFlood) {
+  // This test depends on data flowing through a backed up stream eagerly (e.g. the
+  // backpressure-filter triggers above watermark when it receives headers from
+  // the downstream, and only goes below watermark if the response body has
+  // passed through the filter.). With defer processing of backed up streams however
+  // the data won't be eagerly processed as the stream is backed up.
+  // TODO(kbaichoo): Remove this test when removing this feature tag.
+  if (deferredProcessing(GetParam())) {
+    return;
+  }
   config_helper_.prependFilter(R"EOF(
   name: backpressure-filter
   )EOF");

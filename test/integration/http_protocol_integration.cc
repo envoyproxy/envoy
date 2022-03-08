@@ -8,18 +8,29 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
     const std::vector<Http::CodecType>& upstream_protocols) {
   std::vector<HttpProtocolTestParams> ret;
 
+  const auto addHttp2TestParametersWithNewCodecWrapperOrDeferredProcessing =
+      [&ret](Network::Address::IpVersion ip_version, Http::CodecType downstream_protocol,
+             Http::CodecType upstream_protocol) {
+        for (Http2Implementation impl : {kWrappedHttp2, kOgHttp2}) {
+          ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
+                                               impl, false});
+          ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
+                                               impl, true});
+        }
+        ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
+                                             kBareHttp2, true});
+      };
+
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
     for (auto downstream_protocol : downstream_protocols) {
       for (auto upstream_protocol : upstream_protocols) {
 #ifdef ENVOY_ENABLE_QUIC
-        ret.push_back(
-            HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, kBareHttp2});
+        ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
+                                             kBareHttp2, false});
         if (downstream_protocol == Http::CodecType::HTTP2 ||
             upstream_protocol == Http::CodecType::HTTP2) {
-          ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
-                                               kWrappedHttp2});
-          ret.push_back(
-              HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, kOgHttp2});
+          addHttp2TestParametersWithNewCodecWrapperOrDeferredProcessing(
+              ip_version, downstream_protocol, upstream_protocol);
         }
 #else
         if (downstream_protocol == Http::CodecType::HTTP3 ||
@@ -27,13 +38,11 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
           ENVOY_LOG_MISC(warn, "Skipping HTTP/3 as support is compiled out");
         } else {
           ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
-                                               kBareHttp2});
+                                               kBareHttp2, false});
           if (downstream_protocol == Http::CodecType::HTTP2 ||
               upstream_protocol == Http::CodecType::HTTP2) {
-            ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
-                                                 kWrappedHttp2});
-            ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
-                                                 kOgHttp2});
+            addHttp2TestParametersWithNewCodecWrapperOrDeferredProcessing(
+                ip_version, downstream_protocol, upstream_protocol);
           }
         }
 #endif
@@ -84,7 +93,9 @@ std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
   return absl::StrCat((params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
                       downstreamToString(params.param.downstream_protocol),
                       upstreamToString(params.param.upstream_protocol),
-                      implementationToString(params.param.http2_implementation));
+                      implementationToString(params.param.http2_implementation),
+                      params.param.defer_processing_backedup_streams ? "WithDeferredProcessing"
+                                                                     : "NoDeferredProcessing");
 }
 
 void HttpProtocolIntegrationTest::expectUpstreamBytesSentAndReceived(

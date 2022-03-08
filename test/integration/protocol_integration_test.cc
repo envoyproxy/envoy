@@ -1130,7 +1130,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
   EXPECT_EQ(512U, response->body().size());
 }
 
-// Very similar set-up to testRetry but with a 16k request the request will not
+// Very similar set-up to testRetry but with a 65k request the request will not
 // be buffered and the 503 will be returned to the user.
 TEST_P(ProtocolIntegrationTest, RetryHittingBufferLimit) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.

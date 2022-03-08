@@ -13,6 +13,7 @@ struct HttpProtocolTestParams {
   Http::CodecType downstream_protocol;
   Http::CodecType upstream_protocol;
   Http2Implementation http2_implementation;
+  bool defer_processing_backedup_streams;
 };
 
 // Allows easy testing of Envoy code for HTTP/HTTP2 upstream/downstream.
@@ -72,6 +73,9 @@ public:
       config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "true");
       break;
     }
+    config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
+                                      GetParam().defer_processing_backedup_streams ? "true"
+                                                                                   : "false");
   }
 
   void SetUp() override {
