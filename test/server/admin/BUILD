@@ -70,6 +70,19 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "stats_render_test",
+    srcs = ["stats_render_test.cc"],
+    deps = [
+        "//source/common/stats:thread_local_store_lib",
+        "//source/server/admin:stats_render_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_benchmark_binary(
     name = "stats_handler_speed_test",
     srcs = ["stats_handler_speed_test.cc"],
