@@ -81,7 +81,7 @@ public:
   TcpProxyOdcdsIntegrationTest() : BaseIntegrationTest(std::get<0>(GetParam()), config()) {
     // The test envoy use static listener and cluster for xDS.
     // The test framework does not update the above static resources.
-    // Another upstream will be serving delta CDS reqeuests and the response is explicitly generated
+    // Another upstream will be serving delta CDS requests and the response is explicitly generated
     // by test case rather than the integration test framework.
     use_lds_ = false;
     enableHalfClose(true);
