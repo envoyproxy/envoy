@@ -475,6 +475,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     if (client.connect_timer_) {
       client.connect_timer_->disableTimer();
       client.connect_timer_.reset();
+      ASSERT(!client.has_handshake_completed_);
     }
     // Make sure that onStreamClosed won't double count.
     client.remaining_streams_ = 0;
@@ -488,7 +489,6 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     }
 
     if (!client.hasHandshakeCompleted()) {
-      ASSERT(!client.has_handshake_completed_);
       client.has_handshake_completed_ = true;
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
