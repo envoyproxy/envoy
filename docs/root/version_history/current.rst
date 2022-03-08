@@ -98,6 +98,7 @@ New Features
   useful in support systems such as CI, CD, etc. The
   :ref:`schema validator check tool <install_tools_schema_validator_check_tool>` has been added
   to the tools image.
+* thrift: add support for connection draining. This can be enabled by setting the runtime guard ``envoy.reloadable_features.thrift_connection_draining`` to true.
 
 Deprecated
 ----------

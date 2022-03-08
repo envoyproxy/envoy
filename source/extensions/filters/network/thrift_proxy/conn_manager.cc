@@ -226,9 +226,7 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
   ConnectionManager& cm = parent_.parent_;
   if (cm.drain_decision_.drainClose()) {
     // Notify downstream that we are going away.
-    // TODO(rgs1):
-    // * should the key value contain something useful? E.g.: minutes til drain is over?
-    // * this should be protected by a feature flag.
+    // TODO(rgs1): should the key value contain something useful? E.g.: minutes til drain is over?
     metadata->headers().addReferenceKey(Headers::get().Drain, "true");
   }
 

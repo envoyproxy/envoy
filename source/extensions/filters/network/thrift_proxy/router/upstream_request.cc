@@ -133,7 +133,9 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
     stats_.recordUpstreamResponseSize(cluster, response_size_);
 
     // Is the upstream going away?
-    draining = !callbacks.responseMetadata()->headers().get(Headers::get().Drain).empty();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_connection_draining")) {
+      draining = !callbacks.responseMetadata()->headers().get(Headers::get().Drain).empty();
+    }
 
     switch (callbacks.responseMetadata()->messageType()) {
     case MessageType::Reply:
