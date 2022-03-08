@@ -48,6 +48,14 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     }
   }
 
+  // Default enable RVCM connection option so that port migration is enabled.
+  quic::QuicTagVector connection_options;
+  if (info_impl->quic_config_.HasSendConnectionOptions()) {
+    connection_options = info_impl->quic_config_.SendConnectionOptions();
+  }
+  connection_options.push_back(quic::kRVCM);
+  info_impl->quic_config_.SetConnectionOptionsToSend(connection_options);
+
   // QUICHE client session always use the 1st version to start handshake.
   return std::make_unique<EnvoyQuicClientSession>(
       info_impl->quic_config_, quic_versions, std::move(connection), server_id,
