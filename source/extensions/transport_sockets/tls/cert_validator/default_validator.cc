@@ -152,7 +152,8 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
            cert_validation_config->subjectAltNameMatchers()) {
         auto san_matcher = createStringSanMatcher(matcher);
         if (san_matcher == nullptr) {
-          throw EnvoyException(absl::StrCat("Failed to create string SAN matcher of type ", matcher.san_type()));
+          throw EnvoyException(
+              absl::StrCat("Failed to create string SAN matcher of type ", matcher.san_type()));
         }
         subject_alt_name_matchers_.push_back(std::move(san_matcher));
       }
