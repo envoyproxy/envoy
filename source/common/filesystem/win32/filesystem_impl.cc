@@ -125,7 +125,7 @@ ssize_t InstanceImplWin32::fileSize(const std::string& path) {
                         NULL);
   if (fd == INVALID_HANDLE) {
     auto last_error = ::GetLastError();
-    printf("last_error: %d\n", errorDetails(last_error)).c_str();
+    printf("last_error: %s\n", errorDetails(last_error).c_str());
     return -1;
   }
   ssize_t result = 0;
