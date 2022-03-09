@@ -134,6 +134,7 @@ TEST(Ipv4InstanceTest, SockaddrToString) {
 
   for (const auto address : addresses) {
     sockaddr_in addr4;
+    memset(&addr4, 0, sizeof(addr4));
     addr4.sin_family = AF_INET;
     EXPECT_EQ(1, inet_pton(AF_INET, address, &addr4.sin_addr));
     addr4.sin_port = 0;
@@ -143,6 +144,7 @@ TEST(Ipv4InstanceTest, SockaddrToString) {
 
 TEST(Ipv4InstanceTest, SocketAddress) {
   sockaddr_in addr4;
+  memset(&addr4, 0, sizeof(addr4));
   addr4.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
   addr4.sin_port = htons(6502);
@@ -232,6 +234,7 @@ TEST(Ipv4InstanceTest, BadAddress) {
 
 TEST(Ipv6InstanceTest, SocketAddress) {
   sockaddr_in6 addr6;
+  memset(&addr6, 0, sizeof(addr6));
   addr6.sin6_family = AF_INET6;
   EXPECT_EQ(1, inet_pton(AF_INET6, "01:023::00Ef", &addr6.sin6_addr));
   addr6.sin6_port = htons(32000);
