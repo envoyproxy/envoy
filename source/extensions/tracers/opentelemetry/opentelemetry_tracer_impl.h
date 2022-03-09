@@ -18,8 +18,8 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 class OpenTelemetryConstantValues {
-  public:
-    const Http::LowerCaseString TRACE_PARENT{"traceparent"};
+public:
+  const Http::LowerCaseString TRACE_PARENT{"traceparent"};
 };
 
 using OpenTelemetryConstants = ConstSingleton<OpenTelemetryConstantValues>;
@@ -52,6 +52,7 @@ private:
 
   const envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config_;
   ThreadLocal::SlotPtr tls_slot_ptr_;
+  OpenTelemetryTracerStats tracing_stats_;
 };
 
 } // namespace OpenTelemetry

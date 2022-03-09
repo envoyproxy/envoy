@@ -21,13 +21,22 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
+#define OPENTELEMETRY_TRACER_STATS(COUNTER)                                                        \
+  COUNTER(spans_sent)                                                                              \
+  COUNTER(timer_flushed)
+
+struct OpenTelemetryTracerStats {
+  OPENTELEMETRY_TRACER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 /**
  * OpenTelemetry Tracer. It is stored in TLS and contains the exporter.
  */
 class Tracer : Logger::Loggable<Logger::Id::tracing> {
 public:
   Tracer(OpenTelemetryGrpcTraceExporterPtr exporter, Envoy::TimeSource& time_source,
-         Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher);
+         Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
+         OpenTelemetryTracerStats tracing_stats);
 
   // TODO: maybe make this arg const
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
@@ -54,6 +63,7 @@ private:
   std::vector<::opentelemetry::proto::trace::v1::Span> span_buffer_;
   Runtime::Loader& runtime_;
   Event::TimerPtr flush_timer_;
+  OpenTelemetryTracerStats tracing_stats_;
 };
 
 /**

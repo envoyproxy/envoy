@@ -4,6 +4,7 @@
 #include "test/mocks/server/tracer_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/utility.h"
+#include "test/mocks/stats/mocks.h"
 #include "envoy/common/exception.h"
 
 #include "gmock/gmock.h"
@@ -41,6 +42,7 @@ public:
     ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
     ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
         .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
+    ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(stats_));
 
     driver_ = std::make_unique<Driver>(opentelemetry_config, context_);
   }
@@ -70,6 +72,7 @@ protected:
   Tracing::DriverPtr driver_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockTimer>* timer_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_;
 };
 
 TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfig) {
@@ -181,6 +184,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpan) {
   // We should see a call to sendMessage to export that single span.
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
   span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithBuffer) {
@@ -208,6 +212,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithBuffer) {
   // Only now should we see the span exported.
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
   second_span->finishSpan();
+  EXPECT_EQ(2U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithFlushTimeout) {
@@ -239,6 +244,8 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithFlushTimeout) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.open_telemetry.flush_interval_ms", 5000U))
       .WillOnce(Return(5000U));
   timer_->invokeCallback();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.timer_flushed").value());
 }
 
 TEST_F(OpenTelemetryDriverTest, SpawnChildSpan) {
@@ -279,6 +286,7 @@ TEST_F(OpenTelemetryDriverTest, SpawnChildSpan) {
   // We should see a call to sendMessage to export that single span.
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
   child_span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
 } // namespace OpenTelemetry
