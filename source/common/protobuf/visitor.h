@@ -13,7 +13,7 @@ class ConstProtoVisitor {
 public:
   virtual ~ConstProtoVisitor() = default;
 
-  // Invoked when a field is visited, with the message, field descriptor.
+  // Invoked when a field is visited, with the message, and field descriptor.
   virtual void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) PURE;
 
   // Invoked when a message is visited, with the message and visited parents.

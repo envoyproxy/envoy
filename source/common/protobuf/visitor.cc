@@ -1,6 +1,6 @@
-#include <vector>
-
 #include "source/common/protobuf/visitor.h"
+
+#include <vector>
 
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
