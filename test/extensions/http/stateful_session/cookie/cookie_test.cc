@@ -100,6 +100,76 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
   }
 }
 
+TEST(CookieBasedSessionStateFactoryTest, SessionStatePathMatchTest) {
+  {
+    // Any request path will be accepted for empty cookie path.
+    CookieBasedSessionStateProto config;
+    config.mutable_cookie()->set_name("override_host");
+    config.mutable_cookie()->mutable_ttl()->set_seconds(5);
+    CookieBasedSessionStateFactory factory(config);
+
+    EXPECT_TRUE(factory.requestPathMatch("/"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo"));
+    EXPECT_TRUE(factory.requestPathMatch("/bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo/bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo#bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo?bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foobar"));
+  }
+
+  {
+    // Any request path will be accepted for root cookie path.
+    CookieBasedSessionStateProto config;
+    config.mutable_cookie()->set_name("override_host");
+    config.mutable_cookie()->set_path("/");
+    config.mutable_cookie()->mutable_ttl()->set_seconds(5);
+    CookieBasedSessionStateFactory factory(config);
+
+    EXPECT_TRUE(factory.requestPathMatch("/"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo"));
+    EXPECT_TRUE(factory.requestPathMatch("/bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo/bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo#bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo?bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foobar"));
+  }
+
+  {
+    // Request paths that start with the cookie path will be accepted for cookie path ends with '/'.
+    CookieBasedSessionStateProto config;
+    config.mutable_cookie()->set_name("override_host");
+    config.mutable_cookie()->set_path("/foo/");
+    config.mutable_cookie()->mutable_ttl()->set_seconds(5);
+    CookieBasedSessionStateFactory factory(config);
+
+    EXPECT_FALSE(factory.requestPathMatch("/"));
+    EXPECT_FALSE(factory.requestPathMatch("/foo"));
+    EXPECT_FALSE(factory.requestPathMatch("/bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo/"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo/bar"));
+    EXPECT_FALSE(factory.requestPathMatch("/foo#bar"));
+    EXPECT_FALSE(factory.requestPathMatch("/foo?bar"));
+    EXPECT_FALSE(factory.requestPathMatch("/foobar"));
+  }
+
+  {
+    CookieBasedSessionStateProto config;
+    config.mutable_cookie()->set_name("override_host");
+    config.mutable_cookie()->set_path("/foo");
+    config.mutable_cookie()->mutable_ttl()->set_seconds(5);
+    CookieBasedSessionStateFactory factory(config);
+
+    EXPECT_FALSE(factory.requestPathMatch("/"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo"));
+    EXPECT_FALSE(factory.requestPathMatch("/bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo/"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo/bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo#bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo?bar"));
+    EXPECT_FALSE(factory.requestPathMatch("/foobar"));
+  }
+}
+
 } // namespace
 } // namespace Cookie
 } // namespace StatefulSession
