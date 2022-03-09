@@ -915,12 +915,6 @@ void FilterManager::sendLocalReply(
   }
 
   stream_info_.setResponseCodeDetails(details);
-
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.override_request_timeout_by_gateway_timeout") &&
-      code == Http::Code::RequestTimeout && remoteDecodeComplete()) {
-    code = Http::Code::GatewayTimeout;
-  }
   StreamFilterBase::LocalReplyData data{code, details, false};
   FilterManager::onLocalReply(data);
   if (data.reset_imminent_) {
