@@ -41,7 +41,7 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
   downstream connection after some time to prevent stickiness. It could also help to better load balance the
   overall traffic among this pool, especially if the size of this pool is dynamically changing. Finally, it
   may help with upstream connections when using a DNS name whose resolved addresses may change even if the
-  upstreams stay healthly. Forcing a maximum upstream lifetime in this scenario prevents holding onto healthy
+  upstreams stay healthy. Forcing a maximum upstream lifetime in this scenario prevents holding onto healthy
   connections even after they would otherwise be undiscoverable. To modify the max connection duration for downstream connections use the
   :ref:`common_http_protocol_options <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`
   field in the HTTP connection manager configuration. To modify the max connection duration for upstream connections use the

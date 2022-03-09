@@ -84,7 +84,7 @@ Firstly, you can ensure that the certificates are from a mutually trusted certif
    :emphasize-lines: 6-9
    :caption: :download:`envoy-demo-tls-validation.yaml <_include/envoy-demo-tls-validation.yaml>`
 
-You can also ensure that the "Subject Alternative Names" for the cerficate match.
+You can also ensure that the "Subject Alternative Names" for the certificate match.
 
 This is commonly used by web certificates (X.509) to identify the domain or domains that a
 certificate is valid for.

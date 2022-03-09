@@ -110,7 +110,7 @@ RBAC):
    destination.address, string, Downstream connection local address
    destination.port, int, Downstream connection local port
    connection.id, uint, Downstream connection ID
-   connection.mtls, bool, Indicates whether TLS is applied to the downstream connection and the peer ceritificate is presented
+   connection.mtls, bool, Indicates whether TLS is applied to the downstream connection and the peer certificate is presented
    connection.requested_server_name, string, Requested server name in the downstream TLS connection
    connection.tls_version, string, TLS version of the downstream TLS connection
    connection.subject_local_certificate, string, The subject field of the local certificate in the downstream TLS connection

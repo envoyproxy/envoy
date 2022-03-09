@@ -130,5 +130,5 @@ cleaning up the deprecated code path.
 If this PR changes anything in the [api tree](https://github.com/envoyproxy/envoy/tree/main/api),
 please read the [API Review
 Checklist](https://github.com/envoyproxy/envoy/tree/main/api/review_checklist.md)
-and make sure that your changes have addressed all of the considerations listed there.
+and make sure that your changes have addressed all the considerations listed there.
 Any relevant considerations should be documented under "API Considerations" in the PR description.

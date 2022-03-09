@@ -196,7 +196,7 @@ Envoy will include the specified headers in the direct HTTP response.
 Routing Via Generic Matching
 ----------------------------
 
-Envoy recently added support for utilzing a :ref:`generic match tree <arch_overview_matching_api>` to
+Envoy recently added support for utilizing a :ref:`generic match tree <arch_overview_matching_api>` to
 specify the route table. This is a more expressive matching engine than the original one, allowing
 for sublinear matching on arbitrary headers (unlike the original matching engine which could only
 do this for :authority in some cases).

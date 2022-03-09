@@ -45,7 +45,7 @@ schedule, initially aiming for the bi-weekly releases.
 Release managers of stable releases are responsible for approving and merging backports, tagging
 stable releases and sending announcements about them. This role is rotating on a quarterly basis.
 
-| Quarter |       Release manager                                          |
+| Quarter |                        Release manager                         |
 |:-------:|:--------------------------------------------------------------:|
 | 2020 Q1 | Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora))   |
 | 2020 Q2 | Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora))   |

@@ -3,7 +3,7 @@
 * The Envoy source code is formatted using clang-format. Thus all white spaces, etc.
   issues are taken care of automatically. The Azure Pipelines will automatically check
   the code format and fail. There are make targets that can both check the format
-  (check_format) as well as fix the code format for you (fix_format). Errors in
+  (check_format) and fix the code format for you (fix_format). Errors in
   .clang-tidy are enforced while other warnings are suggestions. Note that code and
   comment blocks designated `clang-format off` must be closed with `clang-format on`.
   To run these checks locally, see [Support Tools](support/README.md).
@@ -18,7 +18,7 @@
 
 # Documentation
 
-* If you are modifying the data plane structually, please keep the [Life of a
+* If you are modifying the data plane structurally, please keep the [Life of a
   Request](https://www.envoyproxy.io/docs/envoy/latest/intro/life_of_a_request) documentation up-to-date.
 
 # Deviations from Google C++ style guidelines
@@ -55,7 +55,7 @@
 * If move semantics are intended, prefer specifying function arguments with `&&`.
   E.g., `void onHeaders(Http::HeaderMapPtr&& headers, ...)`. The rationale for this is that it
   forces the caller to specify `std::move(...)` or pass a temporary and makes the intention at
-  the callsite clear. Otherwise, it's difficult to tell if a const reference is actually being
+  the call site clear. Otherwise, it's difficult to tell if a const reference is actually being
   passed to the called function. This is true even for `std::unique_ptr`.
 * Prefer `unique_ptr` over `shared_ptr` wherever possible. `unique_ptr` makes ownership in
   production code easier to reason about. Note that this creates some test oddities where
@@ -174,7 +174,7 @@ A few general notes on our error handling philosophy:
   - `ENVOY_BUG_ALPHA` (alias `ENVOY_BUG`): Used for alpha or rapidly changing protocols that need
   detectability on probable conditions or invariants.
 
-* Per above it's acceptable to turn failures into crash semantics via `RELEASE_ASSERT(condition)` or
+* Per above, it's acceptable to turn failures into crash semantics via `RELEASE_ASSERT(condition)` or
   `PANIC(message)` if there is no other sensible behavior, e.g. in OOM (memory/FD) scenarios.
 * Do not `ASSERT` on conditions imposed by the external environment. Either add error handling
   (potentially with an `ENVOY_BUG` for detectability) or `RELEASE_ASSERT` if the condition indicates
@@ -197,7 +197,7 @@ A few general notes on our error handling philosophy:
   overflow etc.) might manifest as a violation of program invariants or as a detectable condition in
   the external environment (e.g. some library returning a highly unexpected error code or buffer
   contents). Unfortunately no rule can cleanly cover when to use `RELEASE_ASSERT` vs. `ASSERT`. In
-  general we view `ASSERT` as the common case and `RELEASE_ASSERT` as the uncommon case, but
+  general, we view `ASSERT` as the common case and `RELEASE_ASSERT` as the uncommon case, but
   experience and judgment may dictate a particular approach depending on the situation. The risk of
   process death from `RELEASE_ASSERT` should be justified with the severity and possibility of the
   condition to avoid unintentional crashes. You may use the following guide:
@@ -239,7 +239,7 @@ environment. In general, there should be no non-local network access. In additio
     test inputs in shell tests.
   * With `{{ test_tmpdir }}`, `{{ test_rundir }}` and `{{ test_udsdir }}` respectively for JSON templates.
     `{{ test_udsdir }}` is provided for pathname based Unix Domain Sockets, which must fit within a
-    108 character limit on Linux, a property that might not hold for `{{ test_tmpdir }}`.
+    108-character limit on Linux, a property that might not hold for `{{ test_tmpdir }}`.
 
 Tests should be deterministic. They should not rely on randomness or details
 such as the current time. Instead, mocks such as

@@ -12,7 +12,7 @@ If you have an [existing Envoy development environment](https://github.com/envoy
 ./docs/build.sh
 ```
 
-By default configuration examples are going to be validated during build. To disable validation,
+By default, configuration examples are going to be validated during build. To disable validation,
 set `SPHINX_SKIP_CONFIG_VALIDATION` environment variable to `true`:
 
 ```bash
@@ -30,7 +30,7 @@ This can be done as follows:
 ./ci/run_envoy_docker.sh 'docs/build.sh'
 ```
 
-To use this method you will need a minimum of 4-5GB of disk space available to accommodate the build image.
+To use this method you will need a minimum of 4-5 GB of disk space available to accommodate the build image.
 
 # Creating a Pull Request with documentation changes
 

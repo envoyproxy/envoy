@@ -4,7 +4,7 @@
 
 Envoy is hosted by the [Cloud Native Computing Foundation](https://cncf.io) (CNCF). If you are a
 company that wants to help shape the evolution of technologies that are container-packaged,
-dynamically-scheduled and microservices-oriented, consider joining the CNCF. For details about who's
+dynamically-scheduled and microservices-oriented, consider joining the CNCF. For details about who is
 involved and how Envoy plays a role, read the CNCF
 [announcement](https://www.cncf.io/blog/2017/09/13/cncf-hosts-envoy/).
 
@@ -50,7 +50,7 @@ to find out more about the origin story and design philosophy of Envoy
 * [Slack](https://envoyproxy.slack.com/): Slack, to get invited go [here](https://envoyproxy.io/slack).
   We have the IRC/XMPP gateways enabled if you prefer either of those. Once an account is created,
   connection instructions for IRC/XMPP can be found [here](https://envoyproxy.slack.com/account/gateways).
-  * NOTE: Response to user questions is best effort on Slack. For a "guaranteed" response please email
+  * NOTE: Response to user questions is best-effort on Slack. For a "guaranteed" response please email
     envoy-users@ per the guidance in the following linked thread.
 
 Please see [this](https://groups.google.com/forum/#!topic/envoy-announce/l9zjYsnS3TY) email thread
@@ -66,7 +66,7 @@ have prior experience. To get started:
 * [Build/test quick start using docker](ci#building-and-running-tests-as-a-developer)
 * [Developer guide](DEVELOPER.md)
 * Consider installing the Envoy [development support toolchain](https://github.com/envoyproxy/envoy/blob/main/support/README.md), which helps automate parts of the development process, particularly those involving code review.
-* Please make sure that you let us know if you are working on an issue so we don't duplicate work!
+* Please make sure that you let us know if you are working on an issue, so we don't duplicate work!
 
 ## Community Meeting
 

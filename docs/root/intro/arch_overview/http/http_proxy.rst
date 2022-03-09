@@ -41,7 +41,7 @@ Memory usage detail's for Envoy's dynamic forward proxy support are as follows:
 
 * Each resolved host/port pair uses a fixed amount of memory global to the server and shared
   amongst all workers.
-* Address changes are performed inline using read/write locks and require no host reallocations.
+* Address changes are performed inline using read/write locks and require no host reallocation.
 * Hosts removed via TTL are purged once all active connections stop referring to them and all used
   memory is regained.
 * The :ref:`max_hosts

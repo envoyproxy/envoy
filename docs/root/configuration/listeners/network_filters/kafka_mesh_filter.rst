@@ -4,7 +4,7 @@ Kafka Mesh filter
 ===================
 
 The Apache Kafka mesh filter provides a facade for `Apache Kafka <https://kafka.apache.org/>`_
-producers. Produce requests sent to this filter insance can be forwarded to one of multiple
+producers. Produce requests sent to this filter instance can be forwarded to one of multiple
 clusters, depending on configured forwarding rules. Corresponding message versions from
 Kafka 3.1.0 are supported.
 

@@ -437,7 +437,7 @@ which are set to ``debug`` and ``trace`` respectively.
             PS> mkdir logs
             PS> docker run --rm -it
                   -p '10000:10000'
-                  envoyproxy/|envoy_windws_docker_image|
+                  envoyproxy/|envoy_windows_docker_image|
                      -c 'C:\ProgramData\envoy.yaml'
                      -l off
                      --component-log-level 'upstream:debug,connection:trace'

@@ -38,7 +38,7 @@ SDS Configuration
 Key rotation
 ------------
 
-It's usually preferrable to perform key rotation via gRPC SDS, but when this is not possible or
+It's usually preferable to perform key rotation via gRPC SDS, but when this is not possible or
 desired (e.g. during bootstrap of SDS credentials), SDS allows for filesystem rotation when secrets
 refer to filesystem paths. This currently is supported for the following secret types:
 

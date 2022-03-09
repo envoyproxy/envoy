@@ -642,7 +642,7 @@ modify different aspects of the server:
 
   This endpoint helps Envoy developers debug potential contention
   issues in the stats system. Initially, only the count of StatName
-  lookups is acumulated, not the specific names that are being looked
+  lookups is accumulated, not the specific names that are being looked
   up. In order to see specific recent requests, you must enable the
   feature by POSTing to ``/stats/recentlookups/enable``. There may be
   approximately 40-100 nanoseconds of added overhead per lookup.

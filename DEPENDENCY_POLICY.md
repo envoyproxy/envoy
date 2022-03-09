@@ -105,7 +105,7 @@ The rationale behind this policy is tracked
 
 ## Maintaining existing dependencies
 
-We rely on community volunteers to help track the latest versions of dependencies. On a best effort
+We rely on community volunteers to help track the latest versions of dependencies. On the best-effort
 basis:
 
 * Core Envoy dependencies will be updated by the Envoy maintainers/security team.
