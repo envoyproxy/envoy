@@ -187,7 +187,7 @@ protected:
           .WillOnce(ReturnRef(filter_factories_.back()));
       EXPECT_CALL(*filter_chain_, transportSocketFactory())
           .InSequence(seq)
-          .WillOnce(ReturnRef(transport_socket_factory_));
+          .WillRepeatedly(ReturnRef(transport_socket_factory_));
     }
   }
 

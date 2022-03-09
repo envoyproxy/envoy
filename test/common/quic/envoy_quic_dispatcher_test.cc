@@ -185,7 +185,7 @@ public:
         }));
     Network::MockTransportSocketFactory transport_socket_factory;
     EXPECT_CALL(proof_source_->filterChain(), transportSocketFactory())
-        .WillOnce(ReturnRef(transport_socket_factory));
+        .WillRepeatedly(ReturnRef(transport_socket_factory));
     EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
         .WillOnce(ReturnRef(filter_factory));
     EXPECT_CALL(listener_config_, filterChainFactory());
@@ -261,7 +261,7 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringFilterInstallation) {
       .WillOnce(Return(&proof_source_->filterChain()));
   Network::MockTransportSocketFactory transport_socket_factory;
   EXPECT_CALL(proof_source_->filterChain(), transportSocketFactory())
-      .WillOnce(ReturnRef(transport_socket_factory));
+      .WillRepeatedly(ReturnRef(transport_socket_factory));
   EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
       .WillOnce(ReturnRef(filter_factory));
   EXPECT_CALL(listener_config_, filterChainFactory());
@@ -314,7 +314,7 @@ TEST_P(EnvoyQuicDispatcherTest, CloseWithGivenFilterChain) {
       .WillOnce(Return(&proof_source_->filterChain()));
   Network::MockTransportSocketFactory transport_socket_factory;
   EXPECT_CALL(proof_source_->filterChain(), transportSocketFactory())
-      .WillOnce(ReturnRef(transport_socket_factory));
+      .WillRepeatedly(ReturnRef(transport_socket_factory));
   EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
       .WillOnce(ReturnRef(filter_factory));
   EXPECT_CALL(listener_config_, filterChainFactory());
