@@ -27,7 +27,7 @@ public:
   std::function<void()> update_callback_;
 };
 
-TEST_F(QuicClientTransportSocketFactoryTest, getCryptoConfig) {
+TEST_F(QuicClientTransportSocketFactoryTest, GetCryptoConfig) {
   EXPECT_EQ(nullptr, factory_->getCryptoConfig());
 
   Ssl::ClientContextSharedPtr ssl_context1{new Ssl::MockClientContext()};
