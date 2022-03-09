@@ -426,13 +426,14 @@ envoy_cc_test(
     srcs = [
         "buffer_accounting_integration_test.cc",
     ],
-    shard_count = 2,
+    shard_count = 4,
     deps = [
         ":base_overload_integration_test_lib",
         ":http_integration_lib",
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
         ":tracked_watermark_buffer_lib",
+        "//test/integration/filters:tee_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -567,9 +568,19 @@ envoy_cc_test(
     ],
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 10,
+    shard_count = 16,
     deps = [
         ":protocol_integration_test_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "multi_envoy_test",
+    srcs = [
+        "multi_envoy_test.cc",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
     ],
 )
 
@@ -578,7 +589,7 @@ envoy_cc_test(
     srcs = [
         "multiplexed_upstream_integration_test.cc",
     ],
-    shard_count = 2,
+    shard_count = 4,
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -683,7 +694,7 @@ envoy_cc_test(
     srcs = ["idle_timeout_integration_test.cc"],
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 2,
+    shard_count = 4,
     deps = [
         ":http_protocol_integration_lib",
         "//test/integration/filters:backpressure_filter_config_lib",
@@ -1014,6 +1025,7 @@ envoy_cc_test(
     srcs = [
         "redirect_integration_test.cc",
     ],
+    shard_count = 2,
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -1157,7 +1169,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "overload_integration_test",
     srcs = ["overload_integration_test.cc"],
-    shard_count = 2,
+    shard_count = 4,
     deps = [
         ":base_overload_integration_test_lib",
         ":http_protocol_integration_lib",
