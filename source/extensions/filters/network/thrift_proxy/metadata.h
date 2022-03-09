@@ -161,9 +161,7 @@ public:
   }
 
   bool isDraining() const { return is_draining_; }
-  void setDraining(bool draining) {
-    is_draining_ = draining;
-  }
+  void setDraining(bool draining) { is_draining_ = draining; }
 
   absl::optional<int64_t> traceId() const { return trace_id_; }
   void setTraceId(int64_t trace_id) { trace_id_ = trace_id; }
