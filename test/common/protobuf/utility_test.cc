@@ -270,15 +270,16 @@ TEST_F(ProtobufUtilityTest, ValidateUnknownFieldsNestedAny) {
 
   EXPECT_THROW_WITH_MESSAGE(
       TestUtility::validate(bootstrap, /*recurse_into_any*/ true), EnvoyException,
-      unknownFieldsMessage("envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig",
+      unknownFieldsMessage("envoy.extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig",
                            {
                                "envoy.config.bootstrap.v3.Bootstrap",
                                "envoy.config.bootstrap.v3.Bootstrap.StaticResources",
                                "envoy.config.cluster.v3.Cluster",
-                               "envoy.config.cluster.v3.Cluster.ClusterType",
+                               "envoy.config.cluster.v3.Cluster.CustomClusterType",
                                "google.protobuf.Any",
+                               "envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig",
                            },
-                           {1}));
+                           {999}));
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertAnyUnknownMessageType) {
