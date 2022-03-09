@@ -131,6 +131,8 @@ ssize_t InstanceImplWin32::fileSize(const std::string& path) {
   BOOL bGetSize = GetFileSizeEx(fd, &lFileSize);
   CloseHandle(fd);
   if (!bGetSize) {
+    auto last_error = ::GetLastError();
+    printf("last_error_1: %s\n", errorDetails(last_error).c_str());
     return -1;
   }
   result += lFileSize.QuadPart;
