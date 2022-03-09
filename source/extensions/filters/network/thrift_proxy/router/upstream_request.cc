@@ -1,3 +1,4 @@
+
 #include "source/extensions/filters/network/thrift_proxy/router/upstream_request.h"
 
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
@@ -125,14 +126,11 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
 
   const auto& cluster = parent_.cluster();
 
-  bool draining = false;
   const auto status = callbacks.upstreamData(data);
   if (status == ThriftFilters::ResponseStatus::Complete) {
     ENVOY_LOG(debug, "response complete");
 
     stats_.recordUpstreamResponseSize(cluster, response_size_);
-
-    draining = callbacks.responseMetadata()->isDraining();
 
     switch (callbacks.responseMetadata()->messageType()) {
     case MessageType::Reply:
@@ -158,7 +156,7 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
       break;
     }
 
-    if (draining) {
+    if (callbacks.responseMetadata()->isDraining()) {
       stats_.incCloseDrain(cluster);
       resetStream();
     }
