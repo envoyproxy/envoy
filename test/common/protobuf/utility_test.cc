@@ -255,13 +255,13 @@ TEST_F(ProtobufUtilityTest, DowncastAndValidateUnknownFieldsNested) {
 
 // Validated exception thrown when observed nested unknown field with any.
 TEST_F(ProtobufUtilityTest, ValidateUnknownFieldsNestedAny) {
-  // Consturct a nested message with unknown field
+  // Constructs a nested message with unknown field
   envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig cluster_config;
   auto* dns_cache_config = cluster_config->mutable_dns_cache_config();
   dns_cache_config->set_name("dynamic_forward_proxy_cache_config");
   dns_cache_config->GetReflection()->MutableUnknownFields(dns_cache_config)->AddVarint(999, 0);
 
-  // Consturct ancestors of the nested any message with unknown field.
+  // Constructs ancestors of the nested any message with unknown field.
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
   auto* cluster_type = cluster->mutable_cluster_type();
