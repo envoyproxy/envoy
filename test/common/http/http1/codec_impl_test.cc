@@ -3031,16 +3031,15 @@ TEST_F(Http1ServerConnectionImplTest, RuntimeLazyReadDisableTest) {
     auto status = codec_->dispatch(buffer);
     EXPECT_TRUE(status.ok());
 
-    // Delete active request immediately to re-enable connection reading.
-    connection_.dispatcher_.delete_immediately_ = true;
-
-    EXPECT_CALL(connection_, readDisable(false)).Times(0);
-
     std::string output;
     ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
     TestResponseHeaderMapImpl headers{{":status", "200"}};
     response_encoder->encodeHeaders(headers, true);
     EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
+
+    EXPECT_CALL(connection_, readDisable(false)).Times(0);
+    // Delete active request.
+    connection_.dispatcher_.clearDeferredDeleteList();
   }
 
   Runtime::LoaderSingleton::getExisting()->mergeValues(
@@ -3068,16 +3067,15 @@ TEST_F(Http1ServerConnectionImplTest, RuntimeLazyReadDisableTest) {
     auto status = codec_->dispatch(buffer);
     EXPECT_TRUE(status.ok());
 
-    // Delete active request immediately to re-enable connection reading.
-    connection_.dispatcher_.delete_immediately_ = true;
-
-    EXPECT_CALL(connection_, readDisable(false));
-
     std::string output;
     ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
     TestResponseHeaderMapImpl headers{{":status", "200"}};
     response_encoder->encodeHeaders(headers, true);
     EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
+
+    EXPECT_CALL(connection_, readDisable(false));
+    // Delete active request.
+    connection_.dispatcher_.clearDeferredDeleteList();
   }
 }
 
@@ -3107,15 +3105,15 @@ TEST_F(Http1ServerConnectionImplTest, PipedRequestWithSingleEvent) {
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
 
-  // Delete active request immediately to re-enable connection reading.
-  connection_.dispatcher_.delete_immediately_ = true;
-  EXPECT_CALL(connection_, readDisable(false));
-
   std::string output;
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
   TestResponseHeaderMapImpl headers{{":status", "200"}};
   response_encoder->encodeHeaders(headers, true);
   EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
+
+  EXPECT_CALL(connection_, readDisable(false));
+  // Delete active request to re-enable connection reading.
+  connection_.dispatcher_.clearDeferredDeleteList();
 }
 
 // Tests the scenario where the client sends pipelined requests. The second request reaches Envoy
@@ -3150,15 +3148,15 @@ TEST_F(Http1ServerConnectionImplTest, PipedRequestWithMutipleEvent) {
   // The second request will no be consumed.
   EXPECT_TRUE(second_buffer.length() != 0);
 
-  // Delete active request immediately to re-enable connection reading.
-  connection_.dispatcher_.delete_immediately_ = true;
-  EXPECT_CALL(connection_, readDisable(false));
-
   std::string output;
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
   TestResponseHeaderMapImpl headers{{":status", "200"}};
   response_encoder->encodeHeaders(headers, true);
   EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
+
+  EXPECT_CALL(connection_, readDisable(false));
+  // Delete active request to re-enable connection reading.
+  connection_.dispatcher_.clearDeferredDeleteList();
 }
 
 // Tests that incomplete response headers of 80 kB header value fails.
