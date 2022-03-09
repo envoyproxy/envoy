@@ -56,6 +56,8 @@ public:
   static void tokenizeCommand(const std::string& command, const size_t start, const char separator,
                               std::vector<absl::string_view>& tokens,
                               absl::optional<size_t>& max_length);
+  static void tokenizeCommand_new(const std::string& command, const char separator,
+                              std::vector<absl::string_view>& tokens);
 
   /* Variadic function template which invokes tokenizeCommand method to parse the
      token command and assigns found tokens to sequence of params.
@@ -70,10 +72,11 @@ public:
      untouched.
   */
   template <typename... Tokens>
-  static void parseCommand(const std::string& command, const size_t start, const char separator,
-                           absl::optional<size_t>& max_length, Tokens&&... params) {
+  static void parseCommand(const std::string& command, const size_t, const char separator,
+                           const absl::optional<size_t>&, Tokens&&... params) {
     std::vector<absl::string_view> tokens;
-    tokenizeCommand(command, start, separator, tokens, max_length);
+    //tokenizeCommand(command, start, separator, tokens, max_length);
+    tokenizeCommand_new(command, separator, tokens);
     std::vector<absl::string_view>::iterator it = tokens.begin();
     (
         [&](auto& param) {
@@ -419,7 +422,7 @@ public:
  */
 class StreamInfoFormatter : public FormatterProvider {
 public:
-  StreamInfoFormatter(const std::string&, const std::string& = "", const std::string& field_name = "");
+  StreamInfoFormatter(const std::string&, const std::string& = "", const absl::optional<size_t>& = absl::nullopt);
 
   // FormatterProvider
   absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
@@ -437,7 +440,7 @@ public:
     virtual ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const PURE;
   };
   using FieldExtractorPtr = std::unique_ptr<FieldExtractor>;
-  using FieldExtractorCreateFunc = std::function<FieldExtractorPtr(const std::string&, const std::string&)>;
+  using FieldExtractorCreateFunc = std::function<FieldExtractorPtr(const std::string&, const absl::optional<size_t>&)>;
 
   enum class StreamInfoAddressFieldExtractionType { WithPort, WithoutPort, JustPort };
 
@@ -481,10 +484,33 @@ private:
   GetMetadataFunction get_func_;
 };
 
+class MetadataFormatter_new : public StreamInfoFormatter::FieldExtractor {
+public:
+  using GetMetadataFunction =
+      std::function<const envoy::config::core::v3::Metadata*(const StreamInfo::StreamInfo&)>;
+  MetadataFormatter_new(const std::string& filter_namespace, const std::vector<std::string>& path,
+                    absl::optional<size_t> max_length, GetMetadataFunction get);
+
+    absl::optional<std::string> extract(const StreamInfo::StreamInfo&) const override;
+    ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const override;
+
+protected:
+  absl::optional<std::string>
+  formatMetadata(const envoy::config::core::v3::Metadata& metadata) const;
+  ProtobufWkt::Value formatMetadataValue(const envoy::config::core::v3::Metadata& metadata) const;
+
+private:
+  std::string filter_namespace_;
+  std::vector<std::string> path_;
+  absl::optional<size_t> max_length_;
+  GetMetadataFunction get_func_;
+};
+
+
 /**
  * FormatterProvider for DynamicMetadata from StreamInfo.
  */
-class DynamicMetadataFormatter : public MetadataFormatter {
+class DynamicMetadataFormatter : public MetadataFormatter_new {
 public:
   DynamicMetadataFormatter(const std::string& filter_namespace,
                            const std::vector<std::string>& path, absl::optional<size_t> max_length);
@@ -493,7 +519,7 @@ public:
 /**
  * FormatterProvider for ClusterMetadata from StreamInfo.
  */
-class ClusterMetadataFormatter : public MetadataFormatter {
+class ClusterMetadataFormatter : public MetadataFormatter_new {
 public:
   ClusterMetadataFormatter(const std::string& filter_namespace,
                            const std::vector<std::string>& path, absl::optional<size_t> max_length);
@@ -514,6 +540,31 @@ public:
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
                                  absl::string_view) const override;
+
+private:
+  const Envoy::StreamInfo::FilterState::Object*
+  filterState(const StreamInfo::StreamInfo& stream_info) const;
+
+  std::string key_;
+  absl::optional<size_t> max_length_;
+
+  bool serialize_as_string_;
+};
+
+class FilterStateFormatter_new : public StreamInfoFormatter::FieldExtractor {
+public:
+  FilterStateFormatter_new(const std::string& key, absl::optional<size_t> max_length,
+                       bool serialize_as_string);
+
+    absl::optional<std::string> extract(const StreamInfo::StreamInfo&) const override;
+    ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const override;
+  // FormatterProvider
+  //absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+    //                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+      //                               absl::string_view) const override;
+  //ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+    //                             const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+      //                           absl::string_view) const override;
 
 private:
   const Envoy::StreamInfo::FilterState::Object*
@@ -559,6 +610,22 @@ private:
   const TimeFieldExtractorPtr time_field_extractor_;
 };
 
+class SystemTimeFormatter_new : public StreamInfoFormatter::FieldExtractor {
+public:
+  using TimeFieldExtractor =
+      std::function<absl::optional<SystemTime>(const StreamInfo::StreamInfo& stream_info)>;
+  //using TimeFieldExtractorPtr = std::unique_ptr<TimeFieldExtractor>;
+
+  SystemTimeFormatter_new(const std::string& format, TimeFieldExtractor f);
+
+    absl::optional<std::string> extract(const StreamInfo::StreamInfo&) const override;
+    ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const override;
+
+private:
+  const Envoy::DateFormatter date_formatter_;
+  const TimeFieldExtractor time_field_extractor_;
+};
+
 /**
  * SystemTimeFormatter (FormatterProvider) for request start time from StreamInfo.
  */
@@ -576,6 +643,11 @@ public:
   DownstreamPeerCertVStartFormatter(const std::string& format);
 };
 
+class DownstreamPeerCertVStartFormatter_new : public SystemTimeFormatter_new {
+public:
+  DownstreamPeerCertVStartFormatter_new(const std::string& format);
+};
+
 /**
  * SystemTimeFormatter (FormatterProvider) for downstream cert end time from the StreamInfo's
  * ConnectionInfo.
@@ -583,6 +655,11 @@ public:
 class DownstreamPeerCertVEndFormatter : public SystemTimeFormatter {
 public:
   DownstreamPeerCertVEndFormatter(const std::string& format);
+};
+
+class DownstreamPeerCertVEndFormatter_new : public SystemTimeFormatter_new {
+public:
+  DownstreamPeerCertVEndFormatter_new(const std::string& format);
 };
 
 } // namespace Formatter

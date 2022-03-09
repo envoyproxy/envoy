@@ -32,6 +32,7 @@ public:
 // Constructor registers all types of supported metadata along with the
 // handlers accessing the required metadata type.
 MetadataFormatterCommandParser::MetadataFormatterCommandParser() {
+#if 0
   metadata_formatter_providers_["DYNAMIC"] = [](const std::string& filter_namespace,
                                                 const std::vector<std::string>& path,
                                                 absl::optional<size_t> max_length) {
@@ -49,6 +50,7 @@ MetadataFormatterCommandParser::MetadataFormatterCommandParser() {
                                               absl::optional<size_t> max_length) {
     return std::make_unique<RouteMetadataFormatter>(filter_namespace, path, max_length);
   };
+#endif
 }
 
 ::Envoy::Formatter::FormatterProviderPtr
