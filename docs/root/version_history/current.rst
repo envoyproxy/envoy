@@ -1,4 +1,4 @@
-1.20.2 (Pending)
+1.20.3 (Pending)
 ========================
 
 Incompatible Behavior Changes
@@ -15,11 +15,6 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
-* data plane: fix crash when internal redirect selects a route configured with direct response or redirect actions.
-* jwt_authn: fixed the crash when a CONNECT request is sent to JWT filter configured with regex match on the Host header.
-* tcp_proxy: fix a crash that occurs when configured for :ref:`upstream tunneling <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.tunneling_config>` and the downstream connection disconnects while the the upstream connection or http/2 stream is still being established.
-* upstream: fix stack overflow when a cluster with large number of idle connections is removed.
-
 Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -27,10 +22,5 @@ Removed Config or Runtime
 New Features
 ------------
 
-+* tls: added support for :ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>` for subject alternative names to enforce specifying the subject alternative name type for the matcher to prevent matching against an unintended type in the certificate.
-
-
 Deprecated
 ----------
-
-+* tls: :ref:`match_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>` has been deprecated in favor of the :ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`.
