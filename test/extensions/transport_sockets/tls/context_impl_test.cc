@@ -666,7 +666,8 @@ TEST_F(SslServerContextImplOcspTest, TestMustStapleCertWithoutStapleFeatureFlagO
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.require_ocsp_response_for_must_staple_certs", "false"}});
-  loadConfigYaml(tls_context_yaml);
+  auto context = loadConfigYaml(tls_context_yaml);
+  auto cleanup = cleanUpHelper(context);
 }
 
 TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
