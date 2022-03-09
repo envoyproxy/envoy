@@ -42,9 +42,13 @@ def main():
         ]
 
     for rst_file_path in envoy_api_rst_files:
+        root = "api-v3"
         canonical = include_package(envoy_api_protos, rst_file_path, "envoy/")
         if canonical is None:
             canonical = include_package(envoy_api_protos, rst_file_path, "contrib/envoy/")
+        if canonical is None:
+            canonical = include_package(envoy_api_protos, rst_file_path, "xds/")
+            root = "cncf"
         if canonical is None:
             continue
 
@@ -52,7 +56,7 @@ def main():
         if os.path.getsize(rst_file_path) == 0:
             continue
 
-        target = os.path.join("rst-out/api-v3", canonical)
+        target = os.path.join("rst-out", root, canonical)
         if not os.path.exists(os.path.dirname(target)):
             os.makedirs(os.path.dirname(target))
         shutil.copy(rst_file_path, target)

@@ -33,3 +33,18 @@ Common messages
   ../extensions/matching/input_matchers/ip/v3/ip.proto
   ../extensions/matching/common_inputs/environment_variable/v3/input.proto
   ../extensions/matching/common_inputs/network/v3/network_inputs.proto
+  ../../cncf/type/v3/range.proto
+  ../../cncf/type/v3/typed_struct.proto
+  ../../cncf/type/matcher/v3/ip.proto
+  ../../cncf/type/matcher/v3/matcher.proto
+  ../../cncf/type/matcher/v3/range.proto
+  ../../cncf/type/matcher/v3/regex.proto
+  ../../cncf/type/matcher/v3/string.proto
+  ../../cncf/core/v3/authority.proto
+  ../../cncf/core/v3/cidr.proto
+  ../../cncf/core/v3/collection_entry.proto
+  ../../cncf/core/v3/context_params.proto
+  ../../cncf/core/v3/extension.proto
+  ../../cncf/core/v3/resource.proto
+  ../../cncf/core/v3/resource_locator.proto
+  ../../cncf/core/v3/resource_name.proto

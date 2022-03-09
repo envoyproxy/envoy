@@ -105,6 +105,12 @@ genquery(
     scope = ["@envoy_api//:v3_protos"],
 )
 
+genquery(
+    name = "cncf_proto_srcs",
+    expression = "labels(srcs, labels(deps, @envoy_api//:cncf_protos))",
+    scope = ["@envoy_api//:cncf_protos"],
+)
+
 genrule(
     name = "empty_protos_rst",
     srcs = [":empty_extensions.json"],
@@ -126,6 +132,20 @@ genrule(
     cmd = """
     $(location //tools/docs:generate_api_rst) \\
         $(location v3_proto_srcs) $(locations //tools/protodoc:api_v3_protodoc) $@
+    """,
+    tools = ["//tools/docs:generate_api_rst"],
+)
+
+genrule(
+    name = "cncf_rst",
+    srcs = [
+        "//tools/protodoc:cncf_protodoc",
+        ":cncf_proto_srcs",
+    ],
+    outs = ["cncf_rst.tar"],
+    cmd = """
+    $(location //tools/docs:generate_api_rst) \\
+        $(location cncf_proto_srcs) $(locations //tools/protodoc:cncf_protodoc) $@
     """,
     tools = ["//tools/docs:generate_api_rst"],
 )
@@ -177,6 +197,7 @@ pkg_tar(
     extension = "tar",
     deps = [
         ":api_rst",
+        ":cncf_rst",
         ":empty_protos_rst",
         ":extensions_security_rst",
         ":external_deps_rst",

@@ -49,6 +49,9 @@ WKT_NAMESPACE_PREFIX = '.google.protobuf.'
 # Namespace prefix for RPCs.
 RPC_NAMESPACE_PREFIX = '.google.rpc.'
 
+# Namespace prefix for cncf/xds top-level APIs.
+CNCF_PREFIX = '.xds.'
+
 # http://www.fileformat.info/info/unicode/char/2063/index.htm
 UNICODE_INVISIBLE_SEPARATOR = u'\u2063'
 
@@ -429,7 +432,7 @@ def format_field_type(type_context, field):
     Return: RST formatted field type.
     """
     if field.type_name.startswith(ENVOY_API_NAMESPACE_PREFIX) or field.type_name.startswith(
-            ENVOY_PREFIX):
+            ENVOY_PREFIX) or field.type_name.startswith(CNCF_PREFIX):
         type_name = normalize_field_type_name(field.type_name)
         if field.type == field.TYPE_MESSAGE:
             if type_context.map_typenames and type_name_from_fqn(
