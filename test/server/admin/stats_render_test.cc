@@ -23,7 +23,7 @@ protected:
     store_.initializeThreading(main_thread_dispatcher_, tls_);
   }
 
-  ~StatsRenderTest() {
+  ~StatsRenderTest() override {
     tls_.shutdownGlobalThreading();
     store_.shutdownThreading();
     tls_.shutdownThread();
