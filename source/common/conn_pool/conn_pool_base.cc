@@ -470,13 +470,14 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
   case Network::ConnectionEvent::LocalClose: {
-    const bool contributed_to_connecting_stream_capacity = client.currentUnusedCapacity() > 0;
-    decrConnectingAndConnectedStreamCapacity(client.currentUnusedCapacity(), client);
     if (client.connect_timer_) {
+      ASSERT(!client.has_handshake_completed_);
       client.connect_timer_->disableTimer();
       client.connect_timer_.reset();
-      ASSERT(!client.has_handshake_completed_);
     }
+    const bool contributed_to_connecting_stream_capacity = client.currentUnusedCapacity() > 0;
+    decrConnectingAndConnectedStreamCapacity(client.currentUnusedCapacity(), client);
+
     // Make sure that onStreamClosed won't double count.
     client.remaining_streams_ = 0;
     // The client died.
@@ -556,11 +557,12 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     break;
   }
   case Network::ConnectionEvent::Connected: {
-    ASSERT(connecting_stream_capacity_ >= client.currentUnusedCapacity());
-    connecting_stream_capacity_ -= client.currentUnusedCapacity();
+    ASSERT(!client.has_handshake_completed_);
     client.connect_timer_->disableTimer();
     client.connect_timer_.reset();
-    ASSERT(!client.has_handshake_completed_);
+
+    ASSERT(connecting_stream_capacity_ >= client.currentUnusedCapacity());
+    connecting_stream_capacity_ -= client.currentUnusedCapacity();
     client.has_handshake_completed_ = true;
     client.conn_connect_ms_->complete();
     client.conn_connect_ms_.reset();
@@ -592,6 +594,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
   case Network::ConnectionEvent::ConnectedZeroRtt: {
     ENVOY_CONN_LOG(debug, "0-RTT connected with capacity {}", client,
                    client.currentUnusedCapacity());
+    // No need to update connecting capacity and connect_timer_ as the client is still connecting.
     ASSERT(client.state() == ActiveClient::State::CONNECTING);
     host()->cluster().stats().upstream_cx_connect_with_0_rtt_.inc();
     transitionActiveClientState(client, ActiveClient::State::READY_FOR_EARLY_DATA);

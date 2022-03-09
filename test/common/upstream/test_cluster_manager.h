@@ -82,7 +82,7 @@ public:
           alternate_protocol_options,
       const Network::ConnectionSocket::OptionsSharedPtr& options,
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, TimeSource&,
-      ClusterConnectivityState& state, Http::PersistentQuicInfo& /*quic_info*/) override {
+      ClusterConnectivityState& state, Http::PersistentQuicInfoPtr& /*quic_info*/) override {
     return Http::ConnectionPool::InstancePtr{allocateConnPool_(
         host, alternate_protocol_options, options, transport_socket_options, state)};
   }

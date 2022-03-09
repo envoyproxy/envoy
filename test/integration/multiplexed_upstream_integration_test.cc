@@ -696,9 +696,10 @@ TEST_P(MultiplexedUpstreamIntegrationTest, EarlyDataRejected) {
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamCachesZeroRttKeys) {
-  if (upstreamProtocol() != Http::CodecType::HTTP3) {
-    return;
-  }
+#ifdef WIN32
+  // TODO: debug why waiting on the 2nd upstream connection times out on Windows.
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -719,8 +720,11 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamCachesZeroRttKeys) {
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
 
-  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
-  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_EQ(1u,
+              test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+    EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+  }
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response2->waitForEndStream());
 }
