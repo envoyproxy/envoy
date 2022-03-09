@@ -13,6 +13,7 @@
 #include "test/mocks/upstream/cluster_update_callbacks_handle.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
+#include "test/mocks/server/listener_factory_context.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
@@ -166,9 +167,9 @@ public:
     ON_CALL(os_sys_calls_, supportsIpTransparent()).WillByDefault(Return(true));
     EXPECT_CALL(os_sys_calls_, supportsUdpGro()).Times(AtLeast(0)).WillRepeatedly(Return(true));
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
-    EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, address())
+    EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_, address())
         .WillRepeatedly(Return(upstream_address_));
-    EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, health())
+    EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_, health())
         .WillRepeatedly(Return(Upstream::Host::Health::Healthy));
   }
 
@@ -177,15 +178,15 @@ public:
   void setup(const std::string& yaml, bool has_cluster = true, bool expect_gro = true) {
     envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig config;
     TestUtility::loadFromYamlAndValidate(yaml, config);
-    config_ = std::make_shared<UdpProxyFilterConfig>(cluster_manager_, time_system_, stats_store_,
-                                                     config);
-    EXPECT_CALL(cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
+
+    config_ = std::make_shared<UdpProxyFilterConfig>(factory_context_, config);
+    EXPECT_CALL(factory_context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
                         ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
     if (has_cluster) {
-      cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+      factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     }
-    EXPECT_CALL(cluster_manager_, getThreadLocalCluster("fake_cluster"));
+    EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("fake_cluster"));
     filter_ = std::make_unique<TestUdpProxyFilter>(callbacks_, config_);
     expect_gro_ = expect_gro;
   }
@@ -276,9 +277,7 @@ use_original_src_ip: true
 
   Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_;
-  Upstream::MockClusterManager cluster_manager_;
-  NiceMock<MockTimeSystem> time_system_;
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Server::Configuration::MockListenerFactoryContext> factory_context_;
   UdpProxyFilterConfigSharedPtr config_;
   Network::MockUdpReadFilterCallbacks callbacks_;
   Upstream::ClusterUpdateCallbacks* cluster_update_callbacks_{};
@@ -302,7 +301,7 @@ public:
   explicit UdpProxyFilterIpv6Test(Network::Address::InstanceConstSharedPtr&& upstream_address_v6)
       : UdpProxyFilterTest(Network::Utility::parseInternetAddressAndPort(peer_ipv6_address_)),
         upstream_address_v6_(std::move(upstream_address_v6)) {
-    EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, address())
+    EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_, address())
         .WillRepeatedly(Return(upstream_address_v6_));
   }
 
@@ -410,31 +409,31 @@ cluster: fake_cluster
   test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
-  EXPECT_EQ(5, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
+  EXPECT_EQ(5, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
                    .upstream_cx_tx_bytes_total_.value());
 
   test_sessions_[0].recvDataFromUpstream("world2", 0, SOCKET_ERROR_MSG_SIZE);
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
-  EXPECT_EQ(6, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
+  EXPECT_EQ(6, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
                    .upstream_cx_rx_bytes_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_tx_errors_.value());
 
   test_sessions_[0].recvDataFromUpstream("world2", SOCKET_ERROR_MSG_SIZE, 0);
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
-  EXPECT_EQ(6, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
+  EXPECT_EQ(6, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
                    .upstream_cx_rx_bytes_total_.value());
   EXPECT_EQ(1, TestUtility::findCounter(
-                   cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_,
+                   factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_,
                    "udp.sess_rx_errors")
                    ->value());
 
   test_sessions_[0].expectWriteToUpstream("hello", SOCKET_ERROR_MSG_SIZE);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   checkTransferStats(10 /*rx_bytes*/, 2 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
-  EXPECT_EQ(5, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
+  EXPECT_EQ(5, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
                    .upstream_cx_tx_bytes_total_.value());
   EXPECT_EQ(1, TestUtility::findCounter(
-                   cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_,
+                   factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_,
                    "udp.sess_tx_errors")
                    ->value());
 }
@@ -448,9 +447,9 @@ stat_prefix: foo
 cluster: fake_cluster
   )EOF");
 
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(nullptr));
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
-  EXPECT_EQ(1, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
+  EXPECT_EQ(1, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
                    .upstream_cx_none_healthy_.value());
 }
 
@@ -493,7 +492,7 @@ cluster: fake_cluster
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   // Now add the cluster we care about.
-  cluster_update_callbacks_->onClusterAddOrUpdate(cluster_manager_.thread_local_cluster_);
+  cluster_update_callbacks_->onClusterAddOrUpdate(factory_context_.cluster_manager_.thread_local_cluster_);
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -519,7 +518,7 @@ cluster: fake_cluster
   )EOF");
 
   // Allow only a single session.
-  cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(1, 0, 0, 0, 0);
+  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(1, 0, 0, 0, 0);
 
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello");
@@ -531,7 +530,7 @@ cluster: fake_cluster
   recvDataFromDownstream("10.0.0.2:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(
       1,
-      cluster_manager_.thread_local_cluster_.cluster_.info_->stats_.upstream_cx_overflow_.value());
+      factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_.upstream_cx_overflow_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 
@@ -561,8 +560,8 @@ cluster: fake_cluster
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 
-  cluster_manager_.thread_local_cluster_.cluster_.priority_set_.runUpdateCallbacks(
-      0, {}, {cluster_manager_.thread_local_cluster_.lb_.host_});
+  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.priority_set_.runUpdateCallbacks(
+      0, {}, {factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_});
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
@@ -589,7 +588,7 @@ cluster: fake_cluster
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 
-  EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, health())
+  EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_, health())
       .WillRepeatedly(Return(Upstream::Host::Health::Unhealthy));
   test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -611,11 +610,11 @@ cluster: fake_cluster
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 
-  EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, health())
+  EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_, health())
       .WillRepeatedly(Return(Upstream::Host::Health::Unhealthy));
   auto new_host_address = Network::Utility::parseInternetAddressAndPort("20.0.0.2:443");
   auto new_host = createHost(new_host_address);
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(new_host));
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(new_host));
   expectSessionCreate(new_host_address);
   test_sessions_[1].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -647,7 +646,7 @@ use_per_packet_load_balancing: true
   )EOF");
 
   // Allow for two sessions.
-  cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(2, 0, 0, 0, 0);
+  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(2, 0, 0, 0, 0);
 
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello");
@@ -660,7 +659,7 @@ use_per_packet_load_balancing: true
 
   auto new_host_address = Network::Utility::parseInternetAddressAndPort("20.0.0.2:443");
   auto new_host = createHost(new_host_address);
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(new_host));
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(new_host));
   expectSessionCreate(new_host_address);
   test_sessions_[1].expectWriteToUpstream("hello2");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
@@ -669,7 +668,7 @@ use_per_packet_load_balancing: true
   checkTransferStats(11 /*rx_bytes*/, 2 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
 
   // On next datagram, first session should be used
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
       .WillRepeatedly(DoDefault());
   test_sessions_[0].expectWriteToUpstream("hello3");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello3");
@@ -688,11 +687,11 @@ cluster: fake_cluster
 use_per_packet_load_balancing: true
   )EOF");
 
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(nullptr));
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(0, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
-  EXPECT_EQ(1, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
+  EXPECT_EQ(1, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
                    .upstream_cx_none_healthy_.value());
 }
 
@@ -711,14 +710,14 @@ use_per_packet_load_balancing: true
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
-  EXPECT_EQ(0, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
+  EXPECT_EQ(0, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
                    .upstream_cx_none_healthy_.value());
 
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(nullptr));
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
-  EXPECT_EQ(1, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
+  EXPECT_EQ(1, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
                    .upstream_cx_none_healthy_.value());
 }
 
@@ -738,8 +737,8 @@ use_per_packet_load_balancing: true
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 
-  cluster_manager_.thread_local_cluster_.cluster_.priority_set_.runUpdateCallbacks(
-      0, {}, {cluster_manager_.thread_local_cluster_.lb_.host_});
+  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.priority_set_.runUpdateCallbacks(
+      0, {}, {factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_});
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
@@ -761,7 +760,7 @@ use_per_packet_load_balancing: true
   )EOF");
 
   // Allow for two sessions.
-  cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(2, 0, 0, 0, 0);
+  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(2, 0, 0, 0, 0);
 
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello");
@@ -771,7 +770,7 @@ use_per_packet_load_balancing: true
 
   auto new_host_address = Network::Utility::parseInternetAddressAndPort("20.0.0.2:443");
   auto new_host = createHost(new_host_address);
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(new_host));
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(new_host));
   expectSessionCreate(new_host_address);
   test_sessions_[1].expectWriteToUpstream("hello2");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
@@ -798,12 +797,12 @@ use_per_packet_load_balancing: true
   )EOF");
 
   // Don't allow for any session.
-  cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(0, 0, 0, 0, 0);
+  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(0, 0, 0, 0, 0);
 
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(
       1,
-      cluster_manager_.thread_local_cluster_.cluster_.info_->stats_.upstream_cx_overflow_.value());
+      factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_.upstream_cx_overflow_.value());
 }
 
 // Make sure socket option is set correctly if use_original_src_ip is set in case of ipv6.
@@ -926,7 +925,7 @@ hash_policies:
 
   auto host = createHost(upstream_address_);
   auto generated_hash = HashUtil::xxHash64("10.0.0.1");
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Invoke([host, generated_hash](
                            Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
         auto hash = context->computeHashKey();
@@ -950,7 +949,7 @@ cluster: fake_cluster
   )EOF");
 
   auto host = createHost(upstream_address_);
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(
           Invoke([host](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
             auto hash = context->computeHashKey();
@@ -1004,7 +1003,7 @@ hash_policies:
 
   auto host = createHost(upstream_address_);
   auto generated_hash = HashUtil::xxHash64("key");
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Invoke([host, generated_hash](
                            Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
         auto hash = context->computeHashKey();
