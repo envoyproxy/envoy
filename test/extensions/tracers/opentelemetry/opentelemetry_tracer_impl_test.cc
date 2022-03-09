@@ -241,6 +241,46 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithFlushTimeout) {
   timer_->invokeCallback();
 }
 
+TEST_F(OpenTelemetryDriverTest, SpawnChildSpan) {
+  // Set up driver
+  setupValidDriver();
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  // Mock the random call for generating the parent span's IDs so we can check it later.
+  const uint64_t parent_trace_id_high = 0;
+  const uint64_t parent_trace_id_low = 2;
+  const uint64_t parent_span_id = 3;
+  NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
+      context_.server_factory_context_.api_.random_;
+  {
+    InSequence s;
+
+    EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_trace_id_high));
+    EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_trace_id_low));
+    EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_span_id));
+  }
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
+                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  // The child should only generate a span ID for itself; the trace id should come from the parent..
+  const uint64_t child_span_id = 3;
+  EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(child_span_id));
+  Tracing::SpanPtr child_span =
+      span->spawnChild(mock_tracing_config_, operation_name_, time_system_.systemTime());
+
+  // Flush after a single span.
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.open_telemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  // We should see a call to sendMessage to export that single span.
+  EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
+  child_span->finishSpan();
+}
+
 } // namespace OpenTelemetry
 } // namespace Tracers
 } // namespace Extensions

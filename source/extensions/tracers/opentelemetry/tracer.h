@@ -36,8 +36,7 @@ public:
                              SystemTime start_time, const Tracing::Decision tracing_decision);
 
   Tracing::SpanPtr startSpan(const Tracing::Config& config, const std::string& operation_name,
-                             SystemTime start_time, const Tracing::Decision tracing_decision,
-                             const SpanContext& previous_span_context);
+                             SystemTime start_time, const SpanContext& previous_span_context);
 
 private:
   /**
@@ -67,15 +66,11 @@ public:
        Envoy::TimeSource& time_source, Tracer& parent_tracer);
 
   // Tracing::Span functions
-  // TODO(alexellis): implement this
   void setOperation(absl::string_view /*operation*/) override{};
-  // TODO(alexellis): implement this
   void setTag(absl::string_view /*name*/, absl::string_view /*value*/) override{};
-  // TODO(alexellis): implement this
   void log(SystemTime /*timestamp*/, const std::string& /*event*/) override{};
   void finishSpan() override;
   void injectContext(Envoy::Tracing::TraceContext& /*trace_context*/) override;
-  // TODO(alexellis): implement this
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
 
@@ -90,9 +85,7 @@ public:
 
   bool sampled() const { return sampled_; }
 
-  // TODO(alexellis): implement this
   std::string getBaggage(absl::string_view /*key*/) override { return EMPTY_STRING; };
-  // TODO(alexellis): implement this
   void setBaggage(absl::string_view /*key*/, absl::string_view /*value*/) override{};
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
 
@@ -105,6 +98,8 @@ public:
     span_.set_trace_id(absl::HexStringToBytes(trace_id_hex));
   }
 
+  std::string traceId() { return absl::BytesToHexString(span_.trace_id()); }
+
   /**
    * Sets the span's name attribute.
    */
@@ -116,6 +111,8 @@ public:
   void setId(const std::string& span_id_hex) {
     span_.set_span_id(absl::HexStringToBytes(span_id_hex));
   }
+
+  std::string spanId() { return absl::BytesToHexString(span_.span_id()); }
 
   /**
    * Sets the span's parent id.

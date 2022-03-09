@@ -57,7 +57,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     try {
       // Try to extract the span context. If we can't, just return a null span.
       SpanContext span_context = extractor.extractSpanContext();
-      return tracer.startSpan(config, operation_name, start_time, tracing_decision, span_context);
+      return tracer.startSpan(config, operation_name, start_time, span_context);
     } catch (const ExtractorException& e) {
       return std::make_unique<Tracing::NullSpan>();
     }

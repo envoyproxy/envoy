@@ -16,6 +16,7 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 static const absl::string_view kTraceParent = "traceparent";
+static const std::string kDefaultVersion = "00";
 // TODO: handle tracestate
 // static const absl::string_view kTraceState = "tracestate";
 
@@ -31,11 +32,12 @@ Span::Span(const Tracing::Config& config, const std::string& name, SystemTime st
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& name,
                                   SystemTime start_time) {
-  return std::make_unique<Span>(config, name, start_time, time_source_, parent_tracer_);
+  // Build span_context from the current span, then generate the child span from that context.
+  SpanContext span_context(kDefaultVersion, traceId(), spanId(), sampled());
+  return parent_tracer_.startSpan(config, name, start_time, span_context);
 }
 
 void Span::finishSpan() {
-  std::cout << "alexellis Span::finishSpan" << std::endl;
   // Call into the parent tracer so we can access the shared exporter.
   span_.set_end_time_unix_nano(
       std::chrono::nanoseconds(time_source_.systemTime().time_since_epoch()).count());
@@ -43,14 +45,13 @@ void Span::finishSpan() {
 }
 
 void Span::injectContext(Tracing::TraceContext& trace_context) {
-  // TODO: I'm not sure this is exactly the thing to do, but it's close
   std::string trace_id_hex = absl::BytesToHexString(span_.trace_id());
   std::string span_id_hex = absl::BytesToHexString(span_.span_id());
   // Add flag for sampled; maybe for now just nothing?
   std::vector<uint8_t> trace_flags_vec{sampled()};
   std::string trace_flags_hex = Hex::encode(trace_flags_vec);
   std::string traceparent_header_value =
-      absl::StrCat("00-", trace_id_hex, "-", span_id_hex, "-", trace_flags_hex);
+      absl::StrCat(kDefaultVersion, "-", trace_id_hex, "-", span_id_hex, "-", trace_flags_hex);
   // Set the traceparent in the trace_context.
   trace_context.setByReferenceKey(kTraceParent, traceparent_header_value);
 }
@@ -113,11 +114,11 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
 }
 
 Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& operation_name,
-                                   SystemTime start_time, const Tracing::Decision tracing_decision,
+                                   SystemTime start_time,
                                    const SpanContext& previous_span_context) {
   // Create a new span and populate details from the span context.
   Span new_span = Span(config, operation_name, start_time, time_source_, *this);
-  new_span.setSampled(tracing_decision.traced);
+  new_span.setSampled(previous_span_context.sampled());
   new_span.setTraceId(previous_span_context.traceId());
   if (!previous_span_context.parentId().empty()) {
     new_span.setParentId(previous_span_context.parentId());
