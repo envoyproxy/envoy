@@ -269,7 +269,7 @@ void MultiplexedUpstreamIntegrationTest::manySimultaneousRequests(uint32_t reque
   }
 
   for (uint32_t i = 0; i < num_requests; ++i) {
-    ASSERT(responses[i]->waitForEndStream());
+    ASSERT_TRUE(responses[i]->waitForEndStream());
     if (i % 2 != 0) {
       EXPECT_TRUE(responses[i]->complete());
       EXPECT_EQ("200", responses[i]->headers().getStatusValue());
