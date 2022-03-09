@@ -124,7 +124,7 @@ ssize_t InstanceImplWin32::fileSize(const std::string& path) {
   // printed into the file, CreateFileA will fail and report the error:"The process cannot access
   // the file because it is being used by another process". Add FILE_SHARE_DELETE flag to avoid such
   // issue.
-  auto fd = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, 0,
+  auto fd = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
                         OPEN_EXISTING, 0, NULL);
   if (fd == INVALID_HANDLE) {
     return -1;
