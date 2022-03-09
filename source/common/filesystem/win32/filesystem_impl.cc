@@ -122,7 +122,7 @@ bool InstanceImplWin32::directoryExists(const std::string& path) {
 ssize_t InstanceImplWin32::fileSize(const std::string& path) {
   // In integration test, an empty file is created, and then when we check whether some logs are
   // printed into the file, CreateFileA will fail and report the error:"The process cannot access
-  // the file because it is being used by another proces". Add FILE_SHARE_DELETE flag to avoid such
+  // the file because it is being used by another process". Add FILE_SHARE_DELETE flag to avoid such
   // issue.
   auto fd = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, 0,
                         OPEN_EXISTING, 0, NULL);
