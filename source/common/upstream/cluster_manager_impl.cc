@@ -1104,7 +1104,15 @@ Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cl
 
 Http::AsyncClient&
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpAsyncClient() {
-  return http_async_client_;
+  if (!http_async_client_) {
+    http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
+        cluster_info_, parent_.parent_.stats_, parent_.thread_local_dispatcher_,
+        parent_.parent_.local_info_, parent_.parent_, parent_.parent_.runtime_,
+        parent_.parent_.random_,
+        Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent_.parent_)},
+        parent_.parent_.http_context_, parent_.parent_.router_context_);
+  }
+  return *http_async_client_;
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHosts(
@@ -1483,12 +1491,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::addClusterUpdateCallbacks(
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
     const LoadBalancerFactorySharedPtr& lb_factory)
-    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster),
-      http_async_client_(cluster, parent.parent_.stats_, parent.thread_local_dispatcher_,
-                         parent.parent_.local_info_, parent.parent_, parent.parent_.runtime_,
-                         parent.parent_.random_,
-                         Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)},
-                         parent_.parent_.http_context_, parent_.parent_.router_context_) {
+    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster) {
   priority_set_.getOrCreateHostSet(0);
 
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
