@@ -46,7 +46,6 @@ envoy_cc_test(
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@com_github_google_quiche//:epoll_server_lib",
-        "@com_github_google_quiche//:quic_core_buffer_allocator_lib",
         "@com_github_google_quiche//:quic_core_error_codes_lib",
         "@com_github_google_quiche//:quic_core_types_lib",
         "@com_github_google_quiche//:quic_platform_expect_bug",

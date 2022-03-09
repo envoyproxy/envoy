@@ -45,7 +45,6 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         "//source/common/quic/platform:envoy_quic_clock_lib",
-        "@com_github_google_quiche//:quic_core_buffer_allocator_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
         "@com_github_google_quiche//:quic_core_crypto_random_lib",
     ],

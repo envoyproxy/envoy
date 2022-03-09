@@ -155,11 +155,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quiche_common_platform_impl_lib",
     srcs = [
-        "quiche_mem_slice_impl.cc",
     ],
     hdrs = [
         "quiche_logging_impl.h",
-        "quiche_mem_slice_impl.h",
     ],
     external_deps = [
         "abseil_hash",
@@ -170,6 +168,5 @@ envoy_cc_library(
         ":quic_platform_logging_impl_lib",
         ":quiche_flags_impl_lib",
         "//source/common/buffer:buffer_lib",
-        "@com_github_google_quiche//:quic_core_buffer_allocator_lib",
     ],
 )

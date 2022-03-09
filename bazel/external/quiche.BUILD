@@ -69,7 +69,6 @@ test_suite(
     name = "ci_tests",
     tests = [
         "http2_platform_api_test",
-        "quic_platform_api_test",
         "quiche_common_test",
     ],
 )
@@ -1124,7 +1123,6 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_flags.h",
         "quiche/quic/platform/api/quic_iovec.h",
         "quiche/quic/platform/api/quic_logging.h",
-        "quiche/quic/platform/api/quic_reference_counted.h",
         "quiche/quic/platform/api/quic_server_stats.h",
         "quiche/quic/platform/api/quic_stack_trace.h",
         "quiche/quic/platform/api/quic_stream_buffer_allocator.h",
@@ -1534,22 +1532,6 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [":quic_platform_base"],
-)
-
-envoy_cc_library(
-    name = "quic_core_buffer_allocator_lib",
-    srcs = [
-        "quiche/quic/core/quic_buffer_allocator.cc",
-        "quiche/quic/core/quic_simple_buffer_allocator.cc",
-    ],
-    hdrs = [
-        "quiche/quic/core/quic_buffer_allocator.h",
-        "quiche/quic/core/quic_simple_buffer_allocator.h",
-    ],
-    repository = "@envoy",
-    tags = ["nofips"],
-    visibility = ["//visibility:public"],
-    deps = [":quic_platform_export"],
 )
 
 envoy_cc_library(
@@ -2252,6 +2234,25 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quiche_common_buffer_allocator_lib",
+    srcs = [
+        "quiche/common/quiche_buffer_allocator.cc",
+        "quiche/common/simple_buffer_allocator.cc",
+    ],
+    hdrs = [
+        "quiche/common/quiche_buffer_allocator.h",
+        "quiche/common/simple_buffer_allocator.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_base",
+        ":quiche_common_platform_export",
+    ],
+)
+
+envoy_cc_library(
     name = "quiche_common_circular_deque_lib",
     hdrs = ["quiche/common/quiche_circular_deque.h"],
     copts = quiche_copts,
@@ -2399,7 +2400,6 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        ":quic_core_buffer_allocator_lib",
         ":quic_core_constants_lib",
         ":quic_core_error_codes_lib",
         ":quic_core_interval_lib",
@@ -2426,7 +2426,6 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
-        ":quic_core_buffer_allocator_lib",
         ":quic_core_data_lib",
         ":quic_core_http_http_frames_lib",
         ":quic_core_types_lib",
@@ -4004,7 +4003,6 @@ envoy_cc_test_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
-        ":quic_core_buffer_allocator_lib",
         ":quic_core_congestion_control_congestion_control_interface_lib",
         ":quic_core_connection_lib",
         ":quic_core_connection_stats_lib",
@@ -4165,6 +4163,8 @@ envoy_cc_library(
     ],
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quic_mutex_impl.h",
+        "quiche/common/platform/default/quiche_platform_impl/quiche_mem_slice_impl.h",
+        "quiche/common/platform/default/quiche_platform_impl/quiche_reference_counted_impl.h",
         "quiche/common/platform/default/quiche_platform_impl/quic_testvalue_impl.h",
         "quiche/common/platform/default/quiche_platform_impl/quiche_prefetch_impl.h",
         "quiche/common/platform/default/quiche_platform_impl/quiche_sleep_impl.h",
@@ -4175,6 +4175,7 @@ envoy_cc_library(
     deps = [
         ":quic_platform_export",
         ":quiche_common_platform_export",
+        ":quiche_common_buffer_allocator_lib",
     ],
 )
 
@@ -4333,21 +4334,6 @@ envoy_cc_test(
     deps = [
         ":spdy_core_header_block_lib",
         ":spdy_core_test_utils_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "quic_platform_api_test",
-    srcs = [
-        "quiche/quic/platform/api/quic_reference_counted_test.cc",
-    ],
-    copts = quiche_copts,
-    repository = "@envoy",
-    tags = ["nofips"],
-    deps = [
-        ":quic_core_buffer_allocator_lib",
-        ":quic_platform",
-        ":quic_platform_test",
     ],
 )
 
