@@ -120,9 +120,7 @@ bool InstanceImplWin32::directoryExists(const std::string& path) {
 }
 
 ssize_t InstanceImplWin32::fileSize(const std::string& path) {
-  auto fd = CreateFileA(path.c_str(), GENERIC_READ,
-                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0, OPEN_EXISTING, 0,
-                        NULL);
+  auto fd = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, NULL);
   if (fd == INVALID_HANDLE) {
     auto last_error = ::GetLastError();
     printf("last_error: %s\n", errorDetails(last_error).c_str());
