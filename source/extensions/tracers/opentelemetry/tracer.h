@@ -38,7 +38,6 @@ public:
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          OpenTelemetryTracerStats tracing_stats);
 
-  // TODO: maybe make this arg const
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
 
   Tracing::SpanPtr startSpan(const Tracing::Config& config, const std::string& operation_name,

@@ -26,25 +26,25 @@ envoy_cc_library(
     name = "opentelemetry_tracer_lib",
     srcs = [
         "opentelemetry_tracer_impl.cc",
-        "tracer.cc",
         "span_context_extractor.cc",
+        "tracer.cc",
     ],
     hdrs = [
+        "opentelemetry_tracer_impl.h",
         "span_context.h",
         "span_context_extractor.h",
-        "opentelemetry_tracer_impl.h",
         "tracer.h",
     ],
     copts = ["-Wno-unused-parameter"],
     deps = [
+        ":grpc_trace_exporter",
+        "//envoy/thread_local:thread_local_interface",
         "//source/common/config:utility_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/tracers/common:factory_base_lib",
-        "//envoy/thread_local:thread_local_interface",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
         "@opentelemetry_proto//:trace_cc_proto",
-        ":grpc_trace_exporter",
-    ]
+    ],
 )
 
 envoy_cc_library(

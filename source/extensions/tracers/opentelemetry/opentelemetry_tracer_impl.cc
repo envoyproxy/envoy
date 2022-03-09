@@ -32,8 +32,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
     const Grpc::RawAsyncClientSharedPtr& async_client_shared_ptr =
         factory->createUncachedRawAsyncClient();
     TracerPtr tracer = std::make_unique<Tracer>(
-        std::make_unique<OpenTelemetryGrpcTraceExporter>(async_client_shared_ptr,
-                                                         opentelemetry_config.trace_name()),
+        std::make_unique<OpenTelemetryGrpcTraceExporter>(async_client_shared_ptr),
         factory_context.timeSource(), factory_context.api().randomGenerator(),
         factory_context.runtime(), dispatcher, tracing_stats_);
 

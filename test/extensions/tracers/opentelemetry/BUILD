@@ -29,10 +29,10 @@ envoy_extension_cc_test(
         "//source/common/runtime:runtime_lib",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "//test/mocks:common_lib",
-        "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
@@ -64,5 +64,5 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "//test/test_common:utility_lib",
-    ]
+    ],
 )

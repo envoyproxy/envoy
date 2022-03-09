@@ -15,10 +15,9 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
+// TODO: handle tracestate as well.
 static const absl::string_view kTraceParent = "traceparent";
 static const std::string kDefaultVersion = "00";
-// TODO: handle tracestate
-// static const absl::string_view kTraceState = "tracestate";
 
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 
@@ -47,7 +46,6 @@ void Span::finishSpan() {
 void Span::injectContext(Tracing::TraceContext& trace_context) {
   std::string trace_id_hex = absl::BytesToHexString(span_.trace_id());
   std::string span_id_hex = absl::BytesToHexString(span_.span_id());
-  // Add flag for sampled; maybe for now just nothing?
   std::vector<uint8_t> trace_flags_vec{sampled()};
   std::string trace_flags_hex = Hex::encode(trace_flags_vec);
   std::string traceparent_header_value =
@@ -71,7 +69,7 @@ Tracer::Tracer(OpenTelemetryGrpcTraceExporterPtr exporter, Envoy::TimeSource& ti
 
 void Tracer::enableTimer() {
   const uint64_t flush_interval =
-      runtime_.snapshot().getInteger("tracing.open_telemetry.flush_interval_ms", 5000U);
+      runtime_.snapshot().getInteger("tracing.opentelemetry.flush_interval_ms", 5000U);
   flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
 }
 
@@ -95,7 +93,7 @@ void Tracer::flushSpans() {
 void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
   span_buffer_.push_back(span);
   const uint64_t min_flush_spans =
-      runtime_.snapshot().getInteger("tracing.open_telemetry.min_flush_spans", 5U);
+      runtime_.snapshot().getInteger("tracing.opentelemetry.min_flush_spans", 5U);
   if (span_buffer_.size() >= min_flush_spans) {
     flushSpans();
   }

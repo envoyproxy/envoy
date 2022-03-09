@@ -17,7 +17,8 @@ namespace OpenTelemetry {
  * Config registration for the OpenTelemetry tracer. @see TracerFactory.
  */
 class OpenTelemetryTracerFactory
-    : Logger::Loggable<Logger::Id::tracing>, public Common::FactoryBase<envoy::config::trace::v3::OpenTelemetryConfig> {
+    : Logger::Loggable<Logger::Id::tracing>,
+      public Common::FactoryBase<envoy::config::trace::v3::OpenTelemetryConfig> {
 public:
   OpenTelemetryTracerFactory();
 

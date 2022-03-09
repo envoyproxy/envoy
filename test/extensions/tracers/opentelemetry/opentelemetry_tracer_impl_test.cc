@@ -53,7 +53,6 @@ public:
       envoy_grpc:
         cluster_name: fake-cluster
       timeout: 0.250s
-    trace_name: "trace_name"
     )EOF";
     envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
     TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
@@ -68,7 +67,6 @@ protected:
   Event::SimulatedTimeSystem time_system_;
   std::unique_ptr<NiceMock<Grpc::MockAsyncStream>> mock_stream_ptr_{nullptr};
   envoy::config::trace::v3::OpenTelemetryConfig config_;
-  std::string test_string = "ABCDEFGHIJKLMN";
   Tracing::DriverPtr driver_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockTimer>* timer_;
@@ -178,7 +176,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpan) {
   EXPECT_NE(span.get(), nullptr);
 
   // Flush after a single span.
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.open_telemetry.min_flush_spans", 5U))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .Times(1)
       .WillRepeatedly(Return(1));
   // We should see a call to sendMessage to export that single span.
@@ -199,7 +197,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithBuffer) {
   EXPECT_NE(span.get(), nullptr);
 
   // Flush after two spans.
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.open_telemetry.min_flush_spans", 5U))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .Times(2)
       .WillRepeatedly(Return(2));
   // We should not yet see a call to sendMessage to export that single span.
@@ -232,7 +230,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithFlushTimeout) {
   EXPECT_NE(span.get(), nullptr);
 
   // Set it to flush after 2 spans so that the span will only be flushed by timeout.
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.open_telemetry.min_flush_spans", 5U))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .Times(1)
       .WillRepeatedly(Return(2));
   // We should not yet see a call to sendMessage to export that single span.
@@ -241,7 +239,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithFlushTimeout) {
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
   // Timer should be reenabled.
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.open_telemetry.flush_interval_ms", 5000U))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.flush_interval_ms", 5000U))
       .WillOnce(Return(5000U));
   timer_->invokeCallback();
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
@@ -280,7 +278,7 @@ TEST_F(OpenTelemetryDriverTest, SpawnChildSpan) {
       span->spawnChild(mock_tracing_config_, operation_name_, time_system_.systemTime());
 
   // Flush after a single span.
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.open_telemetry.min_flush_spans", 5U))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .Times(1)
       .WillRepeatedly(Return(1));
   // We should see a call to sendMessage to export that single span.

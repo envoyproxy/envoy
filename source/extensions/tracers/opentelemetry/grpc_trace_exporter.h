@@ -83,14 +83,12 @@ public:
 
 class OpenTelemetryGrpcTraceExporter : Logger::Loggable<Logger::Id::tracing> {
 public:
-  OpenTelemetryGrpcTraceExporter(const Grpc::RawAsyncClientSharedPtr& client,
-                                 std::string trace_name);
+  OpenTelemetryGrpcTraceExporter(const Grpc::RawAsyncClientSharedPtr& client);
 
   bool log(const ExportTraceServiceRequest& request);
 
 private:
   OpenTelemetryGrpcTraceExporterClient client_;
-  std::string trace_name_;
 };
 
 using OpenTelemetryGrpcTraceExporterPtr = std::unique_ptr<OpenTelemetryGrpcTraceExporter>;

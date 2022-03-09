@@ -8,10 +8,9 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 OpenTelemetryGrpcTraceExporter::OpenTelemetryGrpcTraceExporter(
-    const Grpc::RawAsyncClientSharedPtr& client, std::string trace_name)
+    const Grpc::RawAsyncClientSharedPtr& client)
     : client_(client, *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                          "opentelemetry.proto.collector.trace.v1.TraceService.Export")),
-      trace_name_(trace_name) {}
+                          "opentelemetry.proto.collector.trace.v1.TraceService.Export")) {}
 
 bool OpenTelemetryGrpcTraceExporter::log(const ExportTraceServiceRequest& request) {
   return client_.log(request);
