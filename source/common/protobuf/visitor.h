@@ -1,7 +1,5 @@
 #pragma once
 
-#include <vector>
-
 #include "envoy/common/pure.h"
 
 #include "source/common/protobuf/protobuf.h"
@@ -27,13 +25,7 @@ public:
 };
 
 void traverseMessage(ConstProtoVisitor& visitor, const Protobuf::Message& message,
-                     std::vector<const Protobuf::Message*>& parents, bool recurse_into_any);
-
-inline void traverseMessage(ConstProtoVisitor& visitor, const Protobuf::Message& message,
-                            bool recurse_into_any) {
-  std::vector<const Protobuf::Message*> parents;
-  traverseMessage(visitor, message, parents, recurse_into_any);
-}
+                     bool recurse_into_any);
 
 } // namespace ProtobufMessage
 } // namespace Envoy

@@ -1,3 +1,5 @@
+#include <vector>
+
 #include "source/common/protobuf/visitor.h"
 
 #include "source/common/protobuf/message_validator_impl.h"
@@ -79,6 +81,7 @@ void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& 
     }
 
     if (inner_message != nullptr) {
+      // Push the Any message as a wrapper.
       ScopedMessageParents scoped_parents(parents, message);
       traverseMessageWorker(visitor, *inner_message, parents, true, recurse_into_any);
       return;
@@ -93,7 +96,7 @@ void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& 
     const Protobuf::FieldDescriptor* field = descriptor->field(i);
     visitor.onField(message, *field);
 
-    // If this is a message, recurse to scrub deprecated fields in the sub-message.
+    // If this is a message, recurse in to the sub-message.
     if (field->cpp_type() == Protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
       ScopedMessageParents scoped_parents(parents, message);
 
@@ -114,7 +117,8 @@ void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& 
 } // namespace
 
 void traverseMessage(ConstProtoVisitor& visitor, const Protobuf::Message& message,
-                     std::vector<const Protobuf::Message*>& parents, bool recurse_into_any) {
+                     bool recurse_into_any) {
+  std::vector<const Protobuf::Message*> parents;
   traverseMessageWorker(visitor, message, parents, true, recurse_into_any);
 }
 

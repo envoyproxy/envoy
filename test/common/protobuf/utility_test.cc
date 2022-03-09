@@ -251,6 +251,22 @@ TEST_F(ProtobufUtilityTest, DowncastAndValidateUnknownFieldsNested) {
                            {1}));
 }
 
+// Validated exception thrown when observed nested unknown field with any.
+TEST_F(ProtobufUtilityTest, ValidateUnknownFieldsNestedAny) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+  cluster->GetReflection()->MutableUnknownFields(cluster)->AddVarint(1, 0);
+
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(bootstrap);
+  EXPECT_THROW_WITH_MESSAGE(
+      TestUtility::validate(source_any, /*recurse_into_any*/ true), EnvoyException,
+      unknownFieldsMessage("envoy.config.cluster.v3.Cluster",
+                           {"google.protobuf.Any", "envoy.config.bootstrap.v3.Bootstrap",
+                            "envoy.config.bootstrap.v3.Bootstrap.StaticResources"},
+                           {1}));
+}
+
 TEST_F(ProtobufUtilityTest, JsonConvertAnyUnknownMessageType) {
   ProtobufWkt::Any source_any;
   source_any.set_type_url("type.googleapis.com/bad.type.url");
