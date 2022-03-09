@@ -283,11 +283,58 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     break;
   }
   case ProcessingMode::BUFFERED_PARTIAL:
-    bool terminate;
-    std::tie(terminate, result) = processBufferedPartial(state, data, end_stream);
+    // BUFFERED_PARTIAL mode works as follows:
+    //
+    // 1) As data chunks arrive, we move the data into a new buffer, which we store
+    // in the buffer queue, and continue the filter stream with an empty buffer. This
+    // is the same thing that we do in STREAMING mode.
+    // 2) If end of stream is reached before the queue reaches the buffer limit, we
+    // send the buffered data to the server and essentially behave as if we are in
+    // buffered mode.
+    // 3) If instead the buffer limit is reached before end of stream, then we also
+    // send the buffered data to the server, and raise the watermark to prevent Envoy
+    // from running out of memory while we wait.
+    // 4) It is possible that Envoy will keep sending us data even in that case, so
+    // we must continue to queue data and prepare to re-inject it later.
+    if (state.partialBodyProcessed()) {
+      // We already sent and received the buffer, so everything else just falls through.
+      ENVOY_LOG(trace, "Partial buffer limit reached");
+      result = FilterDataStatus::Continue;
+    } else if (state.callbackState() ==
+               ProcessorState::CallbackState::BufferedPartialBodyCallback) {
+      // More data came in while we were waiting for a callback result. We need
+      // to queue it and deliver it later in case the callback changes the data.
+      state.enqueueStreamingChunk(data, false, false);
+      ENVOY_LOG(trace, "Call in progress for partial mode");
+      state.setPaused(true);
+      result = FilterDataStatus::StopIterationNoBuffer;
+    } else if (end_stream || state.queueOverHighLimit()) {
+      bool terminate;
+      std::tie(terminate, result) = sendStreamChunk(state, data, end_stream);
 
-    if (terminate) {
-      return result;
+      if (terminate) {
+        return result;
+      }
+    } else {
+      // Keep on running and buffering
+      state.enqueueStreamingChunk(data, false, false);
+
+      if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams) &&
+          state.queueOverHighLimit()) {
+        // We just transitioned to queue over high limit, which will then cause
+        // the receiving codec to buffer the data rather than send it to us.
+        // Prior, we'd rely on eager processing to kick off sending the data to
+        // the external processor, instead we kick it off here.
+        bool terminate;
+        Buffer::OwnedImpl empty_buffer{};
+        std::tie(terminate, result) = sendStreamChunk(state, empty_buffer, false);
+
+        if (terminate) {
+          return result;
+        }
+      } else {
+        result = FilterDataStatus::Continue;
+      }
     }
     break;
   case ProcessingMode::NONE:
@@ -314,71 +361,25 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
 }
 
 std::pair<bool, Http::FilterDataStatus>
-Filter::processBufferedPartial(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
-  // BUFFERED_PARTIAL mode works as follows:
-  //
-  // 1) As data chunks arrive, we move the data into a new buffer, which we store
-  // in the buffer queue, and continue the filter stream with an empty buffer. This
-  // is the same thing that we do in STREAMING mode.
-  // 2) If end of stream is reached before the queue reaches the buffer limit, we
-  // send the buffered data to the server and essentially behave as if we are in
-  // buffered mode.
-  // 3) If instead the buffer limit is reached before end of stream, then we also
-  // send the buffered data to the server, and raise the watermark to prevent Envoy
-  // from running out of memory while we wait.
-  // 4) It is possible that Envoy will keep sending us data even in that case, so
-  // we must continue to queue data and prepare to re-inject it later.
-  Http::FilterDataStatus result;
-  if (state.partialBodyProcessed()) {
-    // We already sent and received the buffer, so everything else just falls through.
-    ENVOY_LOG(trace, "Partial buffer limit reached");
-    result = FilterDataStatus::Continue;
-  } else if (state.callbackState() == ProcessorState::CallbackState::BufferedPartialBodyCallback) {
-    // More data came in while we were waiting for a callback result. We need
-    // to queue it and deliver it later in case the callback changes the data.
-    state.enqueueStreamingChunk(data, false, false);
-    ENVOY_LOG(trace, "Call in progress for partial mode");
-    state.setPaused(true);
-    result = FilterDataStatus::StopIterationNoBuffer;
-  } else if (end_stream || state.queueOverHighLimit()) {
-    switch (openStream()) {
-    case StreamOpenState::Error:
-      return {false, FilterDataStatus::StopIterationNoBuffer};
-    case StreamOpenState::IgnoreError:
-      return {false, FilterDataStatus::Continue};
-    case StreamOpenState::Ok:
-      // Fall through
-      break;
-    }
-    state.enqueueStreamingChunk(data, false, false);
-    // Put all buffered data so far into one big buffer
-    const auto& all_data = state.consolidateStreamedChunks(true);
-    ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode. end_stream = {}",
-              all_data.data.length(), end_stream);
-    sendBodyChunk(state, all_data.data, ProcessorState::CallbackState::BufferedPartialBodyCallback,
-                  end_stream);
-    result = FilterDataStatus::StopIterationNoBuffer;
-    state.setPaused(true);
-  } else {
-    // Keep on running and buffering
-    state.enqueueStreamingChunk(data, false, false);
-
-    if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams) &&
-        state.queueOverHighLimit()) {
-      // We just transitioned to queue over high limit, which will then cause
-      // the receiving codec to buffer the data rather than send it to us.
-      // Prior, we'd rely on eager processing to kick off sending the data to
-      // the external processor, instead we kick it off here.
-      // The recursive call here should only be one deep as we should
-      // end up in the branch where we send data in buffered partial mode.
-      Buffer::OwnedImpl empty_buffer{};
-      return processBufferedPartial(state, empty_buffer, false);
-    } else {
-      result = FilterDataStatus::Continue;
-    }
+Filter::sendStreamChunk(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
+  switch (openStream()) {
+  case StreamOpenState::Error:
+    return {true, FilterDataStatus::StopIterationNoBuffer};
+  case StreamOpenState::IgnoreError:
+    return {true, FilterDataStatus::Continue};
+  case StreamOpenState::Ok:
+    // Fall through
+    break;
   }
-
-  return {true, result};
+  state.enqueueStreamingChunk(data, false, false);
+  // Put all buffered data so far into one big buffer
+  const auto& all_data = state.consolidateStreamedChunks(true);
+  ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode. end_stream = {}",
+            all_data.data.length(), end_stream);
+  sendBodyChunk(state, all_data.data, ProcessorState::CallbackState::BufferedPartialBodyCallback,
+                end_stream);
+  state.setPaused(true);
+  return {false, FilterDataStatus::StopIterationNoBuffer};
 }
 
 FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
