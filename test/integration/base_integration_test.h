@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -8,8 +9,8 @@
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "source/common/common/thread.h"
 #include "source/common/config/api_version.h"
-#include "source/common/config/version_converter.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -70,7 +71,7 @@ public:
   // configuration generated in ConfigHelper::finalize.
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
-  void setDeterministic() { deterministic_ = true; }
+  void setDeterministicValue(uint64_t value = 0) { deterministic_value_ = value; }
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
@@ -93,7 +94,11 @@ public:
   makeClientConnectionWithOptions(uint32_t port,
                                   const Network::ConnectionSocket::OptionsSharedPtr& options);
 
-  void registerTestServerPorts(const std::vector<std::string>& port_names);
+  void registerTestServerPorts(const std::vector<std::string>& port_names) {
+    registerTestServerPorts(port_names, test_server_);
+  }
+  void registerTestServerPorts(const std::vector<std::string>& port_names,
+                               IntegrationTestServerPtr& test_server);
   void createGeneratedApiTestServer(const std::string& bootstrap_path,
                                     const std::vector<std::string>& port_names,
                                     Server::FieldValidationConfig validator_config,
@@ -102,6 +107,12 @@ public:
                            const std::vector<std::string>& port_names,
                            Server::FieldValidationConfig validator_config,
                            bool allow_lds_rejection);
+
+  void createGeneratedApiTestServer(const std::string& bootstrap_path,
+                                    const std::vector<std::string>& port_names,
+                                    Server::FieldValidationConfig validator_config,
+                                    bool allow_lds_rejection,
+                                    IntegrationTestServerPtr& test_server);
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
@@ -143,12 +154,12 @@ public:
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
-                             const std::vector<std::string>& removed, const std::string& version,
-                             const bool api_downgrade = false) {
-    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
-      sendSotwDiscoveryResponse(type_url, state_of_the_world, version, api_downgrade);
+                             const std::vector<std::string>& removed, const std::string& version) {
+    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
+        sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
+      sendSotwDiscoveryResponse(type_url, state_of_the_world, version);
     } else {
-      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, api_downgrade);
+      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version);
     }
   }
 
@@ -157,10 +168,10 @@ public:
       const std::vector<std::string>& expected_resource_subscriptions,
       const std::vector<std::string>& expected_resource_unsubscriptions,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-      const std::string& expected_error_message = "") {
+      const std::string& expected_error_message = "", bool expect_node = true) {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_subscriptions,
                                         expected_resource_unsubscriptions, xds_stream_,
-                                        expected_error_code, expected_error_message);
+                                        expected_error_code, expected_error_message, expect_node);
   }
 
   AssertionResult compareDeltaDiscoveryRequest(
@@ -168,7 +179,7 @@ public:
       const std::vector<std::string>& expected_resource_subscriptions,
       const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& stream,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-      const std::string& expected_error_message = "");
+      const std::string& expected_error_message = "", bool expect_node = true);
 
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
@@ -178,16 +189,12 @@ public:
 
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                                 const std::string& version, const bool api_downgrade = false) {
+                                 const std::string& version) {
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {
-      if (api_downgrade) {
-        discovery_response.add_resources()->PackFrom(API_DOWNGRADE(message));
-      } else {
-        discovery_response.add_resources()->PackFrom(message);
-      }
+      discovery_response.add_resources()->PackFrom(message);
     }
     static int next_nonce_counter = 0;
     discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
@@ -195,54 +202,56 @@ public:
   }
 
   template <class T>
-  void sendDeltaDiscoveryResponse(const std::string& type_url,
-                                  const std::vector<T>& added_or_updated,
-                                  const std::vector<std::string>& removed,
-                                  const std::string& version, const bool api_downgrade = false) {
-    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {},
-                               api_downgrade);
+  void
+  sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
+                             const std::vector<std::string>& removed, const std::string& version) {
+    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {});
   }
   template <class T>
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
-                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {},
-                             const bool api_downgrade = false) {
-    auto response = createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version,
-                                                    aliases, api_downgrade);
+                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {}) {
+    auto response =
+        createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version, aliases);
     stream->sendGrpcMessage(response);
   }
+
+  // Sends a DeltaDiscoveryResponse with a given list of added resources.
+  // Note that the resources are expected to be of the same type, and match type_url.
+  void sendExplicitResourcesDeltaDiscoveryResponse(
+      const std::string& type_url,
+      const std::vector<envoy::service::discovery::v3::Resource>& added_or_updated,
+      const std::vector<std::string>& removed) {
+    xds_stream_->sendGrpcMessage(
+        createExplicitResourcesDeltaDiscoveryResponse(type_url, added_or_updated, removed));
+  }
+
+  envoy::service::discovery::v3::DeltaDiscoveryResponse
+  createExplicitResourcesDeltaDiscoveryResponse(
+      const std::string& type_url,
+      const std::vector<envoy::service::discovery::v3::Resource>& added_or_updated,
+      const std::vector<std::string>& removed);
 
   template <class T>
   envoy::service::discovery::v3::DeltaDiscoveryResponse
   createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                                const std::vector<std::string>& removed, const std::string& version,
-                               const std::vector<std::string>& aliases,
-                               const bool api_downgrade = false) {
-
-    envoy::service::discovery::v3::DeltaDiscoveryResponse response;
-    response.set_system_version_info("system_version_info_this_is_a_test");
-    response.set_type_url(type_url);
+                               const std::vector<std::string>& aliases) {
+    std::vector<envoy::service::discovery::v3::Resource> resources;
     for (const auto& message : added_or_updated) {
-      auto* resource = response.add_resources();
+      envoy::service::discovery::v3::Resource resource;
       ProtobufWkt::Any temp_any;
-      if (api_downgrade) {
-        temp_any.PackFrom(API_DOWNGRADE(message));
-        resource->mutable_resource()->PackFrom(API_DOWNGRADE(message));
-      } else {
-        temp_any.PackFrom(message);
-        resource->mutable_resource()->PackFrom(message);
-      }
-      resource->set_name(intResourceName(message));
-      resource->set_version(version);
+      temp_any.PackFrom(message);
+      resource.mutable_resource()->PackFrom(message);
+      resource.set_name(intResourceName(message));
+      resource.set_version(version);
       for (const auto& alias : aliases) {
-        resource->add_aliases(alias);
+        resource.add_aliases(alias);
       }
+      resources.emplace_back(resource);
     }
-    *response.mutable_removed_resources() = {removed.begin(), removed.end()};
-    static int next_nonce_counter = 0;
-    response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
-    return response;
+    return createExplicitResourcesDeltaDiscoveryResponse(type_url, resources, removed);
   }
 
 private:
@@ -269,8 +278,10 @@ public:
    *
    * @param port the port to connect to.
    * @param raw_http the data to send.
-   * @param response the response data will be sent here
-   * @param if the connection should be terminated once '\r\n\r\n' has been read.
+   * @param response the response data will be sent here.
+   * @param disconnect_after_headers_complete if the connection should be terminated once "\r\n\r\n"
+   *        has been read.
+   * @param transport_socket the transport socket of the created client connection.
    **/
   void sendRawHttpAndWaitForResponse(int port, const char* raw_http, std::string* response,
                                      bool disconnect_after_headers_complete = false,
@@ -332,6 +343,9 @@ public:
   }
 
 protected:
+  static std::string finalizeConfigWithPorts(ConfigHelper& helper, std::vector<uint32_t>& ports,
+                                             bool use_lds);
+
   void setUdpFakeUpstream(absl::optional<FakeUpstreamConfig::UdpConfig> config) {
     upstream_config_.udp_fake_upstream_ = config;
   }
@@ -343,7 +357,7 @@ protected:
 
   bool enableHalfClose() { return upstream_config_.enable_half_close_; }
 
-  const FakeUpstreamConfig& upstreamConfig() { return upstream_config_; }
+  FakeUpstreamConfig& upstreamConfig() { return upstream_config_; }
   void setMaxRequestHeadersKb(uint32_t value) { upstream_config_.max_request_headers_kb_ = value; }
   void setMaxRequestHeadersCount(uint32_t value) {
     upstream_config_.max_request_headers_count_ = value;
@@ -360,6 +374,9 @@ protected:
 
   void mergeOptions(envoy::config::core::v3::Http2ProtocolOptions& options) {
     upstream_config_.http2_options_.MergeFrom(options);
+  }
+  void mergeOptions(envoy::config::listener::v3::QuicProtocolOptions& options) {
+    upstream_config_.quic_options_.MergeFrom(options);
   }
 
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
@@ -431,8 +448,9 @@ protected:
   // This does nothing if autonomous_upstream_ is false
   bool autonomous_allow_incomplete_streams_{false};
 
-  // True if test will use a fixed RNG value.
-  bool deterministic_{};
+  // If this member is not empty, the test will use a fixed RNG value specified
+  // by it.
+  absl::optional<uint64_t> deterministic_value_{};
 
   // Set true when your test will itself take care of ensuring listeners are up, and registering
   // them in the port_map_.
@@ -441,9 +459,6 @@ protected:
   // By default the test server will use custom stats to notify on increment.
   // This override exists for tests measuring stats memory.
   bool use_real_stats_{};
-
-  // Use a v2 bootstrap.
-  bool v2_bootstrap_{false};
 
 private:
   // Configuration for the fake upstream.

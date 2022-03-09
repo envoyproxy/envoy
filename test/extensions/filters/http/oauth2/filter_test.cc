@@ -1,8 +1,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.h"
-#include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.validate.h"
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.validate.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
 
@@ -96,7 +96,7 @@ public:
 
   // Set up proto fields with standard config.
   FilterConfigSharedPtr getConfig() {
-    envoy::extensions::filters::http::oauth2::v3alpha::OAuth2Config p;
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
     endpoint->set_cluster("auth.example.com");
     endpoint->set_uri("auth.example.com/_oauth");
@@ -119,6 +119,8 @@ public:
     credentials->set_client_id(TEST_CLIENT_ID);
     credentials->mutable_token_secret()->set_name("secret");
     credentials->mutable_hmac_secret()->set_name("hmac");
+    // Skipping setting credentials.cookie_names field should give default cookie names:
+    // BearerToken, OauthHMAC, and OauthExpires.
 
     MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
@@ -139,6 +141,43 @@ public:
     auto callbacks = callbacks_.front();
     callbacks_.pop_front();
     return callbacks;
+  }
+
+  // Validates the behavior of the cookie validator.
+  void expectValidCookies(const CookieNames& cookie_names) {
+    // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+    test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
+
+    const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) + 10;
+
+    Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Path.get(), "/anypath"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+        {Http::Headers::get().Cookie.get(),
+         fmt::format("{}={};version=test", cookie_names.oauth_expires_, expires_at_s)},
+        {Http::Headers::get().Cookie.get(),
+         absl::StrCat(cookie_names.bearer_token_, "=xyztoken;version=test")},
+        {Http::Headers::get().Cookie.get(),
+         absl::StrCat(cookie_names.oauth_hmac_, "="
+                                                "NGQ3MzVjZGExNGM5NTFiZGJjODBkMjBmYjAyYjNiOTFjMmNjYj"
+                                                "IxMTUzNmNiNWU0NjQzMmMxMWUzZmE2ZWJjYg=="
+                                                ";version=test")},
+    };
+
+    auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_, cookie_names);
+    EXPECT_EQ(cookie_validator->token(), "");
+    cookie_validator->setParams(request_headers, "mock-secret");
+
+    EXPECT_TRUE(cookie_validator->hmacIsValid());
+    EXPECT_TRUE(cookie_validator->timestampIsValid());
+    EXPECT_TRUE(cookie_validator->isValid());
+
+    // If we advance time beyond 10s the timestamp should no longer be valid.
+    test_time_.advanceTimeWait(std::chrono::seconds(11));
+
+    EXPECT_FALSE(cookie_validator->timestampIsValid());
+    EXPECT_FALSE(cookie_validator->isValid());
   }
 
   NiceMock<Event::MockTimer>* attachmentTimeout_timer_{};
@@ -170,7 +209,7 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
   EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
   EXPECT_CALL(init_manager, add(_))
@@ -245,7 +284,7 @@ TEST_F(OAuth2Test, InvalidCluster) {
 TEST_F(OAuth2Test, DefaultAuthScope) {
 
   // Set up proto fields with no auth scope set.
-  envoy::extensions::filters::http::oauth2::v3alpha::OAuth2Config p;
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
   auto* endpoint = p.mutable_token_endpoint();
   endpoint->set_cluster("auth.example.com");
   endpoint->set_uri("auth.example.com/_oauth");
@@ -328,6 +367,10 @@ TEST_F(OAuth2Test, RequestSignout) {
        "OauthHMAC=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().SetCookie.get(),
        "BearerToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().Location.get(), "https://traffic.example.com/"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -493,37 +536,12 @@ TEST_F(OAuth2Test, OAuthOptionsRequestAndContinue) {
 
 // Validates the behavior of the cookie validator.
 TEST_F(OAuth2Test, CookieValidator) {
-  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
+  expectValidCookies(CookieNames{"BearerToken", "OauthHMAC", "OauthExpires"});
+}
 
-  const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) + 10;
-
-  Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Path.get(), "/anypath"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Cookie.get(),
-       fmt::format("OauthExpires={};version=test", expires_at_s)},
-      {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken;version=test"},
-      {Http::Headers::get().Cookie.get(),
-       "OauthHMAC="
-       "NGQ3MzVjZGExNGM5NTFiZGJjODBkMjBmYjAyYjNiOTFjMmNjYjIxMTUzNmNiNWU0NjQzMmMxMWUzZmE2ZWJjYg=="
-       ";version=test"},
-  };
-
-  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_);
-  EXPECT_EQ(cookie_validator->token(), "");
-  cookie_validator->setParams(request_headers, "mock-secret");
-
-  EXPECT_TRUE(cookie_validator->hmacIsValid());
-  EXPECT_TRUE(cookie_validator->timestampIsValid());
-  EXPECT_TRUE(cookie_validator->isValid());
-
-  // If we advance time beyond 10s the timestamp should no longer be valid.
-  test_time_.advanceTimeWait(std::chrono::seconds(11));
-
-  EXPECT_FALSE(cookie_validator->timestampIsValid());
-  EXPECT_FALSE(cookie_validator->isValid());
+// Validates the behavior of the cookie validator with custom cookie names.
+TEST_F(OAuth2Test, CookieValidatorWithCustomNames) {
+  expectValidCookies(CookieNames{"CustomBearerToken", "CustomOauthHMAC", "CustomOauthExpires"});
 }
 
 // Validates the behavior of the cookie validator when the expires_at value is not a valid integer.
@@ -540,7 +558,8 @@ TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAt) {
        ";version=test"},
   };
 
-  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_);
+  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
+      test_time_, CookieNames{"BearerToken", "OauthHMAC", "OauthExpires"});
   cookie_validator->setParams(request_headers, "mock-secret");
 
   EXPECT_TRUE(cookie_validator->hmacIsValid());

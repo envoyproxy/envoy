@@ -60,9 +60,13 @@ filter_chains:
           validation_context:
             trusted_ca:
               filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-            match_subject_alt_names:
-            - exact: localhost
-            - exact: 127.0.0.1
+            match_typed_subject_alt_names:
+            - matcher:
+                exact: localhost
+              san_type: URI
+            - matcher:
+                exact: 127.0.0.1
+              san_type: IP_ADDRESS
 udp_listener_config:
   quic_options: {}
   )EOF",
@@ -134,6 +138,18 @@ udp_listener_config:
       filter_chain->transportSocketFactory());
   EXPECT_TRUE(quic_socket_factory.implementsSecureTransport());
   EXPECT_FALSE(quic_socket_factory.getTlsCertificates().empty());
+  EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
+
+  // Stop listening shouldn't close the socket.
+  EXPECT_CALL(server_.dispatcher_, post(_)).WillOnce(Invoke([](std::function<void()> callback) {
+    callback();
+  }));
+  EXPECT_CALL(*worker_, stopListener(_, _))
+      .WillOnce(
+          Invoke([](Network::ListenerConfig&, std::function<void()> completion) { completion(); }));
+  manager_->stopListeners(ListenerManager::StopListenersType::All);
+  EXPECT_CALL(*listener_factory_.socket_, close()).Times(0u);
+  EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
 }
 #endif
 
@@ -161,9 +177,13 @@ filter_chains:
         validation_context:
           trusted_ca:
             filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-          match_subject_alt_names:
-          - exact: localhost
-          - exact: 127.0.0.1
+          match_typed_subject_alt_names:
+          - matcher:
+              exact: localhost
+            san_type: URI
+          - matcher:
+              exact: 127.0.0.1
+            san_type: IP_ADDRESS
 udp_listener_config:
   quic_options: {}
   )EOF",
@@ -205,9 +225,13 @@ filter_chains:
           validation_context:
             trusted_ca:
               filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-            match_subject_alt_names:
-            - exact: localhost
-            - exact: 127.0.0.1
+            match_typed_subject_alt_names:
+            - matcher:
+                exact: localhost
+              san_type: URI
+            - matcher:
+                exact: 127.0.0.1
+              san_type: IP_ADDRESS
 udp_listener_config:
   quic_options: {}
   )EOF",
@@ -219,6 +243,66 @@ udp_listener_config:
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(listener_proto, "", true), EnvoyException,
                           "error building network filter chain for quic listener: requires exactly "
                           "one http_connection_manager filter.");
+#else
+  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(listener_proto, "", true), EnvoyException,
+                          "QUIC is configured but not enabled in the build.");
+#endif
+}
+
+TEST_F(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryWithConnectionBalencer) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    protocol: UDP
+    port_value: 1234
+filter_chains:
+- filter_chain_match:
+    transport_protocol: "quic"
+  filters:
+  - name: envoy.filters.network.http_connection_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      codec_type: HTTP3
+      stat_prefix: hcm
+      route_config:
+        name: local_route
+      http_filters:
+        - name: envoy.filters.http.router
+  transport_socket:
+    name: envoy.transport_sockets.quic
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
+      downstream_tls_context:
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+            private_key:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+          validation_context:
+            trusted_ca:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+            match_typed_subject_alt_names:
+            - matcher:
+                exact: localhost
+              san_type: URI
+            - matcher:
+                exact: 127.0.0.1
+              san_type: IP_ADDRESS
+udp_listener_config:
+  quic_options: {}
+connection_balance_config:
+  exact_balance: {}
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
+
+#if defined(ENVOY_ENABLE_QUIC)
+  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(listener_proto, "", true), EnvoyException,
+                          "connection_balance_config is configured for QUIC listener which doesn't "
+                          "work with connection balancer.");
 #else
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(listener_proto, "", true), EnvoyException,
                           "QUIC is configured but not enabled in the build.");

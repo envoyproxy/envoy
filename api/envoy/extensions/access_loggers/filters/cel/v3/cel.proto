@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package envoy.extensions.access_loggers.filters.cel.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.access_loggers.filters.cel.v3";
+option java_outer_classname = "CelProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/filters/cel/v3;celv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: ExpressionFilter]
+// [#extension: envoy.access_loggers.extension_filters.cel]
+
+// ExpressionFilter is an access logging filter that evaluates configured
+// symbolic Common Expression Language expressions to inform the decision
+// to generate an access log.
+message ExpressionFilter {
+  // Expression that, when evaluated, will be used to filter access logs.
+  // Expressions are based on the set of Envoy :ref:`attributes <arch_overview_attributes>`.
+  // The provided expression must evaluate to true for logging (expression errors are considered false).
+  // Examples:
+  // - `response.code >= 400`
+  // - `(connection.mtls && request.headers['x-log-mtls'] == 'true') || request.url_path.contains('v1beta3')`
+  string expression = 1;
+}

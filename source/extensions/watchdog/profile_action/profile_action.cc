@@ -6,7 +6,7 @@
 
 #include "source/common/profiler/profiler.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "absl/strings/str_format.h"
 
@@ -27,7 +27,7 @@ std::string generateProfileFilePath(const std::string& directory, TimeSource& ti
 } // namespace
 
 ProfileAction::ProfileAction(
-    envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig& config,
+    envoy::extensions::watchdog::profile_action::v3::ProfileActionConfig& config,
     Server::Configuration::GuardDogActionFactoryContext& context)
     : path_(config.profile_path()),
       duration_(

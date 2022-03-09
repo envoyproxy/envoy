@@ -17,7 +17,7 @@ Network::Address::InstanceConstSharedPtr OriginalDstFilter::getOriginalDst(Netwo
 }
 
 Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbacks& cb) {
-  ENVOY_LOG(debug, "original_dst: New connection accepted");
+  ENVOY_LOG(debug, "original_dst: new connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
 
   if (socket.addressType() == Network::Address::Type::Ip) {
@@ -58,13 +58,13 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
           filter_state
               .getDataMutable<Network::UpstreamSocketOptionsFilterState>(
                   Network::UpstreamSocketOptionsFilterState::key())
-              .addOption(
+              ->addOption(
                   Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
         }
       }
 #endif
       // Restore the local address to the original one.
-      socket.addressProvider().restoreLocalAddress(original_local_address);
+      socket.connectionInfoProvider().restoreLocalAddress(original_local_address);
     }
   }
 

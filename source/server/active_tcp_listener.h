@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/linked_object.h"
@@ -26,9 +27,9 @@ class ActiveTcpListener final : public Network::TcpListenerCallbacks,
                                 public Network::BalancedConnectionHandler {
 public:
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config,
-                    uint32_t worker_index);
+                    Runtime::Loader& runtime, uint32_t worker_index);
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerPtr&& listener,
-                    Network::ListenerConfig& config);
+                    Network::ListenerConfig& config, Runtime::Loader& runtime);
   ~ActiveTcpListener() override;
 
   bool listenerConnectionLimitReached() const {
@@ -74,7 +75,7 @@ public:
    * Update the listener config. The follow up connections will see the new config. The existing
    * connections are not impacted.
    */
-  void updateListenerConfig(Network::ListenerConfig& config);
+  void updateListenerConfig(Network::ListenerConfig& config) override;
 
   Network::TcpConnectionHandler& tcp_conn_handler_;
   // The number of connections currently active on this listener. This is typically used for

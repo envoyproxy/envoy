@@ -16,20 +16,30 @@ namespace Envoy {
 namespace ThreadLocal {
 
 TEST(MainThreadVerificationTest, All) {
-  // Before threading is on, assertion on main thread should be true.
-  EXPECT_TRUE(Thread::MainThread::isMainThread());
-  EXPECT_TRUE(Thread::MainThread::isWorkerThread());
+  // Before threading is on, we are in the test thread, not the main thread.
+  EXPECT_FALSE(Thread::MainThread::isMainThread());
+#if TEST_THREAD_SUPPORTED
+  EXPECT_TRUE(Thread::TestThread::isTestThread());
+  EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
+#endif
   {
     InstanceImpl tls;
     // Tls instance has been initialized.
     // Call to main thread verification should succeed in main thread.
     EXPECT_TRUE(Thread::MainThread::isMainThread());
-    EXPECT_FALSE(Thread::MainThread::isWorkerThread());
+#if TEST_THREAD_SUPPORTED
+    EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
+    EXPECT_TRUE(Thread::TestThread::isTestThread());
+#endif
     tls.shutdownGlobalThreading();
     tls.shutdownThread();
   }
-  // After threading is off, assertion on main thread should be true.
-  EXPECT_TRUE(Thread::MainThread::isMainThread());
+  // After threading is off, assertion we are again in the test thread, not the main thread.
+  EXPECT_FALSE(Thread::MainThread::isMainThread());
+#if TEST_THREAD_SUPPORTED
+  EXPECT_TRUE(Thread::TestThread::isTestThread());
+  EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
+#endif
 }
 
 class TestThreadLocalObject : public ThreadLocalObject {
@@ -304,6 +314,25 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
         EXPECT_EQ(thread_dispatcher.get(), &tls.dispatcher());
         // Verify that it is inside the worker thread.
         EXPECT_FALSE(Thread::MainThread::isMainThread());
+    // Verify that is is not in the test thread either.
+#if TEST_THREAD_SUPPORTED
+        EXPECT_FALSE(Thread::TestThread::isTestThread());
+        EXPECT_FALSE(Thread::MainThread::isMainOrTestThread());
+#endif
+
+        ASSERT_IS_NOT_TEST_THREAD();
+        ASSERT_IS_NOT_MAIN_OR_TEST_THREAD();
+        {
+          Thread::SkipAsserts skip;
+          ASSERT_IS_NOT_TEST_THREAD();
+          ASSERT_IS_NOT_MAIN_OR_TEST_THREAD();
+          ASSERT_IS_TEST_THREAD();
+          ASSERT_IS_MAIN_OR_TEST_THREAD();
+          TRY_ASSERT_MAIN_THREAD {}
+          END_TRY
+          catch (const std::exception&) {
+          }
+        }
       });
   thread->join();
 

@@ -665,10 +665,12 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   checkStats();
   envoy::config::core::v3::Address expected_local_address;
   Network::Utility::addressToProtobufAddress(
-      *codec_client_->connection()->addressProvider().remoteAddress(), expected_local_address);
+      *codec_client_->connection()->connectionInfoProvider().remoteAddress(),
+      expected_local_address);
   envoy::config::core::v3::Address expected_remote_address;
   Network::Utility::addressToProtobufAddress(
-      *codec_client_->connection()->addressProvider().localAddress(), expected_remote_address);
+      *codec_client_->connection()->connectionInfoProvider().localAddress(),
+      expected_remote_address);
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
   envoy::data::tap::v3::TraceWrapper trace;

@@ -21,11 +21,10 @@
 #include "source/common/common/thread.h"
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/config/opaque_resource_decoder_impl.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
@@ -217,6 +216,15 @@ public:
   static Stats::GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
 
   /**
+   * Find a histogram in a stats store.
+   * @param store supplies the stats store.
+   * @param name supplies the name to search for.
+   * @return Stats::ParentHistogramSharedPtr the histogram or nullptr if there is none.
+   */
+  static Stats::ParentHistogramSharedPtr findHistogram(Stats::Store& store,
+                                                       const std::string& name);
+
+  /**
    * Wait for a counter to == a given value.
    * @param store supplies the stats store.
    * @param name supplies the name of the counter to wait for.
@@ -240,7 +248,7 @@ public:
    * @param value target value.
    * @param time_system the time system to use for waiting.
    * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
-   * @return AssertionSuccess() if the counter was >= to the value within the timeout, else
+   * @return AssertionSuccess() if the counter was >= the value within the timeout, else
    * AssertionFailure().
    */
   static AssertionResult
@@ -279,6 +287,17 @@ public:
                  std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**
+   * Wait for a gauge to be destroyed.
+   * @param store supplies the stats store.
+   * @param name gauge name.
+   * @param time_system the time system to use for waiting.
+   * @return AssertionSuccess() if the gauge is destroyed within a fixed timeout, else
+   * AssertionFailure().
+   */
+  static AssertionResult waitForGaugeDestroyed(Stats::Store& store, const std::string& name,
+                                               Event::TestTimeSystem& time_system);
+
+  /**
    * Wait for a histogram to have samples.
    * @param store supplies the stats store.
    * @param name histogram name.
@@ -315,7 +334,7 @@ public:
    */
   static std::list<Network::DnsResponse>
   makeDnsResponse(const std::list<std::string>& addresses,
-                  std::chrono::seconds = std::chrono::seconds(0));
+                  std::chrono::seconds = std::chrono::seconds(6));
 
   /**
    * List files in a given directory path
@@ -601,34 +620,20 @@ public:
   static std::string nonZeroedGauges(const std::vector<Stats::GaugeSharedPtr>& gauges);
 
   // Strict variants of Protobuf::MessageUtil
-  static void loadFromJson(const std::string& json, Protobuf::Message& message,
-                           bool preserve_original_type = false, bool avoid_boosting = false) {
-    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor(),
-                              !avoid_boosting);
-    if (!preserve_original_type) {
-      Config::VersionConverter::eraseOriginalTypeInformation(message);
-    }
+  static void loadFromJson(const std::string& json, Protobuf::Message& message) {
+    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor());
   }
 
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
     MessageUtil::loadFromJson(json, message);
   }
 
-  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                           bool preserve_original_type = false, bool avoid_boosting = false) {
-    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor(),
-                              !avoid_boosting);
-    if (!preserve_original_type) {
-      Config::VersionConverter::eraseOriginalTypeInformation(message);
-    }
+  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message) {
+    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor());
   }
 
-  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api,
-                           bool preserve_original_type = false) {
+  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
     MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(), api);
-    if (!preserve_original_type) {
-      Config::VersionConverter::eraseOriginalTypeInformation(message);
-    }
   }
 
   template <class MessageType>
@@ -637,14 +642,9 @@ public:
   }
 
   template <class MessageType>
-  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
-                                      bool preserve_original_type = false,
-                                      bool avoid_boosting = false) {
-    MessageUtil::loadFromYamlAndValidate(
-        yaml, message, ProtobufMessage::getStrictValidationVisitor(), avoid_boosting);
-    if (!preserve_original_type) {
-      Config::VersionConverter::eraseOriginalTypeInformation(message);
-    }
+  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
+    MessageUtil::loadFromYamlAndValidate(yaml, message,
+                                         ProtobufMessage::getStrictValidationVisitor());
   }
 
   template <class MessageType> static void validate(const MessageType& message) {
@@ -773,52 +773,8 @@ public:
     case envoy::config::core::v3::ApiVersion::V3:
       return "V3";
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("reached unexpected code");
     }
-  }
-
-  /**
-   * Returns the fully-qualified name of a service, rendered from service_full_name_template.
-   *
-   * @param service_full_name_template the service fully-qualified name template.
-   * @param api_version version of a service.
-   * @param service_namespace to override the service namespace.
-   * @return std::string full path of a service method.
-   */
-  static std::string
-  getVersionedServiceFullName(const std::string& service_full_name_template,
-                              envoy::config::core::v3::ApiVersion api_version,
-                              const std::string& service_namespace = EMPTY_STRING) {
-    switch (api_version) {
-    case envoy::config::core::v3::ApiVersion::AUTO:
-      FALLTHRU;
-    case envoy::config::core::v3::ApiVersion::V2:
-      return fmt::format(service_full_name_template, "v2", service_namespace);
-
-    case envoy::config::core::v3::ApiVersion::V3:
-      return fmt::format(service_full_name_template, "v3", service_namespace);
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-  }
-
-  /**
-   * Returns the full path of a service method.
-   *
-   * @param service_full_name_template the service fully-qualified name template.
-   * @param method_name the method name.
-   * @param api_version version of a service method.
-   * @param service_namespace to override the service namespace.
-   * @return std::string full path of a service method.
-   */
-  static std::string getVersionedMethodPath(const std::string& service_full_name_template,
-                                            absl::string_view method_name,
-                                            envoy::config::core::v3::ApiVersion api_version,
-                                            const std::string& service_namespace = EMPTY_STRING) {
-    return absl::StrCat(
-        "/",
-        getVersionedServiceFullName(service_full_name_template, api_version, service_namespace),
-        "/", method_name);
   }
 };
 

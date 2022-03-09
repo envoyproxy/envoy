@@ -2,18 +2,16 @@
 
 # Validate extension metadata
 
+import json
 import pathlib
 import re
 import sys
 from functools import cached_property
-from importlib.abc import Loader
-from importlib.util import spec_from_loader, module_from_spec
-from importlib.machinery import ModuleSpec, SourceFileLoader
 from typing import Iterator
 
-from tools.base import checker, utils
+from aio.run import checker
 
-BUILD_CONFIG_PATH = "source/extensions/extensions_build_config.bzl"
+from envoy.base import utils
 
 BUILTIN_EXTENSIONS = (
     "envoy.request_id.uuid", "envoy.upstreams.tcp.generic", "envoy.transport_sockets.tls",
@@ -48,12 +46,14 @@ EXTENSION_CATEGORIES = (
     "envoy.formatter", "envoy.grpc_credentials", "envoy.guarddog_actions", "envoy.health_checkers",
     "envoy.http.stateful_header_formatters", "envoy.internal_redirect_predicates",
     "envoy.io_socket", "envoy.http.original_ip_detection", "envoy.matching.common_inputs",
-    "envoy.matching.input_matchers", "envoy.quic.proof_source", "envoy.quic.server.crypto_stream",
-    "envoy.rate_limit_descriptors", "envoy.request_id", "envoy.resource_monitors",
-    "envoy.retry_host_predicates", "envoy.retry_priorities", "envoy.stats_sinks",
-    "envoy.thrift_proxy.filters", "envoy.tracers", "envoy.transport_sockets.downstream",
-    "envoy.transport_sockets.upstream", "envoy.tls.cert_validator", "envoy.upstreams",
-    "envoy.wasm.runtime")
+    "envoy.matching.input_matchers", "envoy.tls.key_providers", "envoy.quic.proof_source",
+    "envoy.quic.server.crypto_stream", "envoy.rate_limit_descriptors", "envoy.request_id",
+    "envoy.resource_monitors", "envoy.retry_host_predicates", "envoy.retry_priorities",
+    "envoy.stats_sinks", "envoy.thrift_proxy.filters", "envoy.tracers", "envoy.sip_proxy.filters",
+    "envoy.transport_sockets.downstream", "envoy.transport_sockets.upstream",
+    "envoy.tls.cert_validator", "envoy.upstreams", "envoy.wasm.runtime", "envoy.common.key_value",
+    "envoy.network.dns_resolver", "envoy.rbac.matchers", "envoy.access_loggers.extension_filters",
+    "envoy.http.stateful_session")
 
 EXTENSION_STATUS_VALUES = (
     # This extension is stable and is expected to be production usable.
@@ -70,6 +70,7 @@ FILTER_NAMES_PATTERN = "NetworkFilterNames::get()"
 FUZZ_TEST_PATH = "test/extensions/filters/network/common/fuzz/uber_per_readfilter.cc"
 
 METADATA_PATH = "source/extensions/extensions_metadata.yaml"
+CONTRIB_METADATA_PATH = "contrib/extensions_metadata.yaml"
 
 
 class ExtensionsConfigurationError(Exception):
@@ -84,25 +85,16 @@ class ExtensionsChecker(checker.Checker):
 
     @cached_property
     def all_extensions(self) -> set:
-        return set(self.configured_extensions.keys()) | set(BUILTIN_EXTENSIONS)
+        return set(self.configured_extensions.keys()) | set(
+            self.configured_contrib_extensions.keys()) | set(BUILTIN_EXTENSIONS)
 
     @cached_property
     def configured_extensions(self) -> dict:
-        # source/extensions/extensions_build_config.bzl must have a
-        # .bzl suffix for Starlark import, so we are forced to do this workaround.
-        _extensions_build_config_spec = spec_from_loader(
-            "extensions_build_config",
-            SourceFileLoader("extensions_build_config", BUILD_CONFIG_PATH))
+        return json.loads(pathlib.Path(self.args.build_config).read_text())
 
-        if not isinstance(_extensions_build_config_spec, ModuleSpec):
-            raise ExtensionsConfigurationError(f"Unable to parse build config {BUILD_CONFIG_PATH}")
-        extensions_build_config = module_from_spec(_extensions_build_config_spec)
-
-        if not isinstance(_extensions_build_config_spec.loader, Loader):
-            raise ExtensionsConfigurationError(f"Unable to parse build config {BUILD_CONFIG_PATH}")
-
-        _extensions_build_config_spec.loader.exec_module(extensions_build_config)
-        return getattr(extensions_build_config, "EXTENSIONS")
+    @cached_property
+    def configured_contrib_extensions(self) -> dict:
+        return json.loads(pathlib.Path(self.args.contrib_build_config).read_text())
 
     @property
     def fuzzed_count(self) -> int:
@@ -114,8 +106,10 @@ class ExtensionsChecker(checker.Checker):
     @cached_property
     def metadata(self) -> dict:
         result = utils.from_yaml(METADATA_PATH)
+        result.update(utils.from_yaml(CONTRIB_METADATA_PATH))
         if not isinstance(result, dict):
-            raise ExtensionsConfigurationError(f"Unable to parse configuration: {METADATA_PATH}")
+            raise ExtensionsConfigurationError(
+                f"Unable to parse metadata: {METADATA_PATH} {CONTRIB_METADATA_PATH}")
         return result
 
     @property
@@ -126,7 +120,13 @@ class ExtensionsChecker(checker.Checker):
             if "network" in ext and data["security_posture"] == "robust_to_untrusted_downstream"
         ])
 
-    def check_fuzzed(self) -> None:
+    def add_arguments(self, parser):
+        super().add_arguments(parser)
+        parser.add_argument("--build_config")
+        parser.add_argument("--contrib_build_config")
+        parser.add_argument("--core_extensions")
+
+    async def check_fuzzed(self) -> None:
         if self.robust_to_downstream_count == self.fuzzed_count:
             return
         self.error(
@@ -135,13 +135,13 @@ class ExtensionsChecker(checker.Checker):
                 f"downstreams are fuzzed by adding them to filterNames() in {FUZZ_TEST_PATH}"
             ])
 
-    def check_metadata(self) -> None:
+    async def check_metadata(self) -> None:
         for extension in self.metadata:
             errors = self._check_metadata(extension)
             if errors:
                 self.error("metadata", errors)
 
-    def check_registered(self) -> None:
+    async def check_registered(self) -> None:
         only_metadata = set(self.metadata.keys()) - self.all_extensions
         missing_metadata = self.all_extensions - set(self.metadata.keys())
 
@@ -164,7 +164,9 @@ class ExtensionsChecker(checker.Checker):
         categories = self.metadata[extension].get("categories", ())
         for cat in categories:
             if cat not in self.extension_categories:
-                yield f"Unknown extension category for {extension}: {cat}"
+                yield (
+                    f"Unknown extension category for {extension}: {cat}. "
+                    "Please add it to tools/extensions/extensions_check.py")
         if not categories:
             yield (
                 f"Missing extension category for {extension}. "
@@ -185,9 +187,9 @@ class ExtensionsChecker(checker.Checker):
             yield f"Unknown status for {extension}: {status}"
 
 
-def main() -> int:
-    return ExtensionsChecker().run()
+def main(*args) -> int:
+    return ExtensionsChecker(*args)()
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(*sys.argv[1:]))

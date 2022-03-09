@@ -5,6 +5,7 @@
 #include "source/common/common/cleanup.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/utility.h"
 #include "source/common/config/xds_resource.h"
 
 namespace Envoy {
@@ -49,7 +50,7 @@ void WatchMap::removeDeferredWatches() {
 AddedRemoved
 WatchMap::updateWatchInterest(Watch* watch,
                               const absl::flat_hash_set<std::string>& update_to_these_names) {
-  if (update_to_these_names.empty()) {
+  if (update_to_these_names.empty() || update_to_these_names.contains(Wildcard)) {
     wildcard_watches_.insert(watch);
   } else {
     wildcard_watches_.erase(watch);
@@ -110,7 +111,7 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
   return ret;
 }
 
-void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+void WatchMap::onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
                               const std::string& version_info) {
   if (watches_.empty()) {
     return;
@@ -123,15 +124,11 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
   // Build a map from watches, to the set of updated resources that each watch cares about. Each
   // entry in the map is then a nice little bundle that can be fed directly into the individual
   // onConfigUpdate()s.
-  std::vector<DecodedResourceImplPtr> decoded_resources;
   absl::flat_hash_map<Watch*, std::vector<DecodedResourceRef>> per_watch_updates;
   for (const auto& r : resources) {
-    decoded_resources.emplace_back(
-        DecodedResourceImpl::fromResource((*watches_.begin())->resource_decoder_, r, version_info));
-    const absl::flat_hash_set<Watch*>& interested_in_r =
-        watchesInterestedIn(decoded_resources.back()->name());
+    const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r->name());
     for (const auto& interested_watch : interested_in_r) {
-      per_watch_updates[interested_watch].emplace_back(*decoded_resources.back());
+      per_watch_updates[interested_watch].emplace_back(*r);
     }
   }
 
@@ -159,6 +156,21 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
       watch->callbacks_.onConfigUpdate(this_watch_updates->second, version_info);
     }
   }
+}
+
+void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                              const std::string& version_info) {
+  if (watches_.empty()) {
+    return;
+  }
+
+  std::vector<DecodedResourcePtr> decoded_resources;
+  for (const auto& r : resources) {
+    decoded_resources.emplace_back(
+        DecodedResourceImpl::fromResource((*watches_.begin())->resource_decoder_, r, version_info));
+  }
+
+  onConfigUpdate(decoded_resources, version_info);
 }
 
 void WatchMap::onConfigUpdate(

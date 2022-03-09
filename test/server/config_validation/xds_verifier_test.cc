@@ -7,13 +7,11 @@ namespace Envoy {
 
 envoy::config::listener::v3::Listener buildListener(const std::string& listener_name,
                                                     const std::string& route_name) {
-  return ConfigHelper::buildListener(listener_name, route_name, "", "ads_test",
-                                     envoy::config::core::v3::ApiVersion::V3);
+  return ConfigHelper::buildListener(listener_name, route_name, "", "ads_test");
 }
 
 envoy::config::route::v3::RouteConfiguration buildRoute(const std::string& route_name) {
-  return ConfigHelper::buildRouteConfig(route_name, "cluster_0",
-                                        envoy::config::core::v3::ApiVersion::V3);
+  return ConfigHelper::buildRouteConfig(route_name, "cluster_0");
 }
 
 // Add, warm, drain and remove a listener.

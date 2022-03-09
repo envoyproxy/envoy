@@ -38,8 +38,8 @@ public:
    * Schedule to remove and destroy the active connections which are not tracked by listener
    * config. Caution: The connection are not destroyed yet when function returns.
    */
-  void
-  deferredRemoveFilterChains(const std::list<const Network::FilterChain*>& draining_filter_chains) {
+  void onFilterChainDraining(
+      const std::list<const Network::FilterChain*>& draining_filter_chains) override {
     // Need to recover the original deleting state.
     const bool was_deleting = is_deleting_;
     is_deleting_ = true;

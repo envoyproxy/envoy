@@ -192,10 +192,10 @@ public:
   virtual bool readEnabled() const PURE;
 
   /**
-   * @return the address provider backing this connection.
+   * @return the connection info provider backing this connection.
    */
-  virtual const SocketAddressProvider& addressProvider() const PURE;
-  virtual SocketAddressProviderSharedPtr addressProviderSharedPtr() const PURE;
+  virtual const ConnectionInfoProvider& connectionInfoProvider() const PURE;
+  virtual ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const PURE;
 
   /**
    * Credentials of the peer of a socket as decided by SO_PEERCRED.
@@ -326,6 +326,29 @@ public:
    *  returned.
    */
   virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() const PURE;
+
+  /**
+   * Try to configure the connection's initial congestion window.
+   * The operation is advisory - the connection may not support it, even if it's supported, it may
+   * not do anything after the first few network round trips with the peer.
+   * @param bandwidth_bits_per_sec The estimated bandwidth between the two endpoints of the
+   * connection.
+   * @param rtt The estimated round trip time between the two endpoints of the connection.
+   *
+   * @note Envoy does not provide an implementation for TCP connections because
+   * there is no portable system api to do so. Applications can implement it
+   * with a proprietary api in a customized TransportSocket.
+   */
+  virtual void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                                std::chrono::microseconds rtt) PURE;
+
+  /**
+   * @return the current congestion window in bytes, or unset if not available or not
+   * congestion-controlled.
+   * @note some congestion controller's cwnd is measured in number of packets, in that case the
+   * return value is cwnd(in packets) times the connection's MSS.
+   */
+  virtual absl::optional<uint64_t> congestionWindowInBytes() const PURE;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;

@@ -1,0 +1,5 @@
+clientPort={{ data['zk_port'] }}
+dataDir={{ data['data_dir'] }}
+maxClientCnxns=0
+# ZK 3.5 tries to bind 8080 for introspection capacility - we do not need that.
+admin.enableServer=false

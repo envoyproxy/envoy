@@ -180,8 +180,8 @@ RouteMatcher::RouteMatcher(
     case RouteMatch::MatchSpecifierCase::kServiceName:
       routes_.emplace_back(new ServiceNameRouteEntryImpl(route));
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case RouteMatch::MatchSpecifierCase::MATCH_SPECIFIER_NOT_SET:
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
   }
 }
@@ -207,6 +207,8 @@ void Router::onDestroy() {
   for (auto& shadow_router : shadow_routers_) {
     shadow_router.get().onRouterDestroy();
   }
+
+  shadow_routers_.clear();
 }
 
 void Router::setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) {
@@ -234,7 +236,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   route_ = callbacks_->route();
   if (!route_) {
     ENVOY_STREAM_LOG(debug, "no route match for method '{}'", *callbacks_, metadata->methodName());
-    stats().route_missing_.inc();
+    stats().named_.route_missing_.inc();
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::UnknownMethod,
                      fmt::format("no route for method '{}'", metadata->methodName())),
@@ -292,7 +294,7 @@ FilterStatus Router::messageEnd() {
   ProtocolConverter::messageEnd();
   const auto encode_size = upstream_request_->encodeAndWrite(upstream_request_buffer_);
   addSize(encode_size);
-  recordUpstreamRequestSize(*cluster_, request_size_);
+  stats().recordUpstreamRequestSize(*cluster_, request_size_);
 
   // Dispatch shadow requests, if any.
   // Note: if connections aren't ready, the write will happen when appropriate.
@@ -452,7 +454,7 @@ FilterStatus Router::setEnd() {
 
 void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   const bool done =
-      upstream_request_->handleUpstreamData(data, end_stream, *this, *upstream_response_callbacks_);
+      upstream_request_->handleUpstreamData(data, end_stream, *upstream_response_callbacks_);
   if (done) {
     cleanup();
   }

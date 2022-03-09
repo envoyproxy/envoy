@@ -25,6 +25,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "custom_stat_namespaces_lib",
+    srcs = ["custom_stat_namespaces_impl.cc"],
+    hdrs = ["custom_stat_namespaces_impl.h"],
+    deps = [
+        "//envoy/stats:custom_stat_namespaces_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
+        "//source/common/common:thread_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "histogram_lib",
     srcs = ["histogram_impl.cc"],
     hdrs = ["histogram_impl.h"],
@@ -77,7 +89,7 @@ envoy_cc_library(
     deps = [
         ":symbol_table_lib",
         "//envoy/stats:stats_interface",
-        "//envoy/stats:symbol_table_interface",
+        "//source/common/config:well_known_names",
     ],
 )
 
@@ -175,12 +187,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "symbol_table_lib",
-    srcs = ["symbol_table_impl.cc"],
-    hdrs = ["symbol_table_impl.h"],
-    external_deps = ["abseil_base"],
+    srcs = ["symbol_table.cc"],
+    hdrs = ["symbol_table.h"],
+    external_deps = [
+        "abseil_base",
+        "abseil_inlined_vector",
+    ],
     deps = [
         ":recent_lookups_lib",
-        "//envoy/stats:symbol_table_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:mem_block_builder_lib",
         "//source/common/common:minimal_logger_lib",

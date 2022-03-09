@@ -31,10 +31,8 @@ class NewGrpcMuxImpl
       Logger::Loggable<Logger::Id::config> {
 public:
   NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-                 const Protobuf::MethodDescriptor& service_method,
-                 envoy::config::core::v3::ApiVersion transport_api_version,
-                 Random::RandomGenerator& random, Stats::Scope& scope,
-                 const RateLimitSettings& rate_limit_settings,
+                 const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
+                 Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
 
   ~NewGrpcMuxImpl() override;
@@ -83,10 +81,9 @@ public:
 
   struct SubscriptionStuff {
     SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
-                      const bool use_namespace_matching, Event::Dispatcher& dispatcher,
-                      const bool wildcard)
+                      const bool use_namespace_matching, Event::Dispatcher& dispatcher)
         : watch_map_(use_namespace_matching),
-          sub_state_(type_url, watch_map_, local_info, dispatcher, wildcard) {}
+          sub_state_(type_url, watch_map_, local_info, dispatcher) {}
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
@@ -140,8 +137,7 @@ private:
                    const SubscriptionOptions& options);
 
   // Adds a subscription for the type_url to the subscriptions map and order list.
-  void addSubscription(const std::string& type_url, bool use_namespace_matching,
-                       const bool wildcard);
+  void addSubscription(const std::string& type_url, bool use_namespace_matching);
 
   void trySendDiscoveryRequests();
 
@@ -178,7 +174,6 @@ private:
 
   const LocalInfo::LocalInfo& local_info_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
-  const envoy::config::core::v3::ApiVersion transport_api_version_;
   Event::Dispatcher& dispatcher_;
 
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is

@@ -95,12 +95,11 @@ protected:
     return addresses;
   }
 
-  void setupFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
+  void setupFromV3Yaml(const std::string& yaml) {
     expectRedisSessionCreated();
     NiceMock<Upstream::MockClusterManager> cm;
-    envoy::config::cluster::v3::Cluster cluster_config =
-        Upstream::parseClusterFromV3Yaml(yaml, avoid_boosting);
-    Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
+    envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
+    Envoy::Stats::ScopeSharedPtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -109,7 +108,6 @@ protected:
 
     envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
     cluster_ = std::make_shared<RedisCluster>(
@@ -130,7 +128,7 @@ protected:
   void setupFactoryFromV3Yaml(const std::string& yaml) {
     NiceMock<Upstream::MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
-    Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
+    Envoy::Stats::ScopeSharedPtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -139,7 +137,6 @@ protected:
 
     envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(),
                                            validation_visitor_, config);
 
     NiceMock<AccessLog::MockAccessLogManager> log_manager;
@@ -196,6 +193,33 @@ protected:
     pool_callbacks_->onFailure();
   }
 
+  NetworkFilters::Common::Redis::RespValuePtr singleSlotPrimary(const std::string& primary,
+                                                                int64_t port) const {
+    std::vector<NetworkFilters::Common::Redis::RespValue> primary_1(2);
+    primary_1[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+    primary_1[0].asString() = primary;
+    primary_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    primary_1[1].asInteger() = port;
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slot_1(3);
+    slot_1[0].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slot_1[0].asInteger() = 0;
+    slot_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slot_1[1].asInteger() = 16383;
+    slot_1[2].type(NetworkFilters::Common::Redis::RespType::Array);
+    slot_1[2].asArray().swap(primary_1);
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slots(1);
+    slots[0].type(NetworkFilters::Common::Redis::RespType::Array);
+    slots[0].asArray().swap(slot_1);
+
+    NetworkFilters::Common::Redis::RespValuePtr response(
+        new NetworkFilters::Common::Redis::RespValue());
+    response->type(NetworkFilters::Common::Redis::RespType::Array);
+    response->asArray().swap(slots);
+    return response;
+  }
+
   NetworkFilters::Common::Redis::RespValuePtr singleSlotPrimaryReplica(const std::string& primary,
                                                                        const std::string& replica,
                                                                        int64_t port) const {
@@ -220,6 +244,50 @@ protected:
     slot_1[2].asArray().swap(primary_1);
     slot_1[3].type(NetworkFilters::Common::Redis::RespType::Array);
     slot_1[3].asArray().swap(replica_1);
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slots(1);
+    slots[0].type(NetworkFilters::Common::Redis::RespType::Array);
+    slots[0].asArray().swap(slot_1);
+
+    NetworkFilters::Common::Redis::RespValuePtr response(
+        new NetworkFilters::Common::Redis::RespValue());
+    response->type(NetworkFilters::Common::Redis::RespType::Array);
+    response->asArray().swap(slots);
+    return response;
+  }
+
+  NetworkFilters::Common::Redis::RespValuePtr
+  singleSlotPrimaryWithTwoReplicas(const std::string& primary, const std::string& replica_1,
+                                   const std::string& replica_2, int64_t port) const {
+    std::vector<NetworkFilters::Common::Redis::RespValue> primary_1(2);
+    primary_1[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+    primary_1[0].asString() = primary;
+    primary_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    primary_1[1].asInteger() = port;
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> repl_1(2);
+    repl_1[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+    repl_1[0].asString() = replica_1;
+    repl_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    repl_1[1].asInteger() = port;
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> repl_2(2);
+    repl_2[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+    repl_2[0].asString() = replica_2;
+    repl_2[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    repl_2[1].asInteger() = port;
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slot_1(5);
+    slot_1[0].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slot_1[0].asInteger() = 0;
+    slot_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slot_1[1].asInteger() = 16383;
+    slot_1[2].type(NetworkFilters::Common::Redis::RespType::Array);
+    slot_1[2].asArray().swap(primary_1);
+    slot_1[3].type(NetworkFilters::Common::Redis::RespType::Array);
+    slot_1[3].asArray().swap(repl_1);
+    slot_1[4].type(NetworkFilters::Common::Redis::RespType::Array);
+    slot_1[4].asArray().swap(repl_2);
 
     std::vector<NetworkFilters::Common::Redis::RespValue> slots(1);
     slots[0].type(NetworkFilters::Common::Redis::RespType::Array);
@@ -401,7 +469,7 @@ protected:
       if (flags.test(primary_ip_value)) {
         primary_1_array.push_back(createStringField(flags.test(primary_ip_type), "127.0.0.1"));
       } else {
-        primary_1_array.push_back(createStringField(flags.test(primary_ip_type), "bad ip foo"));
+        primary_1_array.push_back(createStringField(flags.test(primary_ip_type), ""));
       }
       // Port field.
       primary_1_array.push_back(createIntegerField(flags.test(primary_port_type), 22120));
@@ -414,8 +482,7 @@ protected:
         replica_1_array.push_back(
             createStringField(replica_flags.test(replica_ip_type), "127.0.0.2"));
       } else {
-        replica_1_array.push_back(
-            createStringField(replica_flags.test(replica_ip_type), "bad ip bar"));
+        replica_1_array.push_back(createStringField(replica_flags.test(replica_ip_type), ""));
       }
       // Port field.
       replica_1_array.push_back(createIntegerField(replica_flags.test(replica_port_type), 22120));
@@ -664,6 +731,131 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
   cluster_->initialize([&]() -> void { initialized_.ready(); });
 
   expectHealthyHosts(std::get<3>(GetParam()));
+}
+
+TEST_F(RedisClusterTest, AddressAsHostname) {
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+  const std::list<std::string> primary_resolved_addresses{"127.0.1.1"};
+  const std::list<std::string> replica_resolved_addresses{"127.0.1.2"};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "replica.org",
+                         replica_resolved_addresses);
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com",
+                         primary_resolved_addresses);
+  expectRedisResolve(true);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() -> void { initialized_.ready(); });
+
+  // 1. Single slot with primary and replica
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22120));
+  expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.2:22120"}));
+  EXPECT_EQ(0U, cluster_->info()->stats().update_failure_.value());
+
+  // 2. Single slot with just the primary hostname
+  expectRedisResolve(true);
+  EXPECT_CALL(membership_updated_, ready());
+  resolve_timer_->invokeCallback();
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com",
+                         primary_resolved_addresses);
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  expectClusterSlotResponse(singleSlotPrimary("primary.com", 22120));
+  expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120"}));
+  EXPECT_EQ(0U, cluster_->info()->stats().update_failure_.value());
+
+  // 2. Single slot with just the primary IP address and replica hostname
+  expectRedisResolve();
+  EXPECT_CALL(membership_updated_, ready());
+  resolve_timer_->invokeCallback();
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "replica.org",
+                         replica_resolved_addresses);
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  expectClusterSlotResponse(singleSlotPrimaryReplica("127.0.1.1", "replica.org", 22120));
+  expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.2:22120"}));
+  EXPECT_EQ(0U, cluster_->info()->stats().update_failure_.value());
+}
+
+TEST_F(RedisClusterTest, AddressAsHostnameFailure) {
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+  const std::list<std::string> primary_resolved_addresses{"127.0.1.1"};
+  const std::list<std::string> replica_resolved_addresses{"127.0.1.2"};
+
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+
+  // 1. Primary resolution is successful, but replica fails.
+  // Expect cluster slot update to be successful, with just one healthy host, and failure counter to
+  // be updated.
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com",
+                         primary_resolved_addresses);
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "replica.org",
+                         replica_resolved_addresses,
+                         Network::DnsResolver::ResolutionStatus::Failure);
+  expectRedisResolve(true);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() -> void { initialized_.ready(); });
+
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22120));
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120"}));
+  EXPECT_EQ(1UL, cluster_->info()->stats().update_failure_.value());
+
+  // 2. Primary resolution fails, so replica resolution is not even called.
+  // Expect cluster slot update to be successful, with just one healthy host, and failure counter to
+  // be updated.
+  expectRedisResolve(true);
+  resolve_timer_->invokeCallback();
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com",
+                         primary_resolved_addresses,
+                         Network::DnsResolver::ResolutionStatus::Failure);
+  // NOTE: Intentionally commented out. Replica DNS resolution should even reach. It's here for
+  // illustrative purposes.
+
+  // expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "replica.org",
+  // replica_resolved_addresses);
+  expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22120));
+  // healthy hosts is same as before, but failure count increases by 1
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(2UL, cluster_->info()->stats().update_failure_.value());
+}
+
+TEST_F(RedisClusterTest, AddressAsHostnamePartialReplicaFailure) {
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+  const std::list<std::string> primary_resolved_addresses{"127.0.1.1"};
+
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+
+  // 1. Primary resolution is successful, and one of the replica is successful, but the other fails.
+  // Expect cluster slot update to be successful, with two healthy hosts, and expect failure counter
+  // to be updated.
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com",
+                         primary_resolved_addresses);
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "failed-replica.org",
+                         std::list<std::string>{"127.0.1.2"},
+                         Network::DnsResolver::ResolutionStatus::Failure);
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "success-replica.org",
+                         std::list<std::string>{"127.0.1.3"});
+
+  expectRedisResolve(true);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() -> void { initialized_.ready(); });
+
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  expectClusterSlotResponse(singleSlotPrimaryWithTwoReplicas("primary.com", "failed-replica.org",
+                                                             "success-replica.org", 22120));
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.3:22120"}));
 }
 
 TEST_F(RedisClusterTest, EmptyDnsResponse) {

@@ -61,10 +61,11 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
     pool_ready_.ready();
   }
 
-  void onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override {
     reason_ = reason;
     host_ = host;
+    failure_reason_string_ = std::string(failure_reason);
     pool_failure_.ready();
   }
 
@@ -73,6 +74,7 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
   ReadyWatcher pool_ready_;
   ConnectionPool::ConnectionDataPtr conn_data_{};
   absl::optional<ConnectionPool::PoolFailureReason> reason_;
+  std::string failure_reason_string_;
   Upstream::HostDescriptionConstSharedPtr host_;
   Ssl::ConnectionInfoConstSharedPtr ssl_;
 };
@@ -107,8 +109,9 @@ public:
 
   void addIdleCallback(IdleCb cb) override { conn_pool_->addIdleCallback(cb); }
   bool isIdle() const override { return conn_pool_->isIdle(); }
-  void startDrain() override { return conn_pool_->startDrain(); }
-  void drainConnections() override { conn_pool_->drainConnections(); }
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override {
+    conn_pool_->drainConnections(drain_behavior);
+  }
   void closeConnections() override { conn_pool_->closeConnections(); }
   ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {
     return conn_pool_->newConnection(callbacks);
@@ -320,6 +323,7 @@ public:
 
   void prepareConn() {
     connection_ = new StrictMock<Network::MockClientConnection>();
+    EXPECT_CALL(*connection_, transportFailureReason()).Times(AtLeast(0));
     EXPECT_CALL(*connection_, setBufferLimits(0));
     EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(false));
     EXPECT_CALL(*connection_, addConnectionCallbacks(_));
@@ -342,7 +346,7 @@ public:
     EXPECT_CALL(*connect_timer_, disableTimer());
     EXPECT_CALL(callbacks_->pool_ready_, ready());
     connection_->raiseEvent(Network::ConnectionEvent::Connected);
-    connection_->stream_info_.downstream_address_provider_->setSslConnection(ssl_);
+    connection_->stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_);
   }
 
   bool test_new_connection_pool_;
@@ -442,7 +446,7 @@ TEST_P(TcpConnPoolImplTest, DrainConnections) {
     // This will destroy the ready connection and set requests remaining to 1 on the busy and
     // pending connections.
     EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
-    conn_pool_->drainConnections();
+    conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
     dispatcher_.clearDeferredDeleteList();
   }
   {
@@ -452,6 +456,7 @@ TEST_P(TcpConnPoolImplTest, DrainConnections) {
     c2.releaseConn();
     dispatcher_.clearDeferredDeleteList();
   }
+  EXPECT_FALSE(conn_pool_->isIdle());
   {
     // This will destroy the pending connection when the response finishes.
     c3.completeConnection();
@@ -461,6 +466,7 @@ TEST_P(TcpConnPoolImplTest, DrainConnections) {
     c3.releaseConn();
     dispatcher_.clearDeferredDeleteList();
   }
+  EXPECT_TRUE(conn_pool_->isIdle());
 }
 
 /**
@@ -649,10 +655,13 @@ TEST_P(TcpConnPoolImplTest, RemoteConnectFailure) {
   EXPECT_CALL(*conn_pool_->test_conns_[0].connect_timer_, disableTimer());
 
   EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
+  EXPECT_CALL(*conn_pool_->test_conns_[0].connection_, transportFailureReason())
+      .WillOnce(Return("foo"));
   conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 
   EXPECT_EQ(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, callbacks.reason_);
+  EXPECT_EQ("foo", callbacks.failure_reason_string_);
 
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_fail_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_failure_eject_.value());
@@ -975,12 +984,11 @@ TEST_P(TcpConnPoolImplTest, ConnectionStateWithConcurrentConnections) {
 TEST_P(TcpConnPoolImplTest, DrainCallback) {
   initialize();
   ReadyWatcher drained;
-  EXPECT_CALL(drained, ready());
   conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  conn_pool_->startDrain();
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
   ActiveTestConn c2(*this, 0, ActiveTestConn::Type::Pending);
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   c2.handle_->cancel(ConnectionPool::CancelPolicy::Default);
 
   EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
@@ -1005,7 +1013,7 @@ TEST_P(TcpConnPoolImplTest, DrainWhileConnecting) {
   EXPECT_NE(nullptr, handle);
 
   conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  conn_pool_->startDrain();
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 
   if (test_new_connection_pool_) {
     // The shared connection pool removes and closes connecting clients if there are no
@@ -1029,11 +1037,10 @@ TEST_P(TcpConnPoolImplTest, DrainWhileConnecting) {
 TEST_P(TcpConnPoolImplTest, DrainOnClose) {
   initialize();
   ReadyWatcher drained;
-  EXPECT_CALL(drained, ready());
   conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  conn_pool_->startDrain();
-
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
+
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 
   EXPECT_CALL(drained, ready()).Times(AtLeast(1));
   EXPECT_CALL(c1.callbacks_.callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
@@ -1077,7 +1084,7 @@ TEST_P(TcpConnPoolImplTest, RequestCapacity) {
 
   // This should set the number of requests remaining to 1 on the active
   // connections, and the connecting_request_capacity to 2 as well.
-  conn_pool_->drainConnections();
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 
   // Cancel the connections. Because neither used CloseExcess, the two connections should persist.
   handle1->cancel(ConnectionPool::CancelPolicy::Default);
@@ -1130,7 +1137,7 @@ TEST_P(TcpConnPoolImplTest, TestIdleTimeout) {
 
   testing::MockFunction<void()> drained_callback;
   EXPECT_CALL(idle_callback, Call());
-  conn_pool_->startDrain();
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
   dispatcher_.clearDeferredDeleteList();
 }

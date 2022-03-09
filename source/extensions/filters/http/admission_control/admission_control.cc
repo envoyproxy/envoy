@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "envoy/common/random_generator.h"
-#include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
+#include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/runtime/runtime.h"
@@ -99,7 +99,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
 
     stats_.rq_rejected_.inc();
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
-                                       "denied by admission control");
+                                       "denied_by_admission_control");
     return Http::FilterHeadersStatus::StopIteration;
   }
 

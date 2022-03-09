@@ -16,26 +16,14 @@ import shutil
 import paths
 
 EXCLUDED_PREFIXES = (
-    "./generated/",
-    "./thirdparty/",
-    "./build",
-    "./.git/",
-    "./bazel-",
-    "./.cache",
-    "./source/extensions/extensions_build_config.bzl",
-    "./bazel/toolchains/configs/",
-    "./tools/testdata/check_format/",
-    "./tools/pyformat/",
-    "./third_party/",
-    "./test/extensions/filters/http/wasm/test_data",
+    "./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
+    "./source/extensions/extensions_build_config.bzl", "./contrib/contrib_build_config.bzl",
+    "./bazel/toolchains/configs/", "./tools/testdata/check_format/", "./tools/pyformat/",
+    "./third_party/", "./test/extensions/filters/http/wasm/test_data",
     "./test/extensions/filters/network/wasm/test_data",
-    "./test/extensions/stats_sinks/wasm/test_data",
-    "./test/extensions/bootstrap/wasm/test_data",
-    "./test/extensions/common/wasm/test_data",
-    "./test/extensions/access_loggers/wasm/test_data",
-    "./source/extensions/common/wasm/ext",
-    "./examples/wasm-cc",
-)
+    "./test/extensions/stats_sinks/wasm/test_data", "./test/extensions/bootstrap/wasm/test_data",
+    "./test/extensions/common/wasm/test_data", "./test/extensions/access_loggers/wasm/test_data",
+    "./source/extensions/common/wasm/ext", "./examples/wasm-cc", "./bazel/external/http_parser/")
 SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".mm", ".proto")
 PROTO_SUFFIX = (".proto")
 
@@ -63,15 +51,13 @@ REAL_TIME_ALLOWLIST = (
 # perform temporary registrations.
 REGISTER_FACTORY_TEST_ALLOWLIST = (
     "./test/common/config/registry_test.cc", "./test/integration/clusters/",
-    "./test/integration/filters/")
+    "./test/integration/filters/", "./test/integration/load_balancers/")
 
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_ALLOWLIST = (
-    "./source/common/config/version_converter.cc",
     "./source/common/protobuf/utility.cc",
     "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
     "./test/common/protobuf/utility_test.cc",
-    "./test/common/config/version_converter_test.cc",
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
     "./test/extensions/filters/common/expr/context_test.cc",
@@ -87,9 +73,9 @@ JSON_STRING_TO_MESSAGE_ALLOWLIST = (
 # Histogram names which are allowed to be suffixed with the unit symbol, all of the pre-existing
 # ones were grandfathered as part of PR #8484 for backwards compatibility.
 HISTOGRAM_WITH_SI_SUFFIX_ALLOWLIST = (
-    "downstream_cx_length_ms", "downstream_cx_length_ms", "initialization_time_ms",
-    "loop_duration_us", "poll_delay_us", "request_time_ms", "upstream_cx_connect_ms",
-    "upstream_cx_length_ms")
+    "cx_rtt_us", "cx_rtt_variance_us", "downstream_cx_length_ms", "downstream_cx_length_ms",
+    "initialization_time_ms", "loop_duration_us", "poll_delay_us", "request_time_ms",
+    "upstream_cx_connect_ms", "upstream_cx_length_ms")
 
 # Files in these paths can use std::regex
 STD_REGEX_ALLOWLIST = (
@@ -97,8 +83,8 @@ STD_REGEX_ALLOWLIST = (
     "./source/common/common/regex.cc", "./source/common/stats/tag_extractor_impl.h",
     "./source/common/stats/tag_extractor_impl.cc",
     "./source/common/formatter/substitution_formatter.cc",
-    "./source/extensions/filters/http/squash/squash_filter.h",
-    "./source/extensions/filters/http/squash/squash_filter.cc", "./source/server/admin/utils.h",
+    "./contrib/squash/filters/http/source/squash_filter.h",
+    "./contrib/squash/filters/http/source/squash_filter.cc", "./source/server/admin/utils.h",
     "./source/server/admin/utils.cc", "./source/server/admin/stats_handler.h",
     "./source/server/admin/stats_handler.cc", "./source/server/admin/prometheus_stats.h",
     "./source/server/admin/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
@@ -152,8 +138,6 @@ EXCEPTION_ALLOWLIST = ("./source/common/config/utility.h")
 # Please DO NOT extend this allow list without consulting
 # @envoyproxy/dependency-shepherds.
 BUILD_URLS_ALLOWLIST = (
-    "./generated_api_shadow/bazel/repository_locations.bzl",
-    "./generated_api_shadow/bazel/envoy_http_archive.bzl",
     "./bazel/repository_locations.bzl",
     "./bazel/external/cargo/crates.bzl",
     "./api/bazel/repository_locations.bzl",
@@ -176,6 +160,7 @@ MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*
 HISTOGRAM_SI_SUFFIX_REGEX = re.compile(r"(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)")
 TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s\{")
 EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
+CONTRIB_CODEOWNERS_REGEX = re.compile(r'(/contrib/[^@]*\s+)(@.*)')
 COMMENT_REGEX = re.compile(r"//|\*")
 DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
 PROTO_VALIDATION_STRING = re.compile(r'\bmin_bytes\b')
@@ -185,7 +170,7 @@ FOR_EACH_N_REGEX = re.compile("for_each_n\(")
 # Check for punctuation in a terminal ref clause, e.g.
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
 DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
-FLAG_REGEX = re.compile("    \"(.*)\",")
+FLAG_REGEX = re.compile("RUNTIME_GUARD\((.*)\);")
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -257,6 +242,8 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/network/redis_proxy",
   "extensions/filters/network/kafka",
   "extensions/filters/network/kafka/broker",
+  "extensions/filters/network/kafka/mesh",
+  "extensions/filters/network/kafka/mesh/command_handlers",
   "extensions/filters/network/kafka/protocol",
   "extensions/filters/network/kafka/serialization",
   "extensions/filters/network/mongo_proxy",
@@ -266,10 +253,8 @@ UNOWNED_EXTENSIONS = {
 
 UNSORTED_FLAGS = {
   "envoy.reloadable_features.activate_timers_next_event_loop",
-  "envoy.reloadable_features.check_ocsp_policy",
   "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
-  "envoy.reloadable_features.upstream_http2_flood_checks",
-  "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
+  "envoy.reloadable_features.sanitize_http_header_referer",
 }
 # yapf: enable
 
@@ -280,7 +265,6 @@ class FormatChecker:
         self.operation_type = args.operation_type
         self.target_path = args.target_path
         self.api_prefix = args.api_prefix
-        self.api_shadow_root = args.api_shadow_prefix
         self.envoy_build_rule_check = not args.skip_envoy_build_rule_check
         self.namespace_check = args.namespace_check
         self.namespace_check_excluded_paths = args.namespace_check_excluded_paths + [
@@ -484,7 +468,7 @@ class FormatChecker:
         return file_path in BUILD_URLS_ALLOWLIST
 
     def is_api_file(self, file_path):
-        return file_path.startswith(self.api_prefix) or file_path.startswith(self.api_shadow_root)
+        return file_path.startswith(self.api_prefix)
 
     def is_build_file(self, file_path):
         basename = os.path.basename(file_path)
@@ -519,29 +503,21 @@ class FormatChecker:
         subdir = path[0:slash]
         return subdir in SUBDIR_SET
 
-    # simple check that all flags between "Begin alphabetically sorted section."
-    # and the end of the struct are in order (except the ones that already aren't)
+    # simple check that all flags are sorted.
     def check_runtime_flags(self, file_path, error_messages):
-        in_flag_block = False
         previous_flag = ""
         for line_number, line in enumerate(self.read_lines(file_path)):
-            if "Begin alphabetically" in line:
-                in_flag_block = True
-                continue
-            if not in_flag_block:
-                continue
-            if "}" in line:
-                break
+            if line.startswith("RUNTIME_GUARD"):
+                match = FLAG_REGEX.match(line)
+                if not match:
+                    error_messages.append("%s does not look like a reloadable flag" % line)
+                    break
 
-            match = FLAG_REGEX.match(line)
-            if not match:
-                error_messages.append("%s does not look like a reloadable flag" % line)
-                break
-
-            if previous_flag:
-                if line < previous_flag and match.groups()[0] not in UNSORTED_FLAGS:
-                    error_messages.append("%s and %s are out of order\n" % (line, previous_flag))
-            previous_flag = line
+                if previous_flag:
+                    if line < previous_flag and match.groups()[0] not in UNSORTED_FLAGS:
+                        error_messages.append(
+                            "%s and %s are out of order\n" % (line, previous_flag))
+                previous_flag = line
 
     def check_file_contents(self, file_path, checker):
         error_messages = []
@@ -683,9 +659,15 @@ class FormatChecker:
             if "RealTimeSource" in line or \
               ("RealTimeSystem" in line and not "TestRealTimeSystem" in line) or \
               "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
-              "std::this_thread::sleep_for" in line or self.has_cond_var_wait_for(line):
+              "std::this_thread::sleep_for" in line or " usleep(" in line or "::usleep(" in line:
                 report_error(
-                    "Don't reference real-world time sources from production code; use injection")
+                    "Don't reference real-world time sources; use TimeSystem::advanceTime(Wait|Async)"
+                )
+            if self.has_cond_var_wait_for(line):
+                report_error(
+                    "Don't use CondVar::waitFor(); use TimeSystem::waitFor() instead.  If this "
+                    "already is TimeSystem::waitFor(), please name the TimeSystem variable "
+                    "time_system or time_system_ so the linter can understand.")
         duration_arg = DURATION_VALUE_REGEX.search(line)
         if duration_arg and duration_arg.group(1) != "0" and duration_arg.group(1) != "0.0":
             # Matching duration(int-const or float-const) other than zero
@@ -867,7 +849,7 @@ class FormatChecker:
                 + "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
 
         if file_path.endswith(PROTO_SUFFIX):
-            exclude_path = ['v1', 'v2', 'generated_api_shadow']
+            exclude_path = ['v1', 'v2']
             result = PROTO_VALIDATION_STRING.search(line)
             if result is not None:
                 if not any(x in file_path for x in exclude_path):
@@ -924,8 +906,7 @@ class FormatChecker:
             error_messages += self.execute_command(
                 command, "envoy_build_fixer check failed", file_path)
 
-        if self.is_build_file(file_path) and (file_path.startswith(self.api_prefix + "envoy") or
-                                              file_path.startswith(self.api_shadow_root + "envoy")):
+        if self.is_build_file(file_path) and file_path.startswith(self.api_prefix + "envoy"):
             found = False
             for line in self.read_lines(file_path):
                 if "api_proto_package(" in line:
@@ -1051,21 +1032,6 @@ class FormatChecker:
             error_messages.append(
                 "New directory %s appears to not have owners in CODEOWNERS" % dir_name)
 
-    def check_api_shadow_starlark_files(self, file_path, error_messages):
-        command = "diff -u "
-        command += file_path + " "
-        api_shadow_starlark_path = self.api_shadow_root + re.sub(r"\./api/", '', file_path)
-        command += api_shadow_starlark_path
-
-        error_message = self.execute_command(
-            command, "invalid .bzl in generated_api_shadow", file_path)
-        if self.operation_type == "check":
-            error_messages += error_message
-        elif self.operation_type == "fix" and len(error_message) != 0:
-            shutil.copy(file_path, api_shadow_starlark_path)
-
-        return error_messages
-
     def check_format_visitor(self, arg, dir_name, names):
         """Run check_format in parallel for the given files.
     Args:
@@ -1086,21 +1052,25 @@ class FormatChecker:
         # Sanity check CODEOWNERS.  This doesn't need to be done in a multi-threaded
         # manner as it is a small and limited list.
         source_prefix = './source/'
-        full_prefix = './source/extensions/'
+        core_extensions_full_prefix = './source/extensions/'
         # Check to see if this directory is a subdir under /source/extensions
         # Also ignore top level directories under /source/extensions since we don't
         # need owners for source/extensions/access_loggers etc, just the subdirectories.
-        if dir_name.startswith(full_prefix) and '/' in dir_name[len(full_prefix):]:
+        if dir_name.startswith(
+                core_extensions_full_prefix) and '/' in dir_name[len(core_extensions_full_prefix):]:
             self.check_owners(dir_name[len(source_prefix):], owned_directories, error_messages)
 
+        # For contrib extensions we track ownership at the top level only.
+        contrib_prefix = './contrib/'
+        if dir_name.startswith(contrib_prefix):
+            top_level = pathlib.PurePath('/', *pathlib.PurePath(dir_name).parts[:2], '/')
+            self.check_owners(str(top_level), owned_directories, error_messages)
+
+        dir_name = normalize_path(dir_name)
+
         for file_name in names:
-            if dir_name.startswith("./api") and self.is_starlark_file(file_name):
-                result = pool.apply_async(
-                    self.check_api_shadow_starlark_files,
-                    args=(dir_name + "/" + file_name, error_messages))
-                result_list.append(result)
             result = pool.apply_async(
-                self.check_format_return_trace_on_error, args=(dir_name + "/" + file_name,))
+                self.check_format_return_trace_on_error, args=(dir_name + file_name,))
             result_list.append(result)
 
     # check_error_messages iterates over the list with error messages and prints
@@ -1114,6 +1084,18 @@ class FormatChecker:
 
     def whitelisted_for_memcpy(self, file_path):
         return file_path in MEMCPY_WHITELIST
+
+
+def normalize_path(path):
+    """Convert path to form ./path/to/dir/ for directories and ./path/to/file otherwise"""
+    if not path.startswith("./"):
+        path = "./" + path
+
+    isdir = os.path.isdir(path)
+    if isdir and not path.endswith("/"):
+        path += "/"
+
+    return path
 
 
 if __name__ == "__main__":
@@ -1138,11 +1120,6 @@ if __name__ == "__main__":
         default=multiprocessing.cpu_count(),
         help="number of worker processes to use; defaults to one per core.")
     parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree.")
-    parser.add_argument(
-        "--api-shadow-prefix",
-        type=str,
-        default="./generated_api_shadow/",
-        help="path of the shadow API tree.")
     parser.add_argument(
         "--skip_envoy_build_rule_check",
         action="store_true",
@@ -1191,8 +1168,24 @@ if __name__ == "__main__":
     def owned_directories(error_messages):
         owned = []
         maintainers = [
-            '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@asraa',
-            '@yanavlasov', '@junr03', '@dio', '@jmarantz', '@antoniovicente'
+            '@mattklein123',
+            '@htuch',
+            '@alyssawilk',
+            '@zuercher',
+            '@lizan',
+            '@snowp',
+            '@yanavlasov',
+            '@junr03',
+            '@dio',
+            '@jmarantz',
+            '@antoniovicente',
+            '@ggreenway',
+            '@phlax',
+            '@wrowe',
+            '@rojkov',
+            '@RyanTheOptimist',
+            '@adisuissa',
+            '@KBaichoo',
         ]
 
         try:
@@ -1214,6 +1207,30 @@ if __name__ == "__main__":
                                 "Extensions require at least one maintainer OWNER:\n"
                                 "    {}".format(line))
 
+                    m = CONTRIB_CODEOWNERS_REGEX.search(line)
+                    if m is not None and not line.startswith('#'):
+                        stripped_path = m.group(1).strip()
+                        if not stripped_path.endswith('/'):
+                            error_messages.append(
+                                "Contrib CODEOWNERS entry '{}' must end in '/'".format(
+                                    stripped_path))
+                            continue
+
+                        if not (stripped_path.count('/') == 3 or
+                                (stripped_path.count('/') == 4
+                                 and stripped_path.startswith('/contrib/common/'))):
+                            error_messages.append(
+                                "Contrib CODEOWNERS entry '{}' must be 2 directories deep unless in /contrib/common/ and then it can be 3 directories deep"
+                                .format(stripped_path))
+                            continue
+
+                        owned.append(stripped_path)
+                        owners = re.findall('@\S+', m.group(2).strip())
+                        if len(owners) < 2:
+                            error_messages.append(
+                                "Contrib extensions require at least 2 owners in CODEOWNERS:\n"
+                                "    {}".format(line))
+
             return owned
         except IOError:
             return []  # for the check format tests.
@@ -1222,9 +1239,13 @@ if __name__ == "__main__":
     error_messages = []
     owned_directories = owned_directories(error_messages)
     if os.path.isfile(args.target_path):
-        if not args.target_path.startswith(EXCLUDED_PREFIXES) and args.target_path.endswith(
-                SUFFIXES):
-            error_messages += format_checker.check_format("./" + args.target_path)
+        # All of our EXCLUDED_PREFIXES start with "./", but the provided
+        # target path argument might not. Add it here if it is missing,
+        # and use that normalized path for both lookup and `check_format`.
+        normalized_target_path = normalize_path(args.target_path)
+        if not normalized_target_path.startswith(
+                EXCLUDED_PREFIXES) and normalized_target_path.endswith(SUFFIXES):
+            error_messages += format_checker.check_format(normalized_target_path)
     else:
         results = []
 

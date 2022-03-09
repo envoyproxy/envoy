@@ -51,9 +51,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "utility_lib_header",
+    hdrs = ["utility.h"],
+    deps = [
+        "//envoy/api:api_interface",
+        "//envoy/protobuf:message_validator_interface",
+        "//source/common/common:stl_helpers",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
-    hdrs = ["utility.h"],
     external_deps = [
         "protobuf",
         "yaml_cpp",
@@ -61,17 +71,12 @@ envoy_cc_library(
     deps = [
         ":message_validator_lib",
         ":protobuf",
-        ":well_known_lib",
-        "//envoy/api:api_interface",
-        "//envoy/protobuf:message_validator_interface",
+        ":utility_lib_header",
         "//envoy/runtime:runtime_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:documentation_url_lib",
         "//source/common/common:hash_lib",
-        "//source/common/common:stl_helpers",
         "//source/common/common:utility_lib",
-        "//source/common/config:api_type_oracle_lib",
-        "//source/common/config:version_converter_lib",
         "//source/common/protobuf:visitor_lib",
         "//source/common/runtime:runtime_features_lib",
         "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
@@ -84,10 +89,11 @@ envoy_cc_library(
     name = "visitor_lib",
     srcs = ["visitor.cc"],
     hdrs = ["visitor.h"],
-    deps = [":protobuf"],
-)
-
-envoy_cc_library(
-    name = "well_known_lib",
-    hdrs = ["well_known.h"],
+    deps = [
+        ":message_validator_lib",
+        ":protobuf",
+        ":utility_lib_header",
+        "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
+        "@com_github_cncf_udpa//xds/type/v3:pkg_cc_proto",
+    ],
 )

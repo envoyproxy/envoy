@@ -5,6 +5,7 @@
 
 #include "source/common/upstream/load_stats_reporter.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -45,8 +46,7 @@ public:
       return response_timer_;
     }));
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
-        local_info_, cm_, stats_store_, Grpc::RawAsyncClientPtr(async_client_),
-        envoy::config::core::v3::ApiVersion::AUTO, dispatcher_);
+        local_info_, cm_, stats_store_, Grpc::RawAsyncClientPtr(async_client_), dispatcher_);
   }
 
   void expectSendMessage(
@@ -217,6 +217,121 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
     bar_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(14));
     expectSendMessage({bar_cluster_stats, foo_cluster_stats});
+  }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+}
+
+HostSharedPtr makeTestHost(const std::string& hostname,
+                           const ::envoy::config::core::v3::Locality& locality) {
+  const auto host = std::make_shared<NiceMock<::Envoy::Upstream::MockHost>>();
+  ON_CALL(*host, hostname()).WillByDefault(::testing::ReturnRef(hostname));
+  ON_CALL(*host, locality()).WillByDefault(::testing::ReturnRef(locality));
+  return host;
+}
+
+void addStats(const HostSharedPtr& host, double a, double b = 0, double c = 0, double d = 0) {
+  host->stats().rq_success_.inc();
+  host->loadMetricStats().add("metric_a", a);
+  if (b != 0) {
+    host->loadMetricStats().add("metric_b", b);
+  }
+  if (c != 0) {
+    host->loadMetricStats().add("metric_c", c);
+  }
+  if (d != 0) {
+    host->loadMetricStats().add("metric_d", d);
+  }
+}
+
+void addStatExpectation(envoy::config::endpoint::v3::UpstreamLocalityStats* stats,
+                        const std::string& metric_name, int num_requests_with_metric,
+                        double total_metric_value) {
+  auto metric = stats->add_load_metric_stats();
+  metric->set_metric_name(metric_name);
+  metric->set_num_requests_finished_with_metric(num_requests_with_metric);
+  metric->set_total_metric_value(total_metric_value);
+}
+
+// Validate that per-locality metrics are aggregated across hosts and included in the load report.
+TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  createLoadStatsReporter();
+  time_system_.setMonotonicTime(std::chrono::microseconds(3));
+
+  // Set up some load metrics
+  NiceMock<MockClusterMockPrioritySet> cluster;
+  MockHostSet& host_set_ = *cluster.prioritySet().getMockHostSet(0);
+
+  ::envoy::config::core::v3::Locality locality0, locality1;
+  locality0.set_region("mars");
+  locality1.set_region("jupiter");
+  HostSharedPtr host0 = makeTestHost("host0", locality0), host1 = makeTestHost("host1", locality0),
+                host2 = makeTestHost("host2", locality1);
+  host_set_.hosts_per_locality_ = makeHostsPerLocality({{host0, host1}, {host2}});
+
+  addStats(host0, 0.11111, 1.0);
+  addStats(host0, 0.33333, 0, 3.14159);
+  addStats(host1, 0.44444, 0.12345);
+  addStats(host2, 10.01, 0, 20.02, 30.03);
+
+  cluster.info_->eds_service_name_ = "bar";
+  MockClusterManager::ClusterInfoMaps cluster_info{{{"foo", cluster}}, {}};
+  ON_CALL(cm_, clusters()).WillByDefault(Return(cluster_info));
+  deliverLoadStatsResponse({"foo"});
+  // First stats report on timer tick.
+  time_system_.setMonotonicTime(std::chrono::microseconds(4));
+  {
+    envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
+    expected_cluster_stats.set_cluster_name("foo");
+    expected_cluster_stats.set_cluster_service_name("bar");
+    expected_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
+
+    auto expected_locality0_stats = expected_cluster_stats.add_upstream_locality_stats();
+    expected_locality0_stats->mutable_locality()->set_region("mars");
+    expected_locality0_stats->set_total_successful_requests(3);
+    addStatExpectation(expected_locality0_stats, "metric_a", 3, 0.88888);
+    addStatExpectation(expected_locality0_stats, "metric_b", 2, 1.12345);
+    addStatExpectation(expected_locality0_stats, "metric_c", 1, 3.14159);
+
+    auto expected_locality1_stats = expected_cluster_stats.add_upstream_locality_stats();
+    expected_locality1_stats->mutable_locality()->set_region("jupiter");
+    expected_locality1_stats->set_total_successful_requests(1);
+    addStatExpectation(expected_locality1_stats, "metric_a", 1, 10.01);
+    addStatExpectation(expected_locality1_stats, "metric_c", 1, 20.02);
+    addStatExpectation(expected_locality1_stats, "metric_d", 1, 30.03);
+
+    expectSendMessage({expected_cluster_stats});
+  }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // Traffic between previous request and next response. Previous latched metrics are cleared.
+  host1->stats().rq_success_.inc();
+  host1->loadMetricStats().add("metric_a", 1.41421);
+  host1->loadMetricStats().add("metric_e", 2.71828);
+
+  time_system_.setMonotonicTime(std::chrono::microseconds(6));
+  deliverLoadStatsResponse({"foo"});
+  // Second stats report on timer tick.
+  time_system_.setMonotonicTime(std::chrono::microseconds(28));
+  {
+    envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
+    expected_cluster_stats.set_cluster_name("foo");
+    expected_cluster_stats.set_cluster_service_name("bar");
+    expected_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(24));
+
+    auto expected_locality0_stats = expected_cluster_stats.add_upstream_locality_stats();
+    expected_locality0_stats->mutable_locality()->set_region("mars");
+    expected_locality0_stats->set_total_successful_requests(1);
+    addStatExpectation(expected_locality0_stats, "metric_a", 1, 1.41421);
+    addStatExpectation(expected_locality0_stats, "metric_e", 1, 2.71828);
+
+    // No stats for locality 1 since there was no traffic to it.
+    expectSendMessage({expected_cluster_stats});
   }
   EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
   response_timer_cb_();

@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 
 # L4 network filter that implements HTTP protocol handling and filtering. This filter internally
 # drives all of the L7 HTTP filters.
-# Public docs: docs/root/configuration/http_conn_man/http_conn_man.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_conn_man/http_conn_man
 
 envoy_extension_package()
 
@@ -36,7 +36,7 @@ envoy_cc_extension(
         "//source/common/access_log:access_log_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
-        "//source/common/filter/http:filter_config_discovery_lib",
+        "//source/common/filter:config_discovery_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:default_server_string_lib",
         "//source/common/http:request_id_extension_lib",
@@ -54,6 +54,7 @@ envoy_cc_extension(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:http_tracer_manager_lib",
         "//source/common/tracing:tracer_config_lib",
+        "//source/common/tracing:custom_tag_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",

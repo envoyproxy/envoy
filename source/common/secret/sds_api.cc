@@ -20,7 +20,7 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
                ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
                std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api)
     : Envoy::Config::SubscriptionBase<envoy::extensions::transport_sockets::tls::v3::Secret>(
-          sds_config.resource_api_version(), validation_visitor, "name"),
+          validation_visitor, "name"),
       init_target_(fmt::format("SdsApi {}", sds_config_name), [this] { initialize(); }),
       dispatcher_(dispatcher), api_(api),
       scope_(stats.createScope(absl::StrCat("sds.", sds_config_name, "."))),

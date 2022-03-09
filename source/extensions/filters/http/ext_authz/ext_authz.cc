@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
+#include <chrono>
+
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "source/common/common/assert.h"
@@ -12,14 +14,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
-
-struct RcDetailsValues {
-  // The ext_authz filter denied the downstream request.
-  const std::string AuthzDenied = "ext_authz_denied";
-  // The ext_authz filter encountered a failure, and was configured to fail-closed.
-  const std::string AuthzError = "ext_authz_error";
-};
-using RcDetails = ConstSingleton<RcDetailsValues>;
 
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   // We only merge context extensions here, and leave boolean flags untouched since those flags are
@@ -66,6 +60,9 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
       config_->includePeerCertificate(), config_->destinationLabels());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *decoder_callbacks_);
+  // Store start time of ext_authz filter call
+  start_time_ = decoder_callbacks_->dispatcher().timeSource().monotonicTime();
+
   state_ = State::Calling;
   filter_return_ = FilterReturn::StopDecoding; // Don't let the filter chain continue as we are
                                                // going to invoke check call.
@@ -91,8 +88,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                        *decoder_callbacks_);
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::ResponseFlag::UnauthorizedExternalService);
-      decoder_callbacks_->sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr,
-                                         absl::nullopt, RcDetails::get().AuthzError);
+      decoder_callbacks_->sendLocalReply(
+          config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+          Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
       return Http::FilterHeadersStatus::StopIteration;
     }
     return Http::FilterHeadersStatus::Continue;
@@ -154,14 +152,16 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
   return Http::FilterTrailersStatus::Continue;
 }
 
-Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderMap&) {
+Http::FilterHeadersStatus Filter::encode1xxHeaders(Http::ResponseHeaderMap&) {
   return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   ENVOY_STREAM_LOG(trace,
-                   "ext_authz filter has {} response header(s) to add to the encoded response:",
-                   *encoder_callbacks_, response_headers_to_add_.size());
+                   "ext_authz filter has {} response header(s) to add and {} response header(s) to "
+                   "set to the encoded response:",
+                   *encoder_callbacks_, response_headers_to_add_.size(),
+                   response_headers_to_set_.size());
   if (!response_headers_to_add_.empty()) {
     ENVOY_STREAM_LOG(
         trace, "ext_authz filter added header(s) to the encoded response:", *encoder_callbacks_);
@@ -171,6 +171,14 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     }
   }
 
+  if (!response_headers_to_set_.empty()) {
+    ENVOY_STREAM_LOG(
+        trace, "ext_authz filter set header(s) to the encoded response:", *encoder_callbacks_);
+    for (const auto& header : response_headers_to_set_) {
+      ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, header.first.get(), header.second);
+      headers.setCopy(header.first, header.second);
+    }
+  }
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -207,18 +215,29 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   Stats::StatName empty_stat_name;
 
   if (!response->dynamic_metadata.fields().empty()) {
+    // Add duration of call to dynamic metadata if applicable
+    if (start_time_.has_value() && response->status == CheckStatus::OK) {
+      ProtobufWkt::Value ext_authz_duration_value;
+      auto duration =
+          decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value();
+      ext_authz_duration_value.set_number_value(
+          std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+      (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
+          ext_authz_duration_value;
+    }
     decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ext_authz",
                                                         response->dynamic_metadata);
   }
 
   switch (response->status) {
   case CheckStatus::OK: {
-    // Any changes to request headers can affect how the request is going to be
+    // Any changes to request headers or query parameters can affect how the request is going to be
     // routed. If we are changing the headers we also need to clear the route
     // cache.
     if (config_->clearRouteCache() &&
         (!response->headers_to_set.empty() || !response->headers_to_append.empty() ||
-         !response->headers_to_remove.empty())) {
+         !response->headers_to_remove.empty() || !response->query_parameters_to_set.empty() ||
+         !response->query_parameters_to_remove.empty())) {
       ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *decoder_callbacks_);
       decoder_callbacks_->clearRouteCache();
     }
@@ -271,6 +290,48 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       response_headers_to_add_ = std::move(response->response_headers_to_add);
     }
 
+    if (!response->response_headers_to_set.empty()) {
+      ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to set to the response:",
+                       *decoder_callbacks_, response->response_headers_to_set.size());
+      response_headers_to_set_ = std::move(response->response_headers_to_set);
+    }
+
+    absl::optional<Http::Utility::QueryParams> modified_query_parameters;
+    if (!response->query_parameters_to_set.empty()) {
+      modified_query_parameters =
+          Http::Utility::parseQueryString(request_headers_->Path()->value().getStringView());
+      ENVOY_STREAM_LOG(
+          trace, "ext_authz filter set query parameter(s) on the request:", *decoder_callbacks_);
+      for (const auto& [key, value] : response->query_parameters_to_set) {
+        ENVOY_STREAM_LOG(trace, "'{}={}'", *decoder_callbacks_, key, value);
+        (*modified_query_parameters)[key] = value;
+      }
+    }
+
+    if (!response->query_parameters_to_remove.empty()) {
+      if (!modified_query_parameters) {
+        modified_query_parameters =
+            Http::Utility::parseQueryString(request_headers_->Path()->value().getStringView());
+      }
+      ENVOY_STREAM_LOG(trace, "ext_authz filter removed query parameter(s) from the request:",
+                       *decoder_callbacks_);
+      for (const auto& key : response->query_parameters_to_remove) {
+        ENVOY_STREAM_LOG(trace, "'{}'", *decoder_callbacks_, key);
+        (*modified_query_parameters).erase(key);
+      }
+    }
+
+    // We modified the query parameters in some way, so regenerate the `path` header and set it
+    // here.
+    if (modified_query_parameters) {
+      const auto new_path = Http::Utility::replaceQueryString(request_headers_->Path()->value(),
+                                                              modified_query_parameters.value());
+      ENVOY_STREAM_LOG(
+          trace, "ext_authz filter modified query parameter(s), using new path for request: {}",
+          *decoder_callbacks_, new_path);
+      request_headers_->setPath(new_path);
+    }
+
     if (cluster_) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_ok_);
     }
@@ -300,6 +361,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       config_->httpContext().codeStats().chargeResponseStat(info, false);
     }
 
+    // setResponseFlag must be called before sendLocalReply
+    decoder_callbacks_->streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::UnauthorizedExternalService);
     decoder_callbacks_->sendLocalReply(
         response->status_code, response->body,
         [&headers = response->headers_to_set,
@@ -318,9 +382,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
             response_headers.addCopy(header.first, header.second);
           }
         },
-        absl::nullopt, RcDetails::get().AuthzDenied);
-    decoder_callbacks_->streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::UnauthorizedExternalService);
+        absl::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied);
     break;
   }
 
@@ -343,15 +405,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           *decoder_callbacks_, enumToInt(config_->statusOnError()));
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::ResponseFlag::UnauthorizedExternalService);
-      decoder_callbacks_->sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr,
-                                         absl::nullopt, RcDetails::get().AuthzError);
+      decoder_callbacks_->sendLocalReply(
+          config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+          Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
     }
     break;
   }
-
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-    break;
   }
 }
 

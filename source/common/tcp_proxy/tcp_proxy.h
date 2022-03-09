@@ -9,6 +9,7 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/http/header_evaluator.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
@@ -90,6 +91,24 @@ public:
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
 using TunnelingConfig =
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
+
+class TunnelingConfigHelperImpl : public TunnelingConfigHelper {
+public:
+  TunnelingConfigHelperImpl(
+      const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
+          config_message)
+      : hostname_(config_message.hostname()), use_post_(config_message.use_post()),
+        header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())) {}
+  const std::string& hostname() const override { return hostname_; }
+  bool usePost() const override { return use_post_; }
+  Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
+
+private:
+  const std::string hostname_;
+  const bool use_post_;
+  std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
+};
+
 /**
  * Filter configuration.
  *
@@ -107,9 +126,15 @@ public:
                  Server::Configuration::FactoryContext& context);
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
-    const absl::optional<TunnelingConfig> tunnelingConfig() { return tunneling_config_; }
     const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectinDuration() const {
       return max_downstream_connection_duration_;
+    }
+    TunnelingConfigHelperOptConstRef tunnelingConfigHelper() {
+      if (tunneling_config_helper_) {
+        return TunnelingConfigHelperOptConstRef(*tunneling_config_helper_);
+      } else {
+        return TunnelingConfigHelperOptConstRef();
+      }
     }
 
   private:
@@ -121,8 +146,8 @@ public:
 
     const TcpProxyStats stats_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
-    absl::optional<TunnelingConfig> tunneling_config_;
     absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
+    std::unique_ptr<TunnelingConfigHelper> tunneling_config_helper_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -150,8 +175,9 @@ public:
   const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
     return shared_config_->maxDownstreamConnectinDuration();
   }
-  const absl::optional<TunnelingConfig> tunnelingConfig() {
-    return shared_config_->tunnelingConfig();
+  // Return nullptr if there is no tunneling config.
+  TunnelingConfigHelperOptConstRef tunnelingConfigHelper() {
+    return shared_config_->tunnelingConfigHelper();
   }
   UpstreamDrainManager& drainManager();
   SharedConfigSharedPtr sharedConfig() { return shared_config_; }
@@ -161,24 +187,17 @@ public:
   const Network::HashPolicy* hashPolicy() { return hash_policy_.get(); }
 
 private:
-  struct RouteImpl : public Route {
-    RouteImpl(
-        const Config& parent,
-        const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute&
-            config);
+  struct SimpleRouteImpl : public Route {
+    SimpleRouteImpl(const Config& parent, absl::string_view cluster_name);
 
     // Route
-    bool matches(Network::Connection& connection) const override;
+    bool matches(Network::Connection&) const override { return true; }
     const std::string& clusterName() const override { return cluster_name_; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
       return parent_.metadataMatchCriteria();
     }
 
     const Config& parent_;
-    Network::Address::IpList source_ips_;
-    Network::PortRangeList source_port_ranges_;
-    Network::Address::IpList destination_ips_;
-    Network::PortRangeList destination_port_ranges_;
     std::string cluster_name_;
   };
 
@@ -208,7 +227,7 @@ private:
   };
   using WeightedClusterEntryConstSharedPtr = std::shared_ptr<const WeightedClusterEntry>;
 
-  std::vector<RouteConstSharedPtr> routes_;
+  RouteConstSharedPtr default_route_;
   std::vector<WeightedClusterEntryConstSharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
@@ -266,9 +285,7 @@ public:
   absl::optional<uint64_t> computeHashKey() override {
     auto hash_policy = config_->hashPolicy();
     if (hash_policy) {
-      return hash_policy->generateHash(
-          downstreamConnection()->addressProvider().remoteAddress().get(),
-          downstreamConnection()->addressProvider().localAddress().get());
+      return hash_policy->generateHash(*downstreamConnection());
     }
 
     return {};
@@ -384,12 +401,13 @@ protected:
   Network::Socket::OptionsSharedPtr upstream_options_;
   uint32_t connect_attempts_{};
   bool connecting_{};
+  bool downstream_closed_{};
 };
 
 // This class deals with an upstream connection that needs to finish flushing, when the downstream
 // connection has been closed. The TcpProxy is destroyed when the downstream connection is closed,
 // so handling the upstream connection here allows it to finish draining or timeout.
-class Drainer : public Event::DeferredDeletable {
+class Drainer : public Event::DeferredDeletable, protected Logger::Loggable<Logger::Id::filter> {
 public:
   Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
           const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,

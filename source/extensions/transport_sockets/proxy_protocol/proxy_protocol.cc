@@ -6,6 +6,8 @@
 #include "envoy/network/transport_socket.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/scalar_to_byte_vector.h"
+#include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
@@ -52,8 +54,8 @@ void UpstreamProxyProtocolSocket::generateHeader() {
 void UpstreamProxyProtocolSocket::generateHeaderV1() {
   // Default to local addresses. Used if no downstream connection exists or
   // downstream address info is not set e.g. health checks
-  auto src_addr = callbacks_->connection().addressProvider().localAddress();
-  auto dst_addr = callbacks_->connection().addressProvider().remoteAddress();
+  auto src_addr = callbacks_->connection().connectionInfoProvider().localAddress();
+  auto dst_addr = callbacks_->connection().connectionInfoProvider().remoteAddress();
 
   if (options_ && options_->proxyProtocolOptions().has_value()) {
     const auto options = options_->proxyProtocolOptions().value();
@@ -107,7 +109,7 @@ void UpstreamProxyProtocolSocket::onConnected() {
 
 UpstreamProxyProtocolSocketFactory::UpstreamProxyProtocolSocketFactory(
     Network::TransportSocketFactoryPtr transport_socket_factory, ProxyProtocolConfig config)
-    : transport_socket_factory_(std::move(transport_socket_factory)), config_(config) {}
+    : PassthroughFactory(std::move(transport_socket_factory)), config_(config) {}
 
 Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsConstSharedPtr options) const {
@@ -119,8 +121,18 @@ Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportS
                                                        config_.version());
 }
 
-bool UpstreamProxyProtocolSocketFactory::implementsSecureTransport() const {
-  return transport_socket_factory_->implementsSecureTransport();
+void UpstreamProxyProtocolSocketFactory::hashKey(
+    std::vector<uint8_t>& key, Network::TransportSocketOptionsConstSharedPtr options) const {
+  PassthroughFactory::hashKey(key, options);
+  // Proxy protocol options should only be included in the hash if the upstream
+  // socket intends to use them.
+  if (options) {
+    const auto& proxy_protocol_options = options->proxyProtocolOptions();
+    if (proxy_protocol_options.has_value()) {
+      pushScalarToByteVector(
+          StringUtil::CaseInsensitiveHash()(proxy_protocol_options.value().asStringForHash()), key);
+    }
+  }
 }
 
 } // namespace ProxyProtocol

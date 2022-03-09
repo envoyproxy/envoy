@@ -85,6 +85,37 @@ rules:
 bypass_cors_preflight: true
 )";
 
+const char ExampleConfigWithRegEx[] = R"(
+providers:
+  example_provider:
+    issuer: https://example.com
+    audiences:
+    - example_service
+    - http://example_service1
+    - https://example_service2/
+    remote_jwks:
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+      cache_duration:
+        seconds: 600
+    forward_payload_header: sec-istio-auth-userinfo
+rules:
+- match:
+    safe_regex:
+      google_re2: {}
+      regex: "/somethig/.*"
+  requires:
+    provider_name: "example_provider"
+- match:
+    path: "/"
+  requires:
+    provider_name: "example_provider"
+bypass_cors_preflight: true
+)";
+
 // The name of provider for above config.
 const char ProviderName[] = "example_provider";
 
@@ -190,6 +221,28 @@ const char ExpectedPayloadJSON[] = R"(
   "sub":"test@example.com",
   "exp":2001001001,
   "aud":"example_service"
+}
+)";
+
+const char ExpectedHeaderJSON[] = R"(
+{
+  "alg": "RS256",
+  "typ": "JWT"
+}
+)";
+
+const char ExpectedPayloadAndHeaderJSON[] = R"(
+{
+  "my_payload":{
+    "iss":"https://example.com",
+    "exp":2001001001,
+    "sub":"test@example.com",
+    "aud":"example_service"
+  },
+  "my_header":{
+    "typ":"JWT",
+    "alg":"RS256"
+  }
 }
 )";
 

@@ -1,4 +1,3 @@
-#include "source/extensions/filters/network/common/utility.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/filters/network/common/fuzz/uber_writefilter.h"

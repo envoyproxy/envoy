@@ -63,7 +63,9 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
     throw EnvoyException(fmt::format("invalid thrift header transport magic {:04x}", magic));
   }
 
-  // offset 6: 16 bit flags field, unused
+  // offset 6: 16 bit flags field
+  int16_t header_flags = buffer.peekBEInt<int16_t>(6);
+
   // offset 8: 32 bit sequence number field
   int32_t seq_id = buffer.peekBEInt<int32_t>(8);
 
@@ -92,6 +94,7 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
   // (header_size).
   metadata.setFrameSize(
       static_cast<uint32_t>(frame_size - header_size - MinFrameStartSizeNoHeaders));
+  metadata.setHeaderFlags(header_flags);
   metadata.setSequenceId(seq_id);
 
   ProtocolType proto = ProtocolType::Auto;
@@ -237,10 +240,14 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
   if (metadata.hasSequenceId()) {
     seq_id = metadata.sequenceId();
   }
+  int16_t header_flags = 0;
+  if (metadata.hasHeaderFlags()) {
+    header_flags = metadata.headerFlags();
+  }
 
   buffer.writeBEInt<uint32_t>(static_cast<uint32_t>(size));
   buffer.writeBEInt<uint16_t>(Magic);
-  buffer.writeBEInt<uint16_t>(0); // flags
+  buffer.writeBEInt<uint16_t>(header_flags); // flags
   buffer.writeBEInt<int32_t>(seq_id);
   buffer.writeBEInt<uint16_t>(static_cast<uint16_t>(header_size / 4));
 

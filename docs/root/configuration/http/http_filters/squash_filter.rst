@@ -6,6 +6,8 @@ Squash
 Squash is an HTTP filter which enables Envoy to integrate with Squash microservices debugger.
 Code: https://github.com/solo-io/squash, API Docs: https://squash.solo.io/
 
+The Squash filter is only included in :ref:`contrib images <install_contrib>`
+
 Overview
 --------
 

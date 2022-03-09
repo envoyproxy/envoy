@@ -62,6 +62,21 @@ private:
   absl::flat_hash_set<std::string> names_tracked_;
 };
 
+class SotwSubscriptionStateFactory : public SubscriptionStateFactory<SotwSubscriptionState> {
+public:
+  SotwSubscriptionStateFactory(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+  ~SotwSubscriptionStateFactory() override = default;
+  std::unique_ptr<SotwSubscriptionState>
+  makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
+                        OpaqueResourceDecoder& resource_decoder) override {
+    return std::make_unique<SotwSubscriptionState>(type_url, callbacks, dispatcher_,
+                                                   resource_decoder);
+  }
+
+private:
+  Event::Dispatcher& dispatcher_;
+};
+
 } // namespace XdsMux
 } // namespace Config
 } // namespace Envoy

@@ -93,6 +93,8 @@ detect issues during their execution on ClusterFuzz. A soak period of 7 days pro
 guarantee, since we will invoke the security release process for medium or higher severity issues
 for these older bugs.
 
+**NOTE:** Contrib extensions are not eligible for Envoy security team coverage.
+
 ### Threat model
 
 See https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model.

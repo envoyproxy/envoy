@@ -31,7 +31,9 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 
 PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
-    : parent_context_(parent_context), init_manager_(init_manager) {}
+    : parent_context_(parent_context), scope_(parent_context_.scope().createScope("")),
+      filter_chain_scope_(parent_context_.listenerScope().createScope("")),
+      init_manager_(init_manager) {}
 
 bool PerFilterChainFactoryContextImpl::drainClose() const {
   return is_draining_.load() || parent_context_.drainDecision().drainClose();
@@ -48,6 +50,11 @@ ThreadLocal::SlotAllocator& PerFilterChainFactoryContextImpl::threadLocal() {
 const envoy::config::core::v3::Metadata&
 PerFilterChainFactoryContextImpl::listenerMetadata() const {
   return parent_context_.listenerMetadata();
+}
+
+const Envoy::Config::TypedMetadata&
+PerFilterChainFactoryContextImpl::listenerTypedMetadata() const {
+  return parent_context_.listenerTypedMetadata();
 }
 
 envoy::config::core::v3::TrafficDirection PerFilterChainFactoryContextImpl::direction() const {
@@ -69,8 +76,8 @@ Upstream::ClusterManager& PerFilterChainFactoryContextImpl::clusterManager() {
   return parent_context_.clusterManager();
 }
 
-Event::Dispatcher& PerFilterChainFactoryContextImpl::dispatcher() {
-  return parent_context_.dispatcher();
+Event::Dispatcher& PerFilterChainFactoryContextImpl::mainThreadDispatcher() {
+  return parent_context_.mainThreadDispatcher();
 }
 
 const Server::Options& PerFilterChainFactoryContextImpl::options() {
@@ -101,7 +108,7 @@ Envoy::Runtime::Loader& PerFilterChainFactoryContextImpl::runtime() {
   return parent_context_.runtime();
 }
 
-Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return parent_context_.scope(); }
+Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return *scope_; }
 
 Singleton::Manager& PerFilterChainFactoryContextImpl::singletonManager() {
   return parent_context_.singletonManager();
@@ -135,9 +142,7 @@ PerFilterChainFactoryContextImpl::getTransportSocketFactoryContext() const {
   return parent_context_.getTransportSocketFactoryContext();
 }
 
-Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() {
-  return parent_context_.listenerScope();
-}
+Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() { return *filter_chain_scope_; }
 
 bool PerFilterChainFactoryContextImpl::isQuicListener() const {
   return parent_context_.isQuicListener();
@@ -463,7 +468,7 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
 
 const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
-  const auto& address = socket.addressProvider().localAddress();
+  const auto& address = socket.connectionInfoProvider().localAddress();
 
   const Network::FilterChain* best_match_filter_chain = nullptr;
   // Match on destination port (only for IP addresses).
@@ -493,7 +498,7 @@ FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket)
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDestinationIP(
     const DestinationIPsTrie& destination_ips_trie, const Network::ConnectionSocket& socket) const {
-  auto address = socket.addressProvider().localAddress();
+  auto address = socket.connectionInfoProvider().localAddress();
   if (address->type() != Network::Address::Type::Ip) {
     address = fakeAddress();
   }
@@ -582,7 +587,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForApplicatio
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDirectSourceIP(
     const DirectSourceIPsTrie& direct_source_ips_trie,
     const Network::ConnectionSocket& socket) const {
-  auto address = socket.addressProvider().directRemoteAddress();
+  auto address = socket.connectionInfoProvider().directRemoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     address = fakeAddress();
   }
@@ -632,7 +637,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceType
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceIpAndPort(
     const SourceIPsTrie& source_ips_trie, const Network::ConnectionSocket& socket) const {
-  auto address = socket.addressProvider().remoteAddress();
+  auto address = socket.connectionInfoProvider().remoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     address = fakeAddress();
   }
@@ -755,7 +760,7 @@ AccessLog::AccessLogManager& FactoryContextImpl::accessLogManager() {
   return server_.accessLogManager();
 }
 Upstream::ClusterManager& FactoryContextImpl::clusterManager() { return server_.clusterManager(); }
-Event::Dispatcher& FactoryContextImpl::dispatcher() { return server_.dispatcher(); }
+Event::Dispatcher& FactoryContextImpl::mainThreadDispatcher() { return server_.dispatcher(); }
 const Server::Options& FactoryContextImpl::options() { return server_.options(); }
 Grpc::Context& FactoryContextImpl::grpcContext() { return server_.grpcContext(); }
 Router::Context& FactoryContextImpl::routerContext() { return server_.routerContext(); }
@@ -790,6 +795,10 @@ FactoryContextImpl::getTransportSocketFactoryContext() const {
 }
 const envoy::config::core::v3::Metadata& FactoryContextImpl::listenerMetadata() const {
   return config_.metadata();
+}
+const Envoy::Config::TypedMetadata& FactoryContextImpl::listenerTypedMetadata() const {
+  // TODO(nareddyt): Needs an implementation for this context. Currently not used.
+  PANIC("not implemented");
 }
 envoy::config::core::v3::TrafficDirection FactoryContextImpl::direction() const {
   return config_.traffic_direction();

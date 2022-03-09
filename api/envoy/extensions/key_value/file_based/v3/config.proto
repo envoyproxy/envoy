@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package envoy.extensions.key_value.file_based.v3;
+
+import "google/protobuf/duration.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.key_value.file_based.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/key_value/file_based/v3;file_basedv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: File Based Key Value Store storage plugin]
+
+// [#extension: envoy.key_value.file_based]
+// This is configuration to flush a key value store out to disk.
+message FileBasedKeyValueStoreConfig {
+  option (xds.annotations.v3.message_status).work_in_progress = true;
+
+  // The filename to read the keys and values from, and write the keys and
+  // values to.
+  string filename = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The interval at which the key value store should be flushed to the file.
+  google.protobuf.Duration flush_interval = 2;
+}

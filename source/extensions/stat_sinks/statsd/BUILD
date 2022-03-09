@@ -14,7 +14,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # Legacy test use. TODO(#9953) clean up.
     deps = [
         "//envoy/registry",
         "//source/common/network:address_lib",

@@ -38,3 +38,17 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/health_check/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "health_check_integration_test",
+    srcs = [
+        "health_check_integration_test.cc",
+    ],
+    extension_names = ["envoy.filters.http.health_check"],
+    deps = [
+        "//source/extensions/filters/http/buffer:config",
+        "//source/extensions/filters/http/health_check:config",
+        "//test/integration:http_protocol_integration_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

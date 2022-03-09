@@ -65,7 +65,8 @@ TEST_F(IpTaggingFilterTest, InternalRequest) {
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("1.2.3.5");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
@@ -100,7 +101,8 @@ ip_tags:
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("1.2.3.4");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("external_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
@@ -137,14 +139,16 @@ ip_tags:
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("1.2.3.5");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
 
   request_headers = Http::TestRequestHeaderMapImpl{};
   remote_address = Network::Utility::parseInternetAddress("1.2.3.4");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("external_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
@@ -156,7 +160,8 @@ TEST_F(IpTaggingFilterTest, NoHits) {
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("10.2.3.5");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.no_hit"));
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
@@ -176,7 +181,8 @@ TEST_F(IpTaggingFilterTest, AppendEntry) {
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("1.2.3.5");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("test,internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
@@ -204,7 +210,8 @@ ip_tags:
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("1.2.3.4");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
@@ -235,7 +242,8 @@ ip_tags:
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("2001:abcd:ef01:2345::1");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("ipv6_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
@@ -264,7 +272,8 @@ TEST_F(IpTaggingFilterTest, ClearRouteCache) {
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("1.2.3.5");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_CALL(filter_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
@@ -275,16 +284,6 @@ TEST_F(IpTaggingFilterTest, ClearRouteCache) {
   request_headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
-}
-
-// Test that the deprecated extension name still functions.
-TEST(IpTaggingFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.ip_tagging";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
-          deprecated_name));
 }
 
 } // namespace

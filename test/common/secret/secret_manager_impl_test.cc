@@ -14,6 +14,7 @@
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 #include "source/common/ssl/tls_certificate_config_impl.h"
 
+#include "test/common/secret/private_key_provider.pb.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/server/config_tracker.h"
@@ -33,6 +34,7 @@ namespace Envoy {
 namespace Secret {
 namespace {
 
+const ::test::common::secret::TestPrivateKeyMethodConfig _mock_test_private_key_method_config_dummy;
 using ::Envoy::Matchers::MockStringMatcher;
 
 class SecretManagerImplTest : public testing::Test, public Logger::Loggable<Logger::Id::secret> {
@@ -73,14 +75,15 @@ tls_certificate:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
 )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
   secret_manager->addStaticSecret(secret_config);
 
   ASSERT_EQ(secret_manager->findStaticTlsCertificateProvider("undefined"), nullptr);
   ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
 
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
   Ssl::TlsCertificateConfigImpl tls_config(
-      *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(), nullptr, *api_);
+      *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(), ctx, *api_);
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
@@ -106,7 +109,7 @@ TEST_F(SecretManagerImplTest, DuplicateStaticTlsCertificateSecret) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
     )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
   secret_manager->addStaticSecret(secret_config);
 
   ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
@@ -150,7 +153,7 @@ TEST_F(SecretManagerImplTest, DuplicateStaticCertificateValidationContextSecret)
       allow_expired_certificate: true
     )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
   secret_manager->addStaticSecret(secret_config);
 
   ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
@@ -172,7 +175,7 @@ session_ticket_keys:
 
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
   secret_manager->addStaticSecret(secret_config);
 
@@ -201,7 +204,7 @@ session_ticket_keys:
 
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
   secret_manager->addStaticSecret(secret_config);
 
@@ -212,7 +215,7 @@ session_ticket_keys:
 
 // Validate that secret manager adds static generic secret successfully.
 TEST_F(SecretManagerImplTest, GenericSecretLoadSuccess) {
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
   envoy::extensions::transport_sockets::tls::v3::Secret secret;
   const std::string yaml =
@@ -237,7 +240,7 @@ generic_secret:
 
 // Validate that secret manager throws an exception when adding duplicated static generic secret.
 TEST_F(SecretManagerImplTest, DuplicateGenericSecret) {
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
   envoy::extensions::transport_sockets::tls::v3::Secret secret;
   const std::string yaml =
@@ -259,7 +262,7 @@ generic_secret:
 // Regression test of https://github.com/envoyproxy/envoy/issues/5744
 TEST_F(SecretManagerImplTest, DeduplicateDynamicTlsCertificateSecretProvider) {
   Server::MockInstance server;
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
 
@@ -276,7 +279,7 @@ TEST_F(SecretManagerImplTest, DeduplicateDynamicTlsCertificateSecretProvider) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   envoy::config::core::v3::ConfigSource config_source;
@@ -342,7 +345,7 @@ secret_data:
 
 TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
   Server::MockInstance server;
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
 
@@ -359,7 +362,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
       }));
   EXPECT_CALL(secret_context, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
   EXPECT_CALL(secret_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api_));
 
@@ -380,7 +383,8 @@ tls_certificate:
   init_target_handle->initialize(init_watcher);
   secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, "");
-  Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), nullptr, *api_);
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
+  Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), ctx, *api_);
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
@@ -393,7 +397,7 @@ tls_certificate:
 
 TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
   Server::MockInstance server;
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
   envoy::config::core::v3::ConfigSource config_source;
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
@@ -404,7 +408,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
   Init::TargetHandlePtr init_target_handle;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
 
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
   EXPECT_CALL(secret_context, messageValidationVisitor()).WillOnce(ReturnRef(validation_visitor));
   EXPECT_CALL(secret_context, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
@@ -457,7 +461,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandler) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   auto secret_provider =
@@ -479,7 +483,8 @@ tls_certificate:
   init_target_handle->initialize(init_watcher);
   secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, "keycert-v1");
-  Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), nullptr, *api_);
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
+  Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), ctx, *api_);
   EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_CERT_CHAIN", tls_config.certificateChain());
   EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY", tls_config.privateKey());
   EXPECT_EQ("DUMMY_PASSWORD", tls_config.password());
@@ -726,7 +731,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerWarmingSecrets) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   auto secret_provider =
@@ -874,7 +879,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSecrets) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   const std::string tls_certificate =
@@ -951,7 +956,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticValidationContext) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   const std::string validation_context =
@@ -999,7 +1004,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSessionTicketsContext) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   const std::string stek_context =
@@ -1059,6 +1064,105 @@ static_secrets:
   StrictMock<MockStringMatcher> mock_matcher;
   EXPECT_CALL(mock_matcher, match("signing_key")).WillOnce(Return(false));
   checkConfigDump("{}", mock_matcher);
+}
+
+// Test that private key provider definitions inside Secrets can be added dynamically.
+TEST_F(SecretManagerImplTest, SdsDynamicSecretPrivateKeyProviderUpdateSuccess) {
+  Server::MockInstance server;
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+
+  envoy::config::core::v3::ConfigSource config_source;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Random::MockRandomGenerator> random;
+  Stats::IsolatedStoreImpl stats;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  Init::TargetHandlePtr init_target_handle;
+  EXPECT_CALL(init_manager, add(_))
+      .WillOnce(Invoke([&init_target_handle](const Init::Target& target) {
+        init_target_handle = target.createHandle("test");
+      }));
+  EXPECT_CALL(secret_context, stats()).WillOnce(ReturnRef(stats));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api_));
+
+  auto secret_provider =
+      secret_manager->findOrCreateTlsCertificateProvider(config_source, "abc.com", secret_context);
+  const std::string yaml =
+      R"EOF(
+name: "abc.com"
+tls_certificate:
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
+  private_key_provider:
+    provider_name: test
+    typed_config:
+      "@type": type.googleapis.com/test.common.secret.TestPrivateKeyMethodConfig
+)EOF";
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  EXPECT_TRUE(typed_secret.tls_certificate().has_private_key_provider());
+  EXPECT_FALSE(typed_secret.tls_certificate().has_private_key());
+  const auto decoded_resources = TestUtility::decodeResources({typed_secret});
+  init_target_handle->initialize(init_watcher);
+  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_resources.refvec_, "");
+  EXPECT_TRUE(secret_provider->secret()->has_private_key_provider());
+  EXPECT_FALSE(secret_provider->secret()->has_private_key());
+
+  // Fail because there isn't a real private key message provider, but not because the configuration
+  // is incorrect.
+  testing::NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
+  testing::NiceMock<Ssl::MockContextManager> ssl_context_manager;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
+  EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _))
+      .WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(ssl_context_manager, privateKeyMethodManager())
+      .WillRepeatedly(ReturnRef(private_key_method_manager));
+  EXPECT_CALL(ctx, sslContextManager()).WillRepeatedly(ReturnRef(ssl_context_manager));
+  EXPECT_THROW_WITH_MESSAGE(
+      Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), ctx, *api_),
+      EnvoyException, "Failed to load private key provider: test");
+}
+
+// Verify that using the match_subject_alt_names will result in a typed matcher, one for each of
+// DNS, URI, EMAIL and IP_ADDRESS.
+// TODO(pradeepcrao): Delete this test once the deprecated field is removed.
+TEST_F(SecretManagerImplTest, DeprecatedSanMatcher) {
+  envoy::extensions::transport_sockets::tls::v3::Secret secret_config;
+  const std::string yaml =
+      R"EOF(
+      name: "abc.com"
+      validation_context:
+        trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
+        allow_expired_certificate: true
+        match_subject_alt_names:
+          exact: "example.foo"
+      )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  secret_manager->addStaticSecret(secret_config);
+
+  ASSERT_EQ(secret_manager->findStaticCertificateValidationContextProvider("undefined"), nullptr);
+  ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
+  Ssl::CertificateValidationContextConfigImpl cvc_config(
+      *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(), *api_);
+  EXPECT_EQ(cvc_config.subjectAltNameMatchers().size(), 4);
+  EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[0].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS,
+            cvc_config.subjectAltNameMatchers()[0].san_type());
+  EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[1].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI,
+            cvc_config.subjectAltNameMatchers()[1].san_type());
+  EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[2].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL,
+            cvc_config.subjectAltNameMatchers()[2].san_type());
+  EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[3].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS,
+            cvc_config.subjectAltNameMatchers()[3].san_type());
 }
 
 } // namespace

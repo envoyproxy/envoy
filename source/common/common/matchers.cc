@@ -32,7 +32,7 @@ ValueMatcherConstSharedPtr ValueMatcher::create(const envoy::type::matcher::v3::
   case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kListMatch:
     return std::make_shared<const ListMatcher>(v.list_match());
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    throw EnvoyException("Uncaught default");
   }
 }
 
@@ -59,9 +59,10 @@ bool DoubleMatcher::match(const ProtobufWkt::Value& value) const {
     return matcher_.range().start() <= v && v < matcher_.range().end();
   case envoy::type::matcher::v3::DoubleMatcher::MatchPatternCase::kExact:
     return matcher_.exact() == v;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::type::matcher::v3::DoubleMatcher::MatchPatternCase::MATCH_PATTERN_NOT_SET:
+    break; // Fall through to PANIC.
   };
+  PANIC("unexpected");
 }
 
 ListMatcher::ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher) : matcher_(matcher) {
@@ -118,7 +119,7 @@ PathMatcher::createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex
 
 bool MetadataMatcher::match(const envoy::config::core::v3::Metadata& metadata) const {
   const auto& value = Envoy::Config::Metadata::metadataValue(&metadata, matcher_.filter(), path_);
-  return value_matcher_ && value_matcher_->match(value);
+  return value_matcher_->match(value) ^ matcher_.invert();
 }
 
 bool PathMatcher::match(const absl::string_view path) const {

@@ -4,7 +4,6 @@
 
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/memory/utils.h"
 #include "source/common/protobuf/protobuf.h"
 
@@ -36,14 +35,12 @@ using AllMuxes = ThreadSafeSingleton<AllMuxesState>;
 GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
-                         envoy::config::core::v3::ApiVersion transport_api_version,
                          Random::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
-      first_stream_request_(true), transport_api_version_(transport_api_version),
-      dispatcher_(dispatcher),
+      first_stream_request_(true), dispatcher_(dispatcher),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
           [this](absl::string_view resource_type_url) {
             onDynamicContextUpdate(resource_type_url);
@@ -67,7 +64,7 @@ void GrpcMuxImpl::onDynamicContextUpdate(absl::string_view resource_type_url) {
 
 void GrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
-void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
+void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
   if (shutdown_) {
     return;
   }
@@ -94,7 +91,6 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   } else {
     request.clear_node();
   }
-  VersionConverter::prepareMessageForGrpcWire(request, transport_api_version_);
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.ShortDebugString());
   grpc_stream_.sendMessage(request);
   first_stream_request_ = false;

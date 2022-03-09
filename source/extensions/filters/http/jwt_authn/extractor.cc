@@ -10,7 +10,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/singleton/const_singleton.h"
 
-#include "absl/container/node_hash_set.h"
+#include "absl/container/btree_map.h"
 #include "absl/strings/match.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
@@ -111,6 +111,17 @@ public:
   }
 };
 
+// The JwtLocation for cookie extraction.
+class JwtCookieLocation : public JwtLocationBase {
+public:
+  JwtCookieLocation(const std::string& token, const JwtIssuerChecker& issuer_checker)
+      : JwtLocationBase(token, issuer_checker) {}
+
+  void removeJwt(Http::HeaderMap&) const override {
+    // TODO(theshubhamp): remove JWT from cookies.
+  }
+};
+
 /**
  * The class implements Extractor interface
  *
@@ -133,6 +144,8 @@ private:
                        const std::string& value_prefix);
   // add a query param config
   void addQueryParamConfig(const std::string& issuer, const std::string& param);
+  // add a query param config
+  void addCookieConfig(const std::string& issuer, const std::string& cookie);
   // ctor helper for a jwt provider config
   void addProvider(const JwtProvider& provider);
 
@@ -164,6 +177,14 @@ private:
   // The map of a parameter key to set of issuers specified the parameter
   std::map<std::string, ParamLocationSpec> param_locations_;
 
+  // CookieMap value type to store issuers that specified this cookie.
+  struct CookieLocationSpec {
+    // Issuers that specified this param.
+    JwtIssuerChecker issuer_checker_;
+  };
+  // The map of a cookie key to set of issuers specified the cookie.
+  absl::btree_map<std::string, CookieLocationSpec> cookie_locations_;
+
   std::vector<LowerCaseString> forward_payload_headers_;
 };
 
@@ -183,8 +204,12 @@ void ExtractorImpl::addProvider(const JwtProvider& provider) {
   for (const std::string& param : provider.from_params()) {
     addQueryParamConfig(provider.issuer(), param);
   }
+  for (const std::string& cookie : provider.from_cookies()) {
+    addCookieConfig(provider.issuer(), cookie);
+  }
   // If not specified, use default locations.
-  if (provider.from_headers().empty() && provider.from_params().empty()) {
+  if (provider.from_headers().empty() && provider.from_params().empty() &&
+      provider.from_cookies().empty()) {
     addHeaderConfig(provider.issuer(), Http::CustomHeaders::get().Authorization,
                     JwtConstValues::get().BearerPrefix);
     addQueryParamConfig(provider.issuer(), JwtConstValues::get().AccessTokenParam);
@@ -208,6 +233,11 @@ void ExtractorImpl::addHeaderConfig(const std::string& issuer, const LowerCaseSt
 void ExtractorImpl::addQueryParamConfig(const std::string& issuer, const std::string& param) {
   auto& param_location_spec = param_locations_[param];
   param_location_spec.issuer_checker_.add(issuer);
+}
+
+void ExtractorImpl::addCookieConfig(const std::string& issuer, const std::string& cookie) {
+  auto& cookie_location_spec = cookie_locations_[cookie];
+  cookie_location_spec.issuer_checker_.add(issuer);
 }
 
 std::vector<JwtLocationConstPtr>
@@ -235,22 +265,37 @@ ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
     }
   }
 
-  // If no query parameter locations specified, or Path() is null, bail out
-  if (param_locations_.empty() || headers.Path() == nullptr) {
-    return tokens;
-  }
-
-  // Check query parameter locations.
-  const auto& params = Http::Utility::parseAndDecodeQueryString(headers.getPathValue());
-  for (const auto& location_it : param_locations_) {
-    const auto& param_key = location_it.first;
-    const auto& location_spec = location_it.second;
-    const auto& it = params.find(param_key);
-    if (it != params.end()) {
-      tokens.push_back(std::make_unique<const JwtParamLocation>(
-          it->second, location_spec.issuer_checker_, param_key));
+  // Check query parameter locations only if query parameter locations specified and Path() is not
+  // null
+  if (!param_locations_.empty() && headers.Path() != nullptr) {
+    const auto& params = Http::Utility::parseAndDecodeQueryString(headers.getPathValue());
+    for (const auto& location_it : param_locations_) {
+      const auto& param_key = location_it.first;
+      const auto& location_spec = location_it.second;
+      const auto& it = params.find(param_key);
+      if (it != params.end()) {
+        tokens.push_back(std::make_unique<const JwtParamLocation>(
+            it->second, location_spec.issuer_checker_, param_key));
+      }
     }
   }
+
+  // Check cookie locations.
+  if (!cookie_locations_.empty()) {
+    const auto& cookies = Http::Utility::parseCookies(
+        headers, [&](absl::string_view k) -> bool { return cookie_locations_.contains(k); });
+
+    for (const auto& location_it : cookie_locations_) {
+      const auto& cookie_key = location_it.first;
+      const auto& location_spec = location_it.second;
+      const auto& it = cookies.find(cookie_key);
+      if (it != cookies.end()) {
+        tokens.push_back(
+            std::make_unique<const JwtCookieLocation>(it->second, location_spec.issuer_checker_));
+      }
+    }
+  }
+
   return tokens;
 }
 

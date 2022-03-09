@@ -28,7 +28,7 @@ type_database = rule(
             doc = "List of all proto_library target to be included.",
         ),
         "proto_repositories": attr.string_list(
-            default = ["envoy_api_canonical"],
+            default = ["envoy_api"],
             allow_empty = False,
         ),
         "_type_db_gen": attr.label(

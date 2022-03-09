@@ -27,8 +27,7 @@ void testMerge();
  * given bootstrap protobuf message using the server's loadBootstrapConfig.
  */
 void loadVersionedBootstrapFile(const std::string& filename,
-                                envoy::config::bootstrap::v3::Bootstrap& bootstrap_message,
-                                absl::optional<uint32_t> bootstrap_version = absl::nullopt);
+                                envoy::config::bootstrap::v3::Bootstrap& bootstrap_message);
 
 /**
  * Loads the given bootstrap proto into the given bootstrap protobuf message

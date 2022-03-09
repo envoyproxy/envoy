@@ -150,6 +150,7 @@ struct msghdr {
 #define SOCKET_ERROR_ADDR_IN_USE WSAEADDRINUSE
 #define SOCKET_ERROR_BADF WSAEBADF
 #define SOCKET_ERROR_CONNRESET WSAECONNRESET
+#define SOCKET_ERROR_NETUNREACH WSAENETUNREACH
 
 #define HANDLE_ERROR_PERM ERROR_ACCESS_DENIED
 #define HANDLE_ERROR_INVALID ERROR_INVALID_HANDLE
@@ -177,7 +178,9 @@ constexpr bool win32SupportsOriginalDestination() {
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#if !defined(DO_NOT_INCLUDE_NETINET_TCP_H)
 #include <netinet/tcp.h>
+#endif
 #include <netinet/udp.h> // for UDP_GRO
 #include <sys/ioctl.h>
 #include <sys/mman.h> // for mode_t
@@ -202,6 +205,8 @@ constexpr bool win32SupportsOriginalDestination() {
 #define be16toh(x) OSSwapBigToHostInt16((x))
 #define be32toh(x) OSSwapBigToHostInt32((x))
 #define be64toh(x) OSSwapBigToHostInt64((x))
+
+#undef TRUE
 #else
 #include <endian.h>
 #endif
@@ -227,6 +232,10 @@ constexpr bool win32SupportsOriginalDestination() {
 
 #ifndef UDP_SEGMENT
 #define UDP_SEGMENT 103
+#endif
+
+#ifndef IPPROTO_MPTCP
+#define IPPROTO_MPTCP 262
 #endif
 
 typedef int os_fd_t;            // NOLINT(modernize-use-using)
@@ -259,6 +268,7 @@ typedef int signal_t;           // NOLINT(modernize-use-using)
 #define SOCKET_ERROR_ADDR_IN_USE EADDRINUSE
 #define SOCKET_ERROR_BADF EBADF
 #define SOCKET_ERROR_CONNRESET ECONNRESET
+#define SOCKET_ERROR_NETUNREACH ENETUNREACH
 
 // Mapping POSIX file errors to common error names
 #define HANDLE_ERROR_PERM EACCES
@@ -274,7 +284,7 @@ constexpr absl::string_view null_device_path{"/dev/null"};
 // Note: chromium disabled recvmmsg regardless of ndk version. However, the only Android target
 // currently actively using Envoy is Envoy Mobile, where recvmmsg is not actively disabled. In fact,
 // defining mmsghdr here caused a conflicting definition with the ndk's definition of the struct
-// (https://github.com/lyft/envoy-mobile/pull/772/checks?check_run_id=534152886#step:4:64).
+// (https://github.com/envoyproxy/envoy-mobile/pull/772/checks?check_run_id=534152886#step:4:64).
 // Therefore, we decided to remove the Android check introduced here in
 // https://github.com/envoyproxy/envoy/pull/10120. If someone out there encounters problems with
 // this please bring up in Envoy's slack channel #envoy-udp-quic-dev.
@@ -291,15 +301,11 @@ struct mmsghdr {
 };
 #endif
 
-#define SUPPORTS_GETIFADDRS
-#ifdef WIN32
-#undef SUPPORTS_GETIFADDRS
-#endif
-
-// https://android.googlesource.com/platform/prebuilts/ndk/+/dev/platform/sysroot/usr/include/ifaddrs.h
+// TODO: Remove once bazel supports NDKs > 21
+#define SUPPORTS_CPP_17_CONTIGUOUS_ITERATOR
 #ifdef __ANDROID_API__
 #if __ANDROID_API__ < 24
-#undef SUPPORTS_GETIFADDRS
+#undef SUPPORTS_CPP_17_CONTIGUOUS_ITERATOR
 #endif // __ANDROID_API__ < 24
 #endif // ifdef __ANDROID_API__
 

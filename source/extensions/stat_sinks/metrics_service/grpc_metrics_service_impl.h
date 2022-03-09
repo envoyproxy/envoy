@@ -64,8 +64,7 @@ class GrpcMetricsStreamerImpl
                                  envoy::service::metrics::v3::StreamMetricsResponse> {
 public:
   GrpcMetricsStreamerImpl(Grpc::RawAsyncClientSharedPtr raw_async_client,
-                          const LocalInfo::LocalInfo& local_info,
-                          envoy::config::core::v3::ApiVersion transport_api_version);
+                          const LocalInfo::LocalInfo& local_info);
 
   // GrpcMetricsStreamer
   void send(MetricsPtr&& metrics) override;
@@ -76,7 +75,6 @@ public:
 private:
   const LocalInfo::LocalInfo& local_info_;
   const Protobuf::MethodDescriptor& service_method_;
-  const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
 using GrpcMetricsStreamerImplPtr = std::unique_ptr<GrpcMetricsStreamerImpl>;

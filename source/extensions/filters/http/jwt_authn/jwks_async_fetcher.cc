@@ -28,7 +28,8 @@ JwksAsyncFetcher::JwksAsyncFetcher(const RemoteJwks& remote_jwks,
     return;
   }
 
-  cache_duration_timer_ = context_.dispatcher().createTimer([this]() -> void { fetch(); });
+  cache_duration_timer_ =
+      context_.mainThreadDispatcher().createTimer([this]() -> void { fetch(); });
 
   // For fast_listener, just trigger a fetch, not register with init_manager.
   if (remote_jwks_.async_fetch().fast_listener()) {

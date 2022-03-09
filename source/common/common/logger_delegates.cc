@@ -19,7 +19,7 @@ FileSinkDelegate::FileSinkDelegate(const std::string& log_path,
 
 FileSinkDelegate::~FileSinkDelegate() { restoreDelegate(); }
 
-void FileSinkDelegate::log(absl::string_view msg) {
+void FileSinkDelegate::log(absl::string_view msg, const spdlog::details::log_msg&) {
   // Log files have internal locking to ensure serial, non-interleaved
   // writes, so no additional locking needed here.
   log_file_->write(msg);

@@ -115,6 +115,7 @@ public:
   }
 
   Secret::SecretManager& secretManager() override { return secret_manager_; }
+  Singleton::Manager& singletonManager() override { return singleton_manager_; }
 
   MOCK_METHOD(ClusterManager*, clusterManagerFromProto_,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
@@ -187,6 +188,18 @@ public:
     }
     return clusters;
   }
+
+  OdCdsApiHandlePtr createOdCdsApiHandle(OdCdsApiSharedPtr odcds) {
+    return ClusterManagerImpl::OdCdsApiHandleImpl::create(*this, std::move(odcds));
+  }
+
+  void notifyExpiredDiscovery(absl::string_view name) {
+    ClusterManagerImpl::notifyExpiredDiscovery(name);
+  }
+
+  ClusterDiscoveryManager createAndSwapClusterDiscoveryManager(std::string thread_name) {
+    return ClusterManagerImpl::createAndSwapClusterDiscoveryManager(std::move(thread_name));
+  }
 };
 
 // Override postThreadLocalClusterUpdate so we can test that merged updates calls
@@ -215,7 +228,7 @@ protected:
     }
   }
 
-  void postThreadLocalDrainConnections(const Cluster&, const HostVector& hosts_removed) override {
+  void postThreadLocalRemoveHosts(const Cluster&, const HostVector& hosts_removed) override {
     local_hosts_removed_.post(hosts_removed);
   }
 

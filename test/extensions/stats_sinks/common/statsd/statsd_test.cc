@@ -141,6 +141,20 @@ TEST_F(TcpStatsdSinkTest, SiSuffix) {
   tls_.shutdownThread();
 }
 
+TEST_F(TcpStatsdSinkTest, ScaledPercent) {
+  expectCreateConnection();
+
+  NiceMock<Stats::MockHistogram> items;
+  items.name_ = "items";
+  items.unit_ = Stats::Histogram::Unit::Percent;
+
+  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.items:0.5|h\n"), _));
+  sink_->onHistogramComplete(items, Stats::Histogram::PercentScale / 2);
+
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  tls_.shutdownThread();
+}
+
 // Verify that when there is no statsd host we correctly empty all output buffers so we don't
 // infinitely buffer.
 TEST_F(TcpStatsdSinkTest, NoHost) {

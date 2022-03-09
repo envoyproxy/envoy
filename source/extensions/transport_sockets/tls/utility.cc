@@ -71,6 +71,51 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
   return certificate_details;
 }
 
+bool Utility::labelWildcardMatch(absl::string_view dns_label, absl::string_view pattern) {
+  constexpr char glob = '*';
+  // Check the special case of a single * pattern, as it's common.
+  if (pattern.size() == 1 && pattern[0] == glob) {
+    return true;
+  }
+  // Only valid if wildcard character appear once.
+  if (std::count(pattern.begin(), pattern.end(), glob) == 1) {
+    std::vector<absl::string_view> split_pattern = absl::StrSplit(pattern, glob);
+    return (pattern.size() <= dns_label.size() + 1) &&
+           absl::StartsWith(dns_label, split_pattern[0]) &&
+           absl::EndsWith(dns_label, split_pattern[1]);
+  }
+  return false;
+}
+
+bool Utility::dnsNameMatch(absl::string_view dns_name, absl::string_view pattern) {
+  // A-label ACE prefix https://www.rfc-editor.org/rfc/rfc5890#section-2.3.2.5.
+  constexpr absl::string_view ACE_prefix = "xn--";
+  const std::string lower_case_dns_name = absl::AsciiStrToLower(dns_name);
+  const std::string lower_case_pattern = absl::AsciiStrToLower(pattern);
+  if (lower_case_dns_name == lower_case_pattern) {
+    return true;
+  }
+
+  std::vector<absl::string_view> split_pattern =
+      absl::StrSplit(lower_case_pattern, absl::MaxSplits('.', 1));
+  std::vector<absl::string_view> split_dns_name =
+      absl::StrSplit(lower_case_dns_name, absl::MaxSplits('.', 1));
+
+  // dns name and pattern should contain more than 1 label to match.
+  if (split_pattern.size() < 2 || split_dns_name.size() < 2) {
+    return false;
+  }
+  // Only the left-most label in the pattern contains wildcard '*' and is not an A-label.
+  if ((split_pattern[0].find('*') != absl::string_view::npos) &&
+      (split_pattern[1].find('*') == absl::string_view::npos) &&
+      (!absl::StartsWith(split_pattern[0], ACE_prefix))) {
+    return (split_dns_name[1] == split_pattern[1]) &&
+           labelWildcardMatch(split_dns_name[0], split_pattern[0]);
+  }
+
+  return false;
+}
+
 namespace {
 
 enum class CertName { Issuer, Subject };
@@ -329,6 +374,15 @@ absl::string_view Utility::getErrorDescription(int err) {
 #endif
   ENVOY_BUG(false, "Unknown BoringSSL error had occurred");
   return SSL_ERROR_UNKNOWN_ERROR_MESSAGE;
+}
+
+std::string Utility::getX509VerificationErrorInfo(X509_STORE_CTX* ctx) {
+  const int n = X509_STORE_CTX_get_error(ctx);
+  const int depth = X509_STORE_CTX_get_error_depth(ctx);
+  std::string error_details =
+      absl::StrCat("X509_verify_cert: certificate verification error at depth ", depth, ": ",
+                   X509_verify_cert_error_string(n));
+  return error_details;
 }
 
 } // namespace Tls

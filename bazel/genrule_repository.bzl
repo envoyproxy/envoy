@@ -11,19 +11,11 @@ def _genrule_repository(ctx):
         ctx.symlink(patch, patch_input)
         patch_result = ctx.execute(["patch", "-p0", "--input", patch_input])
         if patch_result.return_code != 0:
-            fail("Failed to apply patch %r: %s" % (patch, patch_result.stderr))
+            fail("Failed to apply patch %r: %s, %s" % (patch, patch_result.stderr, patch_result.stdout))
 
-    # https://github.com/bazelbuild/bazel/issues/3766
-    genrule_cmd_file = Label("@envoy//bazel").relative(str(ctx.attr.genrule_cmd_file))
-    ctx.symlink(genrule_cmd_file, "_envoy_genrule_cmd.genrule_cmd")
-    cat_genrule_cmd = ctx.execute(["cat", "_envoy_genrule_cmd.genrule_cmd"])
-    if cat_genrule_cmd.return_code != 0:
-        fail("Failed to read genrule command %r: %s" % (
-            genrule_cmd_file,
-            cat_genrule_cmd.stderr,
-        ))
-
+    genrule_cmd = ctx.read(ctx.attr.genrule_cmd_file)
     ctx.file("WORKSPACE", "workspace(name=%r)" % (ctx.name,))
+    ctx.delete("BUILD.bazel")
     ctx.symlink(ctx.attr.build_file, "BUILD.bazel")
 
     # Inject the genrule_cmd content into a .bzl file that can be loaded
@@ -32,8 +24,8 @@ def _genrule_repository(ctx):
     ctx.file("genrule_cmd.bzl", """
 _GENRULE_CMD = {%r: %r}
 def genrule_cmd(label):
-    return _GENRULE_CMD[label]
-""" % (str(genrule_cmd_file), cat_genrule_cmd.stdout))
+    return _GENRULE_CMD[Label(label)]
+""" % (ctx.attr.genrule_cmd_file, genrule_cmd))
 
 genrule_repository = repository_rule(
     attrs = {

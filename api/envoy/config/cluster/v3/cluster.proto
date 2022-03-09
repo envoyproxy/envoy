@@ -32,6 +32,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.cluster.v3";
 option java_outer_classname = "ClusterProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3;clusterv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Cluster configuration]
@@ -43,7 +44,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 56]
+// [#next-free-field: 57]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -110,11 +111,11 @@ message Cluster {
     // this option or not.
     CLUSTER_PROVIDED = 6;
 
-    // [#not-implemented-hide:] Use the new :ref:`load_balancing_policy
+    // Use the new :ref:`load_balancing_policy
     // <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` field to determine the LB policy.
-    // [#next-major-version: In the v3 API, we should consider deprecating the lb_policy field
-    // and instead using the new load_balancing_policy field as the one and only mechanism for
-    // configuring this.]
+    // This has been deprecated in favor of using the :ref:`load_balancing_policy
+    // <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` field without
+    // setting any value in :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>`.
     LOAD_BALANCING_POLICY_CONFIG = 7;
   }
 
@@ -123,15 +124,26 @@ message Cluster {
   // only perform a lookup for addresses in the IPv6 family. If AUTO is
   // specified, the DNS resolver will first perform a lookup for addresses in
   // the IPv6 family and fallback to a lookup for addresses in the IPv4 family.
+  // This is semantically equivalent to a non-existent V6_PREFERRED option.
+  // AUTO is a legacy name that is more opaque than
+  // necessary and will be deprecated in favor of V6_PREFERRED in a future major version of the API.
+  // If V4_PREFERRED is specified, the DNS resolver will first perform a lookup for addresses in the
+  // IPv4 family and fallback to a lookup for addresses in the IPv6 family. i.e., the callback
+  // target will only get v6 addresses if there were NO v4 addresses to return.
+  // If ALL is specified, the DNS resolver will perform a lookup for both IPv4 and IPv6 families,
+  // and return all resolved addresses.
   // For cluster types other than
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>` and
   // :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
   // this setting is
   // ignored.
+  // [#next-major-version: deprecate AUTO in favor of a V6_PREFERRED option.]
   enum DnsLookupFamily {
     AUTO = 0;
     V4_ONLY = 1;
     V6_ONLY = 2;
+    V4_PREFERRED = 3;
+    ALL = 4;
   }
 
   enum ClusterProtocolSelection {
@@ -337,6 +349,35 @@ message Cluster {
     bool list_as_any = 7;
   }
 
+  // Configuration for :ref:`slow start mode <arch_overview_load_balancing_slow_start>`.
+  message SlowStartConfig {
+    // Represents the size of slow start window.
+    // If set, the newly created host remains in slow start mode starting from its creation time
+    // for the duration of slow start window.
+    google.protobuf.Duration slow_start_window = 1;
+
+    // This parameter controls the speed of traffic increase over the slow start window. Defaults to 1.0,
+    // so that endpoint would get linearly increasing amount of traffic.
+    // When increasing the value for this parameter, the speed of traffic ramp-up increases non-linearly.
+    // The value of aggression parameter should be greater than 0.0.
+    // By tuning the parameter, is possible to achieve polynomial or exponential shape of ramp-up curve.
+    //
+    // During slow start window, effective weight of an endpoint would be scaled with time factor and aggression:
+    // `new_weight = weight * time_factor ^ (1 / aggression)`,
+    // where `time_factor=(time_since_start_seconds / slow_start_time_seconds)`.
+    //
+    // As time progresses, more and more traffic would be sent to endpoint, which is in slow start window.
+    // Once host exits slow start, time_factor and aggression no longer affect its weight.
+    core.v3.RuntimeDouble aggression = 2;
+  }
+
+  // Specific configuration for the RoundRobin load balancing policy.
+  message RoundRobinLbConfig {
+    // Configuration for slow start mode.
+    // If this configuration is not set, slow start will not be not enabled.
+    SlowStartConfig slow_start_config = 1;
+  }
+
   // Specific configuration for the LeastRequest load balancing policy.
   message LeastRequestLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
@@ -370,6 +411,10 @@ message Cluster {
     // .. note::
     //   This setting only takes effect if all host weights are not equal.
     core.v3.RuntimeDouble active_request_bias = 2;
+
+    // Configuration for slow start mode.
+    // If this configuration is not set, slow start will not be not enabled.
+    SlowStartConfig slow_start_config = 3;
   }
 
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
@@ -690,11 +735,9 @@ message Cluster {
   // emitting stats for the cluster and access logging the cluster name. This will appear as
   // additional information in configuration dumps of a cluster's current status as
   // :ref:`observability_name <envoy_v3_api_field_admin.v3.ClusterStatus.observability_name>`
-  // and as an additional tag "upstream_cluster.name" while tracing. Note: access logging using
-  // this field is presently enabled with runtime feature
-  // `envoy.reloadable_features.use_observable_cluster_name`. Any ``:`` in the name will be
-  // converted to ``_`` when emitting statistics. This should not be confused with :ref:`Router
-  // Filter Header <config_http_filters_router_x-envoy-upstream-alt-stat-name>`.
+  // and as an additional tag "upstream_cluster.name" while tracing. Note: Any ``:`` in the name
+  // will be converted to ``_`` when emitting statistics. This should not be confused with
+  // :ref:`Router Filter Header <config_http_filters_router_x-envoy-upstream-alt-stat-name>`.
   string alt_stat_name = 28 [(udpa.annotations.field_migrate).rename = "observability_name"];
 
   oneof cluster_discovery_type {
@@ -720,8 +763,7 @@ message Cluster {
 
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
-  // [#comment:TODO: Remove enum constraint :ref:`LOAD_BALANCING_POLICY_CONFIG<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>` when implemented.]
-  LbPolicy lb_policy = 6 [(validate.rules).enum = {defined_only: true not_in: 7}];
+  LbPolicy lb_policy = 6 [(validate.rules).enum = {defined_only: true}];
 
   // Setting this is required for specifying members of
   // :ref:`STATIC<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STATIC>`,
@@ -782,7 +824,7 @@ message Cluster {
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Additional options when handling HTTP1 requests.
-  // This has been deprecated in favor of http_protocol_options fields in the in the
+  // This has been deprecated in favor of http_protocol_options fields in the
   // :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` message.
   // http_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
@@ -798,7 +840,7 @@ message Cluster {
   // supports prior knowledge for upstream connections. Even if TLS is used
   // with ALPN, `http2_protocol_options` must be specified. As an aside this allows HTTP/2
   // connections to happen over plain text.
-  // This has been deprecated in favor of http2_protocol_options fields in the in the
+  // This has been deprecated in favor of http2_protocol_options fields in the
   // :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`
   // message. http2_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
@@ -860,41 +902,34 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple's API only allows overriding DNS resolvers via system settings.
   // This field is deprecated in favor of *dns_resolution_config*
   // which aggregates all of the DNS resolver configuration in a single message.
   repeated core.v3.Address dns_resolvers = 18
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Always use TCP queries instead of UDP queries for DNS lookups.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple' API only uses UDP for DNS resolution.
   // This field is deprecated in favor of *dns_resolution_config*
   // which aggregates all of the DNS resolver configuration in a single message.
   bool use_tcp_for_dns_lookups = 45
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // DNS resolution configuration which includes the underlying dns resolver addresses and options.
-  // *dns_resolution_config* will be deprecated once
-  // :ref:'typed_dns_resolver_config <envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>'
-  // is fully supported.
-  core.v3.DnsResolutionConfig dns_resolution_config = 53;
+  // This field is deprecated in favor of
+  // :ref:`typed_dns_resolver_config <envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>`.
+  core.v3.DnsResolutionConfig dns_resolution_config = 53
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
   // or any other DNS resolver types and the related parameters.
-  // For example, an object of :ref:`DnsResolutionConfig <envoy_v3_api_msg_config.core.v3.DnsResolutionConfig>`
-  // can be packed into this *typed_dns_resolver_config*. This configuration will replace the
-  // :ref:'dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>'
-  // configuration eventually.
-  // TODO(yanjunxiang): Investigate the deprecation plan for *dns_resolution_config*.
+  // For example, an object of
+  // :ref:`CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
+  // can be packed into this *typed_dns_resolver_config*. This configuration replaces the
+  // :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`
+  // configuration.
   // During the transition period when both *dns_resolution_config* and *typed_dns_resolver_config* exists,
-  // this configuration is optional.
-  // When *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
+  // when *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
   // When *typed_dns_resolver_config* is missing, the default behavior is in place.
-  // [#not-implemented-hide:]
+  // [#extension-category: envoy.network.dns_resolver]
   core.v3.TypedExtensionConfig typed_dns_resolver_config = 55;
 
   // Optional configuration for having cluster readiness block on warm-up. Currently, only applicable for
@@ -952,6 +987,9 @@ message Cluster {
 
     // Optional configuration for the LeastRequest load balancing policy.
     LeastRequestLbConfig least_request_lb_config = 37;
+
+    // Optional configuration for the RoundRobin load balancing policy.
+    RoundRobinLbConfig round_robin_lb_config = 56;
   }
 
   // Common configuration for all load balancer implementations.
@@ -1008,9 +1046,8 @@ message Cluster {
   // servers of this cluster.
   repeated Filter filters = 40;
 
-  // [#not-implemented-hide:] New mechanism for LB policy configuration. Used only if the
-  // :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>` field has the value
-  // :ref:`LOAD_BALANCING_POLICY_CONFIG<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>`.
+  // If this field is set and is supported by the client, it will supersede the value of
+  // :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>`.
   LoadBalancingPolicy load_balancing_policy = 41;
 
   // [#not-implemented-hide:]
@@ -1073,7 +1110,7 @@ message Cluster {
   bool connection_pool_per_downstream_connection = 51;
 }
 
-// [#not-implemented-hide:] Extensible load balancing policy configuration.
+// Extensible load balancing policy configuration.
 //
 // Every LB policy defined via this mechanism will be identified via a unique name using reverse
 // DNS notation. If the policy needs configuration parameters, it must define a message for its
@@ -1099,14 +1136,11 @@ message LoadBalancingPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.LoadBalancingPolicy.Policy";
 
-    reserved 2;
+    reserved 2, 1, 3;
 
-    reserved "config";
+    reserved "config", "name", "typed_config";
 
-    // Required. The name of the LB policy.
-    string name = 1;
-
-    google.protobuf.Any typed_config = 3;
+    core.v3.TypedExtensionConfig typed_extension_config = 4;
   }
 
   // Each client will iterate over the list in order and stop at the first policy that it

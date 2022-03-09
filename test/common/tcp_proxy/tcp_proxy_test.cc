@@ -74,8 +74,9 @@ public:
       conn_pool_handles_.push_back(
           std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>());
       ON_CALL(*upstream_hosts_.at(i), address()).WillByDefault(Return(upstream_remote_address_));
-      upstream_connections_.at(i)->stream_info_.downstream_address_provider_->setLocalAddress(
-          upstream_local_address_);
+      upstream_connections_.at(i)
+          ->stream_info_.downstream_connection_info_provider_->setLocalAddress(
+              upstream_local_address_);
       EXPECT_CALL(*upstream_connections_.at(i), dispatcher())
           .WillRepeatedly(ReturnRef(filter_callbacks_.connection_.dispatcher_));
     }
@@ -115,15 +116,15 @@ public:
             .filterState()
             ->getDataMutable<Network::UpstreamSocketOptionsFilterState>(
                 Network::UpstreamSocketOptionsFilterState::key())
-            .addOption(
+            ->addOption(
                 Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
       }
       filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
       EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
-      filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setSslConnection(
-          filter_callbacks_.connection_.ssl());
+      filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+          ->setSslConnection(filter_callbacks_.connection_.ssl());
     }
 
     if (connections > 0) {
@@ -136,15 +137,8 @@ public:
   }
 };
 
-TEST_F(TcpProxyTest, DefaultRoutes) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
-
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::WeightedCluster::ClusterWeight*
-      ignored_cluster = config.mutable_weighted_clusters()->mutable_clusters()->Add();
-  ignored_cluster->set_name("ignored_cluster");
-  ignored_cluster->set_weight(10);
-
-  configure(config);
+TEST_F(TcpProxyTest, ExplicitCluster) {
+  configure(defaultConfig());
 
   NiceMock<Network::MockConnection> connection;
   EXPECT_EQ(std::string("fake_cluster"), config_->getRouteFromEntries(connection)->clusterName());
@@ -225,7 +219,7 @@ TEST_F(TcpProxyTest, BadFactory) {
   EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setSslConnection(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setSslConnection(
       filter_callbacks_.connection_.ssl());
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 }
@@ -858,19 +852,6 @@ TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
   EXPECT_EQ(access_log_data_, "127.0.0.1:80 observability_name");
 }
 
-// Test that access log fields %UPSTREAM_HOST% and %UPSTREAM_CLUSTER% are correctly logged with the
-// cluster name.
-TEST_F(TcpProxyTest, AccessLogUpstreamHostLegacyName) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.use_observable_cluster_name", "false"}});
-  setup(1, accessLogConfig("%UPSTREAM_HOST% %UPSTREAM_CLUSTER%"));
-  raiseEventUpstreamConnected(0);
-  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-  filter_.reset();
-  EXPECT_EQ(access_log_data_, "127.0.0.1:80 fake_cluster");
-}
-
 // Test that access log field %UPSTREAM_LOCAL_ADDRESS% is correctly logged.
 TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   setup(1, accessLogConfig("%UPSTREAM_LOCAL_ADDRESS%"));
@@ -882,9 +863,9 @@ TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
 
 // Test that access log fields %DOWNSTREAM_PEER_URI_SAN% is correctly logged.
 TEST_F(TcpProxyTest, AccessLogPeerUriSan) {
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       Network::Utility::resolveUrl("tcp://1.1.1.2:20000"));
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       Network::Utility::resolveUrl("tcp://1.1.1.1:40000"));
 
   const std::vector<std::string> uriSan{"someSan"};
@@ -900,9 +881,9 @@ TEST_F(TcpProxyTest, AccessLogPeerUriSan) {
 
 // Test that access log fields %DOWNSTREAM_TLS_SESSION_ID% is correctly logged.
 TEST_F(TcpProxyTest, AccessLogTlsSessionId) {
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       Network::Utility::resolveUrl("tcp://1.1.1.2:20000"));
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       Network::Utility::resolveUrl("tcp://1.1.1.1:40000"));
 
   const std::string tlsSessionId{
@@ -920,9 +901,9 @@ TEST_F(TcpProxyTest, AccessLogTlsSessionId) {
 // Test that access log fields %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% and
 // %DOWNSTREAM_LOCAL_ADDRESS% are correctly logged.
 TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       Network::Utility::resolveUrl("tcp://1.1.1.2:20000"));
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       Network::Utility::resolveUrl("tcp://1.1.1.1:40000"));
   setup(1, accessLogConfig("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% %DOWNSTREAM_LOCAL_ADDRESS%"));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -937,12 +918,13 @@ TEST_F(TcpProxyTest, AccessLogUpstreamSSLConnection) {
   const std::string session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(*ssl_info, sessionId()).WillRepeatedly(ReturnRef(session_id));
-  stream_info.downstream_address_provider_->setSslConnection(ssl_info);
+  stream_info.downstream_connection_info_provider_->setSslConnection(ssl_info);
   EXPECT_CALL(*upstream_connections_.at(0), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
 
   raiseEventUpstreamConnected(0);
-  ASSERT_NE(nullptr, filter_->getStreamInfo().upstreamSslConnection());
-  EXPECT_EQ(session_id, filter_->getStreamInfo().upstreamSslConnection()->sessionId());
+  ASSERT_NE(nullptr, filter_->getStreamInfo().upstreamInfo()->upstreamSslConnection());
+  EXPECT_EQ(session_id,
+            filter_->getStreamInfo().upstreamInfo()->upstreamSslConnection()->sessionId());
 }
 
 // Tests that upstream flush works properly with no idle timeout configured.
@@ -1087,9 +1069,10 @@ TEST_F(TcpProxyTest, ShareFilterState) {
   raiseEventUpstreamConnected(0);
   EXPECT_EQ("filter_state_cluster",
             filter_callbacks_.connection_.streamInfo()
-                .upstreamFilterState()
+                .upstreamInfo()
+                ->upstreamFilterState()
                 ->getDataReadOnly<PerConnectionCluster>("envoy.tcp_proxy.cluster")
-                .value());
+                ->value());
 }
 
 // Tests that filter callback can access downstream and upstream address and ssl properties.
@@ -1099,9 +1082,10 @@ TEST_F(TcpProxyTest, AccessDownstreamAndUpstreamProperties) {
   raiseEventUpstreamConnected(0);
   EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamAddressProvider().sslConnection(),
             filter_callbacks_.connection().ssl());
-  EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamLocalAddress(),
-            upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().localAddress());
-  EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamSslConnection(),
+  EXPECT_EQ(
+      filter_callbacks_.connection().streamInfo().upstreamInfo()->upstreamLocalAddress().get(),
+      upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().localAddress().get());
+  EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamInfo()->upstreamSslConnection(),
             upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().sslConnection());
 }
 } // namespace

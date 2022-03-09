@@ -25,11 +25,13 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/integration/certs/clientcert_hash.h"
+#include "test/extensions/transport_sockets/tls/test_private_key_method_provider.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
@@ -59,14 +61,17 @@ std::string sdsTestParamsToString(const ::testing::TestParamInfo<TestParams>& p)
       p.param.test_quic ? "UsesQuic" : "UsesTcp");
 }
 
-std::vector<TestParams> getSdsTestsParams() {
+std::vector<TestParams> getSdsTestsParams(bool disable_quic = false) {
   std::vector<TestParams> ret;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
     for (auto sds_grpc_type : TestEnvironment::getsGrpcVersionsForTest()) {
       ret.push_back(TestParams{ip_version, sds_grpc_type, false});
 #ifdef ENVOY_ENABLE_QUIC
-      ret.push_back(TestParams{ip_version, sds_grpc_type, true});
+      if (!disable_quic) {
+        ret.push_back(TestParams{ip_version, sds_grpc_type, true});
+      }
 #else
+      UNREFERENCED_PARAMETER(disable_quic);
       ENVOY_LOG_MISC(warn, "Skipping HTTP/3 as support is compiled out");
 #endif
     }
@@ -261,7 +266,7 @@ resources:
 
       auto sds_path =
           TestEnvironment::writeStringToFileForTest("server_cert_ecdsa.sds.yaml", sds_content);
-      config_source->set_path(sds_path);
+      config_source->mutable_path_config_source()->set_path(sds_path);
       config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
     }
   }
@@ -292,22 +297,7 @@ resources:
           address, Network::Address::InstanceConstSharedPtr(),
           client_ssl_ctx_->createTransportSocket(nullptr), nullptr);
     }
-#ifdef ENVOY_ENABLE_QUIC
-    std::string url = "udp://" + Network::Test::getLoopbackAddressUrlString(version_) + ":" +
-                      std::to_string(port);
-    Network::Address::InstanceConstSharedPtr local_address;
-    if (version_ == Network::Address::IpVersion::v4) {
-      local_address = Network::Utility::getLocalAddress(Network::Address::IpVersion::v4);
-    } else {
-      // Docker only works with loopback v6 address.
-      local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
-    }
-    return Quic::createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_,
-                                             Network::Utility::resolveUrl(url), local_address,
-                                             quic_stat_names_, stats_store_);
-#else
-    NOT_REACHED_GCOVR_EXCL_LINE;
-#endif
+    return makeClientConnectionWithOptions(port, nullptr);
   }
 
 protected:
@@ -975,5 +965,144 @@ TEST_P(SdsCdsIntegrationTest, BasicSuccess) {
   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
 }
 
+class SdsDynamicDownstreamPrivateKeyIntegrationTest : public SdsDynamicDownstreamIntegrationTest {
+public:
+  envoy::extensions::transport_sockets::tls::v3::Secret getCurrentServerPrivateKeyProviderSecret() {
+    envoy::extensions::transport_sockets::tls::v3::Secret secret;
+
+    const std::string yaml =
+        R"EOF(
+name: "abc.com"
+tls_certificate:
+  certificate_chain:
+    filename: "{{ test_tmpdir }}/root/current/servercert.pem"
+  private_key_provider:
+    provider_name: test
+    typed_config:
+      "@type": "type.googleapis.com/google.protobuf.Struct"
+      value:
+        private_key_file: "{{ test_tmpdir }}/root/current/serverkey.pem"
+        expected_operation: "sign"
+        sync_mode: true
+        mode: "rsa"
+)EOF";
+
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret);
+    secret.set_name(server_cert_rsa_);
+
+    return secret;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamPrivateKeyIntegrationTest,
+                         testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
+
+// Validate that a basic SDS updates work with a private key provider.
+TEST_P(SdsDynamicDownstreamPrivateKeyIntegrationTest, BasicPrivateKeyProvider) {
+  v3_resource_api_ = true;
+
+  TestEnvironment::exec(
+      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+
+  // Set up the private key provider.
+  Extensions::PrivateKeyMethodProvider::TestPrivateKeyMethodFactory test_factory;
+  Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
+      test_private_key_method_factory(test_factory);
+
+  on_server_init_function_ = [this]() {
+    createSdsStream(*(fake_upstreams_[1]));
+    sendSdsResponse(getCurrentServerPrivateKeyProviderSecret());
+  };
+  initialize();
+
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
+
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection();
+  };
+  testRouterHeaderOnlyRequestAndResponse(&creator);
+
+  cleanupUpstreamAndDownstream();
+}
+
+class SdsCdsPrivateKeyIntegrationTest : public SdsCdsIntegrationTest {
+public:
+  envoy::extensions::transport_sockets::tls::v3::Secret getCurrentServerPrivateKeyProviderSecret() {
+    envoy::extensions::transport_sockets::tls::v3::Secret secret;
+    const std::string yaml =
+        R"EOF(
+name: "abc.com"
+tls_certificate:
+  certificate_chain:
+    filename: "{{ test_tmpdir }}/root/current/servercert.pem"
+  private_key_provider:
+    provider_name: test
+    typed_config:
+      "@type": "type.googleapis.com/google.protobuf.Struct"
+      value:
+        private_key_file: "{{ test_tmpdir }}/root/current/serverkey.pem"
+        expected_operation: "sign"
+        sync_mode: true
+        mode: "rsa"
+)EOF";
+
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret);
+    secret.set_name(client_cert_);
+
+    return secret;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsCdsPrivateKeyIntegrationTest,
+                         testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
+
+// Test private key providers in SDS+CDS setup.
+TEST_P(SdsCdsPrivateKeyIntegrationTest, BasicSdsCdsPrivateKeyProvider) {
+  v3_resource_api_ = true;
+
+  TestEnvironment::exec(
+      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+
+  // Set up the private key provider.
+  Extensions::PrivateKeyMethodProvider::TestPrivateKeyMethodFactory test_factory;
+  Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
+      test_private_key_method_factory(test_factory);
+
+  on_server_init_function_ = [this]() {
+    {
+      // CDS.
+      AssertionResult result =
+          fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, xds_connection_);
+      EXPECT_TRUE(result);
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      EXPECT_TRUE(result);
+      xds_stream_->startGrpcStream();
+      sendCdsResponse();
+    }
+    {
+      // SDS.
+      AssertionResult result =
+          fake_upstreams_[2]->waitForHttpConnection(*dispatcher_, sds_connection_);
+      EXPECT_TRUE(result);
+
+      result = sds_connection_->waitForNewStream(*dispatcher_, sds_stream_);
+      EXPECT_TRUE(result);
+      sds_stream_->startGrpcStream();
+      sendSdsResponse2(getCurrentServerPrivateKeyProviderSecret(), *sds_stream_);
+    }
+  };
+  initialize();
+
+  test_server_->waitForCounterGe(
+      "cluster.dynamic.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
+  // The 4 clusters are CDS,SDS,static and dynamic cluster.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
+
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                             {}, "42");
+  // Successfully removed the dynamic cluster.
+  test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
+}
 } // namespace Ssl
 } // namespace Envoy

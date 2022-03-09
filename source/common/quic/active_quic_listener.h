@@ -28,8 +28,8 @@ public:
   // TODO(bencebeky): Tune this value.
   static const size_t kNumSessionsToCreatePerLoop = 16;
 
-  ActiveQuicListener(uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
-                     Network::UdpConnectionHandler& parent,
+  ActiveQuicListener(Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
+                     Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      bool kernel_worker_routing,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
@@ -38,8 +38,9 @@ public:
                      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
                      EnvoyQuicProofSourceFactoryInterface& proof_source_factory);
 
-  ActiveQuicListener(uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
-                     Network::UdpConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
+  ActiveQuicListener(Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
+                     Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
+                     Network::SocketSharedPtr listen_socket,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      bool kernel_worker_routing,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
@@ -70,9 +71,14 @@ public:
   void pauseListening() override;
   void resumeListening() override;
   void shutdownListener() override;
+  void updateListenerConfig(Network::ListenerConfig& config) override;
+  void onFilterChainDraining(
+      const std::list<const Network::FilterChain*>& draining_filter_chains) override;
 
 private:
   friend class ActiveQuicListenerPeer;
+
+  void closeConnectionsWithFilterChain(const Network::FilterChain* filter_chain);
 
   uint8_t random_seed_[16];
   std::unique_ptr<quic::QuicCryptoServerConfig> crypto_config_;
@@ -101,10 +107,15 @@ public:
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveUdpListenerPtr
-  createActiveUdpListener(uint32_t worker_index, Network::UdpConnectionHandler& parent,
-                          Event::Dispatcher& disptacher, Network::ListenerConfig& config) override;
+  createActiveUdpListener(Runtime::Loader& runtime, uint32_t worker_index,
+                          Network::UdpConnectionHandler& parent, Event::Dispatcher& disptacher,
+                          Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return false; }
   const Network::Socket::OptionsSharedPtr& socketOptions() const override { return options_; }
+
+  static void setDisableKernelBpfPacketRoutingForTest(bool val) {
+    disable_kernel_bpf_packet_routing_for_test_ = val;
+  }
 
 private:
   friend class ActiveQuicListenerFactoryPeer;
@@ -120,6 +131,8 @@ private:
   const uint32_t packets_to_read_to_connection_count_ratio_;
   const Network::Socket::OptionsSharedPtr options_{std::make_shared<Network::Socket::Options>()};
   bool kernel_worker_routing_{};
+
+  static bool disable_kernel_bpf_packet_routing_for_test_;
 
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   sock_fprog prog_;

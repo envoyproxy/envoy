@@ -11,29 +11,49 @@
 namespace Envoy {
 namespace ProtobufMessage {
 
-class NullValidationVisitorImpl : public ValidationVisitor {
+class ValidationVisitorBase : public ValidationVisitor {
+public:
+  void setRuntime(Runtime::Loader& runtime) { runtime_ = runtime; }
+  void clearRuntime() { runtime_ = {}; } // for tests
+  OptRef<Runtime::Loader> runtime() override { return runtime_; }
+
+protected:
+  OptRef<Runtime::Loader> runtime_;
+};
+
+class NullValidationVisitorImpl : public ValidationVisitorBase {
 public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view) override {}
   void onDeprecatedField(absl::string_view, bool) override {}
-
-  // Envoy::ProtobufMessage::ValidationVisitor
   bool skipValidation() override { return true; }
+  void onWorkInProgress(absl::string_view) override {}
 };
 
 ValidationVisitor& getNullValidationVisitor();
 
-class WarningValidationVisitorImpl : public ValidationVisitor,
+// Base class for both warning and strict validators.
+class WipCounterBase {
+protected:
+  void setWipCounter(Stats::Counter& wip_counter);
+  void onWorkInProgressCommon(absl::string_view description);
+
+private:
+  Stats::Counter* wip_counter_{};
+  uint64_t prestats_wip_count_{};
+};
+
+class WarningValidationVisitorImpl : public ValidationVisitorBase,
+                                     public WipCounterBase,
                                      public Logger::Loggable<Logger::Id::config> {
 public:
-  void setUnknownCounter(Stats::Counter& counter);
+  void setCounters(Stats::Counter& unknown_counter, Stats::Counter& wip_counter);
 
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view description) override;
   void onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
-
-  // Envoy::ProtobufMessage::ValidationVisitor
   bool skipValidation() override { return false; }
+  void onWorkInProgress(absl::string_view description) override;
 
 private:
   // Track hashes of descriptions we've seen, to avoid log spam. A hash is used here to avoid
@@ -45,16 +65,21 @@ private:
   uint64_t prestats_unknown_count_{};
 };
 
-class StrictValidationVisitorImpl : public ValidationVisitor {
+class StrictValidationVisitorImpl : public ValidationVisitorBase, public WipCounterBase {
 public:
+  void setCounters(Stats::Counter& wip_counter) { setWipCounter(wip_counter); }
+
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view description) override;
-
-  // Envoy::ProtobufMessage::ValidationVisitor
   bool skipValidation() override { return false; }
   void onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
+  void onWorkInProgress(absl::string_view description) override;
 };
 
+// TODO(mattklein123): There are various places where the default strict validator is being used.
+// This does not increment the WIP stat because nothing calls setCounters() on the stock/static
+// version. We should remove this as a public function as well as the stock/static version and
+// make sure that all code is either using the server validation context or the null validator.
 ValidationVisitor& getStrictValidationVisitor();
 
 class ValidationContextImpl : public ValidationContext {
@@ -77,23 +102,30 @@ class ProdValidationContextImpl : public ValidationContextImpl {
 public:
   ProdValidationContextImpl(bool allow_unknown_static_fields, bool allow_unknown_dynamic_fields,
                             bool ignore_unknown_dynamic_fields)
-      : ValidationContextImpl(allow_unknown_static_fields ? static_warning_validation_visitor_
-                                                          : getStrictValidationVisitor(),
-                              allow_unknown_dynamic_fields
-                                  ? (ignore_unknown_dynamic_fields
-                                         ? ProtobufMessage::getNullValidationVisitor()
-                                         : dynamic_warning_validation_visitor_)
-                                  : ProtobufMessage::getStrictValidationVisitor()) {}
+      : ValidationContextImpl(
+            allow_unknown_static_fields
+                ? static_cast<ValidationVisitor&>(static_warning_validation_visitor_)
+                : strict_validation_visitor_,
+            allow_unknown_dynamic_fields
+                ? (ignore_unknown_dynamic_fields ? ProtobufMessage::getNullValidationVisitor()
+                                                 : dynamic_warning_validation_visitor_)
+                : strict_validation_visitor_) {}
 
-  ProtobufMessage::WarningValidationVisitorImpl& staticWarningValidationVisitor() {
-    return static_warning_validation_visitor_;
+  void setCounters(Stats::Counter& static_unknown_counter, Stats::Counter& dynamic_unknown_counter,
+                   Stats::Counter& wip_counter) {
+    strict_validation_visitor_.setCounters(wip_counter);
+    static_warning_validation_visitor_.setCounters(static_unknown_counter, wip_counter);
+    dynamic_warning_validation_visitor_.setCounters(dynamic_unknown_counter, wip_counter);
   }
 
-  ProtobufMessage::WarningValidationVisitorImpl& dynamicWarningValidationVisitor() {
-    return dynamic_warning_validation_visitor_;
+  void setRuntime(Runtime::Loader& runtime) {
+    strict_validation_visitor_.setRuntime(runtime);
+    static_warning_validation_visitor_.setRuntime(runtime);
+    dynamic_warning_validation_visitor_.setRuntime(runtime);
   }
 
 private:
+  StrictValidationVisitorImpl strict_validation_visitor_;
   ProtobufMessage::WarningValidationVisitorImpl static_warning_validation_visitor_;
   ProtobufMessage::WarningValidationVisitorImpl dynamic_warning_validation_visitor_;
 };

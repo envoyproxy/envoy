@@ -1,22 +1,11 @@
 #include "source/common/quic/envoy_quic_utils.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
-#include "quiche/quic/test_tools/quic_test_utils.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -63,17 +52,28 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   // converting to Envoy headers.
   headers_block.AppendValueOrAddHeader("key", "value1");
   headers_block.AppendValueOrAddHeader("key", "value2");
+  headers_block.AppendValueOrAddHeader("key1", "value1");
+  headers_block.AppendValueOrAddHeader("key1", "");
+  headers_block.AppendValueOrAddHeader("key1", "value2");
   NiceMock<MockHeaderValidator> validator;
   absl::string_view details;
+  quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
   auto envoy_headers = spdyHeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-      headers_block, 100, validator, details);
-  // Envoy header block is 1 header larger because QUICHE header block does coalescing.
-  EXPECT_EQ(headers_block.size() + 1u, envoy_headers->size());
+      headers_block, 100, validator, details, rst);
+  // Envoy header block is 3 headers larger because QUICHE header block does coalescing.
+  EXPECT_EQ(headers_block.size() + 3u, envoy_headers->size());
   EXPECT_EQ("www.google.com", envoy_headers->getHostValue());
   EXPECT_EQ("/index.hml", envoy_headers->getPathValue());
   EXPECT_EQ("https", envoy_headers->getSchemeValue());
   EXPECT_EQ("value1", envoy_headers->get(Http::LowerCaseString("key"))[0]->value().getStringView());
   EXPECT_EQ("value2", envoy_headers->get(Http::LowerCaseString("key"))[1]->value().getStringView());
+  EXPECT_EQ("value1",
+            envoy_headers->get(Http::LowerCaseString("key1"))[0]->value().getStringView());
+  EXPECT_EQ("", envoy_headers->get(Http::LowerCaseString("key1"))[1]->value().getStringView());
+  EXPECT_EQ("value2",
+            envoy_headers->get(Http::LowerCaseString("key1"))[2]->value().getStringView());
+
+  EXPECT_EQ(rst, quic::QUIC_REFUSED_STREAM); // With no error it will be untouched.
 
   quic::QuicHeaderList quic_headers;
   quic_headers.OnHeaderBlockStart();
@@ -82,6 +82,9 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   quic_headers.OnHeader(":scheme", "https");
   quic_headers.OnHeader("key", "value1");
   quic_headers.OnHeader("key", "value2");
+  quic_headers.OnHeader("key1", "value1");
+  quic_headers.OnHeader("key1", "");
+  quic_headers.OnHeader("key1", "value2");
   quic_headers.OnHeader("key-to-drop", "");
   quic_headers.OnHeaderBlockEnd(0, 0);
   EXPECT_CALL(validator, validateHeader(_, _))
@@ -91,9 +94,10 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
         }
         return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
       });
-  auto envoy_headers2 =
-      quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers, validator, 100, details);
+  auto envoy_headers2 = quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
+      quic_headers, validator, 100, details, rst);
   EXPECT_EQ(*envoy_headers, *envoy_headers2);
+  EXPECT_EQ(rst, quic::QUIC_REFUSED_STREAM); // With no error it will be untouched.
 
   quic::QuicHeaderList quic_headers2;
   quic_headers2.OnHeaderBlockStart();
@@ -110,7 +114,8 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
         return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
       });
   EXPECT_EQ(nullptr, quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers2, validator,
-                                                                           100, details));
+                                                                           100, details, rst));
+  EXPECT_EQ(rst, quic::QUIC_BAD_APPLICATION_PAYLOAD);
 }
 
 TEST(EnvoyQuicUtilsTest, HeadersSizeBounds) {
@@ -122,14 +127,16 @@ TEST(EnvoyQuicUtilsTest, HeadersSizeBounds) {
   absl::string_view details;
   // 6 headers are allowed.
   NiceMock<MockHeaderValidator> validator;
+  quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
   EXPECT_NE(nullptr, spdyHeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 6, validator, details));
+                         headers_block, 6, validator, details, rst));
   // Given the cap is 6, make sure anything lower, exact or otherwise, is rejected.
   EXPECT_EQ(nullptr, spdyHeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 5, validator, details));
+                         headers_block, 5, validator, details, rst));
   EXPECT_EQ("http3.too_many_trailers", details);
   EXPECT_EQ(nullptr, spdyHeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 4, validator, details));
+                         headers_block, 4, validator, details, rst));
+  EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
 }
 
 TEST(EnvoyQuicUtilsTest, TrailerCharacters) {
@@ -141,8 +148,37 @@ TEST(EnvoyQuicUtilsTest, TrailerCharacters) {
   NiceMock<MockHeaderValidator> validator;
   EXPECT_CALL(validator, validateHeader(_, _))
       .WillRepeatedly(Return(Http::HeaderUtility::HeaderValidationResult::REJECT));
+  quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
   EXPECT_EQ(nullptr, spdyHeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 5, validator, details));
+                         headers_block, 5, validator, details, rst));
+  EXPECT_EQ(rst, quic::QUIC_BAD_APPLICATION_PAYLOAD);
+}
+
+TEST(EnvoyQuicUtilsTest, deduceSignatureAlgorithmFromNullPublicKey) {
+  std::string error;
+  EXPECT_EQ(0, deduceSignatureAlgorithmFromPublicKey(nullptr, &error));
+  EXPECT_EQ("Invalid leaf cert, bad public key", error);
+}
+
+TEST(EnvoyQuicUtilsTest, ConvertQuicConfig) {
+  envoy::config::core::v3::QuicProtocolOptions config;
+  quic::QuicConfig quic_config;
+
+  // Test defaults.
+  convertQuicConfig(config, quic_config);
+  EXPECT_EQ(100, quic_config.GetMaxBidirectionalStreamsToSend());
+  EXPECT_EQ(100, quic_config.GetMaxUnidirectionalStreamsToSend());
+  EXPECT_EQ(16777216, quic_config.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
+  EXPECT_EQ(25165824, quic_config.GetInitialSessionFlowControlWindowToSend());
+
+  // Test converting values.
+  config.mutable_max_concurrent_streams()->set_value(2);
+  config.mutable_initial_stream_window_size()->set_value(3);
+  config.mutable_initial_connection_window_size()->set_value(50);
+  convertQuicConfig(config, quic_config);
+  EXPECT_EQ(2, quic_config.GetMaxBidirectionalStreamsToSend());
+  EXPECT_EQ(2, quic_config.GetMaxUnidirectionalStreamsToSend());
+  EXPECT_EQ(3, quic_config.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
 }
 
 } // namespace Quic

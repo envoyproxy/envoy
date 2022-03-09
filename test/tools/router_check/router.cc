@@ -2,12 +2,14 @@
 
 #include <functional>
 #include <memory>
+#include <sstream>
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "source/common/common/enum_to_int.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/network/socket_impl.h"
@@ -30,24 +32,18 @@ const std::string toString(envoy::type::matcher::v3::StringMatcher::MatchPattern
     return "suffix";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
     return "safe_regex";
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
-    return "deprecated_regex";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kContains:
     return "contains";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::MATCH_PATTERN_NOT_SET:
     return "match_pattern_not_set";
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("reached unexpected code");
 }
 
 const std::string toString(const envoy::config::route::v3::HeaderMatcher& header) {
   switch (header.header_match_specifier_case()) {
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
     return "exact_match";
-    break;
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
-      kHiddenEnvoyDeprecatedRegexMatch:
-    return "regex_match";
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
     return "safe_regex_match";
@@ -73,7 +69,7 @@ const std::string toString(const envoy::config::route::v3::HeaderMatcher& header
     return "string_match." + ::toString(header.string_match().match_pattern_case());
     break;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("reached unexpected code");
 }
 
 const std::string toString(const Envoy::Http::HeaderMap::GetResult& entry) {
@@ -141,9 +137,9 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
       route_config, Router::OptionalHttpFilters(), *factory_context,
       ProtobufMessage::getNullValidationVisitor(), false);
   if (!disable_deprecation_check) {
-    MessageUtil::checkForUnexpectedFields(route_config,
-                                          ProtobufMessage::getStrictValidationVisitor(),
-                                          &factory_context->runtime_loader_);
+    ProtobufMessage::StrictValidationVisitorImpl visitor;
+    visitor.setRuntime(factory_context->runtime_loader_);
+    MessageUtil::checkForUnexpectedFields(route_config, visitor);
   }
 
   return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
@@ -247,11 +243,11 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
        validation_config.tests()) {
     active_runtime_ = check_config.input().runtime();
     headers_finalized_ = false;
-    auto address_provider = std::make_shared<Network::SocketAddressSetterImpl>(
+    auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
         nullptr, Network::Utility::getCanonicalIpv4LoopbackAddress());
-    Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                  factory_context_->dispatcher().timeSource(),
-                                                  address_provider);
+    Envoy::StreamInfo::StreamInfoImpl stream_info(
+        Envoy::Http::Protocol::Http11, factory_context_->mainThreadDispatcher().timeSource(),
+        connection_info_provider);
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ =
         config_->route(*tool_config.request_headers_, stream_info, tool_config.random_value_);
@@ -269,6 +265,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
         [this](auto&... params) -> bool { return this->compareRewritePath(params...); },
         [this](auto&... params) -> bool { return this->compareRewriteHost(params...); },
         [this](auto&... params) -> bool { return this->compareRedirectPath(params...); },
+        [this](auto&... params) -> bool { return this->compareRedirectCode(params...); },
         [this](auto&... params) -> bool { return this->compareRequestHeaderFields(params...); },
         [this](auto&... params) -> bool { return this->compareResponseHeaderFields(params...); },
     };
@@ -429,6 +426,29 @@ bool RouterCheckTool::compareRedirectPath(
   return compareRedirectPath(tool_config, expected.path_redirect().value());
 }
 
+bool RouterCheckTool::compareRedirectCode(ToolConfig& tool_config, uint32_t expected) {
+  uint32_t actual = 0;
+  if (tool_config.route_->directResponseEntry() != nullptr) {
+    actual = Envoy::enumToInt(tool_config.route_->directResponseEntry()->responseCode());
+  }
+  const bool matches = compareResults(actual, expected, "code_redirect");
+  if (matches && tool_config.route_->directResponseEntry() != nullptr) {
+    coverage_.markRedirectCodeCovered(*tool_config.route_);
+  }
+  return matches;
+}
+
+bool RouterCheckTool::compareRedirectCode(
+    ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
+  if (!expected.has_code_redirect()) {
+    return true;
+  }
+  if (tool_config.route_ == nullptr) {
+    return compareResults(0u, expected.code_redirect().value(), "code_redirect");
+  }
+  return compareRedirectCode(tool_config, expected.code_redirect().value());
+}
+
 bool RouterCheckTool::compareRequestHeaderFields(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
@@ -517,7 +537,8 @@ bool RouterCheckTool::matchHeaderField(const HeaderMap& header_map,
   return false;
 }
 
-bool RouterCheckTool::compareResults(const std::string& actual, const std::string& expected,
+template <typename U, typename V>
+bool RouterCheckTool::compareResults(const U& actual, const V& expected,
                                      const std::string& test_type, const bool expect_match) {
   if ((expected == actual) != expect_match) {
     reportFailure(actual, expected, test_type, expect_match);
@@ -526,11 +547,14 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
   return true;
 }
 
-void RouterCheckTool::reportFailure(const std::string& actual, const std::string& expected,
+template <typename U, typename V>
+void RouterCheckTool::reportFailure(const U& actual, const V& expected,
                                     const std::string& test_type, const bool expect_match) {
-  tests_.back().second.emplace_back("expected: [" + expected + "], " +
-                                    "actual: " + (expect_match ? "" : "NOT ") + "[" + actual +
-                                    "]," + " test type: " + test_type);
+  std::stringstream ss;
+  ss << "expected: [" << expected << "], actual: " << (expect_match ? "" : "NOT ") << "[" << actual
+     << "],"
+     << " test type: " << test_type;
+  tests_.back().second.emplace_back(ss.str());
 }
 
 void RouterCheckTool::printResults() {

@@ -147,9 +147,9 @@ public:
       absl::node_hash_map<std::string,
                           const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
 
-  void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true) {
+  void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml, avoid_boosting), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   }
 
@@ -900,7 +900,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessIntervalJitterPercent) {
   }
 }
 
-TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious100Continue) {
+TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious1xx) {
   setupNoServiceValidationHC();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
@@ -921,8 +921,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious100Continue) {
 
   std::unique_ptr<Http::TestResponseHeaderMapImpl> continue_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "100"}});
-  test_sessions_[0]->stream_response_callbacks_->decode100ContinueHeaders(
-      std::move(continue_headers));
+  test_sessions_[0]->stream_response_callbacks_->decode1xxHeaders(std::move(continue_headers));
 
   respond(0, "200", false, false, true);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -1099,7 +1098,7 @@ TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
     )EOF";
 
   auto socket_factory = new Network::MockTransportSocketFactory();
-  EXPECT_CALL(*socket_factory, implementsSecureTransport()).Times(2).WillRepeatedly(Return(true));
+  EXPECT_CALL(*socket_factory, implementsSecureTransport()).WillRepeatedly(Return(true));
   auto transport_socket_match = new NiceMock<Upstream::MockTransportSocketMatcher>(
       Network::TransportSocketFactoryPtr(socket_factory));
   cluster_->info_->transport_socket_matcher_.reset(transport_socket_match);
@@ -2076,6 +2075,7 @@ TEST_F(HttpHealthCheckerImplTest, DynamicAddAndRemove) {
   HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
   EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
 }
 
@@ -2564,9 +2564,7 @@ TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
   // We expect that this default_socket_factory will NOT be used to create a transport socket for
   // the health check connection.
   EXPECT_CALL(*default_socket_factory, createTransportSocket(_)).Times(0);
-  EXPECT_CALL(*default_socket_factory, implementsSecureTransport())
-      .Times(2)
-      .WillRepeatedly(Return(true));
+  EXPECT_CALL(*default_socket_factory, implementsSecureTransport()).WillRepeatedly(Return(true));
   auto transport_socket_match =
       std::make_unique<Upstream::MockTransportSocketMatcher>(std::move(default_socket_factory));
 
@@ -2627,9 +2625,7 @@ TEST_F(HttpHealthCheckerImplTest, NoTransportSocketMatchCriteria) {
   // The default_socket_factory should be used to create a transport socket for the health check
   // connection.
   EXPECT_CALL(*default_socket_factory, createTransportSocket(_));
-  EXPECT_CALL(*default_socket_factory, implementsSecureTransport())
-      .Times(2)
-      .WillRepeatedly(Return(true));
+  EXPECT_CALL(*default_socket_factory, implementsSecureTransport()).WillRepeatedly(Return(true));
   auto transport_socket_match =
       std::make_unique<Upstream::MockTransportSocketMatcher>(std::move(default_socket_factory));
   // We expect resolve() to be called exactly once for endpoint socket matching. We should not
@@ -2677,10 +2673,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
   // GOAWAY with non-NO_ERROR code will result in a healthcheck failure and the
   // connection closing. Status is unchanged because unhealthy_threshold is 2.
   expectChangePending(0);
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
-      .WillOnce(Return(true));
+
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
@@ -2693,10 +2686,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
   // GOAWAY with non-NO_ERROR code will result in a healthcheck failure and the
   // connection closing. This time it goes unhealthy.
   expectUnhealthyTransition(0, false);
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
-      .WillOnce(Return(true));
+
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
   EXPECT_EQ(Host::Health::Unhealthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2718,10 +2708,6 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgress) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
-      .WillOnce(Return(true));
   // GOAWAY with NO_ERROR code during check should be handled gracefully.
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2754,10 +2740,6 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressTimeout) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
-      .WillOnce(Return(true));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
@@ -2792,10 +2774,6 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamReset) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
-      .WillOnce(Return(true));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
@@ -2830,10 +2808,6 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressConnectionClose) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
-      .WillOnce(Return(true));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
@@ -2872,10 +2846,6 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayBetweenChecks) {
   respond(0, "200", false, false, true, false, {}, false);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
-      .WillOnce(Return(true));
   // GOAWAY should cause a new connection to be created but should not affect health status.
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2887,48 +2857,6 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayBetweenChecks) {
 
   // Host should stay healthy.
   expectUnchanged(0);
-  respond(0, "200", false, false, true, false, {}, false);
-  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-}
-
-// Smoke test that receiving GOAWAY (no error) is ignored when GOAWAY handling
-// is disabled via runtime. This is based on the
-// GoAwayProbeInProgressStreamReset test case. A single case gives us sufficient
-// coverage due to the simplicity of the runtime check.
-TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamResetRuntimeDisabled) {
-  setupHCHttp2();
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
-      .WillRepeatedly(Return(false));
-
-  expectSessionCreate();
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  health_checker_->start();
-
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
-      .WillOnce(Return(false));
-
-  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
-  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-
-  // Unhealthy threshold is 1 so the first reset causes the host to go unhealthy.
-  expectUnhealthyTransition(0, true);
-  test_sessions_[0]->request_encoder_.stream_.resetStream(Http::StreamResetReason::RemoteReset);
-  EXPECT_EQ(Host::Health::Unhealthy,
-            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-
-  // The new stream should be created on the same connection (old behavior since
-  // the new behavior is disabled via runtime).
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  test_sessions_[0]->interval_timer_->invokeCallback();
-
-  // Host should go back to healthy after a successful check.
-  expectHealthyTransition(0);
   respond(0, "200", false, false, true, false, {}, false);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
@@ -2948,9 +2876,9 @@ public:
 
 class ProdHttpHealthCheckerTest : public testing::Test, public HealthCheckerTestBase {
 public:
-  void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true) {
+  void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestProdHttpHealthChecker>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml, avoid_boosting), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   }
 
@@ -3025,7 +2953,7 @@ TEST_F(HttpHealthCheckerImplTest, Http1CodecClient) {
       codec_client_type: Http1
     )EOF";
 
-  allocHealthChecker(yaml, false);
+  allocHealthChecker(yaml);
   addCompletionCallback();
   EXPECT_EQ(Http::CodecType::HTTP1, health_checker_->codecClientType());
 }
@@ -3045,7 +2973,7 @@ TEST_F(HttpHealthCheckerImplTest, Http2CodecClient) {
       codec_client_type: Http2
     )EOF";
 
-  allocHealthChecker(yaml, false);
+  allocHealthChecker(yaml);
   addCompletionCallback();
   EXPECT_EQ(Http::CodecType::HTTP2, health_checker_->codecClientType());
 }
@@ -3134,14 +3062,17 @@ TEST(HttpStatusChecker, Default) {
     path: /healthcheck
   )EOF";
 
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
   HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-      parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200);
+      conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
+      200);
 
-  EXPECT_TRUE(http_status_checker.inRange(200));
-  EXPECT_FALSE(http_status_checker.inRange(204));
+  EXPECT_TRUE(http_status_checker.inExpectedRanges(200));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(204));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(200));
 }
 
-TEST(HttpStatusChecker, Single100) {
+TEST(HttpStatusChecker, SingleExpected100) {
   const std::string yaml = R"EOF(
   timeout: 1s
   interval: 1s
@@ -3156,17 +3087,44 @@ TEST(HttpStatusChecker, Single100) {
         end: 101
   )EOF";
 
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
   HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-      parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200);
+      conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
+      200);
 
-  EXPECT_FALSE(http_status_checker.inRange(200));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(200));
 
-  EXPECT_FALSE(http_status_checker.inRange(99));
-  EXPECT_TRUE(http_status_checker.inRange(100));
-  EXPECT_FALSE(http_status_checker.inRange(101));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(99));
+  EXPECT_TRUE(http_status_checker.inExpectedRanges(100));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(101));
 }
 
-TEST(HttpStatusChecker, Single599) {
+TEST(HttpStatusChecker, SingleRetriable100) {
+  const std::string yaml = R"EOF(
+  timeout: 1s
+  interval: 1s
+  unhealthy_threshold: 2
+  healthy_threshold: 2
+  http_health_check:
+    service_name_matcher:
+        prefix: locations
+    path: /healthcheck
+    retriable_statuses:
+      - start: 100
+        end: 101
+  )EOF";
+
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
+  HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+      conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
+      200);
+
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(99));
+  EXPECT_TRUE(http_status_checker.inRetriableRanges(100));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(101));
+}
+
+TEST(HttpStatusChecker, SingleExpected599) {
   const std::string yaml = R"EOF(
   timeout: 1s
   interval: 1s
@@ -3181,17 +3139,44 @@ TEST(HttpStatusChecker, Single599) {
         end: 600
   )EOF";
 
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
   HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-      parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200);
+      conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
+      200);
 
-  EXPECT_FALSE(http_status_checker.inRange(200));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(200));
 
-  EXPECT_FALSE(http_status_checker.inRange(598));
-  EXPECT_TRUE(http_status_checker.inRange(599));
-  EXPECT_FALSE(http_status_checker.inRange(600));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(598));
+  EXPECT_TRUE(http_status_checker.inExpectedRanges(599));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(600));
 }
 
-TEST(HttpStatusChecker, Ranges_204_304) {
+TEST(HttpStatusChecker, SingleRetriable599) {
+  const std::string yaml = R"EOF(
+  timeout: 1s
+  interval: 1s
+  unhealthy_threshold: 2
+  healthy_threshold: 2
+  http_health_check:
+    service_name_matcher:
+        prefix: locations
+    path: /healthcheck
+    retriable_statuses:
+      - start: 599
+        end: 600
+  )EOF";
+
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
+  HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+      conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
+      200);
+
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(598));
+  EXPECT_TRUE(http_status_checker.inRetriableRanges(599));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(600));
+}
+
+TEST(HttpStatusChecker, ExpectedRanges_204_304) {
   const std::string yaml = R"EOF(
   timeout: 1s
   interval: 1s
@@ -3208,20 +3193,52 @@ TEST(HttpStatusChecker, Ranges_204_304) {
         end: 305
   )EOF";
 
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
   HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-      parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200);
+      conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
+      200);
 
-  EXPECT_FALSE(http_status_checker.inRange(200));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(200));
 
-  EXPECT_FALSE(http_status_checker.inRange(203));
-  EXPECT_TRUE(http_status_checker.inRange(204));
-  EXPECT_FALSE(http_status_checker.inRange(205));
-  EXPECT_FALSE(http_status_checker.inRange(303));
-  EXPECT_TRUE(http_status_checker.inRange(304));
-  EXPECT_FALSE(http_status_checker.inRange(305));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(203));
+  EXPECT_TRUE(http_status_checker.inExpectedRanges(204));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(205));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(303));
+  EXPECT_TRUE(http_status_checker.inExpectedRanges(304));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(305));
 }
 
-TEST(HttpStatusChecker, Below100) {
+TEST(HttpStatusChecker, RetriableRanges_304_404) {
+  const std::string yaml = R"EOF(
+  timeout: 1s
+  interval: 1s
+  unhealthy_threshold: 2
+  healthy_threshold: 2
+  http_health_check:
+    service_name_matcher:
+        prefix: locations
+    path: /healthcheck
+    retriable_statuses:
+      - start: 304
+        end: 305
+      - start: 404
+        end: 405
+  )EOF";
+
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
+  HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+      conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
+      200);
+
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(303));
+  EXPECT_TRUE(http_status_checker.inRetriableRanges(304));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(305));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(403));
+  EXPECT_TRUE(http_status_checker.inRetriableRanges(404));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(405));
+}
+
+TEST(HttpStatusChecker, ExpectedBelow100) {
   const std::string yaml = R"EOF(
   timeout: 1s
   interval: 1s
@@ -3236,13 +3253,40 @@ TEST(HttpStatusChecker, Below100) {
         end: 100
   )EOF";
 
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
   EXPECT_THROW_WITH_MESSAGE(
       HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-          parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200),
-      EnvoyException, "Invalid http status range: expecting start >= 100, but found start=99");
+          conf.http_health_check().expected_statuses(),
+          conf.http_health_check().retriable_statuses(), 200),
+      EnvoyException,
+      "Invalid http expected status range: expecting start >= 100, but found start=99");
 }
 
-TEST(HttpStatusChecker, Above599) {
+TEST(HttpStatusChecker, RetriableBelow100) {
+  const std::string yaml = R"EOF(
+  timeout: 1s
+  interval: 1s
+  unhealthy_threshold: 2
+  healthy_threshold: 2
+  http_health_check:
+    service_name_matcher:
+        prefix: locations
+    path: /healthcheck
+    retriable_statuses:
+      - start: 99
+        end: 100
+  )EOF";
+
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+          conf.http_health_check().expected_statuses(),
+          conf.http_health_check().retriable_statuses(), 200),
+      EnvoyException,
+      "Invalid http retriable status range: expecting start >= 100, but found start=99");
+}
+
+TEST(HttpStatusChecker, ExpectedAbove599) {
   const std::string yaml = R"EOF(
   timeout: 1s
   interval: 1s
@@ -3257,13 +3301,40 @@ TEST(HttpStatusChecker, Above599) {
         end: 601
   )EOF";
 
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
   EXPECT_THROW_WITH_MESSAGE(
       HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-          parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200),
-      EnvoyException, "Invalid http status range: expecting end <= 600, but found end=601");
+          conf.http_health_check().expected_statuses(),
+          conf.http_health_check().retriable_statuses(), 200),
+      EnvoyException,
+      "Invalid http expected status range: expecting end <= 600, but found end=601");
 }
 
-TEST(HttpStatusChecker, InvalidRange) {
+TEST(HttpStatusChecker, RetriableAbove599) {
+  const std::string yaml = R"EOF(
+  timeout: 1s
+  interval: 1s
+  unhealthy_threshold: 2
+  healthy_threshold: 2
+  http_health_check:
+    service_name_matcher:
+        prefix: locations
+    path: /healthchecka
+    retriable_statuses:
+      - start: 600
+        end: 601
+  )EOF";
+
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+          conf.http_health_check().expected_statuses(),
+          conf.http_health_check().retriable_statuses(), 200),
+      EnvoyException,
+      "Invalid http retriable status range: expecting end <= 600, but found end=601");
+}
+
+TEST(HttpStatusChecker, InvalidExpectedRange) {
   const std::string yaml = R"EOF(
   timeout: 1s
   interval: 1s
@@ -3278,14 +3349,16 @@ TEST(HttpStatusChecker, InvalidRange) {
         end: 200
   )EOF";
 
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
   EXPECT_THROW_WITH_MESSAGE(
       HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-          parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200),
+          conf.http_health_check().expected_statuses(),
+          conf.http_health_check().retriable_statuses(), 200),
       EnvoyException,
-      "Invalid http status range: expecting start < end, but found start=200 and end=200");
+      "Invalid http expected status range: expecting start < end, but found start=200 and end=200");
 }
 
-TEST(HttpStatusChecker, InvalidRange2) {
+TEST(HttpStatusChecker, InvalidRetriableRange) {
   const std::string yaml = R"EOF(
   timeout: 1s
   interval: 1s
@@ -3295,16 +3368,18 @@ TEST(HttpStatusChecker, InvalidRange2) {
     service_name_matcher:
         prefix: locations
     path: /healthchecka
-    expected_statuses:
-      - start: 201
+    retriable_statuses:
+      - start: 200
         end: 200
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-          parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200),
-      EnvoyException,
-      "Invalid http status range: expecting start < end, but found start=201 and end=200");
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
+  EXPECT_THROW_WITH_MESSAGE(HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+                                conf.http_health_check().expected_statuses(),
+                                conf.http_health_check().retriable_statuses(), 200),
+                            EnvoyException,
+                            "Invalid http retriable status range: expecting start < end, but found "
+                            "start=200 and end=200");
 }
 
 TEST(TcpHealthCheckMatcher, loadJsonBytes) {
@@ -3370,9 +3445,9 @@ class TcpHealthCheckerImplTest : public testing::Test,
                                  public HealthCheckerTestBase,
                                  public Event::TestUsingSimulatedTime {
 public:
-  void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true) {
+  void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml, avoid_boosting), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   }
 
@@ -4064,6 +4139,20 @@ public:
     addCompletionCallback();
   }
 
+  void setupHCWithHeaders(const absl::flat_hash_map<std::string, std::string> headers_to_add) {
+    auto config = createGrpcHealthCheckConfig();
+    config.mutable_grpc_health_check()->set_service_name("service");
+    for (const auto& pair : headers_to_add) {
+      auto header_value_option = config.mutable_grpc_health_check()->add_initial_metadata();
+      header_value_option->mutable_append()->set_value(false);
+      auto header = header_value_option->mutable_header();
+      header->set_key(pair.first);
+      header->set_value(pair.second);
+    }
+    allocHealthChecker(config);
+    addCompletionCallback();
+  }
+
   void setupNoReuseConnectionHC() {
     auto config = createGrpcHealthCheckConfig();
     config.mutable_reuse_connection()->set_value(false);
@@ -4346,6 +4435,127 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithHostnameOverridesConfig) {
 TEST_F(GrpcHealthCheckerImplTest, SuccessWithCustomAuthority) {
   const std::string authority = "www.envoyproxy.io";
   testSingleHostSuccess(authority);
+}
+
+// Test single host check success with additional headers.
+TEST_F(GrpcHealthCheckerImplTest, SuccessWithAdditionalHeaders) {
+  const std::string ENVOY_OK_KEY = "x-envoy-ok";
+  const std::string ENVOY_OK_VAL = "ok";
+  const std::string ENVOY_COOL_KEY = "x-envoy-cool";
+  const std::string ENVOY_COOL_VAL = "cool";
+  const std::string ENVOY_AWESOME_KEY = "x-envoy-awesome";
+  const std::string ENVOY_AWESOME_VAL = "awesome";
+  const std::string USER_AGENT_KEY = "user-agent";
+  const std::string USER_AGENT_VAL = "CoolEnvoy/HC";
+  const std::string PROTOCOL_KEY = "x-protocol";
+  const std::string PROTOCOL_VAL = "%PROTOCOL%";
+  const std::string DOWNSTREAM_LOCAL_ADDRESS_KEY = "x-downstream-local-address";
+  const std::string DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT_KEY =
+      "x-downstream-local-address-without-port";
+  const std::string DOWNSTREAM_REMOTE_ADDRESS_KEY = "x-downstream-remote-address";
+  const std::string DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT_KEY =
+      "x-downstream-remote-address-without-port";
+  const std::string START_TIME_KEY = "x-start-time";
+  const std::string UPSTREAM_METADATA_KEY = "x-upstream-metadata";
+
+  setupHCWithHeaders(
+      {{ENVOY_OK_KEY, ENVOY_OK_VAL},
+       {ENVOY_COOL_KEY, ENVOY_COOL_VAL},
+       {ENVOY_AWESOME_KEY, ENVOY_AWESOME_VAL},
+       {USER_AGENT_KEY, USER_AGENT_VAL},
+       {PROTOCOL_KEY, PROTOCOL_VAL},
+       {DOWNSTREAM_LOCAL_ADDRESS_KEY, "%DOWNSTREAM_LOCAL_ADDRESS%"},
+       {DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT_KEY, "%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%"},
+       {DOWNSTREAM_REMOTE_ADDRESS_KEY, "%DOWNSTREAM_REMOTE_ADDRESS%"},
+       {DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT_KEY, "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"},
+       {START_TIME_KEY, "%START_TIME(%s.%9f)%"},
+       {UPSTREAM_METADATA_KEY, "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"}});
+
+  auto metadata = TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
+      R"EOF(
+        filter_metadata:
+          namespace:
+            key: value
+      )EOF");
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", metadata, simTime())};
+
+  cluster_->info_->stats().upstream_cx_total_.inc();
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
+        EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, headers.getContentTypeValue());
+        EXPECT_EQ(std::string("/grpc.health.v1.Health/Check"), headers.getPathValue());
+        EXPECT_EQ(Http::Headers::get().SchemeValues.Http, headers.getSchemeValue());
+        EXPECT_NE(nullptr, headers.Method());
+        EXPECT_EQ(cluster_->info_->name(), headers.getHostValue());
+        EXPECT_EQ(ENVOY_OK_VAL,
+                  headers.get(Http::LowerCaseString(ENVOY_OK_KEY))[0]->value().getStringView());
+        EXPECT_EQ(ENVOY_COOL_VAL,
+                  headers.get(Http::LowerCaseString(ENVOY_COOL_KEY))[0]->value().getStringView());
+        EXPECT_EQ(
+            ENVOY_AWESOME_VAL,
+            headers.get(Http::LowerCaseString(ENVOY_AWESOME_KEY))[0]->value().getStringView());
+        EXPECT_EQ(USER_AGENT_VAL, headers.getUserAgentValue());
+        EXPECT_EQ("HTTP/2",
+                  headers.get(Http::LowerCaseString(PROTOCOL_KEY))[0]->value().getStringView());
+        EXPECT_EQ("127.0.0.1:0",
+                  headers.get(Http::LowerCaseString(DOWNSTREAM_LOCAL_ADDRESS_KEY))[0]
+                      ->value()
+                      .getStringView());
+        EXPECT_EQ("127.0.0.1",
+                  headers.get(Http::LowerCaseString(DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT_KEY))[0]
+                      ->value()
+                      .getStringView());
+        EXPECT_EQ("127.0.0.1:0",
+                  headers.get(Http::LowerCaseString(DOWNSTREAM_REMOTE_ADDRESS_KEY))[0]
+                      ->value()
+                      .getStringView());
+        EXPECT_EQ("127.0.0.1",
+                  headers.get(Http::LowerCaseString(DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT_KEY))[0]
+                      ->value()
+                      .getStringView());
+        Envoy::DateFormatter date_formatter("%s.%9f");
+        std::string current_start_time =
+            date_formatter.fromTime(dispatcher_.timeSource().systemTime());
+        EXPECT_EQ(current_start_time,
+                  headers.get(Http::LowerCaseString(START_TIME_KEY))[0]->value().getStringView());
+        EXPECT_EQ(
+            "value",
+            headers.get(Http::LowerCaseString(UPSTREAM_METADATA_KEY))[0]->value().getStringView());
+        EXPECT_EQ(std::chrono::milliseconds(1000).count(),
+                  Envoy::Grpc::Common::getGrpcTimeout(headers).value().count());
+        return Http::okStatus();
+      }));
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+        std::vector<Grpc::Frame> decoded_frames;
+        Grpc::Decoder decoder;
+        ASSERT_TRUE(decoder.decode(data, decoded_frames));
+        ASSERT_EQ(1U, decoded_frames.size());
+        auto& frame = decoded_frames[0];
+        Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
+        grpc::health::v1::HealthCheckRequest request;
+        ASSERT_TRUE(request.ParseFromZeroCopyStream(&stream));
+        EXPECT_EQ("service", request.service());
+      }));
+
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  expectHealthcheckStop(0, 45000);
+
+  // Host state should not be changed (remains healthy).
+  EXPECT_CALL(*this, onHostStatus(cluster_->prioritySet().getMockHostSet(0)->hosts_[0],
+                                  HealthTransition::Unchanged));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
 }
 
 // Test host check success when gRPC response payload is split between several incoming data chunks.
@@ -4657,6 +4867,7 @@ TEST_F(GrpcHealthCheckerImplTest, DynamicAddAndRemove) {
   HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
   EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
 }
 

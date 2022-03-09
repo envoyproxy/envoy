@@ -12,6 +12,7 @@
 #include "source/extensions/access_loggers/open_telemetry/access_log_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -26,6 +27,9 @@
 using namespace std::chrono_literals;
 using ::Envoy::AccessLog::FilterPtr;
 using ::Envoy::AccessLog::MockFilter;
+using envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig;
+using opentelemetry::proto::common::v1::AnyValue;
+using opentelemetry::proto::common::v1::KeyValueList;
 using opentelemetry::proto::logs::v1::LogRecord;
 using testing::_;
 using testing::An;
@@ -52,56 +56,31 @@ public:
   // GrpcAccessLoggerCache
   MOCK_METHOD(GrpcAccessLoggerSharedPtr, getOrCreateLogger,
               (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               envoy::config::core::v3::ApiVersion, Common::GrpcAccessLoggerType logger_type,
-               Stats::Scope& scope));
+               Common::GrpcAccessLoggerType logger_type));
 };
 
 class AccessLogTest : public testing::Test {
 public:
-  void initAdminAccessLog() {
+  AccessLogPtr makeAccessLog(const AnyValue& body_config, const KeyValueList& attributes_config) {
     ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
-
-    TestUtility::loadFromYaml(R"EOF(
-string_value: "x-request-header: %REQ(x-request-header)%, protocol: %PROTOCOL%"
-)EOF",
-                              *config_.mutable_body());
-
-    TestUtility::loadFromYaml(R"EOF(
-values:
-  - key: "status_code"
-    value:
-      string_value: "%RESPONSE_CODE%"
-  - key: "duration_ms"
-    value:
-      string_value: "%REQUEST_DURATION%"
-  - key: "request_bytes"
-    value:
-      string_value: "%BYTES_RECEIVED%"
-)EOF",
-                              *config_.mutable_attributes());
-
+    *config_.mutable_body() = body_config;
+    *config_.mutable_attributes() = attributes_config;
     config_.mutable_common_config()->set_log_name("test_log");
     config_.mutable_common_config()->set_transport_api_version(
         envoy::config::core::v3::ApiVersion::V3);
-    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _, _, _))
+    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _))
         .WillOnce(
             [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                        config,
-                   envoy::config::core::v3::ApiVersion, Common::GrpcAccessLoggerType logger_type,
-                   Stats::Scope&) {
+                   Common::GrpcAccessLoggerType logger_type) {
               EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
               EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
               return logger_;
             });
-    access_log_ =
-        std::make_unique<AccessLog>(FilterPtr{filter_}, config_, tls_, logger_cache_, scope_);
+    return std::make_unique<AccessLog>(FilterPtr{filter_}, config_, tls_, logger_cache_);
   }
 
   void expectLog(const std::string& expected_log_entry_yaml) {
-    if (access_log_ == nullptr) {
-      initAdminAccessLog();
-    }
-
     LogRecord expected_log_entry;
     TestUtility::loadFromYaml(expected_log_entry_yaml, expected_log_entry);
     EXPECT_CALL(*logger_, log(An<LogRecord&&>()))
@@ -110,13 +89,11 @@ values:
         }));
   }
 
-  Stats::IsolatedStoreImpl scope_;
   MockFilter* filter_{new NiceMock<MockFilter>()};
   NiceMock<ThreadLocal::MockInstance> tls_;
-  envoy::extensions::access_loggers::open_telemetry::v3alpha::OpenTelemetryAccessLogConfig config_;
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config_;
   std::shared_ptr<MockGrpcAccessLogger> logger_{new MockGrpcAccessLogger()};
   std::shared_ptr<MockGrpcAccessLoggerCache> logger_cache_{new MockGrpcAccessLoggerCache()};
-  AccessLogPtr access_log_;
 };
 
 // Test log marshaling.
@@ -124,7 +101,10 @@ TEST_F(AccessLogTest, Marshalling) {
   InSequence s;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.start_time_ = SystemTime(1h);
-  stream_info.last_downstream_rx_byte_received_ = 2ms;
+  MockTimeSystem time_system;
+  EXPECT_CALL(time_system, monotonicTime)
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(2))));
+  stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
   stream_info.protocol_ = Http::Protocol::Http10;
   stream_info.addBytesReceived(10);
   stream_info.response_code_ = 200;
@@ -133,7 +113,22 @@ TEST_F(AccessLogTest, Marshalling) {
       {"x-request-header", "test-request-header"},
   };
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-
+  const auto body_config = TestUtility::parseYaml<AnyValue>(R"EOF(
+    string_value: "x-request-header: %REQ(x-request-header)%, protocol: %PROTOCOL%"
+    )EOF");
+  const auto attributes_config = TestUtility::parseYaml<KeyValueList>(R"EOF(
+    values:
+      - key: "status_code"
+        value:
+          string_value: "%RESPONSE_CODE%"
+      - key: "duration_ms"
+        value:
+          string_value: "%REQUEST_DURATION%"
+      - key: "request_bytes"
+        value:
+          string_value: "%BYTES_RECEIVED%"
+    )EOF");
+  auto access_log = makeAccessLog(body_config, attributes_config);
   expectLog(R"EOF(
       time_unix_nano: 3600000000000
       body:
@@ -149,7 +144,21 @@ TEST_F(AccessLogTest, Marshalling) {
           value:
             string_value: "10"
     )EOF");
-  access_log_->log(&request_headers, &response_headers, nullptr, stream_info);
+  access_log->log(&request_headers, &response_headers, nullptr, stream_info);
+}
+
+// Test log with empty config.
+TEST_F(AccessLogTest, EmptyConfig) {
+  InSequence s;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.start_time_ = SystemTime(1h);
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  auto access_log = makeAccessLog({}, {});
+  expectLog(R"EOF(
+      time_unix_nano: 3600000000000
+    )EOF");
+  access_log->log(&request_headers, &response_headers, nullptr, stream_info);
 }
 
 } // namespace

@@ -1,6 +1,10 @@
+#include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
+
+#include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
 #include "test/extensions/filters/http/ext_proc/utils.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -11,8 +15,10 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 namespace {
 
-using envoy::service::ext_proc::v3alpha::BodyMutation;
+using envoy::config::common::mutation_rules::v3::HeaderMutationRules;
+using envoy::service::ext_proc::v3::BodyMutation;
 
+using Filters::Common::MutationRules::Checker;
 using Http::LowerCaseString;
 
 TEST(MutationUtils, TestBuildHeaders) {
@@ -53,7 +59,7 @@ TEST(MutationUtils, TestApplyMutations) {
       {"x-envoy-strange-thing", "No"},
   };
 
-  envoy::service::ext_proc::v3alpha::HeaderMutation mutation;
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
   auto* s = mutation.add_set_headers();
   s->mutable_append()->set_value(true);
   s->mutable_header()->set_key("x-append-this");
@@ -113,7 +119,13 @@ TEST(MutationUtils, TestApplyMutations) {
   s->mutable_header()->set_key(":status");
   s->mutable_header()->set_value("100");
 
-  MutationUtils::applyHeaderMutations(mutation, headers, false);
+  // Use the default mutation rules
+  Checker checker(HeaderMutationRules::default_instance());
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc()).Times(10);
+  // There were 10 attempts to change un-changeable headers above.
+  EXPECT_TRUE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
 
   Http::TestRequestHeaderMapImpl expected_headers{
       {":scheme", "https"},
@@ -135,7 +147,7 @@ TEST(MutationUtils, TestApplyMutations) {
 
 TEST(MutationUtils, TestNonAppendableHeaders) {
   Http::TestRequestHeaderMapImpl headers;
-  envoy::service::ext_proc::v3alpha::HeaderMutation mutation;
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
   auto* s = mutation.add_set_headers();
   s->mutable_append()->set_value(true);
   s->mutable_header()->set_key(":path");
@@ -154,7 +166,14 @@ TEST(MutationUtils, TestNonAppendableHeaders) {
   s->mutable_header()->set_key(":status");
   s->mutable_header()->set_value("401");
 
-  MutationUtils::applyHeaderMutations(mutation, headers, false);
+  // Use the default mutation rules
+  Checker checker(HeaderMutationRules::default_instance());
+  // There were two invalid attempts above.
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc()).Times(2);
+  EXPECT_TRUE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+
   Http::TestRequestHeaderMapImpl expected_headers{
       {":path", "/foo"},
       {":status", "400"},

@@ -25,7 +25,7 @@ This is the preferred style of adding dependencies that use CMake for their buil
 
 1. Define a the source Bazel repository in [`bazel/repositories.bzl`](repositories.bzl), in the
    `envoy_dependencies()` function.
-2. Add a `cmake_external` rule to [`bazel/foreign_cc/BUILD`](foreign_cc/BUILD). This will reference
+2. Add an `envoy_cmake` rule to [`bazel/foreign_cc/BUILD`](foreign_cc/BUILD). This will reference
    the source repository in step 1.
 3. Reference your new external dependency in some `envoy_cc_library` via the name bound in step 1
    `external_deps` attribute.
@@ -88,7 +88,7 @@ The name of the dependency can be found in
 [the repository locations file.](https://github.com/envoyproxy/envoy/blob/main/bazel/repository_locations.bzl)
 The path of the local copy has to be absolute path.
 
-For repositories built by `envoy_cmake_external()` in `bazel/foreign_cc/BUILD`,
+For repositories built by `envoy_cmake()` in `bazel/foreign_cc/BUILD`,
 it is necessary to populate the local copy with some additional Bazel machinery
 to support `--override_repository`:
 1. Place an empty `WORKSPACE` in the root.

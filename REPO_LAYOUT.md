@@ -66,7 +66,6 @@ Not every directory within test is described below, but a few highlights:
 We maintain a very specific code and namespace layout for extensions. This aids in discovering
 code/extensions, and allows us specify extension owners in [CODEOWNERS](CODEOWNERS).
 
-
 * All extensions are either registered in [all_extensions.bzl](source/extensions/all_extensions.bzl)
   or [extensions_build_config.bzl](source/extensions/extensions_build_config.bzl). The former is
   for extensions that cannot be removed from the primary Envoy build. The latter is for extensions
@@ -124,3 +123,14 @@ code/extensions, and allows us specify extension owners in [CODEOWNERS](CODEOWNE
   code that is used by both HTTP and network filters. Common code used only by two HTTP filters
   would be found in `filters/http/common/`. Common code should be placed in a common namespace.
   E.g., `Envoy::Extensions::Filters::Common`.
+
+## [contrib](contrib/) layout
+
+This directory contains contrib extensions. See [EXTENSION_POLICY.md](EXTENSION_POLICY.md) for
+more information.
+
+* [contrib/exe/](contrib/exe/): The default executable for contrib. This is similar to the
+  `envoy-static` target but also includes all contrib extensions, and is used to produce the
+  contrib image targets.
+* [contrib/...](contrib/): The rest of this directory mirrors the [source/extensions](source/extensions/)
+  layout. Contrib extensions are placed here.

@@ -62,47 +62,45 @@ function bazel_with_collection() {
   run_process_test_result
 }
 
-function cp_binary_for_outside_access() {
-  DELIVERY_LOCATION="$1"
-  cp -f \
-    bazel-bin/"${ENVOY_BIN}" \
-    "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}"
-}
-
-function cp_debug_info_for_outside_access() {
-  DELIVERY_LOCATION="$1"
-  cp -f \
-    bazel-bin/"${ENVOY_BIN}".dwp \
-    "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}".dwp
-}
-
-
 function cp_binary_for_image_build() {
+  local BINARY_TYPE="$1"
+  local COMPILE_TYPE="$2"
+  local EXE_NAME="$3"
+
   # TODO(mattklein123): Replace this with caching and a different job which creates images.
   local BASE_TARGET_DIR="${ENVOY_SRCDIR}${BUILD_ARCH_DIR}"
+  local TARGET_DIR=build_"${EXE_NAME}"_"${BINARY_TYPE}"
+  local FINAL_DELIVERY_DIR="${ENVOY_DELIVERY_DIR}"/"${EXE_NAME}"
+
   echo "Copying binary for image build..."
-  COMPILE_TYPE="$2"
-  mkdir -p "${BASE_TARGET_DIR}"/build_"$1"
-  cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${BASE_TARGET_DIR}"/build_"$1"
-  # Copy the su-exec utility binary into the image
-  cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/build_"$1"
+  mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
+  cp -f "${FINAL_DELIVERY_DIR}"/envoy "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
-    cp -f "${ENVOY_DELIVERY_DIR}"/envoy.dwp "${BASE_TARGET_DIR}"/build_"$1"
+    cp -f "${FINAL_DELIVERY_DIR}"/envoy.dwp "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   fi
-  mkdir -p "${BASE_TARGET_DIR}"/build_"$1"_stripped
-  strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/build_"$1"_stripped/envoy
+
+  # Tools for the tools image. Strip to save size.
+  strip bazel-bin/test/tools/schema_validator/schema_validator_tool \
+    -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
+
+  # Copy the su-exec utility binary into the image
+  cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
+
+  # Stripped binaries for the debug image.
+  mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
+  strip "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
 
   # Copy for azp which doesn't preserve permissions, creating a tar archive
-  tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${BASE_TARGET_DIR}" build_"$1" build_"$1"_stripped
+  tar czf "${ENVOY_BUILD_DIR}"/"${EXE_NAME}"_binary.tar.gz -C "${BASE_TARGET_DIR}" "${TARGET_DIR}" "${TARGET_DIR}"_stripped
 
   # Remove binaries to save space, only if BUILD_REASON exists (running in AZP)
   [[ -z "${BUILD_REASON}" ]] || \
-    rm -rf "${BASE_TARGET_DIR}"/build_"$1" "${BASE_TARGET_DIR}"/build_"$1"_stripped "${ENVOY_DELIVERY_DIR}"/envoy{,.dwp} \
+    rm -rf "${BASE_TARGET_DIR:?}"/"${TARGET_DIR}" "${BASE_TARGET_DIR:?}"/"${TARGET_DIR}"_stripped "${FINAL_DELIVERY_DIR:?}"/envoy{,.dwp} \
       bazel-bin/"${ENVOY_BIN}"{,.dwp}
 }
 
 function bazel_binary_build() {
-  BINARY_TYPE="$1"
+  local BINARY_TYPE="$1"
   if [[ "${BINARY_TYPE}" == "release" ]]; then
     COMPILE_TYPE="opt"
   elif [[ "${BINARY_TYPE}" == "debug" ]]; then
@@ -116,37 +114,55 @@ function bazel_binary_build() {
     COMPILE_TYPE="fastbuild"
   fi
 
-  echo "Building..."
-  ENVOY_BIN=$(echo "${ENVOY_BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
+  local BUILD_TARGET="$2"
+  local BUILD_DEBUG_INFORMATION="$3"
+  local EXE_NAME="$4"
+  local FINAL_DELIVERY_DIR="${ENVOY_DELIVERY_DIR}"/"${EXE_NAME}"
+  mkdir -p "${FINAL_DELIVERY_DIR}"
+
+  echo "Building (type=${BINARY_TYPE} target=${BUILD_TARGET} debug=${BUILD_DEBUG_INFORMATION} name=${EXE_NAME})..."
+  ENVOY_BIN=$(echo "${BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
+  echo "ENVOY_BIN=${ENVOY_BIN}"
 
   # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
   [[ -n "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
 
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" "${ENVOY_BUILD_TARGET}" ${CONFIG_ARGS}
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" "${BUILD_TARGET}" ${CONFIG_ARGS}
   collect_build_profile "${BINARY_TYPE}"_build
 
   # Copy the built envoy binary somewhere that we can access outside of the
   # container.
-  cp_binary_for_outside_access envoy
+  cp -f bazel-bin/"${ENVOY_BIN}" "${FINAL_DELIVERY_DIR}"/envoy
 
   if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
     # Generate dwp file for debugging since we used split DWARF to reduce binary
     # size
-    bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" "${ENVOY_BUILD_DEBUG_INFORMATION}" ${CONFIG_ARGS}
+    bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" "${BUILD_DEBUG_INFORMATION}" ${CONFIG_ARGS}
     # Copy the debug information
-    cp_debug_info_for_outside_access envoy
+    cp -f bazel-bin/"${ENVOY_BIN}".dwp "${FINAL_DELIVERY_DIR}"/envoy.dwp
   fi
 
-  # Build su-exec utility
-  bazel build external:su-exec
-  cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}"
+  # Validation tools for the tools image.
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" \
+    //test/tools/schema_validator:schema_validator_tool ${CONFIG_ARGS}
 
+  # Build su-exec utility
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" external:su-exec
+  cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
+}
+
+function bazel_envoy_binary_build() {
+  bazel_binary_build "$1" "${ENVOY_BUILD_TARGET}" "${ENVOY_BUILD_DEBUG_INFORMATION}" envoy
+}
+
+function bazel_contrib_binary_build() {
+  bazel_binary_build "$1" "${ENVOY_CONTRIB_BUILD_TARGET}" "${ENVOY_CONTRIB_BUILD_DEBUG_INFORMATION}" envoy-contrib
 }
 
 function run_process_test_result() {
   if [[ -z "$CI_SKIP_PROCESS_TEST_RESULTS" ]] && [[ $(find "$TEST_TMPDIR" -name "*_attempt.xml" 2> /dev/null) ]]; then
       echo "running flaky test reporting script"
-      "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
+      bazel run "${BAZEL_BUILD_OPTIONS[@]}" //ci/flaky_test:process_xml "$CI_TARGET"
   else
       echo "no flaky test results found"
   fi
@@ -154,18 +170,19 @@ function run_process_test_result() {
 
 function run_ci_verify () {
   echo "verify examples..."
-  docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
-  _images=$(docker image list --format "{{.Repository}}")
-  while read -r line; do images+=("$line"); done \
-      <<< "$_images"
-  _tags=$(docker image list --format "{{.Tag}}")
-  while read -r line; do tags+=("$line"); done \
-      <<< "$_tags"
-  for i in "${!images[@]}"; do
-      if [[ "${images[i]}" =~ "envoy" ]]; then
-          docker tag "${images[$i]}:${tags[$i]}" "${images[$i]}:latest"
-      fi
+  OCI_TEMP_DIR="${ENVOY_DOCKER_BUILD_DIR}/image"
+  mkdir -p "${OCI_TEMP_DIR}"
+
+  IMAGES=("envoy" "envoy-contrib" "envoy-google-vrp")
+
+  for IMAGE in "${IMAGES[@]}"; do
+    tar xvf "${ENVOY_DOCKER_BUILD_DIR}/docker/${IMAGE}.tar" -C "${OCI_TEMP_DIR}"
+    skopeo copy "oci:${OCI_TEMP_DIR}" "docker-daemon:envoyproxy/${IMAGE}-dev:latest"
+    rm -rf "${OCI_TEMP_DIR:?}/*"
   done
+
+  rm -rf "${OCI_TEMP_DIR:?}"
+
   docker images
   sudo apt-get update -y
   sudo apt-get install -y -qq --no-install-recommends expect redis-tools
@@ -184,7 +201,11 @@ if [[ $# -ge 1 ]]; then
 else
   # Coverage test will add QUICHE tests by itself.
   COVERAGE_TEST_TARGETS=("//test/...")
-  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_googlesource_quiche//:ci_tests")
+  if [[ "$CI_TARGET" == "bazel.release" ]]; then
+    # We test contrib on release only.
+    COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "//contrib/...")
+  fi
+  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests")
 fi
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
@@ -200,18 +221,22 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   echo "Testing ${TEST_TARGETS[*]} with options: ${BAZEL_BUILD_OPTIONS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c opt "${TEST_TARGETS[@]}"
 
-  echo "bazel release build with tests..."
-  bazel_binary_build release
+  echo "bazel release build..."
+  bazel_envoy_binary_build release
+
+  echo "bazel contrib release build..."
+  bazel_contrib_binary_build release
+
   exit 0
 elif [[ "$CI_TARGET" == "bazel.release.server_only" ]]; then
   setup_clang_toolchain
   echo "bazel release build..."
-  bazel_binary_build release
+  bazel_envoy_binary_build release
   exit 0
 elif [[ "$CI_TARGET" == "bazel.sizeopt.server_only" ]]; then
   setup_clang_toolchain
   echo "bazel size optimized build..."
-  bazel_binary_build sizeopt
+  bazel_envoy_binary_build sizeopt
   exit 0
 elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
   setup_clang_toolchain
@@ -219,7 +244,7 @@ elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --config=sizeopt "${TEST_TARGETS[@]}"
 
   echo "bazel size optimized build with tests..."
-  bazel_binary_build sizeopt
+  bazel_envoy_binary_build sizeopt
   exit 0
 elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
   BAZEL_BUILD_OPTIONS+=("--test_env=HEAPCHECK=")
@@ -229,7 +254,7 @@ elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild -- "${TEST_TARGETS[@]}"
 
   echo "bazel release build with gcc..."
-  bazel_binary_build fastbuild
+  bazel_envoy_binary_build fastbuild
   exit 0
 elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   setup_clang_toolchain
@@ -237,12 +262,12 @@ elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}"
 
   echo "bazel debug build with tests..."
-  bazel_binary_build debug
+  bazel_envoy_binary_build debug
   exit 0
 elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
   setup_clang_toolchain
   echo "bazel debug build..."
-  bazel_binary_build debug
+  bazel_envoy_binary_build debug
   exit 0
 elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   setup_clang_toolchain
@@ -295,7 +320,7 @@ elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel fastbuild build with tests..."
   echo "Building..."
-  bazel_binary_build fastbuild
+  bazel_envoy_binary_build fastbuild
 
   echo "Testing ${TEST_TARGETS[*]}"
   bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
@@ -354,14 +379,21 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
   echo "Validating API structure..."
   "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
-  echo "Testing API and API Boosting..."
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api_canonical//test/... @envoy_api_canonical//tools/... \
-    @envoy_api_canonical//tools:tap2pcap_test @envoy_dev//clang_tools/api_booster/...
+  echo "Validate Golang protobuf generation..."
+  "${ENVOY_SRCDIR}"/tools/api/generate_go_protobuf.py
+  echo "Testing API..."
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api//test/... @envoy_api//tools/... \
+    @envoy_api//tools:tap2pcap_test
   echo "Building API..."
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api_canonical//envoy/...
-  echo "Testing API boosting (golden C++ tests)..."
-  # We use custom BAZEL_BUILD_OPTIONS here; the API booster isn't capable of working with libc++ yet.
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" python3.8 "${ENVOY_SRCDIR}"/tools/api_boost/api_boost_test.py
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api//envoy/...
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.api_compat" ]]; then
+  echo "Checking API for breaking changes to protobuf backwards compatibility..."
+  BASE_BRANCH_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
+  COMMIT_TITLE=$(git log -n 1 --pretty='format:%C(auto)%h (%s, %ad)' "${BASE_BRANCH_REF}")
+  echo -e "\tUsing base commit ${COMMIT_TITLE}"
+  # BAZEL_BUILD_OPTIONS needed for setting the repository_cache param.
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/api_proto_breaking_change_detector:detector_ci "${BASE_BRANCH_REF}"
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
   setup_clang_toolchain
@@ -430,21 +462,19 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
 
   echo "verifying dependencies..."
   # Validate dependency relationships between core/extensions and external deps.
-  "${ENVOY_SRCDIR}"/tools/dependency/validate.py
+  time bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:validate
 
   # Validate repository metadata.
   echo "check repositories..."
   "${ENVOY_SRCDIR}"/tools/check_repositories.sh
-  "${ENVOY_SRCDIR}"/ci/check_repository_locations.sh
+
+  echo "check dependencies..."
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check
 
   # Run pip requirements tests
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check "${ENVOY_SRCDIR}"
+  echo "check pip..."
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check
 
-  exit 0
-elif [[ "$CI_TARGET" == "cve_scan" ]]; then
-  echo "scanning for CVEs in dependencies..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan
   exit 0
 elif [[ "$CI_TARGET" == "tooling" ]]; then
   setup_clang_toolchain
@@ -457,19 +487,11 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
   echo "Run protoxform test"
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/protoxform/protoxform_test.sh
 
-  echo "Run merge active shadow test"
-  bazel test "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:merge_active_shadow_test
-
   echo "check_format_test..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
 
   echo "dependency validate_test..."
-  "${ENVOY_SRCDIR}"/tools/dependency/validate_test.py
-
-  # Validate the CVE scanner works. We do it here as well as in cve_scan, since this blocks
-  # presubmits, but cve_scan only runs async.
-  echo "cve_scan_test..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:validate_test
 
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then

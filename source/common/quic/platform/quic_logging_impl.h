@@ -118,7 +118,7 @@
 #define QUICHE_DLOG_IF_IMPL(severity, condition) QUICHE_LOG_IF_IMPL(severity, condition)
 #define QUICHE_DLOG_INFO_IS_ON_IMPL() QUICHE_LOG_INFO_IS_ON_IMPL()
 #define QUICHE_DLOG_EVERY_N_IMPL(severity, n) QUICHE_LOG_EVERY_N_IMPL(severity, n)
-#define QUICHE_NOTREACHED_IMPL() NOT_REACHED_GCOVR_EXCL_LINE
+#define QUICHE_NOTREACHED_IMPL() PANIC("reached unexpected code")
 #define QUICHE_DCHECK_GT_IMPL(a, b) QUICHE_CHECK_GT_IMPL(a, b)
 #define QUICHE_DCHECK_GE_IMPL(a, b) QUICHE_CHECK_GE_IMPL(a, b)
 #define QUICHE_DCHECK_LT_IMPL(a, b) QUICHE_CHECK_LT_IMPL(a, b)
@@ -128,6 +128,7 @@
 #endif
 
 #define QUICHE_PREDICT_FALSE_IMPL(x) ABSL_PREDICT_FALSE(x)
+#define QUICHE_PREDICT_TRUE_IMPL(x) ABSL_PREDICT_TRUE(x)
 
 namespace quic {
 

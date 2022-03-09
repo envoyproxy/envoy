@@ -2,6 +2,7 @@
 
 #include "source/common/http/alternate_protocols_cache_impl.h"
 #include "source/common/http/conn_pool_base.h"
+#include "source/common/http/http3/conn_pool.h"
 #include "source/common/http/http3_status_tracker.h"
 #include "source/common/quic/quic_stat_names.h"
 
@@ -14,6 +15,7 @@ namespace Http {
 // [WiFi / cellular] [ipv4 / ipv6] [QUIC / TCP].
 // Currently only [QUIC / TCP are handled]
 class ConnectivityGrid : public ConnectionPool::Instance,
+                         public Http3::PoolConnectResultCallback,
                          protected Logger::Loggable<Logger::Id::pool> {
 public:
   struct ConnectivityOptions {
@@ -38,7 +40,7 @@ public:
                            public LinkedObject<WrapperCallbacks> {
   public:
     WrapperCallbacks(ConnectivityGrid& grid, Http::ResponseDecoder& decoder, PoolIterator pool_it,
-                     ConnectionPool::Callbacks& callbacks);
+                     ConnectionPool::Callbacks& callbacks, const Instance::StreamOptions& options);
 
     // This holds state for a single connection attempt to a specific pool.
     class ConnectionAttemptCallbacks : public ConnectionPool::Callbacks,
@@ -125,6 +127,8 @@ public:
     bool http3_attempt_failed_{};
     // True if the TCP attempt succeeded.
     bool tcp_attempt_succeeded_{};
+    // Latch the passed-in stream options.
+    const Instance::StreamOptions stream_options_{};
   };
   using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;
 
@@ -134,7 +138,6 @@ public:
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
                    AlternateProtocolsCacheSharedPtr alternate_protocols,
-                   std::chrono::milliseconds next_attempt_duration,
                    ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
                    Stats::Scope& scope);
   ~ConnectivityGrid() override;
@@ -145,11 +148,11 @@ public:
   // Http::ConnPool::Instance
   bool hasActiveConnections() const override;
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
-                                         ConnectionPool::Callbacks& callbacks) override;
+                                         ConnectionPool::Callbacks& callbacks,
+                                         const Instance::StreamOptions& options) override;
   void addIdleCallback(IdleCb cb) override;
   bool isIdle() const override;
-  void startDrain() override;
-  void drainConnections() override;
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override;
   Upstream::HostDescriptionConstSharedPtr host() const override;
   bool maybePreconnect(float preconnect_ratio) override;
   absl::string_view protocolDescription() const override { return "connection grid"; }
@@ -171,6 +174,9 @@ public:
   // Marks that HTTP/3 is working, which resets the exponential backoff counter in the
   // event that HTTP/3 is marked broken again.
   void markHttp3Confirmed();
+
+  // Http3::PoolConnectResultCallback
+  void onHandshakeComplete() override;
 
 protected:
   // Set the required idle callback on the pool.
@@ -202,7 +208,6 @@ private:
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
   Http3StatusTracker http3_status_tracker_;
-  // TODO(RyanTheOptimist): Make the alternate_protocols_ member non-optional.
   AlternateProtocolsCacheSharedPtr alternate_protocols_;
 
   // True iff this pool is draining. No new streams or connections should be created

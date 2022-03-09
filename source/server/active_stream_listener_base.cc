@@ -29,9 +29,9 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {
-    RELEASE_ASSERT(socket->addressProvider().remoteAddress() != nullptr, "");
+    RELEASE_ASSERT(socket->connectionInfoProvider().remoteAddress() != nullptr, "");
     ENVOY_LOG(debug, "closing connection from {}: no matching filter chain found",
-              socket->addressProvider().remoteAddress()->asString());
+              socket->connectionInfoProvider().remoteAddress()->asString());
     stats_.no_filter_chain_match_.inc();
     stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
@@ -49,12 +49,12 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
         timeout, stats_.downstream_cx_transport_socket_connect_timeout_);
   }
   server_conn_ptr->setBufferLimits(config_->perConnectionBufferLimitBytes());
-  RELEASE_ASSERT(server_conn_ptr->addressProvider().remoteAddress() != nullptr, "");
+  RELEASE_ASSERT(server_conn_ptr->connectionInfoProvider().remoteAddress() != nullptr, "");
   const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
       *server_conn_ptr, filter_chain->networkFilterFactories());
   if (empty_filter_chain) {
     ENVOY_CONN_LOG(debug, "closing connection from {}: no filters", *server_conn_ptr,
-                   server_conn_ptr->addressProvider().remoteAddress()->asString());
+                   server_conn_ptr->connectionInfoProvider().remoteAddress()->asString());
     server_conn_ptr->close(Network::ConnectionCloseType::NoFlush);
   }
   newActiveConnection(*filter_chain, std::move(server_conn_ptr), std::move(stream_info));

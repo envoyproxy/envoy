@@ -4,6 +4,8 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
+#include "test/integration/load_balancers/custom_lb_policy.h"
+
 namespace Envoy {
 
 // ClusterImplBase

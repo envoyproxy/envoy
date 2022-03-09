@@ -107,7 +107,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, LocalJwksIntegrationTest,
 
 // With local Jwks, this test verifies a request is passed with a good Jwt token.
 TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
-  config_helper_.addFilter(getFilterConfig(true));
+  config_helper_.prependFilter(getFilterConfig(true));
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -135,7 +135,7 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
 
 // With local Jwks, this test verifies a request is rejected with an expired Jwt token.
 TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
-  config_helper_.addFilter(getFilterConfig(true));
+  config_helper_.prependFilter(getFilterConfig(true));
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -158,7 +158,7 @@ TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
 }
 
 TEST_P(LocalJwksIntegrationTest, MissingToken) {
-  config_helper_.addFilter(getFilterConfig(true));
+  config_helper_.prependFilter(getFilterConfig(true));
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -179,7 +179,7 @@ TEST_P(LocalJwksIntegrationTest, MissingToken) {
 }
 
 TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
-  config_helper_.addFilter(getFilterConfig(true));
+  config_helper_.prependFilter(getFilterConfig(true));
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -205,7 +205,7 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
 
 // This test verifies a request is passed with a path that don't match any requirements.
 TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
-  config_helper_.addFilter(getFilterConfig(true));
+  config_helper_.prependFilter(getFilterConfig(true));
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -227,7 +227,7 @@ TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
 
 // This test verifies a CORS preflight request without JWT token is allowed.
 TEST_P(LocalJwksIntegrationTest, CorsPreflight) {
-  config_helper_.addFilter(getFilterConfig(true));
+  config_helper_.prependFilter(getFilterConfig(true));
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -264,8 +264,8 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
         provider_name: example_provider
 )";
 
-  config_helper_.addFilter(getAuthFilterConfig(auth_filter_conf, true));
-  config_helper_.addFilter(absl::StrCat("name: ", HeaderToFilterStateFilterName));
+  config_helper_.prependFilter(getAuthFilterConfig(auth_filter_conf, true));
+  config_helper_.prependFilter(absl::StrCat("name: ", HeaderToFilterStateFilterName));
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -326,6 +326,33 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
   }
 }
 
+// Verify that JWT config with RegEx matcher can handle CONNECT requests.
+TEST_P(LocalJwksIntegrationTest, ConnectRequestWithRegExMatch) {
+  config_helper_.prependFilter(getAuthFilterConfig(ExampleConfigWithRegEx, true));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "CONNECT"},
+      {":authority", "host.com:80"},
+      {"authorization", "Bearer " + std::string(GoodToken)},
+  });
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    // Because CONNECT requests for HTTP/1 do not include a path, they will fail
+    // to find a route match and return a 404.
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("404", response->headers().getStatusValue());
+  } else {
+    ASSERT_TRUE(response->waitForReset());
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  }
+}
+
 // The test case with a fake upstream for remote Jwks server.
 class RemoteJwksIntegrationTest : public HttpProtocolIntegrationTest {
 public:
@@ -336,7 +363,7 @@ public:
   }
 
   void initializeFilter(bool add_cluster) {
-    config_helper_.addFilter(getFilterConfig(false));
+    config_helper_.prependFilter(getFilterConfig(false));
 
     if (add_cluster) {
       config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -352,7 +379,7 @@ public:
   }
 
   void initializeAsyncFetchFilter(bool fast_listener) {
-    config_helper_.addFilter(getAsyncFetchFilterConfig(ExampleConfig, fast_listener));
+    config_helper_.prependFilter(getAsyncFetchFilterConfig(ExampleConfig, fast_listener));
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* jwks_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -605,7 +632,7 @@ TEST_P(RemoteJwksIntegrationTest, WithFailedJwksAsyncFetchFast) {
 class PerRouteIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void setup(const std::string& filter_config, const PerRouteConfig& per_route) {
-    config_helper_.addFilter(getAuthFilterConfig(filter_config, true));
+    config_helper_.prependFilter(getAuthFilterConfig(filter_config, true));
 
     config_helper_.addConfigModifier(
         [per_route](

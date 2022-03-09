@@ -22,9 +22,9 @@ using DubboProxyProto = envoy::extensions::filters::network::dubbo_proxy::v3::Du
 
 namespace {
 
-DubboProxyProto parseDubboProxyFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
+DubboProxyProto parseDubboProxyFromV3Yaml(const std::string& yaml) {
   DubboProxyProto dubbo_proxy;
-  TestUtility::loadFromYaml(yaml, dubbo_proxy, false, avoid_boosting);
+  TestUtility::loadFromYaml(yaml, dubbo_proxy);
   return dubbo_proxy;
 }
 

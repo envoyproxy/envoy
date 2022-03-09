@@ -34,10 +34,15 @@ class UpstreamRequest;
 class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public UpstreamToDownstream,
                         public LinkedObject<UpstreamRequest>,
-                        public GenericConnectionPoolCallbacks {
+                        public GenericConnectionPoolCallbacks,
+                        public Event::DeferredDeletable {
 public:
-  UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
+  UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
+                  bool can_send_early_data, bool can_use_http3);
   ~UpstreamRequest() override;
+
+  // To be called from the destructor, or prior to deferred delete.
+  void cleanUp();
 
   void encodeHeaders(bool end_stream);
   void encodeData(Buffer::Instance& data, bool end_stream);
@@ -46,7 +51,6 @@ public:
 
   void resetStream();
   void setupPerTryTimeout();
-  void onPerTryTimeout();
   void maybeEndDecode(bool end_stream);
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
 
@@ -55,7 +59,7 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
   // UpstreamToDownstream (Http::ResponseDecoder)
-  void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
+  void decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) override;
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
   void dumpState(std::ostream& os, int indent_level) const override;
@@ -68,6 +72,11 @@ public:
   // UpstreamToDownstream
   const RouteEntry& routeEntry() const override;
   const Network::Connection& connection() const override;
+
+  // UpstreamToDownstream
+  const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
+    return stream_options_;
+  }
 
   void disableDataFromDownstreamForFlowControl();
   void enableDataFromDownstreamForFlowControl();
@@ -105,7 +114,6 @@ public:
     outlier_detection_timeout_recorded_ = recorded;
   }
   bool outlierDetectionTimeoutRecorded() { return outlier_detection_timeout_recorded_; }
-  const StreamInfo::UpstreamTiming& upstreamTiming() { return upstream_timing_; }
   void retried(bool value) { retried_ = value; }
   bool retried() { return retried_; }
   bool grpcRqSuccessDeferred() { return grpc_rq_success_deferred_; }
@@ -120,9 +128,13 @@ public:
   bool encodeComplete() const { return encode_complete_; }
   RouterFilterInterface& parent() { return parent_; }
   // Exposes streamInfo for the upstream stream.
-  const StreamInfo::StreamInfo& streamInfo() const { return stream_info_; }
+  StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
+  bool hadUpstream() const { return had_upstream_; }
 
 private:
+  StreamInfo::UpstreamTiming& upstreamTiming() {
+    return stream_info_.upstreamInfo()->upstreamTiming();
+  }
   bool shouldSendEndStream() {
     // Only encode end stream if the full request has been received, the body
     // has been sent, and any trailers or metadata have also been sent.
@@ -132,11 +144,15 @@ private:
   void addResponseHeadersSize(uint64_t size) {
     response_headers_size_ = response_headers_size_.value_or(0) + size;
   }
+  void resetPerTryIdleTimer();
+  void onPerTryTimeout();
+  void onPerTryIdleTimeout();
 
   RouterFilterInterface& parent_;
   std::unique_ptr<GenericConnPool> conn_pool_;
   bool grpc_rq_success_deferred_;
   Event::TimerPtr per_try_timeout_;
+  Event::TimerPtr per_try_idle_timeout_;
   std::unique_ptr<GenericUpstream> upstream_;
   absl::optional<Http::StreamResetReason> deferred_reset_reason_;
   Buffer::InstancePtr buffered_request_body_;
@@ -144,7 +160,6 @@ private:
   DownstreamWatermarkManager downstream_watermark_manager_{*this};
   Tracing::SpanPtr span_;
   StreamInfo::StreamInfoImpl stream_info_;
-  StreamInfo::UpstreamTiming upstream_timing_;
   const MonotonicTime start_time_;
   // This is wrapped in an optional, since we want to avoid computing zero size headers when in
   // reality we just didn't get a response back.
@@ -175,7 +190,10 @@ private:
   // Sentinel to indicate if timeout budget tracking is configured for the cluster,
   // and if so, if the per-try histogram should record a value.
   bool record_timeout_budget_ : 1;
-
+  // Track if one time clean up has been performed.
+  bool cleaned_up_ : 1;
+  bool had_upstream_ : 1;
+  Http::ConnectionPool::Instance::StreamOptions stream_options_;
   Event::TimerPtr max_stream_duration_timer_;
 };
 

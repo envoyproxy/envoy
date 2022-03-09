@@ -5,6 +5,8 @@ licenses(["notice"])  # Apache 2
 api_cc_test(
     name = "pgv_test",
     srcs = ["pgv_test.cc"],
+    # Workaround for https://github.com/bazelbuild/bazel/issues/13819
+    linkstatic = True,
     deps = [
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -20,7 +22,6 @@ api_cc_test(
         "@envoy_api//envoy/extensions/filters/http/ip_tagging/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/lua/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/squash/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/mongo_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",

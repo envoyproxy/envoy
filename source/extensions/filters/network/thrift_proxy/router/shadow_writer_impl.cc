@@ -21,17 +21,20 @@ ShadowWriterImpl::submit(const std::string& cluster_name, MessageMetadataSharedP
                                                           original_transport, original_protocol);
   const bool created = shadow_router->createUpstreamRequest();
   if (!created) {
+    stats_.named_.shadow_request_submit_failure_.inc();
     return absl::nullopt;
   }
 
-  LinkedList::moveIntoList(std::move(shadow_router), active_routers_);
-  return *active_routers_.front();
+  auto& active_routers = tls_->getTyped<ActiveRouters>().activeRouters();
+
+  LinkedList::moveIntoList(std::move(shadow_router), active_routers);
+  return *active_routers.front();
 }
 
 ShadowRouterImpl::ShadowRouterImpl(ShadowWriterImpl& parent, const std::string& cluster_name,
                                    MessageMetadataSharedPtr& metadata, TransportType transport_type,
                                    ProtocolType protocol_type)
-    : RequestOwner(parent.clusterManager(), parent.statPrefix(), parent.scope()), parent_(parent),
+    : RequestOwner(parent.clusterManager(), parent.stats()), parent_(parent),
       cluster_name_(cluster_name), metadata_(metadata->clone()), transport_type_(transport_type),
       protocol_type_(protocol_type),
       transport_(NamedTransportConfigFactory::getFactory(transport_type).createTransport()),
@@ -64,14 +67,41 @@ bool ShadowRouterImpl::requestStarted() const {
          upstream_request_->upgrade_response_ == nullptr;
 }
 
+void ShadowRouterImpl::flushPendingCallbacks() {
+  if (pending_callbacks_.empty()) {
+    return;
+  }
+
+  for (auto& cb : pending_callbacks_) {
+    cb();
+  }
+
+  pending_callbacks_.clear();
+}
+
+FilterStatus ShadowRouterImpl::runOrSave(std::function<FilterStatus()>&& cb,
+                                         const std::function<void()>& on_save) {
+  if (requestStarted()) {
+    return cb();
+  }
+
+  pending_callbacks_.push_back(std::move(cb));
+
+  if (on_save) {
+    on_save();
+  }
+
+  return FilterStatus::Continue;
+}
+
 FilterStatus ShadowRouterImpl::passthroughData(Buffer::Instance& data) {
   if (requestStarted()) {
     return ProtocolConverter::passthroughData(data);
   }
 
   auto copied = std::make_shared<Buffer::OwnedImpl>(data);
-  auto cb = [copied = std::move(copied), this]() mutable {
-    ProtocolConverter::passthroughData(*copied);
+  auto cb = [copied = std::move(copied), this]() mutable -> FilterStatus {
+    return ProtocolConverter::passthroughData(*copied);
   };
   pending_callbacks_.push_back(std::move(cb));
 
@@ -83,8 +113,8 @@ FilterStatus ShadowRouterImpl::structBegin(absl::string_view name) {
     return ProtocolConverter::structBegin(name);
   }
 
-  auto cb = [name_str = std::string(name), this]() {
-    ProtocolConverter::structBegin(absl::string_view(name_str));
+  auto cb = [name_str = std::string(name), this]() -> FilterStatus {
+    return ProtocolConverter::structBegin(absl::string_view(name_str));
   };
   pending_callbacks_.push_back(std::move(cb));
 
@@ -92,14 +122,7 @@ FilterStatus ShadowRouterImpl::structBegin(absl::string_view name) {
 }
 
 FilterStatus ShadowRouterImpl::structEnd() {
-  if (requestStarted()) {
-    return ProtocolConverter::structEnd();
-  }
-
-  auto cb = [this]() { ProtocolConverter::structEnd(); };
-  pending_callbacks_.push_back(std::move(cb));
-
-  return FilterStatus::Continue;
+  return runOrSave([this]() -> FilterStatus { return ProtocolConverter::structEnd(); });
 }
 
 FilterStatus ShadowRouterImpl::fieldBegin(absl::string_view name, FieldType& field_type,
@@ -108,8 +131,8 @@ FilterStatus ShadowRouterImpl::fieldBegin(absl::string_view name, FieldType& fie
     return ProtocolConverter::fieldBegin(name, field_type, field_id);
   }
 
-  auto cb = [name_str = std::string(name), field_type, field_id, this]() mutable {
-    ProtocolConverter::fieldBegin(absl::string_view(name_str), field_type, field_id);
+  auto cb = [name_str = std::string(name), field_type, field_id, this]() mutable -> FilterStatus {
+    return ProtocolConverter::fieldBegin(absl::string_view(name_str), field_type, field_id);
   };
   pending_callbacks_.push_back(std::move(cb));
 
@@ -117,80 +140,37 @@ FilterStatus ShadowRouterImpl::fieldBegin(absl::string_view name, FieldType& fie
 }
 
 FilterStatus ShadowRouterImpl::fieldEnd() {
-  if (requestStarted()) {
-    return ProtocolConverter::fieldEnd();
-  }
-
-  auto cb = [this]() { ProtocolConverter::fieldEnd(); };
-  pending_callbacks_.push_back(std::move(cb));
-
-  return FilterStatus::Continue;
+  return runOrSave([this]() -> FilterStatus { return ProtocolConverter::fieldEnd(); });
 }
 
 FilterStatus ShadowRouterImpl::boolValue(bool& value) {
-  if (requestStarted()) {
-    return ProtocolConverter::boolValue(value);
-  }
-
-  auto cb = [value, this]() mutable { ProtocolConverter::boolValue(value); };
-  pending_callbacks_.push_back(std::move(cb));
-
-  return FilterStatus::Continue;
+  return runOrSave(
+      [value, this]() mutable -> FilterStatus { return ProtocolConverter::boolValue(value); });
 }
 
 FilterStatus ShadowRouterImpl::byteValue(uint8_t& value) {
-  if (requestStarted()) {
-    return ProtocolConverter::byteValue(value);
-  }
-
-  auto cb = [value, this]() mutable { ProtocolConverter::byteValue(value); };
-  pending_callbacks_.push_back(std::move(cb));
-
-  return FilterStatus::Continue;
+  return runOrSave(
+      [value, this]() mutable -> FilterStatus { return ProtocolConverter::byteValue(value); });
 }
 
 FilterStatus ShadowRouterImpl::int16Value(int16_t& value) {
-  if (requestStarted()) {
-    return ProtocolConverter::int16Value(value);
-  }
-
-  auto cb = [value, this]() mutable { ProtocolConverter::int16Value(value); };
-  pending_callbacks_.push_back(std::move(cb));
-
-  return FilterStatus::Continue;
+  return runOrSave(
+      [value, this]() mutable -> FilterStatus { return ProtocolConverter::int16Value(value); });
 }
 
 FilterStatus ShadowRouterImpl::int32Value(int32_t& value) {
-  if (requestStarted()) {
-    return ProtocolConverter::int32Value(value);
-  }
-
-  auto cb = [value, this]() mutable { ProtocolConverter::int32Value(value); };
-  pending_callbacks_.push_back(std::move(cb));
-
-  return FilterStatus::Continue;
+  return runOrSave(
+      [value, this]() mutable -> FilterStatus { return ProtocolConverter::int32Value(value); });
 }
 
 FilterStatus ShadowRouterImpl::int64Value(int64_t& value) {
-  if (requestStarted()) {
-    return ProtocolConverter::int64Value(value);
-  }
-
-  auto cb = [value, this]() mutable { ProtocolConverter::int64Value(value); };
-  pending_callbacks_.push_back(std::move(cb));
-
-  return FilterStatus::Continue;
+  return runOrSave(
+      [value, this]() mutable -> FilterStatus { return ProtocolConverter::int64Value(value); });
 }
 
 FilterStatus ShadowRouterImpl::doubleValue(double& value) {
-  if (requestStarted()) {
-    return ProtocolConverter::doubleValue(value);
-  }
-
-  auto cb = [value, this]() mutable { ProtocolConverter::doubleValue(value); };
-  pending_callbacks_.push_back(std::move(cb));
-
-  return FilterStatus::Continue;
+  return runOrSave(
+      [value, this]() mutable -> FilterStatus { return ProtocolConverter::doubleValue(value); });
 }
 
 FilterStatus ShadowRouterImpl::stringValue(absl::string_view value) {
@@ -198,8 +178,8 @@ FilterStatus ShadowRouterImpl::stringValue(absl::string_view value) {
     return ProtocolConverter::stringValue(value);
   }
 
-  auto cb = [value_str = std::string(value), this]() {
-    ProtocolConverter::stringValue(absl::string_view(value_str));
+  auto cb = [value_str = std::string(value), this]() -> FilterStatus {
+    return ProtocolConverter::stringValue(absl::string_view(value_str));
   };
   pending_callbacks_.push_back(std::move(cb));
 
@@ -208,97 +188,54 @@ FilterStatus ShadowRouterImpl::stringValue(absl::string_view value) {
 
 FilterStatus ShadowRouterImpl::mapBegin(FieldType& key_type, FieldType& value_type,
                                         uint32_t& size) {
-  if (requestStarted()) {
+  return runOrSave([key_type, value_type, size, this]() mutable -> FilterStatus {
     return ProtocolConverter::mapBegin(key_type, value_type, size);
-  }
-
-  auto cb = [key_type, value_type, size, this]() mutable {
-    ProtocolConverter::mapBegin(key_type, value_type, size);
-  };
-  pending_callbacks_.push_back(std::move(cb));
-
-  return FilterStatus::Continue;
+  });
 }
 
 FilterStatus ShadowRouterImpl::mapEnd() {
-  if (requestStarted()) {
-    return ProtocolConverter::mapEnd();
-  }
-
-  auto cb = [this]() { ProtocolConverter::mapEnd(); };
-  pending_callbacks_.push_back(std::move(cb));
-
-  return FilterStatus::Continue;
+  return runOrSave([this]() -> FilterStatus { return ProtocolConverter::mapEnd(); });
 }
 
 FilterStatus ShadowRouterImpl::listBegin(FieldType& elem_type, uint32_t& size) {
-  if (requestStarted()) {
+  return runOrSave([elem_type, size, this]() mutable -> FilterStatus {
     return ProtocolConverter::listBegin(elem_type, size);
-  }
-
-  auto cb = [elem_type, size, this]() mutable { ProtocolConverter::listBegin(elem_type, size); };
-  pending_callbacks_.push_back(std::move(cb));
-
-  return FilterStatus::Continue;
+  });
 }
 
 FilterStatus ShadowRouterImpl::listEnd() {
-  if (requestStarted()) {
-    return ProtocolConverter::listEnd();
-  }
-
-  auto cb = [this]() { ProtocolConverter::listEnd(); };
-  pending_callbacks_.push_back(std::move(cb));
-
-  return FilterStatus::Continue;
+  return runOrSave([this]() -> FilterStatus { return ProtocolConverter::listEnd(); });
 }
 
 FilterStatus ShadowRouterImpl::setBegin(FieldType& elem_type, uint32_t& size) {
-  if (requestStarted()) {
+  return runOrSave([elem_type, size, this]() mutable -> FilterStatus {
     return ProtocolConverter::setBegin(elem_type, size);
-  }
-
-  auto cb = [elem_type, size, this]() mutable { ProtocolConverter::setBegin(elem_type, size); };
-  pending_callbacks_.push_back(std::move(cb));
-
-  return FilterStatus::Continue;
+  });
 }
 
 FilterStatus ShadowRouterImpl::setEnd() {
-  if (requestStarted()) {
-    return ProtocolConverter::setEnd();
-  }
-
-  auto cb = [this]() { ProtocolConverter::setEnd(); };
-  pending_callbacks_.push_back(std::move(cb));
-
-  return FilterStatus::Continue;
+  return runOrSave([this]() -> FilterStatus { return ProtocolConverter::setEnd(); });
 }
 
 FilterStatus ShadowRouterImpl::messageEnd() {
-  auto cb = [this]() {
+  auto cb = [this]() -> FilterStatus {
     ASSERT(upstream_request_->conn_data_ != nullptr);
 
     ProtocolConverter::messageEnd();
     const auto encode_size = upstream_request_->encodeAndWrite(upstream_request_buffer_);
     addSize(encode_size);
-    recordUpstreamRequestSize(*cluster_, request_size_);
+    stats().recordUpstreamRequestSize(*cluster_, request_size_);
 
     request_sent_ = true;
 
     if (metadata_->messageType() == MessageType::Oneway) {
       upstream_request_->releaseConnection(false);
     }
+
+    return FilterStatus::Continue;
   };
 
-  if (requestStarted()) {
-    cb();
-  } else {
-    request_ready_ = true;
-    pending_callbacks_.push_back(std::move(cb));
-  }
-
-  return FilterStatus::Continue;
+  return runOrSave(std::move(cb), [this]() -> void { request_ready_ = true; });
 }
 
 bool ShadowRouterImpl::requestInProgress() {
@@ -315,6 +252,8 @@ bool ShadowRouterImpl::requestInProgress() {
 }
 
 void ShadowRouterImpl::onRouterDestroy() {
+  ASSERT(!deferred_deleting_);
+
   // Mark the shadow request to be destroyed when the response gets back
   // or the upstream connection finally fails.
   router_destroyed_ = true;
@@ -329,17 +268,22 @@ bool ShadowRouterImpl::waitingForConnection() const {
 }
 
 void ShadowRouterImpl::maybeCleanup() {
+  if (removed_) {
+    return;
+  }
+
+  ASSERT(!deferred_deleting_);
+
   if (router_destroyed_) {
-    upstream_request_.reset();
-    if (inserted()) {
-      removeFromList(parent_.active_routers_);
-    }
+    removed_ = true;
+    upstream_request_->resetStream();
+    parent_.remove(*this);
   }
 }
 
 void ShadowRouterImpl::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   const bool done =
-      upstream_request_->handleUpstreamData(data, end_stream, *this, *upstream_response_callbacks_);
+      upstream_request_->handleUpstreamData(data, end_stream, *upstream_response_callbacks_);
   if (done) {
     maybeCleanup();
   }

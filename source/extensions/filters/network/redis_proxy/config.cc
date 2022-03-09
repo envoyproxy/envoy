@@ -38,7 +38,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager =
       Extensions::Common::Redis::getClusterRefreshManager(
-          context.singletonManager(), context.dispatcher(), context.clusterManager(),
+          context.singletonManager(), context.mainThreadDispatcher(), context.clusterManager(),
           context.timeSource());
 
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
@@ -47,7 +47,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes prefix_routes(
       proto_config.prefix_routes());
 
-  // Set the catch-all route from the deprecated cluster and settings parameters.
+  // Set the catch-all route from the settings parameters.
   if (prefix_routes.routes_size() == 0 && !prefix_routes.has_catch_all_route()) {
     throw EnvoyException("cannot configure a redis-proxy without any upstream");
   }
@@ -63,7 +63,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
-    Stats::ScopePtr stats_scope =
+    Stats::ScopeSharedPtr stats_scope =
         context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
     auto conn_pool_ptr = std::make_shared<ConnPool::InstanceImpl>(
         cluster, context.clusterManager(), Common::Redis::Client::ClientFactoryImpl::instance_,

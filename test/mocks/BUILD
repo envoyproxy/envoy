@@ -14,6 +14,7 @@ envoy_cc_test_library(
     hdrs = ["common.h"],
     deps = [
         "//envoy/common:conn_pool_interface",
+        "//envoy/common:key_value_store_interface",
         "//envoy/common:random_generator_interface",
         "//envoy/common:time_interface",
         "//source/common/common:minimal_logger_lib",

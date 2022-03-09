@@ -72,7 +72,6 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   std::unique_ptr<Filter> filter_;
   std::unique_ptr<MockVerifier> mock_verifier_;
-  NiceMock<MockVerifierCallbacks> verifier_callback_;
   Http::TestRequestTrailerMapImpl trailers_;
   std::shared_ptr<NiceMock<Envoy::Router::MockRoute>> mock_route_;
   std::shared_ptr<PerRouteFilterConfig> per_route_config_;
@@ -143,21 +142,23 @@ TEST_F(FilterTest, CorsPreflightMssingAccessControlRequestMethod) {
   EXPECT_EQ(0U, mock_config_->stats().denied_.value());
 }
 
-// This test verifies the setPayload call is handled correctly
-TEST_F(FilterTest, TestSetPayloadCall) {
+// This test verifies the setExtractedData call is handled correctly
+TEST_F(FilterTest, TestSetExtractedData) {
   setupMockConfig();
-  ProtobufWkt::Struct payload;
+  ProtobufWkt::Struct extracted_data;
   // A successful authentication completed inline: callback is called inside verify().
-  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce(Invoke([&payload](ContextSharedPtr context) {
-    context->callback()->setPayload(payload);
-    context->callback()->onComplete(Status::Ok);
-  }));
+  EXPECT_CALL(*mock_verifier_, verify(_))
+      .WillOnce(Invoke([&extracted_data](ContextSharedPtr context) {
+        context->callback()->setExtractedData(extracted_data);
+        context->callback()->onComplete(Status::Ok);
+      }));
 
   EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([&payload](const std::string& ns, const ProtobufWkt::Struct& out_payload) {
-        EXPECT_EQ(ns, "envoy.filters.http.jwt_authn");
-        EXPECT_TRUE(TestUtility::protoEqual(out_payload, payload));
-      }));
+      .WillOnce(
+          Invoke([&extracted_data](const std::string& ns, const ProtobufWkt::Struct& out_payload) {
+            EXPECT_EQ(ns, "envoy.filters.http.jwt_authn");
+            EXPECT_TRUE(TestUtility::protoEqual(out_payload, extracted_data));
+          }));
 
   auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));

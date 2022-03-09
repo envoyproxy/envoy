@@ -450,16 +450,6 @@ TEST_F(CsrfFilterTest, RequestFromInvalidAdditionalRegexOrigin) {
   EXPECT_EQ(0U, config_->stats().request_valid_.value());
 }
 
-// Test that the deprecated extension name still functions.
-TEST(CsrfFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.csrf";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
-          deprecated_name));
-}
-
 } // namespace Csrf
 } // namespace HttpFilters
 } // namespace Extensions
