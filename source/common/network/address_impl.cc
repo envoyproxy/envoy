@@ -262,19 +262,18 @@ Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port,
                            const SocketInterface* sock_interface, bool v6only)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
   throwOnError(validateProtocolSupported());
-  ip_.ipv6_.address_.sin6_family = AF_INET6;
-  ip_.ipv6_.address_.sin6_port = htons(port);
+  sockaddr_in6 addr_in;
+  memset(&addr_in, 0, sizeof(addr_in));
+  addr_in.sin6_family = AF_INET6;
+  addr_in.sin6_port = htons(port);
   if (!address.empty()) {
-    if (1 != inet_pton(AF_INET6, address.c_str(), &ip_.ipv6_.address_.sin6_addr)) {
+    if (1 != inet_pton(AF_INET6, address.c_str(), &addr_in.sin6_addr)) {
       throw EnvoyException(fmt::format("invalid ipv6 address '{}'", address));
     }
   } else {
-    ip_.ipv6_.address_.sin6_addr = in6addr_any;
+    addr_in.sin6_addr = in6addr_any;
   }
-  // Just in case address is in a non-canonical format, format from network address.
-  ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
-  friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
-  ip_.ipv6_.v6only_ = v6only;
+  initHelper(addr_in, v6only);
 }
 
 Ipv6Instance::Ipv6Instance(uint32_t port, const SocketInterface* sock_interface)
