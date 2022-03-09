@@ -257,7 +257,7 @@ TEST_F(ProtobufUtilityTest, DowncastAndValidateUnknownFieldsNested) {
 TEST_F(ProtobufUtilityTest, ValidateUnknownFieldsNestedAny) {
   // Constructs a nested message with unknown field
   envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig cluster_config;
-  auto* dns_cache_config = cluster_config->mutable_dns_cache_config();
+  auto* dns_cache_config = cluster_config.mutable_dns_cache_config();
   dns_cache_config->set_name("dynamic_forward_proxy_cache_config");
   dns_cache_config->GetReflection()->MutableUnknownFields(dns_cache_config)->AddVarint(999, 0);
 
