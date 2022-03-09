@@ -1682,7 +1682,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
-        "//source/extensions/bootstrap/internal_listener_registry:config",
+        "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/io_socket/user_space:config",
         "//test/common/grpc:grpc_client_integration_lib",

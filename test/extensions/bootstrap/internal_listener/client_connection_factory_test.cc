@@ -5,7 +5,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/fancy_logger.h"
 #include "source/common/network/address_impl.h"
-#include "source/extensions/bootstrap/internal_listener_registry/client_connection_factory.h"
+#include "source/extensions/bootstrap/internal_listener/client_connection_factory.h"
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -21,7 +21,7 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
-namespace InternalListenerRegistry {
+namespace InternalListener {
 
 namespace {
 
@@ -43,11 +43,12 @@ public:
     EXPECT_CALL(tls_allocator_, allocateSlot());
   }
   void setupTlsSlot() {
-    tls_slot_ = ThreadLocal::TypedSlot<
-        Bootstrap::InternalListenerRegistry::ThreadLocalRegistryImpl>::makeUnique(tls_allocator_);
+    tls_slot_ =
+        ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>::makeUnique(
+            tls_allocator_);
     tls_slot_->set([r = registry_](Event::Dispatcher&) { return r; });
     // TODO: restore the original value via RAII.
-    Bootstrap::InternalListenerRegistry::InternalClientConnectionFactory::registry_tls_slot_ =
+    Bootstrap::InternalListener::InternalClientConnectionFactory::registry_tls_slot_ =
         tls_slot_.get();
   }
   Api::ApiPtr api_;
@@ -73,11 +74,12 @@ public:
 
 TEST_F(ClientConnectionFactoryTest,
        ConnectFailsIfInternalConnectionThreadLocalRegistryIsNotPublished) {
-  tls_slot_ = ThreadLocal::TypedSlot<
-      Bootstrap::InternalListenerRegistry::ThreadLocalRegistryImpl>::makeUnique(tls_allocator_);
+  tls_slot_ =
+      ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>::makeUnique(
+          tls_allocator_);
   // This slot set publish a nullptr.
   tls_slot_->set([](Event::Dispatcher&) { return nullptr; });
-  Bootstrap::InternalListenerRegistry::InternalClientConnectionFactory::registry_tls_slot_ =
+  Bootstrap::InternalListener::InternalClientConnectionFactory::registry_tls_slot_ =
       tls_slot_.get();
   auto client_conn = dispatcher_->createClientConnection(
       std::make_shared<Network::Address::EnvoyInternalInstance>(listener_addr),
@@ -165,7 +167,7 @@ TEST_F(ClientConnectionFactoryTest, ConnectSucceeds) {
   server_socket->close();
 }
 } // namespace
-} // namespace InternalListenerRegistry
+} // namespace InternalListener
 } // namespace Bootstrap
 } // namespace Extensions
 } // namespace Envoy

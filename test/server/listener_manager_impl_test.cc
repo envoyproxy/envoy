@@ -48,7 +48,7 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::Throw;
 
-// For test only.
+// For internal listener test only.
 SINGLETON_MANAGER_REGISTRATION(internal_listener_registry);
 
 class ListenerManagerImplWithDispatcherStatsTest : public ListenerManagerImplTest {
@@ -64,6 +64,7 @@ public:
                            "internal_listener_registry_singleton",
                            [registry = internal_registry_]() { return registry; }));
   }
+
   /**
    * Create an IPv4 listener with a given name.
    */

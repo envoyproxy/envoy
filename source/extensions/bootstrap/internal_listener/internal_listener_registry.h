@@ -1,18 +1,18 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
-#include "envoy/extensions/bootstrap/internal_listener_registry/v3/internal_listener_registry.pb.h"
+#include "envoy/extensions/bootstrap/internal_listener/v3/internal_listener.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 
-#include "source/extensions/bootstrap/internal_listener_registry/thread_local_registry.h"
+#include "source/extensions/bootstrap/internal_listener/thread_local_registry.h"
 
 #include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
-namespace InternalListenerRegistry {
+namespace InternalListener {
 
 // This InternalListenerRegistry implementation owns a thread local slot.
 class TlsInternalListenerRegistry : public Singleton::Instance,
@@ -29,8 +29,7 @@ public:
     return nullptr;
   }
 
-  std::unique_ptr<
-      ThreadLocal::TypedSlot<Bootstrap::InternalListenerRegistry::ThreadLocalRegistryImpl>>
+  std::unique_ptr<ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>>
       tls_slot_;
 };
 
@@ -46,12 +45,13 @@ public:
   // Server::Configuration::BootstrapExtension
   void onServerInitialized() override;
 
+private:
   Server::Configuration::ServerFactoryContext& server_context_;
   std::shared_ptr<TlsInternalListenerRegistry> tls_registry_;
 };
 
 // The factory creates the `InternalListenerExtension` instance when envoy starts.
-class InternalListenerRegistryFactory : public Server::Configuration::BootstrapExtensionFactory {
+class InternalListenerFactory : public Server::Configuration::BootstrapExtensionFactory {
 public:
   // Server::Configuration::BootstrapExtensionFactory
   Server::BootstrapExtensionPtr
@@ -59,12 +59,12 @@ public:
                            Server::Configuration::ServerFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::bootstrap::internal_listener_registry::v3::InternalListenerRegistry>();
+        envoy::extensions::bootstrap::internal_listener::v3::InternalListener>();
   }
-  std::string name() const override { return "envoy.bootstrap.internal_listener_registry"; };
+  std::string name() const override { return "envoy.bootstrap.internal_listener"; };
 };
 
-} // namespace InternalListenerRegistry
+} // namespace InternalListener
 } // namespace Bootstrap
 } // namespace Extensions
 } // namespace Envoy

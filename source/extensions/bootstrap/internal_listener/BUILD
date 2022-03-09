@@ -30,7 +30,8 @@ envoy_cc_library(
     deps = [
         ":thread_local_registry",
         "//envoy/server:bootstrap_extension_config_interface",
-        "@envoy_api//envoy/extensions/bootstrap/internal_listener_registry/v3:pkg_cc_proto",
+        "//source/server:listener_manager_lib",
+        "@envoy_api//envoy/extensions/bootstrap/internal_listener/v3:pkg_cc_proto",
     ],
 )
 

@@ -8,12 +8,12 @@
 #include "envoy/network/connection.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/bootstrap/internal_listener_registry/thread_local_registry.h"
+#include "source/extensions/bootstrap/internal_listener/thread_local_registry.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
-namespace InternalListenerRegistry {
+namespace InternalListener {
 
 // This factory creates the client connection to an envoy internal address.
 class InternalClientConnectionFactory : public Network::ClientConnectionFactory,
@@ -33,11 +33,11 @@ public:
   // Since the population and the lookup is supposed to be executed in the same worker thread,
   // neither need to hold a lock.
   // TODO(lambdai): make it friend to only bootstrap extension.
-  static ThreadLocal::TypedSlot<Bootstrap::InternalListenerRegistry::ThreadLocalRegistryImpl>*
+  static ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>*
       registry_tls_slot_;
 };
 
-} // namespace InternalListenerRegistry
+} // namespace InternalListener
 } // namespace Bootstrap
 } // namespace Extensions
 } // namespace Envoy

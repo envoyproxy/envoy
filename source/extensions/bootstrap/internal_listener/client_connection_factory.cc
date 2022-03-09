@@ -1,4 +1,4 @@
-#include "source/extensions/bootstrap/internal_listener_registry/client_connection_factory.h"
+#include "source/extensions/bootstrap/internal_listener/client_connection_factory.h"
 
 #include "envoy/registry/registry.h"
 
@@ -11,9 +11,9 @@ namespace Envoy {
 
 namespace Extensions {
 namespace Bootstrap {
-namespace InternalListenerRegistry {
+namespace InternalListener {
 
-ThreadLocal::TypedSlot<Bootstrap::InternalListenerRegistry::ThreadLocalRegistryImpl>*
+ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>*
     InternalClientConnectionFactory::registry_tls_slot_ = nullptr;
 
 Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnection(
@@ -69,7 +69,7 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
 
 REGISTER_FACTORY(InternalClientConnectionFactory, Network::ClientConnectionFactory);
 
-} // namespace InternalListenerRegistry
+} // namespace InternalListener
 } // namespace Bootstrap
 } // namespace Extensions
 } // namespace Envoy

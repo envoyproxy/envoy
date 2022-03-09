@@ -1,4 +1,4 @@
-#include "source/extensions/bootstrap/internal_listener_registry/internal_listener_registry.h"
+#include "source/extensions/bootstrap/internal_listener/internal_listener_registry.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
-namespace InternalListenerRegistry {
+namespace InternalListener {
 
 namespace {
 
@@ -17,7 +17,7 @@ TEST(TlsInternalListenerRegistryTest, TlsSlotNotInitialized) {
 }
 
 } // namespace
-} // namespace InternalListenerRegistry
+} // namespace InternalListener
 } // namespace Bootstrap
 } // namespace Extensions
 } // namespace Envoy

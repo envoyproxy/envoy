@@ -10,7 +10,7 @@ This extension contains 2 major components to add a listener with
 an :ref:`envoy internal address <envoy_v3_api_msg_config.core.v3.EnvoyInternalAddress>`
 and to create a client connection to that :ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>`
 
-**envoy.bootstrap.internal_listener_registry** This bootstrap extension is required to support looking up the target listener via an
+**envoy.bootstrap.internal_listener** This bootstrap extension is required to support looking up the target listener via an
 :ref:`envoy internal address <envoy_v3_api_msg_config.core.v3.EnvoyInternalAddress>` on each worker threads.
 
 **network.connection.client.envoy_internal** It is a client connection factory. The factory is implicitly instantiated by the dispatcher to establish a client connection to an
@@ -76,9 +76,9 @@ Below is a smallest static config that redirect tcp_proxy on port 19000 to the t
                   address: 0.0.0.0
                   port_value: 19001
   bootstrap_extensions:
-  - name: envoy.bootstrap.internal_listener_registry
+  - name: envoy.bootstrap.internal_listener
     typed_config:
-      "@type": "type.googleapis.com/envoy.extensions.bootstrap.internal_listener_registry.v3.InternalListenerRegistry"
+      "@type": "type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener"
   layered_runtime:
     layers:
     - name: enable_internal_address

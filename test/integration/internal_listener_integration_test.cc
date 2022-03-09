@@ -33,9 +33,9 @@ public:
           "internal_listener");
     });
     config_helper_.addBootstrapExtension(R"EOF(
-name: envoy.bootstrap.internal_listener_registry
+name: envoy.bootstrap.internal_listener
 typed_config:
-  "@type": "type.googleapis.com/envoy.extensions.bootstrap.internal_listener_registry.v3.InternalListenerRegistry"
+  "@type": "type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener"
 )EOF");
     BaseIntegrationTest::initialize();
   }
