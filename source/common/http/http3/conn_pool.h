@@ -59,9 +59,9 @@ public:
   // early data streams.
   bool hasHandshakeCompleted() const override { return has_handshake_completed_; }
 
-  // Overridden to include READY_FOR_EARLY_DATA state.
+  // Overridden to include ReadyForEarlyData state.
   bool readyForStream() const override {
-    return state() == State::READY || state() == State::READY_FOR_EARLY_DATA;
+    return state() == State::READY || state() == State::ReadyForEarlyData;
   }
 
   void updateCapacity(uint64_t new_quiche_capacity) {

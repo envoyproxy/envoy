@@ -86,12 +86,11 @@ public:
   virtual bool hadNegativeDeltaOnStreamClosed() { return false; }
 
   enum class State {
-    CONNECTING, // Connection is not yet established, but might be able to dispatch additional
-                // streams if this connection supports early data and the stream can be sent as
-                // early data.
-    READY_FOR_EARLY_DATA,
-    READY,    // Any additional streams may be immediately dispatched to this connection.
-    BUSY,     // Connection is at its concurrent stream limit.
+    CONNECTING,        // Connection is not yet established.
+    ReadyForEarlyData, // Any additional early data stream can be immediately dispatched to this
+                       // connection.
+    READY,             // Any additional streams may be immediately dispatched to this connection.
+    BUSY,              // Connection is at its concurrent stream limit.
     DRAINING, // No more streams can be dispatched to this connection, and it will be closed
     // when all streams complete.
     CLOSED // Connection is closed and object is queued for destruction.

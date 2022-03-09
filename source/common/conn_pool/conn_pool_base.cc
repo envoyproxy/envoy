@@ -8,7 +8,6 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/server/backtrace.h"
 
 namespace Envoy {
 namespace ConnectionPool {
@@ -170,7 +169,7 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
                                             AttachContext& context) {
   ASSERT(client.readyForStream());
 
-  if (client.state() == Envoy::ConnectionPool::ActiveClient::State::READY_FOR_EARLY_DATA) {
+  if (client.state() == Envoy::ConnectionPool::ActiveClient::State::ReadyForEarlyData) {
     host_->cluster().stats().upstream_rq_0rtt_.inc();
   }
 
@@ -241,7 +240,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
     client.close();
   } else if (client.state() == ActiveClient::State::BUSY && client.currentUnusedCapacity() > 0) {
     if (!client.hasHandshakeCompleted()) {
-      transitionActiveClientState(client, ActiveClient::State::READY_FOR_EARLY_DATA);
+      transitionActiveClientState(client, ActiveClient::State::ReadyForEarlyData);
       if (!delay_attaching_stream) {
         onUpstreamReadyForEarlyData(client);
       }
@@ -341,7 +340,7 @@ std::list<ActiveClientPtr>& ConnPoolImplBase::owningList(ActiveClient::State sta
   switch (state) {
   case ActiveClient::State::CONNECTING:
     return connecting_clients_;
-  case ActiveClient::State::READY_FOR_EARLY_DATA:
+  case ActiveClient::State::ReadyForEarlyData:
     return early_data_clients_;
   case ActiveClient::State::READY:
     return ready_clients_;
@@ -568,7 +567,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     client.conn_connect_ms_.reset();
     bool streams_available = client.currentUnusedCapacity() > 0;
     if (client.state() == ActiveClient::State::CONNECTING ||
-        client.state() == ActiveClient::State::READY_FOR_EARLY_DATA) {
+        client.state() == ActiveClient::State::ReadyForEarlyData) {
       transitionActiveClientState(client, streams_available ? ActiveClient::State::READY
                                                             : ActiveClient::State::BUSY);
     }
@@ -597,7 +596,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     // No need to update connecting capacity and connect_timer_ as the client is still connecting.
     ASSERT(client.state() == ActiveClient::State::CONNECTING);
     host()->cluster().stats().upstream_cx_connect_with_0_rtt_.inc();
-    transitionActiveClientState(client, ActiveClient::State::READY_FOR_EARLY_DATA);
+    transitionActiveClientState(client, ActiveClient::State::ReadyForEarlyData);
     break;
   }
   }

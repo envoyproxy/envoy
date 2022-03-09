@@ -271,6 +271,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
   // 2021/08/15  17290                40349   add all host map to priority set for fast host
   //                                          searching
   // 2021/08/18  13176    40577       40700   Support slow start mode
+  // 2022/03/09  20167    40809       40900   stats for 0-RTT connections and requests
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you

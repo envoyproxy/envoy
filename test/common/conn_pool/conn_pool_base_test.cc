@@ -51,7 +51,7 @@ public:
       return ActiveClient::readyForStream();
     }
     return state() == ActiveClient::State::READY ||
-           state() == ActiveClient::State::READY_FOR_EARLY_DATA;
+           state() == ActiveClient::State::ReadyForEarlyData;
   }
 
   bool hasHandshakeCompleted() const override {
@@ -582,10 +582,10 @@ TEST_F(ConnPoolImplDispatcherBaseTest, EarlyDataStreamsReachConcurrentStreamLimi
   EXPECT_EQ(2, pool_.host()->cluster().stats().upstream_rq_0rtt_.value());
   EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
 
-  // After 1 stream gets closed, the client should transit to READY_FOR_EARLY_DATA.
+  // After 1 stream gets closed, the client should transit to ReadyForEarlyData.
   --clients_.back()->active_streams_;
   pool_.onStreamClosed(*clients_.back(), false);
-  EXPECT_EQ(ActiveClient::State::READY_FOR_EARLY_DATA, clients_.back()->state());
+  EXPECT_EQ(ActiveClient::State::ReadyForEarlyData, clients_.back()->state());
   CHECK_STATE(1 /*active*/, 0 /*pending*/, concurrent_streams_ - 1 /*connecting capacity*/);
 
   // Creating another early data stream should be immediate.
