@@ -22,7 +22,6 @@ py_binary(
     ],
     args = ["$(location //bazel:all_repository_locations)"],
     data = ["//bazel:all_repository_locations"],
-    deps = ["//tools/dependency:utils"],
 )
 
 py_binary(
@@ -48,5 +47,5 @@ envoy_entry_point(
 envoy_py_binary(
     name = "tools.docs.rst_check",
     data = ["//docs:root/version_history/current.rst"],
-    deps = [requirement("envoy.base.checker")],
+    deps = [requirement("aio.run.checker")],
 )

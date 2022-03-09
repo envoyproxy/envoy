@@ -113,6 +113,34 @@ for how to update or override dependencies.
     Envoy compiles and passes tests with the version of clang installed by Xcode 11.1:
     Apple clang version 11.0.0 (clang-1100.0.33.8).
 
+    #### Troubleshooting
+    If you see some error messages like the following:
+    ```console
+    xcrun: error: SDK "macosx12.1" cannot be located
+    xcrun: error: SDK "macosx12.1" cannot be located
+    xcrun: error: unable to lookup item 'Path' in SDK 'macosx12.1'
+    ```
+    please check the installed sdk version.
+    ```console
+    xcrun --show-sdk-version
+    ```
+
+    If the sdk version is lower than the one in the error message, upgrade your Command Line Tools using the following commands:
+    ```console
+    sudo rm -rf /Library/Developer/CommandLineTools
+    softwareupdate --all --install --force
+    sudo xcode-select --install
+    ```
+
+    If the following error occurs during the compilation process:
+    ```console
+    xcode-select: error: tool 'xcodebuild' requires Xcode, but active developer directory '/Library/Developer/CommandLineTools' is a command line tools instance
+    ```
+    please execute the following command and retry:
+    ```console
+    sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+    ```
+
     Having the binutils keg installed in Brew is known to cause issues due to putting an incompatible
     version of `ar` on the PATH, so if you run into issues building third party code like luajit
     consider uninstalling binutils.
@@ -731,7 +759,7 @@ local_repository(
 
 When performing custom builds, it is acceptable to include contrib extensions as well. This can
 be done by including the desired Bazel paths from [contrib_build_config.bzl](../contrib/contrib_build_config.bzl)
-into the overriden `extensions_build_config.bzl`. (There is no need to specifically perform
+into the overridden `extensions_build_config.bzl`. (There is no need to specifically perform
 a contrib build to include a contrib extension.)
 
 ## Extra extensions
@@ -885,10 +913,32 @@ Note that if you run the `check_spelling.py` script you will need to have `aspel
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-20.04/bin/clang-format"
+export CLANG_FORMAT="$HOME/ext/clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
-
+The easiest way to use the correct `clang-format` in your host system is to copy the `clang-format` from the ci docker image.
+* Run the ci docker image
+```shell
+ci/run_envoy_docker.sh bash
+```
+* Get the docker container ID
+```shell
+dockerContainerID=$(docker ps | grep envoy-build-ubuntu | awk '{print $1}')
+```
+* Copy the `clang-format` to host machine
+```shell
+docker  copy $dockerContainerID:/opt/llvm/bin/clang-format clang-format-ci
+```
+* Replace the host `clang-format` with the new one. Ensure that the copied `clang-format` is the default one. You can do this by ensuring it is in `$PATH`:
+```shell
+cp clang-format-ci /usr/local/bin/clang-format
+```
+If you are a non-root user, alternatively you can use a bin dir and add that to `$PATH`
+```shell
+mkdir bin
+mv clang-format-ci bin/clang-format
+export PATH=$PATH:$PWD/bin/
+```
 Once this is set up, you can run clang-format without docker:
 
 ```shell

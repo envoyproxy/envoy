@@ -60,7 +60,7 @@ public:
   // progress may be made with the codec.
   void resetStream(StreamResetReason reason) override;
   void readDisable(bool disable) override;
-  uint32_t bufferLimit() override;
+  uint32_t bufferLimit() const override;
   absl::string_view responseDetails() override { return details_; }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override;
   void setFlushTimeout(std::chrono::milliseconds) override {
@@ -252,8 +252,6 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
 
-  bool noChunkedEncodingHeaderFor304() const { return no_chunked_encoding_header_for_304_; }
-
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
                  MessageType type, uint32_t max_headers_kb, const uint32_t max_headers_count);
@@ -298,7 +296,6 @@ protected:
   bool deferred_end_stream_headers_ : 1;
   bool dispatching_ : 1;
   bool dispatching_slice_already_drained_ : 1;
-  const bool no_chunked_encoding_header_for_304_ : 1;
   StreamInfo::BytesMeterSharedPtr bytes_meter_before_stream_;
 
 private:
@@ -534,10 +531,6 @@ private:
   std::unique_ptr<ActiveRequest> active_request_;
   const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
   uint32_t outbound_responses_{};
-  // This defaults to 2, which functionally disables pipelining. If any users
-  // of Envoy wish to enable pipelining (which is dangerous and ill supported)
-  // we could make this configurable.
-  uint32_t max_outbound_responses_{};
   // TODO(mattklein123): This should be a member of ActiveRequest but this change needs dedicated
   // thought as some of the reset and no header code paths make this difficult. Headers are
   // populated on message begin. Trailers are populated on the first parsed trailer field (if

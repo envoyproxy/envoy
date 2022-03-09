@@ -1,7 +1,7 @@
 #include "source/common/memory/heap_shrinker.h"
 
 #include "source/common/memory/utils.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "absl/strings/str_cat.h"
 

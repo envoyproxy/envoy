@@ -456,6 +456,7 @@ TEST_P(TcpConnPoolImplTest, DrainConnections) {
     c2.releaseConn();
     dispatcher_.clearDeferredDeleteList();
   }
+  EXPECT_FALSE(conn_pool_->isIdle());
   {
     // This will destroy the pending connection when the response finishes.
     c3.completeConnection();
@@ -465,6 +466,7 @@ TEST_P(TcpConnPoolImplTest, DrainConnections) {
     c3.releaseConn();
     dispatcher_.clearDeferredDeleteList();
   }
+  EXPECT_TRUE(conn_pool_->isIdle());
 }
 
 /**

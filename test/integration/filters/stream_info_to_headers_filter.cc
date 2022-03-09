@@ -11,9 +11,7 @@
 namespace Envoy {
 namespace {
 
-uint64_t toMs(MonotonicTime time) {
-  return std::chrono::duration_cast<std::chrono::seconds>(time.time_since_epoch()).count();
-}
+std::string toUsec(MonotonicTime time) { return absl::StrCat(time.time_since_epoch().count()); }
 
 } // namespace
 
@@ -32,13 +30,12 @@ public:
     StreamInfo::StreamInfo& stream_info = decoder_callbacks_->streamInfo();
 
     if (stream_info.downstreamTiming().getValue(dns_start).has_value()) {
-      headers.addCopy(
-          Http::LowerCaseString("dns_start"),
-          absl::StrCat(toMs(stream_info.downstreamTiming().getValue(dns_start).value())));
+      headers.addCopy(Http::LowerCaseString("dns_start"),
+                      toUsec(stream_info.downstreamTiming().getValue(dns_start).value()));
     }
     if (stream_info.downstreamTiming().getValue(dns_end).has_value()) {
       headers.addCopy(Http::LowerCaseString("dns_end"),
-                      absl::StrCat(toMs(stream_info.downstreamTiming().getValue(dns_end).value())));
+                      toUsec(stream_info.downstreamTiming().getValue(dns_end).value()));
     }
     if (decoder_callbacks_->streamInfo().upstreamInfo()) {
       if (decoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()) {
@@ -48,33 +45,31 @@ public:
       }
       headers.addCopy(Http::LowerCaseString("num_streams"),
                       decoder_callbacks_->streamInfo().upstreamInfo()->upstreamNumStreams());
-    }
 
+      StreamInfo::UpstreamTiming& upstream_timing =
+          decoder_callbacks_->streamInfo().upstreamInfo()->upstreamTiming();
+      if (upstream_timing.upstream_connect_start_.has_value()) {
+        headers.addCopy(Http::LowerCaseString("upstream_connect_start"),
+                        toUsec(upstream_timing.upstream_connect_start_.value()));
+      }
+      if (upstream_timing.upstream_connect_complete_.has_value()) {
+        headers.addCopy(Http::LowerCaseString("upstream_connect_complete"),
+                        toUsec(upstream_timing.upstream_connect_complete_.value()));
+      }
+      if (upstream_timing.upstream_handshake_complete_.has_value()) {
+        headers.addCopy(Http::LowerCaseString("upstream_handshake_complete"),
+                        toUsec(upstream_timing.upstream_handshake_complete_.value()));
+      }
+      if (upstream_timing.last_upstream_tx_byte_sent_.has_value()) {
+        headers.addCopy(Http::LowerCaseString("request_send_end"),
+                        toUsec(upstream_timing.last_upstream_tx_byte_sent_.value()));
+      }
+      if (upstream_timing.first_upstream_rx_byte_received_.has_value()) {
+        headers.addCopy(Http::LowerCaseString("response_begin"),
+                        toUsec(upstream_timing.first_upstream_rx_byte_received_.value()));
+      }
+    }
     return Http::FilterHeadersStatus::Continue;
-  }
-  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override {
-    ASSERT(decoder_callbacks_->streamInfo().upstreamInfo());
-    StreamInfo::UpstreamTiming& upstream_timing =
-        decoder_callbacks_->streamInfo().upstreamInfo()->upstreamTiming();
-    // Upstream metrics aren't available until the response is complete.
-    if (upstream_timing.upstream_connect_start_.has_value()) {
-      trailers.addCopy(
-          Http::LowerCaseString("upstream_connect_start"),
-          absl::StrCat(upstream_timing.upstream_connect_start_.value().time_since_epoch().count()));
-    }
-    if (upstream_timing.upstream_connect_complete_.has_value()) {
-      trailers.addCopy(
-          Http::LowerCaseString("upstream_connect_complete"),
-          absl::StrCat(
-              upstream_timing.upstream_connect_complete_.value().time_since_epoch().count()));
-    }
-    if (upstream_timing.upstream_handshake_complete_.has_value()) {
-      trailers.addCopy(
-          Http::LowerCaseString("upstream_handshake_complete"),
-          absl::StrCat(
-              upstream_timing.upstream_handshake_complete_.value().time_since_epoch().count()));
-    }
-    return Http::FilterTrailersStatus::Continue;
   }
 };
 

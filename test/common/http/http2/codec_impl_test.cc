@@ -49,7 +49,7 @@ namespace Http {
 namespace Http2 {
 
 using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
-using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool>;
+using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool, bool>;
 namespace CommonUtility = ::Envoy::Http2::Utility;
 
 class Http2CodecImplTestFixture {
@@ -101,9 +101,10 @@ public:
 
   Http2CodecImplTestFixture() = default;
   Http2CodecImplTestFixture(Http2SettingsTuple client_settings, Http2SettingsTuple server_settings,
-                            bool enable_new_codec_wrapper)
+                            bool enable_new_codec_wrapper, bool defer_processing_backedup_streams)
       : client_settings_(client_settings), server_settings_(server_settings),
-        enable_new_codec_wrapper_(enable_new_codec_wrapper) {
+        enable_new_codec_wrapper_(enable_new_codec_wrapper),
+        defer_processing_backedup_streams_(defer_processing_backedup_streams) {
     // Make sure we explicitly test for stream flush timer creation.
     EXPECT_CALL(client_connection_.dispatcher_, createTimer_(_)).Times(0);
     EXPECT_CALL(server_connection_.dispatcher_, createTimer_(_)).Times(0);
@@ -138,6 +139,9 @@ public:
     Runtime::LoaderSingleton::getExisting()->mergeValues(
         {{"envoy.reloadable_features.http2_new_codec_wrapper",
           enable_new_codec_wrapper_ ? "true" : "false"}});
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{std::string(Runtime::defer_processing_backedup_streams),
+          defer_processing_backedup_streams_ ? "true" : "false"}});
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<TestClientConnectionImpl>(
@@ -321,6 +325,7 @@ public:
   absl::optional<const Http2SettingsTuple> client_settings_;
   absl::optional<const Http2SettingsTuple> server_settings_;
   bool enable_new_codec_wrapper_ = false;
+  bool defer_processing_backedup_streams_ = false;
   bool allow_metadata_ = false;
   bool stream_error_on_invalid_http_messaging_ = false;
   Stats::TestUtil::TestStore client_stats_store_;
@@ -366,7 +371,7 @@ class Http2CodecImplTest : public ::testing::TestWithParam<Http2SettingsTestPara
 public:
   Http2CodecImplTest()
       : Http2CodecImplTestFixture(::testing::get<0>(GetParam()), ::testing::get<1>(GetParam()),
-                                  ::testing::get<2>(GetParam())) {}
+                                  ::testing::get<2>(GetParam()), ::testing::get<3>(GetParam())) {}
 
 protected:
   void priorityFlood() {
@@ -1581,13 +1586,31 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // updates to be sent, and the client to flush all queued data.
   // For bonus corner case coverage, remove callback2 in the middle of runLowWatermarkCallbacks()
   // and ensure it is not called.
+  NiceMock<Event::MockSchedulableCallback>* process_buffered_data_callback{nullptr};
+  if (defer_processing_backedup_streams_) {
+    process_buffered_data_callback =
+        new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+  }
+
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([&]() -> void {
     request_encoder_->getStream().removeCallbacks(callbacks2);
   }));
   EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
   EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
+
+  if (defer_processing_backedup_streams_) {
+    // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
+    EXPECT_FALSE(process_buffered_data_callback->enabled_);
+  }
+
   server_->getStream(1)->readDisable(false);
   driveToCompletion();
+
+  if (defer_processing_backedup_streams_) {
+    EXPECT_TRUE(process_buffered_data_callback->enabled_);
+    process_buffered_data_callback->invokeCallback();
+  }
+
   EXPECT_EQ(0, client_->getStream(1)->pending_send_data_->length());
   EXPECT_EQ(0, TestUtility::findGauge(client_stats_store_, "http2.pending_send_bytes")->value());
   // The extra 1 byte sent won't trigger another window update, so the final window should be the
@@ -1879,9 +1902,6 @@ TEST_P(Http2CodecImplFlowControlTest, WindowUpdateOnReadResumingFlood) {
   EXPECT_EQ(initial_stream_window, server_->getStream(1)->bufferLimit());
   EXPECT_EQ(initial_stream_window, client_->getStream(1)->bufferLimit());
 
-  auto* violation_callback =
-      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
-
   // One large write gets broken into smaller frames.
   EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AnyNumber());
   Buffer::OwnedImpl long_data(std::string(initial_stream_window / 2, 'a'));
@@ -1901,7 +1921,18 @@ TEST_P(Http2CodecImplFlowControlTest, WindowUpdateOnReadResumingFlood) {
   }
   driveToCompletion();
 
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
   EXPECT_FALSE(violation_callback->enabled_);
+
+  NiceMock<Event::MockSchedulableCallback>* process_buffered_data_callback{nullptr};
+  if (defer_processing_backedup_streams_) {
+    process_buffered_data_callback =
+        new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
+    EXPECT_FALSE(process_buffered_data_callback->enabled_);
+  }
 
   // Now unblock the server's stream. This will cause the bytes to be consumed, 2 flow control
   // updates to be sent, and overflow outbound frame queue.
@@ -1909,6 +1940,9 @@ TEST_P(Http2CodecImplFlowControlTest, WindowUpdateOnReadResumingFlood) {
   driveToCompletion();
 
   EXPECT_TRUE(violation_callback->enabled_);
+  if (defer_processing_backedup_streams_) {
+    EXPECT_TRUE(process_buffered_data_callback->enabled_);
+  }
   EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
   violation_callback->invokeCallback();
 
@@ -2059,8 +2093,6 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
 
 TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsConsumeError) {
   initialize();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_consume_stream_refused_errors", "true"}});
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
@@ -2083,38 +2115,6 @@ TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsConsumeErr
   EXPECT_TRUE(server_wrapper_->status_.ok());
 }
 
-TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsIgnoreError) {
-  expect_buffered_data_on_teardown_ = true;
-  initialize();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_consume_stream_refused_errors", "false"}});
-
-  TestRequestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
-  driveToCompletion();
-
-  // This causes the next stream creation to fail with a "invalid frame: Stream was refused" error.
-  submitSettings(server_, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 1}});
-
-  request_encoder_ = &client_->newStream(response_decoder_);
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
-  driveToCompletion();
-  // The server codec should fail since there are no available streams.
-  EXPECT_FALSE(server_wrapper_->status_.ok());
-  EXPECT_TRUE(isCodecProtocolError(server_wrapper_->status_));
-  EXPECT_EQ(server_wrapper_->status_.message(), "The user callback function failed");
-
-  EXPECT_EQ(0, server_stats_store_.counter("http2.stream_refused_errors").value());
-  EXPECT_EQ(0, server_stats_store_.counter("http2.tx_reset").value());
-
-  // Not verifying the http2.streams_active server/client gauges here as the
-  // test dispatch function doesn't let us fully capture the behavior of the real system.
-  // In the real world, the status returned from dispatch would trigger a connection close which
-  // would result in the active stream gauges to go down to 0.
-}
-
 #define HTTP2SETTINGS_SMALL_WINDOW_COMBINE                                                         \
   ::testing::Combine(                                                                              \
       ::testing::Values(CommonUtility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE),                   \
@@ -2125,12 +2125,14 @@ TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsIgnoreErro
 // Deferred reset tests use only small windows so that we can test certain conditions.
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplDeferredResetTest, Http2CodecImplDeferredResetTest,
                          ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
-                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE, ::testing::Bool()));
+                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE, ::testing::Bool(),
+                                            ::testing::Bool()));
 
 // Flow control tests only use only small windows so that we can test certain conditions.
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowControlTest,
                          ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
-                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE, ::testing::Bool()));
+                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE, ::testing::Bool(),
+                                            ::testing::Bool()));
 
 // we separate default/edge cases here to avoid combinatorial explosion
 #define HTTP2SETTINGS_DEFAULT_COMBINE                                                              \
@@ -2144,11 +2146,13 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowContro
 // edge settings allow for the number of streams needed by the test.
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplStreamLimitTest, Http2CodecImplStreamLimitTest,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool()));
+                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool(),
+                                            ::testing::Bool()));
 
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool()));
+                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool(),
+                                            ::testing::Bool()));
 
 #define HTTP2SETTINGS_EDGE_COMBINE                                                                 \
   ::testing::Combine(                                                                              \
@@ -2161,17 +2165,18 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
       ::testing::Values(CommonUtility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE,          \
                         CommonUtility::OptionsLimits::MAX_INITIAL_CONNECTION_WINDOW_SIZE))
 
-// Make sure we have coverage for high and low values for various  combinations and permutations
+// Make sure we have coverage for high and low values for various combinations and permutations
 // of HTTP settings in at least one test fixture.
 // Use with caution as any test using this runs 255 times.
 using Http2CodecImplTestAll = Http2CodecImplTest;
 
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTestAll,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool()));
+                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool(),
+                                            ::testing::Bool()));
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTestAll,
                          ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE, HTTP2SETTINGS_EDGE_COMBINE,
-                                            ::testing::Bool()));
+                                            ::testing::Bool(), ::testing::Bool()));
 
 TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {
@@ -2225,8 +2230,9 @@ public:
 
   Http2CustomSettingsTestBase(Http2SettingsTuple client_settings,
                               Http2SettingsTuple server_settings, bool use_new_codec_wrapper,
-                              bool validate_client)
-      : Http2CodecImplTestFixture(client_settings, server_settings, use_new_codec_wrapper),
+                              bool defer_processing_backedup_streams, bool validate_client)
+      : Http2CodecImplTestFixture(client_settings, server_settings, use_new_codec_wrapper,
+                                  defer_processing_backedup_streams),
         validate_client_(validate_client) {}
 
   ~Http2CustomSettingsTestBase() override = default;
@@ -2270,16 +2276,17 @@ protected:
 class Http2CustomSettingsTest
     : public Http2CustomSettingsTestBase,
       public ::testing::TestWithParam<
-          ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool, bool>> {
+          ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool, bool, bool>> {
 public:
   Http2CustomSettingsTest()
       : Http2CustomSettingsTestBase(::testing::get<0>(GetParam()), ::testing::get<1>(GetParam()),
-                                    ::testing::get<2>(GetParam()), ::testing::get<3>(GetParam())) {}
+                                    ::testing::get<2>(GetParam()), ::testing::get<3>(GetParam()),
+                                    ::testing::get<4>(GetParam())) {}
 };
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CustomSettingsTest,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
                                             HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool(),
-                                            ::testing::Bool()));
+                                            ::testing::Bool(), ::testing::Bool()));
 
 // Validates that custom parameters (those which are not explicitly named in the
 // envoy::config::core::v3::Http2ProtocolOptions proto) are properly sent and processed by
@@ -3257,6 +3264,220 @@ TEST_P(Http2CodecImplTest, ConnectTest) {
   driveToCompletion();
 }
 
+TEST_P(Http2CodecImplTest, ShouldWaitForDeferredBodyToProcessBeforeProcessingTrailers) {
+  // We must initialize before dtor, otherwise we'll touch uninitialized
+  // members in dtor.
+  initialize();
+
+  // Test only makes sense if we have defer processing enabled.
+  if (!defer_processing_backedup_streams_) {
+    return;
+  }
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  // Force the stream to buffer data at the receiving codec.
+  server_->getStream(1)->readDisable(true);
+  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  request_encoder_->encodeData(body, false);
+  driveToCompletion();
+
+  // Now re-enable the stream, and try dispatching trailers to the server.
+  // It should buffer those trailers until the buffered data is processed
+  // from the callback below.
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+
+  server_->getStream(1)->readDisable(false);
+
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+  // Trailers should be buffered by the codec since there is unprocessed body.
+  // Hence we shouldn't invoke decodeTrailers yet.
+  EXPECT_CALL(request_decoder_, decodeTrailers_(_)).Times(0);
+  request_encoder_->encodeTrailers(TestRequestTrailerMapImpl{{"trailing", "header"}});
+  driveToCompletion();
+
+  // Now invoke the deferred processing callback.
+  {
+    InSequence seq;
+    EXPECT_CALL(request_decoder_, decodeData(_, false));
+    EXPECT_CALL(request_decoder_, decodeTrailers_(_));
+    process_buffered_data_callback->invokeCallback();
+  }
+}
+
+TEST_P(Http2CodecImplTest, ShouldBufferDeferredBodyNoEndstream) {
+  // We must initialize before dtor, otherwise we'll touch uninitialized
+  // members in dtor.
+  initialize();
+
+  // Test only makes sense if we have defer processing enabled.
+  if (!defer_processing_backedup_streams_) {
+    return;
+  }
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  // Force the stream to buffer data at the receiving codec.
+  server_->getStream(1)->readDisable(true);
+  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  request_encoder_->encodeData(body, false);
+  driveToCompletion();
+
+  // Now re-enable the stream, we should just flush the buffered data without
+  // end stream to the upstream.
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+
+  server_->getStream(1)->readDisable(false);
+
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+  // Now invoke the deferred processing callback.
+  {
+    InSequence seq;
+    EXPECT_CALL(request_decoder_, decodeData(_, false));
+    process_buffered_data_callback->invokeCallback();
+  }
+}
+
+TEST_P(Http2CodecImplTest, ShouldBufferDeferredBodyWithEndStream) {
+  // We must initialize before dtor, otherwise we'll touch uninitialized
+  // members in dtor.
+  initialize();
+
+  // Test only makes sense if we have defer processing enabled.
+  if (!defer_processing_backedup_streams_) {
+    return;
+  }
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  // Force the stream to buffer data at the receiving codec.
+  server_->getStream(1)->readDisable(true);
+  Buffer::OwnedImpl first_part(std::string(1024, 'a'));
+  request_encoder_->encodeData(first_part, false);
+  driveToCompletion();
+
+  // Finish request in subsequent call.
+  Buffer::OwnedImpl final_part(std::string(1024, 'a'));
+  request_encoder_->encodeData(final_part, true);
+  driveToCompletion();
+
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+
+  server_->getStream(1)->readDisable(false);
+
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+  // Now invoke the deferred processing callback.
+  {
+    InSequence seq;
+    EXPECT_CALL(request_decoder_, decodeData(_, true));
+    process_buffered_data_callback->invokeCallback();
+  }
+}
+
+TEST_P(Http2CodecImplTest,
+       ShouldGracefullyHandleBufferedDataConsumedByNetworkEventInsteadOfCallback) {
+  // We must initialize before dtor, otherwise we'll touch uninitialized
+  // members in dtor.
+  initialize();
+
+  // Test only makes sense if we have defer processing enabled.
+  if (!defer_processing_backedup_streams_) {
+    return;
+  }
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  // Force the stream to buffer data at the receiving codec.
+  server_->getStream(1)->readDisable(true);
+  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  request_encoder_->encodeData(body, false);
+  driveToCompletion();
+
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+  server_->getStream(1)->readDisable(false);
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+  // Scoop the buffered data instead by this call to encodeData.
+  EXPECT_CALL(request_decoder_, decodeData(_, true));
+  request_encoder_->encodeData(body, true);
+  driveToCompletion();
+
+  // Deferred processing callback should have nothing to consume.
+  {
+    InSequence seq;
+    EXPECT_CALL(request_decoder_, decodeData(_, _)).Times(0);
+    EXPECT_CALL(request_decoder_, decodeTrailers_(_)).Times(0);
+    process_buffered_data_callback->invokeCallback();
+  }
+}
+
+TEST_P(Http2CodecImplTest, CanHandleMultipleBufferedDataProcessingOnAStream) {
+  // We must initialize before dtor, otherwise we'll touch uninitialized
+  // members in dtor.
+  initialize();
+
+  // Test only makes sense if we have defer processing enabled.
+  if (!defer_processing_backedup_streams_) {
+    return;
+  }
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
+  for (int i = 0; i < 10; ++i) {
+    // Repeatedly back up, clearing with the deferred processing callback.
+    const bool end_stream = i == 9;
+    server_->getStream(1)->readDisable(true);
+    Buffer::OwnedImpl body(std::string(1024, 'a'));
+    request_encoder_->encodeData(body, end_stream);
+    driveToCompletion();
+
+    EXPECT_FALSE(process_buffered_data_callback->enabled_);
+    server_->getStream(1)->readDisable(false);
+    EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+    {
+      InSequence seq;
+      EXPECT_CALL(request_decoder_, decodeData(_, end_stream));
+      process_buffered_data_callback->invokeCallback();
+      EXPECT_FALSE(process_buffered_data_callback->enabled_);
+    }
+  }
+}
+
 class TestNghttp2SessionFactory;
 
 // Test client for H/2 METADATA frame edge cases.
@@ -3381,6 +3602,9 @@ protected:
     Runtime::LoaderSingleton::getExisting()->mergeValues(
         {{"envoy.reloadable_features.http2_new_codec_wrapper",
           enable_new_codec_wrapper_ ? "true" : "false"}});
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{std::string(Runtime::defer_processing_backedup_streams),
+          defer_processing_backedup_streams_ ? "true" : "false"}});
     allow_metadata_ = true;
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);

@@ -144,13 +144,13 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   return ret;
 }
 
-ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
+ScopeSharedPtr ThreadLocalStoreImpl::createScope(const std::string& name) {
   StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), alloc_.symbolTable());
   return scopeFromStatName(stat_name_storage.statName());
 }
 
-ScopePtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
-  auto new_scope = std::make_unique<ScopeImpl>(*this, name);
+ScopeSharedPtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
+  auto new_scope = std::make_shared<ScopeImpl>(*this, name);
   Thread::LockGuard lock(lock_);
   scopes_.emplace(new_scope.get());
   return new_scope;
@@ -179,14 +179,10 @@ std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
 
 std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   std::vector<ParentHistogramSharedPtr> ret;
-  Thread::LockGuard lock(hist_mutex_);
-  {
-    ret.reserve(histogram_set_.size());
-    for (const auto& histogram_ptr : histogram_set_) {
-      ret.emplace_back(histogram_ptr);
-    }
-  }
-
+  forEachHistogram([&ret](std::size_t size) mutable { ret.reserve(size); },
+                   [&ret](ParentHistogram& histogram) mutable {
+                     ret.emplace_back(ParentHistogramSharedPtr(&histogram));
+                   });
   return ret;
 }
 
@@ -241,9 +237,7 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
 
 void ThreadLocalStoreImpl::mergeInternal(PostMergeCb merge_complete_cb) {
   if (!shutting_down_) {
-    for (const ParentHistogramSharedPtr& histogram : histograms()) {
-      histogram->merge();
-    }
+    forEachHistogram(nullptr, [](ParentHistogram& histogram) { histogram.merge(); });
     merge_complete_cb();
     merge_in_progress_ = false;
   }
@@ -909,7 +903,7 @@ void ParentHistogramImpl::merge() {
   }
 }
 
-const std::string ParentHistogramImpl::quantileSummary() const {
+std::string ParentHistogramImpl::quantileSummary() const {
   if (used()) {
     std::vector<std::string> summary;
     const std::vector<double>& supported_quantiles_ref = interval_statistics_.supportedQuantiles();
@@ -925,7 +919,7 @@ const std::string ParentHistogramImpl::quantileSummary() const {
   }
 }
 
-const std::string ParentHistogramImpl::bucketSummary() const {
+std::string ParentHistogramImpl::bucketSummary() const {
   if (used()) {
     std::vector<std::string> bucket_summary;
     ConstSupportedBuckets& supported_buckets = interval_statistics_.supportedBuckets();
@@ -967,13 +961,22 @@ void ThreadLocalStoreImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout>
   alloc_.forEachTextReadout(f_size, f_stat);
 }
 
+void ThreadLocalStoreImpl::forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const {
+  Thread::LockGuard lock(hist_mutex_);
+  if (f_size != nullptr) {
+    f_size(histogram_set_.size());
+  }
+  for (ParentHistogramImpl* histogram : histogram_set_) {
+    f_stat(*histogram);
+  }
+}
+
 void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,
                                         StatFn<const Scope> f_scope) const {
   Thread::LockGuard lock(lock_);
   if (f_size != nullptr) {
-    f_size(scopes_.size() + 1 /* for default_scope_ */);
+    f_size(scopes_.size());
   }
-  f_scope(*default_scope_);
   for (ScopeImpl* scope : scopes_) {
     f_scope(*scope);
   }

@@ -80,6 +80,7 @@ def _envoy_repo_impl(repository_ctx):
     repo_path = repository_ctx.path(repository_ctx.attr.envoy_root).dirname
     version = repository_ctx.read(repo_path.get_child("VERSION")).strip()
     repository_ctx.file("version.bzl", "VERSION = '%s'" % version)
+    repository_ctx.file("path.bzl", "PATH = '%s'" % repo_path)
     repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'" % (repo_path, version))
     repository_ctx.file("WORKSPACE", "")
     repository_ctx.file("BUILD", """
@@ -188,7 +189,9 @@ def envoy_dependencies(skip_targets = []):
     _io_opencensus_cpp()
     _com_github_curl()
     _com_github_envoyproxy_sqlparser()
-    _com_googlesource_chromium_v8()
+    _v8()
+    _com_googlesource_chromium_base_trace_event_common()
+    _com_googlesource_chromium_zlib()
     _com_github_google_quiche()
     _com_googlesource_googleurl()
     _com_lightstep_tracer_cpp()
@@ -196,23 +199,19 @@ def envoy_dependencies(skip_targets = []):
     _net_zlib()
     _com_github_zlib_ng_zlib_ng()
     _org_brotli()
+    _re2()
     _upb()
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
     _emscripten_toolchain()
     _rules_fuzzing()
     external_http_archive("proxy_wasm_rust_sdk")
-    external_http_archive("com_googlesource_code_re2")
     _com_google_cel_cpp()
     _com_github_google_perfetto()
     external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
-    external_http_archive(
-        name = "envoy_build_tools",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/external:envoy_build_tools.patch"],
-    )
+    external_http_archive("envoy_build_tools")
     external_http_archive("rules_cc")
     external_http_archive("rules_pkg")
     _com_github_fdio_vpp_vcl()
@@ -539,13 +538,9 @@ def _com_github_nlohmann_json():
     )
 
 def _com_github_nodejs_http_parser():
-    external_http_archive(
-        name = "com_github_nodejs_http_parser",
-        build_file = "@envoy//bazel/external:http-parser.BUILD",
-    )
     native.bind(
         name = "http_parser",
-        actual = "@com_github_nodejs_http_parser//:http_parser",
+        actual = "@envoy//bazel/external/http_parser",
     )
 
 def _com_github_alibaba_hessian2_codec():
@@ -686,6 +681,10 @@ def _com_google_absl():
         name = "abseil_status",
         actual = "@com_google_absl//absl/status",
     )
+    native.bind(
+        name = "abseil_cleanup",
+        actual = "@com_google_absl//absl/cleanup:cleanup",
+    )
 
 def _com_google_protobuf():
     external_http_archive(
@@ -784,16 +783,35 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
         actual = "@envoy//bazel/foreign_cc:curl",
     )
 
-def _com_googlesource_chromium_v8():
-    external_genrule_repository(
-        name = "com_googlesource_chromium_v8",
-        genrule_cmd_file = "@envoy//bazel/external:wee8.genrule_cmd",
-        build_file = "@envoy//bazel/external:wee8.BUILD",
-        patches = ["@envoy//bazel/external:wee8.patch"],
+def _v8():
+    external_http_archive(
+        name = "v8",
+        patches = ["@envoy//bazel:v8.patch"],
+        patch_args = ["-p1"],
     )
     native.bind(
         name = "wee8",
-        actual = "@com_googlesource_chromium_v8//:wee8",
+        actual = "@v8//:wee8",
+    )
+
+def _com_googlesource_chromium_base_trace_event_common():
+    external_http_archive(
+        name = "com_googlesource_chromium_base_trace_event_common",
+        build_file = "@v8//:bazel/BUILD.trace_event_common",
+    )
+    native.bind(
+        name = "base_trace_event_common",
+        actual = "@com_googlesource_chromium_base_trace_event_common//:trace_event_common",
+    )
+
+def _com_googlesource_chromium_zlib():
+    external_http_archive(
+        name = "com_googlesource_chromium_zlib",
+        build_file = "@v8//:bazel/BUILD.zlib",
+    )
+    native.bind(
+        name = "zlib_compression_utils",
+        actual = "@com_googlesource_chromium_zlib//:zlib_compression_utils",
     )
 
 def _com_github_google_quiche():
@@ -884,11 +902,6 @@ def _com_github_grpc_grpc():
     )
 
     native.bind(
-        name = "re2",
-        actual = "@com_googlesource_code_re2//:re2",
-    )
-
-    native.bind(
         name = "upb_lib_descriptor",
         actual = "@upb//:descriptor_upb_proto",
     )
@@ -906,6 +919,14 @@ def _com_github_grpc_grpc():
     native.bind(
         name = "upb_json_lib",
         actual = "@upb//:json",
+    )
+
+def _re2():
+    external_http_archive("com_googlesource_code_re2")
+
+    native.bind(
+        name = "re2",
+        actual = "@com_googlesource_code_re2//:re2",
     )
 
 def _upb():
@@ -930,7 +951,7 @@ def _emscripten_toolchain():
             ".emscripten_sanity",
         ]),
         patch_cmds = [
-            "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 2.0.7 && ./emsdk activate --embedded 2.0.7; fi",
+            "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 3.1.1 && ./emsdk activate --embedded 3.1.1; fi",
         ],
     )
 
@@ -1040,6 +1061,13 @@ def _com_github_wasm_c_api():
     )
     native.bind(
         name = "wasmtime",
+        actual = "@com_github_wasm_c_api//:wasmtime_lib",
+    )
+
+    # This isn't needed in builds with a single Wasm engine, but "bazel query"
+    # complains about a missing dependency, so point it at the regular target.
+    native.bind(
+        name = "prefixed_wasmtime",
         actual = "@com_github_wasm_c_api//:wasmtime_lib",
     )
 

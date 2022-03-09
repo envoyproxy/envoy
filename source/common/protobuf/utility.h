@@ -271,30 +271,51 @@ public:
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
    * @param message message to validate.
-   * @param loader optional a pointer to the runtime loader for live deprecation status.
+   * @param validation_visitor the validation visitor to use.
+   * @param recurse_into_any whether to recurse into Any messages during unexpected checking.
    * @throw ProtoValidationException if deprecated fields are used and listed
    *    in disallowed_features in runtime_features.h
    */
-  static void
-  checkForUnexpectedFields(const Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor,
-                           Runtime::Loader* loader = Runtime::LoaderSingleton::getExisting());
+  static void checkForUnexpectedFields(const Protobuf::Message& message,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                                       bool recurse_into_any = false);
 
   /**
-   * Validate protoc-gen-validate constraints on a given protobuf.
+   * Perform a PGV check on the entire message tree, recursing into Any messages as needed.
+   */
+  static void recursivePgvCheck(const Protobuf::Message& message);
+
+  /**
+   * Validate protoc-gen-validate constraints on a given protobuf as well as performing
+   * unexpected field validation.
    * Note the corresponding `.pb.validate.h` for the message has to be included in the source file
    * of caller.
    * @param message message to validate.
+   * @param validation_visitor the validation visitor to use.
+   * @param recurse_into_any whether to recurse into Any messages during unexpected checking.
    * @throw ProtoValidationException if the message does not satisfy its type constraints.
    */
   template <class MessageType>
   static void validate(const MessageType& message,
-                       ProtobufMessage::ValidationVisitor& validation_visitor) {
+                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                       bool recurse_into_any = false) {
     // Log warnings or throw errors if deprecated fields or unknown fields are in use.
     if (!validation_visitor.skipValidation()) {
-      checkForUnexpectedFields(message, validation_visitor);
+      checkForUnexpectedFields(message, validation_visitor, recurse_into_any);
     }
 
+    // TODO(mattklein123): This will recurse the message twice, once above and once for PGV. When
+    // we move to always recursing, satisfying the TODO below, we should merge into a single
+    // recursion for performance reasons.
+    if (recurse_into_any) {
+      return recursivePgvCheck(message);
+    }
+
+    // TODO(mattklein123): Now that PGV is capable of doing recursive message checks on abstract
+    // types, we can remove bottom up validation from the entire codebase and only validate
+    // at top level ingestion (bootstrap, discovery response). This is a large change and will be
+    // done as a separate PR. This change will also allow removing templating from most/all of
+    // related functions.
     std::string err;
     if (!Validate(message, &err)) {
       ProtoExceptionUtil::throwProtoValidationException(err, message);

@@ -120,6 +120,7 @@ envoy_cc_library(
     hdrs = ["filesystem_subscription_impl.h"],
     deps = [
         ":decoded_resource_lib",
+        ":watched_directory_lib",
         "//envoy/config:subscription_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/filesystem:filesystem_interface",
@@ -129,6 +130,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -395,6 +397,7 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:tag_producer_lib",
+        "//source/common/version:api_version_lib",
         "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
         "@com_github_cncf_udpa//xds/type/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

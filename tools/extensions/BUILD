@@ -22,7 +22,7 @@ envoy_py_binary(
         "//test/extensions/filters/network/common/fuzz:uber_per_readfilter.cc",
     ],
     deps = [
-        requirement("envoy.base.checker"),
+        requirement("aio.run.checker"),
         requirement("envoy.base.utils"),
     ],
 )
