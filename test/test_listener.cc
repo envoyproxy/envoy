@@ -20,7 +20,8 @@ void TestListener::OnTestEnd(const ::testing::TestInfo& test_info) {
                    absl::StrCat("MainThreadLeak: [", test_info.test_suite_name(), ".",
                                 test_info.name(), "] test exited before main thread shut down"));
   }
-  // Reset flags, and latch the defaults for next test.
+  // We must do this in two phases; reset the old flags to get back to the clean state before
+  // constructing a new flag saver to latch the clean values.
   saver_.reset();
   saver_ = std::make_unique<absl::FlagSaver>();
 }

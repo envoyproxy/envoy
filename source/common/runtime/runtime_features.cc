@@ -11,10 +11,8 @@
 // Add additional features here to enable the new code paths by default.
 //
 // Per documentation in CONTRIBUTING.md is expected that new high risk code paths be guarded
-// by runtime feature guards, i.e
-//
-// If you add a guard of the form
-// RUNTIME_GUARD(envoy_reloadable_features_my_feature_nae_name)
+// by runtime feature guards. If you add a guard of the form
+// RUNTIME_GUARD(envoy_reloadable_features_my_feature_name)
 // here you can guard code checking against "envoy.reloadable_features.my_feature_name".
 // Please note the swap of envoy_reloadable_features_ to envoy.reloadable_features.!
 //
@@ -89,11 +87,21 @@ ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
 
 namespace Envoy {
 namespace Runtime {
+namespace {
 
+std::string swapPrefix(std::string name) {
+  return absl::StrReplaceAll(name, {{"envoy_", "envoy."}, {"features_", "features."}});
+}
+
+} // namespace
+
+// This is a singleton class to map Envoy style flag names to absl flags
 class RuntimeFeatures {
 public:
   RuntimeFeatures();
 
+  // Get the command line flag corresponding to the Envoy style feature name, or
+  // nullptr if it is not a registered flag.
   absl::CommandLineFlag* getFlag(absl::string_view feature) const {
     auto it = all_features_.find(feature);
     if (it == all_features_.end()) {
@@ -107,10 +115,6 @@ private:
 };
 
 using RuntimeFeaturesDefaults = ConstSingleton<RuntimeFeatures>;
-
-std::string swapPrefix(std::string name) {
-  return absl::StrReplaceAll(name, {{"envoy_", "envoy."}, {"features_", "features."}});
-}
 
 RuntimeFeatures::RuntimeFeatures() {
   absl::flat_hash_map<absl::string_view, absl::CommandLineFlag*> flags = absl::GetAllFlags();
