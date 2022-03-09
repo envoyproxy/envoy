@@ -668,9 +668,11 @@ void ListenerImpl::buildSocketOptions() {
 #else
     // Not in place listener update.
     if (config_.has_connection_balance_config()) {
-      // Currently exact balance is the only supported type and there are no options.
-      ASSERT(config_.connection_balance_config().has_exact_balance());
-      connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
+      if (config_.connection_balance_config().has_exact_balance()) {
+        connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
+      } else if (config_.connection_balance_config().has_extend_balance()) {
+        //TODO(@daixiang0) implement extend balancer.
+      }
     } else {
       connection_balancer_ = std::make_shared<Network::NopConnectionBalancerImpl>();
     }
