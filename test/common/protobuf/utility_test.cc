@@ -10,6 +10,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/health_checker/redis/v2/redis.pb.h"
 #include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 #include "envoy/extensions/health_checkers/redis/v3/redis.pb.h"
 #include "envoy/extensions/health_checkers/redis/v3/redis.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -253,17 +255,29 @@ TEST_F(ProtobufUtilityTest, DowncastAndValidateUnknownFieldsNested) {
 
 // Validated exception thrown when observed nested unknown field with any.
 TEST_F(ProtobufUtilityTest, ValidateUnknownFieldsNestedAny) {
+  // Consturct a nested message with unknown field
+  envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig cluster_config;
+  auto* dns_cache_config = cluster_config->mutable_dns_cache_config();
+  dns_cache_config->set_name("dynamic_forward_proxy_cache_config");
+  dns_cache_config->GetReflection()->MutableUnknownFields(dns_cache_config)->AddVarint(999, 0);
+
+  // Consturct ancestors of the nested any message with unknown field.
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
-  cluster->GetReflection()->MutableUnknownFields(cluster)->AddVarint(1, 0);
+  auto* cluster_type = cluster->mutable_cluster_type();
+  cluster_type->set_name("envoy.clusters.dynamic_forward_proxy");
+  cluster_type->mutable_typed_config()->PackFrom(cluster_config);
 
-  ProtobufWkt::Any source_any;
-  source_any.PackFrom(bootstrap);
   EXPECT_THROW_WITH_MESSAGE(
-      TestUtility::validate(source_any, /*recurse_into_any*/ true), EnvoyException,
-      unknownFieldsMessage("envoy.config.cluster.v3.Cluster",
-                           {"google.protobuf.Any", "envoy.config.bootstrap.v3.Bootstrap",
-                            "envoy.config.bootstrap.v3.Bootstrap.StaticResources"},
+      TestUtility::validate(bootstrap, /*recurse_into_any*/ true), EnvoyException,
+      unknownFieldsMessage("envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig",
+                           {
+                               "envoy.config.bootstrap.v3.Bootstrap",
+                               "envoy.config.bootstrap.v3.Bootstrap.StaticResources",
+                               "envoy.config.cluster.v3.Cluster",
+                               "envoy.config.cluster.v3.Cluster.ClusterType",
+                               "google.protobuf.Any",
+                           },
                            {1}));
 }
 
