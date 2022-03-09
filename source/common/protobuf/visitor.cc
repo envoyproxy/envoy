@@ -91,7 +91,7 @@ void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& 
   const Protobuf::Reflection* reflection = message.GetReflection();
   for (int i = 0; i < descriptor->field_count(); ++i) {
     const Protobuf::FieldDescriptor* field = descriptor->field(i);
-    visitor.onField(message, *field, parents);
+    visitor.onField(message, *field);
 
     // If this is a message, recurse to scrub deprecated fields in the sub-message.
     if (field->cpp_type() == Protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {

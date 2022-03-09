@@ -373,8 +373,7 @@ public:
                               Runtime::Loader* runtime)
       : validation_visitor_(validation_visitor), runtime_(runtime) {}
 
-  void onField(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
-               absl::Span<const Protobuf::Message* const>) override {
+  void onField(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field) override {
     const Protobuf::Reflection* reflection = message.GetReflection();
     absl::string_view filename = filenameFromPath(field.file()->name());
 
@@ -482,8 +481,7 @@ public:
     }
   }
 
-  void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&,
-               absl::Span<const Protobuf::Message* const>) override {}
+  void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) override {}
 };
 
 } // namespace
