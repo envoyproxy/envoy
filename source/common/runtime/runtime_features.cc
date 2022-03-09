@@ -95,7 +95,7 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
 
 uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
   if (absl::StartsWith(feature, "envoy.")) {
-    // DO NOT ADD MORE FLAGS HERE. This function deprecated and being removed.
+    // DO NOT ADD MORE FLAGS HERE. This function deprecated.
     if (feature == "envoy.http.headermap.lazy_map_min_size") {
       return absl::GetFlag(FLAGS_envoy_headermap_lazy_map_min_size);
     }
@@ -186,29 +186,24 @@ void maybeSetRuntimeGuard(absl::string_view name, bool value) {
   absl::SetFlag(flag, value);
 }
 
-// TODO(alyssawilk) deprecate use of this
 void maybeSetDeprecatedInts(absl::string_view name, uint32_t value) {
   if (!absl::StartsWith(name, "envoy.") && !absl::StartsWith(name, "re2.")) {
     return;
   }
 
-  bool set = false;
   // DO NOT ADD MORE FLAGS HERE. This function deprecated and being removed.
   if (name == "envoy.http.headermap.lazy_map_min_size") {
-    set = true;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.deprecate_global_ints")) {
+      IS_ENVOY_BUG(absl::StrCat(
+          "The Envoy community is attempting to remove global integers. Given you use ", name,
+          " please immediately file an upstream issue to retain the functionality as it will "
+          "otherwise be removed following the usual deprecation cycle."));
+    }
     absl::SetFlag(&FLAGS_envoy_headermap_lazy_map_min_size, value);
   } else if (name == "re2.max_program_size.error_level") {
-    set = true;
     absl::SetFlag(&FLAGS_re2_max_program_size_error_level, value);
   } else if (name == "re2.max_program_size.warn_level") {
-    set = true;
     absl::SetFlag(&FLAGS_re2_max_program_size_warn_level, value);
-  }
-  if (set && Runtime::runtimeFeatureEnabled("envoy.reloadable_features.deprecate_global_ints")) {
-    IS_ENVOY_BUG(absl::StrCat(
-        "The Envoy community is attempting to remove global integers. Given you use ", name,
-        " please immediately file an upstream issue to retain the functionality as it will "
-        "otherwise be removed following the usual deprecation cycle."));
   }
 }
 

@@ -107,4 +107,3 @@ Deprecated
 * http: deprecated ``envoy.http.headermap.lazy_map_min_size``.  If you are using this config knob you can revert this temporarily by setting ``envoy.reloadable_features.deprecate_global_ints`` to true but you MUST file an upstream issue to ensure this feature remains available.
 * http: removing support for long-deprecated old style filter names, e.g. envoy.router, envoy.lua.
 * re2: removed undocumented histograms ``re2.program_size`` and ``re2.exceeded_warn_level``.
-* re2: deprecated ``re2.max_program_size.error_level`` and ``re2.max_program_size.warn_level``. If you are using these config knobs you can revert this temporarily by setting ``envoy.reloadable_features.deprecate_global_ints`` to true but you MUST file an upstream issue to ensure this feature remains available.
