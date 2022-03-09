@@ -86,14 +86,18 @@ TEST_F(FilterStateImplTest, SharedPointerAccessor) {
   EXPECT_EQ(0u, access_count);
   EXPECT_EQ(0u, destruction_count);
 
-  auto obj = filter_state().getDataSharedMutableGeneric("test_name");
-  EXPECT_EQ(5, dynamic_cast<TestStoredTypeTracking*>(obj.get())->access());
-  EXPECT_EQ(1u, access_count);
-  EXPECT_EQ(0u, destruction_count);
+  {
+    auto obj = filter_state().getDataSharedMutableGeneric("test_name");
+    EXPECT_EQ(5, dynamic_cast<TestStoredTypeTracking*>(obj.get())->access());
+    EXPECT_EQ(1u, access_count);
+    EXPECT_EQ(0u, destruction_count);
 
-  resetFilterState();
-  EXPECT_EQ(1u, access_count);
-  EXPECT_EQ(0u, destruction_count);
+    resetFilterState();
+    EXPECT_EQ(1u, access_count);
+    EXPECT_EQ(0u, destruction_count);
+  }
+
+  EXPECT_EQ(1u, destruction_count);
 }
 
 TEST_F(FilterStateImplTest, SameTypes) {
