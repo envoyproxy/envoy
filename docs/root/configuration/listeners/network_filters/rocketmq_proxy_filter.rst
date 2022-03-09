@@ -63,17 +63,17 @@ following statistics:
   get_topic_route, Counter, Total getting topic route requests
   send_message_v1, Counter, Total sending message v1 requests
   send_message_v2, Counter, Total sending message v2 requests
-  pop_message, Counter, Total poping message requests
-  ack_message, Counter, Total acking message requests
+  pop_message, Counter, Total popping message requests
+  ack_message, Counter, Total packing message requests
   get_consumer_list, Counter, Total getting consumer list requests
   maintenance_failure, Counter, Total maintenance failure
   request_active, Gauge, Total active requests
   send_message_v1_active, Gauge, Total active sending message v1 requests
   send_message_v2_active, Gauge, Total active sending message v2 requests
-  pop_message_active, Gauge, Total active poping message active requests
-  get_topic_route_active, Gauge, Total active geting topic route requests
+  pop_message_active, Gauge, Total active popping message active requests
+  get_topic_route_active, Gauge, Total active getting topic route requests
   send_message_pending, Gauge, Total pending sending message requests
-  pop_message_pending, Gauge, Total pending poping message requests
-  get_topic_route_pending, Gauge, Total pending geting topic route requests
+  pop_message_pending, Gauge, Total pending popping message requests
+  get_topic_route_pending, Gauge, Total pending getting topic route requests
   total_pending, Gauge, Total pending requests
   request_time_ms, Histogram, Request time in milliseconds

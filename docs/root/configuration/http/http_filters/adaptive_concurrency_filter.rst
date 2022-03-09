@@ -94,7 +94,7 @@ minRTT latency. In the absence of a headroom value, the concurrency limit could 
 at an unnecessary small value if the sampleRTT and minRTT are close to each other.
 
 Because the headroom value is so necessary to the proper function for the gradient controller, the
-headroom value is unconfigurable and pinned to the square-root of the concurrency limit.
+headroom value is not configurable and pinned to the square-root of the concurrency limit.
 
 Limitations
 -----------

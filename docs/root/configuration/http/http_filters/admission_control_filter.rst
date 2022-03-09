@@ -121,7 +121,7 @@ The above configuration can be understood as follows:
   window.
 * HTTP requests are considered successful if they are 1xx, 2xx, 3xx, or a 404.
 * gRPC requests are considered successful if they are OK or CANCELLED.
-* Requests will never be rejeted from this filter if the RPS is lower than 5.
+* Requests will never be rejected from this filter if the RPS is lower than 5.
 * Rejection probability will never exceed 80% even if the failure rate is 100%.
 
 Statistics

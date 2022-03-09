@@ -20,7 +20,7 @@ The listener limits apply to how much raw data will be read per read() call from
 downstream, as well as how much data may be buffered in userspace between Envoy
 and downstream.
 
-The listener limits are also propogated to the HttpConnectionManager, and applied on a per-stream
+The listener limits are also propagated to the HttpConnectionManager, and applied on a per-stream
 basis to HTTP/1.1 L7 buffers described below. As such they limit the size of HTTP/1 requests and
 response bodies that can be buffered. For HTTP/2 and HTTP/3, as many streams can be multiplexed over one
 connection, the L7 and L4 buffer limits can be tuned separately, and the configuration option

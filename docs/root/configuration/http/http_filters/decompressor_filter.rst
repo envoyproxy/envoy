@@ -104,7 +104,7 @@ multiple decompressor filters enabled only for requests or responses. For instan
 Statistics
 ----------
 
-Every configured Deompressor filter has statistics rooted at
+Every configured Decompressor filter has statistics rooted at
 <stat_prefix>.decompressor.<decompressor_library.name>.<decompressor_library_stat_prefix>.<request/response>*
 with the following:
 

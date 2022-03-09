@@ -87,7 +87,7 @@ versioning guidelines:
 * All deprecations/breaking changes will be clearly listed in the [version history](docs/root/version_history/).
 * High risk deprecations/breaking changes may be announced to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list but by default
-  it is expected the multi-phase warn-by-default/fail-by-default is sufficient to warn users to move
+  it is expected the multiphase warn-by-default/fail-by-default is sufficient to warn users to move
   away from deprecated features.
 
 # Submitting a PR
@@ -115,7 +115,7 @@ versioning guidelines:
   that applies. For instance, a bug fix that introduces incompatible behavior should be noted in
   `Incompatible Behavior Changes` but not in `Bug Fixes`.
 * All code comments and documentation are expected to have proper English grammar and punctuation.
-  If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
+  If you are not a fluent English speaker (or a bad writer ;-)) please let us know, and we will try
   to find some help but there are no guarantees.
 * Your PR title should be descriptive, and generally start with a subsystem name followed by a
   colon. Examples:
@@ -130,11 +130,11 @@ versioning guidelines:
   GitHub's [multiple author
   guidance](https://help.github.com/en/github/committing-changes-to-your-project/creating-a-commit-with-multiple-authors)
   for further details.
-* When all of the tests are passing and all other conditions described herein are satisfied, a
+* When all the tests are passing and all other conditions described herein are satisfied, a
   maintainer will be assigned to review and merge the PR.
 * Once your PR is under review, *please do not rebase it*. If you rebase, you will need to force push to
-  github, and github's user interface will force your reviewer to review the PR
-  from stratch rather than simply look at your latest changes.  It's much easier to review
+  GitHub, and GitHub's user interface will force your reviewer to review the PR
+  from scratch rather than simply look at your latest changes.  It's much easier to review
   new commits and/or merges. We squash rebase the final merged commit so the number of commits
   you have in the PR don't matter. Again once your PR is assigned a reviewer, unless you need to fix DCO
   *please do not force push*.  If you need to pull recent changes you can run
@@ -200,7 +200,7 @@ Runtime guarded features may either set true (running the new code by default) i
 after a testing interval, or during the next release cycle, at the PR author's and reviewing
 maintainer's discretion. Generally all runtime guarded features will be set true when a
 release is cut. Old code paths for refactors can be cleaned up after a release and there has been
-some production run time. Old code for behavioral changes will be deprecated after six months.
+some production run-time. Old code for behavioral changes will be deprecated after six months.
 Runtime features are set true by default by inclusion in
 [source/common/runtime/runtime_features.cc](https://github.com/envoyproxy/envoy/blob/main/source/common/runtime/runtime_features.cc)
 
@@ -208,7 +208,7 @@ There are four suggested options for testing new runtime features:
 
 1. Create a per-test Runtime::LoaderSingleton as done in [DeprecatedFieldsTest.IndividualFieldDisallowedWithRuntimeOverride](https://github.com/envoyproxy/envoy/blob/main/test/common/protobuf/utility_test.cc)
 2. Create a [parameterized test](https://github.com/google/googletest/blob/master/docs/advanced.md#how-to-write-value-parameterized-tests)
-   where the set up of the test sets the new runtime value explicitly to
+   where the set-up of the test sets the new runtime value explicitly to
    GetParam() as outlined in (1).
 3. Set up integration tests with custom runtime defaults as documented in the
    [integration test README](https://github.com/envoyproxy/envoy/blob/main/test/integration/README.md)
@@ -228,7 +228,7 @@ temporarily reverted by setting runtime guard ``envoy.reloadable_features.schema
 
 # PR review policy for maintainers
 
-* Typically we try to turn around reviews within one business day.
+* We typically try to turn around reviews within one business day.
 * See [OWNERS.md](OWNERS.md) for the current list of maintainers.
 * It is generally expected that a senior maintainer should review every PR.
 * It is also generally expected that a "domain expert" for the code the PR touches should review the
@@ -238,7 +238,7 @@ temporarily reverted by setting runtime guard ``envoy.reloadable_features.schema
 * The above rules may be waived for PRs which only update docs or comments, or trivial changes to
   tests and tools (where trivial is decided by the maintainer in question).
 * In general, we should also attempt to make sure that at least one of the approvals is *from an
-  organization different from the PR author.* E.g., if Lyft authors a PR, at least one approver
+  organization different from the PR author.* E.g., if Lyft authors a PR, at least one party
   should be from an organization other than Lyft. This helps us make sure that we aren't putting
   organization specific shortcuts into the code.
 * If there is a question on who should review a PR please discuss in Slack.
@@ -258,7 +258,7 @@ temporarily reverted by setting runtime guard ``envoy.reloadable_features.schema
 If you change anything in the [api tree](https://github.com/envoyproxy/envoy/tree/main/api),
 please read the [API Review
 Checklist](https://github.com/envoyproxy/envoy/tree/main/api/review_checklist.md)
-and make sure that your changes have addressed all of the considerations listed there.
+and make sure that your changes have addressed all the considerations listed there.
 
 # Adding new extensions
 
@@ -287,7 +287,7 @@ extension mostly mirrors adding a normal extension above. Some differences are n
 
 # DCO: Sign your work
 
-Envoy ships commit hooks that allow you to auto-generate the DCO signoff line if
+Envoy ships commit hooks that allow you to auto-generate the DCO sign-off line if
 it doesn't exist when you run `git commit`. Simply navigate to the Envoy project
 root and run:
 
@@ -295,7 +295,7 @@ root and run:
 ./support/bootstrap
 ```
 
-From here, simply commit as normal, and you will see the signoff at the bottom
+From here, simply commit as normal, and you will see the sign-off at the bottom
 of each commit.
 
 The sign-off is a simple line at the end of the explanation for the
@@ -349,7 +349,7 @@ then you just add a line to every git commit message:
 
 using your real name (sorry, no pseudonyms or anonymous contributions.)
 
-You can add the sign off when creating the git commit via `git commit -s`.
+You can add the sign-off when creating the git commit via `git commit -s`.
 
 If you want this to be automatic you can set up some aliases:
 

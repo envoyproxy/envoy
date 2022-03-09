@@ -22,7 +22,7 @@ recent Linux including Ubuntu 18.04 LTS.
 Building Envoy has the following requirements:
 
 * GCC 7+ or Clang/LLVM 7+ (for C++14 support). Clang/LLVM 9+ preferred where Clang is used (see below).
-* About 2GB of RAM per core (so 32GB of RAM for 8 cores with hyperthreading). See
+* About 2GB of RAM per core (so 32GB of RAM for 8 cores with hyper-threading). See
   :ref:`this FAQ entry <faq_build_speed>` for more information on build performance.
 * These :repo:`Bazel native <bazel/repository_locations.bzl>` dependencies.
 
@@ -33,7 +33,7 @@ as the new tcmalloc code is not guaranteed to compile with lower versions of Cla
 Windows Target Requirements
 ---------------------------
 
-Envoy now suports Windows as a target platform. The requirements below only apply if you want to build the Windows
+Envoy now supports Windows as a target platform. The requirements below only apply if you want to build the Windows
 native executable. If you want to build the Linux version of Envoy on Windows either with WSL or Linux containers
 please see the Linux requirements above.
 

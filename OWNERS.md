@@ -93,8 +93,7 @@ contributors to envoy-setec and relevant Slack channels from:
 
 # Friends of Envoy
 
-This section lists a few people that are not maintainers but typically help out with subject
-matter expert reviews. Feel free to loop them in as needed.
+This section lists a few people that are not maintainers but typically help out with subject-matter expert reviews. Feel free to loop them in as needed.
 
 * Yuchen Dai ([lambdai](https://github.com/lambdai)) (lambdai@google.com)
   * v2 xDS, listeners, filter chain discovery service.

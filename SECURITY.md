@@ -21,8 +21,7 @@ run this process.
 
 The initial Product Security Team will consist of all [maintainers](OWNERS.md) in the private
 [envoy-security](https://groups.google.com/forum/#!forum/envoy-security) list. In the future we may
-decide to have a subset of maintainers work on security response given that this process is time
-consuming.
+decide to have a subset of maintainers to work on security response given that this process is time-consuming.
 
 ## Disclosures
 
@@ -35,7 +34,7 @@ via the [reporting policy](README.md#reporting-security-vulnerabilities).
 
 If you know of a publicly disclosed security vulnerability please IMMEDIATELY email
 [envoy-security](https://groups.google.com/forum/#!forum/envoy-security) to inform the Product
-Security Team (PST) about the vulnerability so they may start the patch, release, and communication
+Security Team (PST) about the vulnerability, so they may start the patch, release, and communication
 process.
 
 If possible the PST will ask the person making the public report if the issue can be handled via a
@@ -56,7 +55,7 @@ Note that given the current size of the Envoy community it is likely that the PS
 the "Fix team." (I.e., all maintainers). The PST may decide to bring in additional contributors
 for added expertise depending on the area of the code that contains the vulnerability.
 
-All of the timelines below are suggestions and assume a private disclosure. The Fix Lead drives the
+All the timelines below are suggestions and assume a private disclosure. The Fix Lead drives the
 schedule using their best judgment based on severity and development time. If the Fix Lead is
 dealing with a public disclosure all timelines become ASAP (assuming the vulnerability has a CVSS
 score >= 4; see below). If the fix relies on another upstream project's disclosure timeline, that
@@ -126,7 +125,7 @@ score](https://www.first.org/cvss/specification-document#i5)) the Fix Team can d
 release process down in the face of holidays, developer bandwidth, etc. These decisions must be
 discussed on the envoy-security mailing list.
 
-A three week window will be provided to members of the private distributor list from candidate patch
+A three-week window will be provided to members of the private distributor list from candidate patch
 availability until the security release date. It is expected that distributors will normally be able
 to perform a release within this time window. If there are exceptional circumstances, the Envoy
 security team will raise this window to four weeks. The release window will be reduced if the
@@ -142,8 +141,8 @@ holiday periods or end-of-quarter (e.g. impacting downstream Istio releases), wh
 
 * Privately disclosed issues will be fixed or publicly disclosed within 90 days
   by the Envoy security team. In exceptional circumstances we reserve the right
-  to work with the discloser to coordinate on an extension, but this will be
-  rarely used.
+  to work with the discloser to coordinate on an extension, but this will
+  rarely be used.
 
 * Any issue discovered by the Envoy security team and raised in our private bug
   tracker will be converted to a public issue within 90 days. We will regularly
@@ -265,7 +264,7 @@ receive embargoed reports in the future.
 
 In the unfortunate event you share the information beyond what is allowed by this policy, you _must_
 urgently inform the envoy-security@googlegroups.com mailing list of exactly what information leaked
-and to whom. A retrospective will take place after the leak so we can assess how to prevent making the
+and to whom. A retrospective will take place after the leak, so we can assess how to prevent making the
 same mistake in the future.
 
 If you continue to leak information and break the policy outlined here, you will be removed from the
@@ -342,10 +341,10 @@ use of Envoy should:
 4. Not be a downstream or rebuild of another distribution.
 5. Be a participant and active contributor in the community.
 6. Accept the [Embargo Policy](#embargo-policy) that is outlined above. You must
-   have a way to privately stage and validate your updates that does not violate
+   have a way to privately stage and validate your updates that do not violate
    the embargo.
 7. Be willing to [contribute back](#contributing-back) as outlined above.
-8. Be able to perform a security release of your product within a three week window from candidate fix
+8. Be able to perform a security release of your product within a three-week window from candidate fix
    patch availability.
 9. Have someone already on the list vouch for the person requesting membership
    on behalf of your distribution.
@@ -358,7 +357,7 @@ use of Envoy should:
 Note that Envoy maintainers are members of the Envoy security team. [Members of the Envoy security
 team](OWNERS.md#envoy-security-team) and the organizations that they represent are implicitly
 included in the private distributor list. These organizations do not need to meet the above list of
-criteria with the exception of the acceptance of the embargo policy.
+criteria except for the acceptance of the embargo policy.
 
 ### Requesting to Join
 

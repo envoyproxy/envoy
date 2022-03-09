@@ -1,14 +1,14 @@
 # Repository layout overview
 
 This is a high level overview of how the repository is laid out to both aid in code investigation,
-as well as to clearly specify how extensions are added to the repository. The top level directories
+and to clearly specify how extensions are added to the repository. The top level directories
 are:
 
 * [.azure-pipelines/](.azure-pipelines/): Configuration for
 [Azure Pipelines](https://azure.microsoft.com/en-us/services/devops/pipelines/).
 * [api/](api/): Envoy data plane API.
 * [bazel/](bazel/): Configuration for Envoy's use of [Bazel](https://bazel.build/).
-* [ci/](ci/): Scripts used both during CI as well as to build Docker containers.
+* [ci/](ci/): Scripts used both during CI and to build Docker containers.
 * [configs/](configs/): Example Envoy configurations.
 * [docs/](docs/): End user facing Envoy proxy and data plane API documentation as well as scripts
   for publishing final docs during releases.
@@ -56,7 +56,7 @@ Not every directory within test is described below, but a few highlights:
   "core" Envoy functionality. Those integration tests will likely end up in the
   [extensions/](test/extensions/) directory but further work and thinking is required before
   we get to that point.
-* [mocks/](test/mocks/) contains mock implementations of all of the core Envoy interfaces found in
+* [mocks/](test/mocks/) contains mock implementations of all the core Envoy interfaces found in
   [include/](include/).
 * Other directories include tooling used for configuration testing, coverage testing, fuzz testing,
   common test code, etc.
@@ -64,7 +64,7 @@ Not every directory within test is described below, but a few highlights:
 ## [source/extensions](source/extensions/) layout
 
 We maintain a very specific code and namespace layout for extensions. This aids in discovering
-code/extensions, and allows us specify extension owners in [CODEOWNERS](CODEOWNERS).
+code/extensions, and allows us to specify extension owners in [CODEOWNERS](CODEOWNERS).
 
 * All extensions are either registered in [all_extensions.bzl](source/extensions/all_extensions.bzl)
   or [extensions_build_config.bzl](source/extensions/extensions_build_config.bzl). The former is

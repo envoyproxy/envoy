@@ -22,7 +22,7 @@ the connection will be closed without further filter iteration.
 -  The filter maintains an atomic counter of active connection count. It has a max connections limit value based on the configured total number of connections.
    When a new connection request comes, the filter tries to increment the connection counter. The connection is allowed if the counter is less than the max connections limit, otherwise the connection gets rejected.
    When an active connection is closed, the filter decrements the active connection counter.
--  The filter does not stop connection creation but will close the connections that were accepted but were deemed as overlimit.
+-  The filter does not stop connection creation but will close the connections that were accepted but were deemed as over limit.
 -  **Slow rejection:** The filter can stop reading from the connection and close it after a delay instead of rejecting it right away or letting requests go through before the rejection.
    This way we can prevent a malicious entity from opening new connections while draining their resources.
 

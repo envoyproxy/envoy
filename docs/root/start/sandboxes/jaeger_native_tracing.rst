@@ -112,7 +112,7 @@ to service2, as well as the latency incurred at each hop.
       Jaeger tracing website.
 
    `Jaeger C++ client <https://github.com/jaegertracing/jaeger-client-cpp>`_
-      The Jaeger C++ cient.
+      The Jaeger C++ client.
 
    `Jaeger Go client <https://github.com/jaegertracing/jaeger-client-go#zipkin-http-b3-compatible-header-propagation>`_
       The Jaeger Go client.

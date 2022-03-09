@@ -132,7 +132,7 @@ HTTP/2 or above when you have the choice.
 HTTP POST can also be used to proxy multiplexed TCP when intermediate proxies that don't support
 CONNECT. An example set up proxying HTTP would look something like this:
 
-[TCP Server] --- raw TCP --- [L2 Envoy]  --- TCP tunneled over HTTP/2 or HTTP/1.1 POST --- [Intermidate Proxies] --- HTTP/2 or HTTP/1.1 POST --- [L1 Envoy]  --- raw TCP  --- [TCP Client]
+[TCP Server] --- raw TCP --- [L2 Envoy]  --- TCP tunneled over HTTP/2 or HTTP/1.1 POST --- [Intermediate Proxies] --- HTTP/2 or HTTP/1.1 POST --- [L1 Envoy]  --- raw TCP  --- [TCP Client]
 
 Examples of such a set up can be found in the Envoy example config :repo:`directory <configs/>`
 For HTTP/1.1 CONNECT run ``bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http1_connect.yaml --base-id 1``

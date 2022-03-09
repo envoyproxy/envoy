@@ -86,13 +86,13 @@ The `status` is one of:
   no `status` is specified.
 * `alpha`: The extension is functional but has not had substantial production burn time, use only
   with this caveat.
-* `wip`: The extension is work-in-progress. Functionality is incomplete and it is not intended for
+* `wip`: The extension is work-in-progress. Functionality is incomplete, and it is not intended for
   production use.
 
 The extension status may be adjusted by the extension [CODEOWNERS](./CODEOWNERS) and/or Envoy
 maintainers based on an assessment of the above criteria. Note that the status of the extension
 reflects the implementation status. It is orthogonal to the API stability, for example, an extension
-API marked with `(xds.annotations.v3.file_status).work_in_progress` might have a `stable` implementation and
+API marked with `(xds.annotations.v3.file_status).work_in_progress` might have a `stable` implementation 
 and an extension with a stable config proto can have a `wip` implementation.
 
 The `security_posture` is one of:
@@ -118,7 +118,7 @@ An assessment of a robust security posture for an extension is subject to the fo
 * Does the extension rely on dependencies that meet our [extension maturity
   model](https://github.com/envoyproxy/envoy/issues/10471)?
 * Is the extension reasonable to audit by Envoy security team?
-* Is the extension free of obvious scary things, e.g. `memcpy`, does it have gnarly parsing code, etc?
+* Is the extension free of obvious scary things, e.g. `memcpy`, does it have gnarly parsing code, etc.?
 * Does the extension have active [CODEOWNERS](CODEOWNERS) who are willing to
   vouch for the robustness of the extension?
 * Is the extension absent a [low coverage

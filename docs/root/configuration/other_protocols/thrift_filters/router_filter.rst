@@ -36,7 +36,7 @@ Since these stats utilize the underlying cluster scope, we prefix with the ``thr
   thrift.upstream_rq_call, Counter, Total requests with the "Call" message type.
   thrift.upstream_rq_oneway, Counter, Total requests with the "Oneway" message type.
   thrift.upstream_rq_invalid_type, Counter, Total requests with an unsupported message type.
-  thrift.upstream_resp_reply, Counter, Total responses with the "Reply" message type. Sums both Successses and Errors.
+  thrift.upstream_resp_reply, Counter, Total responses with the "Reply" message type. Sums both Successes and Errors.
   thrift.upstream_resp_success, Counter, Total Replies that are considered "Successes".
   thrift.upstream_resp_error, Counter, Total Replies that are considered "Errors".
   thrift.upstream_resp_exception, Counter, Total responses with the "Exception" message type.

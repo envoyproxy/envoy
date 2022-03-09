@@ -21,9 +21,9 @@ The OAuth filter's flow involves:
 * Using this new grant and the :ref:`token_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.token_secret>`,
   the filter then attempts to retrieve an access token from
   the :ref:`token_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.token_endpoint>`. The filter knows it has to do this
-  instead of reinitiating another login because the incoming request has a path that matches the
+  instead of initiating another login because the incoming request has a path that matches the
   :ref:`redirect_path_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.redirect_path_matcher>` criteria.
-* Upon receiving an access token, the filter sets cookies so that subseqeuent requests can skip the full
+* Upon receiving an access token, the filter sets cookies so that subsequent requests can skip the full
   flow. These cookies are calculated using the
   :ref:`hmac_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.hmac_secret>`
   to assist in encoding.

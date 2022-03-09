@@ -100,4 +100,4 @@ includes robust :ref:`statistics <arch_overview_statistics>` support for all sub
 <https://github.com/etsy/statsd>`_ (and compatible providers) is the currently supported statistics
 sink, though plugging in a different one would not be difficult. Statistics are also viewable via
 the :ref:`administration <operations_admin_interface>` port. Envoy also supports distributed
-:ref:`tracing <arch_overview_tracing>` via thirdparty providers.
+:ref:`tracing <arch_overview_tracing>` via third-party providers.

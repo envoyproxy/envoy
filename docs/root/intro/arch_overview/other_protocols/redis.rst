@@ -22,7 +22,7 @@ The Redis project offers a thorough reference on partitioning as it relates to R
 * Hash-based partitioning.
 * Ketama distribution.
 * Detailed command statistics.
-* Active and passive healthchecking.
+* Active and passive health checking.
 * Hash tagging.
 * Prefix routing.
 * Separate downstream client and upstream server authentication.
@@ -54,10 +54,10 @@ cluster should be configured with a :ref:`custom health check
 <envoy_v3_api_field_config.core.v3.HealthCheck.custom_health_check>` which configured as a
 :ref:`Redis health checker <config_health_checkers_redis>`.
 
-If passive healthchecking is desired, also configure
+If passive health checking is desired, also configure
 :ref:`outlier detection <arch_overview_outlier_detection>`.
 
-For the purposes of passive healthchecking, connect timeouts, command timeouts, and connection
+For the purposes of passive health checking, connect timeouts, command timeouts, and connection
 close map to 5xx. All other responses from Redis are counted as a success.
 
 .. _arch_overview_redis_cluster_support:

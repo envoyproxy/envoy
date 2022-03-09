@@ -66,7 +66,7 @@ For information on how to build and/or install VPP see the getting started guide
   }
 
   buffers {
-    # Default is 16384 (8192 if running unpriviledged)
+    # Default is 16384 (8192 if running unprivileged)
     buffers-per-numa 16384
   }
 

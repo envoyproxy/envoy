@@ -255,7 +255,7 @@ Given that there are only 8 buckets, we partition the space with a gradation of
 heap usage we reset streams in the last bucket e.g. those using `>= 128MiB`. At
 :math:`85% + 1 * gradation` heap usage we reset streams in the last two buckets
 e.g. those using `>= 64MiB`, prioritizing the streams in the last bucket since
-there's a hard limit on the number of streams we can reset per invokation.
+there's a hard limit on the number of streams we can reset per invocation.
 At :math:`85% + 2 * gradation` heap usage we reset streams in the last three
 buckets e.g. those using `>= 32MiB`. And so forth as the heap usage is higher.
 

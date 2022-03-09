@@ -68,7 +68,7 @@ Create self-signed certificates for these endpoints as follows:
    were issued by a recognised certificate authority.
 
    See the :ref:`Securing Envoy quick start guide <start_quick_start_securing>` for more information about
-   :ref:`validating cerfificates <start_quick_start_securing_validation>`.
+   :ref:`validating certificates <start_quick_start_securing_validation>`.
 
 .. _install_sandboxes_tls_sni_step2:
 

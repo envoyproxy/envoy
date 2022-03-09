@@ -42,7 +42,7 @@
 * During GitHub issue triage, apply all applicable [labels](https://github.com/envoyproxy/envoy/labels)
   to each new issue. Labels are extremely useful for future issue follow up. Which labels to apply
   is somewhat subjective so just use your best judgment. A few of the most important labels that are
-  not self explanatory are:
+  not self-explanatory are:
   * **beginner**: Mark any issue that can reasonably be accomplished by a new contributor with
     this label.
   * **help wanted**: Unless it is immediately obvious that someone is going to work on an issue (and
@@ -56,16 +56,16 @@
   this should be a rare occurrence, if a serious vulnerability is found, the process may take up to
   several full days of work to implement. This reality should be taken into account when discussing
   time commitment obligations with employers.
-* In general continue to be willing to spend at least 25% of ones time working on Envoy (~1.25
+* In general continue to be willing to spend at least 25% of one's time working on Envoy (~1.25
   business days per week).
 * We currently maintain an "on-call" rotation within the maintainers. Each on-call is 1 week.
-  Although all maintainers are welcome to perform all of the above tasks, it is the on-call
+  Although all maintainers are welcome to perform all the above tasks, it is the on-call
   maintainer's responsibility to triage incoming issues/questions and marshal ongoing work
   forward. To reiterate, it is *not* the responsibility of the on-call maintainer to answer all
   questions and do all reviews, but it is their responsibility to make sure that everything is
   being actively covered by someone.
 * The on-call rotation is tracked at Opsgenie. The calendar is visible
-[here](https://calendar.google.com/calendar/embed?src=d6glc0l5rc3v235q9l2j29dgovh3dn48%40import.calendar.google.com&ctz=America%2FNew_York)
+[here](https://calendar.google.com/calendar/embed?src=d6glc0l5rc3v235q9l2j29dgovh3dn48%40import.calendar.google.com&ctz=America%2FNew_York),
 or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.com/webapi/webcal/getRecentSchedule?webcalToken=39dd1a892faa8d0d689f889b9d09ae787355ddff894396546726a5a02bac5b26&scheduleId=a3505963-c064-4c97-8865-947dfcb06060)
 
 ## Cutting a release
@@ -105,10 +105,10 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
   post.
-* Do a new PR to setup the next version
+* Do a new PR to set up the next version
   * Update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev".
   * `git mv docs/root/version_history/current.rst docs/root/version_history/v1.6.0.rst`, filling in the previous
-    release version number in the filename and delete empty sections (like Incompatible Behavior Changes, Minor Bahavior Changes, etc).
+    release version number in the filename and delete empty sections (like Incompatible Behavior Changes, Minor Behavior Changes, etc.).
     Add an entry for the new file in the `toctree` in
     [version_history.rst](docs/root/version_history/version_history.rst).
   * Create a new "current" version history file at the [release

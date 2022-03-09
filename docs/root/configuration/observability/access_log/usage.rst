@@ -381,7 +381,7 @@ The following command operators are supported:
     * **UC**: Upstream connection termination in addition to 503 response code.
     * **DI**: The request processing was delayed for a period specified via :ref:`fault injection <config_http_filters_fault_injection>`.
     * **FI**: The request was aborted with a response code specified via :ref:`fault injection <config_http_filters_fault_injection>`.
-    * **RL**: The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
+    * **RL**: The request was rate-limited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
     * **UAEX**: The request was denied by the external authorization service.
     * **RLSE**: The request was rejected because there was an error in rate limit service.
     * **IH**: The request was rejected because it set an invalid value for a
