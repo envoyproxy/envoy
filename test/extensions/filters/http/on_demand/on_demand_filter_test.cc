@@ -13,6 +13,7 @@
 #include "gtest/gtest.h"
 
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -80,7 +81,10 @@ TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButClusterIsNotAva
 TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButClusterNameIsEmpty) {
   setupWithCDS();
   Http::TestRequestHeaderMapImpl headers;
-  decoder_callbacks_.route_->route_entry_.cluster_name_ = "";
+  std::string empty_cluster_name;
+  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_, clusterName())
+      .WillOnce(ReturnRef(empty_cluster_name));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
 }
 
