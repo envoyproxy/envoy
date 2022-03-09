@@ -25,6 +25,8 @@ namespace Upstream {
 // Priority levels and localities are considered overprovisioned with this factor.
 static constexpr uint32_t kDefaultOverProvisioningFactor = 140;
 
+using HostStatusSet = std::bitset<32>;
+
 /**
  * Base class for all LB implementations.
  */
@@ -165,7 +167,7 @@ protected:
   //
   // If multiple bit fields are set, it is acceptable as long as the status of override host is in
   // any of these statuses.
-  const std::bitset<32> override_host_status_{};
+  const HostStatusSet override_host_status_{};
 
 private:
   Common::CallbackHandlePtr priority_update_cb_;
@@ -174,11 +176,11 @@ private:
 class LoadBalancerContextBase : public LoadBalancerContext {
 public:
   // A utility function to select override host from host map according to load balancer context.
-  static HostConstSharedPtr selectOverrideHost(const HostMap* host_map, std::bitset<32> status,
+  static HostConstSharedPtr selectOverrideHost(const HostMap* host_map, HostStatusSet status,
                                                LoadBalancerContext* context);
 
   // A utility function to create override host status from lb config.
-  static std::bitset<32> createOverrideHostStatus(
+  static HostStatusSet createOverrideHostStatus(
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   absl::optional<uint64_t> computeHashKey() override { return {}; }

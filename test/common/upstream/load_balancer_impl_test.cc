@@ -65,10 +65,9 @@ public:
 
 namespace {
 
-static constexpr std::bitset<32> UnhealthyStatus = 1u
-                                                   << static_cast<size_t>(Host::Health::Unhealthy);
-static constexpr std::bitset<32> DegradedStatus = 1u << static_cast<size_t>(Host::Health::Degraded);
-static constexpr std::bitset<32> HealthyStatus = 1u << static_cast<size_t>(Host::Health::Healthy);
+static constexpr HostStatusSet UnhealthyStatus = 1u << static_cast<size_t>(Host::Health::Unhealthy);
+static constexpr HostStatusSet DegradedStatus = 1u << static_cast<size_t>(Host::Health::Degraded);
+static constexpr HostStatusSet HealthyStatus = 1u << static_cast<size_t>(Host::Health::Healthy);
 
 class LoadBalancerTestBase : public Event::TestUsingSimulatedTime,
                              public testing::TestWithParam<bool> {
@@ -2626,7 +2625,7 @@ TEST(LoadBalancerContextBaseTest, LoadBalancerContextBaseTest) {
 TEST(LoadBalancerContextBaseTest, SelectOverrideHostTest) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
 
-  const std::bitset<32> all_health_statuses = UnhealthyStatus | DegradedStatus | HealthyStatus;
+  const HostStatusSet all_health_statuses = UnhealthyStatus | DegradedStatus | HealthyStatus;
 
   {
     // No valid host map.

@@ -515,9 +515,9 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   return false;
 }
 
-std::bitset<32> LoadBalancerContextBase::createOverrideHostStatus(
+HostStatusSet LoadBalancerContextBase::createOverrideHostStatus(
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) {
-  std::bitset<32> override_host_status;
+  HostStatusSet override_host_status;
 
   if (!common_config.has_override_host_status()) {
     // No override host status and 'Healthy' and 'Degraded' will be applied by default.
@@ -547,7 +547,7 @@ std::bitset<32> LoadBalancerContextBase::createOverrideHostStatus(
 }
 
 HostConstSharedPtr LoadBalancerContextBase::selectOverrideHost(const HostMap* host_map,
-                                                               std::bitset<32> status,
+                                                               HostStatusSet status,
                                                                LoadBalancerContext* context) {
   if (context == nullptr) {
     return nullptr;

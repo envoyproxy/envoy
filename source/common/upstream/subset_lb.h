@@ -14,6 +14,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #include "absl/container/node_hash_map.h"
@@ -298,7 +299,7 @@ private:
 
   TimeSource& time_source_;
 
-  const std::bitset<32> override_host_status_{};
+  const HostStatusSet override_host_status_{};
 
   friend class SubsetLoadBalancerDescribeMetadataTester;
 };

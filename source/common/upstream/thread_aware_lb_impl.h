@@ -140,7 +140,7 @@ private:
 
     ClusterStats& stats_;
     Random::RandomGenerator& random_;
-    std::bitset<32> override_host_status_{};
+    HostStatusSet override_host_status_{};
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_;
     std::shared_ptr<DegradedLoad> degraded_per_priority_load_;
@@ -151,7 +151,7 @@ private:
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
     LoadBalancerFactoryImpl(ClusterStats& stats, Random::RandomGenerator& random,
-                            std::bitset<32> status)
+                            HostStatusSet status)
         : stats_(stats), random_(random), override_host_status_(status) {}
 
     // Upstream::LoadBalancerFactory
@@ -159,7 +159,7 @@ private:
 
     ClusterStats& stats_;
     Random::RandomGenerator& random_;
-    std::bitset<32> override_host_status_{};
+    HostStatusSet override_host_status_{};
     absl::Mutex mutex_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_ ABSL_GUARDED_BY(mutex_);
     // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriority can be reused.
