@@ -120,10 +120,13 @@ bool InstanceImplWin32::directoryExists(const std::string& path) {
 }
 
 ssize_t InstanceImplWin32::fileSize(const std::string& path) {
-  auto fd = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, NULL);
+  // In integration test, an empty file is created, and then when we check whether some logs are
+  // printed into the file, CreateFileA will fail and report the error:"The process cannot access
+  // the file because it is being used by another proces". Add FILE_SHARE_DELETE flag to avoid such
+  // issue.
+  auto fd = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, 0,
+                        OPEN_EXISTING, 0, NULL);
   if (fd == INVALID_HANDLE) {
-    auto last_error = ::GetLastError();
-    printf("last_error: %s\n", errorDetails(last_error).c_str());
     return -1;
   }
   ssize_t result = 0;
@@ -131,8 +134,6 @@ ssize_t InstanceImplWin32::fileSize(const std::string& path) {
   BOOL bGetSize = GetFileSizeEx(fd, &lFileSize);
   CloseHandle(fd);
   if (!bGetSize) {
-    auto last_error = ::GetLastError();
-    printf("last_error_1: %s\n", errorDetails(last_error).c_str());
     return -1;
   }
   result += lFileSize.QuadPart;
