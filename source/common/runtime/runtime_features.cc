@@ -77,6 +77,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 // TODO(alyssar) flip false once issue complete.
 FALSE_RUNTIME_GUARD(envoy_restart_features_no_runtime_singleton);
+// TODO(kbaichoo): Make this enabled by default when fairness and chunking
+// are implemented, and we've had more cpu time.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT
