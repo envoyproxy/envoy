@@ -30,7 +30,7 @@ Contributing to Envoy Mobile is fun! To get started:
 
 ## Community Meeting
 
-The Envoy mobile team meets weekly on Tuesday at 11am PT. The meeting and zoom link are on the
+The Envoy mobile team meets weekly on Thursday at 11am PT. The meeting and zoom link are on the
 Envoy calendar [here](https://goo.gl/PkDijT)
 
 * Meeting minutes are [here](https://docs.google.com/document/d/1T5qNoUxh80HkCia7XXxUCC8CFs9W6UVx6S5r7n688Ns)
