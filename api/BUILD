@@ -287,9 +287,9 @@ proto_library(
     name = "cncf_protos",
     visibility = ["//visibility:public"],
     deps = [
-      "@com_github_cncf_udpa//xds/core/v3:pkg",
-      "@com_github_cncf_udpa//xds/type/matcher/v3:pkg",
-      "@com_github_cncf_udpa//xds/type/v3:pkg",
+        "@com_github_cncf_udpa//xds/core/v3:pkg",
+        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg",
+        "@com_github_cncf_udpa//xds/type/v3:pkg",
     ],
 )
 
