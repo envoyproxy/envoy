@@ -951,7 +951,7 @@ def _emscripten_toolchain():
             ".emscripten_sanity",
         ]),
         patch_cmds = [
-            "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 3.1.1 && ./emsdk activate --embedded 3.1.1; fi",
+            "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 3.1.7 && ./emsdk activate --embedded 3.1.7; fi",
         ],
     )
 
