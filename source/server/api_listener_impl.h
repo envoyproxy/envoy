@@ -160,8 +160,9 @@ protected:
         IS_ENVOY_BUG("Unexpected function call");
         return false;
       }
-      absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; };
+      absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; }
       void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
+      absl::optional<uint64_t> congestionWindowInBytes() const override { return {}; }
       // ScopeTrackedObject
       void dumpState(std::ostream& os, int) const override { os << "SyntheticConnection"; }
 

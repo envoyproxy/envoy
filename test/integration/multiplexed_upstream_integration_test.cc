@@ -341,6 +341,15 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRando
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     return;
   }
+
+  if (GetParam().defer_processing_backedup_streams) {
+    // TODO(kbaichoo): fix this test to work with deferred processing by using a
+    // timer to lower the watermark when the filter has raised above watermark.
+    // Since we deferred processing data, when the filter raises watermark
+    // with deferred processing we won't invoke it again which could lower
+    // the watermark.
+    return;
+  }
   config_helper_.prependFilter(R"EOF(
   name: random-pause-filter
   typed_config:

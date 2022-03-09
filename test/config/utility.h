@@ -153,6 +153,11 @@ public:
   buildStaticCluster(const std::string& name, int port, const std::string& address,
                      const std::string& lb_policy = "ROUND_ROBIN");
 
+  static envoy::config::cluster::v3::Cluster
+  buildH1ClusterWithHighCircuitBreakersLimits(const std::string& name, int port,
+                                              const std::string& address,
+                                              const std::string& lb_policy = "ROUND_ROBIN");
+
   // ADS configurations
   static envoy::config::cluster::v3::Cluster
   buildCluster(const std::string& name, const std::string& lb_policy = "ROUND_ROBIN");
@@ -317,7 +322,7 @@ public:
   void skipPortUsageValidation() { skip_port_usage_validation_ = true; }
 
   // Add this key value pair to the static runtime.
-  void addRuntimeOverride(const std::string& key, const std::string& value);
+  void addRuntimeOverride(absl::string_view key, absl::string_view value);
 
   // Add typed_filter_metadata to the first listener.
   void addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value);
