@@ -44,7 +44,7 @@ public:
     return std::chrono::time_point_cast<std::chrono::milliseconds>(edf_lb.latest_host_added_time_)
         .time_since_epoch();
   }
-  static double slowStartMinWeightPercent(EdfLoadBalancerBase& edf_lb) {
+  static double slowStartMinWeightPercent(const EdfLoadBalancerBase& edf_lb) {
     return edf_lb.slow_start_min_weight_percent_;
   }
 };
