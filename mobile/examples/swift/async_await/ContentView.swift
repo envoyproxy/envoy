@@ -75,7 +75,9 @@ private extension StreamClient {
                 let allHeaders = headers.allHeaders()
 
                 if allHeaders[":status"]?.first == "200",
-                   let contentLengthValue = allHeaders["Content-Length"],
+                   // TODO(jpsim): Expose an API that enforces case-insensitive lookups
+                   let contentLengthValue = allHeaders["Content-Length"] ??
+                                            allHeaders["content-length"],
                    let firstContentLength = contentLengthValue.first,
                    let contentLengthInt = Int64(firstContentLength)
                 {
