@@ -486,7 +486,7 @@ message Cluster {
   }
 
   // Common configuration for all load balancer implementations.
-  // [#next-free-field: 8]
+  // [#next-free-field: 9]
   message CommonLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.CommonLbConfig";
@@ -595,6 +595,14 @@ message Cluster {
 
     // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
     ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
+
+    // This controls what hosts are considered valid when using
+    // :ref:`host overrides <arch_overview_load_balancing_override_host>`, which is used by some
+    // filters to modify the load balancing decision.
+    //
+    // If this is unset then [UNKNOWN, HEALTHY, DEGRADED] will be applied by default. If this is
+    // set with an empty set of statuses then host overrides will be ignored by the load balancing.
+    core.v3.HealthStatusSet override_host_status = 8;
   }
 
   message RefreshRate {

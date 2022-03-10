@@ -134,6 +134,36 @@ TEST_P(ValidationServerTest, NoopLifecycleNotifier) {
   server.shutdown();
 }
 
+// A test to increase coverage of dummy methods (naively implemented methods
+// needed for interface implementation).
+TEST_P(ValidationServerTest, DummyMethodsTest) {
+  // Setup the server instance.
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  ValidationInstance server(options_, time_system.timeSystem(),
+                            Network::Address::InstanceConstSharedPtr(), stats_store,
+                            access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                            Filesystem::fileSystemForTest());
+
+  // Execute dummy methods.
+  server.drainListeners();
+  server.failHealthcheck(true);
+  server.lifecycleNotifier();
+  server.secretManager();
+  EXPECT_FALSE(server.isShutdown());
+  EXPECT_FALSE(server.healthCheckFailed());
+  server.grpcContext();
+  EXPECT_FALSE(server.processContext().has_value());
+  server.timeSource();
+  server.mutexTracer();
+  server.flushStats();
+  server.statsConfig();
+  server.transportSocketFactoryContext();
+  server.shutdownAdmin();
+  server.shutdown();
+}
+
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against
 // all the example configs) but can't until light validation is implemented, mocking out access to
 // the filesystem for TLS certs, etc. In the meantime, these are the example configs that work
