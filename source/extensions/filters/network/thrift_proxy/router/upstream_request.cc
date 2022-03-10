@@ -1,4 +1,3 @@
-
 #include "source/extensions/filters/network/thrift_proxy/router/upstream_request.h"
 
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
