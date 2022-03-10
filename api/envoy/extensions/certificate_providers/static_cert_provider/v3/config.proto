@@ -15,11 +15,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Static Certificate Provider]
 // [#extension: envoy.cert_providers.static_cert_provider]
 
-// A StaticCertificateProvider provides static TLS identity certificate
+// A StaticCertificateProvider provides one static TLS identity certpair,
+// one CA certpair and one trust ca cert
 // [#extension-category: envoy.cert_providers]
 
 message StaticCertificateProviderConfig {
-  config.core.v3.DataSource certificate = 1;
-
-  config.core.v3.DataSource private_key = 2;
+  config.core.v3.DataSource identity_cert = 1;
+  config.core.v3.DataSource identity_key = 2;
+  config.core.v3.DataSource ca_cert = 3;
+  config.core.v3.DataSource ca_key = 4;
+  config.core.v3.DataSource trust_ca = 5;
 }

@@ -18,17 +18,15 @@ class CertificateProviderManagerImpl : public CertificateProviderManager {
 public:
   CertificateProviderManagerImpl(Api::Api& api);
 
-  void addCertificateProvider(std::string name,
+  void addCertificateProvider(absl::string_view name,
                               const envoy::config::core::v3::TypedExtensionConfig& config) override;
 
-  CertificateProviderSharedPtr getCertificateProvider(std::string name) override;
+  CertificateProviderSharedPtr getCertificateProvider(absl::string_view name) override;
 
 private:
   absl::flat_hash_map<std::string, CertificateProviderSharedPtr> certificate_provider_instances_;
   Api::Api& api_;
 };
-
-using CertificateProviderManagerPtr = std::unique_ptr<CertificateProviderManager>;
 
 } // namespace CertificateProvider
 } // namespace Envoy

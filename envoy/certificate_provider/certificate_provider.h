@@ -11,7 +11,6 @@
 
 namespace Envoy {
 namespace CertificateProvider {
-
 struct Certpair {
   const std::string& certificate_;
   const std::string& private_key_;
@@ -24,16 +23,20 @@ class CertificateSubscriptionCallbacks {
 public:
   virtual ~CertificateSubscriptionCallbacks() = default;
 
+  /* Called when the certpairs update of cert name is received */
   virtual void onCertpairsUpdated(absl::string_view cert_name, std::list<Certpair> certpairs) PURE;
+  /* Called when the ca cert update of cert name is received */
   virtual void onCACertUpdated(absl::string_view cert_name, const std::string cert) PURE;
+  /* Called when the subscription is unable to fetch the update or
+   * onCertpairsUpdated/onCACertUpdated throws the exception */
   virtual void onUpatedFail() PURE;
 };
 
 class CertificateProvider {
 public:
   struct Capabilites {
-    /* whether or not a provider provides a ca cert directly */
-    bool provide_ca_cert = false;
+    /* whether or not a provider provides a trusted ca cert for validation */
+    bool provide_trusted_ca = false;
 
     /* whether or not a provider providers ca certpairs for issuer */
     bool provide_ca_certpairs = false;
@@ -57,9 +60,9 @@ public:
   virtual const std::string& caCert(absl::string_view cert_name) const PURE;
 
   /**
-   * @return CertPairs, identity certpairs used for TLS handshake
+   * @return CertPairs, identity certpairs or ca certpairs
    */
-  virtual std::list<Certpair> certPairs(absl::string_view cert_name) PURE;
+  virtual std::list<Certpair> certPairs(absl::string_view cert_name, bool generate) PURE;
 
   /**
    * Add certificate update callback into certificate provider for asychronous usage.

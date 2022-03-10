@@ -4,35 +4,42 @@
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/certificate_providers/static_cert_provider/v3/config.pb.h"
 
+#include "source/common/common/callback_impl.h"
 #include "source/extensions/certificate_providers/factory.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace CertificateProviders {
 
-class StaticCertificateProvider : public CertificateProvider::CertificateProvider {
+class StaticCertificateProvider : public CertificateProvider::CertificateProvider,
+                                  public CertificateProvider::CertificateSubscriptionCallbacks {
 public:
   StaticCertificateProvider(const envoy::config::core::v3::TypedExtensionConfig& config,
                             Api::Api& api);
 
   Capabilites capabilities() const override { return capabilities_; };
 
-  const std::string& caCert(absl::string_view /*cert_name*/) const override { return ca_cert_; };
+  const std::string& caCert(absl::string_view /*cert_name*/) const override { return trust_ca_; };
 
-  std::list<Envoy::CertificateProvider::Certpair>
-  certPairs(absl::string_view /*cert_name*/) override {
-    return cert_pairs_;
-  };
+  std::list<Envoy::CertificateProvider::Certpair> certPairs(absl::string_view cert_name,
+                                                            bool generate) override;
 
-  Common::CallbackHandlePtr addUpdateCallback(absl::string_view /*cert_name*/,
-                                              std::function<void()> /*callback*/) override {
-    return nullptr;
-  }
+  Common::CallbackHandlePtr addUpdateCallback(absl::string_view cert_name,
+                                              std::function<void()> callback) override;
+
+  void onCertpairsUpdated(absl::string_view cert_name,
+                          std::list<Envoy::CertificateProvider::Certpair> certpairs) override;
+  void onCACertUpdated(absl::string_view /*cert_name*/, const std::string /*cert*/) override{};
+  void onUpatedFail() override{};
+
+  void generateCertpair(absl::string_view cert_name);
 
 private:
   Capabilites capabilities_;
-  const std::string ca_cert_;
-  std::list<Envoy::CertificateProvider::Certpair> cert_pairs_;
+  std::string trust_ca_;
+  absl::flat_hash_map<absl::string_view, std::list<Envoy::CertificateProvider::Certpair>>
+      cert_pairs_;
+  absl::flat_hash_map<absl::string_view, Common::CallbackManager<>> update_callback_managers_;
 };
 
 class StaticCertificateProviderFactory : public CertificateProviderFactory {

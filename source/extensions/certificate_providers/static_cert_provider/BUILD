@@ -13,6 +13,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
+        "//source/common/common:callback_impl_lib",
         "//source/common/config:datasource_lib",
         "//source/common/config:utility_lib",
         "//source/extensions/certificate_providers:certificate_provider_factory_lib",

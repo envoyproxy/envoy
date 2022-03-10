@@ -17,10 +17,10 @@ public:
   virtual ~CertificateProviderManager() = default;
 
   virtual void
-  addCertificateProvider(std::string name,
+  addCertificateProvider(absl::string_view name,
                          const envoy::config::core::v3::TypedExtensionConfig& config) PURE;
 
-  virtual CertificateProviderSharedPtr getCertificateProvider(std::string name) PURE;
+  virtual CertificateProviderSharedPtr getCertificateProvider(absl::string_view name) PURE;
 };
 
 using CertificateProviderManagerPtr = std::unique_ptr<CertificateProviderManager>;

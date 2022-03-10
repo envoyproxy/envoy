@@ -10,9 +10,6 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "certificate_provider_factory_lib",
-    srcs = [
-        "factory.cc",
-    ],
     hdrs = [
         "factory.h",
     ],
