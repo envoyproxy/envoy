@@ -48,7 +48,7 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(
   if (config.google_re2().has_max_program_size()) {
     const uint32_t max_program_size =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.google_re2(), max_program_size, 100);
-    if (regex_program_size > max_program_size) {
+    if (max_program_size > 0 && regex_program_size > max_program_size) {
       throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
                                        "{}. Increase configured max program size if necessary.",
                                        config.regex(), regex_program_size, max_program_size));
