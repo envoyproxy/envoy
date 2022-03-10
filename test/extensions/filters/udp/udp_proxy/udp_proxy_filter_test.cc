@@ -361,12 +361,17 @@ public:
 TEST_F(UdpProxyFilterTest, BasicFlow) {
   InSequence s;
 
-  setup(readConfig(R"EOF(
+  const std::string access_log_format = 
+  "%UDP_DOWNSTREAM_BYTES_RECEIVED% %UDP_DOWNSTREAM_DATAGRAMS_RECEIVED% "
+  "%UDP_DOWNSTREAM_BYTES_SENT% %UDP_DOWNSTREAM_DATAGRAMS_SENT% "
+  "%UDP_DOWNSTREAM_SESS_TOTAL%";
+
+  setup(accessLogConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
 upstream_socket_config:
   prefer_gro: false
-  )EOF"),
+  )EOF", access_log_format),
         true, false);
 
   expectSessionCreate(upstream_address_);
@@ -389,6 +394,9 @@ upstream_socket_config:
   checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 11 /*tx_bytes*/, 2 /*tx_datagrams*/);
   test_sessions_[0].recvDataFromUpstream("world3");
   checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 17 /*tx_bytes*/, 3 /*tx_datagrams*/);
+
+  filter_.reset();
+  EXPECT_EQ(access_log_data_.value(), "17 3 17 3 1");
 }
 
 // Idle timeout flow.
