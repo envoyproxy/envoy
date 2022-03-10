@@ -7,7 +7,7 @@ namespace Extensions {
 namespace Matching {
 namespace InputMatchers {
 namespace Hyperscan {
-ScratchThreadLocal::ScratchThreadLocal(hs_database_t* database) {
+ScratchThreadLocal::ScratchThreadLocal(const hs_database_t* database) {
   hs_error_t err = hs_alloc_scratch(database, &scratch_);
   if (err != HS_SUCCESS) {
     throw EnvoyException(fmt::format("unable to allocate scratch space, error code {}.", err));

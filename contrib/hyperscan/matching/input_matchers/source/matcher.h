@@ -14,7 +14,7 @@ namespace InputMatchers {
 namespace Hyperscan {
 
 struct ScratchThreadLocal : public ThreadLocal::ThreadLocalObject {
-  explicit ScratchThreadLocal(hs_database_t* database);
+  explicit ScratchThreadLocal(const hs_database_t* database);
   ~ScratchThreadLocal() override { hs_free_scratch(scratch_); }
   hs_scratch_t* scratch_{};
 };
