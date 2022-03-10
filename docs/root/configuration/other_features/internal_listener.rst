@@ -31,7 +31,7 @@ Below is a smallest static config that redirect tcp_proxy on port 19000 to the t
 Real world use cases
 --------------------
 
-Encap HTTP GET requests in a HTTP CONNECT request 
+Encap HTTP GET requests in a HTTP CONNECT request
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Currently Envoy :ref:`HTTP connection manager <config_http_conn_man>`
