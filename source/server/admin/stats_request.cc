@@ -48,7 +48,7 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
         startPhase();
         break;
       case Phase::Histograms:
-        render_->render(response);
+        render_->finalize(response);
         return false;
       }
     }
@@ -93,7 +93,7 @@ void StatsRequest::startPhase() {
   }
 
   // Populate stat_map with all the counters found in all the scopes with an
-  // empty prefix.
+  // empty prefix. This is needed to seed the iteration for the current phase.
   auto iter = stat_map_.find("");
   if (iter != stat_map_.end()) {
     StatOrScopes variant = std::move(iter->second);

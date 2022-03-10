@@ -37,7 +37,7 @@ void StatsTextRender::generate(Buffer::Instance& response, const std::string& na
   }
 }
 
-void StatsTextRender::render(Buffer::Instance&) {}
+void StatsTextRender::finalize(Buffer::Instance&) {}
 
 // Computes disjoint buckets as text and adds them to the response buffer.
 void StatsTextRender::addDisjointBuckets(const std::string& name,
@@ -133,9 +133,9 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
   }
 }
 
-// Since histograms are buffered (see above), the render() method generates
+// Since histograms are buffered (see above), the finalize() method generates
 // all of them.
-void StatsJsonRender::render(Buffer::Instance& response) {
+void StatsJsonRender::finalize(Buffer::Instance& response) {
   if (!stats_array_.empty()) {
     flushStats(response);
   }
@@ -194,7 +194,7 @@ void StatsJsonRender::flushStats(Buffer::Instance& response) {
 
   // We are going to wind up with multiple flushes which have to serialize as
   // a single array, rather than a concatenation of multiple arrays, so we add
-  // those in the constructor and render() method, strip off the "[" and "]"
+  // those in the constructor and finalize() method, strip off the "[" and "]"
   // from each buffered serialization.
   ASSERT(json_array.size() >= 2);
   ASSERT(json_array[0] == '[');

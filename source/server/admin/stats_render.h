@@ -31,7 +31,7 @@ public:
                         const Stats::ParentHistogram& histogram) PURE;
 
   // Completes rendering any buffered data.
-  virtual void render(Buffer::Instance& response) PURE;
+  virtual void finalize(Buffer::Instance& response) PURE;
 
   // Determines whether the current chunk is full.
   bool isChunkFull(Buffer::Instance& response) { return response.length() > ChunkSize; }
@@ -52,7 +52,7 @@ public:
                 const std::string& value) override;
   void generate(Buffer::Instance& response, const std::string& name,
                 const Stats::ParentHistogram& histogram) override;
-  void render(Buffer::Instance&) override;
+  void finalize(Buffer::Instance&) override;
 
 private:
   // Computes disjoint buckets as text and adds them to the response buffer.
@@ -74,7 +74,7 @@ public:
                 const std::string& value) override;
   void generate(Buffer::Instance&, const std::string& name,
                 const Stats::ParentHistogram& histogram) override;
-  void render(Buffer::Instance& response) override;
+  void finalize(Buffer::Instance& response) override;
 
 private:
   // Collects a scalar metric (text-readout, counter, or gauge) into an array of

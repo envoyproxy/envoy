@@ -16,6 +16,14 @@ class StatsRequest : public Admin::Request {
   using ScopeVec = std::vector<Stats::ConstScopeSharedPtr>;
   using StatOrScopes = absl::variant<ScopeVec, Stats::TextReadoutSharedPtr, Stats::CounterSharedPtr,
                                      Stats::GaugeSharedPtr, Stats::HistogramSharedPtr>;
+
+  // In order to keep the output consistent with the fully buffered behavior
+  // prior to the chunked implementation that buffered each type, we iterate
+  // over all scopes for each type. This enables the complex chunking
+  // implementation to pass the tests that capture the buffered behavior. There
+  // is not a significant cost to this, but in a future PR we may choose to
+  // co-mingle the types. Note that histograms are groups together in the data
+  // JSON data model, so we won't be able to fully co-mingle.
   enum class Phase {
     TextReadouts,
     CountersAndGauges,

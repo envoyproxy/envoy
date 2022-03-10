@@ -32,7 +32,7 @@ protected:
   template <class T>
   std::string render(StatsRender& render, absl::string_view name, const T& value) {
     render.generate(response_, std::string(name), value);
-    render.render(response_);
+    render.finalize(response_);
     return response_.toString();
   }
 
