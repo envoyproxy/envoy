@@ -358,7 +358,7 @@ void HttpIntegrationTest::initialize() {
   config_helper_.addQuicDownstreamTransportSocketConfig();
 
   BaseIntegrationTest::initialize();
-  registerTestServerPorts({"http"});
+  registerTestServerPorts({"http"}, test_server_);
 
   // Needs to outlive all QUIC connections.
   auto quic_connection_persistent_info =
