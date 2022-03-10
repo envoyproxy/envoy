@@ -8,6 +8,7 @@ envoy_package()
 envoy_mobile_android_test(
     name = "net_tests",
     srcs = [
+        "BrotliTest.java",
         "CronetEngineBuilderTest.java",
         "CronetStressTest.java",
         "DiskStorageTest.java",
