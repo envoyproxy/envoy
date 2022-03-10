@@ -20,6 +20,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // The matcher follows PCRE pattern syntax, and the regex string must adhere to the documented
 // `pattern support <https://intel.github.io/hyperscan/dev-reference/compilation.html#pattern-support>`_.
+// The syntax is not compatible with the default RE2 regex matcher. Depending on configured expressions,
+// swapping regex matcher may cause match rules to no longer be valid.
 message Hyperscan {
   // [#next-free-field: 14]
   message Regex {
