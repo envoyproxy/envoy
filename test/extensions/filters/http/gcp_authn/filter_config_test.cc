@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace GcpAuthentication {
+namespace GcpAuthn {
 namespace {
 
 using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
@@ -52,7 +52,7 @@ TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithCorrectProto) {
 }
 
 } // namespace
-} // namespace GcpAuthentication
+} // namespace GcpAuthn
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

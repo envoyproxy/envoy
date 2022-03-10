@@ -8,91 +8,15 @@
 #include "source/common/http/message_impl.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-#include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
+#include "source/extensions/filters/http/gcp_authn/gcp_authn_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace GcpAuthentication {
-
-using Server::Configuration::FactoryContext;
+namespace GcpAuthn {
 
 using FilterConfigProtoSharedPtr =
     std::shared_ptr<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>;
-
-Http::RequestMessagePtr buildRequest(const std::string& method, const std::string& server_url);
-
-/**
- * Possible async results for a fetchToken call.
- */
-enum class ResponseStatus {
-  //
-  OK,
-  // The gcp authentication service could not be queried.
-  Error,
-};
-
-/**
- * Async callbacks used during fetchToken() calls.
- */
-class RequestCallbacks {
-public:
-  virtual ~RequestCallbacks() = default;
-
-  /**
-   * Called on completion of request.
-   *
-   * @param status the status of the request.
-   */
-  virtual void onComplete(ResponseStatus status) PURE;
-};
-
-class GcpAuthnClient : public Http::AsyncClient::Callbacks,
-                       public Logger::Loggable<Logger::Id::init> {
-public:
-  GcpAuthnClient(
-      const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
-      FactoryContext& context)
-      : config_(config), context_(context) {}
-
-  // TODO(tyxia) Copy Move constructor
-  ~GcpAuthnClient() override {
-    if (active_request_) {
-      active_request_->cancel();
-      active_request_ = nullptr;
-    }
-  }
-
-  void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
-
-  void fetchToken(RequestCallbacks& callbacks);
-
-  void cancel() {
-    if (active_request_) {
-      active_request_->cancel();
-    }
-  }
-
-  // Http::AsyncClient::Callbacks implemented by this class.
-  void onSuccess(const Http::AsyncClient::Request& request,
-                 Http::ResponseMessagePtr&& response) override;
-  void onFailure(const Http::AsyncClient::Request& request,
-                 Http::AsyncClient::FailureReason reason) override;
-
-private:
-  void handleFailure();
-  // TODO(tyxia) Any missing const??
-  void resetRequest() {
-    if (active_request_) {
-      active_request_->cancel();
-      active_request_ = nullptr;
-    }
-  }
-  envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig config_;
-  Server::Configuration::FactoryContext& context_;
-  Http::AsyncClient::Request* active_request_{};
-  RequestCallbacks* callbacks_{};
-};
 
 class GcpAuthnFilter : public Http::PassThroughFilter,
                        public RequestCallbacks,
@@ -100,7 +24,7 @@ class GcpAuthnFilter : public Http::PassThroughFilter,
 public:
   GcpAuthnFilter(
       const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
-      FactoryContext& context)
+      Server::Configuration::FactoryContext& context)
       : filter_config_(
             std::make_shared<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>(
                 config)),
@@ -109,15 +33,9 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
 
-  void onDestroy() override {
-    if (state_ == State::Calling) {
-      state_ = State::Complete;
-      // TODO(tyxia) Why this is inside
-      client_->cancel();
-    }
-  }
+  void onDestroy() override;
 
-  void onComplete(ResponseStatus status) override;
+  void onComplete(ResponseStatus, const Http::ResponseMessage* response) override;
   ~GcpAuthnFilter() override = default;
 
 private:
@@ -135,7 +53,7 @@ private:
   State state_{State::NotStarted};
 };
 
-} // namespace GcpAuthentication
+} // namespace GcpAuthn
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

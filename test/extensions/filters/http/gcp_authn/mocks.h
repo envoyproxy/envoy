@@ -12,11 +12,11 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace GcpAuthentication {
+namespace GcpAuthn {
 
-// error: constructor for 'Envoy::Extensions::HttpFilters::GcpAuthentication::MockGcpAuthnClient'
+// error: constructor for 'Envoy::Extensions::HttpFilters::GcpAuthn::MockGcpAuthnClient'
 // must explicitly initialize the base class
-// 'Envoy::Extensions::HttpFilters::GcpAuthentication::GcpAuthnClient' which does not have a default
+// 'Envoy::Extensions::HttpFilters::GcpAuthn::GcpAuthnClient' which does not have a default
 // constructor MockGcpAuthnClient(Server::Configuration::MockFactoryContext&,
 // class MockGcpAuthnClient : public GcpAuthnClient {
 // public:
@@ -37,11 +37,13 @@ public:
   MockRequestCallbacks() = default;
   ~MockRequestCallbacks() override = default;
 
-  void onComplete(ResponseStatus status) override { onComplete_(status); }
-  MOCK_METHOD(void, onComplete_, (ResponseStatus status));
+  void onComplete(ResponseStatus status, const Http::ResponseMessage* response) override {
+    onComplete_(status, response);
+  }
+  MOCK_METHOD(void, onComplete_, (ResponseStatus status, const Http::ResponseMessage* response));
 };
 
-} // namespace GcpAuthentication
+} // namespace GcpAuthn
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

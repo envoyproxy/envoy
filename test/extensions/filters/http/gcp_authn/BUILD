@@ -33,8 +33,8 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.gcp_authn"],
     deps = [
         ":gcp_authn_mocks",
+        "//source/extensions/filters/http/gcp_authn",
         "//source/extensions/filters/http/gcp_authn:config",
-        "//source/extensions/filters/http/gcp_authn:gcp_authn_lib",
         "//test/common/http:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
@@ -49,7 +49,7 @@ envoy_extension_cc_mock(
     hdrs = ["mocks.h"],
     extension_names = ["envoy.filters.http.gcp_authn"],
     deps = [
-        "//source/extensions/filters/http/gcp_authn:gcp_authn_lib",
+        "//source/extensions/filters/http/gcp_authn",
         "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
     ],
 )

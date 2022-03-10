@@ -7,12 +7,13 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace GcpAuthentication {
+namespace GcpAuthn {
 
 using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
 
 Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
-    const GcpAuthnFilterConfig& config, const std::string&, FactoryContext& context) {
+    const GcpAuthnFilterConfig& config, const std::string&,
+    Server::Configuration::FactoryContext& context) {
   return [config, &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<GcpAuthnFilter>(config, context));
   };
@@ -23,7 +24,7 @@ Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
  */
 REGISTER_FACTORY(GcpAuthnFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
-} // namespace GcpAuthentication
+} // namespace GcpAuthn
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
