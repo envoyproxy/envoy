@@ -360,7 +360,7 @@ void HttpIntegrationTest::initialize() {
   registerTestServerPorts({"http"}, test_server_);
 
   // Needs to outlive all QUIC connections.
-  std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   auto quic_connection_persistent_info =
       Quic::createPersistentQuicInfoForCluster(*dispatcher_, *cluster);
   // Config IETF QUIC flow control window.
