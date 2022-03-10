@@ -3,6 +3,7 @@ package org.chromium.net.impl;
 import static io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
 
 import android.content.Context;
+import androidx.annotation.VisibleForTesting;
 import io.envoyproxy.envoymobile.engine.AndroidEngineImpl;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitor;
@@ -15,6 +16,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +27,24 @@ import org.chromium.net.ICronetEngineBuilder;
  * Implementation of {@link ICronetEngineBuilder} that builds native Cronet engine.
  */
 public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
+
+  private static final String BROTLI_CONFIG =
+      "\n"
+      +
+      "              \"@type\": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor\n"
+      + "              decompressor_library:\n"
+      + "                name: text_optimized\n"
+      + "                typed_config:\n"
+      +
+      "                  \"@type\": type.googleapis.com/envoy.extensions.compression.brotli.decompressor.v3.Brotli\n"
+      + "              request_direction_config:\n"
+      + "                common_config:\n"
+      + "                  enabled:\n"
+      + "                    default_value: false\n"
+      + "                    runtime_key: request_decompressor_enabled\n"
+      + "              response_direction_config:\n"
+      + "                common_config:\n"
+      + "                  ignore_no_transform_header: true\n";
 
   private final EnvoyLogger mEnvoyLogger = null;
   private final EnvoyEventTracker mEnvoyEventTracker = null;
@@ -51,9 +71,6 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private String mAppId = "unspecified";
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private String mVirtualClusters = "[]";
-  private List<EnvoyHTTPFilterFactory> mPlatformFilterChain = Collections.emptyList();
-  private List<EnvoyNativeFilterConfig> mNativeFilterChain = Collections.emptyList();
-  private Map<String, EnvoyStringAccessor> mStringAccessors = Collections.emptyMap();
 
   /**
    * Builder for Native Cronet Engine. Default config enables SPDY, disables QUIC and HTTP cache.
@@ -61,6 +78,17 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
    * @param context Android {@link Context} for engine to use.
    */
   public NativeCronetEngineBuilderImpl(Context context) { super(context); }
+
+  /**
+   * Indicates to skip the TLS certificate verification.
+   *
+   * @return the builder to facilitate chaining.
+   */
+  @VisibleForTesting
+  public CronetEngineBuilderImpl setMockCertVerifierForTesting() {
+    mTrustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED;
+    return this;
+  }
 
   @Override
   public ExperimentalCronetEngine build() {
@@ -80,6 +108,13 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   }
 
   private EnvoyConfiguration createEnvoyConfiguration() {
+    List<EnvoyHTTPFilterFactory> platformFilterChain = Collections.emptyList();
+    List<EnvoyNativeFilterConfig> nativeFilterChain = new ArrayList<>();
+    Map<String, EnvoyStringAccessor> stringAccessors = Collections.emptyMap();
+    if (brotliEnabled()) {
+      nativeFilterChain.add(
+          new EnvoyNativeFilterConfig("envoy.filters.http.decompressor", BROTLI_CONFIG));
+    }
     return new EnvoyConfiguration(
         mAdminInterfaceEnabled, mGrpcStatsDomain, mStatsDPort, mConnectTimeoutSeconds,
         mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax,
@@ -87,7 +122,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
         mEnableDnsFilterUnroutableFamilies, mEnableHappyEyeballs, mEnableInterfaceBinding,
         mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
         mH2RawDomains, mStatsFlushSeconds, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds,
-        mAppVersion, mAppId, mTrustChainVerification, mVirtualClusters, mNativeFilterChain,
-        mPlatformFilterChain, mStringAccessors);
+        mAppVersion, mAppId, mTrustChainVerification, mVirtualClusters, nativeFilterChain,
+        platformFilterChain, stringAccessors);
   }
 }

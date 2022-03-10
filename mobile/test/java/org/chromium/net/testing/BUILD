@@ -13,6 +13,7 @@ android_library(
         "ConditionVariable.java",
         "ContextUtils.java",
         "CronetTestRule.java",
+        "CronetTestUtil.java",
         "FailurePhase.java",
         "Feature.java",
         "FileUtils.java",

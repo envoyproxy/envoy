@@ -871,6 +871,9 @@ public final class CronetUrlRequest extends UrlRequestBase {
       if (completeAbandonIfAny(originalState, updatedState)) {
         return;
       }
+      if (mState.compareAndSet(State.READING, State.COMPLETE)) {
+        mCronvoyCallbacks.successReady(SucceededState.FINAL_READ_DONE);
+      }
     }
 
     @Override

@@ -5,7 +5,6 @@ import static android.os.Process.THREAD_PRIORITY_LOWEST;
 import android.content.Context;
 import android.util.Base64;
 import androidx.annotation.IntDef;
-import androidx.annotation.VisibleForTesting;
 import java.io.File;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -78,7 +77,6 @@ public abstract class CronetEngineBuilderImpl extends ICronetEngineBuilder {
   private int mHttpCacheMode;
   private long mHttpCacheMaxSize;
   private String mExperimentalOptions;
-  protected long mMockCertVerifier;
   private boolean mNetworkQualityEstimatorEnabled;
   private int mThreadPriority = INVALID_THREAD_PRIORITY;
   private String mLogLevel = "info";
@@ -317,21 +315,6 @@ public abstract class CronetEngineBuilderImpl extends ICronetEngineBuilder {
   }
 
   public String experimentalOptions() { return mExperimentalOptions; }
-
-  /**
-   * Sets a native MockCertVerifier for testing. See {@code MockCertVerifier.createMockCertVerifier}
-   * for a method that can be used to create a MockCertVerifier.
-   *
-   * @param mockCertVerifier pointer to native MockCertVerifier.
-   * @return the builder to facilitate chaining.
-   */
-  @VisibleForTesting
-  public CronetEngineBuilderImpl setMockCertVerifierForTesting(long mockCertVerifier) {
-    mMockCertVerifier = mockCertVerifier;
-    return this;
-  }
-
-  long mockCertVerifier() { return mMockCertVerifier; }
 
   /**
    * @return true if the network quality estimator has been enabled for
