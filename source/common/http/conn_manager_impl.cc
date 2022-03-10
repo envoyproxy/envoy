@@ -65,6 +65,17 @@ bool requestWasConnect(const RequestHeaderMapPtr& headers, Protocol protocol) {
   return HeaderUtility::isConnect(*headers) || Utility::isUpgrade(*headers);
 }
 
+// Return the GatewayTimeout HTTP code to indicate the request is full received.
+Http::Code maybeRequestTimeoutCode(const FilterManager& filter_manager) {
+  return filter_manager.remoteDecodeComplete() &&
+                 Runtime::runtimeFeatureEnabled(
+                     "envoy.reloadable_features.override_request_timeout_by_gateway_timeout")
+             ? Http::Code::GatewayTimeout
+             // Http::Code::RequestTimeout is more expensive because HTTP1 client cannot use the
+             // connection any more.
+             : Http::Code::RequestTimeout;
+}
+
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
                                                             Stats::Scope& scope) {
   return ConnectionManagerStats(
@@ -758,34 +769,26 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   connection_manager_.stats_.named_.downstream_rq_idle_timeout_.inc();
   // TODO(mattklein) this may result in multiple flags. This Ok?
   filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
-  sendLocalReply(filter_manager_.remoteDecodeComplete() ? Http::Code::GatewayTimeout
-                                                        : Http::Code::RequestTimeout,
-                 "stream timeout", nullptr, absl::nullopt,
+  sendLocalReply(maybeRequestTimeoutCode(filter_manager_), "stream timeout", nullptr, absl::nullopt,
                  StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
-  sendLocalReply(filter_manager_.remoteDecodeComplete() ? Http::Code::GatewayTimeout
-                                                        : Http::Code::RequestTimeout,
-                 "request timeout", nullptr, absl::nullopt,
-                 StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
+  sendLocalReply(maybeRequestTimeoutCode(filter_manager_), "request timeout", nullptr,
+                 absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestHeaderTimeout() {
   connection_manager_.stats_.named_.downstream_rq_header_timeout_.inc();
-  sendLocalReply(filter_manager_.remoteDecodeComplete() ? Http::Code::GatewayTimeout
-                                                        : Http::Code::RequestTimeout,
-                 "request header timeout", nullptr, absl::nullopt,
-                 StreamInfo::ResponseCodeDetails::get().RequestHeaderTimeout);
+  sendLocalReply(maybeRequestTimeoutCode(filter_manager_), "request header timeout", nullptr,
+                 absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestHeaderTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
-  sendLocalReply(filter_manager_.remoteDecodeComplete() ? Http::Code::GatewayTimeout
-                                                        : Http::Code::RequestTimeout,
-                 "downstream duration timeout", nullptr,
+  sendLocalReply(maybeRequestTimeoutCode(filter_manager_), "downstream duration timeout", nullptr,
                  Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
                  StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
 }

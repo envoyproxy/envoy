@@ -1048,11 +1048,14 @@ void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
   const auto& stream_info = callbacks_->streamInfo();
   // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
   callbacks_->sendLocalReply(
-      stream_info.downstreamTiming().has_value() && stream_info.downstreamTiming()
-                                                        .value()
-                                                        .get()
-                                                        .lastDownstreamRxByteReceived()
-                                                        .has_value()
+      stream_info.downstreamTiming().has_value() &&
+              stream_info.downstreamTiming()
+                  .value()
+                  .get()
+                  .lastDownstreamRxByteReceived()
+                  .has_value() &&
+              Runtime::runtimeFeatureEnabled(
+                  "envoy.reloadable_features.override_request_timeout_by_gateway_timeout")
           ? Http::Code::GatewayTimeout
           : Http::Code::RequestTimeout,
       "upstream max stream duration reached", modify_headers_, absl::nullopt,
