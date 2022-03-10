@@ -238,7 +238,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithFlushTimeout) {
   span->finishSpan();
   // Only now should we see the span exported.
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
-  // Timer should be reenabled.
+  // Timer should be enabled again.
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.flush_interval_ms", 5000U))
       .WillOnce(Return(5000U));
