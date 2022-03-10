@@ -57,7 +57,7 @@ Removed Config or Runtime
 * http: removed ``envoy.reloadable_features.allow_response_for_timeout`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.http2_consume_stream_refused_errors`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.internal_redirects_with_body`` and legacy code paths.
-* json: removed ``envoy.reloadable_features.remove_legacy_json`` and legacy code paths. This decommisions use of rapidjson in Envoy.
+* json: removed ``envoy.reloadable_features.remove_legacy_json`` and legacy code paths.
 * listener: removed ``envoy.reloadable_features.listener_reuse_port_default_enabled`` and legacy code paths.
 * udp: removed ``envoy.reloadable_features.udp_per_event_loop_read_limit`` and legacy code paths.
 * upstream: removed ``envoy.reloadable_features.health_check.graceful_goaway_handling`` and legacy code paths.
