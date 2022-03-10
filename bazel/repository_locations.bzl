@@ -539,7 +539,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/Tencent/rapidjson/archive/{version}.tar.gz"],
         use_category = ["observability_ext"],
         # Rapidjson is used in the external dependency of zipkin tracer.
-        extensions = ["envoy.tracers.zipkin"],
+        extensions = ["envoy.tracers.zipkin", "envoy.tracers.opencensus"],
         release_date = "2019-12-03",
         cpe = "cpe:2.3:a:tencent:rapidjson:*",
     ),
