@@ -40,37 +40,11 @@ using Http::LowerCaseString;
 
 using namespace std::chrono_literals;
 
-// TODO(kbaichoo): Revert to using GrpcClientIntegrationParamTest when deferred
-// processing is enabled by default. It's parameterized by deferred processing
-// now to avoid bit rot since the feature is off by default.
-class GrpcClientIntegrationParamTestWithDeferredProcessing
-    : public Grpc::BaseGrpcClientIntegrationParamTest,
-      public testing::TestWithParam<
-          std::tuple<std::tuple<Network::Address::IpVersion, Grpc::ClientType>, bool>> {
-public:
-  static std::string protocolTestParamsToString(
-      const ::testing::TestParamInfo<
-          std::tuple<std::tuple<Network::Address::IpVersion, Grpc::ClientType>, bool>>& p) {
-    return fmt::format(
-        "{}_{}_{}",
-        std::get<0>(std::get<0>(p.param)) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
-        std::get<1>(std::get<0>(p.param)) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
-                                                                          : "EnvoyGrpc",
-        std::get<1>(p.param) ? "WithDeferredProcessing" : "NoDeferredProcessing");
-  }
-  Network::Address::IpVersion ipVersion() const override {
-    return std::get<0>(std::get<0>(GetParam()));
-  }
-  Grpc::ClientType clientType() const override { return std::get<1>(std::get<0>(GetParam())); }
-  bool deferredProcessing() const { return std::get<1>(GetParam()); }
-};
-
 // These tests exercise the ext_proc filter through Envoy's integration test
 // environment by configuring an instance of the Envoy server and driving it
 // through the mock network stack.
-
 class ExtProcIntegrationTest : public HttpIntegrationTest,
-                               public GrpcClientIntegrationParamTestWithDeferredProcessing {
+                               public Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing {
 protected:
   ExtProcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
 
@@ -341,9 +315,10 @@ protected:
   FakeStreamPtr processor_stream_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
-                         testing::Combine(GRPC_CLIENT_INTEGRATION_PARAMS, testing::Bool()),
-                         ExtProcIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
+    GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
+    Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
 
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
