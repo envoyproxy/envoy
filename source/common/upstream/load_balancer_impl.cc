@@ -804,12 +804,7 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
           slow_start_config.has_value() && slow_start_config.value().has_aggression()
               ? absl::optional<Runtime::Double>({slow_start_config.value().aggression(), runtime})
               : absl::nullopt),
-      time_source_(time_source), latest_host_added_time_(time_source_.monotonicTime()),
-      slow_start_min_weight_percent_(slow_start_config.has_value()
-                                         ? PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(
-                                               slow_start_config.value(), min_weight_percent, 10) /
-                                               100.0
-                                         : 0.1) {
+      time_source_(time_source), latest_host_added_time_(time_source_.monotonicTime()) {
   // We fully recompute the schedulers for a given host set here on membership change, which is
   // consistent with what other LB implementations do (e.g. thread aware).
   // The downside of a full recompute is that time complexity is O(n * log n),
@@ -1007,8 +1002,7 @@ double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host&
     auto time_factor = static_cast<double>(std::max(std::chrono::milliseconds(1).count(),
                                                     host_create_duration.count())) /
                        slow_start_window_.count();
-    return host_weight *
-           std::max(applyAggressionFactor(time_factor), slow_start_min_weight_percent_);
+    return host_weight * applyAggressionFactor(time_factor);
   } else {
     return host_weight;
   }
