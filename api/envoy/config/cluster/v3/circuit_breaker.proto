@@ -27,7 +27,7 @@ message CircuitBreakers {
 
   // A Thresholds defines CircuitBreaker settings for a
   // :ref:`RoutingPriority<envoy_v3_api_enum_config.core.v3.RoutingPriority>`.
-  // [#next-free-field: 9]
+  // [#next-free-field: 10]
   message Thresholds {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.cluster.CircuitBreakers.Thresholds";
@@ -97,6 +97,11 @@ message CircuitBreakers {
     // :ref:`Circuit Breaking <arch_overview_circuit_break_cluster_maximum_connection_pools>` for
     // more details.
     google.protobuf.UInt32Value max_connection_pools = 7;
+
+    // The maximum number of connections a given host can have. If not specified the default is
+    // unlimited. This is especially useful for dynamic forward proxy, where per cluster limits
+    // make less sense thatn per host limits.
+    google.protobuf.UInt32Value per_host_connection_limits = 9;
   }
 
   // If multiple :ref:`Thresholds<envoy_v3_api_msg_config.cluster.v3.CircuitBreakers.Thresholds>`

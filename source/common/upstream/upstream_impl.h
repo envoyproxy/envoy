@@ -136,6 +136,14 @@ public:
         new HealthCheckHostMonitorNullImpl();
     return *null_health_checker;
   }
+
+  bool canCreate(Upstream::ResourcePriority priority) const override {
+    if (stats().cx_active_.value() > cluster().resourceManager(priority).maxConnectionsPerHost()) {
+      return false;
+    }
+    return cluster().resourceManager(priority).connections().canCreate();
+  }
+
   Outlier::DetectorHostMonitor& outlierDetector() const override {
     if (outlier_detector_) {
       return *outlier_detector_;
