@@ -1,11 +1,12 @@
-#include "absl/strings/escaping.h"
+#include "span_context_extractor.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "source/common/http/header_map_impl.h"
+
+#include "absl/strings/escaping.h"
 #include "span_context.h"
-#include "span_context_extractor.h"
 
 namespace Envoy {
 namespace Extensions {

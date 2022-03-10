@@ -1,20 +1,19 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/api/api.h"
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
-#include "envoy/tracing/trace_driver.h"
-#include "envoy/thread_local/thread_local.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/tracing/trace_driver.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/tracers/common/factory_base.h"
-
 #include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
-#include "span_context.h"
+
 #include "absl/strings/escaping.h"
-#include <cstdint>
-#include <mutex>
+#include "span_context.h"
 
 namespace Envoy {
 namespace Extensions {

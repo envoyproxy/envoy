@@ -2,13 +2,15 @@
 
 #include <string>
 
-#include "source/common/tracing/http_tracer_impl.h"
-#include "source/common/common/empty_string.h"
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
-#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
-#include "opentelemetry/proto/trace/v1/trace.pb.h"
+
+#include "source/common/common/empty_string.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
+#include "source/common/tracing/http_tracer_impl.h"
+
+#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
+#include "opentelemetry/proto/trace/v1/trace.pb.h"
 #include "span_context.h"
 #include "span_context_extractor.h"
 #include "tracer.h"

@@ -2,13 +2,12 @@
 
 #include "envoy/api/api.h"
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
-#include "envoy/tracing/trace_driver.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/tracing/trace_driver.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/tracers/common/factory_base.h"
-
 #include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
 #include "source/extensions/tracers/opentelemetry/tracer.h"
 

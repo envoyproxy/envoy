@@ -3,8 +3,8 @@
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/config/trace/v3/opentelemetry.pb.validate.h"
 #include "envoy/registry/registry.h"
-#include "source/common/common/logger.h"
 
+#include "source/common/common/logger.h"
 #include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
 
 namespace Envoy {

@@ -1,12 +1,13 @@
-
 #include "source/extensions/tracers/opentelemetry/tracer.h"
 
 #include <cstdint>
 #include <string>
 
-#include "source/common/common/hex.h"
-#include "source/common/common/empty_string.h"
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
+
+#include "source/common/common/empty_string.h"
+#include "source/common/common/hex.h"
+
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 #include "opentelemetry/proto/trace/v1/trace.pb.h"
 

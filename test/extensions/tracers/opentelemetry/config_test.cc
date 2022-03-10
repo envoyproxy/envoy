@@ -35,7 +35,7 @@ TEST(OpenTelemetryTracerConfigTest, OpenTelemetryHttpTracer) {
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   auto message = Config::Utility::translateToFactoryConfig(
-    configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   auto opentelemetry_tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, opentelemetry_tracer);
 }

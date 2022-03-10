@@ -1,16 +1,17 @@
+#include <sys/types.h>
+
+#include "envoy/common/exception.h"
+
 #include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/server/tracer_factory_context.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/utility.h"
-#include "test/mocks/stats/mocks.h"
-#include "envoy/common/exception.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include <sys/types.h>
 
 namespace Envoy {
 namespace Extensions {

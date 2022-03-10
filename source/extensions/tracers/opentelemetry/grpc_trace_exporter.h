@@ -1,9 +1,11 @@
 #pragma once
 
-#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 #include "envoy/grpc/async_client_manager.h"
-#include "source/common/grpc/typed_async_client.h"
+
 #include "source/common/common/logger.h"
+#include "source/common/grpc/typed_async_client.h"
+
+#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 
 namespace Envoy {
 namespace Extensions {
