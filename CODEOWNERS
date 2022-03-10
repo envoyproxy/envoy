@@ -203,6 +203,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # DNS Resolver
 /*/extensions/network/dns_resolver/cares @junr03 @yanavlasov
 /*/extensions/network/dns_resolver/apple @junr03 @yanavlasov
+# Config Validators
+/*/extensions/config/validators/minimum_clusters @adisuissa @htuch
 # Google Cloud Platform Authentication Filter
 /*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
 
