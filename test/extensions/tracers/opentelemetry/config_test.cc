@@ -28,7 +28,7 @@ TEST(OpenTelemetryTracerConfigTest, OpenTelemetryHttpTracer) {
         "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
         grpc_service:
           envoy_grpc:
-            cluster_name: fake_cluster 
+            cluster_name: fake_cluster
           timeout: 0.250s
   )EOF";
   envoy::config::trace::v3::Tracing configuration;
