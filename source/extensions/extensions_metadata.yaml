@@ -614,6 +614,11 @@ envoy.tracers.opencensus:
   - envoy.tracers
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.tracers.opentelemetry:
+  categories:
+  - envoy.tracers
+  security_posture: unknown
+  status: wip
 envoy.tracers.skywalking:
   categories:
   - envoy.tracers
