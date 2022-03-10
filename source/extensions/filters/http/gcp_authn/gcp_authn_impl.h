@@ -34,6 +34,7 @@ public:
    * Called on completion of request.
    *
    * @param status the status of the request.
+   * @param response the pointer to the response message.
    */
   virtual void onComplete(ResponseStatus status, const Http::ResponseMessage* response) PURE;
 };

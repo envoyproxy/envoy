@@ -48,3 +48,8 @@ HTTP filters
   sxg_filter
   tap_filter
   wasm_filter
+
+.. toctree::
+  :hidden:
+
+  ../../../api-v3/extensions/filters/http/gcp_authn/v3/gcp_authn.proto
