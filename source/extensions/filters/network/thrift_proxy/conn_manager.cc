@@ -223,13 +223,23 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
     success_ = metadata->replyType() == ReplyType::Success;
   }
 
-  // Is the upstream host draining?
+  // Check if the upstream host is draining.
+  //
+  // Note: the drain header needs to be checked here in messageBegin, and not transportBegin, so
+  // that we can support the header in TTwitter protocol, which reads/adds response headers to
+  // metadata in messageBegin when reading the response from upstream. Therefore detecting a drain
+  // should happen here.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_connection_draining")) {
     metadata_->setDraining(!metadata->headers().get(Headers::get().Drain).empty());
     metadata->headers().remove(Headers::get().Drain);
   }
 
-  // Is this host draining?
+  // Check if this host itself is draining.
+  //
+  // Note: Similarly as above, the response is buffered until transportEnd. Therefore metadata
+  // should be set before the encodeFrame() call. It should be set at or after the messageBegin call
+  // so that the header is added after all upstream headers passed, due to messageBegin possibly not
+  // getting headers in transportBegin.
   ConnectionManager& cm = parent_.parent_;
   if (cm.drain_decision_.drainClose()) {
     // TODO(rgs1): should the key value contain something useful? E.g.: minutes til drain is over?
