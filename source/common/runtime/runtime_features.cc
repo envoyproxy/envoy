@@ -41,6 +41,7 @@ RUNTIME_GUARD(envoy_reloadable_features_do_not_await_headers_on_upstream_timeout
 RUNTIME_GUARD(envoy_reloadable_features_enable_grpc_async_client_cache);
 RUNTIME_GUARD(envoy_reloadable_features_fix_added_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_handle_stream_reset_during_hcm_encoding);
+RUNTIME_GUARD(envoy_reloadable_features_http1_lazy_read_disable);
 RUNTIME_GUARD(envoy_reloadable_features_http2_allow_capacity_increase_by_settings);
 RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
 RUNTIME_GUARD(envoy_reloadable_features_http_ext_authz_do_not_skip_direct_response_and_redirect);
@@ -61,6 +62,7 @@ RUNTIME_GUARD(envoy_reloadable_features_support_locality_update_on_eds_cluster_e
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_udp_listener_updates_filter_chain_in_place);
 RUNTIME_GUARD(envoy_reloadable_features_update_expected_rq_timeout_on_retry);
+RUNTIME_GUARD(envoy_reloadable_features_update_grpc_response_error_tag);
 RUNTIME_GUARD(envoy_reloadable_features_use_dns_ttl);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
@@ -102,7 +104,7 @@ public:
 
   // Get the command line flag corresponding to the Envoy style feature name, or
   // nullptr if it is not a registered flag.
-  absl::CommandLineFlag* getFlag(absl::string_view feature) const {
+    auto* getFlag(absl::string_view feature) const {
     auto it = all_features_.find(feature);
     if (it == all_features_.end()) {
       return nullptr;
@@ -146,7 +148,7 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
 
 uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
   if (absl::StartsWith(feature, "envoy.")) {
-    // DO NOT ADD MORE FLAGS HERE. This function deprecated and being removed.
+    // DO NOT ADD MORE FLAGS HERE. This function deprecated.
     if (feature == "envoy.http.headermap.lazy_map_min_size") {
       return absl::GetFlag(FLAGS_envoy_headermap_lazy_map_min_size);
     }
@@ -163,7 +165,7 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
 }
 
 void maybeSetRuntimeGuard(absl::string_view name, bool value) {
-  auto* flag = RuntimeFeaturesDefaults::get().getFlag(name);
+  absl::CommandLineFlag* flag = RuntimeFeaturesDefaults::get().getFlag(name);
   if (flag == nullptr) {
     IS_ENVOY_BUG(absl::StrCat("Unable to find runtime feature ", name));
     return;
@@ -177,23 +179,19 @@ void maybeSetDeprecatedInts(absl::string_view name, uint32_t value) {
     return;
   }
 
-  bool set = false;
   // DO NOT ADD MORE FLAGS HERE. This function deprecated and being removed.
   if (name == "envoy.http.headermap.lazy_map_min_size") {
-    set = true;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.deprecate_global_ints")) {
+      IS_ENVOY_BUG(absl::StrCat(
+          "The Envoy community is attempting to remove global integers. Given you use ", name,
+          " please immediately file an upstream issue to retain the functionality as it will "
+          "otherwise be removed following the usual deprecation cycle."));
+    }
     absl::SetFlag(&FLAGS_envoy_headermap_lazy_map_min_size, value);
   } else if (name == "re2.max_program_size.error_level") {
-    set = true;
     absl::SetFlag(&FLAGS_re2_max_program_size_error_level, value);
   } else if (name == "re2.max_program_size.warn_level") {
-    set = true;
     absl::SetFlag(&FLAGS_re2_max_program_size_warn_level, value);
-  }
-  if (set && Runtime::runtimeFeatureEnabled("envoy.reloadable_features.deprecate_global_ints")) {
-    IS_ENVOY_BUG(absl::StrCat(
-        "The Envoy community is attempting to remove global integers. Given you use ", name,
-        " please immediately file an upstream issue to retain the functionality as it will "
-        "otherwise be removed following the usual deprecation cycle."));
   }
 }
 
