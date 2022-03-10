@@ -681,6 +681,10 @@ def _com_google_absl():
         name = "abseil_status",
         actual = "@com_google_absl//absl/status",
     )
+    native.bind(
+        name = "abseil_cleanup",
+        actual = "@com_google_absl//absl/cleanup:cleanup",
+    )
 
 def _com_google_protobuf():
     external_http_archive(
@@ -765,7 +769,7 @@ def _com_github_curl():
         build_file_content = BUILD_ALL_CONTENT + """
 cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
 """,
-        # Patch curl 7.74.0 due to CMake's problematic implementation of policy `CMP0091`
+        # Patch curl 7.74.0 and later due to CMake's problematic implementation of policy `CMP0091`
         # and introduction of libidn2 dependency which is inconsistently available and must
         # not be a dynamic dependency on linux.
         # Upstream patches submitted: https://github.com/curl/curl/pull/6050 & 6362

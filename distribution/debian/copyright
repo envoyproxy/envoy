@@ -3,6 +3,6 @@ Upstream-Name: Envoy
 Source: <https://github.com/envoyproxy/envoy>
 
 Files: *
-Copyright: Copyright 2016-2018 Envoy Project Authors
+Copyright: Copyright 2016-2022 Envoy Project Authors
 License: Apache
 /usr/share/common-licenses/Apache-2.0

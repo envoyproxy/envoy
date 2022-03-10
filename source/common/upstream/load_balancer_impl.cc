@@ -1,6 +1,7 @@
 #include "source/common/upstream/load_balancer_impl.h"
 
 #include <atomic>
+#include <bitset>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -23,10 +24,6 @@ namespace {
 static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
-
-static constexpr uint32_t UnhealthyStatus = 1u << static_cast<size_t>(Host::Health::Unhealthy);
-static constexpr uint32_t DegradedStatus = 1u << static_cast<size_t>(Host::Health::Degraded);
-static constexpr uint32_t HealthyStatus = 1u << static_cast<size_t>(Host::Health::Healthy);
 
 bool tooManyPreconnects(size_t num_preconnect_picks, uint32_t healthy_hosts) {
   // Currently we only allow the number of preconnected connections to equal the
@@ -118,7 +115,8 @@ LoadBalancerBase::LoadBalancerBase(
     : stats_(stats), runtime_(runtime), random_(random),
       default_healthy_panic_percent_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
           common_config, healthy_panic_threshold, 100, 50)),
-      priority_set_(priority_set) {
+      priority_set_(priority_set),
+      override_host_status_(LoadBalancerContextBase::createOverrideHostStatus(common_config)) {
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
     recalculatePerPriorityState(host_set->priority(), priority_set_, per_priority_load_,
                                 per_priority_health_, per_priority_degraded_, total_healthy_hosts_);
@@ -517,20 +515,39 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   return false;
 }
 
-bool LoadBalancerContextBase::validateOverrideHostStatus(Host::Health health,
-                                                         OverrideHostStatus status) {
-  switch (health) {
-  case Host::Health::Unhealthy:
-    return status & UnhealthyStatus;
-  case Host::Health::Degraded:
-    return status & DegradedStatus;
-  case Host::Health::Healthy:
-    return status & HealthyStatus;
+HostStatusSet LoadBalancerContextBase::createOverrideHostStatus(
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) {
+  HostStatusSet override_host_status;
+
+  if (!common_config.has_override_host_status()) {
+    // No override host status and 'Healthy' and 'Degraded' will be applied by default.
+    override_host_status.set(static_cast<size_t>(Host::Health::Healthy));
+    override_host_status.set(static_cast<size_t>(Host::Health::Degraded));
+    return override_host_status;
   }
-  return false;
+
+  for (auto single_status : common_config.override_host_status().statuses()) {
+    switch (static_cast<envoy::config::core::v3::HealthStatus>(single_status)) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case envoy::config::core::v3::HealthStatus::UNKNOWN:
+    case envoy::config::core::v3::HealthStatus::HEALTHY:
+      override_host_status.set(static_cast<size_t>(Host::Health::Healthy));
+      break;
+    case envoy::config::core::v3::HealthStatus::UNHEALTHY:
+    case envoy::config::core::v3::HealthStatus::DRAINING:
+    case envoy::config::core::v3::HealthStatus::TIMEOUT:
+      override_host_status.set(static_cast<size_t>(Host::Health::Unhealthy));
+      break;
+    case envoy::config::core::v3::HealthStatus::DEGRADED:
+      override_host_status.set(static_cast<size_t>(Host::Health::Degraded));
+      break;
+    }
+  }
+  return override_host_status;
 }
 
 HostConstSharedPtr LoadBalancerContextBase::selectOverrideHost(const HostMap* host_map,
+                                                               HostStatusSet status,
                                                                LoadBalancerContext* context) {
   if (context == nullptr) {
     return nullptr;
@@ -545,7 +562,7 @@ HostConstSharedPtr LoadBalancerContextBase::selectOverrideHost(const HostMap* ho
     return nullptr;
   }
 
-  auto host_iter = host_map->find(override_host.value().first);
+  auto host_iter = host_map->find(override_host.value());
 
   // The override host cannot be found in the host map.
   if (host_iter == host_map->end()) {
@@ -555,17 +572,15 @@ HostConstSharedPtr LoadBalancerContextBase::selectOverrideHost(const HostMap* ho
   HostConstSharedPtr host = host_iter->second;
   ASSERT(host != nullptr);
 
-  // Verify the host status.
-  if (LoadBalancerContextBase::validateOverrideHostStatus(host->health(),
-                                                          override_host.value().second)) {
+  if (status[static_cast<size_t>(host->health())]) {
     return host;
   }
   return nullptr;
 }
 
 HostConstSharedPtr ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
-  HostConstSharedPtr host =
-      LoadBalancerContextBase::selectOverrideHost(cross_priority_host_map_.get(), context);
+  HostConstSharedPtr host = LoadBalancerContextBase::selectOverrideHost(
+      cross_priority_host_map_.get(), override_host_status_, context);
   if (host != nullptr) {
     return host;
   }
@@ -652,8 +667,8 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
     return random_.random() % number_of_localities;
   }
 
-  // Random sampling to select specific locality for cross locality traffic based on the additional
-  // capacity in localities.
+  // Random sampling to select specific locality for cross locality traffic based on the
+  // additional capacity in localities.
   uint64_t threshold = random_.random() % state.residual_capacity_[number_of_localities - 1];
 
   // This potentially can be optimized to be O(log(N)) where N is the number of localities.
@@ -923,8 +938,8 @@ HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* con
 
   // As has been commented in both EdfLoadBalancerBase::refresh and
   // BaseDynamicClusterImpl::updateDynamicHostList, we must do a runtime pivot here to determine
-  // whether to use EDF or do unweighted (fast) selection. EDF is non-null iff the original weights
-  // of 2 or more hosts differ.
+  // whether to use EDF or do unweighted (fast) selection. EDF is non-null iff the original
+  // weights of 2 or more hosts differ.
   if (scheduler.edf_ != nullptr) {
     return scheduler.edf_->peekAgain([this](const Host& host) { return hostWeight(host); });
   } else {
@@ -949,8 +964,8 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
 
   // As has been commented in both EdfLoadBalancerBase::refresh and
   // BaseDynamicClusterImpl::updateDynamicHostList, we must do a runtime pivot here to determine
-  // whether to use EDF or do unweighted (fast) selection. EDF is non-null iff the original weights
-  // of 2 or more hosts differ.
+  // whether to use EDF or do unweighted (fast) selection. EDF is non-null iff the original
+  // weights of 2 or more hosts differ.
   if (scheduler.edf_ != nullptr) {
     auto host = scheduler.edf_->pickAndAdd([this](const Host& host) { return hostWeight(host); });
     return host;
