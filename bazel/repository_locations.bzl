@@ -537,9 +537,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "a2faafbc402394df0fa94602df4b5e4befd734aad6bb55dfef46f62fcaf1090b",
         strip_prefix = "rapidjson-{version}",
         urls = ["https://github.com/Tencent/rapidjson/archive/{version}.tar.gz"],
-        # We're mostly using com_google_protobuf for JSON, but there are some extensions and hard to
-        # disentangle uses on the dataplane, e.g. header_formatter, Squash filter.
-        use_category = ["controlplane", "dataplane_core"],
+        # Rapidjson is only used in external zipkin exporter dependecy.
+        use_category = ["observability_ext"],
         release_date = "2019-12-03",
         cpe = "cpe:2.3:a:tencent:rapidjson:*",
     ),
