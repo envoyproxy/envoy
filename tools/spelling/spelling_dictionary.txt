@@ -25,6 +25,7 @@ BBR
 BSON
 BPF
 Repick
+TRA
 btree
 CAS
 CB
@@ -32,6 +33,7 @@ cbor
 CDN
 CDS
 CEL
+CWND
 DSR
 DSS
 EBADF
@@ -321,6 +323,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIO
 SMTP
 SNI
 SOTW
@@ -1334,3 +1337,4 @@ transid
 routable
 vhosts
 infos
+ElastiCache

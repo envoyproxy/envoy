@@ -47,7 +47,8 @@ public:
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
-  bool usesProxyProtocolOptions() const override { return true; }
+  void hashKey(std::vector<uint8_t>& key,
+               Network::TransportSocketOptionsConstSharedPtr options) const override;
 
 private:
   ProxyProtocolConfig config_;

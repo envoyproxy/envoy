@@ -44,7 +44,8 @@ admin:
 dynamic_resources:
   lds_config:
     resource_api_version: V3
-    path: {}
+    path_config_source:
+      path: {}
 static_resources:
   secrets:
   - name: "secret_static_0"
@@ -441,6 +442,34 @@ envoy::config::cluster::v3::Cluster ConfigHelper::buildStaticCluster(const std::
                   name, name, address, port, lb_policy));
 }
 
+envoy::config::cluster::v3::Cluster ConfigHelper::buildH1ClusterWithHighCircuitBreakersLimits(
+    const std::string& name, int port, const std::string& address, const std::string& lb_policy) {
+  return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(
+      fmt::format(R"EOF(
+      name: {}
+      connect_timeout: 50s
+      type: STATIC
+      circuit_breakers:
+        thresholds:
+        - priority: DEFAULT
+          max_connections: 10000
+          max_pending_requests: 10000
+          max_requests: 10000
+          max_retries: 10000
+      load_assignment:
+        cluster_name: {}
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: {}
+                  port_value: {}
+      lb_policy: {}
+    )EOF",
+                  name, name, address, port, lb_policy));
+}
+
 envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name,
                                                                const std::string& lb_policy) {
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
@@ -812,7 +841,7 @@ void ConfigHelper::configureUpstreamTls(
   });
 }
 
-void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string& value) {
+void ConfigHelper::addRuntimeOverride(absl::string_view key, absl::string_view value) {
   auto* static_layer =
       bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
   (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
@@ -844,6 +873,23 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
 
   applyConfigModifiers();
 
+  setPorts(ports);
+
+  if (!connect_timeout_set_) {
+#ifdef __APPLE__
+    // Set a high default connect timeout. Under heavy load (and in particular in CI), macOS
+    // connections can take inordinately long to complete.
+    setConnectTimeout(std::chrono::seconds(30));
+#else
+    // Set a default connect timeout.
+    setConnectTimeout(std::chrono::seconds(5));
+#endif
+  }
+
+  finalized_ = true;
+}
+
+void ConfigHelper::setPorts(const std::vector<uint32_t>& ports, bool override_port_zero) {
   uint32_t port_idx = 0;
   bool eds_hosts = false;
   bool custom_cluster = false;
@@ -864,7 +910,8 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
         for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
           auto lb_endpoint = locality_lb->mutable_lb_endpoints(k);
           if (lb_endpoint->endpoint().address().has_socket_address()) {
-            if (lb_endpoint->endpoint().address().socket_address().port_value() == 0) {
+            if (lb_endpoint->endpoint().address().socket_address().port_value() == 0 ||
+                override_port_zero) {
               RELEASE_ASSERT(ports.size() > port_idx, "");
               lb_endpoint->mutable_endpoint()
                   ->mutable_address()
@@ -881,19 +928,6 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   }
   ASSERT(skip_port_usage_validation_ || port_idx == ports.size() || eds_hosts ||
          original_dst_cluster || custom_cluster || bootstrap_.dynamic_resources().has_cds_config());
-
-  if (!connect_timeout_set_) {
-#ifdef __APPLE__
-    // Set a high default connect timeout. Under heavy load (and in particular in CI), macOS
-    // connections can take inordinately long to complete.
-    setConnectTimeout(std::chrono::seconds(30));
-#else
-    // Set a default connect timeout.
-    setConnectTimeout(std::chrono::seconds(5));
-#endif
-  }
-
-  finalized_ = true;
 }
 
 void ConfigHelper::setSourceAddress(const std::string& address_string) {
@@ -1325,7 +1359,8 @@ void ConfigHelper::setLds(absl::string_view version_info) {
     resource->PackFrom(listener);
   }
 
-  const std::string lds_filename = bootstrap().dynamic_resources().lds_config().path();
+  const std::string lds_filename =
+      bootstrap().dynamic_resources().lds_config().path_config_source().path();
   std::string file = TestEnvironment::writeStringToFileForTest(
       "new_lds_file", MessageUtil::getJsonStringFromMessageOrDie(lds));
   TestEnvironment::renameFile(file, lds_filename);

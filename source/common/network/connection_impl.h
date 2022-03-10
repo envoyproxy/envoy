@@ -99,6 +99,9 @@ public:
   absl::string_view transportFailureReason() const override;
   bool startSecureTransport() override { return transport_socket_->startSecureTransport(); }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
+  void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                        std::chrono::microseconds rtt) override;
+  absl::optional<uint64_t> congestionWindowInBytes() const override;
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;

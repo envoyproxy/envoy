@@ -369,7 +369,7 @@ void StreamEncoderImpl::readDisable(bool disable) {
   connection_.readDisable(disable);
 }
 
-uint32_t StreamEncoderImpl::bufferLimit() { return connection_.bufferLimit(); }
+uint32_t StreamEncoderImpl::bufferLimit() const { return connection_.bufferLimit(); }
 
 const Network::Address::InstanceConstSharedPtr& StreamEncoderImpl::connectionLocalAddress() {
   return connection_.connection().connectionInfoProvider().localAddress();
