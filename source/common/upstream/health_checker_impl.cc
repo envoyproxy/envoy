@@ -601,7 +601,9 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       random_generator_(random),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "grpc.health.v1.Health.Check")) {
+          "grpc.health.v1.Health.Check")),
+      request_headers_parser_(
+          Router::HeaderParser::configure(config.grpc_health_check().initial_metadata())) {
   if (!config.grpc_health_check().service_name().empty()) {
     service_name_ = config.grpc_health_check().service_name();
   }
@@ -613,7 +615,10 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
 
 GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::GrpcActiveHealthCheckSession(
     GrpcHealthCheckerImpl& parent, const HostSharedPtr& host)
-    : ActiveHealthCheckSession(parent, host), parent_(parent) {}
+    : ActiveHealthCheckSession(parent, host), parent_(parent),
+      local_connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
+          Network::Utility::getCanonicalIpv4LoopbackAddress(),
+          Network::Utility::getCanonicalIpv4LoopbackAddress())) {}
 
 GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::~GrpcActiveHealthCheckSession() {
   ASSERT(client_ == nullptr);
@@ -737,6 +742,12 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
                                    parent_.service_method_.name(), absl::nullopt);
   headers_message->headers().setReferenceUserAgent(
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, parent_.dispatcher_.timeSource(),
+                                         local_connection_info_provider_);
+  stream_info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  stream_info.upstreamInfo()->setUpstreamHost(host_);
+  parent_.request_headers_parser_->evaluateHeaders(headers_message->headers(), stream_info);
 
   Grpc::Common::toGrpcTimeout(parent_.timeout_, headers_message->headers());
 

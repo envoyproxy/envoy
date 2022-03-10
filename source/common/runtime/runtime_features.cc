@@ -27,12 +27,14 @@ RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3);
 RUNTIME_GUARD(envoy_reloadable_features_correct_scheme_and_xfp);
 RUNTIME_GUARD(envoy_reloadable_features_correctly_validate_alpn);
+RUNTIME_GUARD(envoy_reloadable_features_deprecate_global_ints);
 RUNTIME_GUARD(envoy_reloadable_features_disable_tls_inspector_injection);
 RUNTIME_GUARD(envoy_reloadable_features_do_not_await_headers_on_upstream_timeout_to_emit_stats);
 RUNTIME_GUARD(envoy_reloadable_features_enable_grpc_async_client_cache);
 RUNTIME_GUARD(envoy_reloadable_features_fix_added_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_handle_stream_reset_during_hcm_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_http2_allow_capacity_increase_by_settings);
+RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
 RUNTIME_GUARD(envoy_reloadable_features_http_ext_authz_do_not_skip_direct_response_and_redirect);
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
@@ -46,10 +48,12 @@ RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_json);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_http_header_referer);
 RUNTIME_GUARD(envoy_reloadable_features_skip_delay_close);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dispatching_frames_for_closed_connection);
+RUNTIME_GUARD(envoy_reloadable_features_strict_check_on_ipv4_compat);
 RUNTIME_GUARD(envoy_reloadable_features_support_locality_update_on_eds_cluster_endpoints);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_udp_listener_updates_filter_chain_in_place);
 RUNTIME_GUARD(envoy_reloadable_features_update_expected_rq_timeout_on_retry);
+RUNTIME_GUARD(envoy_reloadable_features_update_grpc_response_error_tag);
 RUNTIME_GUARD(envoy_reloadable_features_use_dns_ttl);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
@@ -62,16 +66,17 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 // TODO(adisuissa) reset to true to enable unified mux by default
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
-// TODO(birenroy) reset to true after bug fixes
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
+// TODO(alyssar) flip false once issue complete.
+FALSE_RUNTIME_GUARD(envoy_restart_features_no_runtime_singleton);
+// TODO(kbaichoo): Make this enabled by default when fairness and chunking
+// are implemented, and we've had more cpu time.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
-ABSL_FLAG(uint64_t, envoy_buffer_overflow_multiplier, 0, "");                        // NOLINT
-ABSL_FLAG(uint64_t, envoy_do_not_use_going_away_max_http2_outbound_response, 2, ""); // NOLINT
-ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");                       // NOLINT
-ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, "");                      // NOLINT
-ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,                                 // NOLINT
-          std::numeric_limits<uint32_t>::max(), "");                                 // NOLINT
+ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT
+ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
+ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
+          std::numeric_limits<uint32_t>::max(), "");            // NOLINT
 
 namespace Envoy {
 namespace Runtime {
@@ -92,11 +97,7 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
 uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
   if (absl::StartsWith(feature, "envoy.")) {
     // DO NOT ADD MORE FLAGS HERE. This function deprecated and being removed.
-    if (feature == "envoy.buffer.overflow_multiplier") {
-      return absl::GetFlag(FLAGS_envoy_buffer_overflow_multiplier);
-    } else if (feature == "envoy.do_not_use_going_away_max_http2_outbound_responses") {
-      return absl::GetFlag(FLAGS_envoy_do_not_use_going_away_max_http2_outbound_response);
-    } else if (feature == "envoy.http.headermap.lazy_map_min_size") {
+    if (feature == "envoy.http.headermap.lazy_map_min_size") {
       return absl::GetFlag(FLAGS_envoy_headermap_lazy_map_min_size);
     }
   }
@@ -143,6 +144,8 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3,
   &FLAGS_envoy_reloadable_features_correct_scheme_and_xfp,
   &FLAGS_envoy_reloadable_features_correctly_validate_alpn,
+  &FLAGS_envoy_reloadable_features_defer_processing_backedup_streams,
+  &FLAGS_envoy_reloadable_features_deprecate_global_ints,
   &FLAGS_envoy_reloadable_features_disable_tls_inspector_injection,
   &FLAGS_envoy_reloadable_features_do_not_await_headers_on_upstream_timeout_to_emit_stats,
   &FLAGS_envoy_reloadable_features_enable_grpc_async_client_cache,
@@ -162,14 +165,17 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_sanitize_http_header_referer,
   &FLAGS_envoy_reloadable_features_skip_delay_close,
   &FLAGS_envoy_reloadable_features_skip_dispatching_frames_for_closed_connection,
+  &FLAGS_envoy_reloadable_features_strict_check_on_ipv4_compat,
   &FLAGS_envoy_reloadable_features_support_locality_update_on_eds_cluster_endpoints,
   &FLAGS_envoy_reloadable_features_udp_listener_updates_filter_chain_in_place,
   &FLAGS_envoy_reloadable_features_unified_mux,
   &FLAGS_envoy_reloadable_features_update_expected_rq_timeout_on_retry,
+  &FLAGS_envoy_reloadable_features_update_grpc_response_error_tag,
   &FLAGS_envoy_reloadable_features_use_dns_ttl,
   &FLAGS_envoy_reloadable_features_validate_connect,
   &FLAGS_envoy_restart_features_explicit_wildcard_resource,
   &FLAGS_envoy_restart_features_use_apple_api_for_dns_lookups,
+  &FLAGS_envoy_restart_features_no_runtime_singleton,
 };
 // clang-format on
 
@@ -188,17 +194,23 @@ void maybeSetDeprecatedInts(absl::string_view name, uint32_t value) {
     return;
   }
 
+  bool set = false;
   // DO NOT ADD MORE FLAGS HERE. This function deprecated and being removed.
-  if (name == "envoy.buffer.overflow_multiplier") {
-    absl::SetFlag(&FLAGS_envoy_buffer_overflow_multiplier, value);
-  } else if (name == "envoy.do_not_use_going_away_max_http2_outbound_responses") {
-    absl::SetFlag(&FLAGS_envoy_do_not_use_going_away_max_http2_outbound_response, value);
-  } else if (name == "envoy.http.headermap.lazy_map_min_size") {
+  if (name == "envoy.http.headermap.lazy_map_min_size") {
+    set = true;
     absl::SetFlag(&FLAGS_envoy_headermap_lazy_map_min_size, value);
   } else if (name == "re2.max_program_size.error_level") {
+    set = true;
     absl::SetFlag(&FLAGS_re2_max_program_size_error_level, value);
   } else if (name == "re2.max_program_size.warn_level") {
+    set = true;
     absl::SetFlag(&FLAGS_re2_max_program_size_warn_level, value);
+  }
+  if (set && Runtime::runtimeFeatureEnabled("envoy.reloadable_features.deprecate_global_ints")) {
+    IS_ENVOY_BUG(absl::StrCat(
+        "The Envoy community is attempting to remove global integers. Given you use ", name,
+        " please immediately file an upstream issue to retain the functionality as it will "
+        "otherwise be removed following the usual deprecation cycle."));
   }
 }
 
@@ -228,8 +240,6 @@ void RuntimeFeatures::restoreDefaults() const {
   for (const auto& feature : disabled_features_) {
     absl::SetFlag(feature.second, false);
   }
-  absl::SetFlag(&FLAGS_envoy_buffer_overflow_multiplier, 0);
-  absl::SetFlag(&FLAGS_envoy_do_not_use_going_away_max_http2_outbound_response, 2);
   absl::SetFlag(&FLAGS_envoy_headermap_lazy_map_min_size, 3);
   absl::SetFlag(&FLAGS_re2_max_program_size_error_level, 100);
   absl::SetFlag(&FLAGS_re2_max_program_size_warn_level, std::numeric_limits<uint32_t>::max());

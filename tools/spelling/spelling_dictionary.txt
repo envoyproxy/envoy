@@ -322,6 +322,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIO
 SMTP
 SNI
 SOTW
@@ -1337,3 +1338,4 @@ transid
 routable
 vhosts
 infos
+ElastiCache

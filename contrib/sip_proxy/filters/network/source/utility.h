@@ -1,6 +1,8 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/server/factory_context.h"
+#include "envoy/server/transport_socket_config.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -134,6 +136,17 @@ public:
       const std::string& type, const std::string& key,
       std::function<void(MessageMetadataSharedPtr, DecoderEventHandler&)> func) PURE;
   virtual void eraseActiveTransFromPendingList(std::string& transaction_id) PURE;
+};
+
+class Utility {
+public:
+  static const std::string& localAddress(Server::Configuration::FactoryContext& context) {
+    return context.getTransportSocketFactoryContext()
+        .localInfo()
+        .address()
+        ->ip()
+        ->addressAsString();
+  }
 };
 
 } // namespace SipProxy

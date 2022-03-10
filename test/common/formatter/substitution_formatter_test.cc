@@ -3109,8 +3109,7 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
       "RESP(FIRST)%",
       "%REQ(valid)% %NOT_VALID%",
       "%REQ(FIRST?SECOND%",
-      "%%",
-      "%%HOSTNAME%PROTOCOL%",
+      "%HOSTNAME%PROTOCOL%",
       "%protocol%",
       "%REQ(TEST):%",
       "%REQ(TEST):3q4%",
@@ -3168,6 +3167,20 @@ TEST(SubstitutionFormatterTest, EmptyFormatParse) {
                                      stream_info, body));
 }
 
+TEST(SubstitutionFormatterTest, EscapingFormatParse) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  std::string body;
+
+  auto providers = SubstitutionFormatParser::parse("%%");
+
+  ASSERT_EQ(providers.size(), 1);
+  EXPECT_EQ("%", providers[0]->format(request_headers, response_headers, response_trailers,
+                                      stream_info, body));
+}
+
 TEST(SubstitutionFormatterTest, FormatterExtension) {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_headers;
@@ -3183,6 +3196,31 @@ TEST(SubstitutionFormatterTest, FormatterExtension) {
   EXPECT_EQ(providers.size(), 2);
   EXPECT_EQ("TestFormatter", providers[1]->format(request_headers, response_headers,
                                                   response_trailers, stream_info, body));
+}
+
+TEST(SubstitutionFormatterTest, PercentEscapingEdgeCase) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  std::string body;
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, gethostname(_, _))
+      .WillOnce(Invoke([](char* name, size_t) -> Api::SysCallIntResult {
+        StringUtil::strlcpy(name, "myhostname", 11);
+        return {0, 0};
+      }));
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+  auto providers = SubstitutionFormatParser::parse("%HOSTNAME%%PROTOCOL%");
+
+  ASSERT_EQ(providers.size(), 2);
+  EXPECT_EQ("myhostname", providers[0]->format(request_headers, response_headers, response_trailers,
+                                               stream_info, body));
+  EXPECT_EQ("HTTP/1.1", providers[1]->format(request_headers, response_headers, response_trailers,
+                                             stream_info, body));
 }
 
 } // namespace

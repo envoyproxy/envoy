@@ -89,22 +89,11 @@ public:
    */
   virtual Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const PURE;
 
-  // Using uint32_t to express expected status of override host. Every bit in the OverrideHostStatus
-  // represent an enum value of Host::Health. The specific correspondence is shown below:
-  //
-  // * 0b001: Host::Health::Unhealthy
-  // * 0b010: Host::Health::Degraded
-  // * 0b100: Host::Health::Healthy
-  //
-  // If multiple bit fields are set, it is acceptable as long as the status of override host is in
-  // any of these statuses.
-  using OverrideHostStatus = uint32_t;
-  using OverrideHost = std::pair<std::string, OverrideHostStatus>;
-
+  using OverrideHost = absl::string_view;
   /**
    * Returns the host the load balancer should select directly. If the expected host exists and
-   * the health status of the host matches the expectation, the load balancer can bypass the load
-   * balancing algorithm and return the corresponding host directly.
+   * the host can be selected directly, the load balancer can bypass the load balancing algorithm
+   * and return the corresponding host directly.
    */
   virtual absl::optional<OverrideHost> overrideHostToSelect() const PURE;
 };
