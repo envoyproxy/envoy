@@ -3,10 +3,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/server/admin/utils.h"
 
-namespace {
-constexpr uint64_t ChunkSize = 2 * 1000 * 1000;
-} // namespace
-
 namespace Envoy {
 namespace Server {
 
@@ -32,9 +28,6 @@ public:
 
   // Completes rendering any buffered data.
   virtual void finalize(Buffer::Instance& response) PURE;
-
-  // Determines whether the current chunk is full.
-  bool isChunkFull(Buffer::Instance& response) { return response.length() > ChunkSize; }
 
 protected:
   using UInt64Vec = std::vector<uint64_t>;

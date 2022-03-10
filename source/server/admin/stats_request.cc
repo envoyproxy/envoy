@@ -36,7 +36,7 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
     response.move(response_);
     ASSERT(response_.length() == 0);
   }
-  while (!render_->isChunkFull(response)) {
+  while (response.length() < chunk_size_) {
     while (stat_map_.empty()) {
       switch (phase_) {
       case Phase::TextReadouts:

@@ -90,6 +90,9 @@ public:
   template <class SharedStatType>
   void renderStat(const std::string& name, Buffer::Instance& response, StatOrScopes& variant);
 
+  // Sets the chunk size.
+  void setChunkSize(uint64_t chunk_size) { chunk_size_ = chunk_size; }
+
 private:
   const bool used_only_;
   const bool json_;
@@ -104,6 +107,7 @@ private:
   absl::btree_map<std::string, StatOrScopes> stat_map_;
   Phase phase_{Phase::TextReadouts};
   Buffer::OwnedImpl response_;
+  uint64_t chunk_size_{2 * 1000 * 1000};
 };
 
 } // namespace Server
