@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <queue>
 #include <string>
 #include <vector>
 
@@ -70,6 +71,10 @@ public:
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  uint32_t maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  uint32_t remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  int64_t
+  remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   bool enabled() const;
   bool enforced() const;
   LocalRateLimitStats& stats() const { return stats_; }
@@ -87,6 +92,7 @@ public:
     return descriptors_;
   }
   bool rateLimitPerConnection() const { return rate_limit_per_connection_; }
+  bool enableXRateLimitHeaders() const { return enable_x_rate_limit_headers_; }
 
 private:
   friend class FilterTest;
@@ -119,6 +125,7 @@ private:
   Router::HeaderParserPtr request_headers_parser_;
   const uint64_t stage_;
   const bool has_descriptors_;
+  const bool enable_x_rate_limit_headers_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -135,6 +142,10 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
 
+  // Http::StreamEncoderFilter
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override;
+
 private:
   friend class FilterTest;
 
@@ -142,9 +153,14 @@ private:
                            Http::RequestHeaderMap& headers);
   const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
+  uint32_t maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
+  uint32_t remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
+  int64_t remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
 
   const FilterConfig* getConfig() const;
   FilterConfigSharedPtr config_;
+
+  absl::optional<std::vector<RateLimit::LocalDescriptor>> stored_descriptors_;
 };
 
 } // namespace LocalRateLimitFilter
