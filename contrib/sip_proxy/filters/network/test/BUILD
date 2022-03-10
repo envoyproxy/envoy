@@ -16,13 +16,15 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//contrib/sip_proxy/filters/network/source:conn_manager_lib",
-        "//contrib/sip_proxy/filters/network/source:protocol_interface",
+        "//contrib/sip_proxy/filters/network/source:conn_state_lib",
+        "//contrib/sip_proxy/filters/network/source:utility_interface",
         "//contrib/sip_proxy/filters/network/source/filters:factory_base_lib",
         "//contrib/sip_proxy/filters/network/source/filters:filter_interface",
         "//contrib/sip_proxy/filters/network/source/router:router_interface",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",
+        "@envoy_api//contrib/envoy/extensions/filters/network/sip_proxy/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -42,7 +44,6 @@ envoy_cc_test(
     name = "app_exception_impl_test",
     srcs = ["app_exception_impl_test.cc"],
     deps = [
-        ":mocks",
         "//contrib/sip_proxy/filters/network/source:app_exception_lib",
         "//test/test_common:printers_lib",
         "//test/test_common:utility_lib",

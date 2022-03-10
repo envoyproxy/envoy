@@ -56,7 +56,29 @@ bool checkProtoEquality(const ProtobufWkt::Value& proto1, std::string text_proto
   return Envoy::Protobuf::util::MessageDifferencer::Equals(proto1, proto2);
 }
 
-class ProtobufUtilityTest : public testing::Test, public TestScopedRuntime {};
+class RuntimeStatsHelper : public TestScopedRuntime {
+public:
+  explicit RuntimeStatsHelper()
+      : runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")),
+        deprecated_feature_seen_since_process_start_(
+            store_.gauge("runtime.deprecated_feature_seen_since_process_start",
+                         Stats::Gauge::ImportMode::NeverImport)) {
+
+    auto visitor = static_cast<ProtobufMessage::StrictValidationVisitorImpl*>(
+        &ProtobufMessage::getStrictValidationVisitor());
+    visitor->setRuntime(loader());
+  }
+  ~RuntimeStatsHelper() {
+    auto visitor = static_cast<ProtobufMessage::StrictValidationVisitorImpl*>(
+        &ProtobufMessage::getStrictValidationVisitor());
+    visitor->clearRuntime();
+  }
+
+  Stats::Counter& runtime_deprecated_feature_use_;
+  Stats::Gauge& deprecated_feature_seen_since_process_start_;
+};
+
+class ProtobufUtilityTest : public testing::Test, protected RuntimeStatsHelper {};
 
 TEST_F(ProtobufUtilityTest, ConvertPercentNaNDouble) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
@@ -1662,7 +1684,7 @@ TEST_F(ProtobufUtilityTest, MessageWip) {
   EXPECT_EQ(2, wip_counter.value());
 }
 
-class DeprecatedFieldsTest : public testing::Test, protected TestScopedRuntime {
+class DeprecatedFieldsTest : public testing::Test, protected RuntimeStatsHelper {
 protected:
   void checkForDeprecation(const Protobuf::Message& message) {
     MessageUtil::checkForUnexpectedFields(message, ProtobufMessage::getStrictValidationVisitor());
@@ -1683,6 +1705,8 @@ TEST_F(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
   base.set_not_deprecated("foo");
   // Fatal checks for a non-deprecated field should cause no problem.
   checkForDeprecation(base);
+  EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(0, deprecated_feature_seen_since_process_start_.value());
 }
 
 TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecatedEmitsError)) {
@@ -1692,6 +1716,8 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecatedEm
   EXPECT_LOG_CONTAINS("warning",
                       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
                       checkForDeprecation(base));
+  EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
 }
 
 TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecatedEmitsCrash) {
@@ -1699,12 +1725,14 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecatedEmitsCrash) {
   base.set_is_deprecated("foo");
   // Non-fatal checks for a deprecated field should throw an exception if the
   // runtime flag is enabled..
-  Runtime::LoaderSingleton::getExisting()->mergeValues({
+  mergeValues({
       {"envoy.features.fail_on_any_deprecated_feature", "true"},
   });
   EXPECT_THROW_WITH_REGEX(
       checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'");
+  EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(0, deprecated_feature_seen_since_process_start_.value());
 }
 
 // Use of a deprecated and disallowed field should result in an exception.
@@ -1728,9 +1756,8 @@ TEST_F(DeprecatedFieldsTest,
   // The config will be rejected, so the feature will not be used.
 
   // Now create a new snapshot with this feature allowed.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.is_deprecated_fatal",
-        "True "}});
+  mergeValues({{"envoy.deprecated_features:envoy.test.deprecation_test.Base.is_deprecated_fatal",
+                "True "}});
 
   // Now the same deprecation check should only trigger a warning.
   EXPECT_LOG_CONTAINS(
@@ -1752,8 +1779,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDisallowedWi
   // The config will be rejected, so the feature will not be used.
 
   // Now create a new snapshot with this all features allowed.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.features.enable_all_deprecated_features", "true"}});
+  mergeValues({{"envoy.features.enable_all_deprecated_features", "true"}});
 
   // Now the same deprecation check should only trigger a warning.
   EXPECT_LOG_CONTAINS(
@@ -1772,7 +1798,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(DisallowViaRuntime)) {
                       checkForDeprecation(base));
 
   // Now create a new snapshot with this feature disallowed.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  mergeValues(
       {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.is_deprecated", " false"}});
 
   EXPECT_THROW_WITH_REGEX(
@@ -1781,8 +1807,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(DisallowViaRuntime)) {
 
   // Verify that even when the enable_all_deprecated_features is enabled the
   // feature is disallowed.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.features.enable_all_deprecated_features", "true"}});
+  mergeValues({{"envoy.features.enable_all_deprecated_features", "true"}});
 
   EXPECT_THROW_WITH_REGEX(
       checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
@@ -1887,7 +1912,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RuntimeOverrideEnumDefault)
   envoy::test::deprecation_test::Base base;
   base.mutable_enum_container();
 
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  mergeValues(
       {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_DEFAULT", "false"}});
 
   // Make sure this is set up right.
@@ -1897,8 +1922,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RuntimeOverrideEnumDefault)
 
   // Verify that even when the enable_all_deprecated_features is enabled the
   // enum is disallowed.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.features.enable_all_deprecated_features", "true"}});
+  mergeValues({{"envoy.features.enable_all_deprecated_features", "true"}});
 
   EXPECT_THROW_WITH_REGEX(checkForDeprecation(base),
                           Envoy::ProtobufMessage::DeprecatedProtoFieldException,
@@ -1914,7 +1938,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnum)) {
                           Envoy::ProtobufMessage::DeprecatedProtoFieldException,
                           "Using deprecated value DEPRECATED_FATAL");
 
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  mergeValues(
       {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_FATAL", "true"}});
 
   EXPECT_LOG_CONTAINS(
@@ -1935,8 +1959,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnumGlobalOverride)) {
                           Envoy::ProtobufMessage::DeprecatedProtoFieldException,
                           "Using deprecated value DEPRECATED_FATAL");
 
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.features.enable_all_deprecated_features", "true"}});
+  mergeValues({{"envoy.features.enable_all_deprecated_features", "true"}});
 
   EXPECT_LOG_CONTAINS(
       "warning",

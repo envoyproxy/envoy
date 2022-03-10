@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // See the :ref:`architecture overview <arch_overview_outlier_detection>` for
 // more information on outlier detection.
-// [#next-free-field: 22]
+// [#next-free-field: 23]
 message OutlierDetection {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.cluster.OutlierDetection";
@@ -155,4 +155,10 @@ message OutlierDetection {
   // for more information. If not specified, the default value (300000ms or 300s) or
   // :ref:`base_ejection_time<envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>` value is applied, whatever is larger.
   google.protobuf.Duration max_ejection_time = 21 [(validate.rules).duration = {gt {}}];
+
+  // The maximum amount of jitter to add to the ejection time, in order to prevent
+  // a 'thundering herd' effect where all proxies try to reconnect to host at the same time.
+  // See :ref:`max_ejection_time_jitter<envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>`
+  // Defaults to 0s.
+  google.protobuf.Duration max_ejection_time_jitter = 22;
 }
