@@ -48,7 +48,6 @@ private:
   Runtime::FeatureFlag enabled_;
   LocalRateLimitStats stats_;
 
-  std::vector<RateLimit::LocalDescriptor> descriptors_;
   friend class LocalRateLimitTestBase;
 };
 
