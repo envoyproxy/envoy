@@ -1,3 +1,5 @@
+#include "envoy/config/accesslog/v3/accesslog.pb.h"
+#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
@@ -164,6 +166,8 @@ public:
         upstream_address_(Network::Utility::parseInternetAddressAndPort(upstream_ip_address_)),
         peer_address_(std::move(peer_address)) {
     // Disable strict mock warnings.
+    ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
+        .WillByDefault(SaveArg<0>(&access_log_data_));
     ON_CALL(os_sys_calls_, supportsIpTransparent()).WillByDefault(Return(true));
     EXPECT_CALL(os_sys_calls_, supportsUdpGro()).Times(AtLeast(0)).WillRepeatedly(Return(true));
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
@@ -175,10 +179,8 @@ public:
 
   ~UdpProxyFilterTest() override { EXPECT_CALL(callbacks_.udp_listener_, onDestroy()); }
 
-  void setup(const std::string& yaml, bool has_cluster = true, bool expect_gro = true) {
-    envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig config;
-    TestUtility::loadFromYamlAndValidate(yaml, config);
-
+  void setup(const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config, bool has_cluster = true, bool expect_gro = true) {
+    
     config_ = std::make_shared<UdpProxyFilterConfig>(factory_context_, config);
     EXPECT_CALL(factory_context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
@@ -244,11 +246,11 @@ public:
   ensureIpTransparentSocketOptions(const Network::Address::InstanceConstSharedPtr& upstream_address,
                                    const std::string& local_address, int ipv4_expect,
                                    int ipv6_expect) {
-    setup(R"EOF(
+    setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
 use_original_src_ip: true
-    )EOF");
+    )EOF"));
 
     expectSessionCreate(upstream_address);
     test_sessions_[0].expectSetIpTransparentSocketOption();
@@ -263,6 +265,27 @@ use_original_src_ip: true
 
     test_sessions_[0].recvDataFromUpstream("world");
     checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+  }
+
+  // Return the config from yaml, plus one file access log with the specified format
+  envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig
+  accessLogConfig(const std::string& yaml, const std::string& access_log_format) {
+    auto config = readConfig(yaml);
+
+    envoy::config::accesslog::v3::AccessLog* access_log = config.mutable_access_log()->Add();
+    access_log->set_name("envoy.access_loggers.file");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
+    file_access_log.set_path("unused");
+    file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        access_log_format);
+    access_log->mutable_typed_config()->PackFrom(file_access_log);
+    return config;
+  }
+
+  envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig readConfig(const std::string& yaml) {
+    envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig config;
+    TestUtility::loadFromYamlAndValidate(yaml, config);
+    return config;
   }
 
   bool isTransparentSocketOptionsSupported() {
@@ -283,6 +306,7 @@ use_original_src_ip: true
   Upstream::ClusterUpdateCallbacks* cluster_update_callbacks_{};
   std::unique_ptr<TestUdpProxyFilter> filter_;
   std::vector<TestSession> test_sessions_;
+  StringViewSaver access_log_data_;
   bool expect_gro_{};
   const Network::Address::InstanceConstSharedPtr upstream_address_;
   const Network::Address::InstanceConstSharedPtr peer_address_;
@@ -337,12 +361,12 @@ public:
 TEST_F(UdpProxyFilterTest, BasicFlow) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
 upstream_socket_config:
   prefer_gro: false
-  )EOF",
+  )EOF"),
         true, false);
 
   expectSessionCreate(upstream_address_);
@@ -371,10 +395,10 @@ upstream_socket_config:
 TEST_F(UdpProxyFilterTest, IdleTimeout) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF");
+  )EOF"));
 
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello");
@@ -397,10 +421,10 @@ cluster: fake_cluster
 TEST_F(UdpProxyFilterTest, SendReceiveErrorHandling) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF");
+  )EOF"));
 
   filter_->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
   EXPECT_EQ(1, config_->stats().downstream_sess_rx_errors_.value());
@@ -442,10 +466,10 @@ cluster: fake_cluster
 TEST_F(UdpProxyFilterTest, NoUpstreamHost) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF");
+  )EOF"));
 
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(nullptr));
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -457,10 +481,10 @@ cluster: fake_cluster
 TEST_F(UdpProxyFilterTest, NoUpstreamClusterAtCreation) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF",
+  )EOF"),
         false);
 
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -471,10 +495,10 @@ cluster: fake_cluster
 TEST_F(UdpProxyFilterTest, ClusterDynamicAddAndRemoval) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF",
+  )EOF"),
         false);
 
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -512,10 +536,10 @@ cluster: fake_cluster
 TEST_F(UdpProxyFilterTest, MaxSessionsCircuitBreaker) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF");
+  )EOF"));
 
   // Allow only a single session.
   factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(1, 0, 0, 0, 0);
@@ -549,10 +573,10 @@ cluster: fake_cluster
 TEST_F(UdpProxyFilterTest, RemoveHostSessions) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF");
+  )EOF"));
 
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello");
@@ -577,10 +601,10 @@ cluster: fake_cluster
 TEST_F(UdpProxyFilterTest, HostUnhealthyPickSameHost) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF");
+  )EOF"));
 
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello");
@@ -599,10 +623,10 @@ cluster: fake_cluster
 TEST_F(UdpProxyFilterTest, HostUnhealthyPickDifferentHost) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF");
+  )EOF"));
 
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello");
@@ -639,11 +663,11 @@ TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
 TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingBasicFlow) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
 use_per_packet_load_balancing: true
-  )EOF");
+  )EOF"));
 
   // Allow for two sessions.
   factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(2, 0, 0, 0, 0);
@@ -681,11 +705,11 @@ use_per_packet_load_balancing: true
 TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingFirstInvalidHost) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
 use_per_packet_load_balancing: true
-  )EOF");
+  )EOF"));
 
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(nullptr));
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -699,11 +723,11 @@ use_per_packet_load_balancing: true
 TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingSecondInvalidHost) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
 use_per_packet_load_balancing: true
-  )EOF");
+  )EOF"));
 
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello");
@@ -725,11 +749,11 @@ use_per_packet_load_balancing: true
 TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingRemoveHostSessions) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
 use_per_packet_load_balancing: true
-  )EOF");
+  )EOF"));
 
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello");
@@ -753,11 +777,11 @@ use_per_packet_load_balancing: true
 TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingRemoveCluster) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
 use_per_packet_load_balancing: true
-  )EOF");
+  )EOF"));
 
   // Allow for two sessions.
   factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(2, 0, 0, 0, 0);
@@ -790,11 +814,11 @@ use_per_packet_load_balancing: true
 TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingCannotCreateConnection) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
 use_per_packet_load_balancing: true
-  )EOF");
+  )EOF"));
 
   // Don't allow for any session.
   factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(0, 0, 0, 0, 0);
@@ -827,11 +851,11 @@ TEST_F(UdpProxyFilterIpv4Ipv6Test, NoSocketOptionIfUseOriginalSrcIpIsNotSet) {
 
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
 use_original_src_ip: false
-  )EOF");
+  )EOF"));
 
   ensureNoIpTransparentSocketOptions();
 }
@@ -845,10 +869,10 @@ TEST_F(UdpProxyFilterIpv4Ipv6Test, NoSocketOptionIfUseOriginalSrcIpIsNotMentione
 
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF");
+  )EOF"));
 
   ensureNoIpTransparentSocketOptions();
 }
@@ -867,7 +891,7 @@ use_original_src_ip: true
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      setup(config), EnvoyException,
+      setup(readConfig(config)), EnvoyException,
       "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy is "
       "not running with the CAP_NET_ADMIN capability.");
 }
@@ -876,12 +900,12 @@ use_original_src_ip: true
 TEST_F(UdpProxyFilterTest, HashPolicyWithSourceIp) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
 hash_policies:
 - source_ip: true
-  )EOF");
+  )EOF"));
 
   EXPECT_NE(nullptr, config_->hashPolicy());
 }
@@ -896,7 +920,7 @@ hash_policies:
 - source_ip: false
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(setup(config), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(setup(readConfig(config)), EnvoyException,
                           "caused by HashPolicyValidationError\\.SourceIp");
 }
 
@@ -904,10 +928,10 @@ hash_policies:
 TEST_F(UdpProxyFilterTest, NoHashPolicy) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF");
+  )EOF"));
 
   EXPECT_EQ(nullptr, config_->hashPolicy());
 }
@@ -916,12 +940,12 @@ cluster: fake_cluster
 TEST_F(UdpProxyFilterTest, HashWithSourceIp) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
 hash_policies:
 - source_ip: true
-  )EOF");
+  )EOF"));
 
   auto host = createHost(upstream_address_);
   auto generated_hash = HashUtil::xxHash64("10.0.0.1");
@@ -943,10 +967,10 @@ hash_policies:
 TEST_F(UdpProxyFilterTest, NullHashWithoutHashPolicy) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF");
+  )EOF"));
 
   auto host = createHost(upstream_address_);
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
@@ -966,12 +990,12 @@ cluster: fake_cluster
 TEST_F(UdpProxyFilterTest, HashPolicyWithKey) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
 hash_policies:
 - key: "key"
-  )EOF");
+  )EOF"));
 
   EXPECT_NE(nullptr, config_->hashPolicy());
 }
@@ -986,7 +1010,7 @@ hash_policies:
 - key: ""
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(setup(config), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(setup(readConfig(config)), EnvoyException,
                           "caused by HashPolicyValidationError\\.Key");
 }
 
@@ -994,12 +1018,12 @@ hash_policies:
 TEST_F(UdpProxyFilterTest, HashWithKey) {
   InSequence s;
 
-  setup(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
 hash_policies:
 - key: "key"
-  )EOF");
+  )EOF"));
 
   auto host = createHost(upstream_address_);
   auto generated_hash = HashUtil::xxHash64("key");
