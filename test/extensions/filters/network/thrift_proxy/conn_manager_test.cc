@@ -371,6 +371,9 @@ public:
       EXPECT_TRUE(header.empty());
     }
 
+    // This should not be incremented during a close triggered by a drain.
+    EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());
+
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
     EXPECT_EQ(1U, store_.counter("test.request").value());
