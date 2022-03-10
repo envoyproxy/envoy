@@ -341,3 +341,18 @@ envoy_cc_test_library(
         "@com_github_google_quiche//:quic_test_tools_qpack_qpack_encoder_test_utils_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "quic_transport_socket_factory_test",
+    srcs = ["quic_transport_socket_factory_test.cc"],
+    data = [
+        "//test/extensions/transport_sockets/tls/test_data:certs",
+    ],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/quic:quic_transport_socket_factory_lib",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
