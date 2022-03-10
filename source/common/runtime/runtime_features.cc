@@ -104,7 +104,7 @@ public:
 
   // Get the command line flag corresponding to the Envoy style feature name, or
   // nullptr if it is not a registered flag.
-    auto* getFlag(absl::string_view feature) const {
+  absl::CommandLineFlag* getFlag(absl::string_view feature) const {
     auto it = all_features_.find(feature);
     if (it == all_features_.end()) {
       return nullptr;
@@ -137,7 +137,7 @@ bool isRuntimeFeature(absl::string_view feature) {
 }
 
 bool runtimeFeatureEnabled(absl::string_view feature) {
-  auto* flag = RuntimeFeaturesDefaults::get().getFlag(feature);
+  absl::CommandLineFlag* flag = RuntimeFeaturesDefaults::get().getFlag(feature);
   if (flag == nullptr) {
     IS_ENVOY_BUG(absl::StrCat("Unable to find runtime feature ", feature));
     return false;
