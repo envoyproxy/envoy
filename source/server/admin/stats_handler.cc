@@ -99,6 +99,13 @@ Admin::RequestPtr StatsHandler::makeRequest(absl::string_view path, AdminStream&
   bool json = false;
   if (format_value.has_value()) {
     if (format_value.value() == "prometheus") {
+      // TODO(#16139): modify streaming algorithm to cover Prometheus.
+      //
+      // This may be easiest to accomplish by populating the set
+      // with tagExtractedName(), and allowing for vectors of
+      // stats as multiples will have the same tag-extracted names.
+      // Ideally we'd find a way to do this without slowing down
+      // the non-Prometheus implementations.
       Buffer::OwnedImpl response;
       Http::Code code = prometheusStats(path, response);
       return Admin::makeStaticTextRequest(response, code);
