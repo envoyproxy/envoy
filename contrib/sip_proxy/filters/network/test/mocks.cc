@@ -14,7 +14,7 @@ namespace Envoy {
 
 // Provide a specialization for ProtobufWkt::Struct (for MockFilterConfigFactory)
 template <>
-void MessageUtil::validate(const ProtobufWkt::Struct&, ProtobufMessage::ValidationVisitor&) {}
+void MessageUtil::validate(const ProtobufWkt::Struct&, ProtobufMessage::ValidationVisitor&, bool) {}
 
 namespace Extensions {
 namespace NetworkFilters {
@@ -24,9 +24,14 @@ MockConfig::MockConfig() = default;
 MockConfig::~MockConfig() = default;
 
 MockDecoderCallbacks::MockDecoderCallbacks() {
-  ON_CALL(*this, getLocalIp()).WillByDefault(Return("127.0.0.1"));
-  ON_CALL(*this, getOwnDomain()).WillByDefault(Return("pcsf-cfed.cncs.svc.cluster.local"));
-  ON_CALL(*this, getDomainMatchParamName()).WillByDefault(Return("x-suri"));
+  /*
+  envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService service1,service2;
+  service1.set_parameter("transport");
+  service1.set_domain("pcsf-cfed.cncs.svc.cluster.local");
+  service1.set_parameter("x-suri");
+  service1.set_domain("pcsf-cfed.cncs.svc.cluster.local");
+  local_services_.emplace_back(service1);
+  local_services_.emplace_back(service2); */
 }
 MockDecoderCallbacks::~MockDecoderCallbacks() = default;
 
@@ -91,6 +96,23 @@ MockRoute::MockRoute() { ON_CALL(*this, routeEntry()).WillByDefault(Return(&rout
 MockRoute::~MockRoute() = default;
 
 } // namespace Router
+
+MockTrafficRoutingAssistantHandler::MockTrafficRoutingAssistantHandler(
+    ConnectionManager& parent,
+    const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig& config,
+    Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info)
+    : TrafficRoutingAssistantHandler(parent, config, context, stream_info) {}
+
+MockTrafficRoutingAssistantHandler::~MockTrafficRoutingAssistantHandler() = default;
+
+MockConnectionManager::MockConnectionManager(
+    Config& config, Random::RandomGenerator& random_generator, TimeSource& time_system,
+    Server::Configuration::FactoryContext& context,
+    std::shared_ptr<Router::TransactionInfos> transaction_infos)
+    : ConnectionManager(config, random_generator, time_system, context, transaction_infos) {}
+
+MockConnectionManager::~MockConnectionManager() = default;
+
 } // namespace SipProxy
 } // namespace NetworkFilters
 } // namespace Extensions

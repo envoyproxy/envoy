@@ -70,8 +70,7 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
 
 ## Cutting a release
 
-* We do releases every 3 months, at the end of each quarter, as described in the
-  [release schedule](RELEASES.md#release-schedule).
+* We do releases every 3 months, as described in the [release schedule](RELEASES.md#release-schedule).
 * Take a look at open issues tagged with the current release, by
   [searching](https://github.com/envoyproxy/envoy/issues) for
   "is:open is:issue milestone:[current milestone]" and either hold off until

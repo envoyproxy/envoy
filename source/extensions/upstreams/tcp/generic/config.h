@@ -19,7 +19,7 @@ public:
   std::string category() const override { return "envoy.upstreams"; }
   TcpProxy::GenericConnPoolPtr createGenericConnPool(
       Upstream::ThreadLocalCluster& thread_local_cluster,
-      const absl::optional<TunnelingConfig>& config, Upstream::LoadBalancerContext* context,
+      TcpProxy::TunnelingConfigHelperOptConstRef config, Upstream::LoadBalancerContext* context,
       Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

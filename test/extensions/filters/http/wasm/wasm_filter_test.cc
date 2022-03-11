@@ -6,7 +6,6 @@
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/network/connection.h"
 #include "test/mocks/router/mocks.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/wasm_base.h"
 
 using testing::Eq;
@@ -952,7 +951,6 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
     proto_or_cluster.push_back("grpc_call_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     setupTest(id);
     setupFilter();
 
@@ -1030,7 +1028,6 @@ TEST_P(WasmHttpFilterTest, GrpcCallBadCall) {
     proto_or_cluster.push_back("grpc_call_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     setupTest(id);
     setupFilter();
 
@@ -1072,7 +1069,6 @@ TEST_P(WasmHttpFilterTest, GrpcCallFailure) {
     proto_or_cluster.push_back("grpc_call_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     setupTest(id);
     setupFilter();
 
@@ -1162,7 +1158,6 @@ TEST_P(WasmHttpFilterTest, GrpcCallCancel) {
     proto_or_cluster.push_back("grpc_call_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     setupTest(id);
     setupFilter();
 
@@ -1221,7 +1216,6 @@ TEST_P(WasmHttpFilterTest, GrpcCallClose) {
     proto_or_cluster.push_back("grpc_call_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     setupTest(id);
     setupFilter();
 
@@ -1280,7 +1274,6 @@ TEST_P(WasmHttpFilterTest, GrpcCallAfterDestroyed) {
     proto_or_cluster.push_back("grpc_call_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     setupTest(id);
     setupFilter();
 
@@ -1384,7 +1377,6 @@ TEST_P(WasmHttpFilterTest, GrpcStream) {
     proto_or_cluster.push_back("grpc_stream_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     Grpc::RawAsyncStreamCallbacks* callbacks = nullptr;
     setupGrpcStreamTest(callbacks, id);
 
@@ -1446,7 +1438,6 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseLocal) {
     proto_or_cluster.push_back("grpc_stream_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     Grpc::RawAsyncStreamCallbacks* callbacks = nullptr;
     setupGrpcStreamTest(callbacks, id);
 
@@ -1507,7 +1498,6 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseRemote) {
     proto_or_cluster.push_back("grpc_stream_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     Grpc::RawAsyncStreamCallbacks* callbacks = nullptr;
     setupGrpcStreamTest(callbacks, id);
 
@@ -1567,7 +1557,6 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCancel) {
     proto_or_cluster.push_back("grpc_stream_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     Grpc::RawAsyncStreamCallbacks* callbacks = nullptr;
     setupGrpcStreamTest(callbacks, id);
 
@@ -1618,7 +1607,6 @@ TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
     proto_or_cluster.push_back("grpc_stream_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     Grpc::RawAsyncStreamCallbacks* callbacks = nullptr;
     setupGrpcStreamTest(callbacks, id);
 
@@ -1727,10 +1715,10 @@ TEST_P(WasmHttpFilterTest, Metadata) {
   StreamInfo::MockStreamInfo log_stream_info;
   filter().log(&request_headers, nullptr, nullptr, log_stream_info);
 
-  const auto& result =
+  const auto* result =
       request_stream_info_.filterState()->getDataReadOnly<Filters::Common::Expr::CelState>(
           "wasm.wasm_request_set_key");
-  EXPECT_EQ("wasm_request_set_value", result.value());
+  EXPECT_EQ("wasm_request_set_value", result->value());
 
   filter().onDestroy();
   filter().onDestroy(); // Does nothing.

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bitset>
 #include <cmath>
 #include <cstdint>
 #include <memory>
@@ -23,6 +24,8 @@ namespace Upstream {
 
 // Priority levels and localities are considered overprovisioned with this factor.
 static constexpr uint32_t kDefaultOverProvisioningFactor = 140;
+
+using HostStatusSet = std::bitset<32>;
 
 /**
  * Base class for all LB implementations.
@@ -155,16 +158,30 @@ protected:
   // The total count of healthy hosts across all priority levels.
   uint32_t total_healthy_hosts_;
 
+  // Expected override host statues. Every bit in the OverrideHostStatus represent an enum value of
+  // Host::Health. The specific correspondence is shown below:
+  //
+  // * 0b001: Host::Health::Unhealthy
+  // * 0b010: Host::Health::Degraded
+  // * 0b100: Host::Health::Healthy
+  //
+  // If multiple bit fields are set, it is acceptable as long as the status of override host is in
+  // any of these statuses.
+  const HostStatusSet override_host_status_{};
+
 private:
   Common::CallbackHandlePtr priority_update_cb_;
 };
 
 class LoadBalancerContextBase : public LoadBalancerContext {
 public:
-  static bool validateOverrideHostStatus(Host::Health health, OverrideHostStatus status);
-
-  static HostConstSharedPtr selectOverrideHost(const HostMap* host_map,
+  // A utility function to select override host from host map according to load balancer context.
+  static HostConstSharedPtr selectOverrideHost(const HostMap* host_map, HostStatusSet status,
                                                LoadBalancerContext* context);
+
+  // A utility function to create override host status from lb config.
+  static HostStatusSet createOverrideHostStatus(
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   absl::optional<uint64_t> computeHashKey() override { return {}; }
 
@@ -336,24 +353,30 @@ private:
 
   HostSet& localHostSet() const { return *local_priority_set_->hostSetsPerPriority()[0]; }
 
-  static HostsSource::SourceType localitySourceType(HostAvailability host_availability) {
+  static absl::optional<HostsSource::SourceType>
+  localitySourceType(HostAvailability host_availability) {
     switch (host_availability) {
     case HostAvailability::Healthy:
-      return HostsSource::SourceType::LocalityHealthyHosts;
+      return absl::make_optional<HostsSource::SourceType>(
+          HostsSource::SourceType::LocalityHealthyHosts);
     case HostAvailability::Degraded:
-      return HostsSource::SourceType::LocalityDegradedHosts;
+      return absl::make_optional<HostsSource::SourceType>(
+          HostsSource::SourceType::LocalityDegradedHosts);
     }
-    PANIC_DUE_TO_CORRUPT_ENUM;
+    IS_ENVOY_BUG("unexpected locality source type enum");
+    return absl::nullopt;
   }
 
-  static HostsSource::SourceType sourceType(HostAvailability host_availability) {
+  static absl::optional<HostsSource::SourceType> sourceType(HostAvailability host_availability) {
     switch (host_availability) {
     case HostAvailability::Healthy:
-      return HostsSource::SourceType::HealthyHosts;
+      return absl::make_optional<HostsSource::SourceType>(HostsSource::SourceType::HealthyHosts);
     case HostAvailability::Degraded:
-      return HostsSource::SourceType::DegradedHosts;
+      return absl::make_optional<HostsSource::SourceType>(HostsSource::SourceType::DegradedHosts);
     }
-    PANIC_DUE_TO_CORRUPT_ENUM;
+
+    IS_ENVOY_BUG("unexpected source type enum");
+    return absl::nullopt;
   }
 
   // The set of local Envoy instances which are load balancing across priority_set_.
@@ -378,6 +401,8 @@ private:
   std::vector<PerPriorityStatePtr> per_priority_state_;
   Common::CallbackHandlePtr priority_update_cb_;
   Common::CallbackHandlePtr local_priority_set_member_update_cb_handle_;
+
+  friend class TestZoneAwareLoadBalancer;
 };
 
 /**
@@ -459,6 +484,7 @@ protected:
   const absl::optional<Runtime::Double> aggression_runtime_;
   TimeSource& time_source_;
   MonotonicTime latest_host_added_time_;
+  const double slow_start_min_weight_percent_;
 };
 
 /**

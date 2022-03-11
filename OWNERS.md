@@ -24,11 +24,11 @@ routing PRs, questions, etc. to the right place.
   * Upstream, host/priority sets, load balancing, and retry plugins.
 * Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
   * TLS, TCP proxy, listeners, and HTTP proxy/connection pooling.
+* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
+  * Data plane, codecs, security, configuration.
 
 # Maintainers
 
-* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
-  * Data plane, codecs, security, configuration.
 * Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
   * Outlier detection, HTTP routing, xDS, configuration/operational questions.
 * Dhi Aurrahman ([dio](https://github.com/dio)) (dio@rockybars.com)
@@ -70,6 +70,9 @@ without further review.
 * William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
 * Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
 * Tim Walsh ([twghu](https://github.com/twghu)) (walsh@redhat.com)
+* Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
+* Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) (pcrao@google.com)
+* Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
 
 In addition to the permanent Envoy security team, we have additional temporary
 contributors to envoy-setec and relevant Slack channels from:

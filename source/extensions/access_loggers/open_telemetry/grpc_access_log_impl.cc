@@ -23,13 +23,10 @@ namespace OpenTelemetry {
 GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
     const Grpc::RawAsyncClientSharedPtr& client,
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-    std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
     Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
-    : GrpcAccessLogger(client, buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher, scope,
-                       GRPC_LOG_STATS_PREFIX,
+    : GrpcAccessLogger(client, config, dispatcher, scope, GRPC_LOG_STATS_PREFIX,
                        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                           "opentelemetry.proto.collector.logs.v1.LogsService.Export"),
-                       config.grpc_stream_retry_policy()) {
+                           "opentelemetry.proto.collector.logs.v1.LogsService.Export")) {
   initMessageRoot(config.log_name(), local_info);
 }
 
@@ -76,12 +73,8 @@ GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& a
 
 GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-    const Grpc::RawAsyncClientSharedPtr& client,
-    std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
-    Event::Dispatcher& dispatcher) {
-  return std::make_shared<GrpcAccessLoggerImpl>(client, config, buffer_flush_interval_msec,
-                                                max_buffer_size_bytes, dispatcher, local_info_,
-                                                scope_);
+    const Grpc::RawAsyncClientSharedPtr& client, Event::Dispatcher& dispatcher) {
+  return std::make_shared<GrpcAccessLoggerImpl>(client, config, dispatcher, local_info_, scope_);
 }
 
 } // namespace OpenTelemetry
