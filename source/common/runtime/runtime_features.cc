@@ -41,7 +41,6 @@ RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
 RUNTIME_GUARD(envoy_reloadable_features_internal_address);
 RUNTIME_GUARD(envoy_reloadable_features_listener_reuse_port_default_enabled);
-RUNTIME_GUARD(envoy_reloadable_features_listener_wildcard_match_ip_family);
 RUNTIME_GUARD(envoy_reloadable_features_new_tcp_connection_pool);
 RUNTIME_GUARD(envoy_reloadable_features_postpone_h3_client_connect_to_next_loop);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_102_103);
@@ -132,47 +131,6 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 // clang-format off
-<<<<<<< HEAD
-constexpr const char* runtime_features[] = {
-    // Enabled
-    "envoy.reloadable_features.test_feature_true",
-    // Begin alphabetically sorted section.
-    "envoy.reloadable_features.allow_response_for_timeout",
-    "envoy.reloadable_features.allow_upstream_inline_write",
-    "envoy.reloadable_features.conn_pool_delete_when_idle",
-    "envoy.reloadable_features.correct_scheme_and_xfp",
-    "envoy.reloadable_features.correctly_validate_alpn",
-    "envoy.reloadable_features.disable_tls_inspector_injection",
-    "envoy.reloadable_features.enable_grpc_async_client_cache",
-    "envoy.reloadable_features.fix_added_trailers",
-    "envoy.reloadable_features.handle_stream_reset_during_hcm_encoding",
-    "envoy.reloadable_features.health_check.graceful_goaway_handling",
-    "envoy.reloadable_features.http2_allow_capacity_increase_by_settings",
-    "envoy.reloadable_features.http2_consume_stream_refused_errors",
-    "envoy.reloadable_features.http2_new_codec_wrapper",
-    "envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect",
-    "envoy.reloadable_features.http_reject_path_with_fragment",
-    "envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled",
-    "envoy.reloadable_features.internal_address",
-    "envoy.reloadable_features.internal_redirects_with_body",
-    "envoy.reloadable_features.listener_reuse_port_default_enabled",
-    "envoy.reloadable_features.new_tcp_connection_pool",
-    "envoy.reloadable_features.no_chunked_encoding_header_for_304",
-    "envoy.reloadable_features.proxy_102_103",
-    "envoy.reloadable_features.remove_legacy_json",
-    "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place",
-    "envoy.reloadable_features.unquote_log_string_values",
-    "envoy.reloadable_features.update_expected_rq_timeout_on_retry",
-    "envoy.reloadable_features.use_dns_ttl",
-    "envoy.reloadable_features.validate_connect",
-    "envoy.reloadable_features.vhds_heartbeats",
-    "envoy.restart_features.explicit_wildcard_resource",
-    "envoy.restart_features.use_apple_api_for_dns_lookups",
-    // Misplaced flags: please do not add flags to this section.
-    "envoy.reloadable_features.sanitize_http_header_referer",
-    "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection",
-    // End misplaced flags: please do not add flags in this section.
-=======
 constexpr absl::Flag<bool>* runtime_features[] = {
   // Test flags
   &FLAGS_envoy_reloadable_features_test_feature_false,
@@ -217,7 +175,6 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_restart_features_explicit_wildcard_resource,
   &FLAGS_envoy_restart_features_use_apple_api_for_dns_lookups,
   &FLAGS_envoy_restart_features_no_runtime_singleton,
->>>>>>> main
 };
 // clang-format on
 
