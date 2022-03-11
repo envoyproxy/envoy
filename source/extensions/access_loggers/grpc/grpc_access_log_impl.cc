@@ -1,7 +1,5 @@
 #include "source/extensions/access_loggers/grpc/grpc_access_log_impl.h"
 
-#include <google/protobuf/descriptor.h>
-
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/grpc/async_client_manager.h"

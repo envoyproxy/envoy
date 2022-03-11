@@ -53,7 +53,7 @@ public:
   void prepareBufferedClient(uint32_t buffer_size, std::chrono::milliseconds ttl) {
     buffered_client_ =
         std::make_unique<BufferedAsyncClient<helloworld::HelloRequest, helloworld::HelloReply>>(
-            buffer_size, *method_descriptor_, callback_, *client_, *dispatcher_, ttl);
+            buffer_size, *method_descriptor_, callback_, *client_, *dispatcher_, ttl, stats_);
   }
 
   void bufferNewMessage(absl::optional<uint32_t> expected_message_id) {
@@ -96,6 +96,7 @@ public:
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> callback_;
   std::unique_ptr<BufferedAsyncClient<helloworld::HelloRequest, helloworld::HelloReply>>
       buffered_client_;
+  Stats::TestUtil::TestStore stats_;
 };
 
 TEST_F(BufferedAsyncClientTest, BasicSendFlow) {

@@ -1016,6 +1016,7 @@ ratelimiter
 rawseti
 rc
 rdsone
+reachability
 readded
 readonly
 readv

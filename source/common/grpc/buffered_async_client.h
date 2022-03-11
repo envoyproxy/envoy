@@ -112,6 +112,12 @@ public:
     return message_buffer_;
   }
 
+  void resetActiveStream() {
+    if (active_stream_ != nullptr) {
+      active_stream_ = nullptr;
+    }
+  }
+
 private:
   void erasePendingMessage(uint64_t message_id) {
     // This case will be considered if `onSuccess` had called with unknown message id that is not
