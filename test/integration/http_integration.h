@@ -142,6 +142,9 @@ protected:
   // Enable the encoding/decoding of Http1 trailers upstream
   ConfigHelper::ConfigModifierFunction setEnableUpstreamTrailersHttp1();
 
+  // Enable Proxy-Status response header.
+  ConfigHelper::HttpModifierFunction configureProxyStatus();
+
   // Sends |request_headers| and |request_body_size| bytes of body upstream.
   // Configured upstream to send |response_headers| and |response_body_size|
   // bytes of body downstream.
@@ -219,7 +222,6 @@ protected:
                                               int upstream_index = 0,
                                               const std::string& path = "/test/long/url",
                                               const std::string& authority = "host");
-  void testRequestAndResponseShutdownWithActiveConnection();
 
   // Disconnect tests
   void testRouterUpstreamDisconnectBeforeRequestComplete();

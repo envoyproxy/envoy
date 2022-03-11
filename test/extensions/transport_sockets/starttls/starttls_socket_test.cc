@@ -50,6 +50,10 @@ TEST(StartTlsTest, BasicSwitch) {
   EXPECT_CALL(*ssl_socket, canFlushClose()).Times(0);
   socket->canFlushClose();
 
+  EXPECT_CALL(*raw_socket, configureInitialCongestionWindow(100, std::chrono::microseconds(123)));
+  EXPECT_CALL(*ssl_socket, configureInitialCongestionWindow(_, _)).Times(0);
+  socket->configureInitialCongestionWindow(100, std::chrono::microseconds(123));
+
   EXPECT_CALL(*raw_socket, ssl());
   EXPECT_CALL(*ssl_socket, ssl()).Times(0);
   socket->ssl();
@@ -90,6 +94,9 @@ TEST(StartTlsTest, BasicSwitch) {
   EXPECT_CALL(*ssl_socket, canFlushClose());
   socket->canFlushClose();
 
+  EXPECT_CALL(*ssl_socket, configureInitialCongestionWindow(200, std::chrono::microseconds(223)));
+  socket->configureInitialCongestionWindow(200, std::chrono::microseconds(223));
+
   EXPECT_CALL(*ssl_socket, ssl());
   socket->ssl();
 
@@ -113,7 +120,9 @@ TEST(StartTls, BasicFactoryTest) {
       Network::TransportSocketFactoryPtr(raw_buffer_factory),
       Network::TransportSocketFactoryPtr(ssl_factory));
   ASSERT_FALSE(factory->implementsSecureTransport());
-  ASSERT_FALSE(factory->usesProxyProtocolOptions());
+  std::vector<uint8_t> key;
+  factory->hashKey(key, nullptr);
+  EXPECT_EQ(0, key.size());
 }
 
 } // namespace StartTls

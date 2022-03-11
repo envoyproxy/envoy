@@ -74,6 +74,9 @@ public:
   Admin& admin() override { return *admin_; }
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override { return *config_.clusterManager(); }
+  const Upstream::ClusterManager& clusterManager() const override {
+    return *config_.clusterManager();
+  }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override {
@@ -91,7 +94,7 @@ public:
   ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
-  Runtime::Loader& runtime() override { return Runtime::LoaderSingleton::get(); }
+  Runtime::Loader& runtime() override { return runtime_singleton_->instance(); }
   void shutdown() override;
   bool isShutdown() override { return false; }
   void shutdownAdmin() override {}

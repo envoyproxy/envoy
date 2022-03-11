@@ -298,29 +298,9 @@ void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
       {"grpc-status", std::to_string(static_cast<uint32_t>(status))}});
 }
 
-// The TestHttp1ServerConnectionImpl outlives its underlying Network::Connection
-// so must not access the Connection on teardown. To achieve this, clear the
-// read disable calls to avoid checking / editing the Connection blocked state.
 class TestHttp1ServerConnectionImpl : public Http::Http1::ServerConnectionImpl {
 public:
   using Http::Http1::ServerConnectionImpl::ServerConnectionImpl;
-
-  Http::Http1::ParserStatus onMessageCompleteBase() override {
-    auto rc = ServerConnectionImpl::onMessageCompleteBase();
-
-    if (activeRequest() && activeRequest()->request_decoder_) {
-      // Undo the read disable from the base class - we have many tests which
-      // waitForDisconnect after a full request has been read which will not
-      // receive the disconnect if reading is disabled.
-      activeRequest()->response_encoder_.readDisable(false);
-    }
-    return rc;
-  }
-  ~TestHttp1ServerConnectionImpl() override {
-    if (activeRequest()) {
-      activeRequest()->response_encoder_.clearReadDisableCallsForTests();
-    }
-  }
 };
 
 class TestHttp2ServerConnectionImpl : public Http::Http2::ServerConnectionImpl {
@@ -487,6 +467,21 @@ AssertionResult FakeConnectionBase::waitForHalfClose(milliseconds timeout) {
   return AssertionSuccess();
 }
 
+AssertionResult FakeConnectionBase::waitForNoPost(milliseconds timeout) {
+  absl::MutexLock lock(&lock_);
+  if (!time_system_.waitFor(
+          lock_,
+          absl::Condition(
+              [](void* fake_connection) -> bool {
+                return static_cast<FakeConnectionBase*>(fake_connection)->pending_cbs_ == 0;
+              },
+              this),
+          timeout)) {
+    return AssertionFailure() << "Timed out waiting for ops on this connection";
+  }
+  return AssertionSuccess();
+}
+
 void FakeConnectionBase::postToConnectionThread(std::function<void()> cb) {
   ++pending_cbs_;
   dispatcher_.post([this, cb]() {
@@ -630,7 +625,7 @@ void FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManage
 
 void FakeUpstream::threadRoutine() {
   socket_factory_->doFinalPreWorkerInit();
-  handler_->addListener(absl::nullopt, listener_);
+  handler_->addListener(absl::nullopt, listener_, runtime_);
   server_initialized_.setReady();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   handler_.reset();

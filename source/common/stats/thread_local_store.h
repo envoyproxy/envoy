@@ -17,7 +17,7 @@
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
 #include "source/common/stats/null_text_readout.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -104,8 +104,8 @@ public:
   const HistogramStatistics& cumulativeStatistics() const override {
     return cumulative_statistics_;
   }
-  const std::string quantileSummary() const override;
-  const std::string bucketSummary() const override;
+  std::string quantileSummary() const override;
+  std::string bucketSummary() const override;
 
   // Stats::Metric
   SymbolTable& symbolTable() override;
@@ -158,8 +158,8 @@ public:
   Counter& counterFromString(const std::string& name) override {
     return default_scope_->counterFromString(name);
   }
-  ScopePtr createScope(const std::string& name) override;
-  ScopePtr scopeFromStatName(StatName name) override;
+  ScopeSharedPtr createScope(const std::string& name) override;
+  ScopeSharedPtr scopeFromStatName(StatName name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
@@ -247,6 +247,7 @@ public:
   void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
   void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
   void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
+  void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override;
   void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override;
 
   // Stats::StoreRoot
@@ -347,10 +348,10 @@ private:
                                              Histogram::Unit unit) override;
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
-    ScopePtr createScope(const std::string& name) override {
+    ScopeSharedPtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
     }
-    ScopePtr scopeFromStatName(StatName name) override {
+    ScopeSharedPtr scopeFromStatName(StatName name) override {
       SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
       return parent_.scopeFromStatName(StatName(joined.get()));
     }
@@ -519,7 +520,7 @@ private:
   ThreadLocal::TypedSlotPtr<TlsCache> tls_cache_;
   mutable Thread::MutexBasicLockable lock_;
   absl::flat_hash_set<ScopeImpl*> scopes_ ABSL_GUARDED_BY(lock_);
-  ScopePtr default_scope_;
+  ScopeSharedPtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
   StatsMatcherPtr stats_matcher_;

@@ -108,7 +108,7 @@ void ValidationInstance::initialize(const Options& options,
       admin(), runtime(), stats(), threadLocal(), dnsResolver(), sslContextManager(), dispatcher(),
       localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
       grpc_context_, router_context_, accessLogManager(), singletonManager(), options,
-      quic_stat_names_);
+      quic_stat_names_, *this);
   config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
   runtime().initialize(clusterManager());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });

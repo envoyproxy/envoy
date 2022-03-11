@@ -137,6 +137,7 @@ uint32_t Utility::portFromUdpUrl(const std::string& url) {
 Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::string& ip_address,
                                                                      uint16_t port, bool v6only) {
   sockaddr_in sa4;
+  memset(&sa4, 0, sizeof(sa4));
   if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {
     sa4.sin_family = AF_INET;
     sa4.sin_port = htons(port);
@@ -346,12 +347,14 @@ Address::InstanceConstSharedPtr Utility::getIpv6LoopbackAddress() {
                          new Address::Ipv6Instance("::1", 0, nullptr));
 }
 
-Address::InstanceConstSharedPtr Utility::getIpv4AnyAddress(uint32_t port) {
-  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr, new Address::Ipv4Instance(port));
+Address::InstanceConstSharedPtr Utility::getIpv4AnyAddress() {
+  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr,
+                         new Address::Ipv4Instance(static_cast<uint32_t>(0)));
 }
 
-Address::InstanceConstSharedPtr Utility::getIpv6AnyAddress(uint32_t port) {
-  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr, new Address::Ipv6Instance(port));
+Address::InstanceConstSharedPtr Utility::getIpv6AnyAddress() {
+  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr,
+                         new Address::Ipv6Instance(static_cast<uint32_t>(0)));
 }
 
 const std::string& Utility::getIpv4CidrCatchAllAddress() {

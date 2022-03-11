@@ -479,8 +479,11 @@ public:
    * Set the buffer's high watermark. The buffer's low watermark is implicitly set to half the high
    * watermark. Setting the high watermark to 0 disables watermark functionality.
    * @param watermark supplies the buffer high watermark size threshold, in bytes.
+   * @param watermark supplies the overflow multiplier, in bytes.
+   *        If set to non-zero, overflow callbacks will be called if the
+   *        buffered data exceeds watermark * overflow_multiplier.
    */
-  virtual void setWatermarks(uint32_t watermark) PURE;
+  virtual void setWatermarks(uint32_t watermark, uint32_t overflow_multiplier = 0) PURE;
 
   /**
    * Returns the configured high watermark. A return value of 0 indicates that watermark

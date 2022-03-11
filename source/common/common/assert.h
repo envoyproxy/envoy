@@ -120,13 +120,13 @@ void resetEnvoyBugCountersForTest();
  * RELEASE_ASSERT(foo == bar, "reason foo should actually be bar");
  * new uses of RELEASE_ASSERT should supply a verbose explanation of what went wrong.
  */
-#define RELEASE_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort(), DETAILS)
+#define RELEASE_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, ::abort(), DETAILS)
 
 /**
  * Assert macro intended for security guarantees. It has the same functionality
  * as RELEASE_ASSERT, but is intended for memory bounds-checking.
  */
-#define SECURITY_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort(), DETAILS)
+#define SECURITY_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, ::abort(), DETAILS)
 
 // ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE compiles all ASSERTs in release mode.
 #ifdef ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE
@@ -138,7 +138,7 @@ void resetEnvoyBugCountersForTest();
 // This if condition represents any case where ASSERT()s are compiled in.
 
 #if !defined(NDEBUG) // If this is a debug build.
-#define ASSERT_ACTION abort()
+#define ASSERT_ACTION ::abort()
 #else // If this is not a debug build, but ENVOY_LOG_(FAST)_DEBUG_ASSERT_IN_RELEASE is defined.
 #define ASSERT_ACTION                                                                              \
   Envoy::Assert::invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly(                     \
@@ -161,7 +161,7 @@ void resetEnvoyBugCountersForTest();
  * should always pass but that sometimes fails for an unknown reason. The macro allows it to
  * be temporarily compiled out while the failure is triaged and investigated.
  */
-#define KNOWN_ISSUE_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort(), DETAILS)
+#define KNOWN_ISSUE_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, ::abort(), DETAILS)
 #else
 // This non-implementation ensures that its argument is a valid expression that can be statically
 // casted to a bool, but the expression is never evaluated and will be compiled away.
@@ -197,13 +197,13 @@ void resetEnvoyBugCountersForTest();
   do {                                                                                             \
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,      \
                         "panic: {}", X);                                                           \
-    abort();                                                                                       \
+    ::abort();                                                                                     \
   } while (false)
 
 // We do not want to crash on failure in tests exercising ENVOY_BUGs while running coverage in debug
 // mode. Crashing causes flakes when forking to expect a debug death and reduces lines of coverage.
 #if !defined(NDEBUG) && !defined(ENVOY_CONFIG_COVERAGE)
-#define ENVOY_BUG_ACTION abort()
+#define ENVOY_BUG_ACTION ::abort()
 #else
 #define ENVOY_BUG_ACTION                                                                           \
   Envoy::Assert::invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly(__FILE__                 \
@@ -249,12 +249,6 @@ void resetEnvoyBugCountersForTest();
 
 // Always triggers ENVOY_BUG. This is intended for paths that are not expected to be reached.
 #define IS_ENVOY_BUG(...) ENVOY_BUG(false, __VA_ARGS__);
-
-// NOT_REACHED_GCOVR_EXCL_LINE is for spots the compiler insists on having a return, but where we
-// know that it shouldn't be possible to arrive there, assuming no horrendous bugs. For example,
-// after a switch (some_enum) with all enum values included in the cases. The macro name includes
-// "GCOVR_EXCL_LINE" to exclude the macro's usage from code coverage reports.
-#define NOT_REACHED_GCOVR_EXCL_LINE PANIC("not reached")
 
 // It is safer to avoid defaults in switch statements, so that as new enums are added, the compiler
 // checks that new code is added as well. Google's proto library adds 2 sentinel values which should

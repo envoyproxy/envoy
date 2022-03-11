@@ -230,9 +230,9 @@ def format_header_from_file(
     # TODO(htuch): remove once v3 fixes this naming issue in
     # https://github.com/envoyproxy/envoy/issues/8120.
     if file_proto.package in ['envoy.api.v2.listener', 'envoy.api.v2.cluster']:
-        qualified_package = '.'.join(s.capitalize() for s in file_proto.package.split('.')) + 'NS'
-        options.csharp_namespace = qualified_package
-        options.ruby_package = qualified_package
+        names = [s.capitalize() for s in file_proto.package.split('.')]
+        options.csharp_namespace = '.'.join(names) + 'NS'
+        options.ruby_package = '::'.join(names) + 'NS'
 
     if file_proto.service:
         options.java_generic_services = True

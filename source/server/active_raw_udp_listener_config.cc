@@ -13,7 +13,7 @@ ActiveRawUdpListenerFactory::ActiveRawUdpListenerFactory(uint32_t concurrency)
     : concurrency_(concurrency) {}
 
 Network::ConnectionHandler::ActiveUdpListenerPtr
-ActiveRawUdpListenerFactory::createActiveUdpListener(uint32_t worker_index,
+ActiveRawUdpListenerFactory::createActiveUdpListener(Runtime::Loader&, uint32_t worker_index,
                                                      Network::UdpConnectionHandler& parent,
                                                      Event::Dispatcher& dispatcher,
                                                      Network::ListenerConfig& config) {

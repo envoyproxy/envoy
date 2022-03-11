@@ -333,7 +333,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)),
       strip_trailing_host_dot_(config.strip_trailing_host_dot()),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config.common_http_protocol_options(), max_requests_per_connection, 0)) {
+          config.common_http_protocol_options(), max_requests_per_connection, 0)),
+      proxy_status_config_(config.has_proxy_status_config()
+                               ? std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>(
+                                     config.proxy_status_config())
+                               : nullptr) {
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
@@ -420,11 +424,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         config, context_.getServerFactoryContext(), context_.initManager(), stats_prefix_,
         scoped_routes_config_provider_manager_);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      RouteSpecifierCase::ROUTE_SPECIFIER_NOT_SET:
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   switch (config.forward_client_cert_details()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       SANITIZE:
     forward_client_cert_ = Http::ForwardClientCertType::Sanitize;
@@ -445,8 +451,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       ALWAYS_FORWARD_ONLY:
     forward_client_cert_ = Http::ForwardClientCertType::AlwaysForwardOnly;
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const auto& set_current_client_cert_details = config.set_current_client_cert_details();
@@ -479,6 +483,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     // Listener level traffic direction overrides the operation name
     switch (context.direction()) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::config::core::v3::UNSPECIFIED: {
       // Continuing legacy behavior; if unspecified, we treat this as ingress.
       tracing_operation_name = Tracing::OperationName::Ingress;
@@ -490,8 +495,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     case envoy::config::core::v3::OUTBOUND:
       tracing_operation_name = Tracing::OperationName::Egress;
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
     Tracing::CustomTagMap custom_tags;
@@ -543,6 +546,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   switch (config.codec_type()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       AUTO:
     codec_type_ = CodecType::AUTO;
@@ -566,8 +570,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     throw EnvoyException("HTTP3 configured but not enabled in the build.");
 #endif
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   if (codec_type_ != CodecType::HTTP3 && context_.isQuicListener()) {
     throw EnvoyException("Non-HTTP/3 codec configured on QUIC listener.");
@@ -655,7 +657,7 @@ void HttpConnectionManagerConfig::processFilter(
   ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
   ENVOY_LOG(debug, "    config: {}",
             MessageUtil::getJsonStringFromMessageOrError(
-                static_cast<const Protobuf::Message&>(proto_config.typed_config()), true));
+                static_cast<const Protobuf::Message&>(proto_config.typed_config())));
   filter_factories.push_back(std::move(filter_config_provider));
 }
 
@@ -711,7 +713,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
 #else
     // Should be blocked by configuration checking at an earlier point.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
 #endif
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
@@ -719,7 +721,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
         maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void HttpConnectionManagerConfig::createFilterChainForFactories(

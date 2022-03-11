@@ -62,6 +62,11 @@ public:
   virtual Upstream::ClusterManager& clusterManager() PURE;
 
   /**
+   * @return const Upstream::ClusterManager& singleton for use by the entire server.
+   */
+  virtual const Upstream::ClusterManager& clusterManager() const PURE;
+
+  /**
    * @return Ssl::ContextManager& singleton for use by the entire server.
    */
   virtual Ssl::ContextManager& sslContextManager() PURE;

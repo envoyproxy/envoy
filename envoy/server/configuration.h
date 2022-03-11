@@ -100,6 +100,12 @@ public:
   virtual Upstream::ClusterManager* clusterManager() PURE;
 
   /**
+   * @return const Upstream::ClusterManager* singleton for use by the entire server.
+   *         This will be nullptr if the cluster manager has not initialized yet.
+   */
+  virtual const Upstream::ClusterManager* clusterManager() const PURE;
+
+  /**
    * @return const StatsConfig& the configuration of server stats.
    */
   virtual StatsConfig& statsConfig() PURE;

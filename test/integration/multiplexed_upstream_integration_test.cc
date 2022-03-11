@@ -153,9 +153,8 @@ void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) 
   ASSERT_EQ(response->headers().get(Http::LowerCaseString("alpn"))[0]->value().getStringView(),
             expected_alpn);
 
-  ASSERT_FALSE(response->trailers()->get(Http::LowerCaseString("upstream_connect_start")).empty());
-  ASSERT_FALSE(
-      response->trailers()->get(Http::LowerCaseString("upstream_connect_complete")).empty());
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("upstream_connect_start")).empty());
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("upstream_connect_complete")).empty());
 
   ASSERT_FALSE(response->headers().get(Http::LowerCaseString("num_streams")).empty());
   EXPECT_EQ(
@@ -338,20 +337,23 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBuffe
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
-  if (upstreamProtocol() == Http::CodecType::HTTP3 &&
-      downstreamProtocol() == Http::CodecType::HTTP2) {
-    // This test depends on fragile preconditions.
-    // With HTTP/2 downstream all the requests are processed before the
-    // responses are sent, then the connection read-disable results in not
-    // receiving flow control window updates.
+  // random-pause-filter does not support HTTP3.
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
     return;
   }
-  config_helper_.prependFilter(
-      fmt::format(R"EOF(
-  name: pause-filter{}
+
+  if (GetParam().defer_processing_backedup_streams) {
+    // TODO(kbaichoo): fix this test to work with deferred processing by using a
+    // timer to lower the watermark when the filter has raised above watermark.
+    // Since we deferred processing data, when the filter raises watermark
+    // with deferred processing we won't invoke it again which could lower
+    // the watermark.
+    return;
+  }
+  config_helper_.prependFilter(R"EOF(
+  name: random-pause-filter
   typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty)EOF",
-                  downstreamProtocol() == Http::CodecType::HTTP3 ? "-for-quic" : ""));
+    "@type": type.googleapis.com/google.protobuf.Empty)EOF");
 
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
@@ -645,6 +647,51 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamGoaway) {
   ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
   fake_upstream_connection2.reset();
   cleanupUpstreamAndDownstream();
+}
+
+TEST_P(MultiplexedUpstreamIntegrationTest, EarlyDataRejected) {
+  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
+    return;
+  }
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Kick off the initial request and make sure it's received upstream.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  const Http::TestResponseHeaderMapImpl too_early_response_headers{{":status", "425"}};
+  upstream_request_->encodeHeaders(too_early_response_headers, true);
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
+    ASSERT_TRUE(response->waitForEndStream());
+    // 425 response should be forwarded back to the client as HTTP/2 upstream doesn't support early
+    // data.
+    EXPECT_EQ("425", response->headers().getStatusValue());
+    return;
+  }
+  // 425 response will be retried by Envoy, so expect another upstream request.
+  waitForNextUpstreamRequest(0);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  Http::TestRequestHeaderMapImpl request{{":method", "GET"},
+                                         {":path", "/test/long/url"},
+                                         {":scheme", "http"},
+                                         {":authority", "host"},
+                                         {"Early-Data", "1"}};
+  auto response2 = codec_client_->makeHeaderOnlyRequest(request);
+  waitForNextUpstreamRequest(0);
+  // If the request already has Early-Data header, no additional Early-Data header should be added
+  // and the header should be forwarded as is.
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
+  upstream_request_->encodeHeaders(too_early_response_headers, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  // 425 response should be forwarded back to the client.
+  EXPECT_EQ("425", response2->headers().getStatusValue());
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
 }
 
 } // namespace Envoy
