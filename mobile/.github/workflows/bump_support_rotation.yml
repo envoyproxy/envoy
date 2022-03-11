@@ -21,7 +21,10 @@ jobs:
         with:
           token: ${{ secrets.CREDENTIALS_GITHUB_PUSH_TOKEN }}
           title: Bump Lyft Support Rotation
-          commit-message: Bump Lyft Support Rotation
+          commit-message: |
+            Bump Lyft Support Rotation
+
+            Signed-off-by: GitHub Action <noreply@github.com>
           committer: GitHub Action <noreply@github.com>
           base: main
           delete-branch: true
