@@ -248,13 +248,13 @@ public:
              warming_clusters_.find(cluster) != warming_clusters_.end();
     }
 
-    ClusterConstOptRef getCluster(absl::string_view cluster) {
+    ClusterConstOptRef getCluster(absl::string_view cluster) const {
       auto active_cluster = active_clusters_.find(cluster);
-      if (active_cluster != active_clusters_.end()) {
+      if (active_cluster != active_clusters_.cend()) {
         return active_cluster->second;
       }
       auto warming_cluster = warming_clusters_.find(cluster);
-      if (warming_cluster != warming_clusters_.end()) {
+      if (warming_cluster != warming_clusters_.cend()) {
         return warming_cluster->second;
       }
       return absl::nullopt;
@@ -262,6 +262,10 @@ public:
 
     ClusterInfoMap active_clusters_;
     ClusterInfoMap warming_clusters_;
+
+    // Number of clusters that were dynamically added via API (xDS). This will be
+    // less than or equal to the number of `active_clusters_` and `warming_clusters_`.
+    uint32_t added_via_api_clusters_num_{0};
   };
 
   /**
@@ -269,7 +273,7 @@ public:
    *
    * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
    */
-  virtual ClusterInfoMaps clusters() PURE;
+  virtual ClusterInfoMaps clusters() const PURE;
 
   using ClusterSet = absl::flat_hash_set<std::string>;
 

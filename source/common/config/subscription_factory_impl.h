@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
+#include "envoy/server/instance.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -17,7 +18,8 @@ class SubscriptionFactoryImpl : public SubscriptionFactory, Logger::Loggable<Log
 public:
   SubscriptionFactoryImpl(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                           Upstream::ClusterManager& cm,
-                          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+                          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                          const Server::Instance& server);
 
   // Config::SubscriptionFactory
   SubscriptionPtr subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config,
@@ -38,6 +40,7 @@ private:
   Upstream::ClusterManager& cm_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
+  const Server::Instance& server_;
 };
 
 } // namespace Config
