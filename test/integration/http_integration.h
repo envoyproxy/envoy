@@ -222,7 +222,6 @@ protected:
                                               int upstream_index = 0,
                                               const std::string& path = "/test/long/url",
                                               const std::string& authority = "host");
-  void testRequestAndResponseShutdownWithActiveConnection();
 
   // Disconnect tests
   void testRouterUpstreamDisconnectBeforeRequestComplete();

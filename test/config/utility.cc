@@ -841,7 +841,7 @@ void ConfigHelper::configureUpstreamTls(
   });
 }
 
-void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string& value) {
+void ConfigHelper::addRuntimeOverride(absl::string_view key, absl::string_view value) {
   auto* static_layer =
       bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
   (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));

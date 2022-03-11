@@ -401,12 +401,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Benchmark",
         project_desc = "Library to benchmark code snippets",
         project_url = "https://github.com/google/benchmark",
-        version = "1.5.1",
-        sha256 = "23082937d1663a53b90cb5b61df4bcc312f6dee7018da78ba00dd6bd669dfef2",
+        version = "1.6.1",
+        sha256 = "6132883bc8c9b0df5375b16ab520fac1a85dc9e4cf5be59480448ece74b278d4",
         strip_prefix = "benchmark-{version}",
         urls = ["https://github.com/google/benchmark/archive/v{version}.tar.gz"],
         use_category = ["test_only"],
-        release_date = "2020-06-09",
+        release_date = "2022-01-10",
     ),
     com_github_libevent_libevent = dict(
         project_name = "libevent",
@@ -537,9 +537,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "a2faafbc402394df0fa94602df4b5e4befd734aad6bb55dfef46f62fcaf1090b",
         strip_prefix = "rapidjson-{version}",
         urls = ["https://github.com/Tencent/rapidjson/archive/{version}.tar.gz"],
-        # We're mostly using com_google_protobuf for JSON, but there are some extensions and hard to
-        # disentangle uses on the dataplane, e.g. header_formatter, Squash filter.
-        use_category = ["controlplane", "dataplane_core"],
+        use_category = ["observability_ext"],
+        # Rapidjson is used in the external dependency of zipkin tracer.
+        extensions = ["envoy.tracers.zipkin", "envoy.tracers.opencensus"],
         release_date = "2019-12-03",
         cpe = "cpe:2.3:a:tencent:rapidjson:*",
     ),
@@ -762,8 +762,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "curl",
         project_desc = "Library for transferring data with URLs",
         project_url = "https://curl.haxx.se",
-        version = "7.81.0",
-        sha256 = "ac8e1087711084548d788ef18b9b732c8de887457b81f616fc681d1044b32f98",
+        version = "7.82.0",
+        sha256 = "910cc5fe279dc36e2cca534172c94364cf3fcf7d6494ba56e6c61a390881ddce",
         strip_prefix = "curl-{version}",
         urls = ["https://github.com/curl/curl/releases/download/curl-{underscore_version}/curl-{version}.tar.gz"],
         use_category = ["dataplane_ext", "observability_ext"],
@@ -773,7 +773,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.grpc_credentials.aws_iam",
             "envoy.tracers.opencensus",
         ],
-        release_date = "2022-01-05",
+        release_date = "2022-03-05",
         cpe = "cpe:2.3:a:haxx:libcurl:*",
     ),
     v8 = dict(
