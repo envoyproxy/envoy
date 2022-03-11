@@ -84,7 +84,8 @@ message ExtAuthz {
   type.v3.HttpStatus status_on_error = 7;
 
   // Specifies a list of metadata namespaces whose values, if present, will be passed to the
-  // ext_authz service as an opaque *protobuf::Struct*.
+  // ext_authz service. :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>` is passed as an opaque *protobuf::Struct* while
+  // :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` is passed as an *protobuf::Any*.
   //
   // For example, if the *jwt_authn* filter is used and :ref:`payload_in_metadata
   // <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>` is set,

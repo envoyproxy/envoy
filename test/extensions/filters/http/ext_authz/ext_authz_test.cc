@@ -26,6 +26,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/proto/helloworld.pb.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -1160,6 +1161,7 @@ TEST_F(HttpFilterTest, MetadataContext) {
   - jazz.sax
   - rock.guitar
   - hiphop.drums
+  - blues.piano
   )EOF");
 
   const std::string yaml = R"EOF(
@@ -1173,6 +1175,16 @@ TEST_F(HttpFilterTest, MetadataContext) {
     rock.guitar:
       hendrix: jimi
       richards: keith
+  typed_filter_metadata:
+    blues.piano:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: jack dupree
+    jazz.sax:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: shorter wayne
+    rock.bass:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: geddy lee
   )EOF";
 
   envoy::config::core::v3::Metadata metadata;
@@ -1213,6 +1225,24 @@ TEST_F(HttpFilterTest, MetadataContext) {
 
   EXPECT_EQ(0,
             check_request.attributes().metadata_context().filter_metadata().count("hiphop.drums"));
+
+  helloworld::HelloRequest hello;
+  check_request.attributes()
+      .metadata_context()
+      .typed_filter_metadata()
+      .at("blues.piano")
+      .UnpackTo(&hello);
+  EXPECT_EQ("jack dupree", hello.name());
+
+  check_request.attributes()
+      .metadata_context()
+      .typed_filter_metadata()
+      .at("jazz.sax")
+      .UnpackTo(&hello);
+  EXPECT_EQ("shorter wayne", hello.name());
+
+  EXPECT_EQ(
+      0, check_request.attributes().metadata_context().typed_filter_metadata().count("rock.bass"));
 }
 
 // Test that filter can be disabled via the filter_enabled field.
