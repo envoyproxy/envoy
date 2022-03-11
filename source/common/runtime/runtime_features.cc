@@ -43,6 +43,7 @@ RUNTIME_GUARD(envoy_reloadable_features_internal_address);
 RUNTIME_GUARD(envoy_reloadable_features_listener_reuse_port_default_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_listener_wildcard_match_ip_family);
 RUNTIME_GUARD(envoy_reloadable_features_new_tcp_connection_pool);
+RUNTIME_GUARD(envoy_reloadable_features_override_request_timeout_by_gateway_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_postpone_h3_client_connect_to_next_loop);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_102_103);
 RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_json);
@@ -161,6 +162,7 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_internal_address,
   &FLAGS_envoy_reloadable_features_listener_wildcard_match_ip_family,
   &FLAGS_envoy_reloadable_features_new_tcp_connection_pool,
+  &FLAGS_envoy_reloadable_features_override_request_timeout_by_gateway_timeout,
   &FLAGS_envoy_reloadable_features_postpone_h3_client_connect_to_next_loop,
   &FLAGS_envoy_reloadable_features_proxy_102_103,
   &FLAGS_envoy_reloadable_features_remove_legacy_json,
