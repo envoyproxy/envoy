@@ -20,10 +20,6 @@ class QuicheFlagSaverImpl {};
 // No special setup needed for tests to use threads.
 class ScopedEnvironmentForThreadsImpl {};
 
-using QuicTestImpl = ::testing::Test;
-
-template <class T> using QuicTestWithParamImpl = ::testing::TestWithParam<T>;
-
 inline std::string QuicheGetTestMemoryCachePathImpl() { // NOLINT(readability-identifier-naming)
   PANIC("not implemented");                             // TODO(mpwarres): implement
 }
@@ -32,8 +28,10 @@ namespace quiche {
 namespace test {
 
 using QuicheTest = ::testing::Test;
+using QuicTestImpl = QuicheTest;
 
 template <class T> using QuicheTestWithParamImpl = ::testing::TestWithParam<T>;
+template <class T> using QuicTestWithParamImpl = QuicheTestWithParamImpl<T>;
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 inline std::string QuicheGetCommonSourcePathImpl() {

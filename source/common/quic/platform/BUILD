@@ -193,8 +193,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quiche_common_platform_logging_impl_lib",
-    srcs = [
-    ],
     hdrs = [
         "quiche_logging_impl.h",
     ],

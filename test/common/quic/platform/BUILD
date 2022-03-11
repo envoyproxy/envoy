@@ -155,6 +155,7 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "quiche_common_platform_test_impl_lib",
     hdrs = ["quiche_test_impl.h"],
+    deps = ["//source/common/common:assert_lib"],
 )
 
 envoy_cc_test_library(
