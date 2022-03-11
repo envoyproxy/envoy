@@ -366,7 +366,7 @@ private:
  */
 class ShadowPolicyImpl : public ShadowPolicy {
 public:
-  using RequestMirrorPolicy = envoy::config::route::v3::RequestMirrorPolicy;
+  using RequestMirrorPolicy = envoy::config::route::v3::RouteAction::RequestMirrorPolicy;
   explicit ShadowPolicyImpl(const RequestMirrorPolicy& config);
 
   // Router::ShadowPolicy

@@ -204,7 +204,7 @@ message VirtualHost {
   // That is, policies are not merged, most internal non-empty one becomes the mirror policies.
   // Inherit from the request_mirror_policies of its route config only if the field of request_mirror_policies
   // in the virtual host level is not specified.
-  repeated RequestMirrorPolicy request_mirror_policies = 22;
+  repeated RouteAction.RequestMirrorPolicy request_mirror_policies = 22;
 }
 
 // A filter-defined action type.
@@ -634,43 +634,6 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// The router is capable of shadowing traffic from one cluster to another. The current
-// implementation is "fire and forget," meaning Envoy will not wait for the shadow cluster to
-// respond before returning the response from the primary cluster. All normal statistics are
-// collected for the shadow cluster making this feature useful for testing.
-//
-// During shadowing, the host/authority header is altered such that *-shadow* is appended. This is
-// useful for logging. For example, *cluster1* becomes *cluster1-shadow*.
-//
-// .. note::
-//
-//   Shadowing will not be triggered if the primary cluster does not exist.
-message RequestMirrorPolicy {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.api.v2.route.RouteAction.RequestMirrorPolicy";
-
-  reserved 2;
-
-  reserved "runtime_key";
-
-  // Specifies the cluster that requests will be mirrored to. The cluster must
-  // exist in the cluster manager configuration.
-  string cluster = 1 [(validate.rules).string = {min_len: 1}];
-
-  // If not specified, all requests to the target cluster will be mirrored.
-  //
-  // If specified, this field takes precedence over the `runtime_key` field and requests must also
-  // fall under the percentage of matches indicated by this field.
-  //
-  // For some fraction N/D, a random number in the range [0,D) is selected. If the
-  // number is <= the value of the numerator N, or if the key is not present, the default
-  // value, the request will be mirrored.
-  core.v3.RuntimeFractionalPercent runtime_fraction = 3;
-
-  // Determines if the trace span should be sampled. Defaults to true.
-  google.protobuf.BoolValue trace_sampled = 4;
-}
-
 // [#next-free-field: 39]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
@@ -690,6 +653,43 @@ message RouteAction {
 
     PASS_THROUGH_INTERNAL_REDIRECT = 0;
     HANDLE_INTERNAL_REDIRECT = 1;
+  }
+
+  // The router is capable of shadowing traffic from one cluster to another. The current
+  // implementation is "fire and forget," meaning Envoy will not wait for the shadow cluster to
+  // respond before returning the response from the primary cluster. All normal statistics are
+  // collected for the shadow cluster making this feature useful for testing.
+  //
+  // During shadowing, the host/authority header is altered such that *-shadow* is appended. This is
+  // useful for logging. For example, *cluster1* becomes *cluster1-shadow*.
+  //
+  // .. note::
+  //
+  //   Shadowing will not be triggered if the primary cluster does not exist.
+  message RequestMirrorPolicy {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.route.RouteAction.RequestMirrorPolicy";
+
+    reserved 2;
+
+    reserved "runtime_key";
+
+    // Specifies the cluster that requests will be mirrored to. The cluster must
+    // exist in the cluster manager configuration.
+    string cluster = 1 [(validate.rules).string = {min_len: 1}];
+
+    // If not specified, all requests to the target cluster will be mirrored.
+    //
+    // If specified, this field takes precedence over the `runtime_key` field and requests must also
+    // fall under the percentage of matches indicated by this field.
+    //
+    // For some fraction N/D, a random number in the range [0,D) is selected. If the
+    // number is <= the value of the numerator N, or if the key is not present, the default
+    // value, the request will be mirrored.
+    core.v3.RuntimeFractionalPercent runtime_fraction = 3;
+
+    // Determines if the trace span should be sampled. Defaults to true.
+    google.protobuf.BoolValue trace_sampled = 4;
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
