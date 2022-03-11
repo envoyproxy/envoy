@@ -5,7 +5,6 @@
 #include "test/test_common/utility.h"
 
 using testing::NiceMock;
-using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
