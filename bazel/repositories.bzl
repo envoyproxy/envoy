@@ -940,11 +940,7 @@ def _proxy_wasm_cpp_host():
     external_http_archive(name = "proxy_wasm_cpp_host")
 
 def _emsdk():
-    external_http_archive(
-        name = "emsdk",
-        patches = ["@envoy//bazel:emsdk.patch"],
-        patch_args = ["-p2"],
-    )
+    external_http_archive(name = "emsdk")
 
 def _com_github_google_jwt_verify():
     external_http_archive("com_github_google_jwt_verify")
