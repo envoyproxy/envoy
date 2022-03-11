@@ -61,6 +61,7 @@ public:
     return has_handshake_completed_;
   }
 
+  bool supportsEarlyData() const override { return supports_early_data_; }
   uint32_t active_streams_{};
 
   absl::optional<uint64_t> capacity_override_;
@@ -527,6 +528,26 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredLocalClose) {
   pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 }
 
+TEST_F(ConnPoolImplDispatcherBaseTest, ClientNotSupportEarlyDataGetsEarlyDataReady) {
+  clients_support_early_data_ = false;
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
+
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  Cancellable* cancelable = pool_.newStreamImpl(context_, /*can_send_early_data=*/true);
+  EXPECT_NE(nullptr, cancelable);
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, concurrent_streams_ /*connecting capacity*/);
+
+  ActiveClient& client_ref = *clients_.back();
+  // The first stream should be attached a client upon 0-RTT connected.
+  EXPECT_CALL(pool_, onPoolReady).Times(0u);
+  EXPECT_ENVOY_BUG(client_ref.onEvent(Network::ConnectionEvent::ConnectedZeroRtt),
+                   "Non-early-data compliant client gets early data ready");
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, concurrent_streams_ /*connecting capacity*/);
+
+  // Clean up.
+  cancelable->cancel(ConnectionPool::CancelPolicy::CloseExcess);
+}
+
 TEST_F(ConnPoolImplDispatcherBaseTest, ConnectedZeroRttSendsEarlyData) {
   clients_support_early_data_ = true;
   concurrent_streams_ = 2u;
@@ -624,6 +645,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, PoolDrainsWithEarlyDataStreams) {
   pool_.onUpstreamReadyForEarlyData(client_ref);
   CHECK_STATE(1 /*active*/, 0 /*pending*/, 3 /*connecting capacity*/);
 
+  // Draining existing clients will close the existing CONNECTING client and create a new one.
   EXPECT_CALL(pool_, instantiateActiveClient);
   pool_.drainConnectionsImpl(DrainBehavior::DrainExistingConnections);
   EXPECT_EQ(3u, clients_.size());
@@ -633,10 +655,17 @@ TEST_F(ConnPoolImplDispatcherBaseTest, PoolDrainsWithEarlyDataStreams) {
   EXPECT_EQ(ActiveClient::State::CONNECTING, clients_.back()->state());
   CHECK_STATE(1 /*active*/, 0 /*pending*/, 2 /*connecting capacity*/);
 
-  // Clean up.
+  // The 3rd client gets 0-RTT ready.
+  clients_.back()->onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+  pool_.onUpstreamReadyForEarlyData(*clients_.back());
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 2 /*connecting capacity*/);
+
+  // Drain again to close the 3rd client.
   pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   EXPECT_EQ(ActiveClient::State::CLOSED, clients_.back()->state());
   clients_.pop_back();
+
+  // Clean up.
   closeStream();
 }
 

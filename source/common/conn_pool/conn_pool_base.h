@@ -99,6 +99,10 @@ public:
   State state() const { return state_; }
 
   void setState(State state) {
+    if (state == State::ReadyForEarlyData && !supportsEarlyData()) {
+      IS_ENVOY_BUG("Non-early-data compliant client gets early data ready");
+      return;
+    }
     // If the client is transitioning to draining, update the remaining
     // streams and pool and cluster capacity.
     if (state == State::DRAINING) {

@@ -565,11 +565,11 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     client.has_handshake_completed_ = true;
     client.conn_connect_ms_->complete();
     client.conn_connect_ms_.reset();
-    bool streams_available = client.currentUnusedCapacity() > 0;
     if (client.state() == ActiveClient::State::CONNECTING ||
         client.state() == ActiveClient::State::ReadyForEarlyData) {
-      transitionActiveClientState(client, streams_available ? ActiveClient::State::READY
-                                                            : ActiveClient::State::BUSY);
+      transitionActiveClientState(client,
+                                  (client.currentUnusedCapacity() > 0 ? ActiveClient::State::READY
+                                                                      : ActiveClient::State::BUSY));
     }
 
     // Now that the active client is ready, set up a timer for max connection duration.
@@ -584,7 +584,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     // At this point, for the mixed ALPN pool, the client may be deleted. Do not
     // refer to client after this point.
     onConnected(client);
-    if (streams_available) {
+    if (client.readyForStream()) {
       onUpstreamReady();
     }
     checkForIdleAndCloseIdleConnsIfDraining();
