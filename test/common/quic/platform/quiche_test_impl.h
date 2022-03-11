@@ -6,9 +6,27 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include <string>
+
+#include "source/common/common/assert.h"
+
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+// TODO(mpwarres): implement once QUICHE flag mechanism is defined.
+class QuicheFlagSaverImpl {};
+
+// No special setup needed for tests to use threads.
+class ScopedEnvironmentForThreadsImpl {};
+
+using QuicTestImpl = ::testing::Test;
+
+template <class T> using QuicTestWithParamImpl = ::testing::TestWithParam<T>;
+
+inline std::string QuicheGetTestMemoryCachePathImpl() { // NOLINT(readability-identifier-naming)
+  PANIC("not implemented");                           // TODO(mpwarres): implement
+}
 
 namespace quiche {
 namespace test {

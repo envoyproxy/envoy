@@ -2,9 +2,9 @@
 
 #include "source/common/quic/platform/envoy_quic_clock.h"
 
+#include "quiche/common/simple_buffer_allocator.h"
 #include "quiche/quic/core/crypto/quic_random.h"
 #include "quiche/quic/core/quic_connection.h"
-#include "quiche/quic/core/quic_simple_buffer_allocator.h"
 
 namespace Envoy {
 namespace Quic {
@@ -21,12 +21,12 @@ public:
   // QuicConnectionHelperInterface
   const quic::QuicClock* GetClock() const override { return &clock_; }
   quic::QuicRandom* GetRandomGenerator() override { return random_generator_; }
-  quic::QuicBufferAllocator* GetStreamSendBufferAllocator() override { return &buffer_allocator_; }
+  quiche::QuicheBufferAllocator* GetStreamSendBufferAllocator() override { return &buffer_allocator_; }
 
 private:
   EnvoyQuicClock clock_;
   quic::QuicRandom* random_generator_ = nullptr;
-  quic::SimpleBufferAllocator buffer_allocator_;
+  quiche::SimpleBufferAllocator buffer_allocator_;
 };
 
 } // namespace Quic
