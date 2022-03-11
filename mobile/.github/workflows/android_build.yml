@@ -32,7 +32,7 @@ jobs:
           architecture: x64
       - name: 'Install dependencies'
         if: steps.check-cache.outputs.cache-hit != 'true'
-        run: ./ci/mac_ci_setup.sh
+        run: ./ci/mac_ci_setup.sh --android
       - name: 'Build envoy.aar distributable'
         if: steps.check-cache.outputs.cache-hit != 'true'
         env:
@@ -57,7 +57,7 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
-      - run: ./ci/mac_ci_setup.sh
+      - run: ./ci/mac_ci_setup.sh --android
         name: 'Install dependencies'
       - uses: actions/cache@v2
         id: check-cache
@@ -100,7 +100,7 @@ jobs:
           java-package: jdk
           architecture: x64
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh
+        run: ./ci/mac_ci_setup.sh --android
       - name: 'Download aar'
         uses: actions/cache@v2
         id: check-cache
