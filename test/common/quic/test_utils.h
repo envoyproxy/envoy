@@ -240,7 +240,8 @@ std::string spdyHeaderToHttp3StreamPayload(const spdy::SpdyHeaderBlock& header) 
 
 std::string bodyToHttp3StreamPayload(const std::string& body) {
   quiche::SimpleBufferAllocator allocator;
-  quiche::QuicheBuffer header = quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &allocator);
+  quiche::QuicheBuffer header =
+      quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &allocator);
   return absl::StrCat(header.AsStringView(), body);
 }
 

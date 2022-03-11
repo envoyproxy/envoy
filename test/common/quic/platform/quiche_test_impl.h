@@ -25,7 +25,7 @@ using QuicTestImpl = ::testing::Test;
 template <class T> using QuicTestWithParamImpl = ::testing::TestWithParam<T>;
 
 inline std::string QuicheGetTestMemoryCachePathImpl() { // NOLINT(readability-identifier-naming)
-  PANIC("not implemented");                           // TODO(mpwarres): implement
+  PANIC("not implemented");                             // TODO(mpwarres): implement
 }
 
 namespace quiche {

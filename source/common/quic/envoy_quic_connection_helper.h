@@ -21,7 +21,9 @@ public:
   // QuicConnectionHelperInterface
   const quic::QuicClock* GetClock() const override { return &clock_; }
   quic::QuicRandom* GetRandomGenerator() override { return random_generator_; }
-  quiche::QuicheBufferAllocator* GetStreamSendBufferAllocator() override { return &buffer_allocator_; }
+  quiche::QuicheBufferAllocator* GetStreamSendBufferAllocator() override {
+    return &buffer_allocator_;
+  }
 
 private:
   EnvoyQuicClock clock_;
